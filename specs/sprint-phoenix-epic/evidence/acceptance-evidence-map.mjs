@@ -239,6 +239,21 @@ const DELTA = {
   'P-AC-10': ['implemented', 'WP-P'],
   'P-AC-11': ['partial', 'WP-P'],
 
+  // --- evidence/phx-wp-k.txt (task PHX-WP-K, 2026-08-09, commit d536fcd) ---
+  // Independently re-run: 13/13 governance-event-store-tests pass, both new
+  // K-AC assertions present by name. K-AC-10 reclassified `not-started`
+  // (from `partial`): the dispatch confirmed by repo-wide search that no
+  // multi-stream query carrier exists anywhere, not merely that the clause
+  // is unpinned -- the same bar applied to X-AC-11/E-AC-20/H-AC-08/H-AC-09.
+  'K-AC-08': ['implemented', 'WP-K'],
+  'K-AC-10': ['not-started', 'WP-K'],
+
+  // --- evidence/phx-wp-v.txt (task PHX-WP-V, 2026-08-09, commit fdb0292) ---
+  // Independently re-run: 17/17 evidence-view-model/renderer/viewer suites
+  // pass, all four V-AC assertions present by name.
+  'V-AC-07': ['implemented', 'WP-V'],
+  'V-AC-09': ['implemented', 'WP-V'],
+
   // --- evidence/phx-wp-gate.txt (task PHX-WP-GATE, 2026-08-09, commit 92b21ed) ---
   // The third feature-package plan kind, `reconcile`, landed: the digest-only
   // no-drift invariant, PO-bound apply, manual-replacement refusal, and the
@@ -281,12 +296,12 @@ const POINTERS = {
   'K-AC-02': 'governance-event-store-tests: exact idempotency is a zero-write replay',
   'K-AC-03': 'same assertion, conflicting-key half',
   'K-AC-04': 'governance-event-store-tests: canonical bytes, readback checkpoint, source-last head, RFC 8785 canonicalization',
-  'K-AC-05': 'fork DETECTION is pinned; the governed disposition appended through the sanctioned recovery operation is not',
+  'K-AC-05': 'governance-event-store-tests: fork detection now proven to also block append and recovery, not only verify/query (PHX-WP-K, break-proofed). Still absent: no disposition operation exists anywhere in the module -- "governed disposition appended through the sanctioned recovery operation" has no code to test against',
   'K-AC-06': 'governance-event-store-tests: checkpoint-aware verification; symlink and cross-repository rejection',
   'K-AC-07': 'governance-event-store-tests: projection recovery requires a retained checkpoint',
-  'K-AC-08': 'no assertion covers a head/index ASSERTING an absent or invalid canonical record; only the stale-head case',
+  'K-AC-08': 'governance-event-store-tests: governance-event-store.mjs:673 (GES-CHECKPOINT) rejects a head/index checkpoint asserting an absent or digest-mismatched canonical record, for both verify and query (PHX-WP-K, break-proofed)',
   'K-AC-09': 'governance-event-core-tests: six exact typed absence states preserved',
-  'K-AC-10': 'validated-chain querying is pinned; preservation across MULTIPLE streams is not named',
+  'K-AC-10': 'NO CARRIER, confirmed by repo-wide search (PHX-WP-K): queryPortableGovernanceStream, the governance-event CLI and governance-replay.mjs all accept exactly one streamId; no function anywhere queries more than one stream, so per-record provenance preservation across streams has no code to test',
 
   'H-AC-01': 'human-governance-ledger-tests: closed portable grant, single-use consumption under the canonical stream lock',
   'H-AC-02': 'governance-authority-resolver-tests + guard-push consumption receipt',
@@ -345,14 +360,14 @@ const POINTERS = {
   'P-AC-13': 'organization-policy-packs.md and audit-bundles.md are stubs; no migration/versioning policy, no pack threat model',
 
   'V-AC-01': 'evidence-view-model-tests: offline report with source links and a candidate-bound receipt',
-  'V-AC-02': 'part of the label set is pinned; fact, estimate, assumption, human decision, redacted, invalid and not-applicable are not all covered',
+  'V-AC-02': 'evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid and not-applicable each labelled visibly, six of nine (PHX-WP-V, break-proofed). estimate, assumption and human decision remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules -- no field carries them at all',
   'V-AC-03': 'evidence-view-model-tests: claims linked to canonical source record and exact candidate',
   'V-AC-04': 'evidence-view-model-tests: invalid topology yields an invalid view with no candidate or artifact leak',
   'V-AC-05': 'evidence-view-renderer-tests: deterministic redacted projection withholding artifact paths',
-  'V-AC-06': 'the renderer test claims accessibility; NO keyboard/navigation, CSP or mobile/desktop snapshot check is named',
-  'V-AC-07': 'the input side is pinned; no assertion modifies a viewer file or UI state and shows canonical authority unchanged',
+  'V-AC-06': 'evidence-view-renderer-tests: exact CSP directive value, skip-link keyboard focus target, and landmark/table accessibility structure all pinned (PHX-WP-V, break-proofed). Mobile/desktop snapshot checks remain absent: a viewport meta tag and one CSS breakpoint exist but no test or tooling captures a deterministic snapshot of either, and this repo has no headless-render/visual-regression infrastructure at all',
+  'V-AC-07': 'evidence-viewer-tests: input-side rejection was already pinned; a new assertion tampers the generated viewer file and proves canonical authority stays unchanged and re-derivation never yields a pass claim (PHX-WP-V, break-proofed)',
   'V-AC-08': 'evidence-view-model-tests: exact canonical lifecycle state or a typed unavailable result',
-  'V-AC-09': 'pass/unknown/invalid fixtures exist; tampered, misplaced, orphaned and legacy-layout fixtures with deterministic snapshots do not',
+  'V-AC-09': 'evidence-view-renderer-tests: all seven required fixtures now covered -- pass/fail/unknown pre-existing, tampered/misplaced/orphaned/legacy-layout added with deterministic snapshots (PHX-WP-V, break-proofed)',
   'V-AC-10': 'evidence-viewer-tests: candidate binding rendered before any derived summary',
 
   'X-AC-01': 'external-reference-adapter-tests: unclosed references rejected, non-pipeline-owned writes blocked',
@@ -456,7 +471,7 @@ const CLOSURE = {
 
   'K-AC-05': ['assert', 'WP-K'],
   'K-AC-08': ['assert', 'WP-K'],
-  'K-AC-10': ['assert', 'WP-K'],
+  'K-AC-10': ['build', 'WP-K'],
 
   'H-AC-08': ['seam', 'WP-H'],
   'H-AC-09': ['seam', 'WP-H'],

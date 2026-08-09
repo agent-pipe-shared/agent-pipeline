@@ -8,7 +8,7 @@ Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acce
 
 ## What this design is for
 
-The measurement established that 78 of 157 acceptance criteria are not
+The measurement established that 75 of 157 acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart.
@@ -19,12 +19,12 @@ one list is what has made the epic look larger and more uniform than it is.
 
 | class | criteria | what closing one actually costs |
 |---|---|---|
-| A — assertion missing | 45 | one named test case in an already-registered, unprotected suite |
+| A — assertion missing | 41 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 7 | one document section set; no code, no gate |
 | S — seam missing | 6 | a connector between two packages that already work |
-| B — capability missing | 15 | real implementation plus its tests |
+| B — capability missing | 16 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **78** | |
+| **total** | **75** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -129,9 +129,9 @@ is by module family, which makes the disjointness checkable rather than asserted
 | work package | open criteria | owns |
 |---|---|---|
 | WP-GATE | 1 | plugins/pipeline-core/lib/feature-package-topology.mjs, plugins/pipeline-core/scripts/pipeline-state.mjs, harness/scripts/pipeline-state.test.mjs (TP-5) |
-| WP-K | 3 | plugins/pipeline-core/lib/governance-event-store.test.mjs, plugins/pipeline-core/lib/governance-event.test.mjs |
+| WP-K | 2 | plugins/pipeline-core/lib/governance-event-store.test.mjs, plugins/pipeline-core/lib/governance-event.test.mjs |
 | WP-P | 5 | plugins/pipeline-core/lib/audit-bundle*.mjs, plugins/pipeline-core/lib/organization-policy*.mjs |
-| WP-V | 4 | plugins/pipeline-core/lib/evidence-view-model*.mjs, plugins/pipeline-core/lib/evidence-view-renderer*.mjs |
+| WP-V | 2 | plugins/pipeline-core/lib/evidence-view-model*.mjs, plugins/pipeline-core/lib/evidence-view-renderer*.mjs |
 | WP-X | 3 | plugins/pipeline-core/lib/external-reference-adapter*.mjs |
 | WP-C | 4 | plugins/pipeline-core/lib/change-control*.mjs |
 | WP-E | 9 | plugins/pipeline-core/lib/governance-export-*.mjs |
@@ -174,7 +174,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 ## Per criterion
 
-### Class A — the behaviour exists, the assertion does not (45)
+### Class A — the behaviour exists, the assertion does not (41)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -195,9 +195,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | E-AC-11 | partial | WP-E | the privacy half is pinned; attempt, counts, cursor/lag and policy digests are not each pinned |
 | E-AC-14 | partial | WP-E | the in-memory collector is pinned; local-file, syslog and failure-injection fixtures are not named |
 | H-AC-15 | partial | WP-H | grant, consumption, expiry, drift, single-use, lifecycle links covered; denial, correction, retry, concurrency, interruption are not |
-| K-AC-05 | partial | WP-K | fork DETECTION is pinned; the governed disposition appended through the sanctioned recovery operation is not |
-| K-AC-08 | partial | WP-K | no assertion covers a head/index ASSERTING an absent or invalid canonical record; only the stale-head case |
-| K-AC-10 | partial | WP-K | validated-chain querying is pinned; preservation across MULTIPLE streams is not named |
+| K-AC-05 | partial | WP-K | governance-event-store-tests: fork detection now proven to also block append and recovery, not only verify/query (PHX-WP-K, break-proofed). Still absent: no disposition operation exists anywhere in the module -- "governed disposition appended through the sanctioned recovery operation" has no code to test against |
 | L-AC-04 | partial | WP-L | semantic classes pinned; the VISUAL class distinction in the renderer is not pinned |
 | L-AC-07 | partial | WP-L | no serial/parallel/retry/cancellation/recovery/malicious fixture matrix is named |
 | P-AC-01 | partial | WP-P | schema/compatibility/merge pinned; provenance, dependency and signature-policy validation are not named |
@@ -217,10 +215,8 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | R-AC-09 | partial | WP-R | substitution is pinned; the replay-renders-unknown/invalid half is not |
 | R-AC-11 | partial | WP-R | the restricted machine-local store exists; no assertion pairs it with a public-safe typed omission/commitment |
 | R-AC-13 | partial | WP-R | five of the eleven required fixture classes are named; guard override, secret-bearing command rejection, governed-script identity and malicious external content are not |
-| V-AC-02 | partial | WP-V | part of the label set is pinned; fact, estimate, assumption, human decision, redacted, invalid and not-applicable are not all covered |
-| V-AC-06 | partial | WP-V | the renderer test claims accessibility; NO keyboard/navigation, CSP or mobile/desktop snapshot check is named |
-| V-AC-07 | partial | WP-V | the input side is pinned; no assertion modifies a viewer file or UI state and shows canonical authority unchanged |
-| V-AC-09 | partial | WP-V | pass/unknown/invalid fixtures exist; tampered, misplaced, orphaned and legacy-layout fixtures with deterministic snapshots do not |
+| V-AC-02 | partial | WP-V | evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid and not-applicable each labelled visibly, six of nine (PHX-WP-V, break-proofed). estimate, assumption and human decision remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules -- no field carries them at all |
+| V-AC-06 | partial | WP-V | evidence-view-renderer-tests: exact CSP directive value, skip-link keyboard focus target, and landmark/table accessibility structure all pinned (PHX-WP-V, break-proofed). Mobile/desktop snapshot checks remain absent: a viewport meta tag and one CSS breakpoint exist but no test or tooling captures a deterministic snapshot of either, and this repo has no headless-render/visual-regression infrastructure at all |
 | X-AC-12 | partial | WP-X | the CLI test uses local synthetic observations; the four required profiles are not each named |
 | X-AC-14 | partial | WP-X | the doc carries a reconciliation section; no assertion shows an offline external system leaving canonical authority intact |
 
@@ -247,7 +243,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
 | X-AC-11 | not-started | WP-X | NO CARRIER: the adapter never references organization policy, and the policy modules never reference the adapter |
 
-### Class B — an absent capability (15)
+### Class B — an absent capability (16)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -259,6 +255,7 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 | E-AC-10 | not-started | WP-E | NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range |
 | EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file |
 | H-AC-12 | partial | WP-H | guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier |
+| K-AC-10 | not-started | WP-K | NO CARRIER, confirmed by repo-wide search (PHX-WP-K): queryPortableGovernanceStream, the governance-event CLI and governance-replay.mjs all accept exactly one streamId; no function anywhere queries more than one stream, so per-record provenance preservation across streams has no code to test |
 | L-AC-01 | partial | WP-L | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event |
 | L-AC-02 | partial | WP-L | six of the eight #10 exchange identities are retained; queueRevision and a distinct correlationId are absent |
 | P-AC-09 | not-started | WP-P | NO CARRIER: no export-backfill preview or explicit consent path exists |

@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 79 of 157 criteria carry a named assertion in a
-gate-registered suite; 78 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 82 of 157 criteria carry a named assertion in a
+gate-registered suite; 75 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,10 +61,10 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 79 |
-| partial | 65 |
+| implemented | 82 |
+| partial | 61 |
 | designed-only | 1 |
-| not-started | 11 |
+| not-started | 12 |
 | constraint | 1 |
 | **total** | **157** |
 
@@ -97,7 +97,7 @@ clause that is not pinned or not built.
 | PX0-AC-16 | implemented | A | bootstrap-source-attestation-acceptance-tests — equality bound to exact loaded and observed public remote identity |
 | PX0-AC-17 | implemented | A | bootstrap-source-attestation-acceptance-tests — unknown keys, ambiguous selectors, more than one selected plugin all fail closed |
 
-### K — Governance event kernel (7/10 implemented)
+### K — Governance event kernel (8/10 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -105,12 +105,12 @@ clause that is not pinned or not built.
 | K-AC-02 | implemented | C | governance-event-store-tests: exact idempotency is a zero-write replay |
 | K-AC-03 | implemented | C | same assertion, conflicting-key half |
 | K-AC-04 | implemented | C | governance-event-store-tests: canonical bytes, readback checkpoint, source-last head, RFC 8785 canonicalization |
-| K-AC-05 | partial | C | fork DETECTION is pinned; the governed disposition appended through the sanctioned recovery operation is not |
+| K-AC-05 | partial | C | governance-event-store-tests: fork detection now proven to also block append and recovery, not only verify/query (PHX-WP-K, break-proofed). Still absent: no disposition operation exists anywhere in the module -- "governed disposition appended through the sanctioned recovery operation" has no code to test against |
 | K-AC-06 | implemented | C | governance-event-store-tests: checkpoint-aware verification; symlink and cross-repository rejection |
 | K-AC-07 | implemented | C | governance-event-store-tests: projection recovery requires a retained checkpoint |
-| K-AC-08 | partial | C | no assertion covers a head/index ASSERTING an absent or invalid canonical record; only the stale-head case |
+| K-AC-08 | implemented | WP-K | governance-event-store-tests: governance-event-store.mjs:673 (GES-CHECKPOINT) rejects a head/index checkpoint asserting an absent or digest-mismatched canonical record, for both verify and query (PHX-WP-K, break-proofed) |
 | K-AC-09 | implemented | C | governance-event-core-tests: six exact typed absence states preserved |
-| K-AC-10 | partial | C | validated-chain querying is pinned; preservation across MULTIPLE streams is not named |
+| K-AC-10 | not-started | WP-K | NO CARRIER, confirmed by repo-wide search (PHX-WP-K): queryPortableGovernanceStream, the governance-event CLI and governance-replay.mjs all accept exactly one streamId; no function anywhere queries more than one stream, so per-record provenance preservation across streams has no code to test |
 
 ### H — Human Governance Decision Ledger (#30) (9/15 implemented)
 
@@ -184,19 +184,19 @@ clause that is not pinned or not built.
 | P-AC-12 | implemented | C | audit-bundle-tests: tampered or missing bundle bytes detected; signature invalidated when the manifest changes |
 | P-AC-13 | partial | C | organization-policy-packs.md and audit-bundles.md are stubs; no migration/versioning policy, no pack threat model |
 
-### V — Human-readable Evidence Viewer (#5) (6/10 implemented)
+### V — Human-readable Evidence Viewer (#5) (8/10 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
 | V-AC-01 | implemented | C | evidence-view-model-tests: offline report with source links and a candidate-bound receipt |
-| V-AC-02 | partial | C | part of the label set is pinned; fact, estimate, assumption, human decision, redacted, invalid and not-applicable are not all covered |
+| V-AC-02 | partial | C | evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid and not-applicable each labelled visibly, six of nine (PHX-WP-V, break-proofed). estimate, assumption and human decision remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules -- no field carries them at all |
 | V-AC-03 | implemented | C | evidence-view-model-tests: claims linked to canonical source record and exact candidate |
 | V-AC-04 | implemented | C | evidence-view-model-tests: invalid topology yields an invalid view with no candidate or artifact leak |
 | V-AC-05 | implemented | C | evidence-view-renderer-tests: deterministic redacted projection withholding artifact paths |
-| V-AC-06 | partial | C | the renderer test claims accessibility; NO keyboard/navigation, CSP or mobile/desktop snapshot check is named |
-| V-AC-07 | partial | C | the input side is pinned; no assertion modifies a viewer file or UI state and shows canonical authority unchanged |
+| V-AC-06 | partial | C | evidence-view-renderer-tests: exact CSP directive value, skip-link keyboard focus target, and landmark/table accessibility structure all pinned (PHX-WP-V, break-proofed). Mobile/desktop snapshot checks remain absent: a viewport meta tag and one CSS breakpoint exist but no test or tooling captures a deterministic snapshot of either, and this repo has no headless-render/visual-regression infrastructure at all |
+| V-AC-07 | implemented | WP-V | evidence-viewer-tests: input-side rejection was already pinned; a new assertion tampers the generated viewer file and proves canonical authority stays unchanged and re-derivation never yields a pass claim (PHX-WP-V, break-proofed) |
 | V-AC-08 | implemented | C | evidence-view-model-tests: exact canonical lifecycle state or a typed unavailable result |
-| V-AC-09 | partial | C | pass/unknown/invalid fixtures exist; tampered, misplaced, orphaned and legacy-layout fixtures with deterministic snapshots do not |
+| V-AC-09 | implemented | WP-V | evidence-view-renderer-tests: all seven required fixtures now covered -- pass/fail/unknown pre-existing, tampered/misplaced/orphaned/legacy-layout added with deterministic snapshots (PHX-WP-V, break-proofed) |
 | V-AC-10 | implemented | C | evidence-viewer-tests: candidate binding rendered before any derived summary |
 
 ### X — Traceability and documentation adapters (#23) (11/15 implemented)
@@ -296,13 +296,11 @@ clause that is not pinned or not built.
 
 ### #5 — Generate a local human-readable Evidence Viewer
 
-3 of 6 live acceptance bullets fully carried; **3 blocked**.
+5 of 6 live acceptance bullets fully carried; **1 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
-| 1 | Tampered/stale/mismatched/misplaced/orphaned evidence fails visibly | V-AC-09 (partial) |
-| 2 | Pass/fail/unknown/tampered/misplaced/legacy fixtures | V-AC-09 (partial) |
-| 3 | Accessibility and mobile/desktop readability | V-AC-06 (partial) |
+| 1 | Accessibility and mobile/desktop readability | V-AC-06 (partial) |
 
 ### #9 — Introduce organization policy packs and signed audit bundles
 
@@ -326,7 +324,7 @@ clause that is not pinned or not built.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
-| 1 | Replay is non-authoritative and links canonical evidence | L-AC-04 (partial), V-AC-07 (partial) |
+| 1 | Replay is non-authoritative and links canonical evidence | L-AC-04 (partial) |
 | 2 | Serial/parallel/retry/cancellation/malicious fixtures | L-AC-07 (partial) |
 | 3 | Design is driven by user/audit needs, not competitor parity | L-AC-08 (partial) |
 
@@ -355,7 +353,7 @@ clause that is not pinned or not built.
 
 ### #30 — Add a repository-scoped tamper-evident human governance decision ledger
 
-6 of 17 live acceptance bullets fully carried; **11 blocked**.
+7 of 17 live acceptance bullets fully carried; **10 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
@@ -363,13 +361,12 @@ clause that is not pinned or not built.
 | 2 | Full decision lifecycle is reconstructable | H-AC-11 (partial) |
 | 3 | Cross-repository writes/consumption are rejected | H-AC-09 (not-started) |
 | 4 | Interrupted/concurrent append recovers without silent split authority | K-AC-05 (partial) |
-| 5 | Truncation/reorder/change/fork/path/hash failures verify offline | K-AC-05 (partial), K-AC-08 (partial) |
+| 5 | Truncation/reorder/change/fork/path/hash failures verify offline | K-AC-05 (partial) |
 | 6 | Guard/plan/release/deploy/override paths reference decision IDs | H-AC-12 (partial) |
 | 7 | Unverified legacy material cannot satisfy a current gate | H-AC-08 (not-started) |
-| 8 | #5 renders the timeline without authority | V-AC-07 (partial) |
-| 9 | #9 bundles verified ledger records/integrity | P-AC-06 (partial) |
-| 10 | Schema/taxonomy/authority/threat/migration/retention/recovery docs exist | H-AC-14 (partial) |
-| 11 | Complete decision/failure/privacy fixture set | H-AC-15 (partial) |
+| 8 | #9 bundles verified ledger records/integrity | P-AC-06 (partial) |
+| 9 | Schema/taxonomy/authority/threat/migration/retention/recovery docs exist | H-AC-14 (partial) |
+| 10 | Complete decision/failure/privacy fixture set | H-AC-15 (partial) |
 
 ### #31 — Add a privacy-preserving agent decision and assumption journal
 
@@ -385,7 +382,7 @@ clause that is not pinned or not built.
 | 6 | Mandatory material events are never sampled/discarded silently | A-AC-07 (partial) |
 | 7 | Retention/access/integrity is independent of human ledger | A-AC-12 (partial) |
 | 8 | Interrupted/concurrent/duplicate/out-of-order behavior is deterministic | A-AC-13 (partial) |
-| 9 | Offline verification detects mutation/gaps/forks/path/repository errors | K-AC-05 (partial), K-AC-08 (partial) |
+| 9 | Offline verification detects mutation/gaps/forks/path/repository errors | K-AC-05 (partial) |
 | 10 | #17 replays all origins without authority collapse | L-AC-04 (partial) |
 | 11 | #5 shows uncertainty/status/decision with evidence | V-AC-02 (partial) |
 | 12 | Complete assumption/selection/failure/privacy fixture set | A-AC-14 (partial) |
@@ -397,7 +394,7 @@ clause that is not pinned or not built.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
-| 1 | Human/agent/lifecycle origin and authority survive export | K-AC-10 (partial) |
+| 1 | Human/agent/lifecycle origin and authority survive export | K-AC-10 (not-started) |
 | 2 | CloudEvents/OTLP/NDJSON/RFC 5424 mappings are deterministic/loss-declared | E-AC-02 (partial) |
 | 3 | Free-form rationale is explicit-policy-only and redacted | E-AC-04 (partial) |
 | 4 | At-least-once/idempotency/order/retry/rate/backpressure/replay/restart tested | E-AC-06 (partial) |
@@ -405,7 +402,7 @@ clause that is not pinned or not built.
 | 6 | Advisory failure preserves canonical operation | E-AC-09 (partial) |
 | 7 | Required mode blocks only exact named boundary/range | E-AC-10 (not-started) |
 | 8 | Receipts state exact acknowledgement without retention/review claims | E-AC-11 (partial) |
-| 9 | External event correlates to sources/candidate/evidence/policy/chain | K-AC-10 (partial) |
+| 9 | External event correlates to sources/candidate/evidence/policy/chain | K-AC-10 (not-started) |
 | 10 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
 | 11 | Threat/data-flow/mapping/retention/runbook/recovery docs exist | E-AC-21 (partial) |
 
@@ -413,12 +410,12 @@ clause that is not pinned or not built.
 
 | issue | bullets | carried | blocked | closeable |
 |---|---|---|---|---|
-| #5 | 6 | 3 | 3 | **no** |
+| #5 | 6 | 5 | 1 | **no** |
 | #9 | 11 | 2 | 9 | **no** |
 | #17 | 6 | 3 | 3 | **no** |
 | #23 | 16 | 12 | 4 | **no** |
 | #24 | 12 | 7 | 5 | **no** |
-| #30 | 17 | 6 | 11 | **no** |
+| #30 | 17 | 7 | 10 | **no** |
 | #31 | 17 | 4 | 13 | **no** |
 | #32 | 20 | 9 | 11 | **no** |
 
@@ -426,7 +423,7 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 
 ## The blocking set, ranked
 
-48 distinct criteria block at least one live acceptance bullet.
+45 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -434,11 +431,8 @@ Issues closeable on their own live acceptance bullets: **0 of 8**.
 | K-AC-05 | partial | 3 |
 | P-AC-06 | partial | 3 |
 | H-AC-12 | partial | 2 |
-| K-AC-08 | partial | 2 |
-| K-AC-10 | partial | 2 |
+| K-AC-10 | not-started | 2 |
 | L-AC-04 | partial | 2 |
-| V-AC-07 | partial | 2 |
-| V-AC-09 | partial | 2 |
 | X-AC-12 | partial | 2 |
 | A-AC-01 | partial | 1 |
 | A-AC-02 | partial | 1 |
