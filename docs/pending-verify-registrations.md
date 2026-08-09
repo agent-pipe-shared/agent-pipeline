@@ -124,16 +124,17 @@ Pipeline plugin source in a source checkout, `recordHumanGuardDenial()` returns
 (`lib/human-guard-override.mjs:1466`), and author repair needs an author source
 root a guard will not choose on a human's behalf. There is no in-session route.
 
-The content is ready and **validated, not merely drafted**: the identical check
-logic was run standalone against the real committed guard (`ce1a741`) and passed
-4/4, including the case where a vendored copy of the exempt script at the same
-relative path under a different root is correctly *not* exempt. What is missing
-is the paste, not the proof.
+The content was **validated, not merely drafted**, before it was applied: the
+identical check logic was run standalone against the real committed guard
+(`ce1a741`) and passed 4/4, including the case where a vendored copy of the
+exempt script at the same relative path under a different root is correctly
+*not* exempt. What was missing was the paste, not the proof.
 
-[`pending-protected-suite-edits/guard-gate-strength-gst33-36.mjs`](pending-protected-suite-edits/guard-gate-strength-gst33-36.mjs)
-carries it, with the exact insertion points. After applying, run
-`node plugins/pipeline-core/hooks/guard-gate-strength.test.mjs` and confirm
-36 passed / 0 failed (baseline before: 32).
+It was applied and committed on 2026-08-08 —
+`node plugins/pipeline-core/hooks/guard-gate-strength.test.mjs` reports 36
+passed / 0 failed (baseline before: 32). The paste-ready draft that carried the
+payload was retired on 2026-08-09; `harness/scripts/apply-pending-protected-edits.mjs`
+holds the only surviving copy, which is what applied it.
 
 This is the third confirmed instance in two blocks of `guard-testpath` blocking
 a dispatch's explicitly briefed, in-scope test edit and offering no route the

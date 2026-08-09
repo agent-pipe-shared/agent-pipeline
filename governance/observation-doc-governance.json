@@ -227,8 +227,7 @@
         "lifecycle": "review-candidate",
         "paths": [
           "docs/codex-isolated-critic-foundation.md",
-          "docs/known-issues.md",
-          "docs/pending-protected-suite-edits/guard-gate-strength-gst33-36.mjs"
+          "docs/known-issues.md"
         ]
       },
       {

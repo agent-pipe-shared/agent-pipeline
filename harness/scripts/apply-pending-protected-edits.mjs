@@ -202,9 +202,11 @@ const GS14_REPLACEMENT = 'check("GST14 the cat-shaped reads (cat, sha256sum, git
 
 const GS_CHECKS_ANCHOR = '  console.log(`\\nguard-gate-strength: ${passed} passed, ${failed} failed`);';
 
-// GST33-GST36, verbatim from docs/pending-protected-suite-edits/guard-gate-strength-gst33-36.mjs,
-// with the helper block that section 2 of that file specifies. The helpers live
-// here, immediately before their only callers, rather than beside LIFECYCLE_GUARD:
+// GST33-GST36, with the helper block they need. This script carries the only
+// surviving copy of the payload: the paste-ready draft it was transcribed from
+// was retired on 2026-08-09 once its content had been applied and committed.
+// The helpers live here, immediately before their only callers, rather than
+// beside LIFECYCLE_GUARD:
 // one insertion point instead of two, and nothing defined far from its use.
 const GS_CHECKS_BLOCK = `  // Self-application (ADR-0015): this repo's own checkout is a real governed root
   // (has project/pipeline.json, GOVERNANCE_MARKERS), and its own
