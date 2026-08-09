@@ -49,7 +49,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0035](0035-codex-native-normal-critic.md) | Codex normal Critic through a native host boundary | accepted | 2026-07-15 |
 | [0036](0036-runner-honest-profiles-v2.md) | Runner-honest profiles and usage contracts v2 | accepted | 2026-07-17 |
 | [0037](0037-batman-bounded-assurance.md) | Batman bounded assurance, static Verify extension and typed delivery | accepted | 2026-07-18 |
-| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutral advisory duty v3 | accepted route registry; session trigger superseded by 0047 | 2026-07-19 |
+| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutral advisory duty v3 | accepted route registry; session-trigger and mandatory-receipt semantics superseded by 0047 | 2026-07-19 |
 | [0039](0039-hawkeye-lifecycle-boundaries.md) | Hawkeye lifecycle boundaries for session power and regulated documents | proposed | 2026-07-19 |
 | [0040](0040-advisor-consent-and-readonly-bash.md) | Explicit advisor export consent and sandbox-bound Bash | accepted; partially superseded by 0041 and 0047 | 2026-07-19 |
 | [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-authorized Codex functional-equivalent gate pass | accepted transport; trigger governed by 0047 | 2026-07-20 |
@@ -59,8 +59,6 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0045](0045-canonical-artifact-topology.md) | Canonical artifact topology | accepted | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Project authority layering | accepted | 2026-07-24 |
 | [0047](0047-model-free-advisor-preflight-v2.md) | Model-free Advisor preflight and on-demand consultation v2 | accepted | 2026-07-29 |
-| [0047-N](0047-local-supervisor-state-authority.md) | Local supervisor state authority (repository-local numbering collision retained) | accepted | 2026-07-26 |
-| [0047-N2](0047-governance-event-kernel.md) | Governance event kernel uses separate immutable stream records (Phoenix PHX-1; repository-local numbering collision retained) | accepted | 2026-08-02 |
 | [0048](0048-local-goldfish-supervisor.md) | Local Goldfish supervisor | accepted | 2026-07-26 |
 | [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab CI constrained remote-executor pilot | accepted | 2026-07-27 |
 | [0050](0050-candidate-bound-verify-run-journal.md) | Candidate-bound private Verify run journal | accepted | 2026-08-01 |
@@ -74,6 +72,8 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0058](0058-guard-maintenance-window.md) | Signed, time-boxed maintenance window lets the PO lift GS-6/TP-* with no in-session activation step | accepted | 2026-08-07 |
 | [0059](0059-signed-human-guard-override.md) | Human Guard Override gains a signed admission path, usable in `signature` mode for everything else it already classifies | accepted | 2026-08-07 |
 | [0060](0060-handover-placement-and-rotation.md) | Mid-task findings go into the handover because a fresh context is a Goldfish; durable rules go into ADRs; the handover gains a retention obligation whose mechanism is still open | accepted (placement) / open (rotation) | 2026-08-07 |
+| [0061](0061-local-supervisor-state-authority.md) | Local supervisor state authority (renumbered from the 0047 numbering collision) | accepted | 2026-07-25 |
+| [0062](0062-governance-event-kernel.md) | Governance event kernel uses separate immutable stream records (Phoenix PHX-1; renumbered from the 0047 numbering collision) | accepted | 2026-08-02 |
 
 ### Resubmissions
 
@@ -156,7 +156,7 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0045](0045-canonical-artifact-topology.md) | Kanonische Artefakt-Topologie | akzeptiert | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Projekt-Authority-Layering | akzeptiert | 2026-07-24 |
 | [0047](0047-model-free-advisor-preflight-v2.md) | Modellfreier Advisor-Preflight und On-demand-Consultation v2 | akzeptiert | 2026-07-29 |
-| [0047-N](0047-local-supervisor-state-authority.md) | Lokale Supervisor-State-Authority (repo-lokale Nummernkollision beibehalten) | akzeptiert | 2026-07-26 |
+| [0061](0061-local-supervisor-state-authority.md) | Lokale Supervisor-State-Authority (repo-lokale Nummernkollision beibehalten) | akzeptiert | 2026-07-26 |
 | [0048](0048-local-goldfish-supervisor.md) | Lokaler Goldfish-Supervisor | akzeptiert | 2026-07-26 |
 | [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab-CI-Pilot für eingeschränkte Remote-Ausführung | akzeptiert | 2026-07-27 |
 | [0050](0050-candidate-bound-verify-run-journal.md) | Kandidatengebundenes privates Verify-Run-Journal | akzeptiert | 2026-08-01 |

@@ -4,7 +4,7 @@
 
 ## Context
 
-ADR-0047 established the machine-local state root and repair authority but
+ADR-0061 established the machine-local state root and repair authority but
 deliberately prohibited worker launch. Nova B1-C established only a pure pool
 contract. Nova B1-I now needs a functional same-host execution path: separate
 Git workspaces, real child processes, bounded liveness observation,
@@ -34,7 +34,7 @@ may execute only one already-admitted, digest-bound package. It cannot
 delegate, approve, widen paths, issue credentials, import its own result,
 modify the source checkout, merge, push or release.
 
-ADR-0047 `pipeline.local-supervisor-state.v3` and B1-C
+ADR-0061 `pipeline.local-supervisor-state.v3` and B1-C
 `pipeline.local-worker-pool.v1` remain unchanged. B1-I adds the companion
 schemas:
 
@@ -59,14 +59,14 @@ Representable constraints, including safe relative paths, remain duplicated
 in Schema and runtime and are tested for parity. A client that runs only the
 JSON Schema has performed structural validation, not B1-I admission.
 
-The supervisor proceeds only after exact ADR-0047 `ready/noop` readback for the
+The supervisor proceeds only after exact ADR-0061 `ready/noop` readback for the
 same repository fingerprint, candidate digest and supervisor subject. `busy`,
 `recovery-required`, unavailable or unsafe local state returns typed
 non-success before a clone or process exists.
 
 One foreground supervisor owns one pool for one repository. Its persisted
 record is closed, limited to 65,536 bytes, atomically replaced, fsynced and
-read back under the ADR-0047 root. It binds:
+read back under the ADR-0061 root. It binds:
 
 - repository fingerprint, source-root digest and planning-time source-status
   digest;
@@ -97,7 +97,7 @@ partially admit a requested wave.
 
 Every admitted worker receives an independent local Git clone under:
 
-`<ADR-0047-root>/workspaces/<lease-id>`
+`<ADR-0061-root>/workspaces/<lease-id>`
 
 The adapter uses fixed `git` argv with `shell:false`,
 `--local --no-hardlinks --no-checkout`, disabled hooks, no terminal prompt and
@@ -187,7 +187,7 @@ implementation, credentials, network access, issue closure, push or release.
 5. Provide a production-capable Codex `exec` adapter while keeping live
    provider activation off in this implementation/test block.
 6. Register the complete focused suites in Full Verify and preserve all
-   ADR-0047 and B1-C regressions.
+   ADR-0061 and B1-C regressions.
 7. Keep B1 capability and Issue `#21` open until the separate live `N+1 >= 2`
    Goldfish observation is accepted.
 8. Prove the structural-plus-semantic validation contract with positive,
@@ -221,7 +221,7 @@ Only these 20 paths belong to the ADR-0048 B1-I slice:
 | `specs/sprint-nova-epic/result.md` | append-only design/fallback/implementation evidence |
 | `specs/sprint-nova-epic/lifecycle.json` | refreshed artifact bindings |
 
-ADR-0047 and B1-C source/schema files are imported authorities and are not
+ADR-0061 and B1-C source/schema files are imported authorities and are not
 modified by this slice.
 
 ## Consequences
@@ -239,7 +239,7 @@ deletes a state root or signals a process.
 
 ## Discarded alternatives
 
-- Extend ADR-0047 v3 or B1-C v1 in place: rejected; both accepted shapes remain
+- Extend ADR-0061 v3 or B1-C v1 in place: rejected; both accepted shapes remain
   stable and get a companion contract.
 - Shared Git worktrees: rejected for this slice; they mutate the source Git
   common directory and weaken workspace separation.

@@ -1,4 +1,6 @@
-# ADR 0047: Governance event kernel uses separate immutable stream records
+# ADR 0062: Governance event kernel uses separate immutable stream records
+
+**Status:** accepted · **Date:** 2026-08-02
 
 ## Status
 

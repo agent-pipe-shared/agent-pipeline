@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.adr-0047-numbering-collision
 type: defect
 owner: pipeline
-status: open
+status: in_progress
 created: 2026-08-07
 source: "specs/sprint-nova-epic/plans/nova-b-readiness-2026-08-06.md (lines 55-69), promoted from a plan-only note to a backlog item per the 0.5.2 Critic round's F2 finding, 2026-08-07."
 due: 2026-09-06
@@ -48,17 +48,39 @@ session-scoped plan file rather than the versioned work queue.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accept-open.
-- **Rationale:** confirmed still live — `docs/adr/0047-local-supervisor-state-authority.md`
-  and `docs/adr/0047-model-free-advisor-preflight-v2.md` both exist. Step 1
-  of the item's own Proposal (confirm with the PO whether this is
-  intentional) is unresolved and is a PO call, not something to infer —
-  proceeding straight to a renumber without that confirmation risks
-  guessing which of the two ADRs is the one that should move.
-- **Assignment (if accepted):** ask the PO which ADR keeps `0047` before any
-  rename; then a `goldfish-mechanic` dispatch (uniform rename + reference
-  sweep across `docs/adr/README.md`, `specs/sprint-nova-epic/plans/nova-b.md`,
-  and any other citing document) plus, per the item's step 3, a Verify check
-  for duplicate leading ADR numbers so this class of collision cannot recur
-  silently.
-- **Date:** 2026-08-07
+- **Decision:** accepted — step 1's PO call has been made (2026-08-09): the
+  collision was accidental, not intentional. `docs/adr/0047-model-free-advisor-preflight-v2.md`
+  keeps `0047` — it is the ADR every inbound status line and cross-reference
+  already means. `docs/adr/0047-local-supervisor-state-authority.md` is
+  renumbered to `0061` and `docs/adr/0047-governance-event-kernel.md` to
+  `0062` (0060 was the prior highest number).
+- **Rationale:** confirmed still live at triage time — both `0047-*`
+  local-supervisor and `0047-*` governance-event-kernel files existed
+  alongside `0047-model-free-advisor-preflight-v2.md`, a genuine three-way
+  collision, not two. The PO ruling resolves which of the three keeps the
+  number.
+- **Outcome:** step 2 of the Proposal (rename + reference sweep) was executed
+  by the `PHX-ADR-FIX` Goldfish dispatch (2026-08-09): `git mv` for both
+  files, heading/self-reference updates, `docs/adr/README.md` table brought
+  back in step, and every in-corpus inbound `ADR-0047` reference resolved to
+  the correct one of the three ADRs from its own context (`docs/adr/0048-local-goldfish-supervisor.md`,
+  8 references, updated to `ADR-0061`). Several inbound references live
+  outside the ADR corpus (`docs/local-supervisor-state-threat-model.md`,
+  `specs/sprint-nova-epic/{spec.md,plans/nova-b.md,plans/nova-b-readiness-2026-08-06.md,result.md}`)
+  and were left untouched — that edit would have exceeded the `PHX-ADR-FIX`
+  dispatch's scope boundary (ADR corpus + `docs/adr/README.md` + this item
+  only); it is open follow-up work, tracked below. Step 3 of the Proposal (a
+  Verify check against duplicate leading ADR numbers) was not part of this
+  dispatch and remains open.
+- **Status note:** advanced to `in_progress`, not `closed` — a `closed` status
+  requires `closure_commit` to name an already-existing commit
+  (`plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs`), and this
+  Goldfish dispatch is forbidden from committing (`PHX-ADR-FIX` field 4). The
+  Pipeline Elephant should move this item to `closed` (with closure fields
+  bound to the actual landing commit) once the rename lands, or file the two
+  remaining follow-ups (out-of-corpus reference sweep; duplicate-number Verify
+  check) as their own items first.
+- **Assignment (if accepted):** land the `PHX-ADR-FIX` diff; then either close
+  this item directly (closure fields bound to that commit) or split the two
+  remaining follow-ups into their own backlog items before closing.
+- **Date:** 2026-08-07; triage call and execution 2026-08-09.

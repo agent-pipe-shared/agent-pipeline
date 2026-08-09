@@ -3,11 +3,11 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "066bf9edb460ab5055ffad1da678118b199f7530b7fea4ce526105916ab48e1c"
+    "transitionHead": "dcc71b1979df8f0d6ec670cbf410095f7bacb908d67d5fe9a1a14518ab8159e7"
   },
   "counts": {
-    "open": 74,
-    "in_progress": 26,
+    "open": 73,
+    "in_progress": 27,
     "closed": 23
   },
   "items": [
@@ -37,7 +37,7 @@
     },
     {
       "id": "pipeline.adr-0047-numbering-collision",
-      "status": "open",
+      "status": "in_progress",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
