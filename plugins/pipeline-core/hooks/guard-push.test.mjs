@@ -320,6 +320,32 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   check("PG09 allow  security evidence skipped when gates.security mode=off", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
 }
 
+// ---- PG08b security mode=warn never hard-blocks, even though push.mode=blocking ------
+// PUSHWARN-1 (backlog: a warn security gate hard-blocks every push). Each gate's findings
+// must respect that gate's OWN configured mode -- security.mode=warn is a promise that a
+// security finding is advisory, and push.mode=blocking must not silently override it.
+{
+  const { dir, head } = freshRepo("security-warn-only-failure");
+  writeManifest(dir, manifestPush({ approval: "standing-approved", security: "warn" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  // security-latest.json intentionally absent -> a security-only failure.
+  check("PG08b warn  security mode=warn never hard-blocks even though push.mode=blocking", PUSH_CMD, dir, WARN, {
+    stderrIncludes: ["evidence/security-latest.json missing"],
+  });
+}
+
+// ---- PG08c security mode=blocking still hard-blocks, even though push.mode=warn --------
+// The reverse of PG08b: a security gate configured "blocking" must not be downgraded to
+// advisory just because the push gate itself is lenient -- each bucket's mode is its own.
+{
+  const { dir, head } = freshRepo("security-blocking-push-warn");
+  writeManifest(dir, manifestPush({ mode: "warn", approval: "standing-approved", security: "blocking" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG08c block  security mode=blocking still hard-blocks even though push.mode=warn", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["evidence/security-latest.json missing"],
+  });
+}
+
 // ---- PG10 standing-approved passes without any state file ------------------------------
 {
   const { dir, head } = freshRepo("standing-approved");
@@ -397,7 +423,14 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   if (withoutKey.code !== withEmptyObject.code) {
     problems.push(`exit code diverges from PG11c: ${withoutKey.code} vs ${withEmptyObject.code}`);
   }
-  if (withoutKey.stderr !== withEmptyObject.stderr) {
+  // PG11e-FLAKE (backlog: a verify-gate suite fails on where a second boundary falls): the
+  // two fixture repos are identical except for their commit hash, which differs only when
+  // the two `git commit` calls straddle a second boundary. The property under test is that
+  // the two STATES produce the same message, not that two independently created
+  // repositories share a hash -- so each fixture's own commit is normalized out of both
+  // strings before comparing; every other byte still must match exactly.
+  const withoutCommit = (text, commit) => text.replaceAll(commit, "<source-commit>");
+  if (withoutCommit(withoutKey.stderr, head) !== withoutCommit(withEmptyObject.stderr, headC)) {
     problems.push(
       `stderr diverges from PG11c -- no-key: ${withoutKey.stderr.trim().slice(0, 300)} | empty-object: ${withEmptyObject.stderr.trim().slice(0, 300)}`,
     );

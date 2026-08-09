@@ -75,6 +75,17 @@ fixture repositories in the same way. The construction is easy to repeat and the
 failure only appears on a fraction of runs, so a second instance would have gone
 unnoticed the same way this one did.
 
+## Fixed
+
+2026-08-09, same-session follow-up once the PO explicitly cleared the TP-5
+override this required (`guard-push.test.mjs` gates itself): applied exactly
+the normalization from "Direction" above — each fixture's own commit is
+replaced with a fixed placeholder in both stderr strings before comparing,
+leaving every other byte still pinned exactly. 152/152 in `guard-push.test.mjs`
+including this case; the fix needed no other file. Status stays `open` here
+pending the formal ledger transition (`backlog/README.md` triage rules); the
+work itself is done and verified.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**

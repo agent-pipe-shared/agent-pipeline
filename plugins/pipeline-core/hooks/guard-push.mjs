@@ -44,7 +44,12 @@
  *   5. Otherwise (mode "blocking" or "warn"): evaluate ALL of the checks below,
  *      collect ALL failures, and report them TOGETHER in one English stderr message —
  *      never fail on the first mismatch alone, so a single push attempt surfaces
- *      every reason at once instead of a frustrating fix-one-fail-next loop.
+ *      every reason at once instead of a frustrating fix-one-fail-next loop. Each
+ *      finding is dispatched under its OWN gate's mode (PUSHWARN-1): (a)/(c) and the
+ *      anonymous-public-push check follow `gates.push.mode`; (b)/(b.2) follow
+ *      `gates.security.mode` instead — a security gate configured "warn" stays
+ *      advisory even when the push gate itself is "blocking", and a security gate
+ *      configured "blocking" still hard-blocks even when the push gate itself is "warn".
  *        (a) the push is one standalone, explicit repo/source operation;
  *            `evidence/verify-latest.json` exists, `exitCode === 0`, and `commit`
  *            equals the resolved commit OID of that exact source ref.
@@ -64,8 +69,10 @@
  *            `.claude/pipeline-state.json` at THIS point (only reached when the
  *            state file is actually needed) is its own WARN exit 1, same as (3).
  *   6. All checks pass -> exit 0 (allow).
- *   7. Any check failed -> mode "blocking" -> exit 2; mode "warn" -> exit 1. Same
- *      collected message either way.
+ *   7. Any check failed -> the mode of the bucket it failed under decides severity
+ *      (step 5): "blocking" -> exit 2, "warn" -> exit 1. If failures span both buckets
+ *      under different modes, "blocking" wins for the whole push. Same collected
+ *      message either way.
  *
  * MECHANICS: stdin = `{ tool_input: { command } }` (PreToolUse contract). Wired via
  * plugins/pipeline-core/hooks/hooks.json in a LATER bundled wave — this delivery does
@@ -1611,6 +1618,13 @@ function checkSecurityEvidenceBinding() {
 }
 
 const failures = [];
+// PUSHWARN-1 (backlog: a warn security gate hard-blocks every push): security findings
+// -- (b)/(b.2) below -- are collected separately so they can be dispatched under
+// `gates.security.mode` instead of `gates.push.mode` (see header, step 5/7). `securityGate`
+// itself is assigned inside the try block below but declared here so the final dispatch,
+// which runs after that block, can still read its mode.
+const securityFailures = [];
+let securityGate = null;
 
 // ---- terminal fault boundary (PUSHBOUND-1 / issue #100 AC3) --------------------------
 // Everything below builds `failures` for THIS authority-bearing evaluation. An
@@ -1642,9 +1656,11 @@ try {
   failures.push(...checkEvidenceFreshness("evidence/verify-latest.json"));
 
   // (b) security evidence -- only when a security gate is configured and not "off".
-  const securityGate = gateConfig(manifest, "security");
+  // PUSHWARN-1: pushed into securityFailures, NOT failures -- this bucket is dispatched
+  // under gates.security.mode at the final dispatch below, independent of gates.push.mode.
+  securityGate = gateConfig(manifest, "security");
   if (securityGate && securityGate.mode !== "off") {
-    failures.push(...checkSecurityEvidenceBinding());
+    securityFailures.push(...checkSecurityEvidenceBinding());
 
     // (b.2) v2 policy-complete verdict -- additive, same trigger as (b), never replacing
     // its severity-based authority (CYB-2F; see this file's header "V2 POLICY-COMPLETE
@@ -1652,7 +1668,7 @@ try {
     // ../lib/security-completeness-gate.mjs, CYB-2I-0). Reuses the single
     // `resolveSourceTree()` computation `checkSecurityEvidenceBinding()` above may already
     // have triggered (Finding 5) -- never a second independent `git rev-parse`.
-    failures.push(
+    securityFailures.push(
       ...checkSecurityCompleteness({ projectDir: evidenceProjectDir, commit: sourceCommit, tree: resolveSourceTree() }),
     );
   }
@@ -1780,15 +1796,25 @@ try {
   ]);
 }
 
-if (failures.length === 0) process.exit(0); // all-green -- allow
+const allFailures = [...failures, ...securityFailures];
+if (allFailures.length === 0) process.exit(0); // all-green -- allow
+
+// PUSHWARN-1: each bucket's severity follows its OWN gate's mode, never the other
+// gate's. `failures` (verify evidence, anonymous-public-push, approval) follows
+// gates.push.mode, exactly as before this fix; `securityFailures` follows
+// gates.security.mode instead. Either bucket demanding "blocking" makes the whole push
+// block; only when every bucket carrying a finding is "warn" does the push stay
+// non-blocking.
+const pushBlocking = failures.length > 0 && pushGate.mode !== "warn";
+const securityBlocking = securityFailures.length > 0 && securityGate?.mode !== "warn";
 
 const message = [
   invalidityNote, // case B: non-null only for a semantic-invalid manifest with a release
   // section whose push is NOT deploy-triggering -- prepended, `emit`'s own
   // `.filter(Boolean)` drops it cleanly on every other path (`invalidityNote` stays null).
-  `BLOCKED (guard-push, plugin pipeline-core): Push-Gate check failed (${failures.length} finding(s)):`,
-  ...failures.map((f, i) => `  ${i + 1}. ${f}`),
+  `BLOCKED (guard-push, plugin pipeline-core): Push-Gate check failed (${allFailures.length} finding(s)):`,
+  ...allFailures.map((f, i) => `  ${i + 1}. ${f}`),
 ];
 
-if (pushGate.mode === "warn") emit(1, message);
-emit(2, message); // mode "blocking" (or any unrecognized non-"off" value -- errs safe)
+if (pushBlocking || securityBlocking) emit(2, message); // some bucket demands blocking
+emit(1, message); // every failing bucket here is configured "warn" -- non-blocking

@@ -91,6 +91,22 @@ briefed task with the clearance that requires.
   — the `.gitignore` gap, which is the first of the three reasons the security
   gate cannot be satisfied at all.
 
+## Fixed
+
+2026-08-09, same-session follow-up once the PO explicitly cleared the TP-5
+override this required: `guard-push.mjs` now collects security findings
+((b)/(b.2)) into their own bucket, dispatched under `gates.security.mode`
+rather than `gates.push.mode`. `pushBlocking`/`securityBlocking` are computed
+independently and either demanding "blocking" blocks the whole push; only when
+every bucket carrying a finding is "warn" does it stay non-blocking. Two new
+cases pin both directions (`PG08b`: security warn does not escalate under a
+blocking push gate; `PG08c`: security blocking still blocks under a warn push
+gate) — 152/152 in `guard-push.test.mjs`, 9/9 in `guard-push-v2.test.mjs`
+(unaffected, checked directly: every existing v2 case already used
+`security: blocking` or `off`, never `warn`, so nothing there could regress).
+Status stays `open` pending the formal ledger transition; the work itself is
+done and verified.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
