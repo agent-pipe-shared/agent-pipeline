@@ -21,6 +21,15 @@ works, at the cost of a still-English document scaffold underneath either
 way. Recommendation: match the language you would already write the PRD
 in."* Bind the answer into `<!-- po-language: (de|en) -->` before drafting.
 
+Two different guard-drift refusals can hit this same PRD-authoring step in a
+row — a `PO-GATE-PRD-LANGUAGE-MISMATCH` on the marker, then a separate
+`projection-drift` refusal right after that repair — and both share the same
+repair path: `po-gate-profile-repair.mjs plan --root <project-root>
+--human-facing <de|en>`, then `po-gate-profile-repair.mjs apply --root
+<project-root> --human-facing <de|en> --plan-sha256 <sha256> --activate` with
+the digest the plan step reports. Run the plan/apply round trip again for the
+second refusal rather than treating it as a different, undocumented problem.
+
 Before the first `kickoff plan`, obtain both a single-line project goal and an
 explicit PO profile: `epic`, `feature`, or `mini`. Ask for them together when
 the project is pristine; if the user supplied only a goal, ask for the profile
@@ -48,6 +57,16 @@ Treat that named package as a pre-authority staging set: write and review its
 PRD, Spec, and `design-input.md` there first, then run `kickoff promote plan`
 and only its digest-bound `kickoff promote apply` to bind the PRD/Spec in State
 and the source-evidence path/hash in the same immutable continuity transaction.
+The exact invocation shape (both subcommands take the same flags; `apply` adds
+`--plan-sha256` and `--activate`):
+
+```
+node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> \
+  --root <project-dir> --profile <epic|feature|mini> --id <id> \
+  --plan-path <path> --prd-path <path> --spec-path <path> \
+  --design-input-path <path> [--runner claude|codex] \
+  [--plan-sha256 <sha256>] [--activate]
+```
 Never edit the active provisional
 `specs/kickoff-*` PRD/Spec, or any already bound PRD/Spec, merely to add richer
 design documentation. Do not invoke a repair, generic continuity CAS, manifest

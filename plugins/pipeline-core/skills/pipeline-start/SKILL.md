@@ -88,7 +88,14 @@ deployment, publication, destructive work, or scope change.
    facts; never claim a skipped or cached check passed.
 3. **Boundary:** one simple shell command per tool call; never compose
    `&&`, `;`, redirects or pipelines except bounded, expansions-free
-   `rg … | rg …` or `rg … | head -n 1..500` diagnostics. Treat
+   `rg … | rg …` or `rg … | head -n 1..500` diagnostics, and never a heredoc
+   or a multi-line command — a multi-line `-m` commit message is refused the
+   same way. The full closed grammar, including the two costliest
+   workarounds (a multi-line commit message: write it to a file and use
+   `git commit -F <msgfile> -- <paths>`; capturing output to a file: write it
+   from Node instead of `>`/`2>&1`/`| tee`), is
+   `templates/prompts/agent-obligations.md` §1 — read it before hitting the
+   same refusal live. Treat
    `executionBoundary: "host-authorized-wsl"` as mandatory: submit the exact
    returned action directly at that boundary, including every Git
    observation, keeping that routing authoritative. For Codex, never retry
@@ -223,6 +230,11 @@ whose safe recovery actions cannot progress. A guard
 denial alone is not a human gate: first run its exact typed read-only or
 lifecycle recovery action. Never bypass a real gate or turn an automated
 evidence failure into an invented PO approval.
+
+When one of those does require asking, a confirmation with only one real
+option (proceed or don't, with nothing else meaningfully on offer) is plain
+text plus waiting for the reply — never `AskUserQuestion`, whose own
+validator rejects a single-option call outright.
 
 ## Compact
 

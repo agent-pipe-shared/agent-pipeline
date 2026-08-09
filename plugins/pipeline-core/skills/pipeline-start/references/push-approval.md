@@ -39,6 +39,17 @@ this gate exists to prevent. A human may choose `chat` deliberately, for a
 project where an attribution record is the honest level of assurance. That is
 their decision to state, not a session's to suggest as a fix.
 
+## The classifier's refusal surface is wider than "push"
+
+Do not assume the harness auto-mode classifier only watches `git push` and
+`git restore` (the two actions `docs/push-release-flow.md` names as its
+headline risk). A live session has also had it fire on a bare read-only
+`Read` of a guard script while investigating how the push gate works —
+escalating a routine look-around into a sub-agent dispatch the PO then
+rejected as overkill. Expect it to be able to fire on read-only
+investigation near this gate too, and do not treat a hit there as a sign
+something is broken.
+
 ## Never guess whether a refusal can be lifted — ask
 
 ```
