@@ -25,6 +25,47 @@ and route it through `recordPipelineAttempt` with `resolveHumanAuthority` bound 
 `resolveHumanGovernanceAuthority` (`human-governance-ledger.mjs:48-65`). **This is a wiring task,
 not a design task** — the interface shape is already fixed by the tested function signature.
 
+### CORRECTED 2026-08-09 (Elephant, direct code read): a second, real carrier exists — `guard-git.mjs`'s Phoenix override path
+
+The paragraph above checked exactly one candidate carrier (`external-command-offer.mjs`) and
+concluded "NO CARRIER" for the whole criterion from that single negative. It missed a second,
+independent, already-production-wired mechanism: `guard-git.mjs`'s `consumePhoenixOverrideAuthority`
+(`plugins/pipeline-core/hooks/guard-git.mjs:697-728`). When an agent's git command is blocked by a
+guard rule and the agent supplies a `PIPELINE_GUARD_OVERRIDE` reference, the guard spawns
+`governance-authority.mjs` to correlate the referenced `decisionId` against the real human ledger
+(`human-governance-ledger.mjs`'s `resolveHumanGovernanceAuthority`/`queryHumanGovernanceDecisions`),
+checks the decision's scope binds this exact repository fingerprint, candidate commit+tree,
+`OVERRIDE.<rule>` action, and the guard file's own sha256, then **consumes** the grant so it cannot
+be replayed. `guard-git-phoenix.test.mjs`'s one integration test proves the full chain live: no
+reference → refused ("closed Phoenix authority reference is required"); a genuine ledger grant →
+one-time allowed; the identical command replayed a second time → refused. Independently re-run in
+this session: 1/1 pass. **This is the clause's "correlate to the ledger, do not self-confirm" half,
+proven end-to-end, not absent.**
+
+What remains genuinely missing, traced to the exact three functions involved: **there is no
+production entry point that ever creates a "granted" human-governance-decision in the first
+place.** `appendHumanGovernanceDecision` (`human-governance-ledger.mjs:150`) and
+`createExternalHumanGovernanceIntent` (`human-governance-ledger.mjs:73`, the function that builds
+a signable PO-approval intent from a decision) are each called only from test files — confirmed by
+`grep -rln` over every `scripts/*.mjs` and `lib/*.mjs` — and `governance-authority.mjs`'s own CLI
+only ever calls `appendConsumedHumanGovernanceDecision` (marking an existing grant used), never the
+function that creates one. In today's live repository, a PO has no CLI to actually grant an agent
+this authority; the test manufactures the grant by calling the library function directly, which is
+legitimate for a test but is not a production path. `verifyExternalHumanGovernanceProof`
+(`human-governance-ledger.mjs:101`) — the function that would make such a grant genuinely
+non-self-confirmable, checked against the same `local-po-key` trust anchor already pinned at
+`project/critical-human-proof.json` (`trustAnchor.publicKeySha256`) — is built and unit-tested but,
+like the other two, has no caller outside tests either.
+
+**This is now a small, precisely wiring task, not a design task**: chain three already-tested,
+already-correct library functions behind a CLI, mirroring the exact prepare→external-sign→install
+shape `guard-maintenance-window.mjs` already uses successfully in this repo (the same shape this
+session used twice tonight for TP-3/TP-5 windows). No new schema, no new cryptography, no new
+trust model — the trust anchor, the intent/proof shapes, and the ledger's own validation are all
+already built and independently tested. Given the sensitivity of authority-granting code, this
+should get an independent Critic pass on top of the usual break-proof self-verification before
+being counted `implemented`, not merely self-verified re-run.
+
 ## A-AC-05 — needs a schema decision, not just wiring
 
 **Clause:** "WHEN runner, model, effort, profile, role, adapter, or capability identity is

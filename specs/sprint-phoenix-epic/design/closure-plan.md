@@ -21,8 +21,8 @@ one list is what has made the epic look larger and more uniform than it is.
 |---|---|---|
 | A — assertion missing | 3 | one named test case in an already-registered, unprotected suite |
 | D — documentation missing | 1 | one document section set; no code, no gate |
-| S — seam missing | 5 | a connector between two packages that already work |
-| B — capability missing | 44 | real implementation plus its tests |
+| S — seam missing | 4 | a connector between two packages that already work |
+| B — capability missing | 45 | real implementation plus its tests |
 | P — not code | 5 | a human gate, a sanctioned authority revision, or a proved impossibility |
 | **total** | **58** | |
 
@@ -187,22 +187,22 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 |---|---|---|---|
 | L-AC-08 | partial | WP-DOC | docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed |
 
-### Class S — two implemented packages, mutually unaware (5)
+### Class S — two implemented packages, mutually unaware (4)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
-| A-AC-04 | partial | WP-A | CORRECTED 2026-08-09 (Elephant, direct code read): the correlation mechanism EXISTS and is tested -- recordPipelineAttempt (external-command-offer.mjs:29) calls an injected resolveHumanAuthority resolver and fails closed (self-confirmation prevented) whenever authorityRequirement is "human-decision-required". What is actually missing: zero production call sites invoke recordPipelineAttempt anywhere in the codebase (grep confirms only its own definition and test file reference it) -- the interface is built, nothing calls it with the real resolveHumanGovernanceAuthority resolver at the point an agent actually asks for authority. Smaller Class S task than the old pointer text implied ("no correlation path is implemented" was wrong; the path exists and is dead code, not absent) |
 | A-AC-05 | not-started | WP-A | NO CARRIER: neither event shape carries a runner/model/effort/profile/role/adapter field at all |
 | E-AC-20 | not-started | WP-E | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
 | H-AC-08 | not-started | WP-H | NO CARRIER: no path imports a legacy approval/override/deploy record as an unverified observation |
 | H-AC-09 | not-started | WP-H | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target |
 
-### Class B — an absent capability (44)
+### Class B — an absent capability (45)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | A-AC-01 | partial | WP-A | record shape pinned; nothing enforces recording BEFORE dependent action where policy requires |
 | A-AC-03 | not-started | WP-A | NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption |
+| A-AC-04 | partial | WP-A | CORRECTED AGAIN 2026-08-09 (Elephant, direct code read): a second, real, production-wired carrier exists that the first correction missed -- guard-git.mjs's Phoenix override path (consumePhoenixOverrideAuthority, guard-git.mjs:697-728) correlates an agent's override reference to the real human ledger via governance-authority.mjs, binds it to the exact repository/candidate/rule/artifact-digest tuple, and single-use-consumes it; guard-git-phoenix.test.mjs proves refuse-without-reference, one-time-allow, and refuse-on-replay end to end (1/1, independently re-run). The correlate-and-cannot-replay half of the clause is proven, not absent. What is still missing, narrowly: no production entry point ever CREATES a granted human-governance-decision -- appendHumanGovernanceDecision, createExternalHumanGovernanceIntent and verifyExternalHumanGovernanceProof (human-governance-ledger.mjs:150,73,101) are each called only from tests (repo-wide grep confirms), so a PO has no CLI to actually grant this authority today; governance-authority.mjs's own CLI only ever consumes an existing grant, never creates one. See design/class-s-scoping.md's 2026-08-09 correction for the exact three-function wiring this needs -- no new schema or cryptography, the trust anchor at project/critical-human-proof.json already covers the same PO key |
 | A-AC-07 | not-started | WP-A | CONFIRMED ABSENT (PHX-WP-A, repo-wide search): no per-event-class "mandatory" capture concept exists anywhere in the journal, the shared store, or capture-policy.json -- five of the seven named event classes are not even representable as a journal `kind` |
 | A-AC-08 | not-started | WP-A | NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only |
 | A-AC-09 | designed-only | WP-A | materiality is documented as design intent only; no code enforces or measures it |
