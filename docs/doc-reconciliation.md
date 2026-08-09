@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate e9d13c8ffaf34ce178af1d6086af575c2949255e — 2026-08-09, range 3387065..e9d13c8, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `3371a0d` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `25f48cd`, `78006b4`, `8c7efa3`, `e9d13c8`: the A-AC-04 measurement correction (a second
+real carrier found), the human-authority-grant.mjs build, the backlog item for a second
+evidence-citation defect, and this leg's checkpoint recording the Critic FAIL that build received.
+Same reading as the whole chain: `docs/state.md` stays ADR-0012, the generated evidence-map/
+closure-plan/class-s-scoping trio stays ADR-0045. The new backlog item confirms `backlog/`'s own
+dedicated class again, same as every prior occurrence in this chain.
+
 ## Candidate 3371a0d9327d5430cd876ce2be0d0baad51b5754 — 2026-08-09, range 3387065..3371a0d, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
