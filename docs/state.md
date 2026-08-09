@@ -1023,6 +1023,52 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### NIGHT CLOSED — `e676e48`, gate green at 368/368, exactly two things left and both are the PO's
+
+Final gate: exit 0, 368 steps, `binding: "exact"`, clean at tree `9480300`,
+00:44:11Z → 00:47:29Z. Ten gate runs tonight, the last seven green.
+
+**What is actually finished.** The Windows-assurance suite is registered (365 → 366,
+exclusions 6 → 5). BS25 no longer reads live repository state — proved tonight when a
+new ledger event, the exact thing that had turned it red, left it green. The WSL
+freshness family is restored and its entry point imports again. The Critic contract's
+citations resolve, guarded by a check whose every class is demonstrated to fail when
+its *target* breaks, with a committed test pinning that property. Three red suites
+repaired, one retired, one product defect fixed.
+
+**Exactly two things are open, and neither is mine to close.**
+
+1. **22 commits carry forbidden trailers.** The rule says this must not enter public
+   history; the hard rules say never rewrite history. Both cannot hold for the same
+   commits, so it is accept, rewrite under an explicit override, or keep the branch
+   local. Recurrence is closed — the guard refuses them now, with no override.
+2. **The pin re-baseline needs a yes or no.** Measurement done, six of nine differ,
+   three independent reviews behind it, every finding against the pinned files
+   repaired. I stood it down because I had inferred consent from an answer that only
+   authorized the review.
+
+Both were re-examined tonight specifically to see whether I had parked them out of
+caution. I had done exactly that with two others — the freshness restoration and the
+retirement "collision" — and both dissolved on contact. These two did not.
+
+**The four smaller ones** (RED1's GIT-04 contradiction, BFAM §13, the canon-gap
+question, and whether tonight's four reviews need re-running under the contamination
+finding) are decisions rather than tasks, each written up where the work is.
+
+**What I would want read first, if only one thing is.** Tonight produced four
+disciplined stops and one revert, and every one of them was worth more than the fix it
+replaced. A dispatch that refused to restore code it would have had to invent. One
+that refused to execute a premise it had disproved. One that left the gate red rather
+than paper over a contradiction in my briefing. One that found a pre-merge defect and
+preserved it instead of quietly repairing it under an unrelated commit. And a
+re-baseline I stood down after building a justification good enough to convince myself.
+
+Set against that: five wrong paths or premises in my own briefings, one over-claimed
+success, one inferred consent, and a contaminated reference in all four Critic
+dispatches. **The machinery caught more of my errors than I caught of its.** That is
+the system working, and it is also the reason none of it should be read as a green
+light.
+
 ### NOT DONE: I stood the pin re-baseline down, because I had over-read the PO's authorization
 
 The measurement is done and the change is **reverted**. Working tree back to the three
