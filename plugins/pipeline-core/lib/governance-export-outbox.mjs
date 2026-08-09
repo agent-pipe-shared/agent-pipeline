@@ -29,3 +29,24 @@ export function applyGovernanceExportDelivery(outbox, { attempt, acceptedDestina
   return frozenState({ ...outbox, cursor, entries });
 }
 export function nextGovernanceExportBatch(outbox, { maxEvents } = {}) { if (!state(outbox) || !Number.isSafeInteger(maxEvents) || maxEvents < 1 || maxEvents > 1000) fail("GEO-BATCH"); return freeze(outbox.entries.filter((entry) => entry.status === "pending").slice(0, maxEvents).map((entry) => freeze({ sequence: entry.sequence, projection: entry.projection, attempts: entry.attempts }))); }
+/**
+ * E-AC-10: a pure, read-only gate for one named lifecycle boundary
+ * (release/promotion/publication/...). Blocks only when entries at/after
+ * the outbox cursor are not yet "acknowledged" -- the exact prefix
+ * applyGovernanceExportDelivery already maintains, never a second mutation
+ * path. Never mutates the outbox and never blocks any boundary other than
+ * the one it was asked to evaluate.
+ */
+export function evaluateGovernanceExportBoundaryGate(outbox, { boundary } = {}) {
+  const queue = validateGovernanceExportOutbox(outbox); if (!ID.test(boundary ?? "")) fail("GEO-BOUNDARY");
+  let cursor = queue.cursor; while (queue.entries[cursor]?.status === "acknowledged") cursor += 1;
+  const unacknowledged = queue.entries.slice(cursor).filter((entry) => entry.status !== "acknowledged");
+  if (unacknowledged.length === 0) return freeze({ schema: "pipeline.governance-export-boundary-gate.v1", boundary, destinationProfile: queue.destinationProfile, blocked: false });
+  const entries = freeze(unacknowledged.map((entry) => freeze({ sequence: entry.sequence, status: entry.status, destinationEventId: entry.projection.destinationEventId, sourceEventDigest: entry.projection.sourceEventDigest })));
+  const statuses = new Set(entries.map((entry) => entry.status));
+  const recovery = freeze({
+    ...(statuses.has("pending") ? { pending: "Pending entries advance to acknowledged only via applyGovernanceExportDelivery (this module), driven by an adapter's accepted acknowledgement -- see deliverGovernanceExportBatch in governance-export-delivery.mjs for the end-to-end path." } : {}),
+    ...(statuses.has("quarantined") ? { quarantined: "No mechanism in this module or its siblings currently moves a quarantined entry to acknowledged -- disclosed residual, out of scope for E-AC-10." } : {}),
+  });
+  return freeze({ schema: "pipeline.governance-export-boundary-gate.v1", boundary, destinationProfile: queue.destinationProfile, blocked: true, range: freeze({ fromSequence: entries[0].sequence, toSequence: entries[entries.length - 1].sequence, count: entries.length, entries }), recovery });
+}
