@@ -533,14 +533,15 @@ check("kickoff plan is deterministic, closed, valid, and read-only", () => {
   assert.deepEqual(after, before);
   assert.equal(existsSync(join(root, "nope")), false);
   assert.deepEqual(Object.keys(first).sort(), [
-    "applyAction", "calibration", "goal", "goalSha256", "onboardingScript",
+    "applyAction", "calibration", "goal", "goalSha256", "language", "onboardingScript",
     "planSha256", "repositoryCapability", "root", "runner", "schema", "targets",
     "transactionSha256",
   ]);
   assert.equal(first.runner, "codex");
+  assert.equal(first.language, "en");
   assert.deepEqual(first.applyAction.argv, [
     "/plugin/project-onboarding-v3.mjs", "kickoff", "apply", "--root", root,
-    "--goal", first.goal, "--runner", "codex", "--plan-sha256", first.planSha256, "--activate",
+    "--goal", first.goal, "--language", "en", "--runner", "codex", "--plan-sha256", first.planSha256, "--activate",
   ]);
   assert.equal(first.applyAction.mutation, true);
   assert.equal(first.applyAction.requiresConfirmation, true);

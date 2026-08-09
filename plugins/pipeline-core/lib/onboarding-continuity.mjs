@@ -109,7 +109,7 @@ const SESSION_CLEANUP_PRIVATIZATION_AUDIT_BASENAME = "session-cleanup-privatizat
 const SESSION_CLEANUP_PRIVATIZATION_CONFIRMATION_BASENAME = "session-cleanup-privatization-confirmation";
 const SHA256_RE = /^[a-f0-9]{64}$/u;
 const PLAN_KEYS = new Set([
-  "schema", "root", "repositoryCapability", "goal", "goalSha256", "calibration",
+  "schema", "root", "repositoryCapability", "goal", "goalSha256", "language", "calibration",
   "targets", "transactionSha256", "onboardingScript", "runner", "planSha256", "applyAction",
 ]);
 const TARGET_KEYS = {
@@ -2915,6 +2915,20 @@ export function previewOnboardingSessionCleanupRelease({
   };
 }
 
+/**
+ * Validate one explicit kickoff language answer. Mirrors `validateKickoffGoal`
+ * below: an explicit, structurally-required kickoff input gets its own
+ * validator rather than an inline enum check, so a caller that passes a
+ * malformed value fails here instead of silently corrupting the PRD language
+ * marker or `continuity.runtime.humanFacingLanguage`.
+ */
+export function validateKickoffLanguage(language) {
+  if (!["de", "en"].includes(language)) {
+    fail("KICKOFF-LANGUAGE-INVALID", "language must be de or en");
+  }
+  return language;
+}
+
 /** Trim and validate one goal as UTF-8 data, never as shell syntax. */
 export function validateKickoffGoal(goal) {
   if (typeof goal !== "string" || goal.includes("\0")) {
@@ -2943,6 +2957,14 @@ function initialAuthorityPaths(featureId) {
   };
 }
 
+// Fallback only: `buildOnboardingKickoffPlan` now accepts an explicit
+// `language` argument (threaded from `--language` at the CLI, enforced there
+// exactly like `--goal`; backlog:
+// language-selection-scope-is-unclear-and-arrives-too-late). This function is
+// consulted only when no explicit value was supplied -- the historical
+// pristine-kickoff derivation for internal/test callers that have not been
+// updated to pass one. It is never reached from the live onboarding CLI path,
+// which now refuses to omit `--language`.
 function kickoffLanguage(root) {
   const userPath = join(root, "pipeline.user.yaml");
   // `project/` is the canonical runner-neutral authority.  The legacy
@@ -3188,11 +3210,11 @@ function planBoundApplyAction(onboardingScript, commandArgv, optionArgv, runner,
   };
 }
 
-function applyAction(onboardingScript, root, goal, planSha256, runner) {
+function applyAction(onboardingScript, root, goal, language, planSha256, runner) {
   return planBoundApplyAction(
     onboardingScript,
     ["kickoff", "apply"],
-    ["--root", root, "--goal", goal],
+    ["--root", root, "--goal", goal, "--language", language],
     runner,
     planSha256,
     "pipeline.project-onboarding.v4",
@@ -3206,6 +3228,7 @@ function planBinding(plan) {
     repositoryCapability: plan.repositoryCapability,
     goal: plan.goal,
     goalSha256: plan.goalSha256,
+    language: plan.language,
     calibration: plan.calibration,
     targets: plan.targets,
     transactionSha256: plan.transactionSha256,
@@ -3240,6 +3263,7 @@ function validatePlan(plan) {
     || typeof plan.runner !== "string" || plan.runner.length === 0
     || validateKickoffGoal(plan.goal) !== plan.goal
     || sha256(Buffer.from(plan.goal, "utf8")) !== plan.goalSha256
+    || !new Set(["de", "en"]).has(plan.language)
     || !exactKeys(plan.calibration, new Set(["path", "sha256"]))
     || plan.calibration.path !== selectedAuthority.calibration
     || !SHA256_RE.test(plan.calibration.sha256 ?? "")
@@ -3328,7 +3352,7 @@ function validatePlan(plan) {
     fail("KICKOFF-PLAN-INVALID", "kickoff transaction binding is invalid");
   }
   if (canonicalJson(plan.applyAction) !== canonicalJson(
-    applyAction(plan.onboardingScript, plan.root, plan.goal, plan.planSha256, plan.runner),
+    applyAction(plan.onboardingScript, plan.root, plan.goal, plan.language, plan.planSha256, plan.runner),
   )) {
     fail("KICKOFF-PLAN-INVALID", "kickoff apply action is invalid");
   }
@@ -3349,6 +3373,7 @@ function validatePlan(plan) {
 function buildOnboardingKickoffPlan({
   rootDir,
   goal,
+  language,
   runner = "codex",
   repositoryCapability = "local",
   onboardingScript = DEFAULT_ONBOARDING_SCRIPT,
@@ -3377,10 +3402,12 @@ function buildOnboardingKickoffPlan({
       }
     }
   }
-  const language = kickoffLanguage(observed.root);
+  const resolvedLanguage = language === undefined
+    ? kickoffLanguage(observed.root)
+    : validateKickoffLanguage(language);
   const specContent = initialSpecContent(goalSha256, authority.prd);
   const specSha256 = sha256(Buffer.from(specContent, "utf8"));
-  const prdContent = initialPrdContent(normalizedGoal, goalSha256, language, specSha256);
+  const prdContent = initialPrdContent(normalizedGoal, goalSha256, resolvedLanguage, specSha256);
   const prdSha256 = sha256(Buffer.from(prdContent, "utf8"));
   const content = handoverContent(
     normalizedGoal,
@@ -3395,7 +3422,7 @@ function buildOnboardingKickoffPlan({
     prdSha256,
     specPath: authority.spec,
     specSha256,
-    language,
+    language: resolvedLanguage,
   });
   const state = {
     schema: "pipeline.state.v0",
@@ -3473,6 +3500,7 @@ function buildOnboardingKickoffPlan({
     repositoryCapability,
     goal: normalizedGoal,
     goalSha256,
+    language: resolvedLanguage,
     calibration: {
       path: selectedAuthority.calibration,
       sha256: observed.calibrationSha256,
@@ -3486,7 +3514,7 @@ function buildOnboardingKickoffPlan({
   const plan = {
     ...binding,
     planSha256,
-    applyAction: applyAction(onboardingScript, observed.root, normalizedGoal, planSha256, runner),
+    applyAction: applyAction(onboardingScript, observed.root, normalizedGoal, resolvedLanguage, planSha256, runner),
   };
   validatePlan(plan);
   if (replay) {

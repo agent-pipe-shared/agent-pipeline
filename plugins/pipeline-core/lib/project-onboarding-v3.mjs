@@ -4233,6 +4233,7 @@ export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), dep
 export function planProjectOnboardingKickoffV4({
   rootDir = process.cwd(),
   goal,
+  language,
   runner,
   deps: overrides = {},
 } = {}) {
@@ -4243,6 +4244,7 @@ export function planProjectOnboardingKickoffV4({
   return planOnboardingKickoff({
     rootDir: observed.root,
     goal,
+    language,
     runner,
     repositoryCapability: observed.repository.mode,
     onboardingScript: ONBOARDING_SCRIPT,
@@ -4253,6 +4255,7 @@ export function planProjectOnboardingKickoffV4({
 export function applyProjectOnboardingKickoffV4({
   rootDir = process.cwd(),
   goal,
+  language,
   runner,
   planSha256,
   activate = false,
@@ -4268,6 +4271,7 @@ export function applyProjectOnboardingKickoffV4({
   const plan = reconstructOnboardingKickoffPlan({
     rootDir: observed.root,
     goal,
+    language,
     runner,
     repositoryCapability: observed.repository.mode,
     onboardingScript: ONBOARDING_SCRIPT,
