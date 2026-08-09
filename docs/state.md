@@ -3103,6 +3103,50 @@ while those return, picked two more well-scoped, file-disjoint gaps from the evi
 Four dispatches now live: two Critics (K-AC-05, O-1/O-2-design §15) and two Goldfish
 (E-AC-09, C-AC-07). Verification queue applies to each as it returns.
 
+### K-AC-05 CRITIC ROUND 1: FAIL (1 BLOCKER) — REWORK DISPATCHED
+
+The K-AC-05 Critic review (`d2ad02a`) returned **FAIL**. Verified the reasoning myself before
+accepting it — this is not a rubber stamp:
+
+**F1 (blocker):** K-AC-05's text requires disposition "appended through the sanctioned recovery
+operation." The only recovery operation in the codebase is `recoverPortableGovernanceProjection`;
+the diff's own doc comment states `appendGovernanceForkDisposition` is "a SEPARATE operation"
+from it, calling neither it nor sharing its journal/receipt machinery. Independently confirmed
+by reading both functions: `appendGovernanceForkDisposition` genuinely never calls
+`recoverPortableGovernanceProjection`. Independently confirmed the DEEPER reason the dispatch
+went this way: `recoverPortableGovernanceProjection`'s own first line calls
+`verifyPortableGovernanceStream`, which calls `scanStream` unconditionally — and `scanStream`
+throws `GES-FORK` immediately on a forked stream, before returning anything. So the existing
+recovery function is currently *structurally incapable* of processing a fork at all — confirming
+this is a genuine design gap, not a naming nitpick: satisfying K-AC-05 literally requires giving
+`recoverPortableGovernanceProjection` itself fork-awareness, not adding a function beside it.
+Also independently confirmed: a pre-existing, unmodified test's own assertion MESSAGE TEXT
+("there is no separate governed-disposition operation that can process a fork") is now false
+given the new code's existence — the implementor never touched or reconciled it.
+
+**F2-F4 (minor, accepted without re-deriving each independently — the Critic's evidence
+citations are concrete file:line pairs, consistent with what I already read in the original
+diff):** untested N-way/sequence-1 fork boundaries; a hand-duplicated (not shared) validation
+loop between `scanStream` and `inspectForkedGovernanceStream`; no orphan-cleanup for the new
+disposition-file directory.
+
+**Not booked as `implemented`** (was already withheld pending Critic, per CLAUDE.md
+self-application — this is exactly the case that rule exists for). Dispatched
+**WP-K-AC05-rework1** (goldfish-deep, xhigh): fix F1 by giving `recoverPortableGovernanceProjection`
+itself real fork-awareness (two legitimate directions sketched, design choice left to the
+dispatch, non-negotiable constraint restated: DoD-3 — a recorded disposition must never make the
+stream normally writable/readable again), fix F2-F4, all under a hard constraint that the 14
+pre-existing tests keep passing with UNMODIFIED assertions (the one permitted exception: F1's
+stale test-message string, text only). Findings handed over as the Critic's own verbatim
+Gap/Risk/Evidence text — a neutral findings registry, no implementor-justification prose, per
+`templates/prompts/critic-review.md`'s rework input contract. Explicitly told this needs a FRESH
+Critic round before K-AC-05 counts as closed — not self-certified by the rework dispatch.
+
+Also noted, not yet acted on: the O-1/O-2-design Critic review truncated mid-sentence with no
+findings delivered (same failure mode as WP-R-AC10 earlier) — resumed via `SendMessage` rather
+than treated as a result. Five dispatches now live: the resumed O-1/O-2 Critic, WP-E-AC09,
+WP-C-AC07, and the new WP-K-AC05-rework1.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
