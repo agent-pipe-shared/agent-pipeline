@@ -3705,6 +3705,27 @@ message bodies).
 **Both O-1/O-2 and K-AC-05 are now parked pending PO architecture-level input.** Neither blocks
 the rest of the evidence-map closure work, which continues.
 
+### V-AC-02 NARROWED (WP-V-AC02); WP-A-AC07 DISPATCHED
+
+WP-V-AC02 landed a well-reasoned honest-partial closure: investigated all three previously-unpinned
+value classes before building anything, found only "human decision" has real grounding —
+`approved` is the sole feature-package lifecycle state gated behind PO-specific authority
+(`feature-package-topology.mjs:171`, `requiredAuthority: "po"` on the `approve` operation, verified
+myself), wired renderer-only (no model change needed). `estimate`/`assumption` stay disclosed gaps,
+not fabricated. Verified independently (7/7 tests, diff read, the authority claim checked against
+source). Narrowed `partial→partial`, 6 of 9 classes → 7 of 9 (`4717862c`).
+
+Dispatched **WP-A-AC07** (per-event-class mandatory capture — `capture-policy.json` +
+`agent-decision-journal.mjs` + `governance-event-store.mjs`'s policy enforcement path), file-disjoint
+from the one remaining live thread. Briefed with explicit design latitude to investigate whether
+each of the 7 named classes (security/privacy/authority/candidate/external-side-effect/recovery/
+verification-scope) maps to an EXISTING mechanism before building a new `kind` — only
+`verification-scope` is a `kind` today, and several of the others plausibly correspond to fields
+this codebase already has (`candidateDigest`, `personalIdentifiability`, `relatedHumanDecisionId`).
+
+**Live now:** WP-A-AC07. Both design-latitude threads (O-1/O-2, K-AC-05) remain parked pending PO
+input. Handover fully current through this checkpoint.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
