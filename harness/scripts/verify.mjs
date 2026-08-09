@@ -458,6 +458,9 @@ const TEST_SUITES = [
   { name: "po-human-approval-tests", file: join(pluginScriptsDir, "po-human-approval.test.mjs") },
   { name: "reference-path-tests", file: join(scriptDir, "check-reference-paths.test.mjs") },
   { name: "reference-path-check", file: join(scriptDir, "check-reference-paths.mjs") },
+  { name: "repair-map-tests", file: join(pluginScriptsDir, "repair-map.test.mjs") },
+  { name: "obligations-contract-tests", file: join(scriptDir, "generate-agent-obligations.test.mjs") },
+  { name: "resume-hint-tests", file: join(libDir, "resume-hint.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at

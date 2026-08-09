@@ -11,20 +11,26 @@
 > work. The rule stands and is now applied: the pending section goes first and
 > says so in its heading; a resolved section never keeps that word.
 
-## PENDING — three suites are written, green, and not run by the gate
+## NONE PENDING
+
+Every suite written in this block is registered in `harness/scripts/verify.mjs`
+and run by the gate. The resolved batches below are the record.
+
+## Resolved 2026-08-09 — the repair-map, obligations and Resume-Hint suites
 
 `plugins/pipeline-core/scripts/repair-map.test.mjs` (REPAIRMAP-1),
 `harness/scripts/generate-agent-obligations.test.mjs` (OBLIG-1) and
-`plugins/pipeline-core/lib/resume-hint.test.mjs` are **not** in `TEST_SUITES`.
-Confirmed by reading `harness/scripts/verify.mjs`, not by recalling a batch: none
-of the three names appears in it.
-
-All three pass on their own, run 2026-08-09:
+`plugins/pipeline-core/lib/resume-hint.test.mjs` are in `TEST_SUITES`. The PO ran
+the operator tool on 2026-08-09; it registered all three and ran each one green
+after writing:
 
 ```
-node plugins/pipeline-core/scripts/repair-map.test.mjs          # 7/7, exit 0
-node harness/scripts/generate-agent-obligations.test.mjs        # 9/9, exit 0
-node plugins/pipeline-core/lib/resume-hint.test.mjs             # 6/6, exit 0
+$ node harness/scripts/apply-pending-protected-edits.mjs --only=verify
+A. register pending suites in harness/scripts/verify.mjs (TP-3)
+  applied: 3 suite(s) registered and each run green:
+    + repair-map-tests
+    + obligations-contract-tests
+    + resume-hint-tests
 ```
 
 The first two cover the two halves of one route: the map answers, at runtime,
@@ -36,24 +42,14 @@ The third was found unregistered on 2026-08-09 while fixing the defect it should
 have caught — the bootstrap skill described the Resume-Hint card as four strings
 while the validator requires three of the four keys to be arrays, so the one
 carrier of material input across a session boundary was never written in either
-greenfield run. A regression in any of the three is invisible to Verify today.
+greenfield run.
 
-**The human step**, unchanged in shape from the batch below and already prepared:
-
-```
-node harness/scripts/apply-pending-protected-edits.mjs --check   # dry run, writes nothing
-node harness/scripts/apply-pending-protected-edits.mjs --only=verify
-```
-
-The dry run reports exactly these two registrations and nothing else. The tool
-refuses on a missing or ambiguous anchor, runs each newly registered suite after
-writing, and restores the original bytes if one does not pass. It does not
-commit.
-
-Its `VERIFY_ANCHOR` was re-pointed for this batch. It had gone stale the moment
-the 2026-08-08 batch landed — `nova-verify-journal-tests` stopped being the last
-entry — so the next operator run would have aborted on a missing anchor. Correct
-behaviour, and unusable until someone looked.
+`VERIFY_ANCHOR` in the operator tool was re-pointed for this batch before the run.
+It had gone stale the moment the 2026-08-08 batch landed —
+`nova-verify-journal-tests` stopped being the last entry — so the run would
+otherwise have aborted on a missing anchor. Correct behaviour, and unusable until
+someone looked. **It is now stale again**, for the same reason: `reference-path-check`
+is no longer the last entry. The next batch re-points it first.
 
 ## Resolved 2026-08-09 — the reference-path check
 
