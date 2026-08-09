@@ -1787,13 +1787,28 @@ or `governance-event.mjs` is needed for O-1 at all, and why §11's "no change in
 three files stands even after this amendment.
 
 **Wiring, minimal.** `plugins/pipeline-core/scripts/governance-authority.mjs` (already gaining a `reconcile`
-path per §11) gains one more read-only command, `resolve-identity --authority-class <class>
---occurred-at-ms <n>`, a thin CLI wrapper over the lookup above. No producer path (GMW's `install`/`close`,
-HGO's authorize/consume/deny) reads or writes the registry; populating it is a manual, PO-side act, exactly
-like editing `critical-human-proof.json` is today. The registry file is a candidate for the same GS-family
-protection `critical-human-proof.json` already gets (`GATE_STRENGTH_PATHS`, `hooks/guard-gate-strength.mjs:73`)
-so an agent cannot edit it either — noted here as follow-up guard-config work, not designed further; this
-document has no new ground to cover for it.
+path per §11) gains one more read-only verb over the lookup above — composed to fit, not bypass, its existing
+closed shape. `parse(argv)` (`governance-authority.mjs:12-23`) accepts exactly four `argv` entries,
+`argv[0] === "--repo"`, and `argv[2]` one of six enumerated flags, each an existing verb's `-file`/`-json`
+pair carrying a single canonical-JSON payload in `argv[3]` — not a multi-flag CLI. A bare `resolve-identity
+--authority-class <class> --occurred-at-ms <n>` does not fit that shape at all. The verb is added the same way
+every other one was: two more entries in the `Set` at `:13`, `--resolve-identity-file` and
+`--resolve-identity-json`, each carrying the canonical-JSON payload `{authorityClass, occurredAtEpochMs}` —
+exactly `resolveNaturalPersonIdentity`'s two parameters. `main()` (`:39-99`) gains one more early branch,
+alongside its existing `consumptionReadback`/`consumption`/default three, that validates this payload's exact
+shape, calls `resolveNaturalPersonIdentity` directly against the local registry (no
+`queryHumanGovernanceDecisions` call — this verb never touches the ledger), and returns
+`Object.freeze({schema: "pipeline.governance-authority-identity-readback.v1", ...result})`, the same
+freeze-and-print convention every other branch already uses (`:102`). No producer path (GMW's
+`install`/`close`, HGO's authorize/consume/deny) reads or writes the registry; populating it is a manual,
+PO-side act, exactly like editing `critical-human-proof.json` is today. **Unlike `critical-human-proof.json`,
+no guard protects this file today.** `identity-registry.json` lives outside the worktree (above);
+`gateStrengthRuleFor` (`guard-gate-strength.mjs:170-178`) resolves every candidate path against the project
+root and returns no rule whenever the resolved path lies outside it (`rel.startsWith('..' + sep)`) — GS-family
+protection is worktree-relative by construction and structurally cannot reach a path outside the project
+directory without unrelated guard changes out of this design-doc-only dispatch's scope. Populating **and**
+protecting this file are therefore both currently unenforced, manual, PO-side acts. Disclosed as a residual,
+not designed around here — §15.1.6.
 
 #### 15.1.3 (a)/(b) Assurance and shape: self-declared, bounded, no new ceremony
 
@@ -1858,11 +1873,12 @@ insertion, immediately after that paragraph, same style:**
 > `authorityClass` and the decision's own `occurredAtEpochMs` — fields the portable record already exposes for
 > their existing purpose under this criterion's own first clause — a local holder of both the portable stream
 > and the registry can attribute a decision, from **either** producer, to a natural person by role and time
-> window whenever the registry holds a covering entry for that decision's `authorityClass` and
+> window whenever the registry holds exactly one covering entry for that decision's `authorityClass` and
 > `occurredAtEpochMs`; where no covering entry exists, resolution yields no identity
-> (`resolveNaturalPersonIdentity`'s `unknown` outcome, or `ambiguous` on an overlap defect, §15.1.2), and this
-> clause's disclosure reaches exactly that conditional case, not an unconditional one. This clause's "no
-> portable counterpart or join handle" is read, as of this amendment, to forbid a
+> (`resolveNaturalPersonIdentity`'s `unknown` outcome); where more than one entry would cover it instead —
+> reachable only if the file was hand-edited around the overlap check, §15.1.2 — resolution yields `ambiguous`
+> rather than guessing; and this clause's disclosure reaches only the resolving case, not either non-resolving
+> outcome. This clause's "no portable counterpart or join handle" is read, as of this amendment, to forbid a
 > correlator manufactured for the purpose of joining — a decision ID, a request digest, a candidate, or any
 > value derived from the trust anchor (§5.1) — not the pre-existing `authorityClass` and `occurredAtEpochMs`
 > fields the ledger already carries for authority and event time. **This does NOT exempt
@@ -1890,6 +1906,19 @@ that explicit and queryable rather than pretending an anonymity the deployment d
 that trade is acceptable for a future multi-human PO is not this document's call — it is disclosed, exactly as
 O-5 (§14) disclosed a comparable single-human-shaped simplification, for whoever generalizes this later to read
 rather than discover.
+
+**Also new, and not currently closed: the registry file itself carries no write protection today.**
+`identity-registry.json` lives outside the worktree (§15.1.2), and `gateStrengthRuleFor`
+(`guard-gate-strength.mjs:170-178`) resolves every candidate path against the project root, returning no rule
+whenever that path lies outside it — GS-family protection is worktree-relative by construction and cannot
+reach a machine-local file outside the project directory without guard changes this document does not design
+(out of scope here, §15.1.2). No guard today prevents an agent with local write access from editing or
+corrupting this file undetected. This is not a weaker claim than the mechanism already makes: §15.1.3(a)
+already sets the registry's assurance ceiling at self-asserted, never independently verified, never signed —
+an unprotected file is consistent with, not a regression from, that ceiling, since the ceiling never assumed
+write protection existed. Tracked as a residual, owner `pipeline` (PHX-2), alongside the role-and-time-
+granularity residual above; closing it is follow-up guard-config work outside a design-doc-only dispatch's
+scope, not designed further here.
 
 ### 15.2 O-2 — closing the synchronous guard-hook gap inside increment 1
 
