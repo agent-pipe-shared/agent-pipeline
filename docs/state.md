@@ -3147,6 +3147,22 @@ findings delivered (same failure mode as WP-R-AC10 earlier) — resumed via `Sen
 than treated as a result. Five dispatches now live: the resumed O-1/O-2 Critic, WP-E-AC09,
 WP-C-AC07, and the new WP-K-AC05-rework1.
 
+### C-AC-07 CLOSED (`dedd2ef`)
+
+Verified independently (own `node --test` run, `git show --stat`, diff read): `journalBinding`/
+`createChangeControlJournal` gain `changeClass`; a new `retrospective` entry class is refused by
+`appendChangeControlEntry` unless strictly later than the local event it reviews (cannot be
+backdated to gate time by construction); `projectChangeControlState` withholds `completed` for
+`changeClass: "emergency"` behind a new `emergency-review-required`/`retrospective-evidence-
+outstanding` status, additive to C-AC-06's existing published-external-update bar, every other
+class unaffected (confirmed no other caller of `createChangeControlJournal` exists anywhere in
+the codebase yet, so the schema addition breaks nothing downstream). 17/17 green under my own
+run. Evidence map moved to `implemented`. Cleaned up the dispatch's own untracked
+`.wp-c-ac07-scratch/` (it flagged this itself as housekeeping — harmless, unversioned, same
+scratchpad-guard workaround WP-C-AC12 hit).
+
+WP-E-AC09 and WP-K-AC05-rework1 still running; the resumed O-1/O-2-design Critic still running.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
