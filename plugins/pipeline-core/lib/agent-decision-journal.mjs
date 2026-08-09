@@ -72,13 +72,53 @@ export function validateAgentDecisionEvent(value) {
  * other than `not-applicable` -- recording what cleanup/readback is
  * required only makes sense once WHETHER one is needed has itself been
  * asserted.
+ *
+ * R-AC-09: `occurredAtEpochMs` is the field this criterion's "stale"
+ * clause needs -- until now no timestamp existed anywhere on this shape,
+ * so staleness could not be evaluated at all. This module has no notion
+ * of "now" or a hard staleness window today, and unilaterally inventing
+ * one would be a caller's policy this validator does not own; the
+ * criterion's own text ("SHALL render it ... never successful") is a
+ * rendering requirement, satisfied by exposing a bounded, comparable
+ * timestamp for a caller to judge staleness against its own window, not
+ * by embedding a rejection threshold here. Optional at the key level,
+ * exactly like `requiredCleanup` above and `assumptionState`/`identity`
+ * on `validateAgentDecisionEvent`, so every pre-existing command-offer
+ * fixture keeps validating unchanged. Format-validated only -- a
+ * non-negative safe integer, matching `occurredAtEpochMs`'s existing
+ * meaning on the governance-event envelope (governance-event.mjs) --
+ * and never scoped to a particular `state`: every command-offer event in
+ * a lifecycle (offer, attempt, outcome, recovery) has its own "when this
+ * occurred" fact, and none of them constrain it against another.
+ * Deliberately excluded from `external-command-offer.mjs`'s `sameOffer`/
+ * `sameRecoveryContext` identity checks for the same reason: a later
+ * event in the same lifecycle is expected to carry a different, later
+ * timestamp -- that is not substitution.
+ *
+ * R-AC-09's "duplicated" clause is deliberately NOT addressed by a new
+ * field or rule here: `governance-event-store.mjs`'s
+ * `appendPortableGovernanceEvent` already detects a duplicate/
+ * conflicting submission via its own `idempotencyKey` mechanism
+ * (idempotent-replay on an exact match, `GES-IDEMPOTENCY-CONFLICT` on a
+ * same-key/different-digest submission), exercised end-to-end for
+ * agent-origin events generically by this file's own A-AC-13
+ * store-integration test (not command-offer-specific, but the same
+ * store code path a wired command-offer append would use).
+ * A pre-existing R-AC-13 test in `external-command-offer.test.mjs`
+ * documents that duplicate/retry detection is intentionally NOT done at
+ * this validation layer, delegated entirely to the caller-supplied
+ * `append()`; this function has no visibility into prior events to
+ * compare against in any case. Building a second duplicate-detection
+ * mechanism here would both contradict that documented design and be
+ * redundant with the store layer's existing one.
  */
 export function validateCommandOfferEvent(value) {
   const keys=["eventId","kind","state","reasonCode","candidateDigest","relatedHumanDecisionId","supersedesEventId","offerOrigin","operation","target","sideEffectClass","authorityRequirement","policyDigest","redactionPolicyDigest","executionAssurance","omissions","offerEventId","preEvidenceDigest","postEvidenceDigest","recoverability"];
   const hasRequiredCleanup=rec(value)&&Object.hasOwn(value,"requiredCleanup");
-  const extended=hasRequiredCleanup?[...keys,"requiredCleanup"]:keys;
+  const hasOccurredAtEpochMs=rec(value)&&Object.hasOwn(value,"occurredAtEpochMs");
+  const extended=[...keys,...(hasRequiredCleanup?["requiredCleanup"]:[]),...(hasOccurredAtEpochMs?["occurredAtEpochMs"]:[])];
   const validRequiredCleanup=(cleanup)=>exact(cleanup,["cleanupClass","status","digest"])&&ID.test(cleanup.cleanupClass)&&CLEANUP_STATUSES.has(cleanup.status)&&(cleanup.digest===null||SHA.test(cleanup.digest));
-  if(!exact(value,extended)||value.kind!=="command-offer"||!ID.test(value.eventId)||!COMMAND_STATES.has(value.state)||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&!ID.test(value.relatedHumanDecisionId))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId))||!["pipeline-initiated","user-requested-pipeline-supplied"].includes(value.offerOrigin)||!exact(value.operation,["operationClass","version","governedArtifactSha256"])||!ID.test(value.operation.operationClass)||(value.operation.version!==null&&!ID.test(value.operation.version))||(value.operation.governedArtifactSha256!==null&&!SHA.test(value.operation.governedArtifactSha256))||!exact(value.target,["repositoryFingerprint","scopeDigest"])||!SHA.test(value.target.repositoryFingerprint)||!SHA.test(value.target.scopeDigest)||!["non-authoritative","destructive","guard-bypass","authority-changing"].includes(value.sideEffectClass)||!["not-required","human-decision-required"].includes(value.authorityRequirement)||!SHA.test(value.policyDigest)||!SHA.test(value.redactionPolicyDigest)||!COMMAND_ASSURANCE.has(value.executionAssurance)||!Array.isArray(value.omissions)||value.omissions.length<4||value.omissions.length>7||new Set(value.omissions).size!==value.omissions.length||value.omissions.some((entry)=>!OMITTABLE.has(entry))||!["raw-command","arguments","private-coordinates","unrestricted-output"].every((entry)=>value.omissions.includes(entry))||(value.offerEventId!==null&&!ID.test(value.offerEventId))||(value.preEvidenceDigest!==null&&!SHA.test(value.preEvidenceDigest))||(value.postEvidenceDigest!==null&&!SHA.test(value.postEvidenceDigest))||!["not-applicable","recoverable","cleanup-required","rollback-required"].includes(value.recoverability)||(hasRequiredCleanup&&!validRequiredCleanup(value.requiredCleanup)))fail("ADJ-COMMAND-OFFER");
+  if(!exact(value,extended)||value.kind!=="command-offer"||!ID.test(value.eventId)||!COMMAND_STATES.has(value.state)||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&!ID.test(value.relatedHumanDecisionId))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId))||!["pipeline-initiated","user-requested-pipeline-supplied"].includes(value.offerOrigin)||!exact(value.operation,["operationClass","version","governedArtifactSha256"])||!ID.test(value.operation.operationClass)||(value.operation.version!==null&&!ID.test(value.operation.version))||(value.operation.governedArtifactSha256!==null&&!SHA.test(value.operation.governedArtifactSha256))||!exact(value.target,["repositoryFingerprint","scopeDigest"])||!SHA.test(value.target.repositoryFingerprint)||!SHA.test(value.target.scopeDigest)||!["non-authoritative","destructive","guard-bypass","authority-changing"].includes(value.sideEffectClass)||!["not-required","human-decision-required"].includes(value.authorityRequirement)||!SHA.test(value.policyDigest)||!SHA.test(value.redactionPolicyDigest)||!COMMAND_ASSURANCE.has(value.executionAssurance)||!Array.isArray(value.omissions)||value.omissions.length<4||value.omissions.length>7||new Set(value.omissions).size!==value.omissions.length||value.omissions.some((entry)=>!OMITTABLE.has(entry))||!["raw-command","arguments","private-coordinates","unrestricted-output"].every((entry)=>value.omissions.includes(entry))||(value.offerEventId!==null&&!ID.test(value.offerEventId))||(value.preEvidenceDigest!==null&&!SHA.test(value.preEvidenceDigest))||(value.postEvidenceDigest!==null&&!SHA.test(value.postEvidenceDigest))||!["not-applicable","recoverable","cleanup-required","rollback-required"].includes(value.recoverability)||(hasRequiredCleanup&&!validRequiredCleanup(value.requiredCleanup))||(hasOccurredAtEpochMs&&!(Number.isSafeInteger(value.occurredAtEpochMs)&&value.occurredAtEpochMs>=0)))fail("ADJ-COMMAND-OFFER");
   if(value.authorityRequirement==="human-decision-required"&&value.relatedHumanDecisionId===null)fail("ADJ-COMMAND-AUTHORITY");
   if(value.state==="offered"&&(value.offerEventId!==null||value.executionAssurance!=="not-applicable"||value.preEvidenceDigest!==null||value.postEvidenceDigest!==null))fail("ADJ-COMMAND-OFFER");
   if(value.state!=="offered"&&value.offerEventId===null)fail("ADJ-COMMAND-LINK");

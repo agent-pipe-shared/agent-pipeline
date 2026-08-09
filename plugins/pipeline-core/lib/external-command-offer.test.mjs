@@ -126,6 +126,23 @@ test("R-AC-09: cross-repository and cross-scope substitution are rejected, not o
   await assert.rejects(recordCommandOutcome({ offer: event(), outcome: crossScope, append }), (error) => error.code === "ECO-OUTCOME");
 });
 
+test("R-AC-09: a well-formed occurrence timestamp flows through recordCommandOffer end-to-end, and a malformed one is rejected before append", async () => {
+  const withTimestamp = event({ occurredAtEpochMs: 1754000000000 });
+  let seen = null;
+  const receipt = await recordCommandOffer({ offer: withTimestamp, append: async (value) => { seen = value; return append(value); } });
+  assert.equal(receipt.status, "offered");
+  assert.equal(seen.occurredAtEpochMs, 1754000000000);
+  const malformed = event({ occurredAtEpochMs: -1 });
+  await assert.rejects(recordCommandOffer({ offer: malformed, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
+});
+
+test("R-AC-09: an outcome's occurrence timestamp is never compared against the offer's -- a later, different value on the outcome is not treated as substitution", async () => {
+  const offerWithTimestamp = event({ occurredAtEpochMs: 1754000000000 });
+  const laterOutcome = follow("failed", { occurredAtEpochMs: 1754000005000 });
+  const receipt = await recordCommandOutcome({ offer: offerWithTimestamp, outcome: laterOutcome, append });
+  assert.equal(receipt.status, "failed");
+});
+
 test("R-AC-11: a public-safe typed omission is mandatory — dropping one of the four required labels is rejected; an extra sanctioned label (e.g. credential) is admitted", async () => {
   const incomplete = event({ omissions: ["raw-command", "arguments", "unrestricted-output"] });
   await assert.rejects(recordCommandOffer({ offer: incomplete, append }), (error) => error.code === "ADJ-COMMAND-OFFER");

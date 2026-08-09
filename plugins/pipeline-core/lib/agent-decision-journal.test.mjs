@@ -46,6 +46,36 @@ test("R-AC-04 records a distinct required-cleanup/readback field, optional, scop
   assert.throws(()=>validateCommandOfferEvent(offer({recoverability:"rollback-required",requiredCleanup:{cleanupClass:"manual-file-restore",status:"pending",digest:"not-a-digest"}})),(error)=>error.code==="ADJ-COMMAND-OFFER");
   assert.throws(()=>validateCommandOfferEvent(offer({recoverability:"not-applicable",requiredCleanup:{cleanupClass:"manual-file-restore",status:"pending",digest:null}})),(error)=>error.code==="ADJ-COMMAND-CLEANUP-SCOPE");
 });
+
+// R-AC-09: `occurredAtEpochMs` closes the "stale" clause by giving a
+// command-offer event a timestamp at all (previously none existed on this
+// shape anywhere). Optional at the key level, exactly like `requiredCleanup`
+// above, so every pre-existing fixture keeps validating with no key present.
+// Format-validated only (a non-negative safe integer); no hardcoded
+// staleness window is embedded here (see the function's own doc comment).
+// The "duplicated" clause is deliberately not re-covered by a new mechanism
+// here: it is already substantially covered by governance-event-store.mjs's
+// idempotencyKey-based duplicate/conflict detection at the append layer
+// (see the function's own doc comment and this file's A-AC-13 test above),
+// and a pre-existing R-AC-13 test in external-command-offer.test.mjs
+// documents that this validation layer intentionally delegates duplicate/
+// retry detection to the caller-supplied append(), which this dispatch must
+// not contradict.
+test("R-AC-09 records a stale-evaluable occurrence timestamp, optional, format-validated, unscoped by state",()=>{
+  const withTimestamp=validateCommandOfferEvent(offer({occurredAtEpochMs:1754000000000}));
+  assert.equal(withTimestamp.occurredAtEpochMs,1754000000000);
+  assert.equal(Object.hasOwn(validateCommandOfferEvent(offer()),"occurredAtEpochMs"),false,"absence must stay absence, not a synthesised value");
+  const zero=validateCommandOfferEvent(offer({occurredAtEpochMs:0}));
+  assert.equal(zero.occurredAtEpochMs,0,"zero is a valid epoch timestamp, not treated as falsy-absent");
+  for(const state of ["offered","attempted","failed","recovery-proposed"]){
+    const fixture=state==="offered"?offer({occurredAtEpochMs:5}):offer({state,executionAssurance:state==="recovery-proposed"?"not-applicable":state,offerEventId:"offer-origin",occurredAtEpochMs:5});
+    assert.equal(validateCommandOfferEvent(fixture).occurredAtEpochMs,5,`occurredAtEpochMs was rejected or altered for state ${state}`);
+  }
+});
+test("R-AC-09 rejects a malformed occurrence timestamp with ADJ-COMMAND-OFFER",()=>{
+  for(const occurredAtEpochMs of [-1,1.5,"1754000000000",null,NaN,Infinity,Number.MAX_SAFE_INTEGER+1])
+    assert.throws(()=>validateCommandOfferEvent(offer({occurredAtEpochMs})),(error)=>error.code==="ADJ-COMMAND-OFFER",`malformed occurredAtEpochMs ${String(occurredAtEpochMs)} was admitted`);
+});
 // R-AC-05 enumerates what must never cross a durable boundary. The journal
 // rejects rather than redacts, and it does so structurally: no prohibited field
 // is representable in either event shape, and the single digest slot is typed
