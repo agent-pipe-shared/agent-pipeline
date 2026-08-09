@@ -1887,6 +1887,32 @@ The dispatch substituted two real sibling suites under an explicit label rather 
 skipping the check, and it removed a QG-06 deferred decision whose promise its own
 work had made obsolete instead of leaving a stale expiry standing.
 
+### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
+
+*"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
+eine Nacht."* That wording is more precise than the option as I had framed it, and the
+difference is the whole disposition.
+
+**What this settles.** The five files are not carved out. What is acknowledged is that
+harness-level checks have been created outside the Epic's §7 inventory throughout this
+sprint — at least eight of them, one by a commit whose own subject carries a Phoenix package
+id. No Spec edit, no authority rebind, no approval renewal. The Critic's F3 is closed on
+this disposition rather than repaired.
+
+**What it does not settle, and must not be allowed to look settled.** Acknowledging a
+practice is only defensible if the gap that produced it is recorded, so the item filed
+alongside this is not about the five files at all: **nothing checks that a declared file
+inventory still matches the tree.** That absence is what let eight files through unnoticed,
+and repairing the last five entries while leaving the mechanism absent would have made §7
+look maintained while remaining exactly as stale — the failure mode this sprint has spent
+its time naming elsewhere.
+
+**Deliberately not proposed:** a check that fails on any unlisted file. An inventory is a
+statement of intent, not a whitelist of the filesystem, and a gate that goes red on every
+new file gets switched off inside a day. The proposal is: fail on an inventory entry whose
+path does not exist, report on tracked files under the covered roots that the inventory does
+not name.
+
 ### F3 RE-MEASURED WHILE PREPARING ITS OWN OPTION B: §7 HAS BEEN STALE ALL SPRINT, NOT SINCE TONIGHT
 
 I went to write the Spec rows for option B and checked first whether comparable files were
