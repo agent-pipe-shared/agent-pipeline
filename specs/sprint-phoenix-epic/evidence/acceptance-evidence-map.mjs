@@ -881,6 +881,19 @@ const DELTA = {
   // activation tests pass.
   'P-AC-03': ['implemented', 'WP-P-AC01-AC03'],
 
+  // H-AC-12: decision-reference-dual-evaluation.mjs is the shared "dual-
+  // evaluate during migration, fail on disagreement, carry a shared
+  // compatibility owner+expiry" primitive, wired into the two lowest-risk
+  // named subsystems: guard-devplan.mjs's legacy/v2/v4 plan-approval path
+  // (previously a bare skip -- zero second evaluation) and change-control.mjs's
+  // pipelineAuthority gate (optional decisionReference, byte-for-byte
+  // unchanged when absent). guard-push.mjs, pipeline-state.mjs, release
+  // planning, deploy approval/consumption, and Git-guard override consumption
+  // remain open -- deliberately narrowed, not closed. 40/40 + 33/33 + 10/10 +
+  // 3/3 tests pass across all four consumer files, including the CLI-level
+  // change-control test.
+  'H-AC-12': ['partial', 'WP-H-AC12'],
+
   // R-AC-04: an optional requiredCleanup field on validateCommandOfferEvent
   // (agent-decision-journal.mjs -- the real edit surface; external-command-
   // offer.mjs only consumes it) records WHAT cleanup/readback is required
@@ -989,7 +1002,7 @@ const POINTERS = {
   'H-AC-09': 'NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target. RECLASSIFIED Class S -> Class P 2026-08-09 (PO-confirmed): the clause\'s own subject -- authorizing guarded work IN another repository -- is exactly the capability CLAUDE.md\'s Sprint-0 hard rule currently forbids outright ("Read-only toward the three project repos ... never a write ... until an explicitly approved Phase-4 migration"). There is no design to scope: building a cross-repository binding mechanism for a write capability this repo is not yet authorized to exercise would be building ahead of its own governing policy, not closing a gap. Closes only if/when a Phase-4 migration lifts the restriction, or the PO narrows the clause\'s scope by amendment (the same route H-AC-11 already used) -- either way, not a code task available now',
   'H-AC-10': 'five named assertions covering scope, reason, expiry, constraints, follow-up review, no standing bypass',
   'H-AC-11': 'portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4)',
-  'H-AC-12': 'guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier',
+  'H-AC-12': 'guard-devplan/change-control-tests (WP-H-AC12): the shared dual-evaluation primitive (decision-reference-dual-evaluation.mjs) now closes the migration-boundary gap for two of five named subsystems -- guard-devplan.mjs (legacy/v2/v4 plans, previously a bare skip) and change-control.mjs (optional decisionReference). guard-push.mjs, pipeline-state.mjs, release planning, and deploy/override paths remain open, deliberately narrowed. 40/40 + 33/33 + 10/10 + 3/3 tests pass',
   'H-AC-13': 'human-governance-ledger-tests + store admission: prohibited content rejected before any temporary file exists',
   'H-AC-14': 'docs/governance-events.md (PHX-WP-DOC-1 + PHX-WP-DOC-3): all eight named parts present -- migration/retention/recovery/operator-guidance and schema/taxonomy/authority-trust-model were already solid, and a dedicated "Human ledger: threat model" section now covers eight scenarios each tied to an HGL-* code and, where one exists, an H-AC-15 test',
   'H-AC-15': 'human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed)',
