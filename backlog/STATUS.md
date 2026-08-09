@@ -23,6 +23,7 @@
 | pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.bare-branch-name-in-git-push-fails-approval-with-a-misleading-code | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.canonical-worktree-lifecycle | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.citation-coordinate-checker-bare-basename | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | open | defect | pipeline | 2026-08-05 | — |
@@ -94,6 +95,7 @@
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-authority-dual-state-repair-and-failclosed-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.push-release-flow-unusable-for-third-party-adopters | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.readonly-command-guard-classification | open | workflow-improvement | pipeline | 2026-07-26 | — |
@@ -124,6 +126,7 @@
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.trust-mismatch-names-neither-key-nor-directory | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.verify-gate-scoped-registration | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.verify-gate-unreachable-without-a-session-cleanup-binding | open | defect | pipeline | 2026-08-07 | — |
@@ -136,6 +139,6 @@
 
 ## Counts
 
-- open: 78
+- open: 81
 - in_progress: 26
 - closed: 24
