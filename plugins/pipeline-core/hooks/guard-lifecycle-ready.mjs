@@ -1213,28 +1213,41 @@ function sanctionedMigrationArgs(args, root) {
     || (args.length === 5 && args[3] === "--initialize-missing-runtime" && args[4] === "--activate");
 }
 
+// GF-060 (backlog: 2026-08-09-guard-lifecycle-ready-runner-allowlist-incomplete.md;
+// originally GF-059's finding (a), never merged -- HEAD carried none of this widening,
+// for any subcommand). session-cleanup.mjs's own USAGE text and arg-parsing table
+// document and accept an optional `--runner claude|codex` pair on every one of its
+// subcommands (ADR-0051's runner threading). Same optional-tail style as
+// sanctionedHumanOverrideArgs()'s exactAuthorRoot(...): a fixed base shape, plus an
+// exact optional suffix -- never a loosened match on the base shape itself, so a wrong
+// runner value, extra/misordered args, or a duplicate --runner still falls through to
+// exact rejection.
 function sanctionedSessionCleanupArgs(args, root) {
+  const exactRunnerTail = (index) => args[index] === "--runner"
+    && (args[index + 1] === "claude" || args[index + 1] === "codex");
   if (["start", "status", "release-binding", "plan-recovery", "plan-human-recovery", "plan-privatization"].includes(args[0])) {
-    return args[1] === "--repo" && args[2] === root && args.length === 3;
+    const base = args[1] === "--repo" && args[2] === root;
+    return base && (args.length === 3 || (exactRunnerTail(3) && args.length === 5));
   }
   if (args[0] === "confirm-privatization") {
-    return args[1] === "--repo" && args[2] === root
+    const base = args[1] === "--repo" && args[2] === root
       && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
-      && args[5] === "--accept" && args.length === 6;
+      && args[5] === "--accept";
+    return base && (args.length === 6 || (exactRunnerTail(6) && args.length === 8));
   }
   if (["apply-recovery", "apply-privatization"].includes(args[0])) {
-    if (args[1] !== "--repo" || args[2] !== root
-      || args[3] !== "--plan-sha256" || !HEX.test(args[4] ?? "")) return false;
-    return (args[0] === "apply-recovery" && args[5] === "--activate" && args.length === 6)
-      || (args[0] === "apply-privatization" && args[5] === "--activate" && args.length === 6);
+    const base = args[1] === "--repo" && args[2] === root
+      && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
+      && args[5] === "--activate";
+    return base && (args.length === 6 || (exactRunnerTail(6) && args.length === 8));
   }
-  return args[0] === "cleanup"
+  const base = args[0] === "cleanup"
     && args[1] === "--repo" && args[2] === root
     && args[3] === "--session-descriptor"
     && /^[A-Za-z0-9._-]{1,80}$/u.test(args[4] ?? "")
     && args[5] === "--expected-descriptor-sha256"
-    && HEX.test(args[6] ?? "")
-    && args.length === 7;
+    && HEX.test(args[6] ?? "");
+  return base && (args.length === 7 || (exactRunnerTail(7) && args.length === 9));
 }
 
 /**

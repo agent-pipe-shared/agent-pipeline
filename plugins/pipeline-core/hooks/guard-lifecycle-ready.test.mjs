@@ -1491,6 +1491,62 @@ test("non-ready cleanup recovery and privatization admit only exact closed argv"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// GF-060 (backlog: 2026-08-09-guard-lifecycle-ready-runner-allowlist-incomplete.md).
+// session-cleanup.mjs's own USAGE text and arg-parsing table document and accept an
+// optional `--runner claude|codex` flag on every subcommand this allowlist covers, but
+// the allowlist demanded an exact closed argv with no room for it. Investigation for
+// this dispatch found the allowlist admitted it for NONE of these subcommands on this
+// branch's HEAD (an earlier attempt at the six-subcommand subset, GF-059, was never
+// merged -- abandoned worktree branch f3bbf275/20d562bf); this is therefore the first
+// landed coverage of the full documented surface, not an extension of an already-merged
+// subset. One comprehensive test rather than one per subcommand group, since the fix is
+// the same optional-tail predicate applied identically across all four branches.
+test("non-ready session-cleanup admits the documented optional --runner tail on every subcommand this allowlist covers", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const digest = "a".repeat(64);
+    const admitted = [
+      "start --repo '${path}'",
+      "status --repo '${path}'",
+      "release-binding --repo '${path}'",
+      "plan-recovery --repo '${path}'",
+      "plan-human-recovery --repo '${path}'",
+      "plan-privatization --repo '${path}'",
+      `confirm-privatization --repo '\${path}' --plan-sha256 ${digest} --accept`,
+      `apply-recovery --repo '\${path}' --plan-sha256 ${digest} --activate`,
+      `apply-privatization --repo '\${path}' --plan-sha256 ${digest} --activate`,
+      `cleanup --repo '\${path}' --session-descriptor session-01 --expected-descriptor-sha256 ${digest}`,
+    ];
+    for (const template of admitted) {
+      // eslint-disable-next-line no-template-curly-in-string -- intentional: `${path}` is
+      // substituted per-iteration below, after the fixture's own `path` is in scope.
+      const base = template.replaceAll("${path}", path);
+      for (const runner of ["claude", "codex"]) {
+        const invocation = `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner ${runner}`;
+        assert.equal(isSanctionedLifecycleCommand(invocation, path), true, invocation);
+        assert.equal(evaluateLifecycleReadyGuard(bash(invocation), {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+        }).exitCode, 0, invocation);
+      }
+      for (const rejected of [
+        `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner cursor`,
+        `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner`,
+        `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner claude --extra`,
+        `node '${SESSION_CLEANUP_SCRIPT}' ${base} --runner claude --runner codex`,
+        `node '${SESSION_CLEANUP_SCRIPT}' --runner claude ${base}`,
+      ]) {
+        assert.equal(isSanctionedLifecycleCommand(rejected, path), false, rejected);
+        assert.equal(evaluateLifecycleReadyGuard(bash(rejected), {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+        }).exitCode, 2, rejected);
+      }
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("partial lifecycle admits only exact rebase abort plus ordinary readback", () => {
   const path = root();
   try {
