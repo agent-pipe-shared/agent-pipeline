@@ -31,4 +31,32 @@ something to do here without review.
 
 ## Entries
 
-None yet.
+## Candidate 3a8589152e778fc1ec164c6a5ba981139c431a90 — 2026-08-09, range 8dcb1cc..3a85891 (the unpushed sprint_phoenix range); ADR-0045 checked and a divergence filed as pipeline.adr-0045-topology-divergence-from-package-and-skill
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Notes for a reader, outside the two machine-parsed lines above. ADR-0012 governs
+`docs/state.md`, which this range rewrites heavily; its decision — one canonical
+versioned handover file, memory mirror-only, the open-items block referenced
+rather than hand-maintained — is unaffected, and the file is still the only
+handover. Its recorded risk, *secondary sources creep back in*, did materialise
+in this range, but **inside** `state.md` rather than between files: a decision
+list at the top kept reading as authoritative after it stopped being true, and
+was corrected in `a69c288`. That is the ADR's risk being right, not the ADR being
+wrong.
+
+ADR-0045 governs `specs/**` and was implicated by three changed files. Reading it
+against the package it governs surfaced a real divergence — four root artifacts
+its enumeration does not name, and a PRD filename that disagrees between the
+record, the disk and the shipped bootstrap skill. **No change to the ADR is made
+here**, because both halves are governance questions rather than edits; they are
+filed as `pipeline.adr-0045-topology-divergence-from-package-and-skill`,
+committed in `3a85891`.
+
+That is the honest reading of `checked, no change needed` in this case: the
+decision record was read against its subject and left alone deliberately. The
+format offers exactly two line shapes, and neither says "checked, and a
+divergence was filed". A third shape is worth adding, and adding it belongs in
+the same review as the ancestor-span widening noted above rather than in the
+commit that first needed it.
