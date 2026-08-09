@@ -850,6 +850,15 @@ const DELTA = {
   // reasonCode, preEvidenceDigest, candidateDigest, supersedesEventId) with
   // no new field. 27/27 external-command-offer tests pass, 3 new.
   'R-AC-02': ['implemented', 'WP-R-AC02'],
+
+  // E-AC-10: evaluateGovernanceExportBoundaryGate (governance-export-outbox.mjs)
+  // is a pure read-only gate reusing the outbox's existing acknowledged-prefix
+  // cursor to name the exact unacknowledged range (pending + quarantined, not
+  // silently excluded) at one named boundary, with a structured per-status
+  // recovery description. Quarantined-entry recovery has no existing
+  // mechanism -- disclosed as a residual, not built here. 12/12
+  // governance-export-outbox tests pass, 5 new.
+  'E-AC-10': ['implemented', 'WP-E-AC10'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
