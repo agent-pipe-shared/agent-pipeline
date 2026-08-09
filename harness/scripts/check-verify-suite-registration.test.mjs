@@ -195,11 +195,11 @@ check("the checker's own two files are not declared exclusions", () => {
   assert.equal(Object.prototype.hasOwnProperty.call(EXCLUSIONS, "harness/scripts/check-verify-suite-registration.test.mjs"), false);
 });
 
-check("EXCLUSIONS is exactly the 1 surviving red suite plus 6 green suites parked on a closed maintenance window, each with reason, owner and expiry", () => {
+check("EXCLUSIONS is exactly the 1 surviving red suite plus 7 green suites parked on a closed maintenance window, each with reason, owner and expiry", () => {
   // Two classes, kept apart on purpose. A red suite is a defect that must not be
   // registered; a green suite waiting on a human signature is a scheduling fact.
   // Asserting them separately means the green one cannot quietly become the cover
-  // for a sixth red one, which a flat six-entry list would have allowed.
+  // for an eighth red one, which a flat seven-entry list would have allowed.
   const red = [
     "plugins/pipeline-core/scripts/afk-activation.test.mjs",
   ];
@@ -207,6 +207,7 @@ check("EXCLUSIONS is exactly the 1 surviving red suite plus 6 green suites parke
     "harness/lib/plan-spec-state-v2.test.mjs",
     "harness/scripts/check-adr-consistency.test.mjs",
     "harness/scripts/check-critic-contract-citations.test.mjs",
+    "harness/scripts/check-doc-reconciliation.test.mjs",
     "harness/scripts/recovery-bridge-approval.test.mjs",
     "plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs",
     "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs",
