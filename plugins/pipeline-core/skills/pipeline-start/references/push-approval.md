@@ -4,6 +4,15 @@ Load this when a session reaches, explains, or is about to discuss the push
 gate. Everything here is about the moment a **human** has to act; the session's
 own job is to state it clearly and then wait.
 
+> **Changed under [ADR-0061](../../../../../docs/adr/0061-uniform-human-approval-ceremony.md).**
+> In `signature` mode the human's part is now **one command, the word
+> `approve`, and the passphrase** — `authorize-critical` collapsed the old
+> two-step `prepare-critical`/`approve-critical` shape into a single
+> invocation. The sections below describe both the current shape and what it
+> replaced, because a repository running an older plugin build still walks the
+> old one. See `docs/push-release-flow.md` for the full, canonical, layer-by-layer
+> description this reference summarizes.
+
 ## The one setting
 
 `gates.push_approval` in `pipeline.user.yaml` decides how a human clears a push.
@@ -79,13 +88,25 @@ Everything a session may run is read-only or verify-only. The signing step is th
 human's, in their own terminal, at their own prompt — a session never handles key
 material and never types a passphrase.
 
+### The human's one command (current shape)
+
 ```
-node plugins/pipeline-core/scripts/po-human-approval.mjs
+node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical \
+  --repo-root <repo> --directory <external-po-dir> \
+  --feature-id <featureId> \
+  --plan <repo-relative-PRD-path> --spec <repo-relative-spec-path> \
+  --kind push --subject-sha256 <hash> --expires-at <ISO-8601>
 ```
 
-Run it with no arguments to see the current subcommand set rather than trusting a
-list written here; the set has changed before, and a stale command in a shipped
-file is worse than none. Two things to pass on to the human when you do:
+Prepares the candidate-bound request and signs **that** request in one
+invocation, stating the action kind, candidate commit/tree, subject binding,
+expiry, and what the approval does not cover immediately before the passphrase
+prompt. The human types `approve`, then the passphrase. That is the whole human
+ceremony. The agent constructs the command (including `--subject-sha256`) and
+hands it over; the agent cannot run it — signing needs the private key, and
+`po-approval-gate.mjs` deliberately cannot reach `authorize-critical` at all.
+
+Two things to pass on to the human:
 
 - **`--repo-root` must be an absolute path.** `.` is rejected, and the refusal is
   a bare usage dump that does not say why. `"$PWD"` works.
@@ -93,6 +114,23 @@ file is worse than none. Two things to pass on to the human when you do:
   machine-scoped configuration plane, or from the documented environment
   variable — in that precedence. Recording it once in the machine plane removes
   the question permanently.
+
+### The two-step shape (superseded as a human step, still supported)
+
+```
+node plugins/pipeline-core/scripts/po-approval-gate.mjs prepare-critical ...
+node plugins/pipeline-core/scripts/po-human-approval.mjs approve-critical \
+  --repo-root <repo> --directory <external-po-dir> --kind push
+```
+
+Still exists and is unchanged for programmatic use, and is what a repository
+running an older plugin build still walks. It is no longer the human's path: a
+failed `prepare-critical` followed by a successful `approve-critical` can sign
+the **stale** request still on disk, with a confirmation that looks entirely
+normal — the failure mode `authorize-critical` removes by construction. Do not
+offer this shape to a human as the current ceremony; `docs/push-release-flow.md`
+carries the full detail (subject-sha256 computation, external-directory
+verification, etc.) for whichever shape a given repository is actually running.
 
 ## What a session should say, and what it must not do
 
