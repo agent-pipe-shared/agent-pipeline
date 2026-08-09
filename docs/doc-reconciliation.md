@@ -47,6 +47,41 @@ something to do here without review.
 
 ## Entries
 
+## Candidate e44fb6e00722c91c3a90b4c9a4dbc89bcbcbfe20 — 2026-08-09, range 3387065..e44fb6e, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+The entry below (record commit `4309d2c`) already covered `8e7a2f7..382626f`. This entry
+supersedes it and additionally covers `55f361c`, `8df045f`, `92b21ed`, `8b696bc`, `e44fb6e` —
+one entry for the whole unpushed range rather than one per candidate, because the intervening
+commits either touched no governed path at all (`8df045f`, `92b21ed`, both entirely under
+`plugins/pipeline-core/`, checked below) or are themselves the docs commits this entry covers
+(`8b696bc`, `e44fb6e`).
+
+ADR-0045 was implicated by the same class of change as the prior entry: `evidence/` package
+files, this time a new design document (`design/closure-plan.md`) alongside edits to the
+already-covered generator and map. `design/` is named explicitly in the ADR's own enumeration,
+so this needs no new reading — the file lands inside what the decision already governs.
+
+ADR-0012 was implicated by two further `docs/state.md` entries and still holds with one
+canonical handover file. Both entries point at committed package artifacts rather than
+restating their content, consistent with the prior entry's reading of A9.
+
+**One thing worth naming rather than assuming past this range, checked rather than asserted.**
+`plugins/pipeline-core/scripts/pipeline-state.mjs` and `lib/feature-package-topology.mjs`
+changed substantively in this range (`92b21ed`, +290/−6), adding a new writer transaction to the
+Pipeline's own runtime. This layer did not flag it. The reason is narrower than "no ADR governs
+`plugins/**`" — that claim is false: `docs/adr/0058-guard-maintenance-window.md:14` governs eight
+files under `plugins/pipeline-core/hooks/` and `lib/` by exact path. The precise gap is that
+neither of the two files this range touched is among ADR-0058's eight, nor named by any other
+`Governs:` line in the corpus (confirmed by re-reading all five lines, not by pattern-matching
+the directory). A governance-writer change of real substance therefore produced zero signal from
+this layer, for want of a `Governs:` line naming it — a distinct observation from the filed
+`pipeline.doc-reconciliation-blind-to-adr-corpus-changes` item, which concerns the corpus not
+covering edits to itself, not production code going uncovered. Not filed as its own item here;
+recorded so a later reader does not have to re-derive it from the commit.
+
 ## Candidate 382626f42708d10fd17e0607f010d6342e4ac57c — 2026-08-09, range 3387065..382626f, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
