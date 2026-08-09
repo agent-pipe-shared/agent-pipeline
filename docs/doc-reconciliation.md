@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate bc023a0a735264e8daf7cb4e0bcf1417d3b979b7 — 2026-08-09, range 3387065..bc023a0, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `6b1fa48` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `2594552`, `e33618d`, `de13e92`, `7253d49`, `bc023a0`. Same reading as the whole chain:
+`docs/state.md` stays ADR-0012 (one new checkpoint entry), the generated evidence-map/closure-plan
+pair stays ADR-0045 (two delta commits). The two test-authorship commits
+(`plugins/pipeline-core/lib/human-governance-ledger.test.mjs`;
+`plugins/pipeline-core/lib/governance-export-{adapter,delivery,outbox}.test.mjs`) touch no path
+any `Governs:` line in the corpus names, confirmed by this run.
+
 ## Candidate 5bae83c2aac599271a07644d335af8f958771c1f — 2026-08-09, range 3387065..5bae83c, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
