@@ -64,7 +64,7 @@ a route it never offered is wasted budget.
 | `rg -n 'needle' file.txt | head -20` | 0 |
 | `git commit -F msg.txt -- a.md` | 0 |
 | `git commit -m 'one line'` | 0 |
-| `git commit -m 'line one\n\nline two'` | 1 |
+| `git commit -m 'line one\n\nline two'` | 0 |
 | `git status && git log` | 0 |
 | `git status ; git log` | 2 |
 | `echo hi > out.txt` | 0 |
