@@ -1023,6 +1023,47 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### The budget that lied (`a54f53b`, `a0c6301`) — two committed assertions disagreed, and the permissive one won for months
+
+The skill repair turned the gate red twice in a row. Both reds were worth having.
+
+**First red — three steps, one cause.** A contract requires the literal
+`node harness/scripts/check-observation-governance.mjs` command **in `SKILL.md` itself**;
+the compression had reduced it to a pointer. A pointer satisfies a reader and not a
+contract. Fixed in `a54f53b` — and the one restored clause put the file **6 bytes over**
+its cap, which is the saturation I had recorded as a finding minutes earlier, arriving
+faster than the note predicted and proving it better.
+
+**Second red — the real defect, and it is the one I keep finding.** Two committed
+assertions disagreed about the same budget:
+
+- `pipeline-start-v3.test.mjs` asserted `byteLength(core) <= 15_000` — **the file alone**
+- `bootstrap-payload-measure.test.mjs` measures **file + envelope** against the same 15,000
+
+At 14,992 the first passed and the second failed. **The permissive one is the liar**: it
+grants an author room that does not exist, and an author who trims to satisfy it lands in
+a red gate anyway. That is the same shape as the taxonomy checker edited in lockstep and
+the citation class that could not fail — *a green check that misleads is worse than a
+red one*, and this is the third instance tonight.
+
+Reconciled in `a0c6301`, in the correct direction: the permissive assertion now measures
+against the **production** envelope, which is *larger* than the payload test's, so
+passing the skill suite implies passing the payload measurement and never the reverse.
+The true constraint was not touched. 600 bytes were freed by moving the conditional
+Resume-Hint card detail into `references/onboarding-recovery.md`, whose declared type
+covers restart and kickoff. **14,392 bytes, 446 free**, coverage still 15/15 with 0
+missing — the proof that a move did not become a deletion.
+
+**It also corrected my briefing.** I named `check-doc-contracts.mjs` as one of the two
+sources of literal-text requirements on this file. It imposes none — both are in
+`check-observation-governance.mjs`. I had inferred that from the failing step name rather
+than reading the checker.
+
+**Recorded against myself:** while diagnosing the first red I typed `rg -rn` — the
+replace form I have warned every dispatch about tonight, in the very briefing I was
+writing. Harmless here because the output was filenames. It is exactly as easy to do as I
+kept telling other people it was.
+
 ### LIVE-1 repaired (`67bac89`): the skill every session starts with matches its spec again
 
 Verified by me from the repository root: `pipeline-start-v3` suite green, and the new
