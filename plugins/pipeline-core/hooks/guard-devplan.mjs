@@ -129,9 +129,11 @@
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-devplan.test.mjs
  */
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join, relative, isAbsolute, posix, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
 import {
@@ -142,6 +144,96 @@ import {
 } from "../lib/project-authority.mjs";
 import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
+
+// ---- PHX-LEDGERAUTH: restored read-time ledger resolution -----------------------------
+// Restored from 998a609:plugins/pipeline-core/hooks/guard-devplan.mjs (lines 138-145 and
+// 147-212), verbatim. The 0.5.2 integration merge (75b8361) took the second parent's side
+// for this file wholesale and the symbol was lost with it. Nothing on the merged base
+// replaced it: `derivePlanLifecycle` is a pure function of the state object plus caller-
+// supplied file digests (it takes no projectDir and its module performs no I/O), and its
+// v3 compatibility branch accepts a `pipeline.plan-approval.v3` approval on SHAPE ALONE.
+// The `priorInvalidationSha256` seal is a digest over data already in the same mutable
+// file, so it closes replay-after-revocation, not forgery. Anyone able to write the state
+// file could therefore mint plan-approval authority. Re-bound additively at the permit
+// below; no existing binding is renamed, shadowed or weakened.
+const GOVERNANCE_AUTHORITY_CLI = fileURLToPath(new URL("../scripts/governance-authority.mjs", import.meta.url));
+const SHA256 = /^[a-f0-9]{64}$/u;
+const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
+
+function exact(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+}
+
+/**
+ * H-AC-12 migration boundary. A mutable `planApproved` projection is never
+ * authority by itself: the exact v3 reference must still resolve from the
+ * canonical human ledger at the current read. Cyborg's PO-proof verification
+ * is deliberately owned by that authority CLI rather than this hook.
+ */
+function hasLedgerBackedPlanApproval(state, projectDir) {
+  const approval = state?.planApproval;
+  const feature = state?.activeFeature;
+  if (state?.planApproved !== true
+    || !exact(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority", "humanDecision"])
+    || approval.schema !== "pipeline.plan-approval.v3"
+    || !exact(feature, ["id", "planPath", "phase"])
+    || !exact(approval.poGateAuthority, ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"])
+    || approval.poGateAuthority.planPath !== feature.planPath
+    || !SHA256.test(approval.poGateAuthority.planSha256 ?? "")
+    || !SHA256.test(approval.poGateAuthority.specSha256 ?? "")) return false;
+  const reference = approval.humanDecision;
+  if (!exact(reference, ["schema", "decisionId", "decisionDigest", "candidate", "checkpoint"])
+    || reference.schema !== "pipeline.human-decision-reference.v1"
+    || typeof reference.decisionId !== "string"
+    || !SHA256.test(reference.decisionDigest ?? "")
+    || !exact(reference.candidate, ["commit", "tree"])
+    || !OID.test(reference.candidate.commit ?? "")
+    || !OID.test(reference.candidate.tree ?? "")
+    || !exact(reference.checkpoint, ["repositoryFingerprint", "streamId", "sequence", "eventDigest", "candidateCommit", "candidateTree"])
+    || !SHA256.test(reference.checkpoint.repositoryFingerprint ?? "")
+    || reference.checkpoint.candidateCommit !== reference.candidate.commit
+    || reference.checkpoint.candidateTree !== reference.candidate.tree
+    || reference.checkpoint.repositoryFingerprint !== approval.poGateAuthority.repositoryFingerprint) return false;
+  const request = {
+    schema: "pipeline.governance-authority-request.v1",
+    repositoryFingerprint: reference.checkpoint.repositoryFingerprint,
+    decisionId: reference.decisionId,
+    candidate: reference.candidate,
+    checkpoint: reference.checkpoint,
+    nowEpochMs: Date.now(),
+  };
+  const invoked = spawnSync(process.execPath, [
+    GOVERNANCE_AUTHORITY_CLI,
+    "--repo", projectDir,
+    "--request-json", JSON.stringify(request),
+  ], { encoding: "utf8", timeout: 5000, shell: false });
+  if (invoked.status !== 0) return false;
+  let readback;
+  try { readback = JSON.parse(invoked.stdout); } catch { return false; }
+  if (!exact(readback, ["schema", "granted", "decisionId", "decisionDigest", "scope", "singleUse"])
+    || readback.schema !== "pipeline.governance-authority-readback.v1"
+    || readback.granted !== true
+    || readback.decisionId !== reference.decisionId
+    || readback.decisionDigest !== reference.decisionDigest
+    || readback.singleUse !== true
+    || !exact(readback.scope, ["repositoryFingerprint", "candidate", "packageId", "action", "environment", "artifacts"])
+    || readback.scope.repositoryFingerprint !== reference.checkpoint.repositoryFingerprint
+    || JSON.stringify(readback.scope.candidate) !== JSON.stringify(reference.candidate)
+    || readback.scope.packageId !== feature.id
+    || readback.scope.action !== "APPROVE_PLAN"
+    || readback.scope.environment !== "local"
+    || !Array.isArray(readback.scope.artifacts)) return false;
+  const expected = [
+    { path: approval.poGateAuthority.planPath, sha256: approval.poGateAuthority.planSha256 },
+    { path: approval.poGateAuthority.specPath, sha256: approval.poGateAuthority.specSha256 },
+  ];
+  return expected.every((artifact) => readback.scope.artifacts.some((entry) => exact(entry, ["path", "sha256"])
+    && entry.path === artifact.path && entry.sha256 === artifact.sha256));
+}
+
+/** The one schema whose approval carries a ledger reference that must still resolve. */
+const LEDGER_FIRST_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
 
 const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
 
@@ -264,8 +356,17 @@ const lifecycle = derivePlanLifecycle(state, {
   ...(typeof planPath === "string" ? { planSha256: fileSha256(planPath) } : {}),
   ...(typeof specPath === "string" ? { specSha256: fileSha256(specPath) } : {}),
 });
+// PHX-LEDGERAUTH: AND-ed onto the existing permit, never a second permit path. A v3
+// approval is ledger-first by construction, so the stored human-decision reference must
+// still resolve from the canonical ledger at THIS read before the lifecycle verdict is
+// honoured. v2/v4/legacy approvals are untouched and keep exactly their current standing.
+let ledgerAuthorityUnresolved = false;
 if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
-  process.exit(0);
+  if (state.planApproval?.schema !== LEDGER_FIRST_APPROVAL_SCHEMA
+    || hasLedgerBackedPlanApproval(state, projectDir)) {
+    process.exit(0);
+  }
+  ledgerAuthorityUnresolved = true;
 }
 
 // ---- exempt paths -------------------------------------------------------------------
@@ -290,7 +391,13 @@ const isExempt = isDraftAuthority
 if (isExempt) process.exit(0);
 
 // ---- verdict --------------------------------------------------------------------------
-const lifecycleReason = lifecycle.nextAction === "reopen-design"
+const lifecycleReason = ledgerAuthorityUnresolved
+  ? "The recorded pipeline.plan-approval.v3 approval is ledger-first: its human-decision "
+    + "reference must still resolve from the canonical human ledger at THIS read, and it did "
+    + "not. A mutable planApproved projection is never authority by itself. Re-record it: "
+    + "node harness/scripts/pipeline-state.mjs approve-plan --by <name> "
+    + "--human-decision-file <repo-relative-reference>."
+  : lifecycle.nextAction === "reopen-design"
   ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
   : lifecycle.status === "awaiting-approval"
     ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
