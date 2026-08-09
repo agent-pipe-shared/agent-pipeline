@@ -1023,6 +1023,44 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### THE MERGE-LOSS INVENTORY IS CLOSED — all nine accounted for, and the audit's own boundary is the next job
+
+Every item in `evidence/phx-merge-audit.md` now has a disposition, verified rather than
+assumed:
+
+| # | Subject | Disposition |
+|---|---|---|
+| 1 | `pipeline-state.mjs` recovery-bridge writer | **repaired** `77a2f50` |
+| 2 | `plan-spec-state-v2.mjs` human-decision binding | **repaired** `1f37b40` |
+| 3 | `ruleset-freshness.mjs` host-action family | **repaired** `6d6fa5c` |
+| 4 | `pipeline-start-preflight.mjs` freshness action | **repaired** `6d6fa5c` |
+| 5 | `codex-host-plugin-list.mjs` `observeCodexRulesetSource` | **retired by PO decision** — successor named and unbuilt in the design |
+| 6 | `guard-devplan.mjs` ledger-backed plan approval | **repaired** `9473da7` |
+| 7 | `guard-push.mjs` ledger push authority | **superseded** — restoring it would have added a weaker second verdict path |
+| 8 | `guard-git.mjs` Phoenix override authority | **repaired** `1729334` |
+| 9 | `staleness-check.mjs` 8 helpers | **paired supersession, confirmed here** |
+
+**Item 9 checked rather than accepted**, because this audit has been wrong twice (it
+undercounted item 8 and misclassified item 7). Module and suite were replaced together
+(−411/−661 lines), the suite passes 10/10, `buildStaleMessage` is not lost but
+**relocated** to `stop-suggest.mjs`, and `PUBLIC_MARKETPLACE_URL` was re-bound during the
+freshness repair. No orphan, nothing referencing an absent symbol. The classification
+holds.
+
+**Six repaired, one retired by decision, two supersessions. Nothing from this list is
+waiting on the PO.**
+
+**What "closed" does NOT mean, stated plainly because the number invites the wrong
+reading.** The audit deliberately bounded itself and said so: it examined the code half
+and left roughly **490 of 936 changed paths untouched** — `docs/`, `specs/`, `backlog/`,
+`guardrails/`, `policies/`, `templates/`, workflows, JSON schemas, plugin manifests —
+plus losses *inside* test files and symbols under four characters. Its own final
+recommendation was a second audit for that half, and that recommendation is the
+honest next workstream. Given what the code half turned up — a guard silently
+permitting forged approvals, a decision queued for a human that nobody needed to make —
+the untested assumption that the non-code half is clean is not one I would leave
+standing.
+
 ### RED1 DISSOLVED (`1729334`, `bf6abb7`) — the contradiction I escalated never existed
 
 **This closes a decision I put in the PO's queue. Nobody needs to make it.**
