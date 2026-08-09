@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 1d5298c72d4d84244bbb5cfde9a0bd282dd6f2fb — 2026-08-09, range 3387065..1d5298c, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `78b7fb5` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `5897862`, `2005bb6`, `1d5298c`: R-AC-12's fixture build (the motivating Phoenix
+bootstrap trajectory, encoded as a test rather than a production caller — the criterion asked for
+nothing else), its evidence-map delta, and this leg's checkpoint. Same reading as the whole chain:
+`docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan/class-s-scoping trio stays
+ADR-0045. `plugins/pipeline-core/lib/external-command-offer.test.mjs` (the R-AC-12 commit's only
+changed path) implicates neither ADR — a test file is not `docs/state.md` and not one of the
+generated evidence/design artifacts.
+
 ## Candidate 78b7fb58a19531c7bdd8f05d96b6bba4b350f423 — 2026-08-09, range 3387065..78b7fb5, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
