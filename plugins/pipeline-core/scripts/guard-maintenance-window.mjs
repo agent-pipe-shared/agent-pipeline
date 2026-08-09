@@ -116,8 +116,18 @@ export function run(argv = process.argv.slice(2)) {
     if (!args.request || !args.proof) throw new Error(usage);
     const request = JSON.parse(readFileSync(resolve(args.request), "utf8"));
     const proof = externalJson(rootDir, args.proof);
+    // The shared trustPolicy contract (verifyPoApprovalProof et al.) checks an EXACT
+    // {keyReference, publicKeySha256} shape; the external authority file may additionally
+    // carry `humanName` (SETUP-1: `po-human-approval.mjs setup --human-name` writes it into
+    // the same trust-policy.json this command is documented to be pointed at). Only the two
+    // key-identity fields travel into verification -- the same narrowing already applied in
+    // pipeline-state.mjs's verifyCriticalHumanProof and po-approval-request.mjs's verify
+    // subcommand.
     const trustPolicy = args.authority
-      ? externalJson(rootDir, args.authority)
+      ? (() => {
+        const authority = externalJson(rootDir, args.authority);
+        return { keyReference: authority?.keyReference, publicKeySha256: authority?.publicKeySha256 };
+      })()
       : (() => {
         const policy = readCriticalHumanProofPolicy(rootDir);
         if (!policy.ok || policy.trustAnchor === null) throw new Error("GMW-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");

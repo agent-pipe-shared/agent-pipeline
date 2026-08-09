@@ -31,6 +31,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+import { run as runGuardMaintenanceWindowCli } from "../scripts/guard-maintenance-window.mjs";
 // Namespace import ON PURPOSE for the CEREMONY-1 additions below: a missing named
 // export fails ESM linking for the WHOLE file, which would turn a red-before run into
 // a single "cannot link" line instead of a per-behaviour failure list. Through the
@@ -760,6 +761,39 @@ try {
       "a failed HEAD^{tree} lookup must refuse install, not admit it",
     );
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
+  });
+
+  // ---- GF-072: the CLI's --authority branch narrows a fresh SETUP-1 (3-field) --------
+  // authority file before it becomes trustPolicy, the same fix already applied to
+  // pipeline-state.mjs's verifyCriticalHumanProof (GF-067) and po-approval-request.mjs's
+  // verify subcommand (GF-069). Exercised at the CLI level (via `run`), not the lib
+  // level, because the lib's `installGuardMaintenanceWindow` never saw the bug -- the
+  // narrowing belongs to the CLI's own `install --authority` branch.
+  check("GMW26 CLI install --authority accepts a fresh SETUP-1 (3-field) authority file, exactly like a legacy 2-field one", () => {
+    const root = repoFixture("gmw-cli-authority-");
+    const prepared = runGuardMaintenanceWindowCli([
+      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "300",
+      "--reason", "cli authority narrowing", "--plan", "plan.md", "--spec", "spec.md",
+    ]);
+    assert.equal(prepared.ok, true);
+    const { request, intent } = prepared.value;
+
+    const external = mkdtempSync(join(tmpdir(), "gmw-cli-external-"));
+    roots.push(external);
+    const requestPath = join(root, "gmw-request.json");
+    writeFileSync(requestPath, JSON.stringify(request));
+    const proofPath = join(external, "proof.json");
+    writeFileSync(proofPath, JSON.stringify(proofFor(intent)));
+    const authorityPath = join(external, "authority-setup1.json");
+    writeFileSync(authorityPath, JSON.stringify({ ...trustPolicy, humanName: "Test Operator" }));
+
+    const installed = runGuardMaintenanceWindowCli([
+      "install", "--repo-root", root, "--request", requestPath,
+      "--proof", proofPath, "--authority", authorityPath,
+    ]);
+    assert.equal(installed.ok, true);
+    assert.equal(installed.value.status, "active");
+    assert.equal(closeGuardMaintenanceWindow({ rootDir: root }).status, "closed");
   });
 
   console.log(`\nguard-maintenance-window: ${passed} passed, ${failed} failed`);
