@@ -3267,6 +3267,34 @@ policy) are explicitly out of scope, left for a later dispatch.
 Three dispatches now live: two round-2 Critics (K-AC-05, O-1/O-2-design) and WP-P-AC11 —
 `organization-policy.mjs`, touched by nothing else in flight.
 
+### O-1/O-2-DESIGN ROUND 2: FAIL AGAIN, BUT NARROW (1 MAJOR, 1 MINOR, NO BLOCKER) — ROUND-3 REWORK DISPATCHED
+
+Round-2 Critic on the design doc (current state as of `3440e5f`) returned FAIL again, but the gap
+narrowed sharply from round 1: no blocker, the underlying §15.2 guard-hook mechanism and §15.1
+identity registry are explicitly confirmed sound and narrowing-only by this same round. Two
+findings, both verified myself before accepting:
+
+- **F1 (major):** §15.3's new file-inventory table (5 files, including the two guard hooks and
+  the new identity-registry module) has zero `spec.md` §7.4 row coverage — confirmed by grepping
+  every "spec.md" occurrence in the document myself: none fall inside §15's ranges. §9's own
+  five-file enumeration this exact document uses as its precision precedent was never
+  symmetrically extended when §15.3 added these five.
+- **F2 (minor):** the proposed H-AC-11 text claims a local registry holder "can attribute **any**
+  decision... to a natural person," but the registry's own three-way resolution
+  (`resolved`/`unknown`/`ambiguous`) makes this conditional on a populated entry existing — an
+  overstatement in the conservative direction, but destined for verbatim insertion into a bound
+  criterion.
+
+Dispatched **WP-O1O2-DESIGN-rework2**: extend §9's spec.md enumeration to cover all 5 files
+(new-row vs. extension, per the document's own established distinction), reword §15.1.5's "any
+decision" claim to its actual conditional scope. Small, bounded, one file, ≤40 tool budget. Needs
+a round-3 Critic pass before implementation-ready — this is the third Critic round on this
+document's O-1/O-2 amendment (of at most 4 permitted per package).
+
+**Context note:** this session is very long; the Stop hook has twice suggested `/compact`. Not
+executed by the Elephant — compaction is a user-run command. Continuing to work through the live
+dispatch queue in the meantime; nothing here is blocked on it.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
