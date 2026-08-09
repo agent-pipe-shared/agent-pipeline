@@ -39,6 +39,12 @@ const external = mkdtempSync(join(tmpdir(), "po-human-approval-")); const nomina
 writeFileSync(join(external, "request.json"), JSON.stringify({ ok: true, value: request })); writeFileSync(join(external, "authority.json"), JSON.stringify(trustPolicy)); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
 assert.equal(runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => candidate }).value.verified, true);
 assert.throws(() => runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => ({ ...candidate, tree: "f".repeat(40) }) }), /current clean candidate/u);
+// GF-069: a fresh SETUP-1 (3-field) authority file -- the exact shape
+// `po-human-approval.mjs setup --human-name` writes to trust-policy.json --
+// must be accepted by `po-approval-request.mjs verify` exactly like the
+// legacy 2-field shape above, not unconditionally rejected.
+writeFileSync(join(external, "authority-setup1.json"), JSON.stringify({ ...trustPolicy, humanName: "Test Operator" }));
+assert.equal(runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority-setup1.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => candidate }).value.verified, true);
 writeFileSync(join(external, "trust-policy.json"), JSON.stringify({ ...trustPolicy, humanName: "Test Operator" })); writeFileSync(join(external, "po-public.pem"), publicKey); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
 assert.equal(runHumanApproval(["verify", "--repo-root", nominalRepo, "--directory", external], { observeCandidate: () => candidate }).value.verified, true);
 assert.equal(runApprovalGate(["verify", "--repo-root", nominalRepo, "--directory", external], { observeCandidate: () => candidate }).value.verified, true);
@@ -91,4 +97,4 @@ assert.equal(JSON.parse(readFileSync(join(external, "proof.json"), "utf8")).inte
 writeFileSync(join(external, "request-cyb-5.json"), JSON.stringify({ ok: true, value: request }));
 assert.equal(runHumanApproval(["approve-all", "--repo-root", nominalRepo, "--directory", external], { readConfirmation: () => "approve", spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-APPROVE-ALL-READY");
 assert.equal(JSON.parse(readFileSync(join(external, "proof-cyb-5.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
-console.log("38 threat-model approval request checks passed");
+console.log("39 threat-model approval request checks passed");

@@ -78,7 +78,17 @@ export function run(argv = process.argv.slice(2), dependencies = {}) {
     const request = approvalRequestFromExternalJson(externalJson(args.repoRoot, args.request));
     const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(args.repoRoot);
     if (!currentCandidateMatches(request, candidate)) throw new Error("proof request is not bound to the current clean candidate");
-    return { ok: true, value: verifyThreatModelApprovalRequest({ request, trustPolicy: externalJson(args.repoRoot, args.authority), proof: externalJson(args.repoRoot, args.proof) }) };
+    // The shared trustPolicy contract (verifyPoApprovalProof et al.) checks an EXACT
+    // {keyReference, publicKeySha256} shape; the external authority file may additionally
+    // carry `humanName` (SETUP-1: `po-human-approval.mjs setup --human-name` writes it into
+    // the same trust-policy.json this command is documented to be pointed at). Only the two
+    // key-identity fields travel into verification -- the same narrowing already applied in
+    // pipeline-state.mjs's verifyCriticalHumanProof and po-human-approval.mjs's own verify
+    // subcommand. This command records no separate attribution from the authority file, so
+    // nothing else here needs the full object.
+    const authority = externalJson(args.repoRoot, args.authority);
+    const trustPolicy = { keyReference: authority?.keyReference, publicKeySha256: authority?.publicKeySha256 };
+    return { ok: true, value: verifyThreatModelApprovalRequest({ request, trustPolicy, proof: externalJson(args.repoRoot, args.proof) }) };
   }
   throw new Error(usage);
 }
