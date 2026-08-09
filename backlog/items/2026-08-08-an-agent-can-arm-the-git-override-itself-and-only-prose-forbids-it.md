@@ -96,6 +96,36 @@ records the symptom and hides that it parks an unbuilt security feature plus a
 contract conflict. That is a QG-05 gate-honesty defect in its own right and should
 be corrected whichever way the decision goes.
 
+## CORRECTION 2026-08-09 — the premise is half wrong, and the other half had a cause
+
+This item says the prohibition is enforced by nothing. That is **no longer true for a
+Phoenix-governed repository, and it was only ever true because of a deleted
+implementation** — not because the enforcement had never been built.
+
+`PHX-GITAUTH` (commit `1729334`) restored `phoenixGovernedProject()` and the canonical
+human-authority path that merge `75b8361` dropped from
+`plugins/pipeline-core/hooks/guard-git.mjs`. Where `governance/events/registry.json`
+exists, a three-segment arming is no longer sufficient: the reason segment must open
+with an authority-reference path, that reference is resolved through the governance
+authority CLI, and it is single-consumed against a checkpoint. A self-armed override on
+this repository is now refused with exit 2 — demonstrated on a throwaway fixture against
+a pre-repair baseline that permitted the identical command.
+
+**What remains true, and why this item stays open:** for a repository *without* that
+governance registry, the analysis above is unchanged — three agent-chosen segments, a
+token checked for freshness and never for provenance, every ledger field
+agent-supplied. That is where the Pipeline's own consumer projects live, so the item
+narrows in scope rather than closing.
+
+**A second claim here is also wrong.** The section above frames the conflict with
+`guard-git.test.mjs` OV-AC1 as a contract contradiction needing a PO decision. It is not
+one. The two suites never exercised the same code path — one fixture writes
+`governance/events/registry.json` and the other does not — and the merge removed the
+predicate that discriminated between them, so both fell into the same branch. No
+decision is required; an implementation was missing. Recorded here because a wrongly
+filed decision is more expensive than a wrongly filed defect: it waits for a human who
+has nothing to decide.
+
 ## Related
 
 - `2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md` —

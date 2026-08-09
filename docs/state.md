@@ -1023,6 +1023,44 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### RED1 DISSOLVED (`1729334`, `bf6abb7`) — the contradiction I escalated never existed
+
+**This closes a decision I put in the PO's queue. Nobody needs to make it.**
+
+I reported that `guard-git-phoenix.test.mjs` and the TP-1-protected
+`guard-git.test.mjs` (OV-AC1) assert opposite verdicts for the same command, and that
+both could not be green under one contract. **They never exercised the same code path.**
+The pre-merge guard discriminated on `phoenixGovernedProject()` — the presence of
+`governance/events/registry.json`. The red suite writes that file into its fixture and
+demands canonical human authority; OV-AC1's fixture is created without it and expects
+the local one-time ledger. Merge `75b8361` deleted the predicate, so both fixtures fell
+into the same branch, and one of them was then guaranteed to be wrong.
+
+Restored: protected suite **192/192 unchanged**, Phoenix suite red → green, and the
+restored check sits *inside* the existing branch so **no new permit path** was created —
+a 13-case matrix shows no case where the governed fixture permits what the ungoverned
+one refuses.
+
+**A wrongly filed decision costs more than a wrongly filed defect**: it waits on a human
+who has nothing to decide. That is now the second one tonight (the freshness
+"retirement collision" was the first), and both came from me describing a missing
+implementation as a conflict of rules.
+
+**My own error, and it nearly cost the result.** I ran the repaired suite and read it as
+still failing, then said so. This session's shell sits in the detached verify worktree,
+and that suite spawns the guard as a child process, so it tested the **worktree's** old
+code. Re-run from the repository root it passes. I was one step from rejecting a correct
+repair on the strength of my own environment. The trap is now recorded in the exclusion
+entry itself, where the next person to run it will see it.
+
+**Two of my records were falsified by this dispatch and are corrected:** the backlog item
+`2026-08-08-an-agent-can-arm-the-git-override-itself…` claimed the self-arming
+prohibition is enforced by nothing — true only for ungoverned repositories now, and only
+ever true here because of the deletion; and `evidence/phx-merge-audit.md` undercounted
+this loss as 5 functions when it is 9 plus three in-place regions.
+
+**Exclusions: 2 red, 4 green.** At the start of the night: 6 red, 0 green.
+
 ### A guard was silently permitting forged approvals (`9473da7`) — and the better decision was the one NOT to restore
 
 Gate at `9473da7`: exit 0, 368 steps, `binding: "exact"`. `guard-devplan.test.mjs`
