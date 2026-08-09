@@ -862,6 +862,22 @@ const DELTA = {
   // change-control tests pass, 6 new for this resolver.
   'C-AC-09': ['implemented', 'WP-C-AC09'],
 
+  // A-AC-07: representedEventClasses (agent-decision-journal.mjs) recognizes
+  // all seven named classes through existing fields/kinds -- no new kind was
+  // needed for any of them (candidate=candidateDigest, always present;
+  // privacy=the existing unconditional personalIdentifiability "prohibited"
+  // gate; authority=relatedHumanDecisionId/authorityRequirement;
+  // verification-scope=the existing kind; security/recovery/external-side-
+  // effect=command-offer fields). capture-policy.json gains additive
+  // mandatoryEventClasses; governance-event-store.mjs's
+  // appendPortableGovernanceEvent gains an explicit captureDecision
+  // ("captured" default, unchanged behavior; "sampled-out" fails closed with
+  // GES-MANDATORY-CAPTURE for a mandatory class, and is only ever admitted
+  // for the policy-selected agent origin). 38/38 + 28/28 tests pass across
+  // both files, both independently re-run, no regression to any pre-existing
+  // K-AC-05 test.
+  'A-AC-07': ['implemented', 'WP-A-AC07'],
+
   // R-AC-02: recordCommandRecoveryDisposition (external-command-offer.mjs)
   // reaches the previously-unreachable recovery-proposed/recovered states,
   // correlating trigger/typed-rejection/evidence-gap/candidate-alternatives/
@@ -954,7 +970,7 @@ const POINTERS = {
   'A-AC-04': 'CORRECTED AGAIN 2026-08-09 (Elephant, direct code read): a second, real, production-wired carrier exists that the first correction missed -- guard-git.mjs\'s Phoenix override path (consumePhoenixOverrideAuthority, guard-git.mjs:697-728) correlates an agent\'s override reference to the real human ledger via governance-authority.mjs, binds it to the exact repository/candidate/rule/artifact-digest tuple, and single-use-consumes it; guard-git-phoenix.test.mjs proves refuse-without-reference, one-time-allow, and refuse-on-replay end to end (1/1, independently re-run). The correlate-and-cannot-replay half of the clause is proven, not absent. What is still missing, narrowly: no production entry point ever CREATES a granted human-governance-decision -- appendHumanGovernanceDecision, createExternalHumanGovernanceIntent and verifyExternalHumanGovernanceProof (human-governance-ledger.mjs:150,73,101) are each called only from tests (repo-wide grep confirms), so a PO has no CLI to actually grant this authority today; governance-authority.mjs\'s own CLI only ever consumes an existing grant, never creates one. See design/class-s-scoping.md\'s 2026-08-09 correction for the exact three-function wiring this needs -- no new schema or cryptography, the trust anchor at project/critical-human-proof.json already covers the same PO key. CLOSED 2026-08-09 (PHX-WP-AAC04-FIX3, commit 0022d13): the missing create-half was built (human-authority-grant.mjs, a prepare/external-sign/install ceremony), survived an independent round-3 Critic PASS after two prior FAIL rounds closed a blocker, a major, and five other findings, and its final three minor findings (a docstring overclaim, runPrepare reading the wrong root, missing command/exit-code evidence headers) are also closed and independently re-verified (14/14 unit, 1/1 e2e, 25/25 regression). Both halves of the clause are now real, tested, and production-wired',
   'A-AC-05': 'agent-decision-journal-tests (PHX-WP-AAC05): the observational shape now carries an optional identity array (dimension/value/provenance/assurance, closed enums, 1-7 entries, no duplicate dimension) on selection/escalation/fallback only, rejected elsewhere via ADJ-IDENTITY-SCOPE, schema/validator drift-tested. Still no production caller: CONFIRMED ABSENT (repo-wide search) that any code path emits a selection/escalation/fallback event at all',
   'A-AC-06': 'agent-decision-journal-tests: free text, authority-shaped fields and unbound supersession rejected',
-  'A-AC-07': 'CONFIRMED ABSENT (PHX-WP-A, repo-wide search): no per-event-class "mandatory" capture concept exists anywhere in the journal, the shared store, or capture-policy.json -- five of the seven named event classes are not even representable as a journal `kind`',
+  'A-AC-07': 'agent-decision-journal/governance-event-store-tests (WP-A-AC07): all seven named event classes now recognized through existing fields/kinds, no new kind needed; capture-policy.json carries an additive mandatoryEventClasses list; appendPortableGovernanceEvent fails closed (GES-MANDATORY-CAPTURE) rather than silently sampling out a mandatory class, scoped to the policy-selected agent origin only. 38/38 + 28/28 tests pass',
   'A-AC-08': 'NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only',
   'A-AC-09': 'materiality is documented as design intent only; no code enforces or measures it',
   'A-AC-10': 'the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists',
