@@ -35,6 +35,42 @@ Failures, partial results, cancellation, unavailability, mismatch, recovery,
 and cleanup remain distinct append-only states. The command-offer adapter does
 not execute commands and cannot itself grant authority.
 
+## Schema
+
+Two closed event shapes exist under a `oneOf`
+(`governance/schemas/agent-decision-event.schema.json:6-64`), enforced
+identically by the runtime validators the store actually calls
+(`plugins/pipeline-core/lib/agent-decision-journal.mjs:18-42`):
+
+1. **Observational shape** (`assumption`, `selection`, `verification-scope`,
+   `fallback`, `escalation`) — seven closed keys, six required plus one
+   optional: `eventId`, `kind`, `state`, `reasonCode`, `candidateDigest`,
+   `relatedHumanDecisionId`, `supersedesEventId`
+   (`agent-decision-journal.mjs:19`), plus the optional `assumptionState`,
+   present only when the epistemic axis described under Taxonomy is recorded
+   (`agent-decision-event.schema.json:9-19`).
+2. **`command-offer` shape** — eighteen required keys covering offer
+   identity and provenance (`offerOrigin`), the governed `operation` and
+   `target` sub-objects, `sideEffectClass`/`authorityRequirement`, three
+   digests (`policyDigest`, `redactionPolicyDigest`, plus the shared
+   `candidateDigest`), `executionAssurance`, a bounded `omissions` array,
+   offer linkage (`offerEventId`, `preEvidenceDigest`, `postEvidenceDigest`),
+   and `recoverability` (`agent-decision-journal.mjs:33`,
+   `agent-decision-event.schema.json:23`).
+
+Both shapes are closed by `additionalProperties: false` in the schema
+(`agent-decision-event.schema.json:8,22`) and by the matching `exact()`
+key-set check in the runtime validator (`agent-decision-journal.mjs:11,22,34`)
+— no undeclared key is representable in either shape. The published JSON
+Schema file is not itself invoked by `assertPortablePayload` at write time
+(`plugins/pipeline-core/lib/governance-event-store.mjs:318-324` dispatches
+`origin === "agent"` events straight to `validateAgentDecisionEvent`, a
+hand-written check); schema/validator drift is instead caught by a dedicated
+test that loads the schema file and asserts its enums and
+`additionalProperties` match the runtime constants
+(`plugins/pipeline-core/lib/agent-decision-journal.test.mjs:72-79`, "A-AC-11
+keeps the published schema closed and in step with the validator").
+
 ## Taxonomy
 
 Closed event kinds (`plugins/pipeline-core/lib/agent-decision-journal.mjs:4`):
@@ -111,6 +147,54 @@ prose above ("cannot grant, consume, revoke, or replace human authority"):
 `validateAgentDecisionEvent`/`validateCommandOfferEvent`
 (`agent-decision-journal.mjs:18-42`) admit only closed reason codes, digests
 and lifecycle state, never a free-text authority claim.
+
+## Privacy threat model
+
+What this stream must never carry: free text, prompts, tool output, terminal
+history, raw logs, chain-of-thought, account data, or an authority-shaped
+field (stated in this document's own intro, and structurally enforced — see
+Schema above: neither event shape has a slot typed for prose or an account
+identifier at all). At the field level, R-AC-05 enumerates the concrete
+prohibited set and pins it as a test: credentials, tokens, account/accountId,
+SSH keys, private paths, private coordinates, raw command text/arguments/
+scripts, shell history, transcripts, prompts, unrestricted output, and any
+"untyped" digest of the above
+(`plugins/pipeline-core/lib/agent-decision-journal.test.mjs:15-33`, the
+`PROHIBITED` fixture and "R-AC-05 refuses every enumerated private field and
+every untyped digest at both journal boundaries").
+
+Enforcement is structural rejection, not redaction or best-effort filtering:
+because both event shapes are `exact()`-closed (`agent-decision-journal.mjs:11`),
+an event carrying an extra key such as `command` or `privatePath` fails
+validation outright (`ADJ-SHAPE`/`ADJ-COMMAND-OFFER`,
+`agent-decision-journal.mjs:22,34`) before it can reach the store. There is
+exactly one digest slot per shape family (`candidateDigest` on the
+observational shape; `policyDigest`/`redactionPolicyDigest`/
+`preEvidenceDigest`/`postEvidenceDigest`/`governedArtifactSha256` on the
+command-offer shape, all typed `^[a-f0-9]{64}$`, `agent-decision-journal.mjs:3`),
+and none is documented or usable as a stand-in for a private-content digest —
+the test asserts the one accepted operation digest is the governed-artifact
+one and that a raw serialization of an accepted event never contains any of
+the prohibited fixture values (`agent-decision-journal.test.mjs:27-33`).
+
+At the store layer, `assertPortablePayload` additionally requires the agent
+stream's registered capture-policy entry to declare
+`personalIdentifiability: "prohibited"` and `contextualIdentifiability:
+"prohibited"` before any event on the stream is accepted at all
+(`plugins/pipeline-core/lib/governance-event-store.mjs:297`), and read access
+to the stream is `repository-public-safe` (see Trust model above) — so the
+privacy boundary is enforced twice, once at the shape level (this module) and
+once at the policy-registration level (the store), with no path for either
+boundary to bypass the other.
+
+Honesty note: this is a structural/allowlist defense (only enumerated, typed
+fields exist), not a content-scanning defense. A caller that wanted to
+smuggle private data into a *permitted* field (e.g. choosing a `reasonCode`
+that itself encodes a person's name) is bounded only by the `CODE`/`ID`
+regexes (`agent-decision-journal.mjs:3`), which constrain character class and
+length, not semantic content. This document does not find a semantic or
+content-based privacy check anywhere in this module — the mitigation is
+exhaustively enumerated-field allowlisting, not content inspection.
 
 ## Retention
 

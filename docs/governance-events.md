@@ -177,6 +177,91 @@ repository, so a corrupted human-stream chain segment has no documented
 repair procedure beyond discarding and rebuilding history outside this
 module; this document does not claim otherwise.
 
+## Human ledger: threat model
+
+The ledger is a pure validation/authority-resolution layer over the shared
+portable event store
+(`plugins/pipeline-core/lib/human-governance-ledger.mjs:2`). The scenarios
+below are the concrete threats it is built against, each traced to an actual
+check in the code, and — where a dedicated test exists — to that test. A
+single scattered sentence on this topic previously lived at
+`docs/phoenix-governance-threat-model.md:75`; this section is the dedicated
+one this document was missing.
+
+- **Forged/fabricated grants.** `resolveHumanGovernanceAuthority` never
+  trusts a `decisions` array on its own claims: every entry is re-validated
+  through `validateLedgerDecision` (`human-governance-ledger.mjs:50`), which
+  enforces the closed `pipeline.human-governance-decision.v1`/role-exception
+  shapes (no free-form rationale, no person identity — see "Human governance
+  decisions" above) before any authority question is asked. The authenticity
+  of *where* those decisions came from rests one layer down, in the store's
+  hash-chained, non-symlinked, atomically written canonical files ("Portable
+  records" above) — a caller cannot inject an unattested decision into that
+  chain.
+- **Unauthorized/duplicate consumption of a single-use grant.**
+  `appendConsumedHumanGovernanceDecision` re-reads the live persisted grant
+  under the stream's append lock and re-resolves authority immediately before
+  sealing the consuming event (`human-governance-ledger.mjs:209-222`); a
+  second attempt against an already-consumed or non-live grant fails closed
+  with `HGL-CONSUME-NOT-LIVE` (`human-governance-ledger.mjs:222`). Pinned by
+  "H-AC-15 concurrency: exactly one of two racing consumption attempts on the
+  same single-use grant wins"
+  (`plugins/pipeline-core/lib/human-governance-ledger.test.mjs:365-383`),
+  which asserts exactly one of two racing attempts is accepted and the loser
+  fails with `GES-LOCKED` or `HGL-CONSUME-NOT-LIVE`.
+- **Grant staleness/substitution during consumption.** The consuming
+  append's `assertAppend` closure verifies the exact grant event it was
+  handed is still byte-identical to what is persisted
+  (`canonicalSha256(persisted) !== canonicalSha256(grantEvent)` fails
+  `HGL-CONSUME-GRANT-STALE`, `human-governance-ledger.mjs:211`) — a caller
+  cannot consume against a grant that was disposed or altered between read
+  and write.
+- **Tampering with an already-persisted event.** Reading the stream
+  re-verifies the hash chain on every read; a mutated persisted event is
+  rejected with `GES-EVENT-INVALID` rather than silently returned. Pinned by
+  "H-AC-15 tampering: a mutated persisted event is detected and rejected on
+  read, never silently accepted"
+  (`human-governance-ledger.test.mjs:395-402`), which rewrites a persisted
+  grant's `reasonCode` directly on disk and asserts `queryHumanGovernanceDecisions`
+  rejects it.
+- **Replay of an append (idempotency, not double-write).** An identical
+  append intent is answered as `idempotent-replay` with the same digest
+  rather than a duplicate event. Pinned by "H-AC-15 retry: replaying the
+  identical append intent returns the committed event as a replay, never a
+  duplicate" (`human-governance-ledger.test.mjs:352-363`).
+- **Cross-repository binding confusion.** `appendHumanGovernanceDecision`
+  fails `HGL-CROSS-REPOSITORY` before any store access when the envelope's
+  declared repository, the caller's asserted repository, and the decision's
+  own scoped repository disagree (`human-governance-ledger.mjs:156`). Pinned
+  by "H-AC-15 cross-repository binding: an intent whose declared repository
+  does not match its own scope is rejected before any store access"
+  (`human-governance-ledger.test.mjs:345-350`).
+- **Stale-candidate replay.** `resolveHumanGovernanceAuthority` denies with
+  reason `scope-mismatch` when the evaluation candidate's commit/tree do not
+  match the grant's scoped candidate (`human-governance-ledger.mjs:55`).
+  Pinned by "H-AC-15 stale candidate: a grant scoped to one candidate commit
+  does not resolve once the candidate has moved"
+  (`human-governance-ledger.test.mjs:338-343`).
+- **External-proof forgery / trust-policy substitution.**
+  `verifyExternalHumanGovernanceProof` binds the detached Ed25519 proof to a
+  caller-supplied `trustPolicy` only after checking the proof's public key
+  hashes to the policy's pinned `publicKeySha256`
+  (`HGL-EXTERNAL-TRUST-MISMATCH`, `human-governance-ledger.mjs:107`) and that
+  the signature verifies over the intent's own digest
+  (`HGL-EXTERNAL-PROOF-MISMATCH`, `human-governance-ledger.mjs:112`); the
+  result deliberately never upgrades a caller-supplied trust policy into
+  attested human identity — it reports cryptographic proof validity only
+  (`human-governance-ledger.mjs:118-121`).
+
+Honesty note: interrupted-write recovery for the human stream is the same
+shared mechanism already documented above under "Human ledger: recovery"
+(orphaned temp files, `human-governance-ledger.test.mjs:385-392`) — a
+durability property, not a distinct threat mitigation, so it is not repeated
+here as a separate item. This section also does not claim a threat model for
+the disposition flow that would resolve a corrupted or forked chain: as
+already stated under "Human ledger: recovery," no such flow exists yet as
+runnable code in this repository.
+
 ## Human ledger: operator guidance
 
 Inspecting the human decision stream uses the same shared surface as any
