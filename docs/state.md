@@ -1023,6 +1023,44 @@ a dispatch the authority to clear a control whose purpose is to check that
 dispatch's own class of work. "Show your evidence" is not a substitute for
 separation of duties — it is what makes the absence of separation look rigorous.
 
+### LIVE-3 REFUTED — superseded in place, and restoring it would have broken a test I forbade editing
+
+**No commit. Nothing changed. This is the most useful result of the four.**
+
+The section was **not deleted**. The merge replaced `#### V3 advisor-export override
+(ADR-0040)` with `#### V2 Advisor lifecycle override (ADR-0047)` in the **exact same
+structural slot**, and the successor carries the ADR forward in its own words:
+*"ADR-0040 continues to govern consent and tool/export boundaries."* One level-4 heading
+before, one after.
+
+**And the rule was deliberately reversed, not lost.** Pre-merge: *missing consent and
+`consent: declined` are valid, accepted Advisory-off states*, disclosure *defaults to
+decline*. Today: **enabled by default**, only an explicit decline keeps Advisory off —
+and `setup.test.mjs:123` **asserts** the disclosure contains "enabled by default". So
+restoring the pre-merge text would have contradicted the current spec, the current
+implementation, and a registered test the briefing itself forbade editing. The dispatch
+stopped on exactly that.
+
+**My measurement was precise and answered the wrong question.** I counted
+`configure-advisor-export` — the **flag** — found it live in `setup.mjs` (6),
+`setup.test.mjs` (3) and `SETUP.md` (1), and concluded the **states** it belongs to had
+survived. They had not: `disabled-no-consent` appears in none of those three files, and
+`degraded-direct-subagent` has **zero occurrences anywhere at `HEAD`**. Counting the
+right string for the wrong claim is a subtler failure than a wrong path, and "verified"
+in my last handover entry papered over it.
+
+**The real defect it found instead, and it is a decision:**
+`docs/adr/0040-advisor-consent-and-readonly-bash.md:18` still says *"Missing or declined
+consent leaves advisory off"*; `setup.mjs:232/235` says the export is **enabled by
+default** and only an explicit decline disables it. **Either the ADR needs an amendment
+or the implementation contradicts an accepted ADR.** That is a PO question and it is a
+real one — unlike the two I filed earlier tonight that dissolved on contact.
+
+**Standing of the second audit's six:** LIVE-1 repaired, LIVE-2 repaired, **LIVE-3
+refuted**, LIVE-4 already filed as a backlog item, SILENT-5 open, SILENT-6 measured as
+genuinely silent and deliberately not restored. **Four of six needed no restoration, and
+three of those four only became clear by checking rather than by executing.**
+
 ### Two corrections to the second audit, measured before dispatching anything (2026-08-09)
 
 **SILENT-6 is weaker than reported — do not restore it reflexively.** The audit said
