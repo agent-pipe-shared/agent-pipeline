@@ -4117,6 +4117,43 @@ storage + commitment) are now closed — booked `implemented`, not narrowed (`10
 
 **Live now: none.**
 
+### SYNTHESIS: WHY THE REMAINING 33 CRITERIA CLUSTER INTO FIVE CATEGORIES, NOT ONE FLAT LIST
+
+Rather than keep attempting one-off dispatches that increasingly re-discover the same blockers,
+mapped the remaining `partial`/`not-started` pool by root cause:
+
+1. **PO-gated design questions (2 items: O-1/O-2, K-AC-05).** Parked this stretch, findings fully
+   recorded. Need architectural input, not code.
+2. **Guard-blocked on `pipeline-state.mjs`'s test file (at least PX0-AC-03/05/06/13).**
+   `harness/scripts/pipeline-state.test.mjs` requires a human-authorized Ed25519 override
+   (`guard-testpath.mjs` TP-5) to edit — discovered concretely via PX0-AC-06's block, stashed and
+   parked. Any further PX0-AC work needing a NEW test in that file will hit the identical wall; not
+   worth re-discovering per-criterion.
+3. **"Built, tested, never wired into live orchestration" (at least A-AC-01, A-AC-05, H-AC-08,
+   L-AC-01 — confirmed by grep, all four evidence-map notes use nearly identical language:
+   "CONFIRMED ABSENT: no code path emits/imports/calls it at all").** The journal-recording
+   machinery (`agent-decision-journal.mjs`, `external-command-offer.mjs`,
+   `lifecycle-governance-events.mjs`) is fully built and tested, but nothing in real Pipeline
+   orchestration (goldfish dispatch, guard hooks, session bootstrap) actually calls it yet. This
+   is NOT four independent narrow gaps — it's one cross-cutting wiring initiative wearing four
+   different acceptance-criterion labels. Piecemeal dispatches against each would likely each
+   independently rediscover "there's no caller to wrap" and stop, the same shape WP-A-AC01/L-AC-01
+   research already found earlier. This deserves its own scoped initiative (deciding WHERE in
+   orchestration each event type should actually fire) rather than four more speculative
+   dispatches tonight.
+4. **Explicitly Class P / PO-only by this repo's own design (EPIC-AC-01 confirmed; H-AC-09
+   already reclassified Class S→P by the PO earlier this sprint).** Not code tasks at all.
+5. **Missing infrastructure this repo doesn't have (V-AC-06's headless-render/visual-regression
+   tooling; E-AC-20's audit-bundle↔export cross-reference, assessed earlier as high design
+   ambiguity).** Buildable, but each is its own small project, not a narrow fix.
+
+**This categorization is itself now the actionable next-steps artifact** — a future session (or
+this one, resuming) should pick ONE category deliberately rather than sampling the flat list
+randomly. Category 3 (the wiring initiative) is probably the single highest-leverage next piece of
+work once picked up, since it would advance four criteria at once, but it needs its own design pass
+(where does each event type actually belong in orchestration?) before dispatch, not a rushed attempt
+at the tail of this stretch.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
