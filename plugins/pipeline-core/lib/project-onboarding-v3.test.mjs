@@ -3691,7 +3691,12 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(source.advisor_export.consent, "approved");
     assert.equal(source.autonomy.push_policy, "gated");
     assert.equal(source.autonomy.branch_model, "feature-branch");
-    assert.equal(source.gates.security, "warn");
+    // Same correction as the verify placeholder below: this pin encoded the defect
+    // it was meant to guard. `warn` promised a security gate that the manifest never
+    // carried and that a fresh consumer cannot satisfy -- measured, not assumed
+    // (dirty-tree refusal caused by the push gate's own evidence, three external
+    // scanners, a license allowlist at a Pipeline-only path). `off` is what is true.
+    assert.equal(source.gates.security, "off");
     const calibration = JSON.parse(readFileSync(join(path, "project/pipeline.json"), "utf8"));
     // Contract correction: this pin used to assert the always-green placeholder
     // `git diff --check`. That value made a brand-new project report a satisfied
@@ -4964,6 +4969,16 @@ test("a freshly seeded project is honest about its authority tier, its verify co
     assert.match(userIntent, /push: "?blocking"?/, "the calibration declares the push gate");
     assert.match(userIntent, /push_approval: "?signature"?/,
       "the calibration states how a human clears a push, so `chat` is discoverable without reading plugin source");
+    // The calibration must not promise a gate nothing enforces. `security` read
+    // `warn` while the manifest carried no security chapter -- and unlike `push`,
+    // seeding that chapter is not the fix: the satisfying path was measured and is
+    // CLOSED for a fresh consumer (dirty-tree refusal caused by the push gate's own
+    // evidence, three external scanners, a license allowlist at a path that exists
+    // only in the Pipeline's own repository). `off` is what is true.
+    assert.match(userIntent, /security: "?off"?/,
+      "the calibration must not declare a security gate whose satisfying path is closed");
+    assert.equal(gateConfig(parseYaml(freshManifestBytes()), "security"), null,
+      "and the manifest must not carry one either -- the two must agree");
 
     // (e) guard-devplan.mjs no longer exits 0 by default, and no longer merely
     // reports: with the seeded gate chapter and an active feature whose design

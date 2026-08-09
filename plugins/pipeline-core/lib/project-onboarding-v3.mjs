@@ -698,7 +698,33 @@ function freshIntent(runner) {
     // a push, and with the key omitted the only way to learn that "chat" exists at
     // all was to read the plugin's source, which is exactly what the 2026-08-09
     // greenfield runs did.
-    gates: { dev_plan: "blocking", push: "blocking", push_approval: "signature", security: "warn", claude_md_max_lines: 200 },
+    // `security` is seeded OFF, and that is the honest value rather than a
+    // weakening. It read `warn` while the manifest carried no security gate at
+    // all, so a consumer was promised a gate nothing enforced -- the same defect
+    // as `push`, found in the same 2026-08-09 runs. Unlike `push`, it cannot be
+    // fixed by seeding the manifest chapter, and the satisfying path was MEASURED
+    // to establish that rather than assumed:
+    //
+    //   1. `security-scan.mjs` refuses a dirty working tree, and the evidence the
+    //      push gate demands (`evidence/verify-latest.json`) is itself what makes
+    //      a fresh consumer's tree dirty -- onboarding writes no `.gitignore`. The
+    //      gate cannot be satisfied without breaking that circle first.
+    //   2. Even with a clean tree it needs three external scanners (gitleaks,
+    //      osv-scanner, semgrep) that a consumer machine need not have, and a
+    //      license allowlist at `governance/examples/policies/license-allowlist.json`
+    //      -- a path that exists in the PIPELINE's own repository, not in a
+    //      consumer's.
+    //   3. The measured verdict on a clean, empty consumer was WARNING -> exit 1,
+    //      and guard-push demands exit 0. `repositorySha256` was also invalid.
+    //
+    // And `warn` would not have meant "warn": guard-push evaluates the security
+    // findings into the SAME failure list it evaluates under the PUSH gate's mode,
+    // which is `blocking`. A `warn` security gate therefore hard-blocks every
+    // consumer push. Filed as its own defect; seeding `off` does not depend on it.
+    //
+    // Turning it on is a deliberate act with prerequisites, so it is named as one
+    // rather than defaulted into.
+    gates: { dev_plan: "blocking", push: "blocking", push_approval: "signature", security: "off", claude_md_max_lines: 200 },
     critic_export: clone(registry.criticExportPolicy),
     roles: { po: { display_label: "Human" } },
     session: { keep_awake: true },
