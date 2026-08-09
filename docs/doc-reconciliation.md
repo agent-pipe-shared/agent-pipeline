@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate c23dc80a217ce98c81b9434b790bd8c055454e8c — 2026-08-09, range 3387065..c23dc80, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `1d288f0` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `dee3958`, `c23dc80`: the prior doc-rec entry and a checkpoint recording WP-P-AC11's
+dispatch (a deliberately narrow-scoped two-of-seven-subconcept closure attempt) while both
+round-2 Critic reviews run. No code changed in this range. Same reading as the whole chain:
+`docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan trio stays ADR-0045.
+
 ## Candidate 1d288f0aa1456632651c6d938f600cd6de0eb8f8 — 2026-08-09, range 3387065..1d288f0, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
