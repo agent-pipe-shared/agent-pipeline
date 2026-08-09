@@ -1995,6 +1995,56 @@ before layer 3 of `docs/push-release-flow.md`. `8e7a2f7` and the reconciliation 
 above it are unpushed; the push needs the PO's detached signature against the exact
 candidate, and nothing about a measurement changes that.
 
+### CLOSURE DESIGN DELIVERED AND EXECUTION STARTED: P-AC-08 IS BUILT, 79 OF 157 IMPLEMENTED (2026-08-09)
+
+The PO's correction landed exactly where it should have: measuring is not closing, and a
+handover entry that says so and then stops is not closing either. What follows is the design
+that was missing and the first wave of its execution.
+
+**The design**, `specs/sprint-phoenix-epic/design/closure-plan.md` (`55f361c`), generated from
+the same verdict data as the evidence map so the two cannot drift apart. Its claim: the 79 open
+criteria are not one backlog but five populations with different costs and different gates —
+**45 need only a named assertion in an already-registered, unprotected suite** (no window, no
+PO gate), 7 are documentation sections, 6 are seams between packages that already work and are
+mutually unaware, 16 are absent capabilities, and 5 are not closeable by code at all. The
+gating slice, P-AC-08, is designed in full: a third `feature-package` plan kind, `reconcile`,
+with the no-drift invariant enforced as a structural property of the plan object rather than a
+promise, and a three-arm Result-reconciliation fence.
+
+**Two dispatches executed the design's first wave in parallel** (disjoint file ownership,
+Spec §4.6), and I verified each independently rather than accepting its report:
+
+- **`PHX-WP-P` (`8df045f`)** pinned P-AC-10 outright and partially pinned P-AC-06/P-AC-11 with
+  break-proofed assertions — I re-read the new test file and confirmed the break/red/restore
+  discipline in the diff itself. **The honest part:** P-AC-01 and P-AC-03 were reported
+  `absent`, not gamed — their named sub-clauses (provenance/dependency/signature-policy;
+  newly-required-artifacts/external-effects/backfill-range) have no corresponding field
+  anywhere in the pack or activation-plan schema, and the dispatch wrote no test around that
+  gap. That is exactly the discipline the briefing demanded and exactly the failure mode a
+  weaker dispatch would have produced instead.
+- **`PHX-WP-GATE` (`92b21ed`)** built `planFeaturePackageReconcile` and the
+  `feature-package-reconcile` apply mode. **Its first completion notification was truncated
+  mid-sentence with the production diff uncommitted** — I resumed the same agent rather than
+  taking over its task, and it finished and committed properly. I then re-verified everything
+  myself before trusting the second report: `node --check` clean on both files, sanitization
+  grep clean, the diff between the two commits touches exactly the two production files and no
+  protected file, the 26 staged cases re-run independently at **26/26**, the TP-5-protected
+  suite re-run independently at **418/418 — zero regression**, and
+  `feature-package-inspect` still validates all three live packages at zero findings.
+
+**P-AC-08 stays `partial` by its own letter, correctly** — the criterion names a
+gate-registered suite by path and the 26 cases are staged in `evidence/`, not registered. What
+moved is real: every prose section describing it in both generated documents was rewritten from
+"what to build" to "built; one signed TP-3+TP-5 window away," because leaving proposal-tense
+prose next to a landed commit is exactly the drift `doc-reconciliation.md` exists to catch.
+**That window is now the epic's single nearest hard gate** — smaller than it looked this
+morning, because the implementation and its 26 proven cases sit ready behind it rather than
+needing to be built inside it.
+
+78 implemented became **79 of 157**. Both deltas and the P-AC-08 prose rewrite are one commit,
+`8b696bc`, because neither delta was committed to the measurement before the second dispatch
+finished.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
