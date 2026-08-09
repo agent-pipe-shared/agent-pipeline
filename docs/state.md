@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-09
 **Project status:** ACTIVE
-**Local candidate:** `0.5.4+<runner>.20260809112525.4ad3a30` · commit `9902a541d74d90e3718904a63fed351885a9d8d0` · Verify **264/264 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809091238.7d38484`)
+**Local candidate:** `0.5.4+<runner>.20260809121256.1d5bba1` · commit `963fc5f159c50cff86123dc337bcf846f60aca3c` · Verify **267/267 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809112525.4ad3a30`)
 **Current block:** GF-058 — **the stable blocker is resolved: the push gate is seeded and live, after its satisfying path was measured end to end** (option C, as the PO chose). Two further happy-path defects fixed in the same block: the reopen-design deadlock, and the promoted state's language. Also in this block: the closure-evidence trackedness contract, three routing defects found by reading, the staging exemption, and the defects the PO's three greenfield runs produced; three suite registrations are open for the PO (TP-3); 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
@@ -145,6 +145,48 @@ and `apply-pending-protected-edits.mjs` now report three rather than two.
     version of its test was green and proved nothing — the fixture carried no
     Pipeline marker, so the rule was inactive; it now opens with a check that the
     rule is firing.
+
+## 2026-08-09 The third local `0.5.4` candidate — the happy-path table worked to the end
+
+Candidate: `0.5.4+<runner>.20260809121256.1d5bba1`, commit `963fc5f1`. Full Verify
+**267/267, exit 0** — 264 suites plus the three the PO cleared through TP-3.
+
+**Every row of the happy-path findings table is now closed or honestly recorded.**
+
+| Finding | Disposition |
+|---|---|
+| Push gate silent in every consumer | fixed (`3c90882a`), path measured first |
+| `chat`-mode push approval unreachable | fixed (`3c90882a`), found by that measurement |
+| reopen-design deadlock | fixed (`44d6d506`) |
+| Promotion freezes the language | fixed (`29380a77`) |
+| Promotion leaves the handover stale | fixed (`765ca6c1`), fourth transaction target |
+| `security: warn` promised and unenforceable | fixed (`102ec4f2`), seeded `off` after measuring |
+| `scratch/` and `evidence/` not ignored | fixed (`d7a52fed`) |
+| `--help` is an error; verb list stale | fixed (`b045e391`) |
+| `Author identity unknown` at first commit | fixed (`b045e391`), warns, never invents |
+
+**The handover is a real transaction target, not an appended write.** Before/after
+digests, its own crash point, its own arm of the recover-prefix predicate, its own
+drift refusal, and a readback beside the state and history digests. It publishes
+BEFORE the state, which is the commit point, so a crash can only leave a handover
+ahead of a state that is behind — never a promoted state beside a handover still
+naming the kickoff. Both the plan target and the history record are optional on
+the same terms as `cleanupBinding`, so a promotion applied before this existed
+replays bit-for-bit unchanged.
+
+**`security` was measured, and its path is CLOSED.** Three independent reasons:
+the scan refuses a dirty tree while the push gate's own evidence is what dirties
+it (that circle is now broken by the `.gitignore` seed); it needs three external
+scanners plus a license allowlist at a path that exists only in the Pipeline's own
+repository; and the measured verdict on a clean empty consumer was WARNING → exit
+1 anyway. So the calibration says `off`, which is what is true. Two defects found
+on the way are filed: a `warn` security gate hard-blocks every push (its findings
+are dispatched under the PUSH gate's mode), and the license allowlist path.
+
+**The PG11e flake fired twice more.** Two full Verify cycles lost, each passing
+150/150 on the immediate unchanged re-run. `guard-push.test.mjs` is TP-5 protected
+and this session changed the seed of the hook it gates, so the three-line fix
+needs its own briefed task. Recorded in the item, including the rate.
 
 ## 2026-08-09 The second local `0.5.4` candidate — the happy-path fixes, stamped and verified
 

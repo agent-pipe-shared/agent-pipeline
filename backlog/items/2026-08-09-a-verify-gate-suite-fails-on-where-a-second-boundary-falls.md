@@ -30,6 +30,15 @@ Observed directly: the suite failed inside a full Verify run, and passed 150/150
 on an immediately following unchanged run. The failure text is the two messages
 side by side, differing only in a 40-character hash.
 
+## It fired twice in one afternoon
+
+Two separate full-Verify runs on 2026-08-09 died on this, hours apart, each
+passing 150/150 on the immediate unchanged re-run. That is two full gate cycles
+spent on a coin flip, and it is the reason this is filed as a defect rather than
+as a note: at roughly this rate it will land on whoever runs the gate next, and
+the correct-looking response — re-run it — is the response that must never become
+a habit.
+
 ## Why this is worse than a missing assertion
 
 A flaky check **inside a gate** teaches that a red gate can be re-run away. That
