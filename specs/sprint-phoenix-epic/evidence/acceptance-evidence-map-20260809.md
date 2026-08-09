@@ -42,8 +42,8 @@ reproduced here rather than referenced.
 
 ## The direct answer
 
-**Phoenix cannot claim complete.** 107 of 157 criteria carry a named assertion in a
-gate-registered suite; 50 do not. EPIC-AC-05 forbids a completion claim while any
+**Phoenix cannot claim complete.** 108 of 157 criteria carry a named assertion in a
+gate-registered suite; 49 do not. EPIC-AC-05 forbids a completion claim while any
 criterion remains unimplemented or unverified, and it currently bites. No issue is closeable on
 its own live acceptance bullets.
 
@@ -61,8 +61,8 @@ A bullet is therefore BLOCKED unless every criterion mapped to it is `implemente
 
 | verdict | count |
 |---|---|
-| implemented | 107 |
-| partial | 36 |
+| implemented | 108 |
+| partial | 35 |
 | designed-only | 1 |
 | not-started | 12 |
 | constraint | 1 |
@@ -237,7 +237,7 @@ clause that is not pinned or not built.
 | C-AC-12 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): unavailable external state blocks via C-AC-04, and the distinct "external-unavailable" gate reason is now pinned by name; the explicit advisory-vs-mandatory policy distinction remains absent -- mandatory:false is only representable together with changeClass:"not-required", which short-circuits before ITSM availability is ever inspected |
 | C-AC-13 | implemented | WP-DOC | docs/change-control.md (PHX-WP-DOC-1): threat model, policy precedence, migration, operator runbook, and failure/rollback/recovery procedures all present and grounded in change-control.mjs; migration section honestly states no migration tooling exists |
 
-### E — Governance event export (#32) (15/21 implemented)
+### E — Governance event export (#32) (16/21 implemented)
 
 | ID | verdict | src | evidence / named gap |
 |---|---|---|---|
@@ -251,7 +251,7 @@ clause that is not pinned or not built.
 | E-AC-08 | partial | WP-E | governance-export-outbox-tests (PHX-WP-E, break-proofed): 4 of 8 detections pinned (destination-mismatch/forged-ack pre-existing, event-gap/schema-downgrade new); CONFIRMED ABSENT: cursor rollback, outbox truncation, source fork, invalid hash -- no bound on cursor vs entries.length or hash-chain check anywhere in outbox.mjs:6-11 |
 | E-AC-09 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): lag exposed on a failed acknowledgement is pinned; CONFIRMED ABSENT: the "advisory destination" concept itself -- no such distinction exists anywhere in scope, so "canonical governance continues under an unavailable advisory destination" is not representable |
 | E-AC-10 | not-started | C | NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range |
-| E-AC-11 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): the closed 9-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension; CONFIRMED ABSENT: a per-projection/mapping digest field -- only policyRevision exists (governance-event-projection.mjs:22-24) |
+| E-AC-11 | implemented | WP-E-AC11 | governance-export-delivery-tests (PHX-WP-E-AC11): the closed 10-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension, AND now carries a projectionDigest alongside policyRevision -- deterministic over batch content, proven to change when batch content changes |
 | E-AC-12 | implemented | C | governance-export-adapter-tests: profile and acknowledgements are closed, non-authoritative and deduplicated |
 | E-AC-13 | implemented | C | governance-export-outbox-tests: destination queues, cursors and failure domains stay independent |
 | E-AC-14 | implemented | WP-EAC14 | governance-export-delivery-tests (PHX-WP-EAC14, break-proofed): all five named fixture classes individually evidenced -- in-memory/local-file/OTLP-profile/syslog (pre-existing) plus a genuine failure-injection fixture (new): a rejected adapter.deliver() call leaves the outbox untouched and a later retry recovers cleanly. Corrects the prior partial verdict, which had leaned on CAS-conflict/forged-ack tests that direct re-examination found to be validation assertions, not simulated transport failure |
@@ -372,7 +372,7 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 
 ### #32 — Add provider-neutral governance event export for SIEM and audit platforms
 
-14 of 20 live acceptance bullets fully carried; **6 blocked**.
+15 of 20 live acceptance bullets fully carried; **5 blocked**.
 
 | # | live acceptance bullet | blocking criteria (verdict) |
 |---|---|---|
@@ -380,8 +380,7 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 | 2 | Cursor/gap/fork/hash/schema/ack failures are typed | E-AC-08 (partial) |
 | 3 | Advisory failure preserves canonical operation | E-AC-09 (partial) |
 | 4 | Required mode blocks only exact named boundary/range | E-AC-10 (not-started) |
-| 5 | Receipts state exact acknowledgement without retention/review claims | E-AC-11 (partial) |
-| 6 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
+| 5 | #9 bundles sanitized export-policy/delivery metadata | E-AC-20 (not-started) |
 
 ## Summary
 
@@ -394,13 +393,13 @@ No blocking criterion. Closeable subject to the epic-level gates (EPIC-AC-01..06
 | #24 | 12 | 9 | 3 | **no** |
 | #30 | 17 | 9 | 8 | **no** |
 | #31 | 17 | 10 | 7 | **no** |
-| #32 | 20 | 14 | 6 | **no** |
+| #32 | 20 | 15 | 5 | **no** |
 
 Issues closeable on their own live acceptance bullets: **1 of 8**.
 
 ## The blocking set, ranked
 
-26 distinct criteria block at least one live acceptance bullet.
+25 distinct criteria block at least one live acceptance bullet.
 
 | criterion | verdict | live bullets blocked |
 |---|---|---|
@@ -420,7 +419,6 @@ Issues closeable on their own live acceptance bullets: **1 of 8**.
 | E-AC-08 | partial | 1 |
 | E-AC-09 | partial | 1 |
 | E-AC-10 | not-started | 1 |
-| E-AC-11 | partial | 1 |
 | E-AC-20 | not-started | 1 |
 | H-AC-08 | partial | 1 |
 | H-AC-09 | not-started | 1 |

@@ -437,7 +437,15 @@ const DELTA = {
   'E-AC-04': ['partial', 'WP-E'],
   'E-AC-08': ['partial', 'WP-E'],
   'E-AC-09': ['partial', 'WP-E'],
-  'E-AC-11': ['partial', 'WP-E'],
+  // WP-E-AC11 CLOSED 2026-08-09 (goldfish-implementor, commit 5bb4269):
+  // createGovernanceDeliveryReceipt now requires projectionDigest alongside
+  // policyRevision (both SHA-shaped), and its one real production caller
+  // (deliverGovernanceExportBatch) computes it deterministically via
+  // canonicalSha256 over the batch's own mappings (destinationEventId +
+  // sourceEventDigest pairs, ordered). Proven deterministic AND
+  // content-sensitive by a new test. 3/3 governance-event-projection-tests,
+  // 18/18 governance-export-delivery-tests pass (independently re-run).
+  'E-AC-11': ['implemented', 'WP-E-AC11'],
 
   // --- evidence/phx-wp-doc1.txt + phx-wp-doc2.txt (tasks PHX-WP-DOC-1/2,
   // 2026-08-09, commits f9e300c + 3f09bed) ---
@@ -824,7 +832,7 @@ const POINTERS = {
   'E-AC-08': 'governance-export-outbox-tests (PHX-WP-E, break-proofed): 4 of 8 detections pinned (destination-mismatch/forged-ack pre-existing, event-gap/schema-downgrade new); CONFIRMED ABSENT: cursor rollback, outbox truncation, source fork, invalid hash -- no bound on cursor vs entries.length or hash-chain check anywhere in outbox.mjs:6-11',
   'E-AC-09': 'governance-export-delivery-tests (PHX-WP-E, break-proofed): lag exposed on a failed acknowledgement is pinned; CONFIRMED ABSENT: the "advisory destination" concept itself -- no such distinction exists anywhere in scope, so "canonical governance continues under an unavailable advisory destination" is not representable',
   'E-AC-10': 'NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range',
-  'E-AC-11': 'governance-export-delivery-tests (PHX-WP-E, break-proofed): the closed 9-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension; CONFIRMED ABSENT: a per-projection/mapping digest field -- only policyRevision exists (governance-event-projection.mjs:22-24)',
+  'E-AC-11': 'governance-export-delivery-tests (PHX-WP-E-AC11): the closed 10-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension, AND now carries a projectionDigest alongside policyRevision -- deterministic over batch content, proven to change when batch content changes',
   'E-AC-12': 'governance-export-adapter-tests: profile and acknowledgements are closed, non-authoritative and deduplicated',
   'E-AC-13': 'governance-export-outbox-tests: destination queues, cursors and failure domains stay independent',
   'E-AC-14': 'governance-export-delivery-tests (PHX-WP-EAC14, break-proofed): all five named fixture classes individually evidenced -- in-memory/local-file/OTLP-profile/syslog (pre-existing) plus a genuine failure-injection fixture (new): a rejected adapter.deliver() call leaves the outbox untouched and a later retry recovers cleanly. Corrects the prior partial verdict, which had leaned on CAS-conflict/forged-ack tests that direct re-examination found to be validation assertions, not simulated transport failure',
