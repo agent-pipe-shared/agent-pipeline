@@ -4943,7 +4943,32 @@ Architecture-class change (core continuity/state-authority machinery) — per th
 self-application discipline, dispatching an independent Critic review before booking any of the three
 ACs as implemented in the evidence map, same standard applied to K-AC-05/O-1/O-2 all stretch.
 
-**Live now:** WP-PX0-AC13, PX0-AC-03/05/06 Critic round 1.
+### WP-PX0-AC13 RETURNED, SELF-COMMITTED, INDEPENDENTLY VERIFIED — CRITIC DISPATCHED BEFORE BOOKING
+
+Self-committed as `08d9f7cb`. Turned out to be a deeper gap than "wire it": `ruleset-freshness-host.mjs`'s
+host-transport selection was already correct, but its ONE required dependency, `observeRulesetSource`,
+had no default producer at all — the file's own comment said the successor was "designed but not yet
+built". Built it: a self-referential `observeCodexPublicCoreIdentity` call (mirroring the exact
+composition `self-application-attestation-gate.mjs` already proves for the same PX0-AC-08/Part-A
+mechanism), gated on `.git` presence, origin-checked against `PUBLIC_SELF_APPLICATION_ORIGINS`, closed
+through the existing `normalizeRulesetSource` — reusing established shape/validation rather than
+inventing a new one. Every failure path returns a typed `source-unavailable` result, never a thrown
+exception or a fabricated partial observation. Confirmed independently: all four imported symbols
+(`observeCodexPublicCoreIdentity`, `PUBLIC_SELF_APPLICATION_ORIGINS`, `normalizeRulesetSource`,
+`RULESET_SOURCE_SCHEMA`) exist exactly as used, at the paths used — grep-verified against source, not
+assumed. Re-ran `node --test` on all three suites myself: **63/63 pass**, matching the report exactly.
+
+Honestly disclosed rather than silently decided: no code call site anywhere in the tree invokes
+`ruleset-freshness-host.mjs`/`inspectHostRulesetFreshness` — confirmed by the dispatch's own grep. The
+mechanism is architecturally CLI-standalone (invoked procedurally per the harness bootstrap doc, not
+via a function chain), so "bootstrap does not wire it" meant the missing producer, not a missing
+function call — the dispatch's own investigation correctly overrode what my briefing had assumed about
+the shape of the gap, and said so rather than inventing a call site to force a fit.
+
+Security-adjacent (origin-attestation deciding a trusted self-application identity) — same discipline:
+dispatching Critic review before booking, rather than booking on my own read of the diff alone.
+
+**Live now:** PX0-AC-03/05/06 Critic round 1, PX0-AC-13 Critic round 1.
 
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
