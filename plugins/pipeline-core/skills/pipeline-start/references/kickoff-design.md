@@ -7,6 +7,20 @@ below is what to do once you are in one of those states. It was moved out of
 the core verbatim (BOOTMOD-1): the core is read at the start of every session
 and pays for every byte, including the sessions that never reach a kickoff.
 
+A pristine project's first commits mix two different kinds of file: the
+onboarding transaction's own pipeline-scaffolding output (`.claude/settings*`,
+guard/hook configs, and any other pipeline-authority file it writes) and the
+first feature code the PO actually asked for. Commit those separately —
+scaffolding in its own commit(s), never bundled into the same commit as
+feature code. A later Critic dispatch escalates to the heavier T1 review tier
+whenever the reviewed diff touches "architecture/guardrail/security
+surfaces — hooks/, agents/, .claude/settings*, permission/guard config,
+guardrails/, policies/, secrets/auth/credentials, or A/G/S-marked `riskZones`
+from the calibration" (`skills/critic-review/SKILL.md`), regardless of
+whether anything else in that diff has real security surface. A scaffolding
+file riding along with ordinary feature code forces that heavier tier onto
+work that needed only the standard review.
+
 Bootstrap questions are answered before any artifact is written. The
 project's operator-facing language is decided by what the PO answers, never
 inferred from the greeting, the repository's contents, or the runner's
