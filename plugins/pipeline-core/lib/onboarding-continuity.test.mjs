@@ -25,6 +25,7 @@ import {
   serializePoGateProfileReceipt,
   validatePoGateAuthority,
 } from "./po-gate-authority.mjs";
+import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
 
 import {
   KICKOFF_FAULT_STAGES,
@@ -34,6 +35,7 @@ import {
   applyOnboardingKickoffPromotionCleanupRecovery,
   bindOnboardingSessionCleanup,
   classifyOnboardingContinuity,
+  nextActionSection,
   planOnboardingContinuityRepair,
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
@@ -42,6 +44,8 @@ import {
   reconstructOnboardingKickoffPlan,
   reconstructOnboardingKickoffPromotionPlan,
   releaseOnboardingSessionCleanup,
+  replaceNextActionSection,
+  syncStateMdNextAction,
   validateKickoffGoal,
 } from "./onboarding-continuity.mjs";
 
@@ -1911,6 +1915,208 @@ check("every kickoff/promotion plan builder carries its runner into the resolved
     const plan = fixtures[name]();
     assertActionCarriesRunner(plan.applyAction, runner);
   }
+});
+
+// ---- GF-090: nextActionSection / replaceNextActionSection / syncStateMdNextAction ------
+
+const NEXT_ACTION_AUTHORITY = {
+  schema: "pipeline.po-gate-authority.v2",
+  humanFacing: "en",
+  sourceSha256: "a".repeat(64),
+  runtimeSha256: "b".repeat(64),
+  receiptSha256: "c".repeat(64),
+  repositoryFingerprint: "d".repeat(64),
+  planPath: "specs/demo/prd.md",
+  planSha256: "e".repeat(64),
+  specPath: "specs/demo/spec.md",
+  specSha256: "f".repeat(64),
+};
+
+function nextActionSubmissionFixture(overrides = {}) {
+  return {
+    schema: "pipeline.plan-submission.v1",
+    featureId: "demo-feature",
+    planPath: NEXT_ACTION_AUTHORITY.planPath,
+    planSha256: NEXT_ACTION_AUTHORITY.planSha256,
+    specPath: NEXT_ACTION_AUTHORITY.specPath,
+    specSha256: NEXT_ACTION_AUTHORITY.specSha256,
+    profile: "feature",
+    profileSha256: "1".repeat(64),
+    submittedBy: "coordinator",
+    submittedAt: "2026-08-10T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+function nextActionApprovalFixture(submission, overrides = {}) {
+  return {
+    schema: "pipeline.plan-approval.v4",
+    approvedBy: "po-test",
+    approvedAt: "2026-08-10T01:00:00.000Z",
+    submissionSha256: sha256CanonicalJson(submission),
+    profileSha256: submission.profileSha256,
+    poGateAuthority: NEXT_ACTION_AUTHORITY,
+    priorInvalidationSha256: null,
+    ...overrides,
+  };
+}
+
+function nextActionStateFixture(overrides = {}) {
+  return {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "demo-feature", planPath: NEXT_ACTION_AUTHORITY.planPath, phase: "design" },
+    planApproved: false,
+    ...overrides,
+  };
+}
+
+check("nextActionSection: no active feature renders the set-feature action", () => {
+  const text = nextActionSection({ schema: "pipeline.state.v0" });
+  assert.match(text, /^## Next action\n\n/);
+  assert.match(text, /pipeline-state set-feature --id/);
+});
+
+check("nextActionSection: a closed feature (activeFeature removed) renders the same set-feature action", () => {
+  const text = nextActionSection({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    closedFeatures: [{
+      id: "demo", planPath: "specs/demo/prd.md", phaseAtClose: "implementation",
+      closedAt: "2026-08-10T00:00:00.000Z", closedBy: "po", forCommit: null,
+    }],
+  });
+  assert.match(text, /pipeline-state set-feature --id/);
+});
+
+check("nextActionSection: draft (no submission yet) renders submit-plan", () => {
+  const text = nextActionSection(nextActionStateFixture());
+  assert.match(text, /pipeline-state submit-plan --by/);
+  assert.doesNotMatch(text, /approve-plan/);
+});
+
+check("nextActionSection: awaiting-approval (submitted, not yet approved) renders approve-plan", () => {
+  const submission = nextActionSubmissionFixture();
+  const text = nextActionSection(nextActionStateFixture({ planSubmission: submission }));
+  assert.match(text, /pipeline-state approve-plan --by/);
+  assert.doesNotMatch(text, /submit-plan/);
+});
+
+check("nextActionSection: approved but still in design phase renders set-phase implementation", () => {
+  const submission = nextActionSubmissionFixture();
+  const approval = nextActionApprovalFixture(submission);
+  const text = nextActionSection(nextActionStateFixture({
+    planSubmission: submission, planApproval: approval, planApproved: true,
+  }));
+  assert.match(text, /pipeline-state set-phase --phase implementation/);
+});
+
+check("nextActionSection: implementing (phase switched) renders the proceed-with-implementation text", () => {
+  const submission = nextActionSubmissionFixture();
+  const approval = nextActionApprovalFixture(submission);
+  const text = nextActionSection(nextActionStateFixture({
+    activeFeature: { id: "demo-feature", planPath: NEXT_ACTION_AUTHORITY.planPath, phase: "implementation" },
+    planSubmission: submission, planApproval: approval, planApproved: true,
+  }));
+  assert.match(text, /in implementation/);
+  assert.match(text, /pipeline-state reopen-design --by/);
+});
+
+check("nextActionSection: a contradictory state (planApproved true, no approval on record) fails closed to the live-source fallback", () => {
+  const text = nextActionSection(nextActionStateFixture({ planApproved: true }));
+  assert.match(text, /could not be classified/);
+  assert.match(text, /project\/pipeline-state\.json/);
+  // The exact defect this fix closes: never claim the plan still needs
+  // submitting while the recorded state says it is already approved.
+  assert.doesNotMatch(text, /submit-plan/);
+});
+
+check("nextActionSection: a malformed state (unrecognized schema) never throws and falls back to the live-source text", () => {
+  const text = nextActionSection({ schema: "not-a-real-schema" });
+  assert.match(text, /could not be classified/);
+});
+
+check("nextActionSection does not mutate its input state object", () => {
+  const submission = nextActionSubmissionFixture();
+  const state = nextActionStateFixture({ planSubmission: submission });
+  const before = JSON.stringify(state);
+  nextActionSection(state);
+  assert.equal(JSON.stringify(state), before);
+});
+
+check("replaceNextActionSection: replaces only the Next-action span; another heading follows", () => {
+  const original = [
+    "# Project state", "", "## Goal", "", "Ship the thing.", "",
+    "## Current state", "", "Feature `x` is active.", "",
+    "## Next action", "", "OLD TEXT.", "",
+    "## Trailer", "", "Untouched.", "",
+  ].join("\n");
+  const replacement = "## Next action\n\nNEW TEXT.\n";
+  const updated = replaceNextActionSection(original, replacement);
+  assert.ok(updated.includes("## Goal\n\nShip the thing.\n\n## Current state"));
+  assert.ok(updated.includes("NEW TEXT."));
+  assert.ok(!updated.includes("OLD TEXT"));
+  assert.ok(updated.includes("## Trailer\n\nUntouched.\n"));
+});
+
+check("replaceNextActionSection: Next action is the last section (EOF); trailing newline preserved", () => {
+  const original = "# Project state\n\n## Next action\n\nOLD.\n";
+  const replacement = "## Next action\n\nNEW.\n";
+  const updated = replaceNextActionSection(original, replacement);
+  assert.equal(updated, "# Project state\n\n## Next action\n\nNEW.\n");
+});
+
+check("replaceNextActionSection: returns null (fail closed) when no '## Next action' heading exists", () => {
+  const original = "# Project state\n\n## Something else\n\nbody\n";
+  assert.equal(replaceNextActionSection(original, "## Next action\n\nNEW.\n"), null);
+});
+
+check("replaceNextActionSection: returns null on non-string input rather than throwing", () => {
+  assert.equal(replaceNextActionSection(null, "## Next action\n\nNEW.\n"), null);
+  assert.equal(replaceNextActionSection("markdown", null), null);
+});
+
+check("syncStateMdNextAction: rewrites docs/state.md's Next action section in place", () => {
+  const root = mkdtempSync(join(tmpdir(), "gf090-sync-"));
+  mkdirSync(join(root, "docs"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), [
+    "# Project state", "", "## Goal", "", "Ship it.", "",
+    "## Current state", "", "Feature `demo` is active.", "",
+    "## Next action", "", "Review the goal and establish the initial PRD and technical specification.", "",
+  ].join("\n"));
+  const result = syncStateMdNextAction(root, nextActionStateFixture());
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, true);
+  const rewritten = readFileSync(join(root, "docs", "state.md"), "utf8");
+  assert.match(rewritten, /## Goal\n\nShip it\./);
+  assert.match(rewritten, /pipeline-state submit-plan --by/);
+});
+
+check("syncStateMdNextAction: fails closed (no write) when docs/state.md is absent", () => {
+  const root = mkdtempSync(join(tmpdir(), "gf090-sync-absent-"));
+  const result = syncStateMdNextAction(root, nextActionStateFixture());
+  assert.equal(result.ok, false);
+  assert.ok(!existsSync(join(root, "docs", "state.md")));
+});
+
+check("syncStateMdNextAction: fails closed (no corruption) when no '## Next action' heading exists", () => {
+  const root = mkdtempSync(join(tmpdir(), "gf090-sync-noheading-"));
+  mkdirSync(join(root, "docs"), { recursive: true });
+  const original = "# Project state\n\n## Hand-edited section\n\nsomething else\n";
+  writeFileSync(join(root, "docs", "state.md"), original);
+  const result = syncStateMdNextAction(root, nextActionStateFixture());
+  assert.equal(result.ok, false);
+  assert.equal(readFileSync(join(root, "docs", "state.md"), "utf8"), original);
+});
+
+check("syncStateMdNextAction: is a no-op write when the rendered text already matches", () => {
+  const state = nextActionStateFixture();
+  const section = nextActionSection(state);
+  const root = mkdtempSync(join(tmpdir(), "gf090-sync-noop-"));
+  mkdirSync(join(root, "docs"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), `# Project state\n\n${section}`);
+  const result = syncStateMdNextAction(root, state);
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, false);
 });
 
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);

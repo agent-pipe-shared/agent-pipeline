@@ -73,6 +73,7 @@ import {
   listActiveSessionDescriptors,
   loadSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
+import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 
 export const KICKOFF_PLAN_SCHEMA = "pipeline.codex-onboarding-kickoff-plan.v1";
 export const KICKOFF_HISTORY_SCHEMA = "pipeline.codex-onboarding-continuity-history.v1";
@@ -3115,6 +3116,155 @@ function promotionHandoverContent({ featureId, prdPath, specPath, designInputPat
     "`pipeline-state.mjs continuity-status`) as the live, authoritative source.",
     "",
   ].join("\n");
+}
+
+/**
+ * The rendered body for each non-null `derivePlanLifecycle` status
+ * (`PLAN_LIFECYCLE_STATUSES` in `plan-spec-state-v2.mjs`). Kept as a lookup
+ * table, not a `switch`, so an added lifecycle status fails loudly here
+ * (`undefined` body -> the generic fallback in `nextActionSection()`) instead
+ * of silently falling through to the wrong text.
+ */
+const NEXT_ACTION_BODY_BY_STATUS = {
+  draft: [
+    "Review the PRD and specification, then submit the plan for PO approval:",
+    "`pipeline-state submit-plan --by <name> --profile <epic|feature|mini>`.",
+    "Implementation writes stay refused until the plan is approved and the phase is",
+    "switched to `implementation`.",
+  ],
+  "awaiting-approval": [
+    "The plan has been submitted and is awaiting PO approval:",
+    "`pipeline-state approve-plan --by <name>`. Implementation writes stay refused",
+    "until the plan is approved.",
+  ],
+  approved: [
+    "The plan is approved. Switch the feature to implementation with",
+    "`pipeline-state set-phase --phase implementation`, then proceed with the",
+    "approved implementation packages.",
+  ],
+  implementing: [
+    "The plan is approved and the feature is in implementation. Proceed with the",
+    "approved implementation packages; reopen design only through",
+    "`pipeline-state reopen-design --by <name>` if it must change.",
+  ],
+};
+
+function nextActionBlock(bodyLines) {
+  return ["## Next action", "", ...bodyLines, ""].join("\n");
+}
+
+/**
+ * Render the CURRENT "## Next action" section of a project's `docs/state.md`
+ * from the LIVE Pipeline state object (`pipeline-state.mjs`'s `readState()`
+ * result), classified through the same `derivePlanLifecycle` projection every
+ * other State reader uses. Called with no `observation` argument, that
+ * projection reduces to state-only fields (`activeFeature`, `planSubmission`,
+ * `planApproval`, `planInvalidation`, `planApproved`) -- exactly what a
+ * doc section needs, and nothing this pure function has to fetch itself.
+ *
+ * Filed against
+ * backlog/items/2026-08-09-docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync.md:
+ * `handoverContent()`/`promotionHandoverContent()` write this section once,
+ * at kickoff/promotion, and it goes stale the moment a later command changes
+ * phase or approval. `syncStateMdNextAction()` below calls this after every
+ * state-changing `pipeline-state.mjs` command to keep the section current.
+ */
+export function nextActionSection(state) {
+  const lifecycle = derivePlanLifecycle(state);
+  if (lifecycle.code === "PLAN-LIFECYCLE-INACTIVE") {
+    return nextActionBlock([
+      "No feature is currently active. Start the next one with",
+      "`pipeline-state set-feature --id <id> --plan-path <path>`, or review closed",
+      "feature history in `project/pipeline-state.json` (`closedFeatures`).",
+    ]);
+  }
+  if (!lifecycle.ok || lifecycle.status === null) {
+    return nextActionBlock([
+      `The recorded plan/approval state could not be classified (${lifecycle.code ?? "unknown"}).`,
+      "Treat `project/pipeline-state.json` (or `pipeline-state.mjs continuity-status`)",
+      "as the live, authoritative source until the state is repaired.",
+    ]);
+  }
+  const body = NEXT_ACTION_BODY_BY_STATUS[lifecycle.status];
+  if (body === undefined) {
+    return nextActionBlock([
+      `The recorded lifecycle status ("${lifecycle.status}") has no rendered text yet.`,
+      "Treat `project/pipeline-state.json` (or `pipeline-state.mjs continuity-status`)",
+      "as the live, authoritative source.",
+    ]);
+  }
+  return nextActionBlock(body);
+}
+
+/**
+ * Locate the "## Next action" section inside a `docs/state.md`-shaped
+ * markdown string and replace it (heading through the line before the next
+ * `## ` heading, or end of file) with `sectionText` (a `nextActionSection()`
+ * return value, heading included). Everything outside that span -- every
+ * other section, including "## Goal"/"## Current state" above it -- is
+ * passed through byte-for-byte.
+ *
+ * Returns `null` -- never throws, never guesses -- when no exact
+ * "## Next action" heading line is found, so a caller can fail closed rather
+ * than corrupt a hand-edited file or one from an older onboarding shape.
+ */
+export function replaceNextActionSection(markdown, sectionText) {
+  if (typeof markdown !== "string" || typeof sectionText !== "string") return null;
+  const lines = markdown.split("\n");
+  const headingIndex = lines.findIndex((line) => line.trim() === "## Next action");
+  if (headingIndex === -1) return null;
+  let endIndex = lines.length;
+  for (let i = headingIndex + 1; i < lines.length; i += 1) {
+    if (lines[i].startsWith("## ")) { endIndex = i; break; }
+  }
+  const before = lines.slice(0, headingIndex);
+  const after = lines.slice(endIndex);
+  // `sectionText` always ends with a blank-line terminator element once split
+  // (see `nextActionBlock`), so no extra separator line is needed here.
+  return [...before, ...sectionText.split("\n"), ...after].join("\n");
+}
+
+/**
+ * Best-effort resync of `docs/state.md`'s "## Next action" section to the
+ * CURRENT `state`, called after a `pipeline-state.mjs` command has already
+ * committed its own write. Never throws; a caller MUST NOT let this gate
+ * command success -- the state write is authoritative, this sync is
+ * advisory (see the backlog item cited on `nextActionSection` above).
+ *
+ * Fails closed on anything it cannot safely handle: an absent/unreadable
+ * `docs/state.md`, or one with no recognizable "## Next action" heading (an
+ * older project, or one that hand-edited the section), both skip the
+ * rewrite rather than guess at a repair. Only the literal `docs/state.md`
+ * path is synced; a project whose calibration configures a different
+ * handover path is out of scope for this mechanism.
+ */
+export function syncStateMdNextAction(dir, state) {
+  const path = join(dir, "docs", "state.md");
+  let markdown;
+  try {
+    markdown = readFileSync(path, "utf8");
+  } catch {
+    return { ok: false, reason: "docs/state.md is absent or unreadable" };
+  }
+  let sectionText;
+  try {
+    sectionText = nextActionSection(state);
+  } catch (error) {
+    return { ok: false, reason: `next-action rendering failed: ${error?.message ?? error}` };
+  }
+  const updated = replaceNextActionSection(markdown, sectionText);
+  if (updated === null) {
+    return { ok: false, reason: 'no recognizable "## Next action" heading' };
+  }
+  if (updated === markdown) {
+    return { ok: true, changed: false };
+  }
+  try {
+    writeFileSync(path, updated, "utf8");
+  } catch (error) {
+    return { ok: false, reason: `write failed: ${error?.message ?? error}` };
+  }
+  return { ok: true, changed: true };
 }
 
 /**
