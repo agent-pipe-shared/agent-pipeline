@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e5d72a0fde713f7d82558318be0780a7ff559235d2330891b41d0bf3be59c545"
+    "transitionHead": "ee5ebdb6a077b0a82cf8e0a107347d69e5d10165f7bdc795cd5d0d77a7721ef8"
   },
   "counts": {
-    "open": 115,
+    "open": 116,
     "in_progress": 21,
     "closed": 42
   },
@@ -447,6 +447,14 @@
       "closureRepository": "self",
       "closureCommit": "049ab1a8bc5224345cae2e8a48ced0ebe2c030e5",
       "closureEvidence": "backlog/evidence/2026-08-10-docs-state-md-live-sync-closure.md"
+    },
+    {
+      "id": "pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "Critic review (claude-opus-5, max, functional-equivalent-read-only lane) of GF-090 (commits 1b9ca12e/049ab1a8), 2026-08-10. Finding F2, verdict FAIL (alongside major finding F1, fixed as GF-091). Full report: scratch/critic-843d081a/critic-notes.md."
     },
     {
       "id": "pipeline.documentation-information-architecture",
