@@ -4196,6 +4196,23 @@ authority."
 
 **Live now:** WP-E-AC20.
 
+### E-AC-20 CLOSED — CATEGORY 5's SECOND CONFIRMED WIN
+
+WP-E-AC20 landed clean (`124eda66`): `exportMetadata: {profileDigest, receipt}` is narrowed
+exactly as pre-resolved (never `mappings`/`outbox`/`acknowledgement`), rejects a receipt shaped
+like the full delivery result, and — the concrete proof for "SHALL NOT treat delivery as source
+authority" — a dedicated test builds and verifies a bundle whose export metadata is deliberately
+wrong and internally inconsistent, confirming the signature/digest-chain logic genuinely never
+reads it. Confirmed `feature-package-topology.mjs` untouched (the file whose editing caused the
+earlier P-AC-06 regression) — this dispatch stayed correctly confined to the two files it was
+scoped to. Verified independently (16/16 tests, diff read). Booked `implemented` (`42c7149f`).
+
+Between R-AC-11 and E-AC-20, category 5's "carries real design ambiguity" framing turned out to be
+resolvable, not blocking — the ambiguity was in what the FIELD SHAPE should be, which a careful
+research pass could resolve outright, not in whether the work was safely dispatchable at all.
+
+**Live now: none.**
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
