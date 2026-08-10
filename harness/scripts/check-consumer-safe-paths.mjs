@@ -257,6 +257,125 @@ export const ALLOWLIST = Object.freeze([
     filePattern: /^plugins\/pipeline-core\/scripts\/nova-b5-candidate-freeze-v2\.schema\.json$/u,
     reason: "Class B: a `const` binding path embedded in a JSON Schema used only by this repository's own Nova-sprint candidate-freeze release tooling, self-application-only.",
   },
+
+  // --- GF-108: manual, byte-identical vendored copies of self-application
+  // canon text (guardrails/roles/templates-prompts, GF-107 ae25b35e) and the
+  // ADRs that text cites (GF-108). Each of these files is a verbatim mirror
+  // of a repo-root source file that legitimately documents THIS repository's
+  // own harness/ tooling in its self-application voice; every harness/- or
+  // setup.mjs-prefixed mention below is inherited unchanged from that source,
+  // not a new instruction telling a consumer to run it. This is a known,
+  // PO-accepted, EXPLICITLY TEMPORARY gap in the "quick copy now" vendoring
+  // approach -- not an oversight -- tracked by the deferred generated
+  // build-step item that will properly classify/reconcile this content:
+  // backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md
+  // File-wide filePattern (not per-line) matches this checker's own Class-C
+  // convention for files whose entire content is a known, accepted snapshot
+  // rather than hundreds of near-duplicate per-line entries.
+
+  {
+    filePattern: /^plugins\/pipeline-core\/guardrails\/deploy\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/deploy.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/guardrails\/git\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/git.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/guardrails\/global\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/global.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/guardrails\/quality-gates\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/quality-gates.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/guardrails\/security\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/security.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/roles\/critic\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own roles/critic.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/roles\/elephant\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own roles/elephant.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/roles\/goldfish\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own roles/goldfish.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/agent-obligations\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/agent-obligations.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/critic-review\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/critic-review.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/elephant-kickoff\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/elephant-kickoff.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/goldfish-task\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/goldfish-task.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/kickoff-new-project\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/kickoff-new-project.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/session-bootstrap-check\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/session-bootstrap-check.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+  },
+
+  // --- GF-108: vendored ADRs (plugins/pipeline-core/docs/adr/), the subset
+  // of the 14 files above's own docs/adr/ or bare ADR-<NNNN> citations that
+  // this dispatch's own grep re-confirmed. Same known-accepted-gap rationale
+  // as the group above; only the five that actually trip SOURCE_ONLY_PREFIXES
+  // need an entry -- the other thirteen vendored ADRs (0003, 0005, 0008,
+  // 0011, 0012, 0013, 0014, 0032, 0033, 0047, 0055, 0056, 0061) carry none.
+
+  {
+    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0010-session-bootstrap\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0010-session-bootstrap.md, cited by templates/prompts/session-bootstrap-check.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0017-push-policy-standing-approval\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0017-push-policy-standing-approval.md, cited by guardrails/git.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0027-gate-philosophy\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0027-gate-philosophy.md, cited by guardrails/quality-gates.md and guardrails/security.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0028-manifest-approach\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0028-manifest-approach.md, cited by templates/prompts/kickoff-new-project.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0029-file-handoffs-status\.md$/u,
+    reason:
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0029-file-handoffs-status.md, cited by guardrails/security.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
+  },
 ]);
 
 function posixPath(value) {
