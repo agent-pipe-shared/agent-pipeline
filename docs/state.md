@@ -4729,7 +4729,45 @@ two minors. Verified both myself directly against source before accepting either
 Both are real but genuinely minor — a stale doc comment and a defense-in-depth gap, neither a path
 to a forged authorization. Fixing both directly rather than carrying them as tracked residuals: the
 fixes are small, well-scoped, and this is the last round in the cap, so a cheap fix now is cheaper
-than a residual entry that has to survive to a future fresh cap.
+than a residual entry that has to survive to a future fresh cap. **Dispatched
+WP-K-AC05-F1F2FIX** for both (redispatched once — first attempt used an invalid `model` parameter
+value, fixed to `sonnet`).
+
+### O-1/O-2 CRITIC ROUND 3: FAIL (1 MAJOR, 2 MINOR) — ONE FIXED DIRECTLY, TWO DISPATCHED
+
+Same full-track review discipline (908b084a, e872f8ea, 11eb98ef, 85f33138 — including my own
+ADR-0058 correction commit in scope, not just the design-doc commits), template hunt categories
+verbatim. Returned **FAIL**. Verified all three findings myself against source before accepting any:
+
+- **F1 (major):** §14 F-1's own 2026-08-10 correction ends "`docs/adr/` now runs to 0059" —
+  false at the commit that introduced it: `ls docs/adr/` shows ADRs tracked through 0063. The
+  paragraph's own stated purpose is to stop the document asserting unverified checkout state; this
+  sentence repeats exactly that failure. Worse: the verify script's `DoD4-f1-matching-correction`
+  check (`scratch/verify-WP-O1O2-CACHING-REWORK2.mjs:129`) asserts the literal string is present
+  rather than reading `docs/adr/` from disk, so it certifies the false claim as passing. Confirmed
+  both independently (`ls docs/adr/`, then read the check's regex myself).
+- **F2 (minor):** §15.4's O-2 bullet states "nine … git subprocess spawns … per lifted tool call"
+  at line 2701, then "a miss still contains six git spawns" four lines later at line 2705 — the
+  same bullet contradicts itself. "Nine" is the pre-R1 figure; §15.1.6 (iii) and §15.2.3a already
+  correctly say "six" elsewhere. Confirmed via direct grep of both lines.
+- **F3 (minor):** ADR-0058's own 2026-08-10 correction (from the previous checkpoint, `11eb98ef`)
+  mislabels the one open kernel-membership question it carries forward: its Follow-up bullet calls
+  `self-application-attestation-gate.mjs` "GS-8's module", but `guard-gate-strength.mjs`'s own GS-8
+  entry protects a different, sibling file (`public-core-origin-allowlist.mjs`) — confirmed by
+  reading the source comment (`self-application-attestation-gate.mjs:22-23`, `:38-47`) and the
+  guard's own rule table (`guard-gate-strength.mjs:110-124`, GS-8/GS-9). The source names TWO
+  modules with an open question, "one ADR-0058 decision about both"; my correction tracked only
+  one, under the wrong name, with no exit trigger ("no date").
+
+F3 is a defect in my own commit from earlier this same stretch — fixed directly myself (`9e97ca04`),
+same reasoning as before (ADR authorship is Elephant's own domain): separated the two modules by
+their correct identity, added a real two-way `Trigger:` clause matching the shape §15.1.6 (v)
+already uses for its own analogous open question. **Dispatched WP-O1O2-F1F2FIX** for F1 and F2
+(design-doc-and-its-own-verify-script only; first dispatch attempt for both this round and K-AC-05's
+fix was blocked by `guard-dispatch.mjs` for not following `templates/prompts/goldfish-task.md`'s
+exact 6-field structure — redispatched using the template verbatim).
+
+Both packages are now at their **last round** (round 4) once these fixes return and are verified.
 
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
