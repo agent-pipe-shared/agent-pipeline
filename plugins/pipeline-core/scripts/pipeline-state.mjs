@@ -362,6 +362,7 @@ import {
   readCloseCoordinator,
 } from "./publication-close-journal.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { syncStateMdNextAction } from "../lib/onboarding-continuity.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -637,6 +638,23 @@ function stateWriteSucceeded(result) {
     console.error(`Error: serialized state write failed before commit (${result.code}); zero mutation.`);
   }
   return false;
+}
+
+/**
+ * Best-effort resync of `docs/state.md`'s "## Next action" section after a
+ * command has ALREADY committed its own State write (GF-090). This is
+ * advisory, never authoritative: `syncStateMdNextAction` itself never
+ * throws, but every call is wrapped again here so a defect in the sync path
+ * can never surface as a command failure -- the caller has already returned
+ * exit 0 by the time this runs.
+ */
+function syncNextActionDocs(dir, state) {
+  try {
+    syncStateMdNextAction(dir, state);
+  } catch {
+    // Docs sync is best-effort; the State write above is what already
+    // succeeded and is what this command reports.
+  }
 }
 
 /** Adjacent continuity lock path. It is transient and must never be committed. */
@@ -4819,6 +4837,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
         return 2;
       }
+      syncNextActionDocs(dir, next);
       console.log(`Feature "${id}" set. Plan path: ${planPath}. planApproved=false, phase="design".`);
       return 0;
     }
@@ -4857,6 +4876,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: set-phase implementation requires an exact approved submission (${written.code}).`);
         return 2;
       }
+      syncNextActionDocs(dir, written.transition.state);
       console.log('Phase set: "implementation"; lifecycle="implementing".');
       return 0;
     }
@@ -4910,6 +4930,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: submit-plan failed before commit (${written.code}); no submission was recorded.`);
         return 2;
       }
+      syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan submitted by "${by}" on ${submittedAt}; lifecycle="awaiting-approval".`);
       return 0;
     }
@@ -4944,6 +4965,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: reopen-design failed before commit (${written.code}); approval authority was not changed.`);
         return 2;
       }
+      syncNextActionDocs(dir, written.transition.state);
       console.log(written.replay
         ? "Design is already open; zero-write replay accepted."
         : `Design reopened by "${by}" on ${reopenedAt}; lifecycle="draft".`);
@@ -5099,6 +5121,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: approve-plan authority or v2 transition failed before commit (${written.code}); no approval was recorded.`);
         return 2;
       }
+      syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan approved by "${by}" on ${approvedAt}; lifecycle="approved".`);
       return 0;
     }
@@ -5223,6 +5246,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: revoke-plan requires a current exact v2 approval (${written.code}); no revocation was recorded.`);
         return 2;
       }
+      syncNextActionDocs(dir, written.transition.state);
       console.log(written.replay
         ? `Plan revocation by "${by}" on ${revokedAt} already recorded.`
         : `Plan approval revoked by "${by}" on ${revokedAt}.`);
@@ -5626,6 +5650,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
         return 2;
       }
+      syncNextActionDocs(dir, next);
       console.log(
         `Feature "${activeFeature.id}" closed by "${by}" (commit ${forCommit ?? "—"}, ${closedAt}). activeFeature removed, planApproved=false.`,
       );
