@@ -393,6 +393,65 @@ test("a Claude registry with two eligible entries fails closed as ambiguous", ()
   assert.equal(result.installedSource, "unknown");
 });
 
+// GF-111: a `scope: "project"` entry belonging to a DIFFERENT project on the same
+// host must never count toward THIS session's ambiguity check -- only entries
+// for the current project (or scope "user"/"local", which are not project-scoped
+// at all) can ever conflict with each other for the running cwd. Fixture: one
+// scope:"user" entry (no projectPath) plus two scope:"project" entries for two
+// different projects, all sharing id `pipeline-core@agent-pipeline`.
+const threeEntriesFixture = () => JSON.stringify([
+  { id: "pipeline-core@agent-pipeline", version: "0.5.4", scope: "user", enabled: true },
+  {
+    id: "pipeline-core@agent-pipeline", version: "0.5.4", scope: "project", enabled: true,
+    projectPath: "/projects/mine",
+  },
+  {
+    id: "pipeline-core@agent-pipeline", version: "0.5.4", scope: "project", enabled: true,
+    projectPath: "/projects/other",
+  },
+]);
+
+test("a Claude project-scope entry for an unrelated project never counts toward this session's ambiguity", () => {
+  // cwd matches NEITHER project-scope entry's projectPath: both drop out of eligibility,
+  // leaving the scope:"user" entry as the single match -- resolves cleanly, not ambiguous.
+  const cwd = "/projects/third";
+  const identity = installedPipelineIdentity(threeEntriesFixture, "claude", claudeKnownMarketplaces(), cwd);
+  assert.deepEqual(identity, { version: "0.5.4", source: "unknown" });
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: threeEntriesFixture,
+    knownMarketplaces: claudeKnownMarketplaces(),
+    read: () => JSON.stringify({ version: "0.5.4" }),
+    cwd,
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.installedVersion, "0.5.4");
+  assert.equal(result.installedSource, "unknown");
+});
+
+// GF-111 known-open sub-case (see dispatch report): cwd matching the "mine" project-scope
+// entry leaves it eligible ALONGSIDE the unrelated scope:"user" entry (two distinct enabled
+// entries for the same id) -- the briefing's Fix bullet explicitly keeps user-scope
+// eligibility unconditional and explicitly forbids inventing a project-shadows-user
+// precedence rule, so this sub-case still resolves ambiguous, unchanged from before the fix.
+// This assertion documents the actual, spec-compliant behavior -- not the briefing's DoD (a)
+// prediction of "ready", which is unreachable without the precedence rule the briefing forbids.
+test("a Claude project-scope entry matching cwd still coexists with an unrelated user-scope entry as ambiguous", () => {
+  const cwd = "/projects/mine";
+  const identity = installedPipelineIdentity(threeEntriesFixture, "claude", claudeKnownMarketplaces(), cwd);
+  assert.deepEqual(identity, { version: null, source: "unknown", ambiguous: true });
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: threeEntriesFixture,
+    knownMarketplaces: claudeKnownMarketplaces(),
+    read: () => JSON.stringify({ version: "0.5.4" }),
+    cwd,
+  });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(result.installedVersion, null);
+  assert.equal(result.installedSource, "unknown");
+});
+
 test("a malformed, non-array, or empty Claude registry yields no identity without crashing", () => {
   for (const invalid of [
     () => { throw new Error("unavailable"); },

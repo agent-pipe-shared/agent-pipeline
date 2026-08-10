@@ -137,13 +137,19 @@ function claudeLocalDevelopmentAttested(entry, knownMarketplaces) {
     && resolve(source.path) === source.path;
 }
 
-function installedPipelineIdentityClaude(payload, knownMarketplaces) {
+function installedPipelineIdentityClaude(payload, knownMarketplaces, cwd) {
   if (!Array.isArray(payload)) return null;
   const eligible = (entry) =>
     [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(entry?.id)
     && entry?.enabled === true
     && typeof entry?.version === "string"
-    && entry.version.trim() !== "";
+    && entry.version.trim() !== ""
+    // A "project"-scope entry can only ever conflict with THIS session when it belongs to
+    // the running project -- an enabled project-scope entry for an unrelated project on the
+    // same host must never count toward this session's ambiguity check. Every other scope
+    // ("user", "local", or the field absent) keeps its unconditional eligibility unchanged.
+    && (entry?.scope !== "project"
+      || (typeof entry?.projectPath === "string" && resolve(entry.projectPath) === resolve(cwd)));
   const localMatches = payload.filter((entry) => eligible(entry) && entry.id === LOCAL_PLUGIN_ID);
   const officialMatches = payload.filter((entry) => eligible(entry) && entry.id === PLUGIN_ID);
   if (localMatches.length + officialMatches.length > 1) {
@@ -162,6 +168,7 @@ export function installedPipelineIdentity(
   pluginList = () => readInstalledPluginList("codex"),
   runner = "codex",
   knownMarketplaces = readClaudeKnownMarketplaces,
+  cwd = process.cwd(),
 ) {
   let payload;
   try {
@@ -170,7 +177,7 @@ export function installedPipelineIdentity(
     return null;
   }
   return runner === "claude"
-    ? installedPipelineIdentityClaude(payload, knownMarketplaces)
+    ? installedPipelineIdentityClaude(payload, knownMarketplaces, cwd)
     : installedPipelineIdentityCodex(payload);
 }
 
@@ -208,7 +215,7 @@ export function observePipelineStartPreflight({
     version = null;
   }
   const resolvedPluginList = pluginList ?? (() => readInstalledPluginList(runner));
-  const installedIdentity = installedPipelineIdentity(resolvedPluginList, runner, knownMarketplaces);
+  const installedIdentity = installedPipelineIdentity(resolvedPluginList, runner, knownMarketplaces, cwd);
   const installedVersion = installedIdentity?.version ?? null;
   const ticket = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TICKET_ID")
     && String(env.PIPELINE_CODEX_ONBOARDING_TICKET_ID) !== "";
