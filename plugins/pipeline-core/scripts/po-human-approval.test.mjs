@@ -1207,6 +1207,87 @@ test("GF-104: setup against an existing named authority record stays unchanged (
 });
 
 /* ------------------------------------------------------------------ *
+ * GF-112: `setup` against a LEGACY-shape authority record (predates
+ * --human-name -- only {keyReference, publicKeySha256} on disk, no
+ * humanName field at all) -- regression coverage for dd1eb9ee, which fixed
+ * this branch to actually consume a supplied --human-name and perform the
+ * upgrade instead of always failing.
+ * ------------------------------------------------------------------ */
+
+/** A legacy-shape authority record: only {keyReference, publicKeySha256}, no
+ * humanName field -- the exact shape localAuthority() would have produced
+ * before SETUP-1 added the humanName parameter, and the shape `namedShape`
+ * (po-human-approval.mjs) requires be false for the upgrade branch to run. */
+function legacyKeyFixture(directory) {
+  const privateKey = join(directory, "po-private.pem");
+  const publicKey = join(directory, "po-public.pem");
+  openssl(["genpkey", "-algorithm", "ED25519", "-out", privateKey]);
+  openssl(["pkey", "-in", privateKey, "-pubout", "-out", publicKey]);
+  const publicKeyPem = readFileSync(publicKey, "utf8");
+  const authority = { keyReference: "legacy-test-key", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") };
+  writeFileSync(join(directory, "trust-policy.json"), `${JSON.stringify(authority, null, 2)}\n`);
+  return { publicKeyPem, authority };
+}
+
+test("GF-112: setup upgrades a legacy-shape (no humanName) authority record when --human-name is supplied", () => {
+  const dirs = fixtureDirs();
+  const home = noMachinePlaneHomeFixture();
+  try {
+    legacyKeyFixture(dirs.directory);
+    const result = runHumanApproval(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Ada Lovelace"],
+      { homedirFn: () => home },
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-AUTHORITY-READY");
+    assert.equal(result.recovered, true);
+    assert.equal(result.authority.humanName, "Ada Lovelace");
+    const onDisk = JSON.parse(readFileSync(join(dirs.directory, "trust-policy.json"), "utf8"));
+    assert.equal(onDisk.humanName, "Ada Lovelace", "the upgrade must be persisted to disk, not only returned");
+    assert.equal(onDisk.keyReference, "legacy-test-key");
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("GF-112: setup still refuses a legacy-shape record when --human-name is supplied together with a conflicting --key-reference", () => {
+  const dirs = fixtureDirs();
+  const home = noMachinePlaneHomeFixture();
+  try {
+    legacyKeyFixture(dirs.directory); // writes keyReference: "legacy-test-key"
+    const error = thrown(() => runHumanApproval(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Ada Lovelace", "--key-reference", "a-different-key-reference"],
+      { homedirFn: () => home },
+    ));
+    assert.ok(error, "an upgrade attempt with a conflicting --key-reference must still be refused, not silently rebound");
+    assert.match(error.message, /already exists under a different name\/key-reference/u);
+    const onDisk = JSON.parse(readFileSync(join(dirs.directory, "trust-policy.json"), "utf8"));
+    assert.equal(Object.hasOwn(onDisk, "humanName"), false, "a refused upgrade must not touch the on-disk record");
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("GF-112: setup still fails with the original message for a legacy-shape record when no --human-name is supplied", () => {
+  const dirs = fixtureDirs();
+  const home = noMachinePlaneHomeFixture();
+  try {
+    legacyKeyFixture(dirs.directory);
+    const error = thrown(() => runHumanApproval(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory],
+      { homedirFn: () => home },
+    ));
+    assert.ok(error, "a legacy-shape record with no --human-name supplied must still fail");
+    assert.match(error.message, /predates --human-name/u);
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------------------------ *
  * GF-105: authorizeCriticalPushCommand -- a bounded, copy-safe RENDERING of
  * the human's one authorize-critical push-approval command
  * (references/push-approval.md, "The human's one command (current shape)"),
