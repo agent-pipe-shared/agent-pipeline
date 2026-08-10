@@ -93,6 +93,29 @@ cannot today for a push in `signature` mode.
    signed payload claims — checked before any window lookup happens at all, not
    merely by convention.
 
+**Correction, 2026-08-10 (found by a round-2 Critic review of a design that proposes growing this
+kernel).** Decision 3 enumerates the kernel by name and has never been amended since — this ADR is
+the decision authority for that list (`plugins/pipeline-core/lib/self-application-attestation-gate.mjs:45-47`
+already treats "whether the kernel list should grow" as "one ADR-0058 decision"), so a design that
+proposes a new member without amending this ADR leaves the authoritative record silently incomplete
+the moment the code change lands. Stated as a standing process, so this does not need rediscovering
+per future module: **a `NEVER_LIFTABLE_KERNEL_PATHS` addition is a decision of this ADR, recorded
+here as a dated correction at the time the addition is proposed** — never merely a code-review
+outcome on the file that hosts the array. The correction names the new module, the capability-
+bearing artifact it computes that makes it kernel-eligible (Decision 3's own test: would a window
+covering this file let the first edit disable the very check that gates it), and the design or
+dispatch that raised it.
+
+**First application of that process.** `specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-
+into-the-human-ledger.md` §15.1.6 (iv) proposes `plugins/pipeline-core/lib/guard-authority-ledger-
+intake.mjs` as an eighth kernel entry once that module ships (it does not exist yet): it will host
+`ledgerConfirmsLiveGmwGrant`, whose return value becomes a term of the lift condition — exactly
+Decision 3's own recursive-hole test. Endorsed here as the correct kernel classification, contingent
+on that module actually landing; the array itself is edited by whichever dispatch ships the module,
+not by this correction. This does not resolve the SEPARATE, already-pending question named at
+`self-application-attestation-gate.mjs:45-47` about GS-8's own module — a different capability-
+bearing artifact, outside this design's scope, left open for its own dated correction when addressed.
+
 4. **Bounded TTL, enforced in code, fail-closed on a malformed clock.** The
    verifier clamps effective expiry to `min(signedExpiresAt, openedAt + MAX_TTL)`
    with a fixed, short `MAX_TTL` (hours, not days). Expiry parsing follows the
@@ -183,3 +206,10 @@ its own right (see Follow-up).
 - `deploy`/`publication` are untouched by this ADR; if a maintenance-window
   need is ever raised for them, the shape proven here (closed scope, no
   activation step, bounded TTL) is the template to reuse.
+- `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs`'s addition to
+  `NEVER_LIFTABLE_KERNEL_PATHS` (2026-08-10 correction above) is endorsed but
+  not yet applied — the array itself is edited when that module ships, not
+  here. Trigger: land alongside that module.
+- GS-8's module (`self-application-attestation-gate.mjs:45-47`) still has an
+  open kernel-membership question this ADR has not decided. Owner `pipeline`,
+  no date — a separate module, a separate decision.
