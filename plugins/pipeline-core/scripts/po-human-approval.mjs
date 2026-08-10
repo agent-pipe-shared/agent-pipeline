@@ -19,9 +19,11 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject, inspectForkedGovernanceStream } from "../lib/governance-event-store.mjs";
+import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256>";
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
@@ -74,17 +76,39 @@ function artifactPath(directory, name) {
   return path;
 }
 
+/**
+ * The three fork-disposition commands (ADR-0063). They are a sibling of the
+ * `-critical` trio, not a fourth `--kind` for it: a fork disposition's subject
+ * is DERIVED from the fork that actually exists, so the parameters that locate
+ * that fork replace the ones `prepare-critical` accepts verbatim.
+ */
+const FORK_DISPOSITION_COMMANDS = new Set(["prepare-fork-disposition", "approve-fork-disposition", "verify-fork-disposition"]);
+const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
+const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+
 export function parseHumanArgs(argv) {
   const [command, ...tokens] = argv; const values = { command, keyReference: "local-po-key" }; const supplied = new Set();
   for (let index = 0; index < tokens.length; index += 1) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256", "repositoryFingerprint", "streamId", "sequence"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
-  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "sign-intent"]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
+  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "sign-intent", ...FORK_DISPOSITION_COMMANDS]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
     || !text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
+  // The fork-locating parameters exist only for the new commands; every
+  // pre-existing command rejects them exactly as it rejected any unknown flag
+  // before, so widening the accepted-key set above changes nothing for them.
+  if (!FORK_DISPOSITION_COMMANDS.has(command) && (values.repositoryFingerprint || values.streamId || values.sequence)) return { error: USAGE };
+  if (FORK_DISPOSITION_COMMANDS.has(command)) {
+    // No `--subject-sha256` here, ever: accepting a bare digest is precisely
+    // the self-minting route ADR-0063 closes. Nor plan/spec/feature paths --
+    // GOVERNANCE_FORK_DISPOSITION_APPROVAL fixes all three.
+    if (values.kind || values.subjectSha256 || values.featureId || values.plan || values.spec || values.model) return { error: USAGE };
+    if (!SHA.test(values.repositoryFingerprint ?? "") || !text(values.streamId) || !SEQUENCE.test(values.sequence ?? "")) return { error: USAGE };
+    if (command === "prepare-fork-disposition" ? !isoTimestamp(values.expiresAt) : values.expiresAt !== undefined) return { error: USAGE };
+  }
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
   if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
   if (command === "sign-intent" && !SHA.test(values.intentSha256 ?? "")) return { error: USAGE };
@@ -137,6 +161,10 @@ function requireExplicitConfirmation(summaryLines, dependencies) {
 
 export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}) {
   const args = parseHumanArgs(argv); if (args.error) fail(args.error);
+  // Fail closed rather than fall through: the fork-disposition commands need an
+  // async fork inspection this synchronous entry point cannot perform, and they
+  // were rejected here (as unknown commands) before they existed.
+  if (FORK_DISPOSITION_COMMANDS.has(args.command)) fail("fork-disposition commands run through runForkDispositionApproval");
   if (args.command.endsWith("-all")) {
     const action = args.command.slice(0, -4);
     const results = ["cyb-4", "cyb-5"].map((featureId) => runHumanApproval([
@@ -267,6 +295,124 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   return { ok: true, value: verified };
 }
 
+/**
+ * The subject of a fork disposition, rebuilt from the fork that ACTUALLY
+ * exists right now — never from anything the operator typed. The only caller
+ * inputs are the three coordinates that locate the fork; the conflicting
+ * entries' content digests, the derived candidate and the signed digest all
+ * come from `inspectForkedGovernanceStream` and
+ * `governanceForkDispositionApprovalSubject`, i.e. from the exact two exports
+ * the store itself uses at verification time. Recomputing either here would be
+ * a second definition of the binding, which is the duplication class this
+ * neighbourhood has already paid for once.
+ */
+async function forkDispositionSubject(args, repository, sequence) {
+  const inspection = await inspectForkedGovernanceStream({
+    repositoryRoot: repository,
+    repositoryFingerprint: args.repositoryFingerprint,
+    streamId: args.streamId,
+  });
+  const fork = inspection.forks.find((entry) => entry.sequence === sequence);
+  if (!fork) fail(`stream ${args.streamId} has no forked position at sequence ${sequence}`);
+  const subject = governanceForkDispositionApprovalSubject({
+    repositoryFingerprint: inspection.repositoryFingerprint,
+    streamId: args.streamId,
+    sequence,
+    forkedEventDigests: fork.entries.map((entry) => entry.eventDigest),
+  });
+  return { ...subject, acknowledgedEventIds: fork.entries.map((entry) => entry.eventId) };
+}
+
+/**
+ * The fork-disposition half of the ceremony (ADR-0063), split from
+ * `runHumanApproval` because inspecting the fork is asynchronous and because
+ * nothing about the `push`/`deploy`/`publication` branches may change to
+ * accommodate it.
+ *
+ * `prepare-fork-disposition` is agent work and writes only public bytes;
+ * `approve-fork-disposition` re-checks the prepared request against the fork
+ * as it stands NOW and then hands the signing itself to the untouched
+ * `approve-critical` branch, so there is exactly one OpenSSL/confirmation path
+ * in this file; `verify-fork-disposition` is public readback that predicts the
+ * store's own decision by rebuilding the subject the same way and verifying
+ * against the SAME anchor the store will use — the repository's declared
+ * `project/critical-human-proof.json` trustAnchor, never the external
+ * directory's `trust-policy.json`, which is the signer's own claim about its
+ * own key.
+ */
+export async function runForkDispositionApproval(argv = process.argv.slice(2), dependencies = {}) {
+  const args = parseHumanArgs(argv); if (args.error) fail(args.error);
+  if (!FORK_DISPOSITION_COMMANDS.has(args.command)) fail(USAGE);
+  const repository = resolve(args.repoRoot);
+  const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "prepare-fork-disposition" });
+  const suffix = `-critical-${GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind}`;
+  const paths = {
+    request: artifactPath(directory, `request${suffix}.json`),
+    authority: artifactPath(directory, "trust-policy.json"),
+    proof: artifactPath(directory, `proof${suffix}.json`),
+  };
+  const write = dependencies.writeFile ?? writeFileSync; const exists = dependencies.exists ?? existsSync;
+  const sequence = Number(args.sequence);
+  const subject = await forkDispositionSubject(args, repository, sequence);
+  if (args.command === "prepare-fork-disposition") {
+    const request = createCriticalActionApprovalRequest({
+      candidate: subject.candidate,
+      featureId: GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId,
+      // The fixed LABEL bytes, never a repository file: a disposition is a
+      // store-level governance act with no sprint plan/spec of its own, and the
+      // signer must be able to rebuild these offline with no repository I/O.
+      planBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.planLabel, "utf8"),
+      specBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.specLabel, "utf8"),
+      action: { kind: GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind, subjectSha256: subject.subjectSha256, expiresAt: args.expiresAt },
+    });
+    write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+    return {
+      ok: true,
+      code: "PO-HUMAN-FORK-DISPOSITION-REQUEST-READY",
+      candidate: request.candidate,
+      subjectSha256: subject.subjectSha256,
+      intentSha256: request.approvalIntent.sha256,
+      action: request.action,
+      forkedEventDigests: [...subject.subject.forkedEventDigests],
+      acknowledgedEventIds: [...subject.acknowledgedEventIds],
+    };
+  }
+  if (!exists(paths.request)) fail("run prepare-fork-disposition first");
+  const request = json(paths.request);
+  if (request?.action?.kind !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind || request?.action?.subjectSha256 !== subject.subjectSha256) {
+    fail("the prepared request does not bind the conflicting entries that exist at this sequence now; prepare it again");
+  }
+  if (args.command === "approve-fork-disposition") {
+    // Deliberately the EXISTING critical signing branch, unchanged: same
+    // confirmation gate, same OpenSSL invocation, same proof shape.
+    return runHumanApproval(["approve-critical", "--repo-root", args.repoRoot, "--directory", args.directory, "--kind", GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind], dependencies);
+  }
+  if (!exists(paths.authority) || !exists(paths.proof)) fail("run approve-fork-disposition before verifying");
+  const policy = readCriticalHumanProofPolicy(repository);
+  if (!policy.ok || policy.trustAnchor === null) fail("project/critical-human-proof.json declares no usable trustAnchor, so the store can verify no external approval");
+  const intent = request?.approvalIntent?.value;
+  if (intent?.featureId !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId
+    || intent?.planSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.planSha256
+    || intent?.specSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.specSha256) {
+    fail("the prepared request was not issued for the fork-disposition authority");
+  }
+  const proof = json(paths.proof);
+  const verified = verifyCriticalActionApprovalRequest({ request, trustPolicy: policy.trustAnchor, proof, expectedCandidate: subject.candidate, expectedAction: request.action });
+  if (!verified.verified) fail(`the fork disposition approval does not verify (${verified.code}${verified.cause ? `; ${verified.cause}` : ""})`);
+  return {
+    ok: true,
+    code: "PO-HUMAN-FORK-DISPOSITION-VERIFIED",
+    value: verified,
+    subjectSha256: subject.subjectSha256,
+    acknowledgedEventIds: [...subject.acknowledgedEventIds],
+    approval: { mode: "signature", request, proof },
+  };
+}
+
 if (isDirectInvocation(import.meta.url)) {
-  try { process.stdout.write(`${JSON.stringify(runHumanApproval(), null, 2)}\n`); } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
+  const argv = process.argv.slice(2);
+  try {
+    const result = FORK_DISPOSITION_COMMANDS.has(argv[0]) ? await runForkDispositionApproval(argv) : runHumanApproval(argv);
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  } catch (error) { process.stderr.write(`PO-HUMAN-APPROVAL-FAILED: ${error.message}\n`); process.exitCode = 2; }
 }

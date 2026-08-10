@@ -1045,10 +1045,22 @@ function assertForkDispositionApprovalReference(approval, code) {
  * stream, a different sequence, or a different set of conflicting records
  * cannot be replayed here.
  *
- * The trust anchor comes exclusively from the repository's committed
+ * The trust anchor comes exclusively from the repository's own
  * `project/critical-human-proof.json`. No `trustPolicy` parameter is offered:
  * letting a caller hand in the anchor its own proof verifies against would
  * reinstate Finding 1 one layer up.
+ *
+ * Be exact about what protects that file, because this comment previously
+ * credited a check that is not performed: it said "committed", but
+ * `readCriticalHumanProofPolicy` reads the working-tree copy and compares
+ * nothing against HEAD -- unlike its sibling `readPushApprovalMode`, which
+ * genuinely does resolve a differing or absent working-tree copy to the
+ * strongest mode. The protection comes from another layer: the file is
+ * gate-strength write-protected (GS-2, `hooks/guard-gate-strength.mjs`), so an
+ * agent cannot install an anchor of its own unilaterally -- every write lane
+ * into it passes through a human authorization bound to that exact edit and
+ * recorded in the override audit ledger. Treat it as human-gated and audited,
+ * not as unwritable, and not as verified-committed here.
  */
 function authorizeForkDisposition(root, registry, streamId, disposition, fork, now) {
   const { subjectSha256, candidate } = governanceForkDispositionApprovalSubject({

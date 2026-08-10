@@ -13,17 +13,32 @@
  * confirmation. `approve`/`approve-critical` share the exact same
  * `requireExplicitConfirmation` gate exercised below; their own request-fixture setup
  * is covered elsewhere (plugins/pipeline-core/lib/threat-model-approval-request.test.mjs).
+ *
+ * WP-K-AC05-REWORK1 adds a second scope to this file: the `*-fork-disposition`
+ * commands (ADR-0063). Their central proof is deliberately end-to-end rather
+ * than shape-level — a request this CLI builds, signed by a real OpenSSL round
+ * trip, must be accepted by the store's OWN verifier (`authorizeForkDisposition`
+ * via `recoverPortableGovernanceProjection`), because "the command runs" is
+ * exactly what the previous, unusable `prepare-critical --kind
+ * governance-fork-disposition` route could also claim. One regression test
+ * pins that `push`/`deploy`/`publication` keep composing the same request from
+ * the real candidate and real repository file bytes.
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { execFileSync, spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { runHumanApproval } from "./po-human-approval.mjs";
+import { runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "../lib/governance-event.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { appendPortableGovernanceEvent, recoverPortableGovernanceProjection } from "../lib/governance-event-store.mjs";
 
 function openssl(args) {
   const result = spawnSync("openssl", args, { stdio: "pipe" });
@@ -152,6 +167,217 @@ test("sign-intent cancels on a mismatched confirmation: OpenSSL is never invoked
     assert.equal(existsSync(join(dirs.directory, "proof-manual.json")), false);
     assert.equal(existsSync(join(dirs.directory, "signature-manual.bin")), false);
     assert.equal(existsSync(join(dirs.directory, "intent-manual.txt")), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+/* ------------------------------------------------------------------------- *
+ * WP-K-AC05-REWORK1 — fork-disposition ceremony fixtures.
+ *
+ * The forked-stream fixture is rebuilt here rather than imported from
+ * lib/governance-event-store.test.mjs: importing a `node:test` file registers
+ * its whole suite a second time. It reproduces that file's technique exactly —
+ * two genuine appends, then a rogue `sealGovernanceEvent` written straight into
+ * the canonical directory at an already-occupied sequence.
+ * ------------------------------------------------------------------------- */
+const CANDIDATE = { commit: "b".repeat(40), tree: "c".repeat(40) };
+const UNAVAILABLE = { state: "not-applicable" };
+const FAR_FUTURE = "2999-01-01T00:00:00.000Z";
+
+function registryFixture(fingerprint) {
+  return {
+    schema: "pipeline.governance-stream-registry.v1",
+    repositoryFingerprint: fingerprint,
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventDigestDomain: "pipeline.governance-event.v1\0",
+    storageRoot: "governance/events",
+    streams: [
+      { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    ],
+  };
+}
+
+function capturePolicyFixture() {
+  return { schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: "c".repeat(64), defaultAction: "deny", streams: [
+    { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+  ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false }, mandatoryEventClasses: [] };
+}
+
+function envelope(fingerprint, capturePolicyDigest, overrides = {}) {
+  return {
+    schema: "pipeline.governance-event-envelope.v1",
+    payloadSchema: "pipeline.lifecycle-governance-event.v1",
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventId: "evt-1",
+    idempotencyKey: "idem-1",
+    origin: "lifecycle",
+    authorityClass: "non-authoritative",
+    eventType: "lifecycle.dispatch",
+    occurredAtEpochMs: 1,
+    observedAtEpochMs: 1,
+    timeAssurance: "locally-observed",
+    repositoryFingerprint: fingerprint,
+    sourceUri: `urn:pipeline:repository:${fingerprint}`,
+    streamId: "lifecycle",
+    correlation: { featureId: UNAVAILABLE, packageId: "phoenix-3", requestId: UNAVAILABLE, sessionId: UNAVAILABLE, dispatchId: "dispatch-1", traceId: UNAVAILABLE },
+    candidate: CANDIDATE,
+    artifacts: [UNAVAILABLE],
+    policy: { policyDigest: UNAVAILABLE, configurationDigest: UNAVAILABLE, capturePolicyDigest, redactionPolicyDigest: UNAVAILABLE },
+    classification: "repository-public-safe",
+    storageProfile: "repository-public-safe",
+    retentionCompatibility: "repository-retained",
+    disclosureClass: "repository-visible",
+    payload: { eventId: "lifecycle-1", kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1", correlationId: "correlation-1", queueRevision: 0 }, candidate: CANDIDATE, invalidatesEventId: null, supersedesEventId: null },
+    ...overrides,
+  };
+}
+
+async function forkedRepositoryFixture() {
+  const repoRoot = mkdtempSync(join(tmpdir(), "po-fork-disposition-repo-"));
+  execFileSync("git", ["init", "-q", repoRoot]);
+  const repository = discoverRepository(repoRoot);
+  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const capturePolicy = capturePolicyFixture();
+  const capturePolicyDigest = canonicalSha256(capturePolicy);
+  mkdirSync(join(repoRoot, "governance/events"), { recursive: true });
+  writeFileSync(join(repoRoot, "governance/events/registry.json"), `${canonicalizeJson(registryFixture(fingerprint))}\n`);
+  writeFileSync(join(repoRoot, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
+  const intent = (overrides = {}) => envelope(fingerprint, capturePolicyDigest, overrides);
+  const first = await appendPortableGovernanceEvent({ repositoryRoot: repoRoot, repositoryFingerprint: fingerprint, intent: intent() });
+  await appendPortableGovernanceEvent({ repositoryRoot: repoRoot, repositoryFingerprint: fingerprint, intent: intent({ eventId: "evt-2", idempotencyKey: "idem-2", occurredAtEpochMs: 2, observedAtEpochMs: 2, payload: { ...intent().payload, eventId: "lifecycle-2", reasonCode: "CONTINUED" } }) });
+  const fork = sealGovernanceEvent({ ...intent({ eventId: "evt-fork", idempotencyKey: "idem-fork" }), sequence: 2, previousEventDigest: first.eventDigest, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  writeFileSync(join(repoRoot, "governance/events/lifecycle/2-evt-fork.json"), `${canonicalizeJson(fork)}\n`);
+  const directory = mkdtempSync(join(tmpdir(), "po-fork-disposition-external-"));
+  return { repoRoot, directory, fingerprint };
+}
+
+/** Declares the fixture's own throwaway key as the repository's trust anchor — the
+ * store accepts no caller-supplied one, exactly as the library tests establish. */
+function declareTrustAnchor(repoRoot, authority) {
+  mkdirSync(join(repoRoot, "project"), { recursive: true });
+  writeFileSync(join(repoRoot, "project/critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["governance-fork-disposition"],
+    trustAnchor: { keyReference: authority.keyReference, publicKeySha256: authority.publicKeySha256 },
+  }));
+}
+
+const forkArgs = (dirs, extra = []) => [
+  "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+  "--repository-fingerprint", dirs.fingerprint, "--stream-id", "lifecycle", "--sequence", "2",
+  ...extra,
+];
+
+test("a fork-disposition request built by the CLI, signed with the PO key, is accepted by the store's own verifier", async () => {
+  const dirs = await forkedRepositoryFixture();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    declareTrustAnchor(dirs.repoRoot, authority);
+
+    const prepared = await runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, ["--expires-at", FAR_FUTURE])], {});
+    assert.equal(prepared.code, "PO-HUMAN-FORK-DISPOSITION-REQUEST-READY");
+    assert.deepEqual([...prepared.acknowledgedEventIds].sort(), ["evt-2", "evt-fork"], "the acknowledged identifiers must come from the observed fork, not from the caller");
+    assert.equal(prepared.forkedEventDigests.length, 2);
+    assert.notDeepEqual(prepared.candidate, CANDIDATE, "the candidate must be the derived one, never a repository commit/tree");
+
+    const written = JSON.parse(readFileSync(join(dirs.directory, "request-critical-governance-fork-disposition.json"), "utf8"));
+    assert.equal(written.action.kind, "governance-fork-disposition");
+    assert.equal(written.action.subjectSha256, prepared.subjectSha256);
+
+    const confirmations = [];
+    const dependencies = { readConfirmation: (prompt) => { confirmations.push(prompt); return "approve"; } };
+    const approved = await runForkDispositionApproval(["approve-fork-disposition", ...forkArgs(dirs)], dependencies);
+    assert.equal(approved.code, "PO-HUMAN-PROOF-READY", "signing must run through the existing critical-approval branch, unchanged");
+    assert.equal(confirmations.length, 1, "the human must confirm exactly once before OpenSSL is reached");
+    assert.match(confirmations[0], new RegExp(prepared.subjectSha256, "u"), "the confirmation must name the exact subject being authorized");
+
+    const verified = await runForkDispositionApproval(["verify-fork-disposition", ...forkArgs(dirs)], {});
+    assert.equal(verified.code, "PO-HUMAN-FORK-DISPOSITION-VERIFIED");
+    assert.equal(verified.value.verified, true);
+
+    // THE central proof: the store's own path, not this CLI's readback.
+    const recovered = await recoverPortableGovernanceProjection({
+      repositoryRoot: dirs.repoRoot,
+      repositoryFingerprint: dirs.fingerprint,
+      streamId: "lifecycle",
+      disposition: {
+        idempotencyKey: "fork-disp-cli",
+        sequence: 2,
+        acknowledgedEventIds: prepared.acknowledgedEventIds,
+        reasonCode: "GOVERNED_ACK",
+        disposedAtEpochMs: 1,
+        approval: verified.approval,
+      },
+    });
+    assert.equal(recovered.status, "fork-disposition-recorded", "authorizeForkDisposition must accept a request this CLI built and this key signed");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("the fork-disposition commands refuse every self-minting shortcut", async () => {
+  const dirs = await forkedRepositoryFixture();
+  try {
+    // A bare subject digest or a caller-chosen kind is exactly what ADR-0063 closes.
+    for (const extra of [["--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE], ["--kind", "push", "--expires-at", FAR_FUTURE]]) {
+      await assert.rejects(() => runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, extra)], {}), /Usage:/u);
+    }
+    // A sequence that is not actually forked cannot be prepared at all.
+    await assert.rejects(
+      () => runForkDispositionApproval(["prepare-fork-disposition", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--repository-fingerprint", dirs.fingerprint, "--stream-id", "lifecycle", "--sequence", "7", "--expires-at", FAR_FUTURE], {}),
+      /no forked position at sequence 7/u,
+    );
+    // Verification is against the repository's declared anchor, so an undeclared key cannot self-verify.
+    const { authority } = keyFixture(dirs.directory);
+    await runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, ["--expires-at", FAR_FUTURE])], {});
+    await runForkDispositionApproval(["approve-fork-disposition", ...forkArgs(dirs)], { readConfirmation: () => "approve" });
+    await assert.rejects(() => runForkDispositionApproval(["verify-fork-disposition", ...forkArgs(dirs)], {}), /no usable trustAnchor/u);
+    declareTrustAnchor(dirs.repoRoot, authority);
+    assert.equal((await runForkDispositionApproval(["verify-fork-disposition", ...forkArgs(dirs)], {})).value.verified, true, "the rejections above must not be a fixture that could never verify");
+    // A synchronous caller must not silently reach a wrong branch.
+    assert.throws(() => runHumanApproval(["verify-fork-disposition", ...forkArgs(dirs)], {}), /runForkDispositionApproval/u);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("prepare-critical keeps composing push/deploy/publication requests exactly as before", () => {
+  const dirs = fixtureDirs();
+  try {
+    writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+    writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+    const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
+    const subjectSha256 = "a".repeat(64);
+    for (const kind of ["push", "deploy", "publication"]) {
+      const result = runHumanApproval([
+        "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+        "--kind", kind, "--subject-sha256", subjectSha256, "--expires-at", FAR_FUTURE,
+      ], { observeCandidate: () => observed });
+      assert.equal(result.code, "PO-HUMAN-CRITICAL-REQUEST-READY");
+      assert.deepEqual(result.candidate, observed, "the three original kinds still bind the observed git candidate");
+      const expected = createCriticalActionApprovalRequest({
+        candidate: observed,
+        featureId: "cyb-4",
+        planBytes: Buffer.from("plan bytes\n", "utf8"),
+        specBytes: Buffer.from("spec bytes\n", "utf8"),
+        action: { kind, subjectSha256, expiresAt: FAR_FUTURE },
+      });
+      assert.deepEqual(JSON.parse(readFileSync(join(dirs.directory, `request-critical-${kind}.json`), "utf8")), expected, "real repository file bytes and the caller-supplied subject digest, unchanged");
+    }
+    // The fork-locating flags stay unknown to every pre-existing command.
+    assert.throws(() => runHumanApproval([
+      "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+      "--kind", "push", "--subject-sha256", subjectSha256, "--expires-at", FAR_FUTURE, "--stream-id", "lifecycle",
+    ], {}), /Usage:/u);
   } finally {
     cleanup(dirs);
   }
