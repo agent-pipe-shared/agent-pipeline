@@ -906,6 +906,18 @@ const DELTA = {
   // 36/36 + governance-event-store's 28/28 tests pass.
   'R-AC-11': ['implemented', 'WP-R-AC11'],
 
+  // E-AC-20: planAuditBundle's optional exportEvidence input narrows to
+  // exportMetadata: {profileDigest, receipt} on the plan/manifest -- a
+  // canonicalSha256 of the adapter profile plus the delivery receipt's own
+  // already-public-safe 10 fields, verbatim. mappings/outbox/acknowledgement
+  // (live or authority-adjacent content) are never admitted -- a receipt
+  // shaped like the full delivery result is rejected. The signature/digest-
+  // chain/verification logic never reads exportMetadata for any decision,
+  // proven by a dedicated test: a bundle with deliberately wrong,
+  // internally-inconsistent export metadata still builds and verifies.
+  // Omitting it leaves output byte-identical. 16/16 tests pass.
+  'E-AC-20': ['implemented', 'WP-E-AC20'],
+
   // H-AC-12: decision-reference-dual-evaluation.mjs is the shared "dual-
   // evaluate during migration, fail on disagreement, carry a shared
   // compatibility owner+expiry" primitive, wired into the two lowest-risk
@@ -1132,7 +1144,7 @@ const POINTERS = {
   'E-AC-17': 'governance-export-outbox-tests: duplicate delivery preserves one canonical source history',
   'E-AC-18': 'governance-export-adapter-tests: destination secrets excluded from every portable export record',
   'E-AC-19': 'evidence-viewer-tests: export lag and receipts rendered as a separate non-authoritative observation',
-  'E-AC-20': 'NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle',
+  'E-AC-20': 'audit-bundle-tests (WP-E-AC20): planAuditBundle now accepts optional exportEvidence, narrowed to exportMetadata {profileDigest, receipt} on the plan/manifest -- never mappings/outbox/acknowledgement, never consulted by signature/verification logic (proven: a bundle with wrong export metadata still verifies). 16/16 tests pass',
   'E-AC-21': 'docs/governance-event-export.md (PHX-WP-DOC-2): threat model, data-flow diagram, mapping/loss guide, retention guidance, operator runbook, and incident/recovery procedures all present and grounded; the loss guide names the known loss:[] gap explicitly, the retention section reports no pruning/archival/expiry function exists anywhere in the outbox modules',
 
   'R-AC-01': 'external-command-offer-tests: public-safe offer recorded before presentation, verified append readback required',
