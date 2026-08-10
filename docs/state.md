@@ -4769,6 +4769,40 @@ exact 6-field structure — redispatched using the template verbatim).
 
 Both packages are now at their **last round** (round 4) once these fixes return and are verified.
 
+### BOTH ROUND-3 FIX DISPATCHES RETURNED, SELF-COMMITTED, INDEPENDENTLY VERIFIED — LAST ROUND (4) DISPATCHED AS DELTA
+
+**WP-K-AC05-F1F2FIX → `4673ff8a`.** F1: the doc comment now states plainly what
+`assertForkDispositionApprovalReference`/`readForkDisposition` validate (shape/format plus a
+subject-content cross-check) and what they do not (authenticity of the other four approval fields on
+a hand-edited record) — the blind spot named explicitly per QG-05, not just the overclaim removed. F2:
+a `pinnedIntent` check against `GOVERNANCE_FORK_DISPOSITION_APPROVAL`'s three fixed fields now runs in
+`po-human-approval.mjs` immediately before `approve-fork-disposition` delegates to the real signing
+branch — the same pin `verify-fork-disposition` already applied, now applied before signing too, not
+only after. New regression test proves a tampered `approvalIntent` is refused before any OpenSSL
+invocation. Read the full diff myself; re-ran the same three test files myself: **52/52 green**
+(51 prior + 1 new), matching the report exactly.
+
+**WP-O1O2-F1F2FIX → `094f6e83`.** F1: §14 F-1's correction now reads "ran to 0063, sequentially, as
+observed by re-running `ls docs/adr/` at the time this correction was written (2026-08-10) — a dated
+observation... not a standing count to be carried forward unchecked" — past tense, dated, self-aware
+of its own staleness risk, replacing the false evergreen "now runs to 0059" claim. F2: §15.4's O-2
+bullet now reads "six added git subprocess spawns ... per cache miss", matching §15.1.6 (iii)/
+§15.2.3a exactly, no longer self-contradicting four lines later. The verify script's own
+`DoD4-f1-matching-correction` check was rewritten to read `docs/adr/` from disk (`readdirSync`),
+compute the actual sequential max, and check the document's claim against that — no longer a literal-
+string tautology. Left uncommitted per convention: `scratch/` is gitignored repo-wide (confirmed:
+`.gitignore:20`), so no scratch file has ever been trackable. Read the full diff myself; re-ran the
+fixed verify script myself: **10/10 passed, 0 controlFailed, 0 errors**, matching the report exactly,
+and confirmed by inspection that the rewritten check is no longer tautological (reads the real
+directory rather than asserting a string).
+
+Both packages have now used all 3 rework rounds of their fresh 4-round cap; **round 4 is the final
+permitted round for each.** Dispatching both as **delta** reviews rather than full — the template
+explicitly allows this when the bound base/head, prior receipt, changed paths and affected invariants
+are all named, which they are here, and re-reviewing the entire track a fourth time for a
+one-paragraph comment fix and a three-line check reorder would spend the last round's scrutiny on
+already-passed material instead of on what actually changed.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
