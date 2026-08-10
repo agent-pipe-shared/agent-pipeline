@@ -19,6 +19,8 @@ import {
   sealGovernanceEvent,
   validateGovernanceEventEnvelope,
 } from "./governance-event.mjs";
+import { criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "./critical-action-approval-request.mjs";
+import { readCriticalHumanProofPolicy, readPushApprovalMode } from "./critical-human-proof-policy.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
@@ -865,8 +867,249 @@ function assertForkDispositionFields(disposition, code) {
 }
 
 function assertForkDisposition(disposition) {
-  if (!exactKeys(disposition, ["idempotencyKey", "sequence", "acknowledgedEventIds", "reasonCode", "disposedAtEpochMs"])) fail("GES-FORK-DISPOSITION", "A closed fork disposition is required.");
-  return assertForkDispositionFields(disposition, "GES-FORK-DISPOSITION");
+  if (!exactKeys(disposition, ["idempotencyKey", "sequence", "acknowledgedEventIds", "reasonCode", "disposedAtEpochMs", "approval"])) fail("GES-FORK-DISPOSITION", "A closed fork disposition is required.");
+  assertForkDispositionFields(disposition, "GES-FORK-DISPOSITION");
+  assertForkDispositionAuthorization(disposition.approval);
+  return disposition;
+}
+
+/* ------------------------------------------------------------------------ *
+ * K-AC-05 / ADR-0063: a fork disposition requires a verified PO approval.
+ *
+ * Finding 1 was that the record above is self-mintable: any caller holding
+ * library access could produce the exact shape this module then treated as
+ * sufficient to end a stream's invalidity. The fix reuses the repository's
+ * existing human-clearance primitive rather than inventing a second one --
+ * `po-approval-proof.mjs` through `critical-action-approval-request.mjs`, the
+ * same route push, GMW (ADR-0058) and HGO (ADR-0059) already take -- with
+ * `"governance-fork-disposition"` added as the fourth CRITICAL_ACTION_KINDS
+ * member. The strength setting is the repository's existing
+ * `gates.push_approval` (ADR-0056); no disposition-specific config key exists.
+ * ------------------------------------------------------------------------ */
+
+const FORK_DISPOSITION_ACTION_KIND = "governance-fork-disposition";
+const FORK_DISPOSITION_SUBJECT_SCHEMA = "pipeline.governance-fork-disposition-subject.v1";
+const FORK_DISPOSITION_CANDIDATE_DOMAIN = "pipeline.governance-fork-disposition-candidate.v1";
+const FORK_DISPOSITION_KEY_REFERENCE = /^[A-Za-z0-9._:@/-]{1,200}$/u;
+const FORK_DISPOSITION_PLAN_LABEL = "pipeline.governance-fork-disposition-plan.v1";
+const FORK_DISPOSITION_SPEC_LABEL = "pipeline.governance-fork-disposition-spec.v1";
+
+/**
+ * The fixed, public, content-independent inputs an offline signer needs to
+ * rebuild the exact intent this module verifies -- exported so the CLI, an
+ * external signer and the tests all read them from one definition instead of
+ * copying the literals (the duplication class that produced earlier findings
+ * in this neighbourhood).
+ *
+ * `planSha256`/`specSha256` are sentinel digests of their own descriptive
+ * labels, exactly as `human-guard-override.mjs` does and for the same reason:
+ * a fork disposition is a general store-level governance act, not one scoped
+ * to a particular sprint's plan/spec documents, and fixed values keep the
+ * intent reproducible offline with no repository file I/O by the signer. They
+ * carry no security value of their own; the unique binding is `subjectSha256`.
+ */
+export const GOVERNANCE_FORK_DISPOSITION_APPROVAL = Object.freeze({
+  kind: FORK_DISPOSITION_ACTION_KIND,
+  featureId: FORK_DISPOSITION_ACTION_KIND,
+  planLabel: FORK_DISPOSITION_PLAN_LABEL,
+  specLabel: FORK_DISPOSITION_SPEC_LABEL,
+  planSha256: createHash("sha256").update(FORK_DISPOSITION_PLAN_LABEL).digest("hex"),
+  specSha256: createHash("sha256").update(FORK_DISPOSITION_SPEC_LABEL).digest("hex"),
+  policyRevision: "critical-human-proof-v1",
+});
+
+function isIsoTimestamp(value) {
+  return typeof value === "string" && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
+}
+
+/**
+ * A push is naturally bound to the commit/tree it would publish. A fork is
+ * not: it exists independently of any one commit, so binding the proof to a
+ * candidate commit would either let the proof outlive the fork state it was
+ * signed for, or force re-signing on every unrelated commit (ADR-0063,
+ * Alternatives). The primitive's `candidate` slot is nonetheless mandatory and
+ * shape-checked (two distinct 40-64 hex identifiers), so it is filled with a
+ * deterministic, domain-separated derivation of the disposition's OWN identity.
+ *
+ * This is a substitution, and it is deliberately not a git object: it adds no
+ * independent binding of its own (it is a pure function of the subject that is
+ * signed anyway), and it asserts no repository state that is not true. What it
+ * does buy is that `verifyCriticalActionApprovalRequest` -- which compares the
+ * request's candidate against the one the verifier rebuilds -- rejects any
+ * request whose candidate was chosen by the requester instead of derived from
+ * the exact stream position being dispositioned.
+ */
+function forkDispositionCandidate(subject) {
+  const base = canonicalizeJson(subject);
+  return Object.freeze({
+    commit: createHash("sha256").update(`${FORK_DISPOSITION_CANDIDATE_DOMAIN}\0commit\0${base}`).digest("hex"),
+    tree: createHash("sha256").update(`${FORK_DISPOSITION_CANDIDATE_DOMAIN}\0tree\0${base}`).digest("hex"),
+  });
+}
+
+/**
+ * The exact subject a PO signs to dispose of one forked stream position.
+ *
+ * Binds `repositoryFingerprint`, `streamId`, `sequence` and the sorted set of
+ * the conflicting entries' `eventDigest` -- CONTENT digests, never `eventId`
+ * strings (K-AC-05 Finding 5): two different records may not carry the same
+ * content digest, while an `eventId` is merely a claimed identity that the
+ * forking writer chose. A fork always has at least two conflicting entries, so
+ * fewer than two digests can never describe a real one.
+ *
+ * Exported because an offline signer and the CLI must rebuild byte-identically
+ * what this module rebuilds from reality at verification time.
+ */
+export function governanceForkDispositionApprovalSubject({ repositoryFingerprint, streamId, sequence, forkedEventDigests } = {}) {
+  if (typeof repositoryFingerprint !== "string" || !SHA256.test(repositoryFingerprint)
+    || typeof streamId !== "string" || !STREAMS.has(streamId)
+    || !Number.isSafeInteger(sequence) || sequence < 1
+    || !Array.isArray(forkedEventDigests) || forkedEventDigests.length < 2
+    || forkedEventDigests.some((entry) => typeof entry !== "string" || !SHA256.test(entry))
+    || new Set(forkedEventDigests).size !== forkedEventDigests.length) {
+    fail("GES-FORK-DISPOSITION-APPROVAL-SUBJECT", "A fork disposition approval subject requires the exact repository, stream, sequence and conflicting content digests.");
+  }
+  const subject = Object.freeze({
+    schema: FORK_DISPOSITION_SUBJECT_SCHEMA,
+    repositoryFingerprint,
+    streamId,
+    sequence,
+    forkedEventDigests: Object.freeze([...forkedEventDigests].sort()),
+  });
+  const candidate = forkDispositionCandidate(subject);
+  return Object.freeze({
+    subject,
+    candidate,
+    subjectSha256: criticalActionSubjectSha256({ kind: FORK_DISPOSITION_ACTION_KIND, candidate, subject }),
+  });
+}
+
+/**
+ * The caller-supplied authorization travelling WITH the write. Two closed
+ * shapes, self-declaring by `mode`, mirroring ADR-0056's own two modes.
+ * `signature` carries the public approval request plus the detached proof;
+ * `chat` carries only an attribution, and is exactly as weak as push's chat
+ * mode -- it is an attribution record, not evidence.
+ */
+function assertForkDispositionAuthorization(authorization) {
+  if (!isRecord(authorization)) fail("GES-FORK-DISPOSITION-APPROVAL", "A fork disposition requires a closed approval.");
+  if (authorization.mode === "signature") {
+    if (!exactKeys(authorization, ["mode", "request", "proof"]) || !isRecord(authorization.request) || !isRecord(authorization.proof)) {
+      fail("GES-FORK-DISPOSITION-APPROVAL", "A signature-mode fork disposition approval requires exactly an approval request and a detached proof.");
+    }
+    return authorization;
+  }
+  if (authorization.mode === "chat") {
+    if (!exactKeys(authorization, ["mode", "clearedBy", "clearedAtEpochMs"])
+      || typeof authorization.clearedBy !== "string" || !FORK_DISPOSITION_TOKEN.test(authorization.clearedBy)
+      || !Number.isSafeInteger(authorization.clearedAtEpochMs) || authorization.clearedAtEpochMs < 0) {
+      fail("GES-FORK-DISPOSITION-APPROVAL", "A chat-mode fork disposition approval requires exactly a closed attribution token and an exact integer clearance timestamp.");
+    }
+    return authorization;
+  }
+  fail("GES-FORK-DISPOSITION-APPROVAL", "A fork disposition approval must declare either signature or chat mode.");
+}
+
+/**
+ * The DURABLE reference. The raw proof is deliberately not re-embedded: the
+ * record references the verified approval by digest, mirroring how
+ * `pushApproval.lastApproved` references an approval. Shared by the writer
+ * (which builds it) and `readForkDisposition` (which re-validates it), so a
+ * hand-edited persisted approval fails closed on read instead of being
+ * surfaced as a trustworthy governed disposition.
+ */
+function assertForkDispositionApprovalReference(approval, code) {
+  if (!isRecord(approval)) fail(code, "A recorded fork disposition requires a closed approval reference.");
+  if (approval.mode === "signature") {
+    if (!exactKeys(approval, ["mode", "subjectSha256", "intentSha256", "proofSha256", "keyReference", "expiresAt"])
+      || !SHA256.test(approval.subjectSha256 ?? "") || !SHA256.test(approval.intentSha256 ?? "") || !SHA256.test(approval.proofSha256 ?? "")
+      || typeof approval.keyReference !== "string" || !FORK_DISPOSITION_KEY_REFERENCE.test(approval.keyReference)
+      || !isIsoTimestamp(approval.expiresAt)) fail(code, "The recorded signature-mode approval reference is invalid.");
+    return approval;
+  }
+  if (approval.mode === "chat") {
+    if (!exactKeys(approval, ["mode", "subjectSha256", "clearedBy", "clearedAtEpochMs", "source"])
+      || !SHA256.test(approval.subjectSha256 ?? "")
+      || typeof approval.clearedBy !== "string" || !FORK_DISPOSITION_TOKEN.test(approval.clearedBy)
+      || !Number.isSafeInteger(approval.clearedAtEpochMs) || approval.clearedAtEpochMs < 0
+      || typeof approval.source !== "string" || !FORK_DISPOSITION_TOKEN.test(approval.source)) fail(code, "The recorded chat-mode approval reference is invalid.");
+    return approval;
+  }
+  fail(code, "A recorded fork disposition approval must declare either signature or chat mode.");
+}
+
+/**
+ * Turn a caller-supplied authorization into the durable reference, or fail
+ * closed. The subject is rebuilt from the fork this module observed itself --
+ * never from anything the caller claimed -- so a proof signed for a different
+ * stream, a different sequence, or a different set of conflicting records
+ * cannot be replayed here.
+ *
+ * The trust anchor comes exclusively from the repository's committed
+ * `project/critical-human-proof.json`. No `trustPolicy` parameter is offered:
+ * letting a caller hand in the anchor its own proof verifies against would
+ * reinstate Finding 1 one layer up.
+ */
+function authorizeForkDisposition(root, registry, streamId, disposition, fork, now) {
+  const { subjectSha256, candidate } = governanceForkDispositionApprovalSubject({
+    repositoryFingerprint: registry.repositoryFingerprint,
+    streamId,
+    sequence: disposition.sequence,
+    forkedEventDigests: fork.entries.map((entry) => entry.eventDigest),
+  });
+  const authorization = disposition.approval;
+  const configured = readPushApprovalMode(root);
+  // Chat is admissible only where the human genuinely, committedly configured
+  // it. Every other resolution -- default, invalid, unreadable, unsafe,
+  // uncommitted -- is `signature`, which is what `readPushApprovalMode`
+  // already guarantees; a signature-mode approval stays admissible under a
+  // chat configuration because it is strictly stronger, never weaker.
+  if (configured.mode !== "chat" && authorization.mode !== "signature") {
+    fail("GES-FORK-DISPOSITION-APPROVAL-MODE", `A verified signature approval is required (gates.push_approval resolved to ${configured.mode} from ${configured.source}).`);
+  }
+  if (authorization.mode === "chat") {
+    return Object.freeze({
+      mode: "chat",
+      subjectSha256,
+      clearedBy: authorization.clearedBy,
+      clearedAtEpochMs: authorization.clearedAtEpochMs,
+      source: configured.source,
+    });
+  }
+  const policy = readCriticalHumanProofPolicy(root);
+  if (!policy.ok || policy.trustAnchor === null) fail("GES-FORK-DISPOSITION-TRUST-ANCHOR", "project/critical-human-proof.json carries no usable trustAnchor, so no external approval can be verified.");
+  const action = authorization.request.action;
+  if (!isRecord(action) || action.kind !== FORK_DISPOSITION_ACTION_KIND || action.subjectSha256 !== subjectSha256) {
+    fail("GES-FORK-DISPOSITION-APPROVAL-SUBJECT", "The approval does not bind this exact stream, sequence and set of conflicting content digests.");
+  }
+  const verified = verifyCriticalActionApprovalRequest({
+    request: authorization.request,
+    trustPolicy: policy.trustAnchor,
+    proof: authorization.proof,
+    expectedCandidate: candidate,
+    expectedAction: action,
+    now,
+  });
+  if (!verified.verified) fail("GES-FORK-DISPOSITION-APPROVAL-UNVERIFIED", `The fork disposition approval could not be verified (${verified.code}).`);
+  // Pin the intent's own authority fields, exactly as `pipeline-state.mjs`
+  // pins them for push: `verifyCriticalActionApprovalRequest` rebuilds the
+  // intent from whatever featureId/plan/spec the request carries, so without
+  // this an otherwise valid proof minted under a different feature context
+  // would verify here.
+  const intent = authorization.request.approvalIntent?.value;
+  if (intent?.featureId !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId
+    || intent?.planSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.planSha256
+    || intent?.specSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.specSha256) {
+    fail("GES-FORK-DISPOSITION-APPROVAL-AUTHORITY", "The approval intent was not issued for the fork-disposition authority.");
+  }
+  return Object.freeze({
+    mode: "signature",
+    subjectSha256,
+    intentSha256: authorization.request.approvalIntent.sha256,
+    proofSha256: verified.proofSha256,
+    keyReference: authorization.proof.keyReference,
+    expiresAt: action.expiresAt,
+  });
 }
 
 /**
@@ -952,8 +1195,14 @@ async function inspectStreamForForks(root, registry, streamId) {
  * "has a governed disposition already been appended here." Returns `null`
  * when no disposition has been recorded at this sequence yet.
  */
-async function readForkDisposition(root, registry, streamId, sequence) {
+async function readForkDisposition(root, registry, streamId, sequence, fork = null) {
   const target = repositoryPath(root, `${registry.storageRoot}/fork-disposition/${streamId}/${sequence}.json`);
+  // K-AC-05 Finding 4: `inspectStreamForForks` guards its own stream root
+  // against symlinked ancestry, and `ensureSafeDirectory` guards the write
+  // side of this very path; the read side did not. A symlinked ancestor
+  // directory could therefore serve a disposition from outside the governance
+  // tree to every reader, including `inspectForkedGovernanceStream`.
+  await assertNoSymlinkAncestry(target);
   const entry = await lstatOrNull(target);
   if (!entry) return null;
   await assertNoSymlink(target, { directory: false });
@@ -963,7 +1212,7 @@ async function readForkDisposition(root, registry, streamId, sequence) {
     bytes = await readFile(target);
     record = parseStrictJson(bytes);
   } catch { fail("GES-FORK-DISPOSITION-RECORD", "The recorded fork disposition is not strict JSON."); }
-  if (!exactKeys(record, ["schema", "repositoryFingerprint", "streamId", "idempotencyKey", "sequence", "acknowledgedEventIds", "reasonCode", "disposedAtEpochMs"])
+  if (!exactKeys(record, ["schema", "repositoryFingerprint", "streamId", "idempotencyKey", "sequence", "acknowledgedEventIds", "reasonCode", "disposedAtEpochMs", "approval"])
     || record.schema !== "pipeline.governance-fork-disposition.v1" || record.repositoryFingerprint !== registry.repositoryFingerprint
     || record.streamId !== streamId || record.sequence !== sequence) fail("GES-FORK-DISPOSITION-RECORD", "The recorded fork disposition shape is invalid.");
   // The four binding fields are checked above; every other persisted field
@@ -972,16 +1221,42 @@ async function readForkDisposition(root, registry, streamId, sequence) {
   // corrupted or hand-edited non-binding field fails closed here too instead
   // of being surfaced verbatim as a trustworthy governed disposition.
   assertForkDispositionFields(record, "GES-FORK-DISPOSITION-RECORD");
+  assertForkDispositionApprovalReference(record.approval, "GES-FORK-DISPOSITION-RECORD");
   // Mirrors readEvent's own GES-NONCANONICAL check: a persisted disposition
   // whose on-disk bytes are not the exact canonical serialization of its own
   // parsed value is rejected rather than silently accepted.
   if (Buffer.from(`${canonicalizeJson(record)}\n`, "utf8").compare(bytes) !== 0) fail("GES-NONCANONICAL", "A recorded fork disposition does not contain exact canonical bytes.");
+  // K-AC-05 Finding 3: the write side bound `acknowledgedEventIds` to the real
+  // conflicting entries once, at write time. Nothing re-checked it afterwards,
+  // so a disposition stayed readable as "governed" even after the reality it
+  // named had changed -- a third conflicting record appended later, or the
+  // named ones replaced. Whenever the caller has the actual fork in hand (the
+  // exported read path always does), the identity set AND the signed content
+  // binding are re-derived from that fork and compared. Canonical bytes prove
+  // the record is intact; only this proves it still describes reality.
+  if (fork !== null) {
+    const actualEventIds = fork.entries.map((entry) => entry.eventId).slice().sort();
+    const recordedEventIds = [...record.acknowledgedEventIds].sort();
+    if (actualEventIds.length !== recordedEventIds.length || actualEventIds.some((eventId, index) => eventId !== recordedEventIds[index])) {
+      fail("GES-FORK-DISPOSITION-MISMATCH", "The recorded disposition's acknowledged event identifiers no longer match the conflicting entries at this sequence.");
+    }
+    const { subjectSha256 } = governanceForkDispositionApprovalSubject({
+      repositoryFingerprint: registry.repositoryFingerprint,
+      streamId,
+      sequence,
+      forkedEventDigests: fork.entries.map((entry) => entry.eventDigest),
+    });
+    if (record.approval.subjectSha256 !== subjectSha256) {
+      fail("GES-FORK-DISPOSITION-MISMATCH", "The recorded disposition's approved subject no longer matches the conflicting entries' content digests at this sequence.");
+    }
+  }
   return Object.freeze({
     idempotencyKey: record.idempotencyKey,
     sequence: record.sequence,
     acknowledgedEventIds: Object.freeze([...record.acknowledgedEventIds]),
     reasonCode: record.reasonCode,
     disposedAtEpochMs: record.disposedAtEpochMs,
+    approval: Object.freeze({ ...record.approval }),
   });
 }
 
@@ -1003,7 +1278,7 @@ export async function inspectForkedGovernanceStream({ repositoryRoot, registryPa
   const { prefix, forks } = await inspectStreamForForks(root, registry, streamId);
   const dispositionedForks = await Promise.all(forks.map(async (fork) => Object.freeze({
     ...fork,
-    disposition: await readForkDisposition(root, registry, streamId, fork.sequence),
+    disposition: await readForkDisposition(root, registry, streamId, fork.sequence, fork),
   })));
   return Object.freeze({
     schema: "pipeline.governance-event-fork-inspection.v1",
@@ -1038,7 +1313,7 @@ async function removeOrphanedTemporaryForkDispositions(dispositionRoot) {
  * exactly as before; restoring write availability afterward is a separate,
  * out-of-scope policy decision.
  */
-async function recordGovernanceForkDisposition(root, registry, streamId, disposition) {
+async function recordGovernanceForkDisposition(root, registry, streamId, disposition, now = new Date().toISOString()) {
   const stream = streamFor(registry, streamId);
   assertForkDisposition(disposition);
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${stream.relativeRoot}`);
@@ -1051,6 +1326,12 @@ async function recordGovernanceForkDisposition(root, registry, streamId, disposi
     if (actualEventIds.length !== namedEventIds.length || actualEventIds.some((eventId, index) => eventId !== namedEventIds[index])) {
       fail("GES-FORK-DISPOSITION-MISMATCH", "The disposition's acknowledged event identifiers do not exactly match the conflicting entries at this sequence.");
     }
+    // ADR-0063: reality-binding above proves the disposition names the fork
+    // that exists; this proves a human with the repository's declared external
+    // authority approved disposing of exactly THAT fork. Verified inside the
+    // stream's exclusive lock and against the inspection just performed, so
+    // the approved content digests cannot drift between check and write.
+    const approval = authorizeForkDisposition(root, registry, streamId, disposition, fork, now);
     // A separate top-level sibling of `recovery`/`recovery-journal`, never a
     // child of the stream's own event directory: scanStream lists that
     // directory's direct entries and hard-fails on anything it does not
@@ -1074,6 +1355,11 @@ async function recordGovernanceForkDisposition(root, registry, streamId, disposi
       acknowledgedEventIds: namedEventIds,
       reasonCode: disposition.reasonCode,
       disposedAtEpochMs: disposition.disposedAtEpochMs,
+      // A REFERENCE to the verified approval, never the raw proof: the record
+      // is repository-public-safe storage, and re-embedding the signature
+      // would duplicate a verifiable artifact into a place nothing re-verifies
+      // it from. `pushApproval.lastApproved` references an approval the same way.
+      approval,
     });
     const existing = await lstatOrNull(target);
     if (existing) {

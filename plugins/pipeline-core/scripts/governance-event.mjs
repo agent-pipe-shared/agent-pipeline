@@ -45,12 +45,20 @@ function parse(argv) {
     verify: ["--repo", "--request-file"],
     query: ["--repo", "--request-file"],
     recover: ["--repo", "--request-file"],
+    dispose: ["--repo", "--request-file", "--proof"],
     restricted: ["--repo", "--request-file", "--key-file"],
   }[operation];
-  if (!allowed || flags.size !== allowed.length || allowed.some((flag) => !flags.has(flag)) || [...flags.keys()].some((flag) => !allowed.includes(flag))) {
-    fail("GEC-ARGUMENT", "Usage: governance-event.mjs preview --request-file <file> | append|verify|query|recover --repo <checkout> --request-file <file>");
+  // `--proof` is the only optional flag in the whole surface: a disposition
+  // under `gates.push_approval: chat` carries an attribution instead of a
+  // detached proof. Every other operation keeps its exact previous contract —
+  // with an empty optional list, "every required flag present" plus "no flag
+  // outside the allowed set" plus parse-time uniqueness is precisely the
+  // arity check this replaces.
+  const optional = { dispose: ["--proof"] }[operation] ?? [];
+  if (!allowed || allowed.some((flag) => !optional.includes(flag) && !flags.has(flag)) || [...flags.keys()].some((flag) => !allowed.includes(flag))) {
+    fail("GEC-ARGUMENT", "Usage: governance-event.mjs preview --request-file <file> | append|verify|query|recover --repo <checkout> --request-file <file> | dispose --repo <checkout> --request-file <file> [--proof <file>]");
   }
-  return { operation, repo: flags.get("--repo"), requestFile: flags.get("--request-file"), keyFile: flags.get("--key-file") };
+  return { operation, repo: flags.get("--repo"), requestFile: flags.get("--request-file"), keyFile: flags.get("--key-file"), proofFile: flags.get("--proof") };
 }
 
 function appendRequest(value) {
@@ -64,6 +72,20 @@ function streamRequest(value, schema) {
 
 function recoveryRequest(value) {
   if (!exactKeys(value, ["schema", "repositoryFingerprint", "streamId", "checkpoint", "recovery"]) || value.schema !== "pipeline.governance-event-recovery-request.v1") fail("GEC-REQUEST", "Recovery request has an invalid closed shape.");
+  return value;
+}
+
+/**
+ * K-AC-05 Finding 2 / ADR-0063: before this, the fork-disposition mechanism
+ * was reachable only from inside the library — no sanctioned operator surface
+ * led to it at all. The detached proof arrives as its own `--proof` file,
+ * exactly as the push flow keeps request and proof separate: the request is
+ * public preparable material an agent may build, the proof is the one artifact
+ * an agent cannot produce.
+ */
+function dispositionRequest(value) {
+  if (!exactKeys(value, ["schema", "repositoryFingerprint", "streamId", "disposition"]) || value.schema !== "pipeline.governance-event-fork-disposition-request.v1"
+    || value.disposition === null || typeof value.disposition !== "object" || Array.isArray(value.disposition)) fail("GEC-REQUEST", "Fork disposition request has an invalid closed shape.");
   return value;
 }
 
@@ -101,6 +123,21 @@ export async function main(argv = process.argv.slice(2)) {
   if (parsed.operation === "append") {
     const append = appendRequest(body);
     return appendPortableGovernanceEvent({ repositoryRoot: parsed.repo, repositoryFingerprint: append.repositoryFingerprint, intent: append.intent });
+  }
+  if (parsed.operation === "dispose") {
+    const disposal = dispositionRequest(body);
+    const approval = disposal.disposition.approval;
+    const mode = approval === null || typeof approval !== "object" || Array.isArray(approval) ? undefined : approval.mode;
+    if ((mode === "signature") !== (parsed.proofFile !== undefined)) {
+      fail("GEC-ARGUMENT", "A signature-mode disposition requires exactly one --proof file, and a chat-mode disposition must not carry one.");
+    }
+    // The store owns every authorization decision. The CLI only transports the
+    // detached proof into the approval it was minted for; it never inspects,
+    // repairs, or vouches for it.
+    const disposition = mode === "signature"
+      ? { ...disposal.disposition, approval: { ...approval, proof: await request(parsed.proofFile) } }
+      : disposal.disposition;
+    return recoverPortableGovernanceProjection({ repositoryRoot: parsed.repo, repositoryFingerprint: disposal.repositoryFingerprint, streamId: disposal.streamId, disposition });
   }
   const stream = parsed.operation === "recover" ? recoveryRequest(body) : streamRequest(body, "pipeline.governance-event-stream-request.v1");
   if (parsed.operation === "verify") return verifyPortableGovernanceStream({ repositoryRoot: parsed.repo, repositoryFingerprint: stream.repositoryFingerprint, streamId: stream.streamId, checkpoint: stream.checkpoint });

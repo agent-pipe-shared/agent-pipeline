@@ -10,8 +10,13 @@ import test from "node:test";
 import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "./governance-event.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest } from "./critical-action-approval-request.mjs";
+import { PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
 import {
+  GOVERNANCE_FORK_DISPOSITION_APPROVAL,
   GovernanceEventStoreError,
+  governanceForkDispositionApprovalSubject,
   createRestrictedAuthorization,
   appendPortableGovernanceEvent,
   eraseRestrictedGovernanceEvent,
@@ -103,6 +108,65 @@ async function append(root, event = intent()) {
 }
 
 async function cleanup(root) { await rm(root, { recursive: true, force: true }); }
+
+/* ADR-0063 fixtures: a fork disposition is no longer self-mintable, so every
+ * disposition below now carries a real, verified PO approval. The trust anchor
+ * is declared in the repository's OWN policy file because the store accepts no
+ * caller-supplied one — a library caller that could hand in the anchor its own
+ * proof verifies against would be exactly the self-minting K-AC-05 Finding 1. */
+const PO_KEY_REFERENCE = "po-fork-disposition-fixture";
+const FAR_FUTURE = "2999-01-01T00:00:00.000Z";
+
+async function poAuthority(root, { keyReference = PO_KEY_REFERENCE, declare = true } = {}) {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicKeyPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  if (declare) {
+    await mkdir(path.join(root, "project"), { recursive: true });
+    await writeFile(path.join(root, "project/critical-human-proof.json"), JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v1",
+      requiredKinds: ["governance-fork-disposition"],
+      trustAnchor: { keyReference, publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") },
+    }));
+  }
+  return { privateKey, publicKeyPem, keyReference };
+}
+
+async function forkedEventDigestsAt(root, streamId, sequence) {
+  const inspected = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId });
+  return inspected.forks.find((entry) => entry.sequence === sequence).entries.map((entry) => entry.eventDigest);
+}
+
+/** Mints the signature-mode approval a real PO would produce offline: the subject
+ * is rebuilt from the fork's actual content digests, exactly as the store rebuilds
+ * it at verification time. */
+async function approvalFor(root, streamId, sequence, { expiresAt = FAR_FUTURE, authority = null, forkedEventDigests = null, signWith = null } = {}) {
+  const anchor = authority ?? await poAuthority(root);
+  const subject = governanceForkDispositionApprovalSubject({
+    repositoryFingerprint: fingerprint,
+    streamId,
+    sequence,
+    forkedEventDigests: forkedEventDigests ?? await forkedEventDigestsAt(root, streamId, sequence),
+  });
+  const request = createCriticalActionApprovalRequest({
+    candidate: subject.candidate,
+    featureId: GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId,
+    planBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.planLabel, "utf8"),
+    specBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.specLabel, "utf8"),
+    action: { kind: GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind, subjectSha256: subject.subjectSha256, expiresAt },
+  });
+  const signer = signWith ?? anchor;
+  return {
+    mode: "signature",
+    request,
+    proof: {
+      schema: PO_APPROVAL_PROOF_SCHEMA,
+      intentSha256: request.approvalIntent.sha256,
+      keyReference: anchor.keyReference,
+      publicKey: signer.publicKeyPem,
+      signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256, "utf8"), signer.privateKey).toString("base64"),
+    },
+  };
+}
 
 /** A stream with two genuine, sequence-1-rooted events, forked from the same
  * predecessor at sequence 2 — reusing the exact fork-construction technique
@@ -305,7 +369,7 @@ test("K-AC-05 a fork at sequence 1 yields an empty non-forked prefix (zero-lengt
   assert.equal(inspected.forks[0].sequence, 1);
   assert.deepEqual(inspected.forks[0].entries.map((entry) => entry.eventId).sort(), ["evt-1a", "evt-1b"]);
 
-  const disposition = { idempotencyKey: "fork-disp-seq1", sequence: 1, acknowledgedEventIds: ["evt-1a", "evt-1b"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
+  const disposition = { idempotencyKey: "fork-disp-seq1", sequence: 1, acknowledgedEventIds: ["evt-1a", "evt-1b"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1, approval: await approvalFor(root, "lifecycle", 1) };
   const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
   assert.equal(recorded.status, "fork-disposition-recorded");
   assert.equal(recorded.path, "governance/events/fork-disposition/lifecycle/1.json");
@@ -327,7 +391,7 @@ test("K-AC-05 a 3-way fork at one sequence is detected in full, and a dispositio
   assert.equal(inspected.forks[0].sequence, 2);
   assert.deepEqual(inspected.forks[0].entries.map((entry) => entry.eventId).sort(), ["evt-2a", "evt-2b", "evt-2c"]);
 
-  const disposition = { idempotencyKey: "fork-disp-3way", sequence: 2, acknowledgedEventIds: ["evt-2a", "evt-2b", "evt-2c"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 2 };
+  const disposition = { idempotencyKey: "fork-disp-3way", sequence: 2, acknowledgedEventIds: ["evt-2a", "evt-2b", "evt-2c"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 2, approval: await approvalFor(root, "lifecycle", 2) };
   await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...disposition, idempotencyKey: "fork-disp-3way-partial", acknowledgedEventIds: ["evt-2a", "evt-2b"] } }), (error) => error.code === "GES-FORK-DISPOSITION-MISMATCH", "acknowledging only two of three conflicting records must fail closed");
   const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
   assert.equal(recorded.status, "fork-disposition-recorded");
@@ -359,7 +423,7 @@ test("K-AC-05 recovering a forked stream with a matching disposition is recoverP
   const beforeB = await readFile(canonicalPathB);
   const headsBefore = await readFile(headsPath, "utf8");
 
-  const disposition = { idempotencyKey: "fork-disp-1", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 12345 };
+  const disposition = { idempotencyKey: "fork-disp-1", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 12345, approval: await approvalFor(root, "lifecycle", 2) };
   const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
   assert.equal(recorded.status, "fork-disposition-recorded");
   assert.equal(recorded.path, "governance/events/fork-disposition/lifecycle/2.json");
@@ -392,7 +456,7 @@ test("K-AC-05 recording a fork disposition removes an orphaned temporary disposi
   await mkdir(dispositionDir, { recursive: true });
   const orphan = path.join(dispositionDir, ".2.json.0123456789abcdef01234567.tmp");
   await writeFile(orphan, "partial writer bytes");
-  const disposition = { idempotencyKey: "fork-disp-orphan", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 5 };
+  const disposition = { idempotencyKey: "fork-disp-orphan", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 5, approval: await approvalFor(root, "lifecycle", 2) };
   const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
   assert.equal(recorded.status, "fork-disposition-recorded");
   await assert.rejects(() => stat(orphan), { code: "ENOENT" }, "an orphaned temporary disposition file must be swept while the stream's exclusive lock is held");
@@ -400,7 +464,7 @@ test("K-AC-05 recording a fork disposition removes an orphaned temporary disposi
 
 test("K-AC-05 a recorded fork disposition never makes the stream normally usable again — append/verify/query/an ordinary recovery call carrying no matching disposition still fail closed with GES-FORK", async (t) => {
   const { root, first } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
-  const disposition = { idempotencyKey: "fork-disp-boundary-1", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 999 };
+  const disposition = { idempotencyKey: "fork-disp-boundary-1", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 999, approval: await approvalFor(root, "lifecycle", 2) };
   const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
   assert.equal(recorded.status, "fork-disposition-recorded");
   await assert.rejects(() => append(root, intent({ eventId: "evt-after-disposition", idempotencyKey: "idem-after-disposition" })), (error) => error.code === "GES-FORK", "append must still fail closed after a disposition is recorded");
@@ -412,7 +476,8 @@ test("K-AC-05 a recorded fork disposition never makes the stream normally usable
 
 test("K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own content on the corresponding fork entry, readable without touching internal storage paths", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
-  const disposition = { idempotencyKey: "fork-disp-visible-1", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 4242 };
+  const approval = await approvalFor(root, "lifecycle", 2);
+  const disposition = { idempotencyKey: "fork-disp-visible-1", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 4242, approval };
   const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
   assert.equal(recorded.status, "fork-disposition-recorded");
   const inspected = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
@@ -423,12 +488,131 @@ test("K-AC-05 inspectForkedGovernanceStream reports a recorded disposition's own
     acknowledgedEventIds: ["evt-2", "evt-fork"].sort(),
     reasonCode: "GOVERNED_ACK",
     disposedAtEpochMs: 4242,
+    approval: {
+      mode: "signature",
+      subjectSha256: approval.request.action.subjectSha256,
+      intentSha256: approval.request.approvalIntent.sha256,
+      proofSha256: inspected.forks[0].disposition.approval.proofSha256,
+      keyReference: PO_KEY_REFERENCE,
+      expiresAt: FAR_FUTURE,
+    },
   }, "the recorded governed disposition must be readable straight from inspectForkedGovernanceStream's own output, not from the internal fork-disposition path");
+});
+
+test("ADR-0063 CRITICAL_ACTION_KINDS gains the fork-disposition kind without disturbing its three original members", () => {
+  assert.equal(CRITICAL_ACTION_KINDS.includes("governance-fork-disposition"), true);
+  assert.deepEqual(CRITICAL_ACTION_KINDS.slice(0, 3), ["push", "deploy", "publication"], "the three original kinds must keep their identity and order");
+});
+
+test("ADR-0063 a fork disposition carrying no approval at all is refused — the record is no longer self-mintable", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const bare = { idempotencyKey: "fork-disp-bare", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: bare }), (error) => error.code === "GES-FORK-DISPOSITION", "the exact pre-ADR-0063 shape — every field a caller could mint alone — must now be refused as an incomplete disposition");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...bare, approval: null } }), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL");
+  await assert.rejects(() => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...bare, approval: { mode: "none" } } }), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL");
+});
+
+test("ADR-0063 a fork disposition proof must come from the repository's declared trust anchor, must not be expired, and must not be forged", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const base = { idempotencyKey: "fork-disp-proof", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
+  const dispose = (approval, overrides = {}) => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...base, ...overrides, approval } });
+
+  const declared = await poAuthority(root);
+  const impostor = await poAuthority(root, { declare: false });
+  await assert.rejects(async () => dispose(await approvalFor(root, "lifecycle", 2, { authority: declared, signWith: impostor })), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL-UNVERIFIED", "a proof signed by a key the repository never declared must fail closed");
+
+  const valid = await approvalFor(root, "lifecycle", 2, { authority: declared });
+  await assert.rejects(async () => dispose({ ...valid, proof: { ...valid.proof, signatureBase64: Buffer.from("not a signature").toString("base64") } }), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL-UNVERIFIED", "a tampered signature must fail closed");
+  await assert.rejects(async () => dispose(await approvalFor(root, "lifecycle", 2, { authority: declared, expiresAt: "2000-01-01T00:00:00.000Z" })), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL-UNVERIFIED", "an expired approval must fail closed");
+
+  // The genuine one still records, so the rejections above are not a fixture that could never succeed.
+  assert.equal((await dispose(valid)).status, "fork-disposition-recorded");
+});
+
+test("ADR-0063 a fork disposition proof binds the exact stream position and the exact conflicting CONTENT digests, not the caller's claim", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const declared = await poAuthority(root);
+  const base = { idempotencyKey: "fork-disp-subject", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
+  const dispose = (approval) => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...base, approval } });
+
+  const actual = await forkedEventDigestsAt(root, "lifecycle", 2);
+  await assert.rejects(async () => dispose(await approvalFor(root, "lifecycle", 2, { authority: declared, forkedEventDigests: [actual[0], "9".repeat(64)] })), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL-SUBJECT", "an approval signed over different content digests must not clear this fork");
+  const wrongSequence = await approvalFor(root, "lifecycle", 2, { authority: declared, forkedEventDigests: actual });
+  const otherSequence = governanceForkDispositionApprovalSubject({ repositoryFingerprint: fingerprint, streamId: "lifecycle", sequence: 7, forkedEventDigests: actual });
+  await assert.rejects(async () => dispose({ ...wrongSequence, request: { ...wrongSequence.request, action: { ...wrongSequence.request.action, subjectSha256: otherSequence.subjectSha256 } } }), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL-SUBJECT", "an approval bound to another sequence must not clear this one");
+});
+
+test("ADR-0063 a fork disposition needs a declared trust anchor, and chat clearance is refused while gates.push_approval resolves to signature", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const base = { idempotencyKey: "fork-disp-mode", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1 };
+  const dispose = (approval) => recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition: { ...base, approval } });
+  await assert.rejects(async () => dispose({ mode: "chat", clearedBy: "product-owner", clearedAtEpochMs: 5 }), (error) => error.code === "GES-FORK-DISPOSITION-APPROVAL-MODE", "a repository that never configured chat mode must refuse an in-session clearance, exactly as push does");
+
+  const digests = await forkedEventDigestsAt(root, "lifecycle", 2);
+  const undeclared = await poAuthority(root, { declare: false });
+  await assert.rejects(async () => dispose(await approvalFor(root, "lifecycle", 2, { authority: undeclared, forkedEventDigests: digests })), (error) => error.code === "GES-FORK-DISPOSITION-TRUST-ANCHOR", "with no committed trustAnchor there is no external authority to verify against, so the disposition must fail closed rather than accept the caller's own key");
+});
+
+test("ADR-0063 gates.push_approval: chat records an attributed, self-declaring in-session clearance — exactly as weak as push's own chat mode", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  await writeFile(path.join(root, "pipeline.user.yaml"), "gates:\n  push_approval: chat\n");
+  execFileSync("git", ["-C", root, "add", "--", "pipeline.user.yaml"]);
+  execFileSync("git", ["-C", root, "-c", "user.email=fixture@example.invalid", "-c", "user.name=fixture", "commit", "-q", "-m", "fixture: configure chat approval mode"]);
+
+  const disposition = { idempotencyKey: "fork-disp-chat", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1, approval: { mode: "chat", clearedBy: "product-owner", clearedAtEpochMs: 5 } };
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  assert.equal(recorded.status, "fork-disposition-recorded");
+  const inspected = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
+  const approval = inspected.forks[0].disposition.approval;
+  assert.equal(approval.mode, "chat", "the record must declare its own weakness rather than reading like a verified proof");
+  assert.equal(approval.clearedBy, "product-owner");
+  assert.equal(approval.source, "pipeline.user.yaml", "the clearance must name the configuration that admitted it, and the store — not the caller — must set that field");
+  assert.equal(Object.hasOwn(approval, "proofSha256"), false, "a chat clearance must never masquerade as carrying proof material");
+});
+
+test("ADR-0063 the durable record references the verified approval and never re-embeds the raw proof or signature", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const approval = await approvalFor(root, "lifecycle", 2);
+  const disposition = { idempotencyKey: "fork-disp-reference", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1, approval };
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  const bytes = await readFile(path.join(root, recorded.path), "utf8");
+  assert.equal(bytes.includes(approval.proof.signatureBase64), false, "the detached signature must not be copied into repository-public-safe storage");
+  assert.equal(bytes.includes("BEGIN PUBLIC KEY"), false, "the public key material must not be copied into the durable record either");
+  const persisted = JSON.parse(bytes);
+  assert.deepEqual(Object.keys(persisted.approval).sort(), ["expiresAt", "intentSha256", "keyReference", "mode", "proofSha256", "subjectSha256"], "the record must carry a closed approval REFERENCE, mirroring how pushApproval.lastApproved references an approval");
+});
+
+test("ADR-0063 / K-AC-05 Finding 3 the read path re-checks a recorded disposition against the conflicting entries that actually exist now", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const disposition = { idempotencyKey: "fork-disp-recheck", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1, approval: await approvalFor(root, "lifecycle", 2) };
+  const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
+  const dispositionPath = path.join(root, recorded.path);
+  const persisted = JSON.parse(await readFile(dispositionPath, "utf8"));
+  const rewrite = (overrides) => writeFile(dispositionPath, `${canonicalizeJson({ ...persisted, ...overrides })}\n`);
+  const isMismatch = (error) => error instanceof GovernanceEventStoreError && error.code === "GES-FORK-DISPOSITION-MISMATCH";
+
+  await rewrite({ acknowledgedEventIds: ["evt-2", "evt-somewhere-else"] });
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), isMismatch, "a structurally perfect, perfectly canonical record naming entries that are not the ones at this sequence must fail closed on READ, not only at write time");
+
+  await rewrite({ approval: { ...persisted.approval, subjectSha256: "0".repeat(64) } });
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), isMismatch, "an approval whose signed subject no longer matches the conflicting entries' content digests must fail closed on read");
+
+  await rewrite({});
+  assert.equal((await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" })).forks[0].disposition.reasonCode, "GOVERNED_ACK", "the untouched record must still read back cleanly, so the rejections above discriminate");
+});
+
+test("ADR-0063 / K-AC-05 Finding 4 a symlinked ancestor on the disposition path is refused on the read side too", async (t) => {
+  const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
+  const outside = await mkdtemp(path.join(os.tmpdir(), "governance-fork-disposition-outside-")); t.after(() => cleanup(outside));
+  await mkdir(path.join(outside, "lifecycle"), { recursive: true });
+  await writeFile(path.join(outside, "lifecycle/2.json"), "{}\n");
+  await symlink(outside, path.join(root, "governance/events/fork-disposition"));
+  await assert.rejects(() => inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" }), (error) => error.code === "GES-SYMLINK", "a disposition served through a symlinked ancestor must be refused before its content is ever considered");
 });
 
 test("K-AC-05 a persisted fork disposition with a malformed non-binding field fails closed with a GovernanceEventStoreError carrying a .code, never an uncaught raw exception", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
-  const disposition = { idempotencyKey: "fork-disp-corrupt", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 100 };
+  const disposition = { idempotencyKey: "fork-disp-corrupt", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 100, approval: await approvalFor(root, "lifecycle", 2) };
   const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
   const dispositionPath = path.join(root, recorded.path);
   const persisted = JSON.parse(await readFile(dispositionPath, "utf8"));
@@ -453,7 +637,7 @@ test("K-AC-05 a persisted fork disposition with a malformed non-binding field fa
 
 test("K-AC-05 a persisted fork disposition whose on-disk bytes are not the exact canonical serialization of its own parsed value is rejected with GES-NONCANONICAL", async (t) => {
   const { root } = await forkedLifecycleFixture(); t.after(() => cleanup(root));
-  const disposition = { idempotencyKey: "fork-disp-noncanonical", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 200 };
+  const disposition = { idempotencyKey: "fork-disp-noncanonical", sequence: 2, acknowledgedEventIds: ["evt-2", "evt-fork"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 200, approval: await approvalFor(root, "lifecycle", 2) };
   const recorded = await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
   const dispositionPath = path.join(root, recorded.path);
   const persisted = JSON.parse(await readFile(dispositionPath, "utf8"));
@@ -480,7 +664,7 @@ test("K-AC-05 inspectForkedGovernanceStream distinguishes an undisposed fork (nu
   assert.equal(beforeDisposition.forks[0].disposition, null, "an undisposed fork must report its absence as null, distinguishable from a fork with a recorded disposition");
   assert.equal(beforeDisposition.forks[1].disposition, null);
 
-  const disposition = { idempotencyKey: "fork-disp-partial", sequence: 2, acknowledgedEventIds: ["evt-2a", "evt-2b"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 7 };
+  const disposition = { idempotencyKey: "fork-disp-partial", sequence: 2, acknowledgedEventIds: ["evt-2a", "evt-2b"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 7, approval: await approvalFor(root, "lifecycle", 2) };
   await recoverPortableGovernanceProjection({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle", disposition });
 
   const afterDisposition = await inspectForkedGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });

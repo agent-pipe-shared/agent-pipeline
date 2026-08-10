@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject } from "../lib/governance-event-store.mjs";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -37,6 +39,54 @@ test("CLI previews without allocating, appends, verifies and queries only closed
   assert.equal((await main(["verify", "--repo", root, "--request-file", streamFile])).completeness, "verified");
   assert.equal((await main(["query", "--repo", root, "--request-file", streamFile])).events.length, 1);
   await assert.rejects(() => main(["append", "--repo", root, "--request-file", streamFile]), (error) => error.code === "GEC-REQUEST");
+});
+
+test("CLI dispose is the sanctioned surface for a fork disposition and refuses one without its detached proof", async (t) => {
+  const root = await fixture(); t.after(() => rm(root, { recursive: true, force: true }));
+  await mkdir(path.join(root, "governance/events/lifecycle"), { recursive: true });
+  const conflict = (eventId, idempotencyKey) => sealGovernanceEvent({ ...intent(), eventId, idempotencyKey, sequence: 1, previousEventDigest: null, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  const left = conflict("cli-1a", "cli-idem-1a");
+  const right = conflict("cli-1b", "cli-idem-1b");
+  await writeFile(path.join(root, "governance/events/lifecycle/1-cli-1a.json"), `${canonicalizeJson(left)}\n`);
+  await writeFile(path.join(root, "governance/events/lifecycle/1-cli-1b.json"), `${canonicalizeJson(right)}\n`);
+
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const publicKeyPem = publicKey.export({ type: "spki", format: "pem" }).toString();
+  await mkdir(path.join(root, "project"), { recursive: true });
+  await writeFile(path.join(root, "project/critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v1",
+    requiredKinds: ["governance-fork-disposition"],
+    trustAnchor: { keyReference: "po-cli-fixture", publicKeySha256: createHash("sha256").update(publicKeyPem).digest("hex") },
+  }));
+
+  const subject = governanceForkDispositionApprovalSubject({ repositoryFingerprint: fingerprint, streamId: "lifecycle", sequence: 1, forkedEventDigests: [left.eventDigest, right.eventDigest] });
+  const approvalRequest = createCriticalActionApprovalRequest({
+    candidate: subject.candidate,
+    featureId: GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId,
+    planBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.planLabel, "utf8"),
+    specBytes: Buffer.from(GOVERNANCE_FORK_DISPOSITION_APPROVAL.specLabel, "utf8"),
+    action: { kind: GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind, subjectSha256: subject.subjectSha256, expiresAt: "2999-01-01T00:00:00.000Z" },
+  });
+  const disposeFile = await request(root, "dispose.json", {
+    schema: "pipeline.governance-event-fork-disposition-request.v1",
+    repositoryFingerprint: fingerprint,
+    streamId: "lifecycle",
+    disposition: { idempotencyKey: "cli-fork-disp", sequence: 1, acknowledgedEventIds: ["cli-1a", "cli-1b"], reasonCode: "GOVERNED_ACK", disposedAtEpochMs: 1, approval: { mode: "signature", request: approvalRequest } },
+  });
+
+  await assert.rejects(() => main(["dispose", "--repo", root, "--request-file", disposeFile]), (error) => error.code === "GEC-ARGUMENT", "a signature-mode disposition without its detached proof must be refused by the CLI itself");
+
+  const proofFile = await request(root, "dispose-proof.json", {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: approvalRequest.approvalIntent.sha256,
+    keyReference: "po-cli-fixture",
+    publicKey: publicKeyPem,
+    signatureBase64: sign(null, Buffer.from(approvalRequest.approvalIntent.sha256, "utf8"), privateKey).toString("base64"),
+  });
+  const recorded = await main(["dispose", "--repo", root, "--request-file", disposeFile, "--proof", proofFile]);
+  assert.equal(recorded.status, "fork-disposition-recorded");
+  assert.equal(recorded.path, "governance/events/fork-disposition/lifecycle/1.json");
+  assert.equal(recorded.disposition.approval.mode, "signature");
 });
 
 test("CLI exposes closed restricted plan, status, erase, and key-destruction operations", async (t) => {
