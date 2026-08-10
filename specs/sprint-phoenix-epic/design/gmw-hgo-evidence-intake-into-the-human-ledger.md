@@ -1356,9 +1356,24 @@ and how the breakage is detected rather than silently absorbed.
 | A-7 | The final GMW adds a signed `subject.reasonCode` | the portable reason code degrades to `GUARD.MAINTENANCE.WINDOW_UNATTESTED` (§5.3) — designed for, not fatal | the code value itself makes the degradation visible in the ledger |
 | A-8 | `LIFTABLE_RULE_IDS` + `TP-` prefix remains the closed liftable set | `ruleDigest` stops being resolvable against a published catalogue | catalogue-pinning test in the conformance suite |
 | A-9 | The CLI keeps the `prepare/install/status/close` command surface | §7.1's placement of the intake moves | CLI test failure |
-| A-10 | ADR-0058 and the GMW threat model/design documents land with the finalized module | this design cites no line from them (they are **absent from this checkout**, §14) and does not depend on them | §14 |
+| A-10 | **Corrected 2026-08-10 — discharged, no longer an unverified assumption.** As originally written: "ADR-0058 and the GMW threat model/design documents land with the finalized module", qualified by "this design cites no line from them (they are **absent from this checkout**, §14)". All three are **present** in this checkout, and this design now **does** cite ADR-0058: §15.1.6 (iv)'s 2026-08-10 correction rests on it for kernel-list growth being that ADR's own decision. See the note below the table | nothing breaks — the assumption's premise arrived rather than failed; what is corrected is the row's own stale claim, not a design dependency | `git ls-files` resolves all three paths; §14's F-1 carries the matching dated correction |
 | A-11 | GMW enforcement stays candidate-independent — validity from the signed time bound alone, no candidate term (`:542-545`) | §8.5.1's choice inverts: if the final GMW binds a candidate at enforcement, the boundary must pass the *current* candidate and the vacuity disclosure is wrong in the other direction | §12's stale-candidate test fails the moment a candidate term enters the validity computation |
 | A-12 | `install` remains re-runnable with an identical `{request, proof}` (`:451-455`) | §7.3's fail-closed retry after a lost race stops being free for the human, and §8.1's "costs the human nothing" no longer holds | integration test 8 (re-install appends nothing, does not error) |
+
+**Note on A-10, 2026-08-10 — when the row stopped being true, checked rather than asserted.** All three
+documents exist and are tracked: `docs/adr/0058-guard-maintenance-window.md` and
+`docs/guard-maintenance-window-threat-model.md` (both added 2026-08-07 12:00:33 in `586f59ed`) and
+`specs/sprint-nova-epic/design/2026-08-07-guard-maintenance-window-design.md` (`c457a100`, 12:04:47 the same
+day). The row was **not** wrong when it was written: this document's first commit (`f68a17dc`, 2026-08-07
+20:28:21) is not a descendant of `586f59ed` — the GMW documents were produced on a parallel branch line and
+first became reachable from this document's own line with the merge `35d9e11a` ("bring plugin candidate 0.5.3
+from origin/main into sprint_phoenix", 2026-08-08 00:12:59), some four hours later. So the claim was accurate
+for roughly four hours and stale from 2026-08-08 onward, and several revisions carried it forward without
+re-checking a fact that had a cheap check (`git ls-files`). It is corrected here rather than deleted, because
+the failure worth recording is not the original claim but the re-copying: an "absent from this checkout" note
+is a **dated observation**, not an assumption, and a document that keeps one for three days without re-running
+the observation is asserting a state it stopped verifying. §14's F-1, which is where the observation was made,
+carries the same correction.
 
 ### 10.2 HGO dependencies — verified in this checkout, pinned against drift
 
@@ -1641,6 +1656,19 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   two). GMW arrived via the marketplace snapshot merge without its decision
   record. This design therefore cites no line from them; the ADR should land with
   the finalized module (A-10).
+  **Correction, 2026-08-10 — the finding is resolved and its "none of the three
+  exist" text is now false.** All three are present and tracked: the ADR and the
+  threat model arrived in the same marketplace-snapshot merge the finding
+  anticipated (`35d9e11a`, 2026-08-08 00:12:59, carrying `586f59ed`/`c457a100`
+  from 2026-08-07 midday), i.e. roughly four hours after this document's first
+  commit. The observation was therefore correct when made and stale one day later;
+  the details, including why an "absent from this checkout" note is a dated
+  observation rather than a standing assumption, are under §10.1's A-10. The
+  original text is kept above rather than rewritten so that the finding's own
+  history stays readable. This design now **does** cite the ADR — §15.1.6 (iv),
+  on ADR-0058 being the deciding authority for `NEVER_LIFTABLE_KERNEL_PATHS`
+  growth — so F-1's "cites no line from them" no longer holds either. `docs/adr/`
+  now runs to 0059.
 - **Finding F-2 (spec drift, verified).** `pipeline.human-role-exception-decision.v1`
   is implemented and admitted by the kernel (`governance-event.mjs:170`) but is
   absent from `spec.md` §6.1's "closed" v1 schema family (`:278-301`). Not caused
@@ -1946,11 +1974,13 @@ reviewed rebind, not here. `acceptance.md` is not touched by this dispatch.
 
 This subsection is the residual register for the **whole** of §15, not for §15.1 alone. It sits under §15.1
 because that is where it started and because §15.2.4 already points here by name; the first **two** entries below
-belong to O-1's identity registry, the last **four** — (i) to (iv) — to O-2's hook-path closure. (An earlier
+belong to O-1's identity registry, the last **five** — (i) to (v) — to O-2's hook-path closure. (An earlier
 revision of this sentence read "the first three… the last two", which matched neither the entries then present
-nor the ones now: it is corrected here, and §15.4's O-2 bullet is corrected to the same count.) Keeping one
+nor the ones now; a later one read "the last four", correct until the 2026-08-10 revision promoted the
+`guard-testpath.mjs` exposure out of (iv)'s closing paragraph into its own entry (v). Both are corrected here,
+and §15.4's O-2 bullet is corrected to the same count.) Keeping one
 register is deliberate: a reader asking "what did §15 leave open" must not have to find two lists. **Every entry
-in the O-2 block ((i)-(iv)) carries an owner and an explicit `Trigger:` clause** — a disclosed residual with an
+in the O-2 block ((i)-(v)) carries an owner and an explicit `Trigger:` clause** — a disclosed residual with an
 owner but no exit condition is the "documented instead of fixed" state QG-06 names as a finding rather than a
 mitigation. The two O-1 entries above state their exits in prose and are left in that form here; promoting them
 to the same labelled shape is named as a follow-up rather than done silently in a dispatch scoped to the O-2
@@ -2072,22 +2102,66 @@ specified precisely, reviewed together with this design, then applied by the dis
 edited in-session. §15.3 carries it as a required companion change to the `guard-authority-ledger-intake.mjs`
 row so that the module cannot ship without it.
 
+*Correction, 2026-08-10 — which authority decides the addition.* As written above, this entry proposed a
+kernel-list addition and named only the *file* that hosts the array, as though membership were a code-review
+outcome on `lib/guard-maintenance-window.mjs`. It is not. ADR-0058 Decision 3 enumerates the kernel by name,
+and its own 2026-08-10 correction states the standing rule: **a `NEVER_LIFTABLE_KERNEL_PATHS` addition is a
+decision of ADR-0058, recorded there as a dated correction at the time it is proposed** — the same reading
+`self-application-attestation-gate.mjs:45-47` already applies when it treats kernel membership as "one ADR-0058
+decision". That correction has since been made and **endorses this entry by name**: it records
+`guard-authority-ledger-intake.mjs` as the correct kernel classification once the module lands, on Decision 3's
+own recursive-hole test, with the array edit still left to the shipping dispatch. So the proposal below is no
+longer only this document's; the decision behind it exists in the ADR that owns the list, and the trigger below
+is now a code condition with the decision already granted rather than a decision waiting to be made.
+
 Owner `pipeline` (PHX-2). **Trigger:** resolved when the entry above is present in
 `NEVER_LIFTABLE_KERNEL_PATHS`. Unlike (i)-(iii), this residual has a definite, cheap exit and no open design
 question behind it; it is open only for as long as this document does not edit the file holding the list.
 
 *What the one entry does and does not close, stated rather than assumed.* It closes the hole **this design
 itself opens**: a newly created module that becomes a term of the lift condition while remaining GS-6-liftable.
-It does not by itself make O-2's narrowing unremovable, because the second call site,
-`plugins/pipeline-core/hooks/guard-testpath.mjs` (§15.2.2, §15.3), is likewise not a
-`NEVER_LIFTABLE_KERNEL_PATHS` member, while the first, `hooks/guard-gate-strength.mjs`, already is (`:121`).
-Under the same window an edit there removes the ledger call — or the entire TP-* refusal — just as permanently.
-That exposure is **inherited, not created here**: it predates O-2 entirely and is a property of which hook files
-the kernel list names, not of anything §15 adds. Whether `guard-testpath.mjs` should join the list is a real
-decision with a real cost (a kernel entry makes the file uneditable under *any* window, exactly as
-`guard-gate-strength.mjs` is today), and it is deliberately **not decided here** — it is named so that the
-one-entry fix above is read as closing what this design opened, rather than as a claim that O-2's narrowing has
-become unremovable.
+It does **not** by itself make O-2's narrowing unremovable, because the second call site,
+`plugins/pipeline-core/hooks/guard-testpath.mjs`, is likewise not a kernel path. Until the 2026-08-10 revision
+that fact lived here, in this paragraph, as a closing remark on (iv) — which meant it would have vanished from
+the register the moment (iv)'s one-element addition landed, taking a still-open exposure with it. It is now
+entry **(v)** below, tracked on its own terms and with its own trigger, so that closing (iv) closes only (iv).
+
+**(v) The second call site, `hooks/guard-testpath.mjs`, is not a kernel path either — and this design puts a
+term of the lift condition inside it.** `plugins/pipeline-core/hooks/guard-testpath.mjs` (the TP-* call site of
+§15.2.2: import at `:105`, call at `:217`) is **not** a member of `NEVER_LIFTABLE_KERNEL_PATHS`
+(`guard-maintenance-window.mjs:120-128`), while its sibling call site `hooks/guard-gate-strength.mjs` already is
+(`:121`) — an asymmetry between two files that read the same window for the same purpose. The defeat path is
+(iv)'s, at the other end: under any active, correctly-scoped GS-6 window armed for some unrelated purpose, one
+edit in this file removes the `ledgerConfirmsLiveGmwGrant` call — or the entire TP-* refusal — and closing or
+expiring the window restores nothing, because nothing restores a deleted check.
+
+*Why it is not simply "inherited".* An earlier revision classified this exposure as **inherited, not created
+here**, on the grounds that it predates O-2 and is a property of which hook files the kernel list names. The
+first half is true and stays true: the file was editable-under-a-window before this document existed, and the
+TP-* refusal was already removable that way. The second half understates what §15 does. §15.2.3/§15.3 specify a
+**modify** to exactly this file — adding the `ledgerConfirmsLiveGmwGrant` call after `windowCoversRule` returns
+`covered: true` — which newly places **a term of the lift condition** inside an editable-under-a-window file.
+That is the same property (iv) treats as decisive for the intake module, arriving here by the same edit. So the
+honest statement is not "inherited, not created here" but *inherited, and deepened here*: this design does not
+create the file's editability, it adds one more capability-bearing computation to what that editability reaches.
+
+*What is not decided here.* Whether `guard-testpath.mjs` **should** join the kernel list is a real decision with
+a real cost: a kernel entry makes the file uneditable under *any* window, exactly as `guard-gate-strength.mjs` is
+today, and that cost falls on legitimate maintenance of a hook whose rule family (TP-*) is itself the liftable
+one. It is deliberately **not decided here**, and — per the 2026-08-10 ADR-0058 correction cited under (iv) — it
+is **not this document's to decide**: kernel membership is ADR-0058's decision. That correction endorses
+`guard-authority-ledger-intake.mjs` and explicitly leaves GS-8's separate module open for its own dated
+correction; it says nothing about `guard-testpath.mjs`, which is therefore an undecided third case, not a
+decided one. Filed as its own backlog item,
+`backlog/items/2026-08-10-guard-testpath-not-kernel-protected-like-its-sibling.md`.
+
+Owner `pipeline` (PHX-2). **Trigger:** resolved when a PO decision on `guard-testpath.mjs`'s kernel membership
+is recorded as a dated ADR-0058 correction — **either way**: adding it to `NEVER_LIFTABLE_KERNEL_PATHS`, or
+deciding on the record that the maintenance cost is accepted and the exposure stays. What does not resolve it is
+the default this entry replaces: leaving the question in a closing sentence attached to another residual, where
+it disappears when that residual closes. Unlike (iv), this one has no pre-granted decision behind it and no
+cheap exit — the array element is one line either way, but which line is a judgement about the TP-* hook's own
+maintainability that neither this document nor the dispatch that ships the intake module is entitled to make.
 
 ### 15.2 O-2 — closing the synchronous guard-hook gap inside increment 1
 
@@ -2577,7 +2651,18 @@ with *no ledger decision consulted at all*. The hook consults one, on every lift
 hook against every state that read can distinguish — and it is **not** discharged against an agent with local
 write access to the human stream's storage root, which can delete a disposition and make a disposed grant read
 as live (§15.2.4), nor against one that forges the memo, which suppresses the same half of the intersection for
-up to one minute (§15.2.3a). Both are carried in §15.1.6, owner `pipeline` (PHX-2). Increment 1 therefore ships
+up to one minute (§15.2.3a). **Nor, third, against an agent that uses an active GS-6 window — armed legitimately,
+for any unrelated purpose — to delete the narrowing check itself.** Neither module that hosts a call to it is a
+`NEVER_LIFTABLE_KERNEL_PATHS` member today: not `lib/guard-authority-ledger-intake.mjs`, which this design
+creates (§15.1.6 (iv), which specifies the one-element addition that closes it and is endorsed by ADR-0058's
+2026-08-10 correction), and not `hooks/guard-testpath.mjs`, the second call site, whose membership is an
+undecided question rather than a pending edit (§15.1.6 (v)). This class is strictly more complete than the other
+two: the first two defeat the read's *answer* while the read still runs and the next read re-examines the state
+it depends on; this one removes the read, after which the hook consults **nothing at all** — the exact interval
+state H-AC-02 names, restored permanently by one edit, and outliving the window that permitted it. Recording it
+here rather than only under §15.1.6 is deliberate: this section is where the closure claim is made, and a
+closure claim that omits the way its own mechanism is deleted is the failure this section was already corrected
+once for. All three are carried in §15.1.6, owner `pipeline` (PHX-2). Increment 1 therefore ships
 O-2's mechanism, not a discharge of every assurance question the mechanism raises; that is the same distinction
 §5.2's R-3 draws for H-AC-11, drawn here for the same reason — a closure claim wider than its evidence is the
 failure this document exists to avoid. H-AC-12's migration clause and its expiry (§9) are untouched — that amendment
@@ -2611,7 +2696,7 @@ The rows below are additions to, or modifications of, §11's table; §11 itself 
   H-AC-11 amendment text is proposed in §15.1.5 and applied by the reviewed rebind, not here — and, unlike
   O-2, that step has not yet happened as of this document: §13 AC-14 is this document's own gate against
   declaring the mechanism complete before it does.
-- **O-2 — mechanism resolved; four assurance residuals open and tracked.** Mechanism specified in §15.2;
+- **O-2 — mechanism resolved; five assurance residuals open and tracked.** Mechanism specified in §15.2;
   D-2's *placement* is closed and pulled into increment 1 (§15.2.5, §15.3), with the real execution cost traced
   in §15.2.3a — nine added git subprocess spawns and two full O(n) hash-chain re-verifications per lifted tool
   call, not "one more read" — bounded by the memo specified there and pinned by budget test B-1 (§15.2.3b).
@@ -2621,10 +2706,18 @@ The rows below are additions to, or modifications of, §11's table; §11 itself 
   other three unbounded in time:** the module hosting the narrowing check,
   `lib/guard-authority-ledger-intake.mjs`, is not a `NEVER_LIFTABLE_KERNEL_PATHS` member, so one edit under any
   active GS-6 window removes the check permanently — §15.1.6 (iv) states the defeat path and proposes the
-  one-element kernel-list addition that closes it, applied per §9's deferred-application pattern by the dispatch
-  that owns `lib/guard-maintenance-window.mjs` and carried in §15.3 as a required companion change. All
-  **four** are in §15.1.6, each with an owner (`pipeline`, PHX-2) and an explicit trigger; the count here and
-  the count in §15.1.6's preamble are the same four by construction. An earlier revision of this bullet read
+  one-element kernel-list addition that closes it — a classification ADR-0058's own 2026-08-10 correction now
+  endorses by name — applied per §9's deferred-application pattern by the dispatch
+  that owns `lib/guard-maintenance-window.mjs` and carried in §15.3 as a required companion change. **Fifth, and
+  the one with no decision behind it yet:** the *second* call site, `hooks/guard-testpath.mjs`, is not a kernel
+  path either, and this design's own §15.3 **modify** places a term of the lift condition inside it — so the
+  same one-edit, window-outliving defeat reaches O-2's narrowing at the TP-* hook even after (iv) lands.
+  §15.1.6 (v) tracks it; it is inherited *and deepened here*, not merely inherited, and its exit is a PO
+  decision recorded as an ADR-0058 correction (either direction), not an edit this design may schedule. All
+  **five** are in §15.1.6, each with an owner (`pipeline`, PHX-2) and an explicit trigger; the count here and
+  the count in §15.1.6's preamble are the same five by construction. An earlier revision of this bullet read
   "no non-conformance remains open for it", which was wider than §15.2.4's own disclosure in the same document;
-  a later one said "three", which stopped being true the moment (iv) was found. Both are corrected here.
+  a later one said "three", which stopped being true the moment (iv) was found; a third said "four", which
+  counted the `guard-testpath.mjs` exposure as a closing remark inside (iv) rather than as the independently
+  open residual it is. All three are corrected here.
 - **O-3, O-4, O-5 — unchanged.** Not reopened by this section.
