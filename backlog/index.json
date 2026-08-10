@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c4eb6e18aa4171162b719469aa054b0732b266a2287c199df19b9ba900c86437"
+    "transitionHead": "60fa1cfbb53037e950aaaeabcb3dbee402ca7578d4bc0f2f62edf49e44c2ff73"
   },
   "counts": {
-    "open": 117,
+    "open": 119,
     "in_progress": 21,
     "closed": 44
   },
@@ -95,6 +95,14 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Full command-level analysis of the PO's Codex greenfield happy path against the 0.5.4 candidate (rollout 019fe56c + 019fe56f, 2026-08-09), read from the Codex rollout logs rather than the chat transcript."
+    },
+    {
+      "id": "pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "Codex self-report from a live 2026-08-10 greenfield test session: 'Beim setup der Freigabeautorität wich die Rückmeldung von den übergebenen Werten ab: Trotz --human-name <value> --key-reference <value> meldete sie APS-PO und local-po-key.' (exact supplied values redacted here — they are the PO's real identity strings and must never appear in a committed artifact; the point is that the echoed identifiers did not match what was passed at all)."
     },
     {
       "id": "pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file",
@@ -1554,6 +1562,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Found incidentally during the 0.5.3 candidate work, 2026-08-07, while looking for something else. Re-confirmed by running the suite directly on candidate d4887b7."
+    },
+    {
+      "id": "pipeline.verify-authorship-defaults-to-source-markers-not-behavior",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "Codex self-report from a live 2026-08-10 greenfield test session: 'Die erste Verify-Version prüfte nur Quelltextmarker. Erst nach Critic-Befund wurde sie zu Verhaltenstests ausgebaut. Es gab keine echte visuelle Browser-/Touch-Prüfung.'"
     },
     {
       "id": "pipeline.verify-evidence-has-no-producer",
