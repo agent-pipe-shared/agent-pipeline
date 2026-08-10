@@ -5,6 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-10
+due: 2026-08-24
 source: "PO decision, 2026-08-10, on the plugin-packaging gap confirmed the same day (backlog item / commit tracking the quick copy-fix pending): 'jetzt a) und c) für später festhalten es sauber zu machen' — a direct copy now, this item tracks doing it properly afterward."
 ---
 
@@ -105,3 +106,37 @@ today (Pipeline repo root only, never shipped).
 - **Assignment:** none yet — pick up after the quick-copy fix's exact
   scope is known.
 - **Date:** 2026-08-10
+
+### Added scope (Critic F2/F3, candidate review 2026-08-10, over commits 4d0f8038..e2a3072f)
+
+Two concrete gaps in the quick-copy fix's exception handling, confirmed by
+the candidate's Critic review, both traced to this item's own "quick copy
+now, proper build step later" tradeoff rather than new defects:
+
+- **F2 — wrong exemption granularity for shipped canon:** the 19
+  `harness/scripts/check-consumer-safe-paths.mjs` `ALLOWLIST` entries added
+  for the vendored copies are whole-file `filePattern` exemptions — the
+  checker's own module doc defines that form for files never read by a
+  consumer as an instruction, which is the opposite of what these 19 files
+  are (vendored specifically so a consumer DOES read them as instructions).
+  A `filePattern` match also registers as "used" before any line is
+  inspected, so a repaired file's entry never goes stale and is never
+  reported — unlike the tighter `{file, match}` form. The sibling gate this
+  same candidate added, `harness/scripts/check-doc-contracts.mjs`'s
+  `VENDORED_LINK_EXCLUSIONS` (per `(file, destination)`, class-scoped,
+  genuinely stale-checked), is the template to follow when this item is
+  picked up: replace the 19 whole-file entries with that tighter shape.
+- **F3 — no drift detection for 25 of the 37 vendored files:** byte-identity
+  to the repo-root origin is machine-checked only for the 9 ADRs covered by
+  `VENDORED_LINK_EXCLUSIONS`'s own test. The other 28 (6 guardrails, 3 role
+  contracts, 6 prompt templates, `docs/push-release-flow.md`, 9 further
+  ADRs) have zero enforcement anywhere in `verify.mjs` — a repo-root edit to
+  any of them silently desyncs what a hosted session reads as canon. This is
+  exactly the drift-detection gap this item already exists to close; treat
+  F3 as confirmation the due date below is warranted, not new scope.
+
+Due date added (`due: 2026-08-24`, two weeks out) specifically to satisfy
+`guardrails/quality-gates.md` QG-06 — the Critic correctly flagged that this
+item, cited as the accepted-gap justification for both the above and the
+19 ALLOWLIST entries themselves, had no expiry, which QG-06 requires for any
+documented-instead-of-fixed exception.

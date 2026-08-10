@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-10
-source: "Claude Code self-report from the 2026-08-10 greenfield test session (transcript: /home/skar667/.claude/projects/-home-skar667-src-Rune-Test1-Claude-054-44/c4750d7f-1f6a-4596-b970-3e382310c891.jsonl), point 13 of its final problem list."
+source: "Claude Code self-report from the 2026-08-10 greenfield test session (exact transcript path redacted here — it is a machine-specific absolute path and must never appear in a committed artifact), point 13 of its final problem list."
 ---
 
 # Once the continuity subsystem has fixed a feature-id, there is no rename path if that id turns out incompatible with a downstream consumer
