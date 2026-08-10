@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4ab9adcdeeb62cb78d820fdb730aca141da673189361ef8092006db8098e1fc4"
+    "transitionHead": "7f3753dc90c889d3b2ccec394681cc32813caaf1c2f1be016dcbe8416e8ba95e"
   },
   "counts": {
-    "open": 123,
+    "open": 124,
     "in_progress": 21,
     "closed": 44
   },
@@ -546,6 +546,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-4)."
+    },
+    {
+      "id": "pipeline.git-identity-ask-step-unreachable-through-live-cli-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "GF-103's own final report (2026-08-10), self-disclosed as a caveat rather than papered over; confirmed independently by the Elephant reading applyLifecycle's 'portable' branch directly."
     },
     {
       "id": "pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation",
