@@ -64,6 +64,36 @@ for (let index = 0; index < lines.length; index++) {
 }
 if (beginCount !== 1 || endCount !== 1 || paths.length === 0) block("non-empty apply_patch payload contains no unambiguous file paths.");
 
+// ARCHITECTURAL INVARIANT, permanent (backlog:
+// raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate,
+// PO decision: option A). guard-lifecycle-ready.mjs's own outer tool-name
+// gate -- `if (![...SHELL_TOOLS, ...WRITE_TOOLS].includes(toolName)) return
+// verdict(0);` in evaluateLifecycleReadyGuard() -- does NOT recognize
+// "apply_patch". A raw apply_patch tool call that reached
+// evaluateLifecycleReadyGuard() directly would be admitted unconditionally,
+// before any lifecycle-readiness, write-target, or governance check ever
+// ran. This loop is deliberately the SOLE enforcement boundary that closes
+// that gap: it never forwards the original apply_patch tool call as-is --
+// for every touched path it synthesizes a `{tool_name: "Edit", tool_input:
+// {file_path}}` shape THAT DOES pass through guard-lifecycle-ready.mjs's
+// gate correctly, and it is spawned with an explicit `--runner codex`
+// (ADR-0051) so that shape reaches the guard on every invocation, restart-
+// required or not. If this file's wiring ever stops translating -- a
+// refactor of this loop, a different call site, or a change to Codex's own
+// hook configuration (codex-hooks.json / codex-pretool-guard.mjs) that lets
+// an apply_patch call reach guard-lifecycle-ready.mjs some other way --
+// lifecycle enforcement for Codex writes would silently stop applying: no
+// error, no warning, just an admitted write. Widening
+// evaluateLifecycleReadyGuard's own outer gate to also recognize
+// apply_patch directly (defense in depth) is a separate, deliberately
+// deferred decision (option B) -- out of scope here and NOT a substitute
+// for this comment holding. Regression coverage in
+// guard-apply-patch.test.mjs pins both halves: the literal synthesized
+// shape below is never a raw pass-through of the original tool_name, and
+// evaluateLifecycleReadyGuard's outer gate still does not recognize
+// apply_patch on its own -- either fact changing should make that suite
+// fail, forcing a reader to reconsider this comment rather than silently
+// drift past it.
 let exitCode = 0;
 const stderr = [];
 for (const filePath of paths) {

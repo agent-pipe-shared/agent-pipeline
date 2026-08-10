@@ -8,6 +8,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
+import { evaluateLifecycleReadyGuard } from "./guard-lifecycle-ready.mjs";
+
 const guard = join(dirname(fileURLToPath(import.meta.url)), "guard-apply-patch.mjs");
 let passed = 0;
 
@@ -151,6 +153,33 @@ check("the lifecycle guard is invoked per patched path with an explicit codex ru
   assert.match(result.stderr, /guard-lifecycle-ready/);
   assert.match(result.stderr, /Pipeline session readiness is/u);
   assert.doesNotMatch(result.stderr, /exact V4 ready result for session intent/u);
+});
+
+check("architectural invariant: evaluateLifecycleReadyGuard's own outer tool-name gate still does not recognize apply_patch -- a raw, untranslated call reaching it directly is admitted unconditionally even against a governed path that the identical path in translated Edit shape blocks (regression pin for backlog: raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate; if this ever stops holding, guard-apply-patch.mjs's translate-first comment needs re-reading before anyone relies on the outer gate alone)", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const filePath = "src/governed.mjs";
+  const patch = `*** Begin Patch\n*** Update File: ${filePath}\n@@\n-a\n+b\n*** End Patch`;
+  const raw = evaluateLifecycleReadyGuard(
+    { tool_name: "apply_patch", tool_input: { command: patch } },
+    { runner: "codex", projectDir: root },
+  );
+  assert.equal(raw.exitCode, 0, `expected the raw, untranslated apply_patch call to be silently admitted by the outer gate; got ${JSON.stringify(raw)}`);
+  const translated = evaluateLifecycleReadyGuard(
+    { tool_name: "Edit", tool_input: { file_path: filePath } },
+    { runner: "codex", projectDir: root },
+  );
+  assert.notEqual(translated.exitCode, 0, "the translated Edit shape for the identical governed path is expected to be gated -- if this also returns 0, the contrast this test relies on to prove translation matters is gone.");
+});
+
+check("architectural invariant: guard-apply-patch.mjs's spawn loop synthesizes a bare Edit shape for guard-lifecycle-ready.mjs, never the original apply_patch tool_name or command envelope (regression pin: this is the only translation boundary before evaluateLifecycleReadyGuard, which does not itself recognize apply_patch)", () => {
+  const source = readFileSync(guard, "utf8");
+  const loopStart = source.indexOf("for (const filePath of paths)");
+  assert.ok(loopStart >= 0, "expected to find the per-path translation loop in guard-apply-patch.mjs");
+  const loopBlock = source.slice(loopStart);
+  assert.match(loopBlock, /input:\s*JSON\.stringify\(\{\s*tool_name:\s*"Edit",\s*tool_input:\s*\{\s*file_path:\s*filePath\s*\}\s*\}\)/su);
+  assert.doesNotMatch(loopBlock, /tool_name:\s*toolName/u);
+  assert.doesNotMatch(loopBlock, /tool_name:\s*"apply_patch"/u);
 });
 
 if (process.exitCode) process.exit(process.exitCode);
