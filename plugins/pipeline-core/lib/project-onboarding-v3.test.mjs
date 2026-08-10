@@ -3102,35 +3102,50 @@ test("onboarding seeds ignore rules for the paths it writes into, and never touc
 // AUTHORID-1. Both 2026-08-09 greenfield runs lost a PO turn to `Author identity
 // unknown` at their first commit. Onboarding initializes the repository and never
 // looked at whether anything could commit into it, so the stop landed several
-// steps later, mid-implementation, where only the human could answer.
+// steps later, mid-implementation, where only the human could answer. A
+// warn-only diagnostic (2026-08-09) fixed the discovery timing but sat as one
+// passive entry in the generic `diagnostics` array -- easy to miss, never a real
+// ask. 2026-08-10 PO instruction: ask and set at setup time instead (backlog:
+// 2026-08-10-git-identity-warn-only-diagnostic-does-not-meet-po-expectation.md).
 //
-// The seed WARNS and does not configure: an author identity is a claim about who a
-// human is, and a seed inventing one would put a fabricated name in permanent
-// history — worse than the stop it prevents. Both halves are the contract.
-test("onboarding says the repository cannot name a commit author, and never invents one", () => {
+// The seed still never configures an identity itself: an author identity is a
+// claim about who a human is, and a seed inventing one would put a fabricated
+// name in permanent history -- worse than the stop it prevents. Only the
+// delivery mechanism changed, from a passive diagnostic to a real ask-step.
+test("onboarding asks for a commit author it cannot name, and never invents one", () => {
   const missing = root();
   const configured = root();
   try {
     const plan = planProjectOnboardingV3({ runner: "codex", rootDir: missing, deps: fakeDeps });
     const applied = applyProjectOnboardingV3(plan, { rootDir: missing, activate: true, deps: fakeDeps });
-    assert.equal(applied.status, "applied", "the warning never fails the seed");
-    const warned = applied.diagnostics.find((entry) => entry.code === "author_identity_unconfigured");
-    assert.notEqual(warned, undefined, "a repository with no author identity must say so at creation");
-    // Which of the two keys is missing depends on the host's own global config, so
-    // the contract is that the guidance names a command for EACH key the message
-    // reports missing -- not that both are always missing.
-    for (const key of ["user.name", "user.email"]) {
-      if (!warned.message.includes(key)) continue;
-      assert.ok(warned.repair.includes(`git config ${key}`), `the repair must name the command for ${key}`);
+    // (a) missing identity now triggers a real ask-step, not only a diagnostic.
+    assert.equal(applied.status, "applied", "the ask never fails the seed's own transaction");
+    assert.equal(applied.diagnostics.length, 0, "the ask-step replaces the passive diagnostic entirely");
+    assert.equal(applied.nextAction.kind, "collect-input");
+    assert.equal(applied.nextAction.mutation, false);
+    assert.equal(applied.nextAction.inputs.length, 2);
+    const fieldNames = applied.nextAction.inputs.map((input) => input.name).sort();
+    assert.deepEqual(fieldNames, ["gitAuthorEmail", "gitAuthorName"]);
+    for (const input of applied.nextAction.inputs) {
+      assert.equal(input.singleLine, true);
+      assert.equal(input.rejectNul, true);
+      assert.equal(input.minBytes, 1);
     }
-    assert.match(warned.message, /user\.(name|email)/u, "the message must name what is unset");
-    // Warned, never written: the seed must not have configured an identity itself.
+    assert.match(applied.nextAction.guidance, /user\.(name|email)/u, "the guidance must name what is unset");
+    assert.match(applied.nextAction.guidance, /git config user\.name/u);
+    assert.match(applied.nextAction.guidance, /git config user\.email/u);
+    assert.equal(/config\s+--global/u.test(applied.nextAction.guidance), false,
+      "the guidance must never name a --global config command");
+    assert.match(applied.nextAction.guidance, /never --global/u,
+      "the guidance must explicitly rule global scope out");
+    // Asked, never written: the seed must not have configured an identity itself.
     assert.equal(existsSync(join(missing, ".git", "config")) === false
       || !readFileSync(join(missing, ".git", "config"), "utf8").includes("[user]"), true,
       "the seed must not invent an author identity in the repository it created");
 
-    // A repository that already knows its author gets no warning. `fakeGit` answers
-    // nothing for `config --get`, so the identity probe needs a stub that does --
+    // (c) A repository that already knows its author is unaffected -- no new
+    // prompt, no diagnostic, exactly current behavior. `fakeGit` answers nothing
+    // for `config --get`, so the identity probe needs a stub that does --
     // otherwise this half would pass for the wrong reason.
     const knowsItsAuthor = {
       ...fakeDeps,
@@ -3146,9 +3161,51 @@ test("onboarding says the repository cannot name a commit author, and never inve
       { rootDir: configured, activate: true, deps: knowsItsAuthor },
     );
     assert.equal(quiet.status, "applied");
-    assert.equal(quiet.diagnostics.some((entry) => entry.code === "author_identity_unconfigured"), false,
-      "a configured repository must not be warned");
+    assert.equal(quiet.diagnostics.length, 0, "a configured repository is not warned");
+    assert.equal(Object.prototype.hasOwnProperty.call(quiet, "nextAction"), false,
+      "a configured repository is not asked");
   } finally { dispose(missing); dispose(configured); }
+});
+
+// (b) Once the PO answers the ask-step above, the values it names as the
+// fulfillment mechanism (`git config user.name`/`git config user.email`, no
+// `--activate`-shaped apply and no library write path exists for this --
+// setting two git-config values is the whole mutation) land in the freshly
+// created repository's LOCAL config only. `GIT_CONFIG_GLOBAL` is pointed at a
+// throwaway path for the whole test so a regression that ever added `--global`
+// is caught here rather than ever touching this machine's real global config.
+// Uses a real Git repository (host `git init`, not the suite's `fakeGit` stub,
+// whose `.git` is an empty placeholder directory) because the assertions below
+// exercise real `git config` read/write semantics.
+test("the PO's answered author identity is written to local git config only, never global", () => {
+  const path = root();
+  const globalConfig = join(path, ".would-be-global-config");
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const env = {
+      ...process.env,
+      GIT_CONFIG_NOSYSTEM: "1",
+      GIT_CONFIG_GLOBAL: globalConfig,
+      LC_ALL: "C",
+    };
+    const name = "Test PO";
+    const email = "test-po@example.invalid";
+    // Exactly the two commands named in applied.nextAction.guidance -- no
+    // `--global` anywhere.
+    const setName = spawnSync("git", ["config", "user.name", name], { cwd: path, encoding: "utf8", env });
+    assert.equal(setName.status, 0, setName.stderr);
+    const setEmail = spawnSync("git", ["config", "user.email", email], { cwd: path, encoding: "utf8", env });
+    assert.equal(setEmail.status, 0, setEmail.stderr);
+    const readLocalName = spawnSync("git", ["config", "--local", "--get", "user.name"], { cwd: path, encoding: "utf8", env });
+    assert.equal(readLocalName.status, 0);
+    assert.equal(readLocalName.stdout.trim(), name);
+    const readLocalEmail = spawnSync("git", ["config", "--local", "--get", "user.email"], { cwd: path, encoding: "utf8", env });
+    assert.equal(readLocalEmail.status, 0);
+    assert.equal(readLocalEmail.stdout.trim(), email);
+    assert.equal(existsSync(globalConfig), false, "the answer must never be written to a global config file");
+    const localConfig = readFileSync(join(path, ".git", "config"), "utf8");
+    assert.match(localConfig, /\[user\]/u);
+  } finally { dispose(path); }
 });
 
 // A runner without a native runtime readback is onboarded exactly as ADR-0057

@@ -69,6 +69,16 @@ the bounded effects once, then execute each returned digest-bound action and
 readback without re-asking per digest. `requiresConfirmation` describes the
 action's safety shape, not a second PO chat gate.
 
+A local Git init result carrying a `collect-input` action for the repository's
+commit author (`project-onboarding-v3.mjs`'s `applyProjectOnboardingV3`,
+neither `user.name` nor `user.email` resolves locally or globally) is a
+blocking question, the same as the kickoff goal/profile/language questions
+already are — never a diagnostic to notice and act on later, and never a
+default or invented value. Ask the PO once for both the author name and email,
+then set both in THIS repository's local config only: `git config user.name
+"<name>"` and `git config user.email "<email>"` — never `--global`, and never
+a value the PO did not type.
+
 After a required restart, an already seeded repository shows this consent
 was exercised; resume ordinary bootstrap without re-asking. Stop for new
 human input only when no usable goal or material design input exists, a

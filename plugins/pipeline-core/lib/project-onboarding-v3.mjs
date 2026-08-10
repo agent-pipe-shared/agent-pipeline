@@ -3721,40 +3721,62 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
 }
 
 /**
- * Warn — never configure — when the repository cannot name a commit author.
+ * Ask — never invent — the repository's commit author when it is unresolved.
  *
  * BOTH 2026-08-09 greenfield runs lost a PO turn to `Author identity unknown` at
- * their first commit: onboarding initializes the repository and never looks at
- * whether anything can commit into it. The agent then hits it several steps later,
- * mid-implementation, where the only person who can answer is the human.
+ * their first commit: onboarding initialized the repository and never looked at
+ * whether anything could commit into it. The agent then hit it several steps
+ * later, mid-implementation, where only the human could answer. A warn-only
+ * diagnostic (2026-08-09) fixed the discovery timing but not the interruption:
+ * it sat as one passive entry in the generic `diagnostics` array, next to dozens
+ * of unrelated diagnostic kinds, easy to miss and never blocking or asking
+ * anything (backlog: 2026-08-10-git-identity-warn-only-diagnostic-does-not-meet-
+ * po-expectation.md). This asks instead, at the exact same point, using the same
+ * `collect-input` shape `collectGoalAction()` already uses for the kickoff goal.
  *
- * This deliberately does NOT set `user.name`/`user.email`. An author identity is a
- * claim about who a human is; a seed inventing one would put a fabricated name in
- * permanent history, which is worse than the stop it prevents. So the seed says
- * what is missing, at the moment the repository is created, and names the exact
- * two commands — which is the whole difference between a surprise and a step.
+ * This deliberately still does NOT set `user.name`/`user.email` itself. An
+ * author identity is a claim about who a human is; a seed inventing one would
+ * put a fabricated name in permanent history, which is worse than the stop it
+ * prevents — that safety property carries over unchanged; only the delivery
+ * mechanism (ask, not warn) changed.
  *
- * Non-fatal by construction: an unreadable Git, a host-managed mount the seed does
- * not own, or any probe failure yields no diagnostic rather than a false alarm.
+ * Non-fatal by construction: an unreadable Git, a host-managed mount this seed
+ * does not own, or any probe failure resolves to "nothing missing" rather than
+ * a false alarm.
  */
-function authorIdentityDiagnostics(root, state, fs) {
+function unresolvedAuthorIdentityKeys(root, state, fs) {
   if (state.hostManaged) return [];
   const configured = (key) => {
     try {
       const probe = fs.spawnSync("git", ["config", "--get", key], { cwd: root, encoding: "utf8" });
       return probe.status === 0 && String(probe.stdout ?? "").trim().length > 0;
     } catch {
-      return true; // Unprobeable is not "missing" -- never warn on evidence we do not have.
+      return true; // Unprobeable is not "missing" -- never ask on evidence we do not have.
     }
   };
-  const missing = ["user.name", "user.email"].filter((key) => !configured(key));
-  if (missing.length === 0) return [];
-  return [diagnostic(
-    "$.git.author",
-    "author_identity_unconfigured",
-    `this repository cannot name a commit author (${missing.join(" and ")} unset), so the first commit will fail`,
-    `set it before the first commit: ${missing.map((key) => `git config ${key} "<value>"`).join(" && ")}`,
-  )];
+  return ["user.name", "user.email"].filter((key) => !configured(key));
+}
+
+// A generous single-line bound for a real name or email address -- the same
+// role KICKOFF_GOAL_MAX_BYTES plays for the kickoff goal, kept local here
+// rather than imported so this stays independent of onboarding-continuity.mjs.
+const AUTHOR_IDENTITY_FIELD_MAX_BYTES = 320;
+
+// Same `collect-input` shape as `collectGoalAction()`, asking for both fields
+// at once: the PO's own wording asks once for both, never one at a time and
+// never a default for whichever key happens to already resolve.
+function collectAuthorIdentityAction(missing) {
+  return {
+    kind: "collect-input",
+    inputs: [
+      { name: "gitAuthorName", encoding: "utf8", trim: true, minBytes: 1, maxBytes: AUTHOR_IDENTITY_FIELD_MAX_BYTES, singleLine: true, rejectNul: true },
+      { name: "gitAuthorEmail", encoding: "utf8", trim: true, minBytes: 1, maxBytes: AUTHOR_IDENTITY_FIELD_MAX_BYTES, singleLine: true, rejectNul: true },
+    ],
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: `this repository cannot name a commit author (${missing.join(" and ")} unset); ask the PO once for the author name and email, then set both in THIS repository's local config only -- git config user.name "<name>" and git config user.email "<email>" -- never --global, and never a value the PO did not type`,
+    expected: { schema: PLAN_SCHEMA, statuses: ["applied"] },
+  };
 }
 
 function ensurePreimage(root, expectedState, fs) {
@@ -3887,7 +3909,19 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     if (source.status !== "ready" || source.sourceKind !== "v3") throw new Error("post-apply portable source validation was not ready");
     const manifest = loadManifest(root);
     if (manifest.status !== "ok") throw new Error("post-apply canonical manifest validation was not ready");
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitIdentity !== null, initialBranch: "main", committed: false }, authority: { status: "portable-seed", runtimeProjection: "missing" }, diagnostics: authorIdentityDiagnostics(root, state, fs) };
+    const gitResult = state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitIdentity !== null, initialBranch: "main", committed: false };
+    const authority = { status: "portable-seed", runtimeProjection: "missing" };
+    // The transaction (Git init + scaffold writes) is unconditionally done by
+    // this point -- an unresolved author identity is never a reason to roll
+    // any of it back. It is a separate, additive `nextAction` alongside the
+    // same "applied" status: a real ask-the-PO step, never a passive
+    // diagnostic entry the caller has to notice on its own (see
+    // `unresolvedAuthorIdentityKeys()`'s doc comment for the full history).
+    const missingIdentity = unresolvedAuthorIdentityKeys(root, state, fs);
+    if (missingIdentity.length > 0) {
+      return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [] };
+    }
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, diagnostics: [] };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
