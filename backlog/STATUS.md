@@ -43,7 +43,7 @@
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.critic-review-has-no-defined-path-for-a-root-commit | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
@@ -100,7 +100,7 @@
 | pipeline.native-windows-verify-red-suite-class | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.no-design-to-implementation-handover-exists | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | open | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | open | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.no-governed-directory-contract | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.no-sanctioned-way-to-start-over | open | defect | pipeline | 2026-08-08 | — |
@@ -187,6 +187,6 @@
 
 ## Counts
 
-- open: 116
+- open: 114
 - in_progress: 21
-- closed: 42
+- closed: 44

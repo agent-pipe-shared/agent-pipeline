@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critic-review-has-no-defined-path-for-a-root-commit
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
+closed_at: 2026-08-10
+closure_repository: self
+closure_commit: 700bb4eb75e7c5d37841cf5da2618a419ddb8337
+closure_evidence: backlog/evidence/2026-08-10-critic-root-commit-example-closure.md
 source: "Codex self-report from a live greenfield test session, 2026-08-09 (rollout files under /home/skar667/.codex/sessions/2026/08/09/), cross-checked by the Elephant directly against plugins/pipeline-core/skills/critic-review/SKILL.md."
 due: 2026-08-23
 ---
@@ -52,7 +56,13 @@ exists), alongside the existing `main..HEAD` example.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted and built directly (2026-08-10), rather than left
+  in the backlog for a future decision — the PO pushed back on treating a
+  well-known, low-risk, fully-specified fix as if it needed a policy
+  decision.
+- **Rationale:** No ambiguity or tradeoff existed: git's empty-tree hash is
+  a fixed, universal constant with no project-specific judgment call.
+- **Assignment:** GF-086 (goldfish-mechanic), self-verified by the Elephant
+  (diff read directly; empty-tree hash independently confirmed via
+  `git hash-object -t tree /dev/null`).
+- **Date:** 2026-08-10

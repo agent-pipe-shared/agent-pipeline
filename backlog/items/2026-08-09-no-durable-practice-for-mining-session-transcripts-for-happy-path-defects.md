@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
+closed_at: 2026-08-10
+closure_repository: self
+closure_commit: 264be61996ce74b3b789374f0af396f9ce495df7
+closure_evidence: backlog/evidence/2026-08-10-transcript-forensics-reference-closure.md
 source: "PO request, 2026-08-09: 'ergänze die Telemetrie daten der Sessions und werte detailliert ihre chat verläufe/transkripte aus um Fehler zu finden und den happy path zu optimieren' — issued alongside two real greenfield test sessions this same night that were mined ad hoc (two general-purpose forensic-analysis subagent dispatches, no reusable artifact produced)."
 due: 2026-08-23
 ---
@@ -53,7 +57,14 @@ unrelated fix.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted and built directly (2026-08-10), rather than left
+  in the backlog for a future decision — the PO pushed back on treating a
+  clearly-scoped documentation task as if it needed a policy decision.
+- **Rationale:** The item's own Direction section was already a complete,
+  self-contained spec; no PO judgment call remained to make.
+- **Assignment:** GF-087 (goldfish-implementor) —
+  `plugins/pipeline-core/skills/pipeline-start/references/transcript-forensics.md`
+  covers transcript grep targets per runner format, the standard check
+  categories, and the report shape; added to `SKILL.md`'s "Typed lazy
+  loading" list. Self-verified by the Elephant (diff read directly).
+- **Date:** 2026-08-10
