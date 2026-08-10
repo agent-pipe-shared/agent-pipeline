@@ -93,3 +93,25 @@ test("V-AC-06 pins the exact content-security-policy value, the skip-link's keyb
   assert.match(html, /<caption>Validated source artifacts and their exact lifecycle state<\/caption>/);
   assert.match(html, /<th scope="col">Artifact<\/th>/);
 });
+// V-AC-06: "representative mobile/desktop snapshot checks" as a deterministic
+// string-level snapshot -- the same technique the V-AC-09 test above already
+// uses (assert.match(html, new RegExp(...)) against the rendered HTML). The
+// renderer inlines evidence-viewer.css verbatim into a single <style> block
+// (evidence-view-renderer.mjs, the CSS-inlining line); there is no separate
+// mobile-render vs desktop-render code path, so the entire visual delta is
+// literal, deterministic CSS text a UA evaluates against viewport width. This
+// pins (a) the sole `@media(max-width:42rem){...}` breakpoint rule verbatim
+// (the "mobile" state applied below that width) and (b) the exact default
+// declarations that rule overrides -- body padding, dl grid-template-columns,
+// th/td padding (the "desktop" baseline applied above that width, before the
+// override). Both pinned in the same static HTML string is the representative
+// mobile/desktop snapshot; there is no dynamic rendering step to add.
+test("V-AC-06 pins representative mobile/desktop snapshot checks via deterministic CSS string assertions", () => {
+  const html = renderEvidenceView(buildEvidenceViewModel({ candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, status: "pass", artifacts: [] }));
+  // mobile: the sole breakpoint rule, verbatim
+  assert.match(html, /@media\(max-width:42rem\)\{body\{padding:\.75rem\}table\{font-size:\.86rem\}th,td\{padding:\.35rem\}dl\{grid-template-columns:1fr\}\.candidate dd\{margin-bottom:\.65rem\}\}/);
+  // desktop: the exact default declarations that breakpoint overrides
+  assert.match(html, /body\{margin:0 auto;max-width:76rem;padding:1\.25rem\}/);
+  assert.match(html, /dl\{display:grid;grid-template-columns:max-content 1fr;gap:\.4rem 1rem\}/);
+  assert.match(html, /th,td\{border:1px solid #777;padding:\.55rem;text-align:left;vertical-align:top\}/);
+});
