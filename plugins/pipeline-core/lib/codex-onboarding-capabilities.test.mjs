@@ -552,6 +552,60 @@ test("root aliases, .git symlinks, and unregistered escaping .git files are reje
   });
 });
 
+test("a one-off transient repository-discovery failure is retried and recovers", () => {
+  const root = localRepository("transient retry");
+  let calls = 0;
+  const observed = observeCodexOnboardingCapabilities({
+    rootDir: root,
+    intent: "session",
+    deps: {
+      spawnSync(command, args, options) {
+        calls += 1;
+        // Call 1 is the leading `gitVersion` probe (must succeed so the code
+        // reaches repository discovery at all). Call 2 is the first git
+        // invocation inside the retried `validateLocalRepository` -- exactly
+        // where a real WSL post-relaunch race was observed to land.
+        if (calls === 2) return { status: 1, stdout: "", stderr: "fixture: transient git failure" };
+        return spawnSync(command, args, options);
+      },
+    },
+  });
+  assertExact(observed, {
+    status: "local-valid-writable",
+    mode: "local",
+    gitVersion: observed.gitVersion,
+    rootWritable: "passed",
+    sessionCapability: "passed",
+    worktreeCapability: "not-required",
+  });
+  assert.ok(calls > 2, "expected the failed discovery attempt to be retried");
+});
+
+test("a persistent repository-discovery failure still reports control-path-invalid after the bounded retry", () => {
+  const root = localRepository("persistent failure");
+  let calls = 0;
+  const observed = observeCodexOnboardingCapabilities({
+    rootDir: root,
+    intent: "session",
+    deps: {
+      spawnSync(command, args, options) {
+        calls += 1;
+        if (calls === 1) return spawnSync(command, args, options);
+        return { status: 1, stdout: "", stderr: "fixture: persistent git failure" };
+      },
+    },
+  });
+  assertExact(observed, {
+    status: "control-path-invalid",
+    mode: "local",
+    gitVersion: observed.gitVersion,
+    rootWritable: "passed",
+    sessionCapability: "not-observed",
+    worktreeCapability: "not-required",
+  });
+  assert.equal(calls, 4, "expected the leading gitVersion call plus exactly 3 retried discovery attempts");
+});
+
 test("session intent performs and fully rolls back one real cleanup-descriptor probe", () => {
   const root = localRepository("session probe");
   const before = treeSnapshot(root);

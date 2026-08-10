@@ -44,6 +44,7 @@
 | pipeline.concurrent-dispatches-share-one-index | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
+| pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | in_progress | defect | pipeline | 2026-08-10 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | 2026-08-09 | — |
@@ -132,6 +133,7 @@
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | open | workflow-improvement | pipeline | 2026-08-08 | — |
+| pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -197,6 +199,6 @@
 
 ## Counts
 
-- open: 124
-- in_progress: 21
+- open: 125
+- in_progress: 22
 - closed: 44

@@ -621,10 +621,27 @@ export function observeCodexOnboardingCapabilities({
     return component;
   }
 
+  // A fresh process (notably right after a Codex/Claude onboarding restart
+  // relaunch on WSL) can observe a one-off transient failure here -- a git
+  // spawn or realpathSync racing the just-relaunched process's own still-
+  // settling filesystem view -- even though the repository itself is a
+  // perfectly ordinary, valid local checkout. A genuine escape (symlinked
+  // .git, a pointer file outside the common directory, an unregistered
+  // worktree) reproduces identically on every attempt, so the bounded retry
+  // costs nothing there; it only changes the outcome for the transient case.
   let repository;
-  try {
-    repository = validateLocalRepository(root, gitType, spawn);
-  } catch {
+  let repositoryError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      repository = validateLocalRepository(root, gitType, spawn);
+      repositoryError = null;
+      break;
+    } catch (error) {
+      repositoryError = error;
+      if (attempt < 2) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20 * (attempt + 1));
+    }
+  }
+  if (repositoryError) {
     component.status = "control-path-invalid";
     return component;
   }

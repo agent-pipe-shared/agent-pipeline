@@ -2823,7 +2823,13 @@ never admitting anything, plus a new OT19 for the real invariant.
 **Incidental, pre-existing, invisible to the gate:**
 `plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs`
 fails on a stale digest pin for `harness/review-protocol.md`, and that suite is
-not registered in `verify.mjs`. A pin nothing checks is not a pin.
+not registered in `verify.mjs`. A pin nothing checks is not a pin. The Critic
+review of candidate nova-b60 (finding F4) found a **second**, independent
+stale pin in the same inventory — `roles/critic.md` — that the assertion loop
+never even reaches, since it throws on the first mismatch
+(`harness/review-protocol.md`, first in file order) rather than collecting
+all of them. Tracked as
+`backlog/items/2026-08-10-preimage-repin-disclosure-incomplete-for-roles-critic.md`.
 
 ### Dispatch truncation, measured
 
