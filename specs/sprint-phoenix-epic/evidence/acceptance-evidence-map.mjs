@@ -1004,6 +1004,22 @@ const DELTA = {
   // disclosed explicitly in its own output and header, not assumed away.
   // Standalone checker only, not wired into CI/hooks. 23/23 tests pass.
   'A-AC-08': ['implemented', 'WP-A-AC08'],
+
+  // K-AC-05: redesigned per ADR-0063 -- fork disposition requires a verified
+  // PO approval proof (po-approval-proof.mjs, the same primitive push/GMW/HGO
+  // already use), closing every gap the prior Critic verdict named: CLI
+  // reachability, read-side re-verification of acknowledgedEventIds and the
+  // approved subject against the fork as it stands now, content-digest (not
+  // eventId) binding, symlink-ancestry check on read, and a named/dated/owned
+  // residual (not an undated comment) for the compensating/superseding-record
+  // question. 3 rework rounds against a fresh 4-round Critic cap, PASS on the
+  // final round with two minors fixed directly and one major (WP-K-AC05, the
+  // signing-confirmation ceremony shared with push/deploy/publication does
+  // not display the intent digest being signed) filed as its own backlog
+  // defect -- real, but out of this mechanism's scope and blast radius.
+  // 52/52 governance-event-store/po-human-approval/po-approval-gate tests
+  // pass.
+  'K-AC-05': ['implemented', 'WP-K-AC05'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -1033,7 +1049,7 @@ const POINTERS = {
   'K-AC-02': 'governance-event-store-tests: exact idempotency is a zero-write replay',
   'K-AC-03': 'same assertion, conflicting-key half',
   'K-AC-04': 'governance-event-store-tests: canonical bytes, readback checkpoint, source-last head, RFC 8785 canonicalization',
-  'K-AC-05': 'governance-event-store-tests: fork detection now proven to also block append and recovery, not only verify/query (PHX-WP-K, break-proofed). A disposition mechanism now exists (3 rework rounds, PHX-WP-K05*) but an independent Opus-routed Critic (2026-08-09, round 4/4, the round cap) found it insufficient for "GOVERNED disposition": the record carries no human/authority binding at all (self-mintable by anything with library access, blocker), is unreachable through the sanctioned governance-event CLI (governance-event.mjs recover has no disposition field), the read path never re-verifies acknowledgedEventIds against the actual conflicting entries at that sequence, binds eventId not content digest, has no symlink-ancestry check on its own storage path, and the crash/fork matrix\'s required compensating/superseding record is entirely absent, deferred in an undated code comment. Parked pending PO architecture-level input -- these are redesign-scale gaps, not another narrow rework',
+  'K-AC-05': 'governance-event-store/po-human-approval/po-approval-gate-tests (ADR-0063, WP-K-AC05-REDESIGN + 2 reworks + F1F2FIX, 2026-08-10): fork disposition now requires a verified PO approval proof -- no longer self-mintable, the blocker the prior Critic named. Reachable through the sanctioned CLI (governance-event.mjs dispose; po-human-approval.mjs/po-approval-gate.mjs prepare-/approve-/verify-fork-disposition). The read path re-verifies acknowledgedEventIds and the approved subject against the fork as it stands now, not only at write time; binds sorted CONTENT digests, not eventId; checks symlink ancestry on read too. The compensating/superseding-record question is a named, dated, owned residual in ADR-0063, not an undated comment. Mode (signature/chat) governed by the existing gates.push_approval. Independent Opus-routed Critic: fresh 4-round cap, PASS on round 4 (final) -- one major finding scoped explicitly outside this mechanism (a pre-existing gap in the SHARED push/deploy/publication signing-confirmation ceremony, filed separately as its own backlog defect) and two minors fixed directly. 52/52 tests pass',
   'K-AC-06': 'governance-event-store-tests: checkpoint-aware verification; symlink and cross-repository rejection',
   'K-AC-07': 'governance-event-store-tests: projection recovery requires a retained checkpoint',
   'K-AC-08': 'governance-event-store-tests: governance-event-store.mjs:673 (GES-CHECKPOINT) rejects a head/index checkpoint asserting an absent or digest-mismatched canonical record, for both verify and query (PHX-WP-K, break-proofed)',
