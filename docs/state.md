@@ -4177,6 +4177,25 @@ is purely an Elephant/Goldfish scoping question with no guard or PO-input depend
 that carries real design ambiguity already noted. This is the honest, fully-mapped state of the
 remaining queue.
 
+### WP-E-AC20 DISPATCHED — CATEGORY 5 IS ACTUALLY DISPATCHABLE, RE-SCOPED WITH FRESH EYES
+
+Rather than leave category 5 as "carries real design ambiguity" and stop there, re-researched
+E-AC-20 specifically. Confirmed it genuinely needs a judgment call (unlike the pure field-mirror
+precedents today) — of `governance-export-delivery.mjs`'s five-key delivery-result shape, only
+`receipt` is already public-safe (counts/classes/digests only); `mappings`/`outbox`/`acknowledgement`
+carry live or authority-adjacent content and must stay excluded. That judgment call is now
+resolved, not open — dispatched **WP-E-AC20** with the resolved decision handed in as a stated
+precondition, same pattern used successfully for A-AC-03-adjacent decisions earlier. Also confirmed
+`audit-bundle.test.mjs` carries no TP-4/TP-5 guard protection (edited without a block twice already
+today) — explicitly warned the dispatch about the file it must NOT repeat touching
+(`feature-package-topology.mjs`, the actual cause of the earlier P-AC-06 regression, not
+`audit-bundle.mjs` itself). Central DoD requirement: prove `exportMetadata` participates in NO
+validation/signature logic — a bundle with deliberately mismatched export metadata must still
+build and verify successfully, the concrete test for "SHALL NOT treat delivery as source
+authority."
+
+**Live now:** WP-E-AC20.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
