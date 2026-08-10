@@ -58,7 +58,7 @@ several worktree-isolated dispatches.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted (direction 1 only).
+- **Rationale:** self-triaged in the same block that filed it, disclosed as such rather than left implicit — the PO is AFK and the standing instruction is to close bounded, non-judgment items directly. Direction (1) (`.gitignore` += `.claude/worktrees/`) has zero design latitude and was independently hit twice this same session (GF-111 and GF-112 both left a stray worktree directory; the second even survived a `git worktree remove` as an empty leftover, cleaned up by hand). Direction (2) (an explicit cleanup step) is NOT accepted here — it needs the `session-cleanup-recovery.mjs` investigation the Proposal itself flags as unresolved, which is design latitude out of scope for a mechanic-tier dispatch.
+- **Assignment (if accepted):** immediate, this block (GF-113).
+- **Date:** 2026-08-11
