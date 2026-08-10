@@ -4642,6 +4642,57 @@ already-fixed ADR-0058 rather than re-doing that work).
 
 **Live now:** WP-K-AC05-REWORK2, WP-O1O2-CACHING-REWORK2.
 
+### WP-K-AC05-REWORK2 AND WP-O1O2-CACHING-REWORK2: BOTH RETURNED, BOTH SELF-COMMITTED, BOTH INDEPENDENTLY VERIFIED
+
+Both round-2 reworks finished and — unlike earlier dispatches this stretch — committed
+themselves. Verified each independently before trusting either (full diff read, own test/verify
+run, one factual claim re-checked against `git` directly), consistent with the discipline applied
+to every dispatch so far.
+
+**WP-K-AC05-REWORK2 → `c5058e20`.** Fixes both round-2 majors with one root change: the `-critical`
+trio's `--kind` check now uses a local, literal `CRITICAL_COMMAND_KINDS = ["push", "deploy",
+"publication"]` instead of importing the four-member `CRITICAL_ACTION_KINDS` — closing the
+filename-collision escape route (`prepare-critical --kind governance-fork-disposition` no longer
+parses at all) and the insufficient re-check (nothing reaches signing without going through
+`runForkDispositionApproval` first) in the same place every other invalid `--kind` is already
+refused. `runHumanApproval` splits into its exported parser wrapper and a module-private
+`executeHumanApproval`; `approve-fork-disposition` now enters that same unchanged signing branch
+with a parsed-form object instead of synthesizing the now-refused argv. `po-approval-gate.mjs`
+admits `prepare-fork-disposition`/`verify-fork-disposition` (never `approve-fork-disposition`,
+which delegates to signing); `run()` returns a promise for those two only. Docs and ADR-0063's
+Follow-up entry corrected to match. Read the full diff myself (all 6 files); re-ran
+`po-human-approval.test.mjs` + `po-approval-gate.test.mjs` + `governance-event-store.test.mjs`
+myself: **51/51 green**, matching the dispatch's own report exactly, including the new
+byte-identical-artifact-survives-refusal test and the new `po-approval-gate.test.mjs` file. One new
+disclosed-not-fixed item, correctly left alone (file was read-only per the briefing):
+`guard-lifecycle-ready.mjs`'s `isAgentPoPublicCommand` allowlist still doesn't admit the new public
+commands, so they're operator-run in this repo for now — tracked in ADR-0063 with a trigger, not
+silently absorbed.
+
+**WP-O1O2-CACHING-REWORK2 → `85f33138`.** Design-doc-only (1 file). Promotes the `guard-testpath.mjs`
+kernel-protection gap from a closing remark inside residual (iv) to its own residual (v) — own
+owner, own trigger (a PO decision recorded as an ADR-0058 correction, either direction), own
+backlog pointer (`backlog/items/2026-08-10-guard-testpath-not-kernel-protected-like-its-sibling.md`,
+already filed) — so it survives (iv) closing instead of vanishing with it. Corrects the "inherited,
+not created here" framing to "inherited, and deepened here," since §15.3's modify newly places a
+term of the lift condition inside that file. Adds §15.2.5's missing third non-discharge class: an
+active GS-6 window can delete the narrowing check itself, strictly more complete than the other two
+defeats. Residual count moves 4→5 everywhere it's stated. Corrects A-10 and §14's F-1 — but caught
+and fixed a wrong premise in my own briefing first: I had characterized A-10's "absent from this
+checkout" claim as having been false when written; the dispatch checked with `git merge-base
+--is-ancestor` and found it was **true when written, stale four hours later** (ADR-0058 landed on a
+parallel branch line, only reachable from the design doc's own line via a later merge). It wrote
+the correction to the verified history rather than to my briefed premise — the right call, and I
+re-verified the ancestry claim myself (`git merge-base --is-ancestor 586f59ed f68a17dc` → exit 1,
+confirming non-ancestry, independently of the dispatch). Re-ran the dispatch's own
+`scratch/verify-WP-O1O2-CACHING-REWORK2.mjs` myself: **10/10 passed**, 9 of 10 with a genuine
+negative control (fails against a mutated copy of the doc), matching the report.
+
+Both packages are now at **3 of 4 rounds used** on their fresh caps (1 round remains after this:
+round 4 is the last permitted round for each). Dispatching Critic round 3 for both next, applying
+the process fix recorded at the previous checkpoint: standard template hunt categories verbatim,
+no custom questions, no characterizing prose, no pre-answered categories.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
