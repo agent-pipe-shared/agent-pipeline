@@ -56,7 +56,7 @@ digest-emission gap for the rest of that phase's cost).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted (direction 1 only).
+- **Rationale:** self-triaged in the same block, disclosed as such — PO is AFK, standing instruction to close bounded non-judgment items directly. Direction 1 (lead with the `authorize-critical` one-command shape, mirroring `docs/push-release-flow.md`'s already-canonical framing) is a content-sync fix with a named source of truth to mirror, not a new design. Direction 2 (a structural drift-prevention test) has real design latitude (schema/generation-step choice) — declined here, left for its own dispatch. Direction 3 (marketplace-shipped copy) is explicitly out of scope per the item's own text.
+- **Assignment (if accepted):** immediate, this block (GF-114).
+- **Date:** 2026-08-11
