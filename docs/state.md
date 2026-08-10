@@ -4917,6 +4917,34 @@ doesn't resolve the schema or the real bootstrap wiring point.
 
 **Live now:** WP-PX0-AC0305-06, WP-PX0-AC13.
 
+### WP-PX0-AC0305-06 RETURNED, SELF-COMMITTED, INDEPENDENTLY VERIFIED — CRITIC DISPATCHED BEFORE BOOKING
+
+Truncated mid-turn on first return (right after announcing it would add the recovered-preimage
+branch, before any diff/commit) — resumed via `SendMessage` with the established recovery pattern,
+plus a reminder to check the GMW window's remaining time itself before continuing. Returned complete
+on resume, self-committed as `f4086513`.
+
+Read the full diff myself (both files). Matches the design decision handed down exactly: the receipt
+splice moved inside `buildAuthorityRevisionPlan` before the single `nextStateBytes` write (not a
+second write pass), correlated by `intentSha256`, stored as a new top-level `State.authorityRevisionReceipts`
+array (not inside `continuity` — correctly identified that `continuity`'s shape is closed by
+`lib/continuity-state.mjs`, out of scope, and left it alone rather than silently widening scope to
+touch it). The journal's `expiresAt` addition sits inside the MAC-protected `core` object, verified
+directly. The new expiry check in `runAuthorityRevisionRecoverCommand` fires before the lock
+acquisition — consistent with the PRE-EXISTING "already-at-postimage" branch, which also retires the
+journal without the lock; not a new pattern, matches established precedent in the same function.
+
+Re-ran `node --test harness/scripts/pipeline-state.test.mjs` myself: **468 PASS, 0 FAIL**, matching the
+report exactly. Individually confirmed all 17 new test names (AR03h/i, AR05d/e/f, AR06e/f) each report
+PASS — including AR06f, which specifically re-proves the pre-existing not-yet-expired path is
+byte-for-byte unchanged behavior.
+
+Architecture-class change (core continuity/state-authority machinery) — per this session's established
+self-application discipline, dispatching an independent Critic review before booking any of the three
+ACs as implemented in the evidence map, same standard applied to K-AC-05/O-1/O-2 all stretch.
+
+**Live now:** WP-PX0-AC13, PX0-AC-03/05/06 Critic round 1.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
