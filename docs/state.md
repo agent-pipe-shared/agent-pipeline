@@ -4970,6 +4970,79 @@ dispatching Critic review before booking, rather than booking on my own read of 
 
 **Live now:** PX0-AC-03/05/06 Critic round 1, PX0-AC-13 Critic round 1.
 
+### BOTH ROUND-1 CRITIC REVIEWS RETURNED FAIL — REAL DEFECTS, NOT PROCESS NOISE, BOTH VERIFIED
+
+Both truncated mid-turn on first return; resumed via the established `SendMessage` pattern. Both
+returned **FAIL**, and unlike most of this stretch's FAILs, these are not cosmetic — real defects in
+core state-authority and bootstrap-security code, several traceable to my own dispatch construction
+rather than the Goldfish's execution. Verified the load-bearing findings myself against source before
+accepting either verdict.
+
+**PX0-AC-03/05/06 (`f4086513`): FAIL, 4 major + 2 minor.**
+- **F1 (major) — my own QG-04 violation.** I dispatched ONE goldfish to write BOTH the production
+  fix AND the tests validating it, in one commit, on a TP-5-protected path. QG-04
+  (`guardrails/quality-gates.md:61-67`) requires the test change to be a SEPARATE dispatch/commit —
+  "an agent that can edit its own examiner always passes." The Goldfish followed the briefing exactly
+  as written (`docs/dispatch-record...` shows implementation then tests, same task); the flaw is in
+  how I built the dispatch, not in how it executed. Confirmed: single commit, `.claude/guard-config.json`'s
+  TP-5 entry names exactly this file "gates the ... state writer (E5/QG-04)".
+- **F2 (major) — journal schema not version-bumped.** `AUTHORITY_REVISION_JOURNAL_SCHEMA` stayed
+  `.v1` while the required key set grew 8→9 (`expiresAt`). `exactObjectKeys` requires an EXACT key
+  count match (confirmed: `pipeline-state.mjs:974-980`), so a journal written by the pre-upgrade code,
+  interrupted and not yet recovered when this ships, becomes permanently unrecoverable —
+  `AR-JOURNAL`/"manual repository inspection is required" with no sanctioned exit.
+- **F3 (major) — a real race condition.** The new expiry check (and the journal deletion it performs
+  on the expired branch) runs BEFORE `acquireContinuityLock` — confirmed by reading the exact line
+  order (`:3618-3637`). `-apply` holds the SAME lock across its own publish→write→retire sequence. A
+  concurrent `-recover`, reading State unlocked, can observe stale preimage while `-apply` is mid-write
+  under lock, take the expiry branch, delete the journal, and report `recovered-preimage, mutated:
+  false` with exit 0 — while apply concurrently commits the postimage and then fails its own
+  retirement (journal already gone) with a false "unresolved" error. Two processes disagreeing about
+  whether a mutation happened, one of them wrong.
+- **F4 (major) — the durable receipt has no typed outcome field.** PX0-AC-05 requires one; confirmed
+  by direct comparison against this same file's OTHER receipt type
+  (`courseDecisionReceipts`/`casOutcome: "applied"`, `:2002-2014`) which does carry one — the new
+  authority-revision receipt (`:3330-3340`) does not, and inherits the gap into the durable copy.
+- F5/F6 minor (append-dedup keys on `intentSha256` alone with no content check; roll-forward recovery
+  doesn't re-validate the postimage's PRD/Spec artifact bytes against the frozen digest) — real,
+  tracked, not yet fixed.
+
+**PX0-AC-13 (`08d9f7cb`): FAIL, 1 BLOCKER + 3 major + 1 minor — wrong mechanism entirely.**
+- **F1 (blocker) — implements the exact path a later, superseding design explicitly excludes.** My
+  dispatch pointed the Goldfish at `bootstrap-origin-allowlist-and-codex-wsl-freshness.md` as "the
+  likely source of the missing producer's design" — but that document's **Part B** (§B.3, confirmed by
+  direct read) explicitly retires `ruleset-freshness-host.mjs`'s single-fixed-action model and states
+  in so many words that reviving the `compareLoadedRulesetIdentity`/`normalizeRulesetSource`-driven
+  self-application source-classing "inside the freshness path itself" is excluded by "this dispatch's
+  explicit 'must not disturb' instruction." Part B's actual two integration points (§B.2(a)/(b),
+  confirmed by direct read) are `pipeline-start-preflight.mjs:208-210`'s runner-blind
+  `executionBoundary` bug and wiring an attested `spawn` into `inspectPipelineUpdateAvailability` via
+  `runPipelineUpdateAvailabilityCli` — neither file was touched. My own dispatch grounding read the
+  stale in-code comment's framing instead of the design doc's own superseding Part B section — a real
+  scoping failure on my side, not the Goldfish's investigation (which correctly found no wiring point
+  existed and said so honestly, per its own report, rather than inventing one — that honesty just
+  didn't catch that the whole target was wrong).
+- **F2 (major) — the activated path can never produce a verdict even when it runs.** The new producer
+  emits `content-sha256`; the host transport's remote identity is typed `git-sha1`/`git-sha256`.
+  `compareLoadedRulesetIdentity` requires algorithm equality, so it's an unconditional mismatch, and
+  `compareSelfApplication` then receives a content hash as a git revision — empirically confirmed
+  (`git rev-list` on the two values → exit 128, unknown revision). `main()` still exits 2 on the real
+  boundary this was meant to fix.
+- **F3 (major) — the new test suite is unregistered in `verify.mjs`.** Confirmed by running
+  `check-verify-suite-registration.mjs` myself pattern (per the Critic's cited command) — it protects
+  nothing the gate runs.
+- **F4 (major) — the evidence artifact is hand-composed prose, not the script-written JSON QG-03
+  requires**, from a narrower `node --test` invocation than the project's one calibrated verify
+  command (`project/pipeline.json`'s `"verify": "node harness/scripts/verify.mjs"`).
+- F5 minor — same QG-04 test-role-separation gap as PX0-AC-03/05/06's F1, same root cause (my own
+  dispatch bundling).
+
+**Action taken, not deferred:** reverted `08d9f7cb` outright (`git log` confirms no later commit
+touched `ruleset-freshness-host.mjs`, clean revert) — F1 means it implements the WRONG mechanism, not
+an incomplete right one; leaving it on the branch would book PX0-AC-13 against code that activates
+exactly what the governing design says must not be disturbed. `f4086513` stays (the mechanism is
+right, the defects are fixable in place) pending a properly test-role-separated rework.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
