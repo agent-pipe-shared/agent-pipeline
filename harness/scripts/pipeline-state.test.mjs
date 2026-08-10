@@ -3721,6 +3721,26 @@ function runAuthorityRevisionTests() {
     applied.value === 2 && /AR-REVISION-STALE/.test(applied.err), applied.err);
   ok("AR03g State is untouched after the preimage-drift refusal", stateBytes(fx.dir).equals(preBytes), "state mutated despite refusal");
 }
+{
+  // AR03h -- the one remaining unpinned recheck axis: the active feature's phase moves
+  // away from "design" (via the SANCTIONED plan-approval lifecycle, not a hand-rolled
+  // edit -- AR01 already covers hand-rolled edits through a different path) between plan
+  // and apply. Apply's own fresh rebuild must catch this via AR-DECISION-SCOPE, which
+  // fires BEFORE the revision/preState staleness checks that the lifecycle transition's
+  // own State writes would otherwise trip first.
+  const { fx, request } = preparedRevision("ar03-decision-scope");
+  const lifecycleDepsForFx = lifecycleDeps(fx.dir, fx.prdRel);
+  const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], lifecycleDepsForFx);
+  const approved = run(["approve-plan", "--by", "po-test"], lifecycleDepsForFx);
+  const phased = run(["set-phase", "--phase", "implementation"], lifecycleDepsForFx);
+  ok("AR03h-setup a real plan-approval lifecycle moves the active feature to implementation phase after the AR plan was already built",
+    submitted === 0 && approved === 0 && phased === 0, `submit=${submitted} approve=${approved} phase=${phased}`);
+  const preBytes = stateBytes(fx.dir);
+  const applied = arApplyCmd(fx, request.name, request.sha256);
+  ok("AR03h PX0-AC-03: apply refuses (AR-DECISION-SCOPE) when the active feature's phase has moved away from design between plan and apply",
+    applied.value === 2 && /AR-DECISION-SCOPE/.test(applied.err), applied.err);
+  ok("AR03i State is untouched by the refused apply itself", stateBytes(fx.dir).equals(preBytes), "state mutated despite refusal");
+}
 
 // ---- PX0-AC-04: named fail-closed cases; State unchanged and no revised authority claimed ----
 {
@@ -3813,6 +3833,39 @@ function runAuthorityRevisionTests() {
   ok("AR05c the plan payload (the pre-image of the receipt) is equally free of any absolute path or root/dir key", planClean, planText.slice(0, 400));
 }
 
+// ---- PX0-AC-05 (durable retention): the receipt survives independently of the private
+// journal (retired on success) and of stdout -- read back from State itself. ----
+{
+  const { fx, plan, request } = preparedRevision("ar05-durable-receipt");
+  const applied = arApplyCmd(fx, request.name, request.sha256);
+  ok("AR05d-setup apply succeeds", applied.value === 0, applied.err);
+  const persisted = JSON.parse(stateBytes(fx.dir).toString("utf8"));
+  const stored = (persisted.authorityRevisionReceipts ?? []).find((entry) => entry.intentSha256 === plan.intentSha256);
+  ok("AR05d PX0-AC-05: the receipt is durably retained in State (not only journal/stdout), correlated via intentSha256",
+    !!stored && stored.operation === "continuity-authority-revision" && stored.reasonClass === "design-authority-revision"
+    && stored.featureId === fx.id && JSON.stringify(stored.nextAuthority) === JSON.stringify(plan.receipt.nextAuthority),
+    JSON.stringify(persisted.authorityRevisionReceipts));
+  const journalPath = join(fx.dir, ".fake-git-common", "agent-pipeline", "continuity-authority-revision", "journal");
+  ok("AR05e the private recovery journal is retired after a clean apply -- AR05d's receipt above was read from State, not from it",
+    !existsSync(journalPath), journalPath);
+}
+{
+  // AR05f -- the SAME durable receipt is also retained when recovery completes forward to
+  // the postimage (not only on a fresh, uninterrupted apply): the receipt was already
+  // spliced into the journaled postimage bytes at apply-rebuild time, so recovery's replay
+  // of those exact frozen bytes carries it through without a second write pass.
+  const { fx, plan, request } = preparedRevision("ar05-durable-receipt-recovered");
+  const interrupted = arApplyCmd(fx, request.name, request.sha256, "ar-lock-001", authorityDeps(fx.dir, { afterAuthorityRevisionJournal: () => false }));
+  ok("AR05f-setup apply interrupted after journal publication", interrupted.value === 2, interrupted.err);
+  const recovered = arRecoverCmd(fx);
+  ok("AR05f-setup2 recover rolls forward to the postimage", recovered.value === 0
+    && JSON.parse(recovered.out || "{}").status === "recovered-postimage", recovered.out || recovered.err);
+  const persisted = JSON.parse(stateBytes(fx.dir).toString("utf8"));
+  const stored = (persisted.authorityRevisionReceipts ?? []).find((entry) => entry.intentSha256 === plan.intentSha256);
+  ok("AR05f PX0-AC-05: the receipt is durably retained in State even when the postimage is reached via recovery, not a fresh apply",
+    !!stored && stored.featureId === fx.id, JSON.stringify(persisted.authorityRevisionReceipts));
+}
+
 // ---- PX0-AC-06: typed recovery-required state; recovers only to the exact preimage or postimage; no new candidate, no trusting a temp file ----
 {
   const recoverClean = seedAuthorityRevisionRoot("ar06-clean");
@@ -3871,6 +3924,51 @@ function runAuthorityRevisionTests() {
   ok("AR06d recover reports diverged and retains the journal rather than guessing", recovered.value === 2
     && report.status === "diverged" && report.retained === true, recovered.out);
   ok("AR06d recover attempted zero writes on divergence", stateBytes(fx.dir).equals(before), "state changed during a diverged diagnosis");
+}
+{
+  // AR06e -- PX0-AC-06's new genuine "recovered-preimage" outcome: the frozen intent's own
+  // expiresAt has passed BY THE TIME RECOVERY RUNS (not at plan/apply time -- both of those
+  // still succeeded against the injected clock they saw). Recovery must NOT complete
+  // forward to the postimage in this case: it retires the journal and reports
+  // recovered-preimage, mutated:false, leaving State exactly the preimage. This is the
+  // ONE fresh binding check recovery performs -- no candidate re-derivation, no
+  // AR-DECISION-SCOPE re-check.
+  const fx = seedAuthorityRevisionRoot("ar06-expired-preimage");
+  const { proposal } = reviseProposal(fx, { expiresAt: "2026-08-08T12:00:05.000Z" });
+  const proposalFile = writeProposal(fx, proposal);
+  const planned = planCmd(fx, proposalFile);
+  const plan = JSON.parse(planned.out || "{}");
+  const request = writeRequestFile(fx, plan);
+  ok("AR06e-setup0 plan still valid against the fixed 12:00:00 clock (expires 12:00:05)", planned.value === 0, planned.err);
+  const preBytes = stateBytes(fx.dir);
+  const interrupted = arApplyCmd(fx, request.name, request.sha256, "ar-lock-001", authorityDeps(fx.dir, { afterAuthorityRevisionJournal: () => false }));
+  ok("AR06e-setup1 apply interrupted after journal publication, State still exactly the preimage",
+    interrupted.value === 2 && stateBytes(fx.dir).equals(preBytes), interrupted.err);
+  const expiredDeps = authorityDeps(fx.dir, { now: () => "2026-08-08T12:00:10.000Z" });
+  const recovered = arRecoverCmd(fx, "ar-lock-001", expiredDeps);
+  const report = JSON.parse(recovered.out || "{}");
+  ok("AR06e PX0-AC-06: recover reports recovered-preimage (not recovered-postimage) once the frozen decision's expiresAt has passed",
+    recovered.value === 0 && report.status === "recovered-preimage" && report.retained === false && report.mutated === false
+    && !!report.receipt && report.receipt.featureId === fx.id, recovered.out || recovered.err);
+  ok("AR06e-2 State remains byte-identical to the preimage -- the postimage was NOT written",
+    stateBytes(fx.dir).equals(preBytes), "state mutated despite an expired recovery window");
+  const again = arRecoverCmd(fx, "ar-lock-001", expiredDeps);
+  ok("AR06e-3 a second recover afterwards reports clean (journal retired)", JSON.parse(again.out || "{}").status === "clean", again.out);
+}
+{
+  // AR06f -- confirms the EXISTING recovered-postimage path (AR06b) is genuinely
+  // unchanged: the same interrupted-after-journal setup, but recovered BEFORE the frozen
+  // expiresAt passes, still rolls forward to the postimage exactly as before PX0-AC-06.
+  const { fx, plan, request } = preparedRevision("ar06-not-yet-expired-postimage");
+  const interrupted = arApplyCmd(fx, request.name, request.sha256, "ar-lock-001", authorityDeps(fx.dir, { afterAuthorityRevisionJournal: () => false }));
+  ok("AR06f-setup apply interrupted after journal publication", interrupted.value === 2, interrupted.err);
+  const recovered = arRecoverCmd(fx);
+  const report = JSON.parse(recovered.out || "{}");
+  ok("AR06f PX0-AC-06: recover still rolls forward to recovered-postimage when the frozen expiresAt has NOT yet passed",
+    recovered.value === 0 && report.status === "recovered-postimage" && report.mutated === true, recovered.out || recovered.err);
+  const persisted = JSON.parse(stateBytes(fx.dir).toString("utf8"));
+  ok("AR06f-2 the persisted State carries exactly the planned postimage authority", persisted.continuity.revision === 1
+    && JSON.stringify(persisted.continuity.authority.prd) === JSON.stringify(plan.postimage.authority.prd), JSON.stringify(persisted.continuity.authority));
 }
 
 // ---- PX0-AC-07: exact replay is a verified zero-write success; a conflicting replay / second writer fails closed ----

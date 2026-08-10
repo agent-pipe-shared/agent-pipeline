@@ -3323,18 +3323,6 @@ function buildAuthorityRevisionPlan(dir, existing, proposal, updatedAt, deps = {
   const marker = rebindMarker(newPrdText);
   if (marker === null || marker.digest !== newSpec.sha256) return { ok: false, code: "AR-NEXT-PRD-MARKER" };
 
-  const nextState = structuredClone(state);
-  nextState.continuity.revision += 1;
-  nextState.continuity.authority = {
-    ...nextState.continuity.authority,
-    prd: { path: value.nextAuthority.prd.path, sha256: value.nextAuthority.prd.sha256 },
-    spec: { path: value.nextAuthority.spec.path, sha256: value.nextAuthority.spec.sha256 },
-  };
-  nextState.continuity.resume = { ...nextState.continuity.resume, sourceRevision: nextState.continuity.revision };
-  nextState.updatedAt = updatedAt;
-  if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok) return { ok: false, code: "AR-POSTIMAGE-INVALID" };
-  const nextStateBytes = Buffer.from(`${JSON.stringify(nextState, null, 2)}\n`, "utf8");
-
   // PX0-AC-05: a public-safe correlated receipt -- stable operation/reason classes,
   // public path+digest references, decision/candidate/evidence references, a typed
   // outcome. Deliberately excludes `dir`/`root`/any absolute path, any raw command,
@@ -3350,6 +3338,34 @@ function buildAuthorityRevisionPlan(dir, existing, proposal, updatedAt, deps = {
     candidate: value.candidate,
     evidence: value.evidence,
   };
+
+  const nextState = structuredClone(state);
+  nextState.continuity.revision += 1;
+  nextState.continuity.authority = {
+    ...nextState.continuity.authority,
+    prd: { path: value.nextAuthority.prd.path, sha256: value.nextAuthority.prd.sha256 },
+    spec: { path: value.nextAuthority.spec.path, sha256: value.nextAuthority.spec.sha256 },
+  };
+  nextState.continuity.resume = { ...nextState.continuity.resume, sourceRevision: nextState.continuity.revision };
+  nextState.updatedAt = updatedAt;
+  if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok) return { ok: false, code: "AR-POSTIMAGE-INVALID" };
+
+  // PX0-AC-05 (durable retention): a receipt correlated by `intentSha256` is spliced
+  // into the SAME nextState object BEFORE it is written once -- no second write pass --
+  // so it survives independently of the private recovery journal (retired on success)
+  // and of stdout. Lives as a top-level sibling of `continuity` (not inside it): the
+  // continuity record's own closed shape is validated by lib/continuity-state.mjs's
+  // ROOT_KEYS, out of this change's scope. Append-only and idempotent by correlation
+  // key so a receipt is never duplicated if this ever re-splices onto a State that
+  // already carries it.
+  const priorReceipts = Array.isArray(state.authorityRevisionReceipts) ? state.authorityRevisionReceipts : [];
+  const durableReceipt = { ...receipt, intentSha256: intent.sha256 };
+  nextState.authorityRevisionReceipts = priorReceipts.some((entry) => entry?.intentSha256 === durableReceipt.intentSha256)
+    ? priorReceipts
+    : [...priorReceipts, durableReceipt];
+
+  const nextStateBytes = Buffer.from(`${JSON.stringify(nextState, null, 2)}\n`, "utf8");
+
   const payload = {
     schema: AUTHORITY_REVISION_PLAN_SCHEMA,
     intent: value,
@@ -3387,7 +3403,7 @@ function loadAuthorityRevisionJournal(dir, deps = {}) {
   if (key === null || key.byteLength !== 32) return { ok: false, code: "AR-JOURNAL" };
   try {
     const value = JSON.parse(raw.toString("utf8"));
-    const keys = ["schema", "intentSha256", "planSha256", "preStateSha256", "postStateSha256", "postStateBase64", "receipt", "mac"];
+    const keys = ["schema", "intentSha256", "planSha256", "preStateSha256", "postStateSha256", "postStateBase64", "expiresAt", "receipt", "mac"];
     if (!exactObjectKeys(value, keys)
       || value.schema !== AUTHORITY_REVISION_JOURNAL_SCHEMA
       || !SHA256_RE.test(value.intentSha256)
@@ -3395,6 +3411,7 @@ function loadAuthorityRevisionJournal(dir, deps = {}) {
       || !SHA256_RE.test(value.preStateSha256)
       || !SHA256_RE.test(value.postStateSha256)
       || typeof value.postStateBase64 !== "string"
+      || typeof value.expiresAt !== "string" || !Number.isFinite(Date.parse(value.expiresAt))
       || value.receipt === null || typeof value.receipt !== "object" || Array.isArray(value.receipt)
       || !SHA256_RE.test(value.mac)) return { ok: false, code: "AR-JOURNAL" };
     const { mac, ...core } = value;
@@ -3417,6 +3434,11 @@ function publishAuthorityRevisionJournal(dir, record, deps = {}) {
     preStateSha256: record.preStateSha256,
     postStateSha256: record.postStateSha256,
     postStateBase64: record.postStateBytes.toString("base64"),
+    // PX0-AC-06: the frozen intent's own expiry, carried through so `-recover` can run
+    // its one fresh binding check (expiry against `deps.now`) without re-deriving the
+    // plan or re-reading a git candidate. Inside `core` -> MAC-protected exactly like
+    // every other journal field.
+    expiresAt: record.expiresAt,
     receipt: record.receipt,
   };
   const bytes = Buffer.from(`${JSON.stringify({ ...core, mac: bootstrapJournalMac(key, core) })}\n`, "utf8");
@@ -3526,7 +3548,7 @@ function runAuthorityRevisionApplyCommand(dir, rest, deps) {
     const published = publishAuthorityRevisionJournal(dir, {
       intentSha256: rebuilt.intentSha256, planSha256: rebuilt.planSha256,
       preStateSha256: sha256Bytes(current.raw), postStateSha256: sha256Bytes(rebuilt.nextStateBytes),
-      postStateBytes: rebuilt.nextStateBytes, receipt: rebuilt.receipt,
+      postStateBytes: rebuilt.nextStateBytes, expiresAt: intentValue.expiresAt, receipt: rebuilt.receipt,
     }, deps);
     if (!published) { console.error("Error: continuity-authority-revision-apply refused (AR-JOURNAL-PREPARE-FAILED); zero mutation."); return 2; }
     if (deps.afterAuthorityRevisionJournal?.() === false) {
@@ -3593,8 +3615,24 @@ function runAuthorityRevisionRecoverCommand(dir, rest, deps) {
     return 2;
   }
 
-  // Preimage confirmed byte-identical to the frozen journal's own preimage -- the ONLY
-  // fresh binding check recovery performs -- then replays the frozen postimage bytes
+  // PX0-AC-06: the ONE fresh binding check recovery performs before completing forward --
+  // the frozen intent's own expiry against the injected clock. No candidate re-derivation,
+  // no re-check of AR-DECISION-SCOPE or any other buildAuthorityRevisionPlan check. If the
+  // decision's approval window has since lapsed, do not complete the write; retire the
+  // journal and report a genuine preimage-recovery outcome instead.
+  const nowIso = (deps.now ?? (() => new Date().toISOString()))();
+  if (!(Date.parse(journal.expiresAt) > Date.parse(nowIso))) {
+    const expiredPaths = authorityRevisionPrivatePaths(dir, deps);
+    if (!retireAuthorityRevisionJournal(expiredPaths)) {
+      console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL-RETIREMENT-UNRESOLVED); recovery journal retained.");
+      return 2;
+    }
+    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-preimage", retained: false, mutated: false, receipt: journal.receipt }, null, 2));
+    return 0;
+  }
+
+  // Preimage confirmed byte-identical to the frozen journal's own preimage, and the
+  // decision's approval window is still valid -- then replays the frozen postimage bytes
   // exactly as journaled. No plan re-derivation, no new candidate.
   const lock = acquireContinuityLock(dir, lockToken, deps);
   if (!lock.ok) { console.error(`Error: continuity-authority-revision-recover refused (${lock.code}); recovery journal retained.`); return 2; }
