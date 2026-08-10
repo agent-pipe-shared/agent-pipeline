@@ -40,6 +40,40 @@ skill. A rejection or unavailable transport is a coordinator defect, not Critic 
 This preflight is read-only and does not replace the
 selected-runner transport readback required above.
 
+**Evidence artifact shape (confirmed from source, hard — not free-form text):**
+each `evidence:{{PATH}}` file must be JSON (plain text is rejected as
+`CDP-EVIDENCE-JSON`, `scripts/critic-dispatch-preflight.mjs` line 147) whose
+parsed object binds the EXACT frozen candidate commit and tree that the same
+preflight run just resolved via `git rev-parse <candidate>^{commit}` and
+`git rev-parse <that-commit>^{tree}` — not a guess, not the base, not a short
+hash. A well-formed but non-matching or wrongly-shaped object (including a
+naive ad hoc `{commit, tree}` block whose values are placeholders, stale, or
+resolved against the wrong ref) is rejected as `CDP-EVIDENCE-BINDING`
+(`scripts/critic-dispatch-preflight.mjs` lines 152-157). Two forms are valid,
+both keyed on the same `commit`/`tree` pair (`lib/critical-action-approval-request.mjs`
+lines 23-24: full 40- or 64-hex object IDs, `commit !== tree`):
+
+Root form (the binding IS the whole object):
+
+```json
+{ "commit": "<candidate commit oid>", "tree": "<candidate tree oid>" }
+```
+
+Nested form (Security/gate evidence style — additional observation metadata
+allowed alongside `candidate`, per the comment at
+`scripts/critic-dispatch-preflight.mjs` lines 148-150):
+
+```json
+{
+  "candidate": { "commit": "<candidate commit oid>", "tree": "<candidate tree oid>" },
+  "...": "any additional observation metadata"
+}
+```
+
+Both `commit` and `tree` must equal the preflight's own resolved
+`candidateCommit`/`candidateTree` for THIS dispatch exactly — recompute them
+freshly for each candidate rather than reusing a prior run's values.
+
 **Closed bootstrap role:** this skill is itself an authoritative Critic role
 carrier. If a SessionStart reminder requires `pipeline-core:pipeline-start`,
 invoke its compact `critic` role; an omitted adapter argument must not select
@@ -73,6 +107,28 @@ Parse STRICTLY as:
    `assurance:functional-equivalent-read-only` = the standing PO-authorized
    T1 functional equivalent, whose report MUST carry the literal
    `functional-equivalent-read-only; OS isolation not asserted`.
+
+**Grammar (confirmed, hard — no prose tolerance):** the `args`/parameter field of the
+Skill or subagent invocation that carries `$ARGUMENTS` is parsed as a strict,
+purely POSITIONAL, whitespace-delimited token list — exactly the shape in this
+file's own frontmatter `argument-hint`:
+`<spec-path> <fixed-candidate-diff-range> [guardrail-path ...] [evidence:<path> ...] [sha:<ruleset-sha>] [project:<name>] [verdict:yes|no] [assurance:...]`.
+There is no keyword/flag syntax and no natural-language tolerance: token 1 is
+ALWAYS taken as the spec path and token 2 is ALWAYS taken as the diff range,
+whatever their content. A caller who fills this field with ordinary descriptive
+prose (the natural assumption from generic tool-calling conventions, e.g. "review
+the changes in main..HEAD against docs/spec.md using the evidence at
+scratch/evidence.json") does not get a helpful parse: the first two prose words
+become `{{SPEC_PATH}}`/`{{DIFF_RANGE}}`, and every further plain word is treated
+as rule 3's "further unprefixed token = a guardrail/constraint path", so it goes
+on to fail path validation or silently misdispatches — this is a caller error
+against the fixed grammar above, not a Critic-side tolerance gap.
+
+Minimal correct worked example (one line, space-separated tokens only):
+
+```
+docs/specs/example-spec.md main..HEAD guardrails/global.md evidence:scratch/evidence.json sha:8ae0de01c9312ff76e2fd7119a8fa5304b08aab3 project:agent-pipeline verdict:yes
+```
 
 Missing spec path or diff range → report "dispatch defect: missing {{FIELD}}" and STOP.
 
