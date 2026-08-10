@@ -4213,6 +4213,27 @@ research pass could resolve outright, not in whether the work was safely dispatc
 
 **Live now: none.**
 
+### WP-V-AC06 DISPATCHED — THE "MISSING INFRASTRUCTURE" PREMISE WAS WRONG
+
+Re-checked V-AC-06 (the last untried category-5 item) rather than accept the evidence-map
+POINTERS text's framing ("no headless-render/visual-regression infrastructure at all") at face
+value. Found this repo already established, for V-AC-09, that "deterministic snapshot" in this
+EARS clause means a STRING-level assertion (`assert.match(html, new RegExp(...))`) against the
+rendered HTML — no image diffing, no headless browser, no snapshot file. Since
+`evidence-view-renderer.mjs` emits one static HTML string with CSS inlined and the mobile/desktop
+delta is entirely one literal `@media(max-width:42rem){...}` CSS rule (a parse-time fact, not
+something a rendering engine computes), the whole "snapshot" is representable as two string pins:
+the breakpoint rule's exact text, and the default declarations it overrides. Dispatched
+**WP-V-AC06** with the technique, the exact file, and the exact strings to pin all pre-resolved —
+implementor tier, no design latitude needed, the ambiguity was already closed by this research.
+
+**This means the "missing infrastructure" framing that shaped this session's whole category-5
+assessment was itself wrong for V-AC-06** — worth flagging plainly: don't trust a POINTERS note's
+framing of WHY something is absent without checking whether the framing itself holds up. Both
+category-5 items turned out to be narrower than their evidence-map prose suggested.
+
+**Live now:** WP-V-AC06.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
