@@ -1680,6 +1680,44 @@ check("promotion refuses a plan that is the Spec, a plan that is not a prd_*.md,
   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
 });
 
+// A feature id that passes the permissive SAFE_FEATURE_ID check used broadly
+// across this file can still be rejected much later, at push/signing time, by
+// po-human-approval.mjs's stricter `^[a-z][a-z0-9-]{0,63}$` (and the same
+// shape re-applied by every approval/proof intent builder that takes a
+// featureId). Confirmed live 2026-08-10: a session's promoted feature id was
+// only discovered invalid at the push ceremony, hours after promotion fixed
+// it. Promotion must refuse it at the one point the id is still choosable.
+check("promotion refuses a feature id that would later fail push-approval's stricter shape", () => {
+  const seed = promotionSeed("feature-id-shape");
+  for (const featureId of [
+    "Feature-Upper",           // uppercase, permitted by SAFE_FEATURE_ID, not by push-approval
+    "feature_underscore",      // underscore
+    "feature.dotted",          // period
+    "feature:colon",           // colon
+    `feature-${"x".repeat(60)}`, // 65+ chars, over push-approval's 64-char cap
+  ]) {
+    assert.throws(() => planOnboardingKickoffPromotion({ ...seed.request, featureId }),
+      (error) => error?.code === "KICKOFF-PROMOTION-INPUT"
+        && error.message.includes("must be lowercase alphanumeric with hyphens")
+        && error.message.includes("push-approval"),
+      `expected featureId ${JSON.stringify(featureId)} to be refused with the stricter downstream message`);
+  }
+  // The kickoff- prefix rejection is a distinct reason and must still fire
+  // unchanged, before the new stricter check ever gets to run its own message.
+  expectKickoffError("KICKOFF-PROMOTION-INPUT", () => planOnboardingKickoffPromotion({
+    ...seed.request, featureId: "kickoff-still-rejected",
+  }));
+  assert.throws(() => planOnboardingKickoffPromotion({ ...seed.request, featureId: "kickoff-still-rejected" }),
+    (error) => error?.code === "KICKOFF-PROMOTION-INPUT" && error.message === "promotion feature id is invalid",
+    "the kickoff- prefix rejection must keep its own undifferentiated message, not the new stricter one");
+  // An ordinary lowercase-hyphenated feature id under 64 chars is unaffected --
+  // no regression for the common case (this is exactly what promotionSeed's
+  // own `feature-${name}` ids already are, exercised by every other check
+  // in this file, but assert it once here directly against the new code path).
+  const plan = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(plan.feature.id, seed.request.featureId);
+});
+
 // A1-PROMOGATE: `kickoff promote plan` must refuse a PRD the PO plan gate
 // (po-gate-authority.mjs) will reject anyway, before anything is frozen --
 // naming the exact line and digest to add, not just a generic authority

@@ -142,6 +142,16 @@ const PROMOTION_TARGET_KEYS = {
 };
 const PROMOTION_PROFILES = new Set(["epic", "feature", "mini"]);
 const SAFE_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
+// Downstream at push/signing time (`po-human-approval.mjs`, and every
+// approval/proof intent builder that takes a featureId: `po-approval-proof.mjs`,
+// `critical-action-approval-request.mjs`, `threat-model-approval-request.mjs`,
+// `security-authority-proof.mjs`) a feature id is re-validated against this
+// exact, strictly narrower shape. `SAFE_FEATURE_ID` above is permissive
+// (uppercase, `.`, `_`, `:`, up to 128 chars) and stays that way for its other
+// call sites; a feature id fixed at promotion time that satisfies only the
+// permissive shape can still be rejected hours later at a push ceremony. This
+// additional check catches that at the one point the id is still choosable.
+const PROMOTION_FEATURE_ID_DOWNSTREAM = /^[a-z][a-z0-9-]{0,63}$/u;
 // The approval subject is the PRD.  `activeFeature.planPath` is what the PO
 // plan gate reads, and that gate accepts exactly one shape: a `prd_*.md` whose
 // neighbouring `spec.md` it binds by digest.  Promotion therefore enforces the
@@ -3826,6 +3836,9 @@ function promotionInput({ profile, featureId, planPath, prdPath, specPath, desig
   if (!PROMOTION_PROFILES.has(profile)) fail("KICKOFF-PROMOTION-INPUT", "promotion profile is invalid");
   if (!SAFE_FEATURE_ID.test(featureId ?? "") || featureId.startsWith("kickoff-")) {
     fail("KICKOFF-PROMOTION-INPUT", "promotion feature id is invalid");
+  }
+  if (!PROMOTION_FEATURE_ID_DOWNSTREAM.test(featureId)) {
+    fail("KICKOFF-PROMOTION-INPUT", "promotion feature id must be lowercase alphanumeric with hyphens, starting with a letter, max 64 characters -- it will later be rejected at push-approval otherwise");
   }
   for (const [value, label] of [[planPath, "plan"], [prdPath, "PRD"], [specPath, "specification"], [designInputPath, "design input"]]) {
     safeRelativePath(value, `promotion ${label}`);
