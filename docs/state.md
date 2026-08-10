@@ -3,7 +3,114 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-08
+**Last updated:** 2026-08-11
+
+---
+
+## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked (READ THIS FIRST)
+
+**Trigger.** PO asked to continue Phoenix work, then went AFK with standing
+authorization to work autonomously, deferring anything that needs a PO act.
+Session start found bootstrap non-ready, not Phoenix-ready.
+
+**Bootstrap was genuinely broken, not just stale, and is now repaired.**
+`pipeline-start-preflight` reported `plugin-refresh-required` (a duplicate
+`pipeline-core@agent-pipeline` install at both `user` and `project` scope —
+cosmetic, non-blocking, left as-is) and the lifecycle guard reported
+`continuity-damaged`, then `partial`, both fail-closed with **no** in-session
+repair path. Root cause, confirmed rather than assumed: the checkout was
+**1458 commits behind** `origin/sprint_phoenix` (last local work at `270a9233`,
+2026-08-02), while `project/pipeline-state.json` (local, gitignored) was
+itself stale in the other direction, still describing `sprint-phoenix-epic`
+as closed. Repair, in order: `git stash push -u` (the two locally-modified
+files, see below) → `git pull --ff-only` to `eb735ae1` (now matches origin) →
+one digest-bound `session-cleanup.mjs apply-recovery` (`bind-orphan`, rebound
+an orphaned descriptor from a crashed prior session) → continuity `valid` at
+revision 5, onboarding `ready`. The `git stash`/`git pull` had to be run by
+the PO directly via the `!` prefix — the guard blocks **all** mutating Bash
+inside the session while continuity is damaged, with no override route for
+that state; only read-only `git log`/`diff`/`show` worked from inside the
+session throughout.
+
+**The stash `phoenix-session-pre-pull-stash` is harmless and should be
+dropped, not popped.** It held an apparent model-routing downgrade
+(`deep`: high→medium, `mechanic`: sonnet/low→haiku/medium in both
+`.claude/pipeline.yaml` and `pipeline.user.yaml`). Verified after the pull:
+the committed post-pull baseline already carries these exact same values —
+the stash is redundant with legitimate upstream history, not unauthorized
+drift. Not dropped this session (no need arose); safe to drop whenever.
+
+**Verify: 6 pre-existing failures → 1, independently confirmed at each
+step.** A fresh full run at `eb735ae1` (368 suites, ~10 min) reproduced
+exactly the six failures the PO's own `eb735ae1` commit message had named:
+`backlog-ledger-reconciliation-tests`, `backlog-state-check`,
+`governance-replay-viewer-tests`, `governance-replay-cli-tests`,
+`external-reference-tests`, `verify-suite-registration-check`. Three
+template-briefed Goldfish dispatches, disjoint file scopes, run in parallel
+in the shared checkout (no worktree isolation needed — Spec §4.6 precedent):
+
+- **PHX-VF-BACKLOG** (`89570dfc`) — a backlog item marked `status: closed`
+  was missing its `closed_at`/`closure_repository`/`closure_commit`/
+  `closure_evidence` fields, which silently excluded it from the checker's
+  item index and cascaded into an orphaned ledger-lookup finding; plus two
+  items with `due: null`. Fixed the three item files; the ledger itself was
+  touched only by the sanctioned `reconcile-backlog-ledger.mjs --activate`
+  writer, never by hand.
+- **PHX-VF-REPLAY** (`fd8fae52`) — `governance-replay-viewer.test.mjs` and
+  `governance-replay.test.mjs` carried a stale 4-key correlation fixture;
+  the validators (correct, unchanged, already gating a passing sibling
+  suite) require 6 keys since the L-AC-02 work. Fixed both fixtures only.
+- **PHX-VF-EXTREF** (`ecbb9df2`) — `external-reference.test.mjs`'s
+  `pipelineArtifact` fixtures predated the X-AC-11 `documentClass` field
+  the validator now requires exactly. Fixed the fixtures only.
+
+Each dispatch's DoD suites were re-run independently by the Elephant (not
+just trusted from the report) before being marked done. A second full Verify
+run, exact-bound to `89570dfc`, clean tree start and finish: **367/368
+suites green**; the sole remaining red is `verify-suite-registration-check`.
+
+**`verify-suite-registration-check` is correctly parked, not missed.** Five
+`*.test.mjs` files exist with no `verify.mjs` registration entry
+(`harness/scripts/check-dispatch-provenance.test.mjs`,
+`plugins/pipeline-core/hooks/guard-git-phoenix-authority-grant.test.mjs`,
+`plugins/pipeline-core/lib/decision-reference-dual-evaluation.test.mjs`,
+`plugins/pipeline-core/scripts/human-authority-grant.test.mjs`,
+`plugins/pipeline-core/scripts/po-approval-gate.test.mjs`). Registering them
+means editing `harness/scripts/verify.mjs`, which is **TP-3**-protected —
+liftable only through a PO-signed Guard Maintenance Window or a direct PO
+edit outside a session, per this file's own earlier-recorded precedent
+(2026-08-07, TP-3/TP-11 section). Not attempted; no override exists for an
+AFK session.
+
+**One minor process defect noticed, not worth an amend.** `fd8fae52`'s
+commit trailer has a blank line between `Dispatch:` and `AI-Assisted:`,
+which breaks machine trailer parsing per `templates/prompts/goldfish-task.md`'s
+own stated rule. Cosmetic; the fix landed correctly. Not amended (never
+amend a committed dispatch) — worth a passing mention to whichever session
+next touches the goldfish-task template's guidance on `git commit -m ... -m ...`
+multi-paragraph trailer construction under the closed shell grammar.
+
+**What this checkpoint does NOT claim.** No push occurred (3 local commits
+ahead of `origin/sprint_phoenix`: `ecbb9df2`, `fd8fae52`, `89570dfc` — publication
+remains a separate, explicitly authorized PO act). No re-measurement of the
+157-criterion acceptance map was run this session; the last recorded figure
+(127 implemented / 22 partial / 6 not-started / 1 designed-only / 1
+constraint, `specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`,
+last updated with the 2026-08-10 K-AC-05 close) is almost certainly stale
+given the PX0-AC dispatches visible in git log between it and `eb735ae1`,
+but this session did not re-run the four-pass fresh-context measurement
+needed to correct it — a real next step, not done here. `EPIC-AC-05` still
+forbids any completion claim. No PO signature, GMW window, or
+`project/guard-config.json` edit was attempted.
+
+**Re-entry:** bootstrap is `ready`/`valid` as of this checkpoint (no repeat
+of the pull/rebind needed unless the checkout goes stale again). Verify is
+green apart from the one named, PO-gated parked item. Good next steps in
+priority order: (1) decide whether to push the three commits above, (2)
+run a fresh acceptance-evidence-map measurement pass to get a current
+criteria count, (3) work the "blocking set, ranked" table from the last
+measurement (`P-AC-11`, `P-AC-06`, `H-AC-12` were the top blockers) if that
+measurement still holds after re-running it.
 
 ---
 
