@@ -467,7 +467,16 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
         fail("existing trust policy does not match the local public key");
       }
       if (!namedShape || !text(authority.humanName)) {
-        fail('existing PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
+        if (!text(args.humanName)) {
+          fail('existing PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
+        }
+        if (args.keyReferenceSupplied && args.keyReference !== authority.keyReference) {
+          fail("a PO authority record already exists under a different name/key-reference than supplied; changing an established identity is not something setup does silently -- rerun without --human-name/--key-reference to keep the existing record, or remove the existing authority files first if a deliberate rebind is intended.");
+        }
+        const upgraded = localAuthority(publicKey, authority.keyReference, args.humanName);
+        write(paths.authority, `${JSON.stringify(upgraded, null, 2)}\n`, { mode: 0o600 });
+        persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
+        return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority: upgraded, recovered: true };
       }
       // GF-104: a named record already exists. Explicit --human-name/--key-reference
       // values that differ from it are a deliberate identity change this command does
