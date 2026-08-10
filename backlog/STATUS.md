@@ -134,6 +134,7 @@
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | open | workflow-improvement | pipeline | 2026-08-08 | — |
+| pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | open | defect | pipeline | 2026-08-09 | — |
@@ -168,6 +169,7 @@
 | pipeline.session-told-ready-but-not-how-to-repair | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.setup-promises-a-human-name-repair-it-cannot-perform | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.shipped-artifacts-assume-the-pipelines-own-repository | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | open | defect | pipeline | 2026-08-08 | — |
@@ -197,9 +199,10 @@
 | pipeline.windows-trusted-tool-resolution | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-verify-brittle-test-hygiene | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.windows-verify-reproducibility | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
+| pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify | open | defect | pipeline | 2026-08-11 | — |
 
 ## Counts
 
-- open: 126
+- open: 129
 - in_progress: 22
 - closed: 44

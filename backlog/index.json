@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "cecd9881413ae956e63c36e882debb4fb0925a1d82360842e0e11b8308bf1112"
+    "transitionHead": "4ca34484cde70e16e623c563666aeed846389a8fc71e8ea7708c33948e15a487"
   },
   "counts": {
-    "open": 126,
+    "open": 129,
     "in_progress": 22,
     "closed": 44
   },
@@ -1150,6 +1150,14 @@
       "source": "Two dispatches on 2026-08-08 independently classified the same red checks as pre-existing and unrelated. Both were wrong; a bisect settled it in one step and found the introducing commit."
     },
     {
+      "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-11",
+      "source": "GF-111 dispatch report (commit 5f0af080, cherry-picked as 257444c8 onto feat/sprint-nova-codex-v046), stop condition 'genuine ambiguity the briefing does not resolve' — the goldfish caught a real self-contradiction in its own briefing and correctly stopped rather than inventing a fix."
+    },
+    {
       "id": "pipeline.preimage-repin-disclosure-incomplete-for-roles-critic",
       "status": "open",
       "type": "defect",
@@ -1473,6 +1481,14 @@
       "source": "Hit live on 2026-08-09 PO-nova machine while signing the PUSHWARN-1/PG11e-FLAKE TP-5 override: `sign-intent` failed with \"external trust policy does not match the local public key\" against a PO key directory whose key and repo binding were both actually correct."
     },
     {
+      "id": "pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-11",
+      "source": "docs/state.md 'Current block' section (0.5.4 release session, 2026-08-10): 'The external PO-signing directory (~/agent-pipeline-po-nova) is also shared with an unrelated parallel test project, which overwrote the first signed request/proof mid-ceremony; the PO re-signed and it was consumed immediately.' Noted there as not yet filed."
+    },
+    {
       "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",
       "status": "open",
       "type": "defect",
@@ -1744,6 +1760,14 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-11",
+      "source": "GF-111 dispatch (worktree isolation), 2026-08-11 — first Full Verify attempt against the cherry-picked commit failed at VERIFY-CANDIDATE-PREFLIGHT with 'Commit or stash tracked changes before Verify; no suite was started', caused by the leftover .claude/worktrees/ directory, not by any real dirty change."
     }
   ]
 }
