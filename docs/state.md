@@ -4486,6 +4486,35 @@ a named, precisely-specified follow-up change, it does not edit that file itself
 
 **Live now:** WP-K-AC05-REWORK1, WP-O1O2-CACHING-REWORK1.
 
+### WP-K-AC05-REWORK1 VERIFIED (`22650672`) — ROUND 2 CRITIC DISPATCHED (FULL HUNT, NOT DELTA-ONLY)
+
+WP-K-AC05-REWORK1 committed itself this time (`22650672`, 3 files as scoped). Verified independently:
+re-ran both directly-relevant suites myself (`po-human-approval.test.mjs` 8/8, `governance-event-
+store.test.mjs` 37/37), read the full diff of all three files. The F4 doc-comment fix is precise and
+honest (credits GS-2 write-protection specifically, no longer claims a committedness check
+`readCriticalHumanProofPolicy` doesn't perform). The F2 fix is careful: three new sibling commands
+(`prepare-/approve-/verify-fork-disposition`, not a fourth `prepare-critical` kind), subject always
+re-derived from a live `inspectForkedGovernanceStream` call — no `--subject-sha256` or caller digest
+list accepted anywhere in the new parser branch; `approve-fork-disposition` re-checks the prepared
+request against the fork as it stands now before delegating signing to the untouched `approve-
+critical` branch; `verify-fork-disposition` verifies against the repository's own declared trust
+anchor (predicting the store's actual decision), not the external directory's `trust-policy.json`.
+The central claim — a CLI-built, really-signed request gets accepted by `authorizeForkDisposition`
+via `recoverPortableGovernanceProjection` — has its own dedicated passing test, read and confirmed.
+
+One residual left deliberately: `prepare-critical --kind governance-fork-disposition` still parses
+and still produces an unverifiable request (real git candidate, real file bytes) — correctly out
+of this dispatch's own scope (touching `prepare-critical`'s existing branches was forbidden), but
+not yet closed either. Not pre-judged — handed to round 2 as a genuine open question rather than
+framed as acceptable or not.
+
+Dispatched round 2 as a FULL hunt (not a narrow delta), given substantial new CLI attack surface
+(three new commands, new parsing, a new async control-flow branch) received no prior review at all —
+scoped to commit `22650672` alone, with round 1's F2/F4 IDs handed over as a neutral registry (no
+justification prose) per the fix-verification input contract.
+
+**Live now:** WP-O1O2-CACHING-REWORK1, K-AC-05 Critic round 2.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
