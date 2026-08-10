@@ -241,6 +241,11 @@ A feature's implementation is not complete until a Critic review
 (`critic-review` skill) has been dispatched against it and returned a
 result — pass, or a documented fail-then-fix cycle; this is a requirement to
 satisfy before treating the block as done, not an optional or ambient step.
+Implementation work under an `epic`- or `feature`-profile plan is dispatched
+to a Goldfish subagent (via the Agent/Task tool) rather than written
+directly by this session; a `mini`-profile plan may be implemented directly.
+This is a followed instruction, not a technically guard-enforced rule — no
+guard blocks or detects a non-dispatched write.
 
 A recorded PRD/Spec approval is an execution mandate for its accepted scope.
 Choose implementation details, sequencing, bounded recovery, test fixes and
