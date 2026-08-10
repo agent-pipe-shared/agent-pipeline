@@ -81,6 +81,7 @@
 | pipeline.guard-refuses-the-prescribed-recovery | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-string-match-makes-a-file-uncommittable | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
+| pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | open | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
@@ -192,6 +193,6 @@
 
 ## Counts
 
-- open: 119
+- open: 120
 - in_progress: 21
 - closed: 44

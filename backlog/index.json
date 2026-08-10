@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "60fa1cfbb53037e950aaaeabcb3dbee402ca7578d4bc0f2f62edf49e44c2ff73"
+    "transitionHead": "2e6bfd91d526cb77fdb40e1cf574de0a9cc946a36c62d935f94c210df38d1871"
   },
   "counts": {
-    "open": 119,
+    "open": 120,
     "in_progress": 21,
     "closed": 44
   },
@@ -674,6 +674,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
+    },
+    {
+      "id": "pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "PO, 2026-08-10, after reviewing two live greenfield happy-path tests: 'die pipeline nimmt durch ihre ineffizienz einfach zu viel zeit weg. Das ist so noch nicht extern vertretbar... Claude Code braucht jetzt 2h für das mini spiel mit push etc.'"
     },
     {
       "id": "pipeline.hardening-round-cannot-register-its-own-suites",
