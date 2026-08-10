@@ -5211,6 +5211,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error("Error: legacy V2 revocation recovery postimage readback failed; inspect State before retry.");
         return 2;
       }
+      syncNextActionDocs(dir, written.transition.state);
       console.log(written.replay
         ? "Legacy V2 revocation recovery already applied; zero-write replay accepted."
         : `Legacy V2 revocation recovery applied by "${value.by}"; lifecycle=\"draft\".`);
@@ -5730,6 +5731,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       if (!stateWriteSucceeded(writeState(dir, discardNext, base))) {
         return 2;
       }
+      syncNextActionDocs(dir, discardNext);
       console.log(
         `Feature "${activeFeature.id}" discarded by "${by}" (commit ${discardForCommit ?? "—"}, ${discardedAt}). Reason: ${reason}. activeFeature removed, planApproved=false.`,
       );
