@@ -174,7 +174,9 @@ success measures, scope/non-goals, testable-acceptance requirements,
 assumptions/risks/open questions, and user-flow decisions. The Spec covers
 linked source evidence, architecture, component responsibilities,
 interfaces/state/data, operational constraints, test/verification approach,
-and PRD-to-Spec traceability. If the input describes an ordered user flow,
+and PRD-to-Spec traceability. Favor thorough, comprehensive coverage of the
+material input over brevity — a short initial goal is not a reason for a
+thin PRD/Spec. If the input describes an ordered user flow,
 state transition, branching, event handoff, or workflow,
 include a valid Mermaid flow/sequence/state diagram wherever it materially
 clarifies that flow (normally the PRD user flow and/or the Spec execution
