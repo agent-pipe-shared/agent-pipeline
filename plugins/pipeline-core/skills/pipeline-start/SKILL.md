@@ -104,22 +104,17 @@ deployment, publication, destructive work, or scope change.
 3. **Boundary:** one simple shell command per tool call; never compose
    `&&`, `;`, redirects or pipelines except bounded, expansions-free
    `rg … | rg …` or `rg … | head -n 1..500` diagnostics, and never a heredoc
-   or a multi-line command — a multi-line `-m` commit message is refused the
-   same way. The full closed grammar, including the two costliest
-   workarounds (a multi-line commit message: write it to a file and use
-   `git commit -F <msgfile> -- <paths>`; capturing output to a file: write it
-   from Node instead of `>`/`2>&1`/`| tee`), is
-   `templates/prompts/agent-obligations.md` §1 (rule above) — read it before
-   hitting the same refusal live. This applies whether a Goldfish/Critic dispatch reads
-   that file directly or an Elephant session acts undispatched: every
-   agent-authored commit message ends with the anonymous `AI-Assisted: true`
-   trailer and nothing else that identifies a provider, model, session,
-   run, trace, or account — never a `Co-Authored-By:` line naming an AI
-   provider or model, never a session/conversation URL (GIT-03,
-   `guardrails/git.md` — same rule; no override exists).
-   `Dispatch: <TASK_ID> (goldfish)`
-   may accompany it for a dispatched Goldfish, but the trailer contract
-   itself binds every session, not only a dispatched one. Treat
+   or a multi-line command. The full closed grammar and its costliest
+   workarounds are in `templates/prompts/agent-obligations.md` §1 — read it
+   before hitting the same refusal live. This applies whether a
+   Goldfish/Critic dispatch reads that file directly or an Elephant session
+   acts undispatched: every agent-authored commit message carries the
+   trailers defined in `templates/prompts/agent-obligations.md` §6
+   (`AI-Assisted: true`, plus `Dispatch: <TASK_ID> (goldfish)` for a
+   dispatched Goldfish) and nothing else that identifies a provider, model,
+   session, run, trace, or account (GIT-03, `guardrails/git.md` — same rule;
+   no override exists); this binds every session, not only a dispatched one.
+   Treat
    `executionBoundary: "host-authorized-wsl"` as mandatory: submit the exact
    returned action directly at that boundary, including every Git
    observation, keeping that routing authoritative. For Codex, never retry
