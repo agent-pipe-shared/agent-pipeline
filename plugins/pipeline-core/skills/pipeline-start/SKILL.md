@@ -219,7 +219,9 @@ The happy path loads no reference file. Load only the exact condition:
   design package, promotion, and the PRD/Spec quality bar;
 - `references/push-approval.md` for the point a session constructs,
   explains, or discusses the push-approval gate (`gates.push_approval`),
-  before a human clears it.
+  before a human clears it;
+- `references/transcript-forensics.md` for preparing a forensic-analysis
+  dispatch of a runner's own session transcript after a live test run.
 
 No happy-path reference is mandatory. Lazy loading never widens authority and
 must preserve lifecycle, V3 authority, calibration, handover, Verify and
