@@ -4444,6 +4444,48 @@ K-AC-05's new 4-round cap follows once rework verifies.
 
 **Live now:** O-1/O-2 Critic round 1 (also resumed from a mid-turn truncation), WP-K-AC05-REWORK1.
 
+### O-1/O-2 CRITIC ROUND 1: FAIL (1 MAJOR) — A REAL, SERIOUS GAP, VERIFIED MYSELF
+
+Also resumed from a mid-turn truncation (same pattern, third time this checkpoint stretch).
+Returned FAIL — 1 major + 5 minor. Verified the major myself against source before dispatching
+anything:
+
+**F1 (major): the residual register the commit declares complete omits an unbounded, self-inflicted
+defeat path.** `guard-authority-ledger-intake.mjs` — the module §11/§15.3 specify to host
+`ledgerConfirmsLiveGmwGrant` and the new memo helpers — is not a member of
+`NEVER_LIFTABLE_KERNEL_PATHS` (confirmed myself: `guard-maintenance-window.mjs:120-128` lists seven
+paths, none matching). Confirmed the file doesn't exist on disk yet (design-only, as expected).
+During an active, legitimately-armed GS-6 window opened for any unrelated purpose, that module is
+Edit/Write-admissible (`guard-gate-strength.mjs:227-240`: a non-kernel path in the live plugin root
+is admitted under an active window) — a one-line edit to `ledgerConfirmsLiveGmwGrant` there could
+make it unconditionally return `true`, permanently disabling O-2's narrowing, an effect that
+OUTLIVES the window, unlike every residual the design currently discloses. The design doc's own
+argument elsewhere ("the recursive hole the never-liftable kernel list exists to close... under an
+agent adversary this is the decisive argument") already sets the standard this gap fails to meet
+by its own logic. Real, well-evidenced, and the Critic's adversarial-probing pass on the memo's
+safe-direction claim (deliberately trying to break "no code path... produces true") came back
+clean otherwise — this is a structural gap next to a genuinely sound cache design, not a sign the
+whole approach is unsound.
+
+Five minors, all cheap, bundled into the same rework: a `streamToken` growth-term overclaim ("no
+term that grows with stream size" contradicted by its own `readdir`+sort definition four
+paragraphs earlier); missing expiry/trigger on all three existing residuals (QG-06); a miscounted
+navigation sentence in §15.1.6 ("first three... last two" when it's two and three); backwards
+"outside §2's non-scope" wording in two places that asserts the opposite of what's meant; and an
+underspecified negative-memo shape (does a `confirmed: false` memo hold `null` or absent grant
+timestamps — ambiguous enough that a naive implementation could accidentally disable negative
+memoization entirely).
+
+The fix for F1 needs a one-line addition to `NEVER_LIFTABLE_KERNEL_PATHS` in
+`guard-maintenance-window.mjs` — a file this design doc's own §7.1/A-3/§11 hold at "no change"
+("another session owns this file"). Resolved by following this document's own already-established
+pattern for exactly this situation (§9's H-AC-11 amendment: "proposed here, reviewed, then applied
+by the rebind, not edited in-session") — the rework PROPOSES the one-line kernel-list addition as
+a named, precisely-specified follow-up change, it does not edit that file itself. Dispatched
+**WP-O1O2-CACHING-REWORK1** covering all six findings, same file-only scope as the original.
+
+**Live now:** WP-K-AC05-REWORK1, WP-O1O2-CACHING-REWORK1.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
