@@ -6,8 +6,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { buildAuditBundle, planAuditBundle, planAuditBundleSignature, signAuditBundle, verifyAuditBundle, verifyAuditBundleSignature } from "./audit-bundle.mjs";
+import { canonicalSha256 } from "./governance-event.mjs";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+// E-AC-20 fixtures: a governance export adapter profile and a delivery receipt, matching the
+// shapes of governance-export-adapter.mjs / governance-export-delivery.mjs (read-only reference;
+// not imported here -- audit-bundle.mjs never validates these against the real adapter modules).
+function adapterProfile() { return { schema: "pipeline.governance-export-adapter-profile.v1", profileId: "otel-collector", format: "otlp-json", adapterVersion: "1.0.0", maxBatchEvents: 100, maxPayloadBytes: 65536, acknowledgement: "per-batch", ordering: "per-stream", deduplication: true, advisory: false }; }
+function deliveryReceipt() { return { destinationProfile: "otel-collector", policyRevision: "a".repeat(64), projectionDigest: "b".repeat(64), batchId: "batch-001", eventCount: 3, attempt: 1, acknowledgementClass: "accepted", terminalDisposition: "delivered", cursor: 3, lag: 0 }; }
+function deliveryResult() { return { schema: "pipeline.governance-export-delivery-result.v1", outbox: { cursor: 3 }, mappings: [{ payload: "secret-content" }], acknowledgement: { receiptId: "x" }, receipt: deliveryReceipt(), advisory: false }; }
 function pack() { return { schema: "pipeline.organization-policy-pack.v1", packId: "security-baseline", revision: "a".repeat(64), compatibility: { minimumCoreVersion: "0.4.0", maximumCoreVersion: "0.5.0" }, governanceFloors: { requireHumanDecisionLedger: true, allowExternalAuthority: false }, documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true }] }; }
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "audit-bundle-")); const id = "bundle-fixture"; const base = join(root, "specs", id); mkdirSync(base, { recursive: true }); const files = [["prd.md", "prd"], ["spec.md", "spec"], ["acceptance.md", "acceptance"], ["result.md", "result"], ["candidate.json", "candidate"]]; for (const [path, bytes] of files) writeFileSync(join(base, path), bytes);
@@ -94,4 +101,58 @@ test("P-AC-10 rejects a compliance claim smuggled through the bundle signature v
   const request = await planAuditBundleSignature({ bundleRoot: join(input.root, "bundle"), algorithm: "test-ed25519", signerKeyId: "test-key" });
   await signAuditBundle({ bundleRoot: join(input.root, "bundle"), request, sign: async () => ({ signature: "a".repeat(32), algorithm: "test-ed25519", signerKeyId: "test-key" }) });
   await assert.rejects(() => verifyAuditBundleSignature({ bundleRoot: join(input.root, "bundle"), verify: async () => ({ verified: true, complianceCertification: "PCI-DSS" }) }), (error) => error.code === "AB-SIGNATURE-VERIFY-PROVIDER");
+});
+// E-AC-20: export metadata is optional, narrowed to a profile digest plus the delivery receipt's
+// own already-public-safe fields, and carries through the built manifest into a bundle that still
+// offline-verifies -- proving the narrowed data is informational, not part of the trust chain.
+test("E-AC-20 narrows optional export metadata to a profile digest and the receipt's own fields, and carries it through a verifying bundle", async () => {
+  const input = fixture(); const profile = adapterProfile(); const receipt = deliveryReceipt();
+  const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()], exportEvidence: { profile, receipt } });
+  assert.deepEqual(Object.keys(plan.exportMetadata).sort(), ["profileDigest", "receipt"]);
+  assert.equal(plan.exportMetadata.profileDigest, canonicalSha256(profile));
+  assert.deepEqual(plan.exportMetadata.receipt, receipt);
+  const receipt2 = await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  assert.equal(receipt2.status, "built");
+  const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
+  assert.deepEqual(manifest.exportMetadata, plan.exportMetadata);
+  const verified = await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") });
+  assert.equal(verified.status, "verified");
+});
+// E-AC-20: either half of export metadata may be supplied alone.
+test("E-AC-20 accepts export metadata with only a profile digest or only a receipt", () => {
+  const input = fixture();
+  const profileOnly = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()], exportEvidence: { profile: adapterProfile() } });
+  assert.deepEqual(Object.keys(profileOnly.exportMetadata), ["profileDigest"]);
+  const receiptOnly = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()], exportEvidence: { receipt: deliveryReceipt() } });
+  assert.deepEqual(Object.keys(receiptOnly.exportMetadata), ["receipt"]);
+});
+// E-AC-20: `mappings`/`outbox`/`acknowledgement` must never reach the bundle, including when a
+// caller mistakenly passes the whole delivery result where only the receipt sub-object belongs.
+test("E-AC-20 rejects export metadata when the receipt looks like the full delivery result instead of the receipt sub-object", () => {
+  const input = fixture();
+  assert.throws(() => planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()], exportEvidence: { receipt: deliveryResult() } }), (error) => error.code === "AB-EXPORT-RECEIPT");
+  assert.throws(() => planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()], exportEvidence: {} }), (error) => error.code === "AB-EXPORT-METADATA");
+  assert.throws(() => planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()], exportEvidence: { profile: adapterProfile(), rogue: true } }), (error) => error.code === "AB-EXPORT-METADATA");
+});
+// E-AC-20: omitting export metadata leaves the plan and manifest exactly as before this feature.
+test("E-AC-20 leaves the plan and manifest unchanged when no export metadata is supplied", async () => {
+  const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] });
+  assert.deepEqual(Object.keys(plan).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicy", "effectivePolicySha256", "schema", "status"]);
+  const receipt = await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  assert.equal(receipt.status, "built");
+  const manifest = JSON.parse(readFileSync(join(input.root, "bundle", "manifest.json"), "utf8"));
+  assert.deepEqual(Object.keys(manifest).sort(), ["artifacts", "bundleId", "candidate", "effectivePolicySha256", "schema"]);
+});
+// E-AC-20: export metadata is never source authority -- a bundle whose export metadata is
+// internally inconsistent with the rest of the bundle (arbitrary digest, unrelated receipt values)
+// still builds and verifies, because nothing in the trust chain ever reads it.
+test("E-AC-20 still builds and verifies a bundle whose export metadata is deliberately wrong and internally inconsistent", async () => {
+  const input = fixture();
+  const wrongReceipt = { destinationProfile: "unrelated-destination", policyRevision: "f".repeat(64), projectionDigest: "0".repeat(64), batchId: "does-not-exist", eventCount: 999, attempt: 7, acknowledgementClass: "none", terminalDisposition: "quarantined", cursor: 0, lag: 999 };
+  const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()], exportEvidence: { profile: { unrelated: "profile-shape" }, receipt: wrongReceipt } });
+  assert.notEqual(plan.exportMetadata.profileDigest, canonicalSha256(adapterProfile()));
+  const receipt = await buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan });
+  assert.equal(receipt.status, "built");
+  const verified = await verifyAuditBundle({ bundleRoot: join(input.root, "bundle") });
+  assert.equal(verified.status, "verified");
 });
