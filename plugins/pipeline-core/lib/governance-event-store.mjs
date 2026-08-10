@@ -1031,6 +1031,14 @@ function assertForkDispositionAuthorization(authorization) {
  * this function and `readForkDisposition` perform and is surfaced as a
  * trustworthy governed disposition (Critic round 3, F1; QG-05: this is the
  * blind spot, not a claim this function closes).
+ *
+ * A second, cheaper blind spot (Critic round 4, F-B): `approval.mode` itself
+ * is not re-checked against configuration on read. The WRITE side
+ * (`authorizeForkDisposition`) refuses a `chat`-mode approval unless
+ * `gates.push_approval` resolves to `chat`; this function has no such check,
+ * so a record hand-edited to `mode: "chat"` needs no forged digest at all --
+ * only the closed `chat`-mode key set, which is public shape, not secret
+ * material -- to be surfaced as governed.
  */
 function assertForkDispositionApprovalReference(approval, code) {
   if (!isRecord(approval)) fail(code, "A recorded fork disposition requires a closed approval reference.");
