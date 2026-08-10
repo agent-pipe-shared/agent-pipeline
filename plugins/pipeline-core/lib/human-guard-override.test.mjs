@@ -780,6 +780,112 @@ test("every push-guard denial routes to an exact publication preflight even thro
   }
 });
 
+// ---- GF-098: a denied push is routed by ITS OWN destination, never by a constant -------
+// The publication executor's `--destination-ref` is the literal `refs/heads/main`. Until
+// this block existed, every denied push was pointed at it -- so a session holding a valid,
+// branch-bound approval for `refs/heads/<feature>` was shown the one recovery that
+// contradicts its own signature, and had no route to its branch at all.
+
+function pushDenial(root, command, denials) {
+  return recordHumanGuardDenial({
+    rootDir: root,
+    pluginRoot: PLUGIN_ROOT,
+    toolName: "Bash",
+    toolInput: { command },
+    denials,
+  });
+}
+
+const PUSH_GUARD_DENIAL = [{ guard: "guard-push.mjs", reason: "PG-CAPABILITY: publication authority required" }];
+
+test("GF-098: a denied push destined for main keeps the exact publication-executor route", () => {
+  const root = fixture();
+  try {
+    for (const command of [
+      "git push origin HEAD:refs/heads/main",
+      "git push origin main",
+      "/usr/bin/git push origin HEAD:refs/heads/main",
+      "/bin/sh -c 'git push origin HEAD:refs/heads/main'",
+    ]) {
+      for (const denials of [PUSH_GUARD_DENIAL, denial]) {
+        const observed = pushDenial(root, command, denials);
+        assert.equal(observed.status, "narrower-recovery-required", command);
+        assert.equal(observed.code, "HGO-NARROWER-PUBLICATION-REQUIRED", command);
+        assert.equal(observed.nextAction.kind, "typed-recovery");
+        assert.equal(observed.nextAction.action.executable, process.execPath);
+        assert.match(observed.nextAction.action.argv[0], /publication-executor\.mjs$/u);
+        assert.equal(observed.nextAction.action.mutation, false);
+        const argv = observed.nextAction.action.argv;
+        assert.equal(argv[argv.indexOf("--remote-name") + 1], "origin");
+        assert.equal(argv[argv.indexOf("--destination-ref") + 1], "refs/heads/main");
+        assert.equal(argv.includes(git(root, "rev-parse", "HEAD")), true);
+      }
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("GF-098: a denied push destined for a non-main branch names THAT branch's approve-push ceremony", () => {
+  const root = fixture();
+  try {
+    for (const [command, remote, destination] of [
+      ["git push origin HEAD:refs/heads/Rune_Test1_Codex_054_45", "origin", "refs/heads/Rune_Test1_Codex_054_45"],
+      ["git -C . push upstream HEAD:refs/heads/feat/sprint-nova", "upstream", "refs/heads/feat/sprint-nova"],
+      ["/bin/sh -c 'git push origin HEAD:refs/heads/Rune_Test1_Codex_054_45'", "origin", "refs/heads/Rune_Test1_Codex_054_45"],
+    ]) {
+      // Both entry paths: the guard-push denial (code HGO-PUBLICATION-REQUIRED) and any
+      // other guard's denial of the same raw push (the command-regex disjunct).
+      for (const denials of [PUSH_GUARD_DENIAL, denial]) {
+        const observed = pushDenial(root, command, denials);
+        assert.equal(observed.status, "narrower-recovery-required", command);
+        assert.equal(observed.code, "HGO-NARROWER-BRANCH-PUSH-APPROVAL-REQUIRED", command);
+        assert.equal(observed.nextAction.kind, "typed-recovery");
+        assert.equal(observed.nextAction.action.executable, process.execPath);
+        const argv = observed.nextAction.action.argv;
+        assert.match(argv[0], /pipeline-state\.mjs$/u);
+        assert.equal(argv[1], "approve-push");
+        assert.equal(argv[argv.indexOf("--remote") + 1], remote, command);
+        assert.equal(argv[argv.indexOf("--destination") + 1], destination, command);
+        // The main-only publication route, and its constants, must be nowhere near this.
+        assert.equal(argv.some((token) => /publication-executor/u.test(token)), false);
+        assert.equal(argv.includes("refs/heads/main"), false, command);
+        assert.equal(observed.nextAction.action.mutation, true);
+        assert.match(observed.nextAction.limitation, /THIS remote and THIS destination ref/u);
+      }
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("GF-098: a denied push whose destination cannot be read is told so, never routed at main", () => {
+  const root = fixture();
+  try {
+    for (const command of [
+      "git push origin HEAD", // shorthand: names no destination
+      "git push origin", // no refspec at all
+      "git push --force origin HEAD:refs/heads/feature", // not approvable by this ceremony
+      "git push origin HEAD:feature", // destination not fully qualified
+      "git push origin HEAD:refs/tags/v1.2.3", // tags are out of scope for approve-push
+      "git push origin +HEAD:refs/heads/feature", // forced refspec
+      "git push origin :refs/heads/feature", // deletion
+      "git push $REMOTE HEAD:refs/heads/feature", // expansion: argv is not the text we see
+      "git push origin HEAD:refs/heads/feature && git status", // bundle
+    ]) {
+      const observed = pushDenial(root, command, PUSH_GUARD_DENIAL);
+      assert.equal(observed.status, "narrower-recovery-required", command);
+      assert.equal(observed.code, "HGO-NARROWER-PUSH-DESTINATION-REQUIRED", command);
+      assert.equal(observed.nextAction.kind, "typed-recovery");
+      assert.equal(typeof observed.nextAction.action, "object");
+      assert.equal(JSON.stringify(observed.nextAction.action).includes("refs/heads/main"), false, command);
+      assert.match(observed.nextAction.action.requiredChange, /refs\/heads\/<branch>/u);
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("pipeline author repair binds one exact source root and action without State readiness", () => {
   const root = fixture();
   try {

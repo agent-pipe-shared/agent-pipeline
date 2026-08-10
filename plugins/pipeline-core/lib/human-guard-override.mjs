@@ -23,6 +23,11 @@ import {
   readCriticalHumanProofPolicy,
   readPushApprovalMode,
 } from "./critical-human-proof-policy.mjs";
+// Dependency-free string helpers ONLY (see git-cmd.mjs's own header). guard-push.mjs owns
+// the normative `parsePushBinding()`, but that file is a HOOK with top-level side effects:
+// importing it to reuse one function would run a guard as a side effect of loading this
+// module. See pushRecoveryTarget() below for the bounded local equivalent.
+import { stripQuotedSegments, tokenizeArgv } from "./git-cmd.mjs";
 import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 import {
   LEGACY_STATE,
@@ -797,15 +802,105 @@ function decisionPreview({ toolName, toolInput, paths, commandClass, denials }) 
   return preview;
 }
 
-function localAction(executable, argv, expected) {
+function localAction(executable, argv, expected, { mutation = false } = {}) {
   return {
     executable,
     argv,
-    mutation: false,
+    mutation,
     requiresConfirmation: false,
     executionBoundary: "local-process",
     expected,
   };
+}
+
+// ---------------------------------------------------------------------------------
+// Push recovery classification.
+//
+// The publication-executor route below is MAIN-ONLY by construction: its
+// `--remote-name`/`--destination-ref` are the literal constants `origin` and
+// `refs/heads/main`, and the denied command's own remote/destination were never read.
+// Offering it as the recovery for EVERY denied push handed a session holding a valid,
+// branch-bound push approval for `refs/heads/<feature>` the one route that contradicts
+// its own signature -- and it was the only route ever shown, so the branch could not be
+// pushed at all (observed 2026-08-10 on a feature branch whose approval verified).
+//
+// This classifier is deliberately PURE and LOCAL. guard-push.mjs owns the normative
+// `parsePushBinding()`, but it is a hook with top-level side effects and must never be
+// imported (see the import block). Nothing here decides admission -- it decides which
+// sentence a denied session reads -- so it errs toward "I cannot tell" and never toward
+// a guessed destination: a wrong hint costs a wasted human ceremony against a ref
+// nobody meant to write.
+// ---------------------------------------------------------------------------------
+const PUSH_COMMAND = /\bgit(?:\.exe)?\b[^\n]*\bpush\b/iu;
+const PUSH_MAIN_REF = "refs/heads/main";
+// `main`/`refs/heads/main` -- the same union guard-push.mjs's own attestedMainPublication()
+// call site treats as main (an explicit destination, or a shorthand push whose source is
+// main). Kept deliberately WIDE: anything main-ish keeps today's publication route.
+const PUSH_MAIN_NAMES = new Set(["main", PUSH_MAIN_REF]);
+// `pipeline-state.mjs approve-push --destination`'s own accepted grammar. A destination
+// outside it (a bare branch name, a tag, a remote-tracking ref) cannot be handed to that
+// ceremony, so it is reported as undetermined rather than qualified on the agent's behalf.
+const PUSH_APPROVABLE_REF = /^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u;
+const PUSH_SAFE_FLAGS = new Set([
+  "--dry-run", "--porcelain", "--verbose", "-v", "--quiet", "-q",
+  "--atomic", "--no-atomic", "--set-upstream", "-u",
+]);
+const PUSH_SHELL_WRAPPERS = new Set(["sh", "bash", "zsh", "dash", "sh.exe", "bash.exe"]);
+
+function executableName(token) {
+  return String(token).split(/[\\/]/u).pop().toLowerCase();
+}
+
+/**
+ * pushRecoveryTarget(command) -- which recovery a DENIED push should be pointed at.
+ * Returns `{ kind: "main" }`, `{ kind: "branch", remote, destination }`, or
+ * `{ kind: "undetermined" }`. Never throws, never spawns, never touches the filesystem.
+ */
+function pushRecoveryTarget(command, depth = 0) {
+  const shape = stripQuotedSegments(command);
+  // A bundle, substitution, expansion or glob means the effective argv is not the text
+  // in front of us; guard-push.mjs refuses the same shapes outright.
+  if (/&&|\|\||[;|\n\r`<>]|\$\(/u.test(shape) || /[$`*?[\]{}~]/u.test(shape)) {
+    return { kind: "undetermined" };
+  }
+  const tokens = tokenizeArgv(command);
+  if (tokens.length === 0) return { kind: "undetermined" };
+  const head = executableName(tokens[0]);
+  if (PUSH_SHELL_WRAPPERS.has(head)) {
+    // `sh -c '<one push>'` carries its destination in exactly one argument; unwrap it once
+    // so a wrapped main publication keeps the publication route it has today.
+    return depth === 0 && tokens[1] === "-c" && tokens.length === 3
+      ? pushRecoveryTarget(tokens[2], depth + 1)
+      : { kind: "undetermined" };
+  }
+  if (head !== "git" && head !== "git.exe") return { kind: "undetermined" };
+  let index = 1;
+  if (tokens[index] === "-C") index += 2;
+  if (tokens[index]?.toLowerCase() !== "push") return { kind: "undetermined" };
+  index += 1;
+  const positionals = [];
+  for (; index < tokens.length; index++) {
+    const token = tokens[index];
+    if (PUSH_SAFE_FLAGS.has(token)) continue;
+    // Any other option (`--force`, `--delete`, `--mirror`, ...) changes what the refspec
+    // means; such a push is not approvable by the ordinary ceremony anyway.
+    if (token.startsWith("-")) return { kind: "undetermined" };
+    positionals.push(token);
+  }
+  if (positionals.length !== 2) return { kind: "undetermined" };
+  const [remote, refspec] = positionals;
+  const colon = refspec.indexOf(":");
+  const source = colon === -1 ? refspec : refspec.slice(0, colon);
+  const destination = colon === -1 ? null : refspec.slice(colon + 1);
+  if (!remote || !source || source.startsWith("+")) return { kind: "undetermined" };
+  if (destination === null) {
+    return PUSH_MAIN_NAMES.has(source) ? { kind: "main" } : { kind: "undetermined" };
+  }
+  if (PUSH_MAIN_NAMES.has(destination)) return { kind: "main" };
+  if (!PUSH_APPROVABLE_REF.test(destination) || destination.includes("..")) {
+    return { kind: "undetermined" };
+  }
+  return { kind: "branch", remote, destination };
 }
 
 function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
@@ -862,7 +957,57 @@ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
         },
       };
   }
-  if (code === "HGO-PUBLICATION-REQUIRED" || /\bgit(?:\.exe)?\b[^\n]*\bpush\b/iu.test(command)) {
+  const deniedPushCommand = PUSH_COMMAND.test(command);
+  if (code === "HGO-PUBLICATION-REQUIRED" || deniedPushCommand) {
+    // Classify ONLY when the denied command is itself a push. A publication-authority
+    // denial whose command is not a push at all (a release alias) never named a
+    // destination, so there is nothing to read and the fixed publication route -- which
+    // revalidates everything from scratch anyway -- stays exactly right for it.
+    const target = deniedPushCommand ? pushRecoveryTarget(command) : { kind: "not-a-push" };
+    if (target.kind === "branch") {
+      return {
+        status: "narrower-recovery-required",
+        code: "HGO-NARROWER-BRANCH-PUSH-APPROVAL-REQUIRED",
+        nextAction: {
+          kind: "typed-recovery",
+          action: localAction(
+            process.execPath,
+            [
+              join(pluginRoot, "scripts", "pipeline-state.mjs"),
+              "approve-push",
+              "--by", "<name>",
+              "--remote", target.remote,
+              "--destination", target.destination,
+              "--proof-request", "<path>",
+              "--proof-authority", "<path>",
+              "--proof", "<path>",
+            ],
+            { effect: "records pushApproval.lastApproved for exactly this candidate commit, remote and destination ref" },
+            { mutation: true },
+          ),
+          // Verbatim from guard-git.mjs's own GG-03 guidance: one ceremony, one wording,
+          // whichever layer a session happens to meet it at.
+          limitation: "A push approval that verifies for THIS commit, THIS remote and THIS destination ref lifts GG-03 with no token and no typed phrase. The push must write its destination out (`HEAD:refs/heads/<branch>`): an approval names a ref, and a command that names none cannot be matched against it.",
+          after: "retry the byte-identical original push once the approval is recorded",
+        },
+      };
+    }
+    if (target.kind === "undetermined") {
+      return {
+        status: "narrower-recovery-required",
+        code: "HGO-NARROWER-PUSH-DESTINATION-REQUIRED",
+        nextAction: {
+          kind: "typed-recovery",
+          action: {
+            toolName,
+            toolInputSha256: sha(toolInput),
+            requiredChange: "restate the push as one plain `git [-C <path>] push <remote> <source>:refs/heads/<branch>` so its destination ref is written out",
+            repositoryRoot: root,
+          },
+          limitation: "the denied command's destination ref could not be determined from its own text, and no destination is assumed on its behalf: an approval names a ref, and a command that names none cannot be matched against it",
+        },
+      };
+    }
     const preflightId = `guard-${sha(toolInput).slice(0, 24)}`;
     return {
       status: "narrower-recovery-required",
