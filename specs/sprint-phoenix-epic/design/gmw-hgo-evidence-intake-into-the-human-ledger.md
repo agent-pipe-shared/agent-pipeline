@@ -1942,7 +1942,12 @@ insertion, immediately after that paragraph, same style:**
 This amendment is proposed text only, per this document's own non-scope (§2) and process (§9): applied by the
 reviewed rebind, not here. `acceptance.md` is not touched by this dispatch.
 
-#### 15.1.6 The residual, stated plainly
+#### 15.1.6 The residuals of §15, stated plainly
+
+This subsection is the residual register for the **whole** of §15, not for §15.1 alone. It sits under §15.1
+because that is where it started and because §15.2.4 already points here by name; the first three entries below
+belong to O-1's identity registry, the last two to O-2's hook-path closure. Keeping one register is deliberate:
+a reader asking "what did §15 leave open" must not have to find two lists.
 
 **What holds.** No portable record produced by this path, before or after this amendment, contains a
 natural-person identifier, a pseudonym, or any value derived from one (R-1 unchanged). Recovering an identity
@@ -1973,6 +1978,40 @@ granularity residual above; adding the `GATE_STRENGTH_PATHS` entry is follow-up 
 design-doc-only dispatch's scope, not designed further here — but it is available and cheap, not blocked on
 any further design.
 
+**From O-2's hook-path closure (§15.2), recorded here because §15.2.4 says they are, and until this revision
+they were not.**
+
+**(i) The hook's ledger read is checkpoint-less, and so is every other read this design specifies.** Without a
+`checkpoint`, `verifyPortableGovernanceStream` reports `completeness: "unknown"` unconditionally, so the read
+proves that the *retained* stream is a contiguous hash chain and cannot prove that it is *complete*. An agent
+with local write access to the human stream's storage root can delete a disposition file and make a disposed
+grant continue to read as live — at the hook, and equally at §7.4's install readback and §7.5's reconcile,
+neither of which this document specifies to retain or pass a checkpoint either. §15.2.4 states the mechanics;
+this entry is the tracking. Owner `pipeline` (PHX-2). No date, and no exit is chosen here: the two available
+ones are for a producer to retain a ledger sequence it can witness later — which for GMW means changing
+`lib/guard-maintenance-window.mjs`, the file §7.1/A-3/§11 hold at "no change" — or for the boundaries that
+*can* retain one to do so, which is a change to §7.4/§7.5 that this amendment did not open. What must not
+happen is the third option an earlier revision took by accident: declaring the closure complete and leaving the
+disclosure three paragraphs upstream to contradict it.
+
+**(ii) The grant memo is forgeable and unwitnessed, bounded by its TTL.** §15.2.3a's memo lives under
+`tmpdir()`, is not signed or MAC'd (deliberately, §15.2.3a), and an agent with local write access can forge
+one. Forging it cannot create the PO-signed window record that remains the necessary condition, so it grants
+nothing new; what it does is suppress the ledger half of the intersection for at most
+`GMW_LEDGER_MEMO_TTL_MS` (60 s) — a strictly weaker, time-bounded instance of (i), which is unbounded. The one
+genuine delta over (i) is visibility: the stream is a worktree path where a tampered event is in principle
+reviewable, while the memo is not. A `<git-common-dir>` location plus one `GATE_STRENGTH_PATHS` entry would
+narrow the delta and was rejected on cost, with the reasoning in §15.2.3a rather than left implicit. Owner
+`pipeline` (PHX-2).
+
+**(iii) A miss still contains six git spawns with no per-spawn timeout.** `runGit` forwards a timeout only when
+its caller passes one (`worktree-lifecycle.mjs:110-122`) and the store's `assertPhysicalRoot` passes none, while
+GMW's own `git()` caps its two spawns at 5 s (`guard-maintenance-window.mjs:193`). `spawnSync` blocks the event
+loop, so nothing in this design can interrupt a hung `git` from outside. The memo bounds how often that path
+runs, not how long one invocation of it can take; B-1 pins the count. The fix is one argument at the store's own
+`discoverRepository` call — outside this dispatch and outside §2's non-scope, hence recorded rather than
+applied. Owner `pipeline` (PHX-2).
+
 ### 15.2 O-2 — closing the synchronous guard-hook gap inside increment 1
 
 #### 15.2.1 What the PO rejected
@@ -1990,9 +2029,13 @@ schedule, not the safety argument, exactly as O-2's decision text frames it.
 
 #### 15.2.2 Corrected finding: which file actually calls `windowCoversRule`
 
-This document's own citation (§8.5.2: "the hooks that call `windowCoversRule`") and this briefing's premise
-both point at `hooks/guard-lifecycle-ready.mjs` as the synchronous call site. **That is not what the source
-shows.** `guard-lifecycle-ready.mjs` imports only `GATE_STRENGTH_PATHS` (the path *list*) from
+The dispatch briefing for this amendment named `hooks/guard-lifecycle-ready.mjs` as the synchronous call site.
+**That is not what the source shows** — and, on re-reading, it is not what this document said either. §8.5.2
+cites `windowCoversRule` in `lib/guard-maintenance-window.mjs:559-566` and speaks of "the hooks that call" it
+without enumerating any, which is exactly what §11's own superseded note records: the D-2 deferral "named no
+hook file". An earlier revision of this subsection attributed the wrong premise to §8.5.2, a section that does
+not contain it; the misattribution is corrected here, and the finding below is unchanged, because it never
+rested on that attribution. `guard-lifecycle-ready.mjs` imports only `GATE_STRENGTH_PATHS` (the path *list*) from
 `guard-gate-strength.mjs`, for its own shell-command substring check (`gateStrengthShellRefusal`,
 `hooks/guard-lifecycle-ready.mjs:299-327`) — and that function's own comment states explicitly that GS-6, the
 live-plugin-root rule GMW governs, is **deliberately excluded** from its needle set ("the live plugin root
@@ -2005,9 +2048,9 @@ The two actual call sites, found by tracing every import of `windowCoversRule` i
 - `plugins/pipeline-core/hooks/guard-testpath.mjs:105` (import), `:217` (call) — the TP-* rule family, wired
   as a PreToolUse deny-guard on `Edit`/`Write` against configured test paths (`guard-testpath.mjs:4`).
 - `plugins/pipeline-core/hooks/guard-gate-strength.mjs:63` (import), `:231` (call) — GS-6 only, wired for write
-  tools only, matcher `Edit|Write|NotebookEdit` (`guard-gate-strength.mjs:44-45`, corroborated from the calling
-  side by `guard-lifecycle-ready.mjs:282`, which is where this document's own §8.5.2 citation was actually
-  found while verifying this section).
+  tools only, matcher `Edit|Write|NotebookEdit` (`guard-gate-strength.mjs:44-45`), registered at
+  `hooks/hooks.json:39`, whose hook object carries no `timeout` key — unlike `guard-testpath.mjs`'s
+  (`hooks/hooks.json:61-65`). Both facts are used again in §15.2.3a.
 
 Both call sites already wrap the call: `try { const { covered, window } = windowCoversRule(...); if (covered)
 {...; process.exit(0);} } catch { /* an unusable window is not a lift; the refusal below still stands */ }`
@@ -2037,27 +2080,38 @@ record already exposes, and ask the ledger whether a live grant carries that exa
 
 ```text
 // plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs
-export async function ledgerConfirmsLiveGmwGrant({ rootDir, scopeRuleIds, openingTreeSha256, nowMs = Date.now() }) {
+export const GMW_LEDGER_MEMO_TTL_MS = 60_000;   // pinned module constant, exported for budget test B-1
+
+export async function ledgerConfirmsLiveGmwGrant({
+  rootDir, scopeRuleIds, openingTreeSha256, windowExpiresAtMs,
+  nowMs = Date.now(),
+  queryDecisions = queryHumanGovernanceDecisions,   // injected default, the `spawn = spawnSync` convention
+} = {}) {                                           // guard-maintenance-window.mjs:336/:383/:485/:559 already uses
   // never throws -- any failure below, including a rejected read, returns false, the same "not covered"
   // outcome an absent or unusable window already produces (guard-testpath.mjs:224, guard-gate-strength.mjs:239)
   try {
-    // repositoryFingerprint: the same derivePoGateRepositoryFingerprint({gitCommonDir, primaryRoot})
-    // resolution the write side already performs for `rootDir` (§7.2, governance-event-store.mjs:81-88,
-    // via discoverRepository, worktree-lifecycle.mjs:235-253) -- not a new resolution problem
-    const { commonDir, primaryRoot } = discoverRepository(rootDir);
-    const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: commonDir, primaryRoot });
     const ruleDigest = canonicalSha256({ scopeRuleIds, openingTreeSha256 });  // same preimage as §4's row
+    // O(1), no subprocess, no event file opened. A miss is anything but a fully valid memo (§15.2.3a).
+    const memo = readGrantMemo({ rootDir, ruleDigest, windowExpiresAtMs, nowMs });
+    if (memo.status === "hit") return memo.confirmed;   // includes the negative memo; see §15.2.3a
+    // --- miss: the full read, priced in §15.2.3a and bounded in frequency by the memo above ---
+    // repositoryFingerprint is READ from the registry the store is about to validate anyway, not re-derived
+    // by a fourth `discoverRepository` call (§15.2.3a, R1): `verifyPortableGovernanceStream` re-derives the
+    // physical fingerprint itself and fails GES-CROSS-REPOSITORY unless the caller's value AND the registry's
+    // both equal it, so a wrong, stale or forged value can only deny.
+    const repositoryFingerprint = readRegistryRepositoryFingerprint(rootDir);
     // async, lock-free read of the human stream (§8.5.2: "readers take none") via the existing reader --
     // queryHumanGovernanceDecisions (human-governance-ledger.mjs:228), awaited here, not reimplemented;
     // see the resolved-assumption note below for why no separate synchronous scan is written.
     // No `checkpoint` is passed -- deliberately; see the completeness/integrity disclosure in §15.2.4.
-    const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: rootDir, repositoryFingerprint });
-    // true iff `decisions` contains at least one entry with:
-    //   event === "granted", outcome === "granted",
-    //   scope.packageId === "guard-maintenance-window", scope.repositoryFingerprint === repositoryFingerprint,
-    //   ruleDigest === ruleDigest (above), validity.notBeforeEpochMs <= nowMs <= validity.expiresAtEpochMs,
-    //   and no committed disposition (revoked/expired/consumed) whose link points back to it
-    return /* at least one such decision exists */;
+    const { decisions } = await queryDecisions({ repositoryRoot: rootDir, repositoryFingerprint });
+    const grant = /* the first entry of `decisions` with:
+         event === "granted", outcome === "granted",
+         scope.packageId === "guard-maintenance-window", scope.repositoryFingerprint === repositoryFingerprint,
+         ruleDigest === ruleDigest (above), validity.notBeforeEpochMs <= nowMs <= validity.expiresAtEpochMs,
+         and no committed disposition (revoked/expired/consumed) whose link points back to it */;
+    writeGrantMemo({ rootDir, ruleDigest, grant, windowExpiresAtMs, nowMs });   // best effort; failure ignored
+    return grant !== undefined;
   } catch { return false; }
 }
 ```
@@ -2087,12 +2141,9 @@ which is the only context top-level `await` is barred from) on Node 24+ (`SETUP.
 `hooks/staleness-check.mjs:207-208` already does exactly this at its own top level today —
 `if (isDirectInvocation(import.meta.url)) { await run(); }` — inside the same `hooks/` directory this
 amendment edits. Empirically confirmed for this exact shape (an `await` inside a top-level `if` block in a
-`.mjs` file) rather than taken on the language spec alone. On the budget question: `hooks.json` gives
-`guard-testpath.mjs` an explicit 10-second PreToolUse timeout (`hooks/hooks.json:63-65`);
-`guard-gate-strength.mjs`'s entry carries no override, so Claude Code's hook default applies. Both budgets
-already cover everything the hook does after the window check today — override consumption, denial
-recording — which is local disk I/O of the same kind; one more lock-free read of the same on-disk,
-atomically-published stream (§8.5.2) does not change that order of magnitude.
+`.mjs` file) rather than taken on the language spec alone. **The budget question is answered in §15.2.3a, and
+the answer an earlier revision of this paragraph gave — "one more lock-free read ... does not change that
+order of magnitude" — was false and is withdrawn there rather than softened.**
 
 **This is what the original wording flagged for the implementor to discover again; it is resolved here
 instead:** `ledgerConfirmsLiveGmwGrant` is `async`, both call sites `await` it, and no parallel synchronous
@@ -2103,7 +2154,7 @@ ledger mechanism exists anywhere in this design.
 ```text
 // hooks/guard-testpath.mjs, replacing the body of the existing try block at :216-224
 const { covered, window } = windowCoversRule({ rootDir: projectDir, ruleId: matched.id });
-if (covered && await ledgerConfirmsLiveGmwGrant({ rootDir: projectDir, scopeRuleIds: window.scopeRuleIds, openingTreeSha256: window.openingTreeSha256 })) {
+if (covered && await ledgerConfirmsLiveGmwGrant({ rootDir: projectDir, scopeRuleIds: window.scopeRuleIds, openingTreeSha256: window.openingTreeSha256, windowExpiresAtMs: window.expiresAtMs })) {
   process.stderr.write(`[pipeline-guard-maintenance-window] ${matched.id} lifted: ...\n`);
   process.exit(0);
 }
@@ -2113,6 +2164,226 @@ if (covered && await ledgerConfirmsLiveGmwGrant({ rootDir: projectDir, scopeRule
 The same edit shape applies at `hooks/guard-gate-strength.mjs:231-238` for GS-6, `await`ed the same way; that
 call site sits inside the top-level `if (process.argv[1] && ...)` block described above, which is still
 top-level module code and not a function body.
+
+#### 15.2.3a The execution budget: the true cost, traced, and the memo that bounds it
+
+**The claim this subsection replaces.** An earlier revision of §15.2.3 settled the budget question with *"one
+more lock-free read of the same on-disk, atomically-published stream (§8.5.2) does not change that order of
+magnitude."* **That claim was false.** It was inferred from the word "read" rather than traced, and it is
+withdrawn here rather than softened. What follows prices the call chain against the real modules and specifies
+the mechanism that makes the PO's 2026-08-09 decision affordable. The decision itself is untouched: the ledger
+read stays in increment 1, at the hook, exactly as §15.2 places it.
+
+*(Line numbers into `plugins/pipeline-core/lib/governance-event-store.mjs` are deliberately omitted in this
+subsection and in §15.2.4, and symbol names used instead. That file is under concurrent modification in this
+checkout — its line numbers moved between two reads taken minutes apart while this section was written — and
+this document's older citations into it have already drifted: §3.1's `:629` for `appendPortableGovernanceEvent`
+no longer resolves to it. Every other file is cited by line as usual.)*
+
+**What one uncached call actually costs**, per hook invocation that reaches the ledger step — i.e. per tool
+call in which `windowCoversRule` has already returned `covered: true`:
+
+| Step | Git subprocesses | Full stream scans |
+| --- | --- | --- |
+| `windowCoversRule` → `currentGuardMaintenanceWindow` → `topology` (`guard-maintenance-window.mjs:559`, `:485`, `:202-210`) — **paid today, unchanged** | **2** (`rev-parse --show-toplevel` `:204`, `rev-parse --path-format=absolute --git-common-dir` `:206`), each capped at 5 s (`:193`) | 0 |
+| `discoverRepository(rootDir)` in the *original* `ledgerConfirmsLiveGmwGrant` body, only to derive `repositoryFingerprint` | **3** (`worktree-lifecycle.mjs:237`, `:241`, `:250`) | 0 |
+| `queryHumanGovernanceDecisions` → `queryPortableGovernanceStream` → `verifyPortableGovernanceStream` → `assertPhysicalRoot` → `discoverRepository` | **3** | 0 |
+| the same `verifyPortableGovernanceStream` → `loadRegistry` + `scanStream` | 0 | **1** |
+| then `queryPortableGovernanceStream`'s **own** `assertPhysicalRoot` → `discoverRepository`, on the next line | **3** | 0 |
+| then its own `loadRegistry` + `scanStream`, repeating verbatim what `verifyPortableGovernanceStream` just did | 0 | **1** |
+| **added by §15.2.3 as originally written** | **9** | **2** |
+| **total in the hook step, including today's window check** | **11** | **2** |
+
+A "full stream scan" is not a file read. `scanStream` lists the human stream's directory and, for **every**
+retained event file, performs a read, a strict-JSON parse, envelope validation and a path/envelope binding
+check; it then sorts the result and re-verifies the **entire** hash chain, failing `GES-CHAIN` on any gap. That
+is O(n) in the number of retained human-governance decisions, twice per call, and the human stream is
+append-only (H-AC-06), so n only ever grows. Nothing in this path passes a `checkpoint` (§15.2.4), so nothing
+bounds the scan to a suffix.
+
+Two properties of that cost matter more than its size:
+
+- **It is unbounded per spawn.** GMW's own `git()` caps each of its two spawns at 5 s
+  (`guard-maintenance-window.mjs:193`). `runGit` forwards a timeout only when its caller passes one
+  (`worktree-lifecycle.mjs:110-122`), and neither `assertPhysicalRoot` nor the original
+  `ledgerConfirmsLiveGmwGrant` passes one. `spawnSync` blocks the event loop, so no `await`, `Promise.race` or
+  `AbortSignal` wrapped around the awaited read can interrupt a hung `git`. The budget being consumed is the
+  runner's, not the hook's: `guard-testpath.mjs` declares `"timeout": 10` (seconds) at `hooks/hooks.json:61-65`
+  and that limit is enforced by the hook runner which spawns the process, not by any code inside
+  `guard-testpath.mjs`; `guard-gate-strength.mjs`'s entry (`hooks/hooks.json:39`) declares no timeout at all
+  and inherits the runner's default. Today's two window-check spawns are bounded at 5 s each, i.e. already at
+  that ceiling in the worst case; the nine added ones are bounded by nothing.
+- **It is paid per tool call, not per window.** A maintenance window exists precisely so that guarded paths can
+  be edited, so its natural shape is a burst of dozens of `Edit`/`Write` calls over a few minutes, every one of
+  them matching the same rule and paying the full price again. §15.2.4's observation that the cost is zero on
+  every call where no window is active is correct and unchanged — it describes the case that was never the
+  problem.
+
+**R1 — the fourth `discoverRepository` call is removed.** `ledgerConfirmsLiveGmwGrant` no longer derives
+`repositoryFingerprint` itself; `readRegistryRepositoryFingerprint(rootDir)` (a new helper in the same module)
+reads it out of `governance/events/registry.json`, one small worktree file. This adds no trust:
+`verifyPortableGovernanceStream` re-derives the *physical* fingerprint through `assertPhysicalRoot` and fails
+`GES-CROSS-REPOSITORY` unless the caller's value **and** the registry's own value both equal it, so the
+caller-supplied term is an assertion target and never an authority. A wrong, stale or forged value can only
+make the read fail, which `ledgerConfirmsLiveGmwGrant`'s `catch` turns into `false` — the safe direction. This
+removes the only spawns this design was itself responsible for: 3 of the 9, on every uncached call.
+
+The remaining 6 spawns and 2 scans are the store's own shape, and §2's non-scope keeps the ledger's internals
+out of this design. They are therefore priced, memoized, and pinned by B-1 (§15.2.3b) rather than restructured
+here, so that a later store-side de-duplication — one `queryPortableGovernanceStream` that does not repeat
+`assertPhysicalRoot`/`loadRegistry`/`scanStream` immediately after `verifyPortableGovernanceStream` performed
+them — shows up as a falling number in a test rather than as an unnoticed one. That is a named, optional
+follow-up, not a precondition of this amendment.
+
+**The memo.** Three new exports in `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs` —
+`readGrantMemo`, `writeGrantMemo`, `GMW_LEDGER_MEMO_TTL_MS` — plus `readRegistryRepositoryFingerprint` above.
+
+- **Where.** `<tmpdir>/agent-pipeline-gmw-grant-memo/<sha256({schema, rootDir})>.json`, directory `0700`, file
+  `0600`, published by write-temporary-then-`rename` so a concurrent reader never observes a torn file. **No
+  new primitive is invented**: `plugins/pipeline-core/lib/native-hook-failure-memory.mjs` is the same shape for
+  the same reason — a machine-local, TTL-bounded, hook-written performance memory under `tmpdir()`, keyed by a
+  digest of its inputs, mode `0600`, whose own header states the governing doctrine ("deliberately not
+  authority state ... a missing, forged, or expired entry can only cause another fail-closed observation",
+  `:3-11`, `:17-20`, `:28-31`, `:43-53`) — and the atomic-publish idiom is GMW's own `writeAtomic`
+  (`guard-maintenance-window.mjs:247-256`).
+- **What it holds, exactly.** `{schema: "pipeline.gmw-grant-memo.v1", rootDir` (realpath)`, ruleDigest,
+  confirmed` (boolean)`, grantNotBeforeEpochMs, grantExpiresAtEpochMs, observedAtEpochMs, streamToken}`.
+  Deliberately **not** held: the window's `reason` — free text that `currentGuardMaintenanceWindow` does return
+  to its caller (`:549`) — the proof, the decision, the decision id, or any event payload. The memo is a
+  validity envelope, not a copy of the ledger; §5.1's exclusion list is honoured in a file that is not portable
+  anyway, and the memo therefore carries nothing that would have to be redacted if it ever were.
+- **`streamToken`.** `sha256({registryMtimeMs, registrySize, streamDirMtimeMs, sortedEventFileNames})` over
+  `governance/events/registry.json` and the human stream's own directory: one `stat`, one `stat` and one
+  `readdir`. No event file is opened, nothing is parsed, and no event's bytes are digested. Every append
+  publishes a new event file into that directory by atomic rename, so any appended disposition changes both the
+  directory mtime and the name set; any deletion changes the name set; a registry repointed at another storage
+  root changes the registry's `stat`.
+- **When a memo may be served — all six, or it is a miss.** (1) it parses and passes an exact closed-shape
+  check; (2) `rootDir` equals `realpathSync(projectDir)`; (3) `ruleDigest` equals the digest recomputed from the
+  **live** window record this same call just read; (4) `0 <= nowMs - observedAtEpochMs <=
+  GMW_LEDGER_MEMO_TTL_MS`, so a future-dated memo is a miss; (5) `streamToken` equals the token computed now;
+  (6) for `confirmed: true` only, `grantNotBeforeEpochMs <= nowMs <= min(grantExpiresAtEpochMs,
+  windowExpiresAtMs)`. Anything else — absent file, unreadable file, parse failure, any mismatch — is a
+  **miss**, and a miss performs the full read. **No miss ever yields `true` by itself.**
+- **`GMW_LEDGER_MEMO_TTL_MS = 60_000`.** A pinned module constant in the style of `MAX_WINDOW_TTL_MS`, not a
+  configuration knob: it is a safety bound, and a bound that an agent-writable configuration file could widen
+  would not be one.
+- **Negative memoization is included, deliberately.** A `confirmed: false` memo is served under (1)-(5) as
+  well. Serving a stale `false` can only refuse a lift, which is the direction §8.1 and §8.5 already choose
+  ("the direction that reduces agent capability always wins"), and without it the case "window armed, ledger
+  silent" — an agent already being refused — would pay the full 6-spawn/2-scan price on every tool call.
+
+**Why this cache cannot be wrong in the unsafe direction.** The unsafe direction is precisely one thing:
+answering `true` when a fresh read would answer `false`. Every way a live grant stops being live is enumerated,
+with what catches it:
+
+| How a live grant stops being live | Caught by |
+| --- | --- |
+| the grant's own validity elapses | condition (6), re-evaluated against `nowMs` on **every** hit; no I/O, so it cannot itself go stale |
+| the window is closed (`close` unlinks `window.json`, `guard-maintenance-window.mjs:574`) | not the memo's problem: `windowCoversRule` runs **first, uncached, on every call**, and `covered: false` short-circuits before the memo is read at all |
+| the window expires | same — `currentGuardMaintenanceWindow` re-derives `active` from the signed bound on every call (`:542-545`) |
+| a `revoked`/`expired`/`consumed` disposition is appended | condition (5): the append publishes a new file into the stream directory, changing both the directory mtime and the name set |
+| an event file is deleted (§15.2.4's disclosed residual) | condition (5): the name set changes |
+| the registry is repointed at a different stream | condition (5): the registry's `stat` changes |
+| the repository under `rootDir` is a different repository | condition (2) |
+| the window is replaced by a different one | condition (3): different `{scopeRuleIds, openingTreeSha256}` is a different `ruleDigest` |
+| the stream becomes corrupt, so a fresh read would fail `GES-CHAIN` | conditions (4)+(5) — **partially**: a content-only edit that changes neither the name set nor the directory mtime is not detected structurally, and is bounded by the TTL instead |
+
+Exactly one row is not caught structurally, and it is bounded rather than left open. In every other row the memo
+is invalidated before it can answer, and every failure of the memo machinery itself degrades to a miss, i.e. to
+a full fresh read. **There is no code path in which an absent, stale, unparsable or mismatched memo produces
+`true`.**
+
+**The forgeable-memo question, answered rather than asserted.** The memo is a file, on a filesystem an agent
+with local write access can write. A forged memo saying `confirmed: true` would make the hook take the lift
+branch. What that buys the forger is nothing it did not already have, for the reason §15.2.1 quotes from
+§8.5.2: **the proof-verified window record remains a necessary condition and is checked first, uncached, on
+every call.** No memo can manufacture a `window.json` carrying a valid detached Ed25519 signature over an
+intent digest; without one, `covered` is `false` and the memo is never consulted. The most a forged memo
+achieves is to suppress the *ledger* half of the intersection for at most `GMW_LEDGER_MEMO_TTL_MS` — that is,
+to restore, for one minute, exactly the pre-O-2 behaviour in which the window record alone decided.
+
+That capability is not new, and it is strictly weaker than one this section already discloses: §15.2.4 records
+that an agent with local write access to the human stream's storage root can delete a disposition file and make
+a disposed grant read as live **permanently**, defeating the same half of the intersection with no expiry at
+all. The memo adds a second, TTL-bounded instance of a residual whose unbounded instance is already on the
+record. One respect in which it is nevertheless a real delta is stated rather than absorbed: the stream lives in
+the worktree, where a tampered or deleted event is at least in principle visible to `git status` and to review,
+while the memo lives under `tmpdir()` and is visible to nobody. Both the bound and the delta are carried in
+§15.1.6.
+
+Two things this design deliberately does **not** do about that:
+
+- **It does not MAC or sign the memo.** A MAC key readable by the same user is tamper-*evidence* against
+  corruption, not a defence against the adversary §1 names, and presenting it as one would be the overclaim this
+  document exists to avoid. HGO's MAC over `audit.jsonl` is not a counter-example: it protects a machine-local
+  record whose *contents are* authority, whereas the memo's contents are a cache of a value that is itself not
+  authority (§8.5.2: the ledger side "can never produce a lift by itself").
+- **It does not move the memo to `<git-common-dir>/agent-pipeline/…`, beside GMW's own window record.** That
+  location would be marginally better protected — §15.1.2 establishes that `gateStrengthRuleFor`
+  (`guard-gate-strength.mjs:170-178`) reaches paths under `.git` in this repository's standard topology with one
+  `GATE_STRENGTH_PATHS` entry — but *resolving* `<git-common-dir>` costs the very git subprocesses the memo
+  exists to avoid, and `topology` (`guard-maintenance-window.mjs:202-210`) is not available for production reuse
+  (`guardMaintenanceWindowInternals` is marked "Exposed only for tests", `:578`). A cache whose lookup costs two
+  subprocesses gives back most of what it saves. The trade is recorded here so the next reader sees that it was
+  taken, not missed.
+
+**What a hit costs.** `windowCoversRule` as today (2 spawns, one Ed25519 verification, two small reads), plus:
+one memo read, one `stat` of `registry.json`, one `stat` and one `readdir` of the stream directory, one sha256
+over a handful of short strings. **Zero added subprocesses, zero event files opened, zero hash-chain
+verification, and no term that grows with the size of the human stream.** A miss costs the 6 spawns and 2 scans
+priced above plus one memo write, and occurs at most once per `GMW_LEDGER_MEMO_TTL_MS` per
+`(rootDir, ruleDigest)`, plus once whenever the stream, the registry or the window actually changes.
+
+**The residual cost, stated as a bound rather than an average.** The worst single call is still a miss, and a
+miss still contains 6 `git` spawns with no per-spawn timeout, inside the store. The memo bounds how *often* that
+path runs; it cannot bound how long one hung `git` takes, because `spawnSync` blocks the event loop. Bounding
+that means passing a `timeout` at the store's own `discoverRepository` call — one argument in
+`governance-event-store.mjs`, which is outside this dispatch and outside §2's non-scope. It is recorded in
+§15.1.6 with that one-line fix named, and B-1 asserts the shape of the cost so the exposure cannot silently
+grow.
+
+#### 15.2.3b B-1 — the budget test
+
+Specified here, written by the implementation dispatch. It extends the integration test
+`plugins/pipeline-core/scripts/guard-authority-ledger-intake.test.mjs` that §11 creates and §15.3 already
+extends once — one row, extended twice, not duplicated, the same direction §9 uses for
+`scripts/governance-authority.mjs`.
+
+Fixture: a temporary repository with a registry, a human stream seeded with **1 000** retained events, and an
+armed window whose `{scopeRuleIds, openingTreeSha256}` match a live `granted` decision. Assertions are
+**structural first, wall-clock second**, because a wall-clock-only budget test pins nothing about the mechanism
+and flakes on shared CI:
+
+1. **Cold miss and warm hit, through the injected reader seam.** `ledgerConfirmsLiveGmwGrant` takes
+   `queryDecisions = queryHumanGovernanceDecisions` (§15.2.3), the same injected-default convention
+   `guard-maintenance-window.mjs` already uses for `spawn`. A cold call invokes `queryDecisions` **exactly
+   once**. A second call inside the TTL, made with a `queryDecisions` stub that **throws if invoked at all**,
+   returns `true` — an answer that touched the stream could not pass this test.
+2. **Burst.** 50 consecutive lifted calls inside one TTL invoke `queryDecisions` exactly **once**, not 50
+   times. With a counting `spawn` injected into `windowCoversRule`, the same 50 calls perform exactly 2 spawns
+   each — today's cost, unchanged — and the memo adds none.
+3. **What (1) and (2) do and do not prove, stated so the coverage is not overclaimed.** The 6 store-internal
+   git spawns and 2 stream scans are **not** reachable from any injection seam this design owns; they are the
+   traced cost of one `queryDecisions` invocation (§15.2.3a's table), so counting invocations is what pins
+   them. A test that also wants the raw spawn count must shim `git` on `PATH`, which is platform-bound and is
+   deliberately not required here.
+4. **Invalidation — the load-bearing safety assertion.** After a `revoked` disposition is appended to the
+   stream, the very next call returns `false` **immediately, without waiting for the TTL**, because the stream
+   token changed. Repeated, each as its own case, for: an event file deleted; the registry repointed at another
+   storage root; the window replaced by one with different `scopeRuleIds`.
+5. **Expiry is never served stale.** A memo written while the grant was live yields `false` on the first call
+   after `min(grantExpiresAtEpochMs, windowExpiresAtMs)` has passed, with the stream untouched and the TTL not
+   yet elapsed — driven by an injected `nowMs`, never by a sleep.
+6. **A miss never grants.** A truncated memo, a memo carrying one extra key, a memo for a different `rootDir`,
+   a memo with a future `observedAtEpochMs`, and an absent memo each force the full read; each, with
+   `queryDecisions` stubbed to reject, returns `false`.
+7. **Wall clock, as a ceiling with margin rather than as a measurement.** The complete hook step
+   (`windowCoversRule` + `ledgerConfirmsLiveGmwGrant`) completes in **< 1 000 ms** on a cold miss at 1 000
+   retained events and **< 250 ms** on a hit — 10 % and 2.5 % of `guard-testpath.mjs`'s declared 10 s runner
+   budget (`hooks/hooks.json:61-65`). The ceilings sit an order of magnitude above the expected cost and an
+   order of magnitude below the timeout on purpose: assertions 1-2 pin the shape of the cost, and 7 fails only
+   when something has gone badly wrong.
 
 #### 15.2.4 Failure mode, specified explicitly
 
@@ -2127,9 +2398,18 @@ harder than today's ordinary refusal, and it can never grant one it would not al
 window check still runs first and is still required (`covered` must be `true` before the ledger call happens
 at all), so the ledger read is purely narrowing, consistent with §8.5's rule stated as one line: "the direction
 that reduces agent capability always wins." The added cost is scoped to exactly the case that matters — an
-active window claiming a lift — and is zero on every call where no window is active, which is the overwhelming
-common case; §8.5.2's "per-call read I/O" concern is therefore bounded to the rare case, not paid on every tool
-call as its original phrasing implied.
+active window claiming a lift — and is zero on every call where no window is active. That bound is real but
+narrower than an earlier revision of this paragraph implied: inside an active window the case is not rare at
+all, it is every guarded edit the window exists to permit, and §15.2.3a prices it, corrects the "one more read"
+claim it rested on, and specifies the memo that bounds it.
+
+**The memo's failure mode is the same one, by construction.** `readGrantMemo` never throws: an absent,
+unreadable, unparsable, mismatched, future-dated or expired memo is a *miss*, and a miss performs the full read
+whose failure mode is the paragraph above. `writeGrantMemo` never throws either, and a failed write is ignored —
+the next call is simply another miss. There is no state of the memo machinery in which
+`ledgerConfirmsLiveGmwGrant` returns `true` without either a fresh confirming read or a memo that satisfied
+every one of §15.2.3a's six conditions, and none in which it blocks a tool call harder than today's ordinary
+refusal.
 
 One honest consequence, stated rather than hidden: a lift that used to succeed on the machine-local window
 record alone now **also** requires the ledger to confirm it, so an unreadable ledger denies a lift the window
@@ -2146,30 +2426,52 @@ passes **no** `checkpoint`, because none is available to it — the machine-loca
 `scopeRuleIds` and `openingTreeSha256` (above), and `lib/guard-maintenance-window.mjs` cannot change to add a
 retained ledger sequence without violating the "no change" constraint this design already preserves (§7.1,
 A-3, §11). Without a `checkpoint`, `verifyPortableGovernanceStream` always returns `completeness: "unknown"`
-and `integrity: "prefix-valid"` (`governance-event-store.mjs:687`) — never `"verified"`/`"valid"` — regardless
+and `integrity: "prefix-valid"` (its own `if (!checkpoint) return …` early return; symbol-anchored per the
+line-number note in §15.2.3a, and an earlier revision's `:687` no longer resolves to it) — never
+`"verified"`/`"valid"` — regardless
 of the ledger's actual state, so gating on those fields the way the other consumers do is not written into this
 design: gating on `completeness` would always refuse, and gating on `integrity` would never refuse, since it is
 unconditionally `"prefix-valid"` here. What the read still gets for free, unconditionally, is `scanStream`'s
-hash-chain re-verification of every retained event on every call (`governance-event-store.mjs:453-457`,
-`GES-CHAIN`) — a corrupted or non-contiguous stream still fails, which `ledgerConfirmsLiveGmwGrant`'s own
-`catch` turns into `false`. What it does **not** get, and could not get without a checkpoint no producer here
+hash-chain re-verification of every retained event on every call (its `previousEventDigest`/`sequence`
+contiguity loop, failing `GES-CHAIN`; an earlier revision's `:453-457` pointed at neither the function nor the
+loop) — a corrupted or non-contiguous stream still fails, which `ledgerConfirmsLiveGmwGrant`'s own
+`catch` turns into `false`. That same loop is the dominant per-call cost §15.2.3a prices and the memo bounds in
+frequency; nothing about the memo weakens it, because a memo miss runs it in full. What it does **not** get,
+and could not get without a checkpoint no producer here
 retains: proof that the retained stream is *complete* — that no disposition (`revoked`/`expired`/`consumed`)
 that once existed for this grant was later deleted from the end of the stream. This read cannot distinguish
 "no disposition exists" from "a disposition existed and the on-disk record for it was removed"; an agent with
 local write access to the human stream's storage root could delete a disposition file and make a lifted grant
-continue to read as live here. This is a genuine, new residual, disclosed rather than assumed away: it does not
-weaken H-AC-02's satisfaction at any boundary that *does* hold a checkpoint (arming, consumption, status,
-reconcile — §8.5.2, unaffected by this section), and is tracked as a residual of the hook-path closure
-specifically, owner `pipeline` (PHX-2), alongside §15.1.6's residuals.
+continue to read as live here. This is a genuine residual, disclosed rather than assumed away — and it is
+**not** confined to the hook, which an earlier revision of this sentence claimed by saying it "does not weaken
+H-AC-02's satisfaction at any boundary that *does* hold a checkpoint (arming, consumption, status,
+reconcile)". Those boundaries are not specified to hold one anywhere in this document: §7.4 step (d) relies on
+"the store's own readback" and names no checkpoint, and §7.5's reconcile names none either. Calling it a
+hook-only residual understated it. It is carried as a residual of this design's checkpoint-less read posture,
+owner `pipeline` (PHX-2), in §15.1.6 — which, until this revision, did not in fact carry it, although this
+paragraph already said it did. Whether the arming and consumption boundaries should retain and pass a
+checkpoint is a design question this amendment does not open and does not answer; it is recorded there so the
+next revision inherits it as a question rather than as a settled claim.
 
 #### 15.2.5 What this removes from increment 2, and what remains
 
-D-2 (§2, "synchronous dual-evaluation inside the guard hot path") is **fully closed** by §15.2.3 — nothing
-partial is left over. §8.5.2's "the hooks that call `windowCoversRule` appear in §9's amendment rather than in
-§11's increment-1 inventory" no longer applies: they are named and specified above, as part of increment 1.
-§14's O-2 entry ("known non-conformance... owner `pipeline`... no date") is resolved: H-AC-02
-(`acceptance.md:143-144`) is satisfied at the hook as of this amendment, not only at the arming/consumption/
-status/reconcile boundaries. H-AC-12's migration clause and its expiry (§9) are untouched — that amendment
+D-2 (§2, "synchronous dual-evaluation inside the guard hot path") is closed by §15.2.3 **as a placement
+decision**: the dual evaluation now runs inside the synchronous guard hook, in increment 1, and no part of that
+move is left to increment 2. §8.5.2's "the hooks that call `windowCoversRule` appear in §9's amendment rather
+than in §11's increment-1 inventory" no longer applies: they are named and specified above, as part of
+increment 1. **What is *not* closed is the assurance of the read that now runs there**, and an earlier revision
+of this paragraph asserted the opposite by writing "fully closed — nothing partial is left over" three
+paragraphs after §15.2.4 disclosed a live residual of its own. §14's O-2 entry ("known non-conformance... owner
+`pipeline`... no date") is resolved **in the respect it was raised**: H-AC-02 (`acceptance.md:143-144`) no
+longer has an interval between two boundaries in which the hook honours mutable state claiming human authority
+with *no ledger decision consulted at all*. The hook consults one, on every lifted call. It is satisfied at the
+hook against every state that read can distinguish — and it is **not** discharged against an agent with local
+write access to the human stream's storage root, which can delete a disposition and make a disposed grant read
+as live (§15.2.4), nor against one that forges the memo, which suppresses the same half of the intersection for
+up to one minute (§15.2.3a). Both are carried in §15.1.6, owner `pipeline` (PHX-2). Increment 1 therefore ships
+O-2's mechanism, not a discharge of every assurance question the mechanism raises; that is the same distinction
+§5.2's R-3 draws for H-AC-11, drawn here for the same reason — a closure claim wider than its evidence is the
+failure this document exists to avoid. H-AC-12's migration clause and its expiry (§9) are untouched — that amendment
 bounds a different clause and was never O-2's subject. D-1 (the restricted attribution store, §5.4) is **not**
 affected by this section; it remains increment 2, and §15.1 does not depend on it (§15.1.2 explicitly avoids
 the kernel path D-1 would need).
@@ -2180,8 +2482,9 @@ The rows below are additions to, or modifications of, §11's table; §11 itself 
 
 | File | Change | Rationale |
 | --- | --- | --- |
-| `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs` | **extend** the create already specified in §11: add `ledgerConfirmsLiveGmwGrant` (§15.2.3) alongside the write-side builders. Same file, one more export. | keeps every ledger-reading and ledger-writing entry point for this design in one module, per §7.1's own reasoning |
+| `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs` | **extend** the create already specified in §11: add `ledgerConfirmsLiveGmwGrant` (§15.2.3) alongside the write-side builders, plus the memo and cost-bounding surface of §15.2.3a — `readGrantMemo`, `writeGrantMemo`, `readRegistryRepositoryFingerprint`, `GMW_LEDGER_MEMO_TTL_MS`. Same file, five more exports. | keeps every ledger-reading and ledger-writing entry point for this design in one module, per §7.1's own reasoning; the memo is the read path's own concern and belongs beside it, not in a new module |
 | `plugins/pipeline-core/scripts/guard-authority-ledger-intake.test.mjs` | **extend** the create already specified in §11: integration tests for the narrowing read (ledger confirms → lift proceeds; ledger silent/absent/corrupted → lift denied exactly like an absent window; a disposed grant → denied) | moves an O-2 non-conformance out of "no test exists for it" the same day it moves out of "not implemented" |
+| `plugins/pipeline-core/scripts/guard-authority-ledger-intake.test.mjs` | **extend a second time — the same row, not a duplicate of it** (the "one row, extended twice" direction §9 already uses for `scripts/governance-authority.mjs`): add **B-1**, the budget test specified in §15.2.3b — cold-miss/warm-hit through the injected `queryDecisions` seam, the 50-call burst, the four invalidation cases, expiry-never-served-stale, five miss-never-grants cases, and the wall-clock ceilings (< 1 000 ms cold, < 250 ms warm) against `guard-testpath.mjs`'s declared 10 s runner budget (`hooks/hooks.json:61-65`) | §15.2.3a corrects a false cost claim; a corrected claim with no test is the same claim one revision later. B-1 is what keeps the bound true after the next change to the store, and its structural assertions fail on a regression the wall clock would hide |
 | `plugins/pipeline-core/hooks/guard-testpath.mjs` | **modify**: call `ledgerConfirmsLiveGmwGrant` after `windowCoversRule` returns `covered: true` (§15.2.3) | closes H-AC-02 at the TP-* hook path (§15.2.2 identifies this as an actual call site; the original §11 named no hook file at all for increment 1) |
 | `plugins/pipeline-core/hooks/guard-gate-strength.mjs` | **modify**: same change, GS-6 only (§15.2.3) | closes H-AC-02 at the GS-6 hook path |
 | `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` | **no change** | §15.2.2's correction: this file does not call `windowCoversRule` and has no role in O-2's closure |
@@ -2199,6 +2502,13 @@ The rows below are additions to, or modifications of, §11's table; §11 itself 
   H-AC-11 amendment text is proposed in §15.1.5 and applied by the reviewed rebind, not here — and, unlike
   O-2, that step has not yet happened as of this document: §13 AC-14 is this document's own gate against
   declaring the mechanism complete before it does.
-- **O-2 — resolved.** Mechanism specified in §15.2; D-2 is fully closed and pulled into increment 1 (§15.2.5,
-  §15.3). H-AC-02 is satisfied at the guard hook as of this amendment; no non-conformance remains open for it.
+- **O-2 — mechanism resolved; three assurance residuals open and tracked.** Mechanism specified in §15.2;
+  D-2's *placement* is closed and pulled into increment 1 (§15.2.5, §15.3), with the real execution cost traced
+  in §15.2.3a — nine added git subprocess spawns and two full O(n) hash-chain re-verifications per lifted tool
+  call, not "one more read" — bounded by the memo specified there and pinned by budget test B-1 (§15.2.3b).
+  H-AC-02 is satisfied at the guard hook against every state the hook's read can distinguish. It is **not**
+  discharged against an agent with local write access to the human stream's storage root (§15.2.4) or to the
+  memo (§15.2.3a), and a miss still contains six git spawns with no per-spawn timeout; all three are in
+  §15.1.6, owner `pipeline` (PHX-2). An earlier revision of this bullet read "no non-conformance remains open
+  for it", which was wider than §15.2.4's own disclosure in the same document, and is corrected here.
 - **O-3, O-4, O-5 — unchanged.** Not reopened by this section.
