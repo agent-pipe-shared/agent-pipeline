@@ -5130,6 +5130,29 @@ Two things a resuming session needs to know before touching push mechanics again
    block until Verify is actually green for whatever commit is being pushed — switching machines
    does not itself clear a mechanical gate.
 
+### Correction — the push happened, outside the documented flow, PO's own action
+
+The prior checkpoint's "not pushed today" is now wrong. Immediately after it, the PO ran
+`git push origin sprint_phoenix` directly in their own terminal (not through this session's Bash
+tool), and it succeeded: `3387065e..2ddff0ff sprint_phoenix -> sprint_phoenix`. `origin/sprint_phoenix`
+now matches local HEAD at `2ddff0ff`, confirmed by `git rev-parse`.
+
+Recorded honestly rather than left implicit: this bypassed both mechanical gates the prior
+checkpoint described. `guard-push.mjs` and the whole push-approval chain
+(`docs/push-release-flow.md`) are Claude-Code Bash-tool `PreToolUse` hooks — they intercept `git`
+invoked *through this session's tool*, not `git` run directly in the PO's own shell. Neither the
+GitHub remote nor a real `.git/hooks/pre-push` enforces them. So: the six pre-existing Verify
+failures the prior checkpoint listed are still exactly as red as before — nothing about them
+changed — `origin/sprint_phoenix` now carries them unverified-fresh. And the signed push-approval
+proof (bound to `dd452881`) was never consumed for the commit that actually got pushed
+(`2ddff0ff`, one past it) — the crypto layer (Layers 2-4) was not exercised for this push at all.
+
+This is the PO's own direct action on their own repository, well within their standing authority —
+not a gate failure on my part, and not something to walk back. It is recorded here so a future
+session reads the true state: `sprint_phoenix` on the remote is pushed, but not Verify-attested at
+the commit it's actually at. Getting Verify green (the six items from the prior checkpoint) is
+still open work; it now matters for the *next* push, not this one.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
