@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
+closed_at: 2026-08-10
+closure_repository: self
+closure_commit: 049ab1a8bc5224345cae2e8a48ced0ebe2c030e5
+closure_evidence: backlog/evidence/2026-08-10-docs-state-md-live-sync-closure.md
 source: "Live Codex+Pipeline 0.5.4 greenfield test session, 2026-08-09 (three rollout files): docs/state.md said 'submit the plan for PO approval' while project/pipeline-state.json's activeFeature.phase was already 'implementation' and planApproved was already true. Confirmed by direct code reading against plugins/pipeline-core/lib/onboarding-continuity.mjs."
 due: 2026-08-23
 ---
@@ -63,7 +67,21 @@ mechanism. See the same-session commit for the caveat wording.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — option 1 (regenerate on every relevant command),
+  per explicit PO decision, 2026-08-10 ("okay mache B" — the item's own
+  numbering, restated to the PO as option B in the decision brief).
+- **Rationale:** Bounded and bindable to the seven concrete
+  phase/approval-changing commands already enumerated in this item's own
+  "Why this needs a dedicated design pass" section; a pure, fully-unit-tested
+  renderer plus a fail-closed splice keeps the risk of an incomplete audit
+  low, and the sync is wired as strictly advisory (never gates a command's
+  own exit code).
+- **Assignment:** GF-090 (goldfish-deep), self-verified by the Elephant
+  (both commits' diffs read directly). Landed as two commits: `1b9ca12e`
+  (the pure `nextActionSection`/`replaceNextActionSection`/
+  `syncStateMdNextAction` functions, 14 new unit tests, no
+  `pipeline-state.mjs` involvement) and `049ab1a8` (wiring all seven call
+  sites — `set-feature`, `set-phase`, `submit-plan`, `reopen-design`,
+  `approve-plan`, `revoke-plan`, `close-feature` — to call the sync
+  best-effort after their own state write already succeeded).
+- **Date:** 2026-08-10
