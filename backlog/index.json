@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2e6bfd91d526cb77fdb40e1cf574de0a9cc946a36c62d935f94c210df38d1871"
+    "transitionHead": "3c209f32f174d0d5c0d40833568c33fbcbd8e0ffc34f1b52c46422caf8bce734"
   },
   "counts": {
-    "open": 120,
+    "open": 121,
     "in_progress": 21,
     "closed": 44
   },
@@ -63,6 +63,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Critic round 1 of the 0.5.3 candidate, 2026-08-07 — the Critic reported its own route violation from direct same-dispatch evidence; the cause was found in the shipped agent definitions afterwards."
+    },
+    {
+      "id": "pipeline.agent-never-asks-po-for-key-directory-invents-one-instead",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "PO live observation, 2026-08-10, during the Claude Code greenfield test: 'er hat das key verzeichnis im setup nicht nachgefragt aber denkt sich jetzt die ganze zeit was aus.'"
     },
     {
       "id": "pipeline.agent-talks-itself-out-of-the-pipeline",

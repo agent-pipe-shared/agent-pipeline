@@ -11,6 +11,7 @@
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-definitions-pin-the-review-tier-model | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.agent-never-asks-po-for-key-directory-invents-one-instead | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.agent-talks-itself-out-of-the-pipeline | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | open | defect | pipeline | 2026-08-08 | — |
@@ -193,6 +194,6 @@
 
 ## Counts
 
-- open: 120
+- open: 121
 - in_progress: 21
 - closed: 44
