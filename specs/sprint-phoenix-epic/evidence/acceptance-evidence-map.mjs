@@ -906,6 +906,18 @@ const DELTA = {
   // 36/36 + governance-event-store's 28/28 tests pass.
   'R-AC-11': ['implemented', 'WP-R-AC11'],
 
+  // V-AC-06: all four clauses now pinned via deterministic string-level
+  // snapshots against the rendered HTML (the same assert.match(html, ...)
+  // technique V-AC-09 already established) -- CSP directive value,
+  // skip-link keyboard focus target, landmark/table accessibility
+  // structure (PHX-WP-V), and now the mobile/desktop breakpoint: the sole
+  // @media(max-width:42rem) rule verbatim (mobile) plus the exact default
+  // body/dl/th,td declarations it overrides (desktop). No headless-render
+  // infrastructure needed -- the renderer inlines CSS verbatim into one
+  // static <style> block, so the CSS text itself is the whole snapshot.
+  // 8/8 tests pass.
+  'V-AC-06': ['implemented', 'WP-V-AC06'],
+
   // E-AC-20: planAuditBundle's optional exportEvidence input narrows to
   // exportMetadata: {profileDigest, receipt} on the plan/manifest -- a
   // canonicalSha256 of the adapter profile plus the delivery receipt's own
@@ -1089,7 +1101,7 @@ const POINTERS = {
   'V-AC-03': 'evidence-view-model-tests: claims linked to canonical source record and exact candidate',
   'V-AC-04': 'evidence-view-model-tests: invalid topology yields an invalid view with no candidate or artifact leak',
   'V-AC-05': 'evidence-view-renderer-tests: deterministic redacted projection withholding artifact paths',
-  'V-AC-06': 'evidence-view-renderer-tests: exact CSP directive value, skip-link keyboard focus target, and landmark/table accessibility structure all pinned (PHX-WP-V, break-proofed). Mobile/desktop snapshot checks remain absent: a viewport meta tag and one CSS breakpoint exist but no test or tooling captures a deterministic snapshot of either, and this repo has no headless-render/visual-regression infrastructure at all',
+  'V-AC-06': 'evidence-view-renderer-tests (PHX-WP-V + WP-V-AC06): exact CSP directive value, skip-link keyboard focus target, landmark/table accessibility structure, AND mobile/desktop snapshot checks all pinned via deterministic string-level assertions against the rendered HTML -- the same technique V-AC-09 established, no visual-regression infrastructure needed. 8/8 tests pass',
   'V-AC-07': 'evidence-viewer-tests: input-side rejection was already pinned; a new assertion tampers the generated viewer file and proves canonical authority stays unchanged and re-derivation never yields a pass claim (PHX-WP-V, break-proofed)',
   'V-AC-08': 'evidence-view-model-tests: exact canonical lifecycle state or a typed unavailable result',
   'V-AC-09': 'evidence-view-renderer-tests: all seven required fixtures now covered -- pass/fail/unknown pre-existing, tampered/misplaced/orphaned/legacy-layout added with deterministic snapshots (PHX-WP-V, break-proofed)',
