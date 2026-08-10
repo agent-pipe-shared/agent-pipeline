@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate ea2ef4d730922992a3bb17548f4269f9c5850566 — 2026-08-10, range 3387065..ea2ef4d7, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `b1190dac` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `ca0a9167` through `ea2ef4d7`: WP-E-AC20's dispatch, closure, evidence-map booking, and
+checkpoint. No code in this range touches the canonical artifact topology ADR-0045 governs beyond
+ordinary content evolution inside files it already lists. Same reading as the whole chain:
+`docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan/design-doc set stays
+ADR-0045.
+
 ## Candidate b1190dacd1eda26fa93a4af846f7ab2d6522d5dc — 2026-08-10, range 3387065..b1190dac, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
