@@ -6,7 +6,7 @@ owner: pipeline
 status: open
 created: 2026-08-10
 source: "Found on 2026-08-10 by the WP-O1O2-CACHING-REWORK1 dispatch while fixing a related, narrower gap (the module hosting O-2's new ledger-narrowing check was not a NEVER_LIFTABLE_KERNEL_PATHS member). While proposing that fix, the dispatch checked the two real GS-6/TP-* call sites named in the O-1/O-2 design doc and found the same class of exposure already existed, independent of anything this sprint added. Verified independently by the Elephant against source before filing."
-due: null
+due: 2026-09-09
 ---
 
 # `guard-testpath.mjs` is not a never-liftable kernel path; its sibling `guard-gate-strength.mjs` already is

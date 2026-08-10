@@ -6,6 +6,7 @@
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.accepted-adrs-drift-from-implementation-undetected | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.adr-0045-topology-divergence-from-package-and-skill | open | defect | pipeline | 2026-08-09 | — |
@@ -52,7 +53,7 @@
 | pipeline.epic-file-contract-has-no-drift-check | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.first-verify-run-is-red-with-four-failures | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-override-route-advertised-not-offered | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | open | defect | pipeline | 2026-08-07 | — |
@@ -61,6 +62,7 @@
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | open | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.guard-testpath-not-kernel-protected | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
@@ -90,6 +92,7 @@
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
+| pipeline.po-approval-confirmation-missing-intent-digest | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-authority-decision-prd-candidate-static | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
@@ -142,6 +145,6 @@
 
 ## Counts
 
-- open: 84
+- open: 86
 - in_progress: 26
-- closed: 24
+- closed: 25

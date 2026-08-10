@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "Found while closing X-AC-14 under dispatch PHX-WP-X (2026-08-09), part of the Sprint Phoenix closure design's Class A wave. Confirmed at source by reading plugins/pipeline-core/lib/external-reference-adapter.mjs in full."
 due: 2026-09-08
+closed_at: 2026-08-09
+closure_repository: self
+closure_commit: 0d018453700bc7b5e08eac99d6b37ee428f31f60
+closure_evidence: backlog/items/2026-08-09-external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system.md
 ---
 
 # The external-reference adapter has no typed response to an unreachable external system
