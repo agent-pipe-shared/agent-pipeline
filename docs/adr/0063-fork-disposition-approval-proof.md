@@ -1,0 +1,43 @@
+# ADR-0063: fork disposition requires a PO approval proof, using the same signature/chat mode this repository already applies to push
+
+> Agent-Pipeline · Sprint Phoenix · as of 2026-08-10
+
+**Status:** accepted (2026-08-10, PO instruction, chat — recorded via `AskUserQuestion`, answer quoted verbatim below). **Refines** [ADR-0056](0056-push-approval-mode.md); **reuses** the primitive [ADR-0058](0058-guard-maintenance-window.md) and [ADR-0059](0059-signed-human-guard-override.md) already established for it.
+
+## Context
+
+K-AC-05's fourth (final, Opus-routed) Critic round found the governance-event-store's fork-disposition mechanism structurally insufficient, not merely incomplete. `assertForkDisposition`/`assertForkDispositionFields` (`plugins/pipeline-core/lib/governance-event-store.mjs:851-870`) accept a closed field set — `idempotencyKey, sequence, acknowledgedEventIds, reasonCode, disposedAtEpochMs` — with no field binding the record to an actual human or authority decision. Confirmed independently: any caller with library access can mint the record `recordGovernanceForkDisposition` (`:1041-1093`) treats as sufficient to end a stream's invalidity. Round 4 also confirmed no CLI surface reaches this mechanism (`governance-event.mjs`'s recovery-request key set has no `disposition` field at all — the mechanism is reachable only from inside the library), that the record binds `eventId` rather than a content digest, and that no compensating/superseding-record policy exists once write availability needs restoring afterward. This is redesign-scale work; K-AC-05's existing 4-round Critic cap governed a narrower design and was exhausted without resolving it, so the finding was parked pending PO input (`docs/state.md`, "K-AC-05 ROUND 4 (FINAL, OPUS-ROUTED)").
+
+Separately, this repository already has exactly the primitive this class of problem needs. [ADR-0056](0056-push-approval-mode.md) established `gates.push_approval` (`signature` default, `chat` opt-in) and the detached Ed25519 `po-approval-proof.mjs` primitive for push. [ADR-0058](0058-guard-maintenance-window.md) reused that same primitive, unmodified, for guard-maintenance-window lifts. [ADR-0059](0059-signed-human-guard-override.md) reused it a third time for signed human-guard-override arming, and states the standing principle this ADR now applies a fourth time: *"Every guard this repository ever adds that blocks an agent action gets the SAME lift shape... signature always, chat whenever the human has genuinely, committedly configured it... no file- or guard-specific exception."* `lib/critical-action-approval-request.mjs` already defines a closed `CRITICAL_ACTION_KINDS` family (`["push", "deploy", "publication"]`, `:12`) for exactly "an action needs a detached proof bound to its own subject" — a fork disposition is that same shape of problem: a durable governance record that must carry genuine human authority, not merely plausible shape.
+
+## Decision
+
+> *"wir machen 1. [Redesign dispatchen] aber bewusst falls möglich auch an die signature funktion und chat alternative binden (ja chat ist unsicher aber wer das aktiv wählt nimmt das in kauf - default ist die externe signature funktion die zB auch bei push genutzt wird)"*
+
+Clarification:
+
+- Add `"governance-fork-disposition"` as a fourth `CRITICAL_ACTION_KINDS` entry. `lib/po-approval-proof.mjs` and `lib/critical-action-approval-request.mjs` are reused unmodified — no new signing ceremony, no new trust anchor.
+- Mode is governed by the existing `gates.push_approval` setting. No new config key. `signature` (default, and every unreadable/unrecognised value, per ADR-0056 Decision 2) demands the same detached Ed25519 proof already used for push; `chat` records an attributed in-session clearance, exactly as weak and exactly as declared as push's `chat` mode (ADR-0056 Decision 4). No disposition-specific exception, per ADR-0059's standing principle.
+- The signed subject binds `repositoryFingerprint`, `streamId`, `sequence`, and the sorted set of the forked entries' `eventDigest` — content digests, not `eventId` strings. This replaces K-AC-05 Finding 5's identity-only binding as a side effect, not a separate fix.
+- `assertForkDisposition`'s closed field set gains a reference to the verified approval (a proof-digest / decision-reference field, mirroring how `pushApproval.lastApproved` records reference an approval rather than re-embedding the raw signature) — the exact field shape is resolved during implementation against the pattern `critical-action-approval-request.mjs` already uses for push, not invented fresh.
+- A CLI subcommand on `governance-event.mjs` becomes the sanctioned entry point for recording a disposition (closing Finding 2), taking `--proof` exactly as the push CLI does.
+- Findings 3 (read-path re-check of `acknowledgedEventIds`), 4 (symlink-ancestry check on the disposition path), and 6 (compensating/superseding-record policy) are in scope for the same implementation pass. This ADR authorizes redesign-scale work on the whole mechanism, not a proof-binding patch bolted onto an otherwise still-incomplete one.
+
+## Consequences
+
+**Positive:** closes K-AC-05's actual blocker (Finding 1: a self-mintable governance record) using an already-audited, already-Critic-reviewed primitive instead of inventing new trust machinery. One mode setting governs the whole repository's human-clearance strength, not a disposition-specific one that could drift out of sync with push's. Finding 5 (identity- vs content-binding) is resolved as a natural consequence of the subject shape rather than needing its own fix.
+
+**Negative:** `CRITICAL_ACTION_KINDS` grows for the first time since its three original members — every consumer that iterates or assumes exactly `["push", "deploy", "publication"]` (`critical-human-proof-policy.mjs`'s `requiredKinds`/`waivedKinds` handling, `pipeline-state.mjs`, `po-human-approval.mjs`) needs an explicit check that a fourth kind does not silently fall through unhandled. `governance-event-store.mjs` gains a dependency on `po-approval-proof.mjs`/`critical-action-approval-request.mjs`, coupling two previously independent trust-critical modules — a coupling that itself needs Critic scrutiny.
+
+**Risk:** a fork disposition is not naturally candidate-bound the way a push is — a stream's fork exists independent of any one commit. The subject fields above (`repositoryFingerprint`/`streamId`/`sequence`/forked `eventDigest`s) are the disposition's own equivalent of push's commit/tree binding; this substitution needs the same fail-closed rigor push's own findings already received under Critic review, not a lighter pass because the shape looks similar. This redesign starts a fresh 4-round Critic cap — K-AC-05's exhausted cap governed the old, narrower, self-mintable design, not this one.
+
+## Alternatives considered
+
+- **A disposition-specific config key (`gates.disposition_approval`).** Rejected: both the PO's own direction and ADR-0059's already-adopted standing principle point at reusing the single existing mode setting rather than adding a second one that must be kept synchronized with the first.
+- **A disposition-specific signed-proof primitive, separate from `po-approval-proof.mjs`.** Rejected: exactly the "bespoke mechanism per denial/action class" ADR-0059 already argued against and closed; no reason to reopen that question here.
+- **Bind the disposition proof to a git commit/candidate, the way push does.** Rejected: a governance-stream fork is not commit-scoped. Binding to an unrelated candidate commit would let a proof outlive the exact fork state it was signed for, or require re-signing on every unrelated commit — the stream's own identity is the correct subject.
+
+## Follow-up
+
+- K-AC-05's fresh Critic cycle (round 1 of a new 4-round cap) is required before this is booked `implemented` in the evidence map.
+- Before this ships: scan every consumer of `CRITICAL_ACTION_KINDS` for an assumption of exactly three members (part of the implementation dispatch's Definition of Done, not deferred cleanup).
