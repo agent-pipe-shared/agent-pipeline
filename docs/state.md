@@ -5067,6 +5067,69 @@ worth the PO's attention specifically: an agent claimed human authorization it n
 file that governs every future session's bootstrap. Surfacing this prominently rather than folding it
 into the general FAIL writeup.
 
+### Checkpoint — push chain complete except Verify; not pushed today, resume on another machine
+
+WP-PX0-AC0305-06-FIX2 (`43d42a23`, fixes F2/F3/F4) and WP-PX0-AC13-REDO (`ee8a38f0`, design
+Part B's actual two integration points) both landed. Both independently verified by the Elephant,
+not just the dispatch's own report: full diffs read, full suites re-run myself —
+`harness/scripts/pipeline-state.test.mjs` 468/468, `ruleset-freshness.test.mjs` +
+`pipeline-start-preflight.test.mjs` 49/49. Neither reached Critic review — explicit PO decision,
+time constraint ("critic wird zeitlich vermutlich nicht mehr drin sein"). **Neither is booked
+`implemented` in the evidence map.** `docs/doc-reconciliation.md` got a new entry (`dd452881`)
+covering `3387065..43d42a23`, naming this explicitly as an interim checkpoint, not a release.
+
+**Push-approval chain (Layers 1b-4) completed for commit `dd452881`** (tree `d885bbb3`):
+subject-sha256 `c83c78f4…` computed via the real `criticalActionSubjectSha256`, signed by the PO
+(`~/agent-pipeline-po-nova/proof-critical-push.json`), consumed via `pipeline-state.mjs
+approve-push` (`pushApproval.lastApproved.forCommit=dd452881`, by "APS",
+2026-08-10T09:16:48.378Z). Along the way found and fixed a real bug in the external PO
+directory's `trust-policy.json`: a stray `humanName` field the file's own `setup` command never
+writes, failing three `own()` two-key-exact checks in `po-human-approval.mjs` with the misleading
+message "external trust policy does not match the local public key". Fixed by rewriting the file
+to its expected two-key shape (outside the repo, PO-side, not a code change).
+
+**Layer 5 (actual `git push`) is blocked, and NOT by anything session-specific.**
+`guard-push.mjs` requires `evidence/verify-latest.json` at `exitCode: 0` for the exact pushed
+commit — unconditional, no waiver, checked once the push gate is active regardless of
+`gates.push_approval` mode. A fresh `node .git/phx-verify/harness/scripts/verify.mjs` run
+(clean worktree, candidate `dd452881`, binding `exact`) came back with **6 failing suites**, all
+confirmed pre-existing — traced to commits `1b266e2c`/`0d018453`/`b78fae10`, all older than
+today's two PX0 fixes, none touching `pipeline-state.mjs`/`ruleset-freshness.mjs`/
+`pipeline-start-preflight.mjs`:
+
+- `backlog-ledger-reconciliation-tests` / `backlog-state-check`: the 2026-08-09
+  external-reference-adapter backlog item is missing `closed_at`/`closure_repository`/
+  `closure_commit`/`closure_evidence`; the two 2026-08-10 backlog items (`guard-testpath...`,
+  `po-approval-confirmation...`) have a `due` that isn't an ISO calendar date; ledger event 242
+  names no current backlog item; `pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote`
+  has no transition-ledger entry.
+- `governance-replay-viewer-tests` / `governance-replay-cli-tests`: `GRV-CORRELATION` /
+  `LGE-CORRELATION` — fixture validation errors in `governance-replay-view.mjs`/
+  `lifecycle-governance-events.mjs` consumers.
+- `external-reference-tests`: 3× `ERA-REFERENCE` in `external-reference-adapter.mjs` consumers.
+- `verify-suite-registration-check`: 5 unregistered `*.test.mjs` files (`check-dispatch-
+  provenance.test.mjs`, `guard-git-phoenix-authority-grant.test.mjs`, `decision-reference-
+  dual-evaluation.test.mjs`, `human-authority-grant.test.mjs`, `po-approval-gate.test.mjs`) —
+  registering them means editing `verify.mjs` itself, which is TP-3-protected: needs its own
+  signed GMW, not a quick patch.
+
+**PO decision: do not force this tonight.** Estimated real fix cost (diagnosis + a second TP-3
+GMW signing round) is 30-60+ min, none of it related to PX0-AC-03/05/06/13. Nothing is at risk by
+waiting — everything is committed, doc-reconciled, and Elephant-verified locally. Resume next
+session: get Verify green (fixing the six items above, likely as their own small dispatches, NOT
+folded into the PX0 packages), then push. **The PO plans to attempt the push from a second
+machine.**
+
+Two things a resuming session needs to know before touching push mechanics again:
+1. The signed proof at `~/agent-pipeline-po-nova/proof-critical-push.json` is bound to exactly
+   commit `dd452881`/tree `d885bbb3` and expires `2026-08-10T13:15:00.000Z` — any further commit
+   (e.g. the six Verify fixes) invalidates it; Layers 2-4 must be redone for the new candidate.
+2. `guard-push.mjs`'s Verify check is commit-and-hook bound, not session-bound: if the same
+   `pipeline-core` hooks are installed on the second machine (expected, per the standing
+   two-machine setup), a plain `git push origin sprint_phoenix` there will hit the identical
+   block until Verify is actually green for whatever commit is being pushed — switching machines
+   does not itself clear a mechanical gate.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
