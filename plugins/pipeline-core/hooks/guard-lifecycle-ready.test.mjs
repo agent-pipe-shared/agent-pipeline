@@ -34,6 +34,7 @@ import {
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
   isRestartResumeHintInputWrite,
+  isSanctionedGhReadOnlyDiagnostic,
   isSanctionedLifecycleCommand,
   machinePlaneFilePath,
   main,
@@ -1115,6 +1116,42 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
         projectDir: path,
         requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
       }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GF-097. `gh --version` and `gh auth status`, bare, are GitHub CLI's own documented
+ * read-only diagnostics and must reach the operator even while lifecycle is not-ready --
+ * the same class of gap GF-093 closed for the onboarding CLI's `--help`, but for a
+ * third-party binary rather than a bundled script (guard-lifecycle-ready.mjs,
+ * isSanctionedGhReadOnlyDiagnostic()). This is a narrow, exact-shape admission for two
+ * specific invocations, never a blanket `gh` carve-out -- the negative list below proves
+ * near-miss `gh` shapes (extra flags, a different subcommand, no args at all) stay refused.
+ */
+test("GF-097: bare `gh --version` and `gh auth status` are admitted while lifecycle is not-ready, and no other `gh` shape is", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const nonReady = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
+    };
+    for (const command of ["gh --version", "gh auth status"]) {
+      assert.equal(isSanctionedGhReadOnlyDiagnostic(command, path), true, command);
+      assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), nonReady), { exitCode: 0, stderr: "" });
+    }
+    for (const command of [
+      "gh pr create",
+      "gh auth login",
+      "gh repo clone owner/repo",
+      "gh --version --help",
+      "gh auth status --hostname example.com",
+      "gh",
+      "gh auth",
+    ]) {
+      assert.equal(isSanctionedGhReadOnlyDiagnostic(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), nonReady).exitCode, 2, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

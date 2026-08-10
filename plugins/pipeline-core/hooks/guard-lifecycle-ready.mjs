@@ -1658,6 +1658,39 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
 }
 
 /**
+ * GF-097: a bare `gh --version` and a bare `gh auth status` are GitHub CLI's own
+ * documented read-only diagnostics -- the former only prints the installed CLI version
+ * (`gh --help`), the latter only reports which account(s) are authenticated and to which
+ * hosts (`gh auth status --help`); neither writes to the repository, the remote, or any
+ * credential store. Confirmed live 2026-08-10: a Codex session had both refused with the
+ * generic GUARD-LIFECYCLE-NOT-READY denial, identically to a real mutating `gh` command,
+ * while diagnosing an unrelated push problem.
+ *
+ * Deliberately NOT a branch inside isSanctionedLifecycleCommand() above: that function's
+ * simpleWords()-based dispatch is keyed on a trusted `node <script>` first word, and `gh`
+ * is a different binary entirely -- one this codebase does not own the source of. That is
+ * a materially different trust basis than GF-093's `--help` admission (sanctionedOnboardingArgs()
+ * above), which could point at the bundled script's own source (`main()` returns before any
+ * filesystem access) as its proof of safety; no such proof is available for a third-party
+ * binary. The trust basis here is instead GitHub CLI's OWN documented behaviour for exactly
+ * these two invocation shapes, stated rather than papered over.
+ *
+ * Narrow by construction, exactly like every sibling admission in this file: only these two
+ * EXACT bare shapes -- no extra flag, no other subcommand, no partial-match tolerance, never
+ * a blanket `gh` carve-out. `gh pr create`, `gh auth login`, `gh repo clone`,
+ * `gh --version --help` and `gh auth status --hostname <host>` all still fall through to the
+ * ordinary GUARD-LIFECYCLE-NOT-READY refusal below, unchanged.
+ */
+export function isSanctionedGhReadOnlyDiagnostic(command, root, options = {}) {
+  const words = simpleWords(command, root, options);
+  if (!words || words.length === 0) return false;
+  if (!["gh", "gh.exe"].includes(basename(words[0]).toLowerCase())) return false;
+  const args = words.slice(1);
+  if (args.length === 1 && args[0] === "--version") return true;
+  return args.length === 2 && args[0] === "auth" && args[1] === "status";
+}
+
+/**
  * ADR-0059 Decision 5 / NOVA-LCR-HGO-2: everything below -- the LAUNCH_SCRIPT
  * external-restart refusal and the onboarding-readiness gate (denial code
  * GUARD-LIFECYCLE-NOT-READY) -- stays outside HGO's authority no matter how the
@@ -1722,7 +1755,8 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && isExactPoAuthorityRebindPlannerRecovery(input.tool_input.command, root, dependencies);
     if (exactPoAuthorityRebindRecovery) return verdict(0);
     return toolName === "Bash"
-      && isSanctionedLifecycleCommand(input.tool_input.command, root)
+      && (isSanctionedLifecycleCommand(input.tool_input.command, root)
+        || isSanctionedGhReadOnlyDiagnostic(input.tool_input.command, root))
       ? verdict(0)
       : blocked(
         "GUARD-LIFECYCLE-NOT-READY",
