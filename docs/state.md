@@ -4321,6 +4321,39 @@ separately PO-approved wiring wave, not wiring itself.
 
 **Live now:** WP-K-AC05-REDESIGN, WP-O1O2-CACHING.
 
+### WP-K-AC05-REDESIGN VERIFIED AND COMMITTED (`204c71e9`) — FRESH CRITIC ROUND 1 DISPATCHED
+
+WP-K-AC05-REDESIGN returned verified-green but had not committed (stopped on its own tool-budget
+condition after verification). Independently verified before doing anything with it: `git diff
+--stat` matched the report's five-file list exactly; read the full diff of all five files myself
+rather than trusting the report's description; re-ran `node --test` on both directly-relevant
+suites (37/37, 3/3) AND the broader consumer sweep (`critical-action-approval-request.test.mjs`,
+`critical-human-proof-policy.test.mjs`, `guard-push.test.mjs` — 5/5, 146/146, 31/31), all green,
+matching the report; grepped the test diff for `.only`/`.skip`/weakened-assertion patterns —
+none found, zero removed `assert.` lines. The `forkDispositionCandidate` substitution (a
+deterministic, domain-separated hash standing in for the primitive's normally-git-bound
+`candidate` slot, since a fork is not commit-scoped) read as sound: it carries no independent
+binding of its own, is a pure function of the signed subject, and `verifyCriticalActionApprovalRequest`
+compares the request's candidate against the store's OWN rebuild from `inspectStreamForForks`'s
+real fork data — a caller cannot choose an arbitrary candidate the way it could self-mint the old
+disposition. Committed myself (`204c71e9`, exact five paths, `Dispatch: WP-K-AC05-REDESIGN
+(goldfish)` trailer preserved) since the work was verified-complete, only the mechanical `git
+commit` step was left undone.
+
+Findings 1/2/3/4/5 closed; Finding 6 (compensating/superseding-record policy) left as an explicit,
+disclosed residual — real redesign-scale work of its own, correctly out of this dispatch's scope.
+
+Per this repository's self-application convention (guardrail/tamper-evidence-core diff needs
+independent Critic review before being booked `implemented`) and K-AC-05's materially new design
+(this is not a continuation of the old self-mintable mechanism whose 4-round cap was already
+exhausted — a fresh cap applies), dispatched round 1 of a new Critic cycle: `docs/adr/0063-fork-
+disposition-approval-proof.md` + `specs/sprint-phoenix-epic/spec.md` as spec/guardrail authority,
+commit `204c71e9` as the sole reviewed diff, Opus-routed (`model: "opus"` on the Agent tool call,
+not just prompt text — the model-routing fix from earlier this session applied correctly).
+No evidence-map DELTA yet — K-AC-05 stays whatever it was until the Critic returns a PASS.
+
+**Live now:** WP-O1O2-CACHING, K-AC-05 Critic round 1.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
