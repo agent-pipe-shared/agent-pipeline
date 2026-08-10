@@ -64,6 +64,7 @@
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.git-appears-despite-initializes-git-false | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
@@ -188,6 +189,6 @@
 
 ## Counts
 
-- open: 115
+- open: 116
 - in_progress: 21
 - closed: 44

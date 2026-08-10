@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1304dbce4ff55c31c4f73b47aa97904c0f315a11a280a408ce18fc3e2968fdfe"
+    "transitionHead": "45ffd8ab90e26455f4de268e652330d763f59ddc4de4cb1afe5c7e80a5129320"
   },
   "counts": {
-    "open": 115,
+    "open": 116,
     "in_progress": 21,
     "closed": 44
   },
@@ -530,6 +530,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-4)."
+    },
+    {
+      "id": "pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "PO instruction during today's (2026-08-10) live greenfield test observation window: 'die lokale git identitäten name und mail sollten direkt im setup abgefragt und festgelegt werden und nicht erst immer beim ersten commit als fehler auftauchen.' This supersedes the closure rationale recorded in backlog/items/2026-08-09-fresh-repo-onboarding-never-asks-for-git-identity.md, which treated a warn-only diagnostic as having resolved the underlying gap."
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time",
@@ -1067,7 +1075,7 @@
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "PO live observation during two greenfield kickoff test sessions on 2026-08-10 (Claude Code test project `Rune-Test1-Claude-054-44`, and two Codex rollout sessions under `~/.codex/sessions/2026/08/10/`, both still in progress at the time this item was filed), reinforced by a standing, independently-noticed pattern from unrelated prior work: bound PRD/Spec documents come out consistently thinner than the GitHub Issues that originate the same scope of work."
+      "source": "PO live observation during two greenfield kickoff test sessions on 2026-08-10 (Claude Code test project `Rune-Test1-Claude-054-44`, and two Codex rollout sessions under `~/.codex/sessions/2026/08/10/`, both still in progress at the time this item was filed). The PO states this is not new: the same pattern has been visible across roughly the last 10 kickoff/planning tests and, separately, across effectively all Pipeline GitHub Issues to date (bound PRD/Spec consistently thinner than the Issue that originated the same scope of work)."
     },
     {
       "id": "pipeline.pre-existing-failure-claims-need-evidence",
