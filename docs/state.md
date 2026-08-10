@@ -4354,6 +4354,47 @@ No evidence-map DELTA yet — K-AC-05 stays whatever it was until the Critic ret
 
 **Live now:** WP-O1O2-CACHING, K-AC-05 Critic round 1.
 
+### WP-O1O2-CACHING VERIFIED AND COMMITTED (`908b084a`) — A REAL GAP OF MINE FOUND AND FIXED, FRESH CRITIC ROUND 1 DISPATCHED
+
+WP-O1O2-CACHING committed on its own (`908b084a`, single file, +357/-47) but reported its own
+verify command (`check-doc-contracts.mjs`) exiting 2 on a finding it correctly attributed to a
+file it never touched: `OG-DOC-UNCLASSIFIED docs/adr/0063-fork-disposition-approval-proof.md`.
+Verified myself by re-running the checker — confirmed the finding, confirmed it named only my own
+ADR from earlier this checkpoint stretch. Root cause: I created ADR-0063 without adding it to
+`governance/observation-doc-governance.json`'s maintainer/normative-record inventory group every
+other ADR (0021-0062, README.md) already sits in — a real omission on my part, not the dispatch's.
+Fixed and committed (`95672e09`, one line, alphabetically ordered between 0062 and README.md per
+the checker's own sort requirement); re-ran the checker clean (577 files, 844 links, 13 anchors).
+
+Read the full `908b084a` diff myself rather than trusting the report. It withdraws the false
+"one more read" cost claim outright (not softened) with a traced table (11 total git subprocess
+spawns + 2 O(n) hash-chain scans per lifted hook call, 9+2 of that added by this design), removes
+3 of the added spawns via a registry-sourced fingerprint read that adds no new trust
+(`verifyPortableGovernanceStream` still re-derives and checks the physical fingerprint
+independently), and specifies a machine-local grant memo bounded by a 60s TTL with an explicit
+table proving every way a live grant could stop being live is still caught (validity re-checked
+on every hit with no I/O; append/deletion/registry-repoint all invalidate via a stream/registry
+stat token; only a content-only edit that changes neither name set nor mtime slips through
+structurally, and that one is bounded by the TTL rather than left open). The forgeable-memo
+question is answered rather than asserted: forging it cannot manufacture the PO-signed window
+record that remains the necessary condition checked first, uncached, every call — the memo can
+only suppress the ledger's narrowing half for at most 60s, strictly weaker than an already-
+disclosed unbounded residual. The O-2 "fully closed" overclaim is corrected to "mechanism
+resolved, three assurance residuals open" (all three now actually appear in §15.1.6, which
+§15.2.4 already claimed they did before this revision). Self-corrects an earlier misattribution
+(§15.2.2 blamed §8.5.2 for a premise §8.5.2 never made) and two stale line citations into
+`governance-event-store.mjs` (replaced with symbol anchors, explicitly because that file is under
+concurrent modification by the still-running K-AC-05 dispatch in this same checkout — a genuinely
+careful choice, not a shortcut). Tool budget (~53 vs ≤45) exceeded and disclosed honestly.
+
+Per the same reasoning as K-AC-05 (this is the PO's 2026-08-10 authorization for a materially new
+caching design, not a continuation of the round-5-capped old thread), dispatched a fresh round-1
+Critic review: spec.md (H-AC-02) + the design doc's own already-approved §1-14 as authority,
+commit `908b084a` as the sole reviewed diff, Opus-routed. No H-AC-02 evidence-map change yet — the
+design stays whatever it was until the Critic returns a PASS.
+
+**Live now:** K-AC-05 Critic round 1, O-1/O-2 Critic round 1.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
