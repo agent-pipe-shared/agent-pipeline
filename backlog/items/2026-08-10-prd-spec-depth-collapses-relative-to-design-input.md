@@ -5,21 +5,35 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-10
-source: "PO live observation during two greenfield kickoff test sessions on 2026-08-10 (Claude Code test project `Rune-Test1-Claude-054-44`, and two Codex rollout sessions under `~/.codex/sessions/2026/08/10/`, both still in progress at the time this item was filed), reinforced by a standing, independently-noticed pattern from unrelated prior work: bound PRD/Spec documents come out consistently thinner than the GitHub Issues that originate the same scope of work."
+source: "PO live observation during two greenfield kickoff test sessions on 2026-08-10 (Claude Code test project `Rune-Test1-Claude-054-44`, and two Codex rollout sessions under `~/.codex/sessions/2026/08/10/`, both still in progress at the time this item was filed). The PO states this is not new: the same pattern has been visible across roughly the last 10 kickoff/planning tests and, separately, across effectively all Pipeline GitHub Issues to date (bound PRD/Spec consistently thinner than the Issue that originated the same scope of work)."
 ---
 
-# PRD/Spec documents collapse far more of the design input than the existing "never collapse" instruction intends
+# PRD/Spec depth tracks whatever input happened to arrive, instead of being driven to completeness by dialogue before the Spec is written
 
 ## Description
 
 Two live greenfield kickoff tests running today produced a PRD and Spec that
 the PO judged much flatter than the design input actually given during
-kickoff — material detail was visibly lost. The PO separately reports this is
-not a one-off: the same collapse pattern shows up whenever a GitHub Issue
-(richer, more detailed) is the source and a pipeline PRD/Spec is derived from
-it — the bound plan/spec ends up noticeably thinner than its own source
-material. This suggests the existing anti-collapse instruction in the kickoff
-flow is not effective in practice, not just under-applied in one test run.
+kickoff — material detail was visibly lost. The PO states this is a
+consistent pattern across roughly the last 10 kickoff/planning tests, and
+separately across effectively all Pipeline GitHub Issues to date: whenever an
+Issue is the richer source, the bound PRD/Spec derived from it comes out
+noticeably thinner than the Issue itself. This is not a one-off and not
+specific to today's two sessions.
+
+The PO's framing reaches past "faithfully capture whatever input volume
+happened to arrive": even when the initial input is small, it is the design
+phase's job to run an actual dialogue with the user until the PRD is
+comprehensive — asking follow-up questions, surfacing gaps, drawing out
+scope/edge cases/acceptance criteria the user did not spontaneously state —
+and only once that PRD is comprehensive should the Spec be written from it.
+Read this way, the defect is not primarily about a lossy capture/summary step
+(`design-input.md`, the resume-hint card) dropping detail that was already
+given. It is that the design phase does not treat "comprehensive PRD via
+dialogue" as its own gated objective, independent of input volume, before
+Spec authoring starts. A rich input getting flattened and a thin input never
+being expanded through dialogue are the same underlying gap: nothing in the
+flow requires the PRD to reach a completeness bar before the Spec begins.
 
 ## Triggering situation
 
@@ -28,7 +42,11 @@ greenfield kickoff tests (one Claude Code, one Codex, the Codex one spanning
 a restart) were still running and being forensically reviewed for other
 kickoff-parameter and turn-waste issues. The PO explicitly asked for this to
 be filed as its own backlog item, separately from the other findings from the
-same test round.
+same test round, then immediately followed up to state the pattern is not
+new to today: it recurs across roughly the last 10 kickoff/planning tests and
+across essentially all Pipeline GitHub Issues, and added the PRD-completeness-
+via-dialogue framing above as the required content of this item, not an
+optional elaboration.
 
 ## Affected artifact
 
@@ -50,17 +68,26 @@ whoever triages this.
 
 ## Proposal
 
-No fix proposed yet. Filed as a live observation pending the completion of
+No fix designed yet. Filed as a live observation pending the completion of
 the two in-progress test sessions and their forensic transcript analysis,
 which should surface concrete before/after examples (specific stated input
-that a specific PRD/Spec section dropped). Candidate directions once that
-evidence exists: an explicit minimum-coverage self-check in the kickoff flow
-(e.g. cross-referencing `design-input.md`'s section list against the
-resulting PRD/Spec section list before presenting a planning result instead
-of only after the fact), a worked "how much detail is enough" example added
-to `kickoff-design.md`, or revisiting whether "distilled, never a transcript"
-capture policies (both `design-input.md` and the resume-hint card) are
-structurally too lossy for how much design input PO sessions actually
-produce.
+that a specific PRD/Spec section dropped, and cases where the PRD moved
+straight to Spec without any follow-up question at all). Candidate
+directions, per the PO's dialogue-driven framing above:
+
+- Make PRD completeness its own explicit gate ahead of Spec authoring: the
+  design phase asks follow-up questions against a fixed coverage checklist
+  (problem/users, outcomes, success measures, scope/non-goals, testable
+  acceptance criteria, assumptions/risks/open questions, user-flow decisions
+  — the categories `kickoff-design.md` already names for the PRD) until each
+  is actually answered or explicitly marked out of scope, rather than moving
+  to Spec once *a* PRD document exists.
+- Treat a short initial goal as a prompt to ask more, not as a signal that
+  little PRD content is warranted — the current flow has no such prompt.
+- Only after that: revisit whether the "distilled, never a transcript"
+  capture policies (`design-input.md`, the resume-hint card) are additionally
+  too lossy on top of the dialogue gap, since a shallow PRD makes those
+  captures look shallow too even if they faithfully reflect a PRD dialogue
+  that itself never went deep enough.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
