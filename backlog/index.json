@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "60989b253846631b61fba3250ca7659869f067066bd4464d3dc65bc767893cbf"
+    "transitionHead": "f8d9dac6682f01c03c642988ace5aea59616d615175a68822da2c1df1b00a407"
   },
   "counts": {
-    "open": 118,
+    "open": 117,
     "in_progress": 21,
-    "closed": 38
+    "closed": 39
   },
   "items": [
     {
@@ -1083,11 +1083,15 @@
     },
     {
       "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Live Claude+Pipeline 0.5.4 greenfield test session, 2026-08-09 (session 6c12cf91) — a static three-file browser game with an explicitly stated 'no backend, no install' scope still went through the full signed push-approval ceremony."
+      "source": "Live Claude+Pipeline 0.5.4 greenfield test session, 2026-08-09 (session 6c12cf91) — a static three-file browser game with an explicitly stated 'no backend, no install' scope still went through the full signed push-approval ceremony.",
+      "closedAt": "2026-08-10",
+      "closureRepository": "self",
+      "closureCommit": "4b730f41e036238369a5aba74057139f8581ed88",
+      "closureEvidence": "backlog/evidence/2026-08-10-push-approval-profile-staging-declined.md"
     },
     {
       "id": "pipeline.push-approval-skill-reference-predates-adr-0061",

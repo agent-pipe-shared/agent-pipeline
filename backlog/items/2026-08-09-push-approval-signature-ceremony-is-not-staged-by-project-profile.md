@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
+closed_at: 2026-08-10
+closure_repository: self
+closure_commit: 4b730f41e036238369a5aba74057139f8581ed88
+closure_evidence: backlog/evidence/2026-08-10-push-approval-profile-staging-declined.md
 source: "Live Claude+Pipeline 0.5.4 greenfield test session, 2026-08-09 (session 6c12cf91) — a static three-file browser game with an explicitly stated 'no backend, no install' scope still went through the full signed push-approval ceremony."
 due: 2026-08-23
 ---
@@ -44,7 +48,14 @@ elsewhere.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Declined — option A (leave `push_approval: signature` global,
+  no per-profile staging), per explicit PO decision, 2026-08-10.
+- **Rationale:** PO's own words: "das Spiel ist nur ein Test für solche Mini
+  Sachen ist die Pipeline eh nicht gedacht" — the tiny static game that
+  surfaced this complaint was itself only a test scenario; the Pipeline is
+  not intended for projects at that scale in the first place, so the
+  overhead this item measured is not representative of the Pipeline's
+  actual target use and does not justify weakening the signature default
+  for any project class.
+- **Assignment:** n/a — declined, no implementation follows.
+- **Date:** 2026-08-10

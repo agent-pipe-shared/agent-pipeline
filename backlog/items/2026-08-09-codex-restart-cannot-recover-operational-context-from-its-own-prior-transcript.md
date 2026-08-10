@@ -69,7 +69,15 @@ proper spec for it rather than a quick patch.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Deferred, not declined — PO wants to test tonight's
+  `apply_patch` resume-hint-capture fix (GF-078, commit `92c4ee71`) in a real
+  Codex restart first, before deciding whether this item's larger
+  transcript-reading idea is still needed on top of it.
+- **Rationale:** PO's own words, 2026-08-10: "ich teste erst mal den Fix von
+  heute" — the narrower fix already landed tonight may reduce or eliminate
+  the practical impact of the context-loss this item describes; investing in
+  the larger, harder design (bounded prior-transcript recovery) before that
+  evidence exists would risk building for a problem that's already smaller
+  than measured.
+- **Assignment:** n/a — revisit after the PO's next live Codex test.
+- **Date:** 2026-08-10
