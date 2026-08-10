@@ -4294,6 +4294,33 @@ external signature (task #6, tracked) — cannot be dispatched until `install` s
 
 **Live now:** WP-K-AC05-REDESIGN, WP-O1O2-CACHING, WP-WIRING-SCOPE.
 
+### WP-WIRING-SCOPE CLOSED — CATEGORY-3 CALL SITES SCOPED, HONEST ABOUT WHAT IS STILL DESIGN WORK
+
+WP-WIRING-SCOPE landed clean (`96100581`, single new file, verified via `git show --stat`):
+`specs/sprint-phoenix-epic/design/journal-orchestration-wiring-scope.md`. Read the document in
+full rather than trusting the report. It names concrete call sites for all four criteria —
+`guard-dispatch.mjs` (A-AC-01/A-AC-05, same site, composed as one event with an optional
+`identity` array, HYPOTHESIZED: mechanism not designed, extraction of a clean model/effort value
+from prompt text doesn't exist yet), `migrate-backlog-state.mjs` (H-AC-08, VERIFIED, file read in
+full, maps directly onto an existing `legacySourceClass`), and two sites for L-AC-01
+(`pipeline-state.mjs`'s `writeState` chokepoint via a proposed third `options.lifecycleEvent`
+callback, VERIFIED mechanism/HYPOTHESIZED per-subcommand mapping across 6,727 lines; `guard-push.mjs`'s
+terminal aggregation point for the `gate` kind, VERIFIED). Correctly flags a real correlation-identity
+question between the two L-AC-01 sites (should a push that followed a dispatch reuse that dispatch's
+correlation chain) as unresolved design work, not silently answered. Recommends one bundled wiring
+wave over four separate ones — three of four sites are guardrail-tier hook files under the same
+`hooks.json`/TP-4 trust boundary anyway. Tool budget (≤35) was exceeded (~39) and disclosed
+honestly, traded for reading `migrate-backlog-state.mjs` and `pipeline-state.mjs`'s chokepoint in
+full rather than hand-waving data-availability claims — accepted, the DoD's own "no hand-waving"
+requirement justifies it. `git status` confirms `hooks.json` and all four orchestration files are
+untouched; the two files shown modified in the working tree (`critical-action-approval-request.mjs`,
+`governance-event-store.mjs`) belong to the still-running WP-K-AC05-REDESIGN dispatch, correctly
+excluded from this commit (`git add`/`git commit` scoped to the dispatch's own path only). No
+production code or `hooks.json` touched, as required — this stays a design artifact for a future,
+separately PO-approved wiring wave, not wiring itself.
+
+**Live now:** WP-K-AC05-REDESIGN, WP-O1O2-CACHING.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
