@@ -121,6 +121,14 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
 - Test fixtures MUST mirror the real harness contract: hook-input fixtures
   include ABSOLUTE paths alongside relative ones — testing only the convenient
   relative form is the fixture-blindness failure class.
+- Behavioral acceptance criteria need a behavioral check: where the acceptance
+  criteria describe user-facing or interactive behavior (keyboard/touch input,
+  visual/state feedback, any runtime interaction), the Verify/DoD check MUST
+  exercise that actual behavior (e.g. simulated input events, rendered-state
+  assertions) — a check that only confirms specific source text/markers exist
+  proves the code was written, not that it works, and is NOT sufficient for
+  this class of criterion. A marker check remains entirely appropriate for
+  non-behavioral facts (a config value, a constant, a doc string).
 - {{ADDITIONAL_CHECKS or delete this line}}
 
 ### 4. Forbidden
