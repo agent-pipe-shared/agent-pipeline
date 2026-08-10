@@ -5,7 +5,7 @@
 
 **Last updated:** 2026-08-10
 **Project status:** ACTIVE
-**Local candidate:** `0.5.4+<runner>.20260810003429.073014f` · commit `584ad29851ed32279c1a39723790a1a0de8b6130` · Verify **267/267 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260809214216.ea79347`)
+**Local candidate:** `0.5.4+<runner>.20260810072252.336e20d` · commit `57f38f1140608085be08e25f3ce7ad28437e7faa` · Verify **267/267 exit 0** bound to that exact commit · ready for the PO's manual copy (supersedes `…20260810003429.073014f`)
 **Current block:** Two more live overnight greenfield happy-path re-tests (Claude session `6c12cf91`, three Codex rollout files) against the eighth local candidate, run while the PO was AFK, surfaced a large batch of real findings — the PO's own explicit instruction was to fix all of them (Claude findings 1-7 "müssen gehärtet werden") plus everything from the Codex self-report, then ship a new candidate, working through problems independently rather than pausing for check-ins. All of the following landed, each self-verified against its own diff, Full Verify run repeatedly as dispatches completed: **GF-079** closed the language-timing bug fully — `apply-portable-seed` hardcodes `human_facing: "en"` before the language question is ever asked, and a PREVIOUS closure (`language-selection-scope-is-unclear-and-arrives-too-late.md`) had only fixed kickoff's `--language` requirement, not this earlier seed stage, so the live `PO-GATE-PRD-LANGUAGE-MISMATCH` → `projection-drift` two-tool repair chain still fired; GF-079 corrects all three still-byte-identical fresh-seed files together the moment the real kickoff language is known, with an end-to-end regression test driving a real `submit-plan` to confirm no repair chain fires. **GF-080** made `po-human-approval.mjs` persist an explicit `setup --directory` into the machine-scoped configuration plane (the read side already existed; nothing ever wrote it) and normalizes `--expires-at` to accept any valid ISO-8601 instead of demanding the exact `toISOString()` byte shape. **GF-081** added a read-only `prepare-push-subject` subcommand computing the exact `--subject-sha256` a push approval needs (removing the need to hand-roll a throwaway script) and fixed `materialize-push-threat-model`'s success message to state the commit requirement inline. **GF-078** fixed three live-reproduced `guard-lifecycle-ready.mjs` bugs, all affecting both runners since Codex funnels through the same guard: Codex's `apply_patch` was never recognized as a write tool, so the one mechanism meant to save context across a restart barrier was unconditionally broken for that runner; the bounded rg-to-rg/rg-to-head diagnostic pipeline only ever admitted paths under the project root, rejecting a legitimate self-inspection read of the plugin's own installed directory (plus a `head -N` combined-flag gap found live during the fix itself); a bare `po-approval-gate.mjs --help`/`--version` was misclassified as a forbidden cross-repository mutation. A deeper reachability question GF-078 found but correctly left alone (the outer tool-name gate doesn't recognize `apply_patch` either, relying entirely on `guard-apply-patch.mjs`'s translation as the only real enforcement point) is filed, not fixed. **GF-084** added `/project/pipeline-state.json` to onboarding's seeded `.gitignore` (both sessions independently hit the same structural trap: it dirties the tree on nearly every `pipeline-state.mjs` command, including `approve-push` itself, risking an already-signed approval), with a real-Git regression test proving no ordering hazard lets it get tracked first. **GF-085** added a stale-state caveat to `docs/state.md`'s generated handover text (the underlying live-sync gap itself — the "Next action" section is a static snapshot never updated by later commands — is filed for a dedicated design pass, not fixed), a one-line early mention of the push-approval gate at bootstrap confirmation instead of only at push time, and corrected `SKILL.md`'s now-stale two-entry gitignore list to three. **GF-082/GF-083**, direct doc strengthenings: the `AI-Assisted: true`-only commit-trailer contract and the safe `launch.copyCommand`-relay rule are now stated in `SKILL.md`'s core (non-lazy) text, not only in the Goldfish-dispatch-only `agent-obligations.md`; a feature's implementation is now explicitly not complete until a Critic review has been dispatched against it and returned a result (the separate, larger question of whether implementation itself must be Goldfish-dispatched in every project, not just this repo's self-application, is filed for a PO decision, since it trades off against the proportionality concern below). One direct Elephant fix: `templates/prompts/agent-obligations.md` regenerated after GF-078's `head -N` change (a mechanical, deterministic follow-up, not a design change). Eight further items were filed to the backlog rather than decided unilaterally overnight: the Goldfish-dispatch-mandate policy question, whether `push_approval: signature` should be staged by project profile, Codex's individually-escalated read-only steps, a durable transcript-mining method for future happy-path audits, Critic review's missing root-commit worked example, whether a Codex restart should also consult its own prior transcript, the docs/state.md live-sync mechanism, and the `apply_patch` outer-gate reachability question. Three new local candidates were built along the way (seventh `42d16e5`, eighth `ea79347`, ninth/current `073014f`), each independently Full-Verify-green. See the dated section below for the full commit-by-commit chain and forensic evidence. Prior block: live greenfield re-tests found a kickoff deadlock and a host-terminal rendering break (GF-074), a combined Critic review FAILed the document-language fix (F-1/F-2/F-3), and a signed TP-5 maintenance window closed F-1 (GF-077) — see the next dated section down. Earlier, happy-path re-test round two — both corrective lineages (Codex hardening GF-059→060→064; turn-efficiency onboarding GF-062→065) landed clean. Earlier still, GF-058 — **the stable blocker is resolved: the push gate is seeded and live**; 0.5.3 is released to `main` and the human-authorization ceremony recorded as [ADR-0061](adr/0061-uniform-human-approval-ceremony.md) remains the governing thread; Nova A completion still paused on genuine ADR-gated/evidence-gated blockers
 **Repair baseline:** `5d2b83dcc765d50801f4491e1bd9bed32090112b`
 **Release version:** `0.5.3` released
@@ -17,7 +17,97 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-10 Second overnight greenfield re-test round (Claude + Codex): ten findings hardened, eight filed for PO decision (GF-078→GF-085) (current)
+## 2026-08-10 PO decisions on the eight filed backlog questions; independent Critic review FAILs the combined diff, fixed and self-verified (GF-088→GF-091) (current)
+
+Once the PO returned and reviewed the eight backlog items filed at the end
+of the previous block, each was presented as a proper decision (problem /
+options / impact / recommendation) rather than left for the PO to
+reconstruct from prose — a correction after the PO directly challenged an
+earlier attempt to close several of them as if a policy tradeoff had already
+been decided unilaterally overnight. Five decisions came back, all built or
+recorded the same session:
+
+1. **Goldfish-dispatch mandate → option (c), instruction-only.** "Grundfunktion
+   gemäß Operating Modell... muss nicht guardrailed durchgesetzt werden aber
+   befolgt werden im Sinne einer Anweisung." **GF-088** (`4b730f41`) states in
+   `SKILL.md`'s core text that `epic`/`feature`-profile implementation is
+   dispatched to a Goldfish subagent, `mini`-profile plans may be implemented
+   directly — explicitly documentation-only, no guard hook added or changed.
+2. **Push-approval profile staging → declined (option A).** "das Spiel ist
+   nur ein Test für solche Mini Sachen ist die Pipeline eh nicht gedacht" —
+   the tiny static-game session that surfaced the ~80-tool-call overhead
+   complaint is itself not representative of the Pipeline's target use.
+   Closed without a code change.
+3. **Codex prior-transcript recovery → deferred**, not decided either way:
+   "ich teste erst mal den Fix von heute" (tonight's `apply_patch`
+   resume-hint fix, GF-078) before deciding whether the larger recovery idea
+   is still needed on top of it.
+4. **docs/state.md live-sync → option B, regenerate on every relevant
+   command.** **GF-090** (`1b9ca12e`, `049ab1a8`) added a pure
+   `nextActionSection`/`replaceNextActionSection`/`syncStateMdNextAction`
+   renderer (14 unit tests) and wired all seven originally-identified
+   phase/approval-changing `pipeline-state.mjs` commands to it, verified end
+   to end in a real `set-feature → submit-plan → approve-plan → set-phase →
+   reopen-design` cycle showing the text tracking every transition correctly.
+5. **`apply_patch` outer-gate → option A, document + test the invariant.**
+   **GF-089** (`7ceb8781`) documents that `guard-lifecycle-ready.mjs`'s outer
+   tool-name gate does not recognize `apply_patch` and that
+   `guard-apply-patch.mjs`'s per-path translation is the sole enforcement
+   boundary, with two regression tests that would fail if that translation
+   ever stopped — validated as genuinely load-bearing by mutating a
+   scratch-only copy of the guard and confirming the new test then fails.
+   Option B (teach the outer gate itself) stays explicitly deferred, not
+   decided against, pending its own dedicated audit.
+
+Two more small, no-decision-needed fixes landed the same block, after the PO
+separately pushed back on two items being left in the backlog rather than
+just built: **GF-086** (`700bb4eb`) added a root-commit worked example
+(git's empty-tree hash) to `critic-review/SKILL.md`'s `{{DIFF_RANGE}}`
+parsing; **GF-087** (`264be619`) wrote a durable transcript-forensics
+reference (`references/transcript-forensics.md`) capturing the method used
+twice this session to mine a runner's own session transcript for concrete,
+evidence-backed findings. Separately, the PO flagged on reviewing GF-080 that
+its `poKeyDirectory` persistence defaults to machine-wide scope, which is the
+wrong default (an agent session is repo-scoped; a human may legitimately
+want different signing identities per repository) — filed as its own item,
+not fixed same-night.
+
+**Per the PO's own instruction ("eine inhaltliche Critic-Runde... muss
+reichen"), the combined GF-088/089/090 diff got exactly one Critic round**
+(`claude-opus-5` at max, functional-equivalent-read-only,
+`scratch/critic-843d081a/critic-notes.md`) — **verdict FAIL**: F-1 major —
+two more commands (`discard-feature`, `apply-legacy-v2-revocation-recovery`)
+change the same state GF-090's seven wired commands do, but were left
+unwired, reproducing the exact staleness class the fix exists to close; F-2
+minor — the sync mechanism hardcodes `docs/state.md`, ignoring a project's
+own configurable `calibration.handover` path, disclosed only in a code
+comment with no owner/expiry (QG-06); F-3 minor — the static
+`handoverContent()`/`promotionHandoverContent()` caveat text still claimed
+the section "is not updated afterwards", which GF-090 made false. **GF-091**
+(`075b408c`, `336e20dc`) fixed F-1 and F-3 directly, self-verified rather
+than a third Critic round; F-2 is tracked as its own backlog item with a
+due date rather than fixed overnight, since it is a separate, larger scope
+(the calibration-configurable path was deliberately out of GF-090's stated
+scope to begin with).
+
+**A genuine process defect was also self-caught and disclosed, not hidden:**
+the Critic's own report flagged that the Elephant's dispatch text for this
+review contained a "claims-to-verify list" and other hunt-priming language
+CLAUDE.md explicitly forbids ("a review that only looks where you told it to
+look is not a second pair of eyes") — the Critic disclosed the contamination,
+continued rather than fail-closed (since the forbidden material sat in hunt
+instructions rather than a reference field), and independently extended its
+one pre-named finding to a second, unnamed instance on its own. Recorded as
+its own memory entry for future dispatch discipline, not just fixed in the
+moment.
+
+Three more local candidates were built along the way, each independently
+Full-Verify-green: tenth (`c837ded0`, `…20260810003429.073014f`), an
+intermediate stamp after GF-086/GF-087 (`264be619`,
+`…20260810061547.264be61`), and eleventh/current (`57f38f11`,
+`…20260810072252.336e20d`, after the Critic rework landed).
+
+## 2026-08-10 Second overnight greenfield re-test round (Claude + Codex): ten findings hardened, eight filed for PO decision (GF-078→GF-085)
 
 The PO ran two more live greenfield onboarding sessions overnight against the
 eighth local candidate (`ea79347`) — one Claude Code (session `6c12cf91`,
