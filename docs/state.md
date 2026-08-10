@@ -4515,6 +4515,33 @@ justification prose) per the fix-verification input contract.
 
 **Live now:** WP-O1O2-CACHING-REWORK1, K-AC-05 Critic round 2.
 
+### WP-O1O2-CACHING-REWORK1 VERIFIED (`e872f8ea`) — ROUND 2 CRITIC DISPATCHED, PLUS A NEW BACKLOG ITEM FROM ITS OWN HONEST DISCLOSURE
+
+WP-O1O2-CACHING-REWORK1 committed itself (`e872f8ea`, one file as scoped, 141+/25-). Verified
+independently: ran its own verify script myself (28/28), read the new §15.1.6 (iv) entry and the
+§15.3 companion-change note in full. All six findings addressed carefully — the proposed kernel-
+list fix is precise (one array entry, exact existing string shape, explicit "why proposed not
+applied" citing §9's H-AC-11 precedent), and the "what it does and does not close" paragraph is
+exactly the honesty this document exists to enforce on itself.
+
+**The dispatch surfaced something bigger than its own scope while checking its own fix's
+completeness, and disclosed it rather than either fixing it unasked or staying silent:**
+`guard-testpath.mjs` — the OTHER O-2 call site, and the TP-* enforcement hook generally — is
+*also* not a `NEVER_LIFTABLE_KERNEL_PATHS` member, unlike its sibling `guard-gate-strength.mjs`
+which already is. This predates this sprint entirely; it is not something O-1/O-2 introduced.
+Verified myself against source (`guard-maintenance-window.mjs:120-128`'s seven entries; `guard-
+gate-strength.mjs:199-208`/`:227-240`'s admission logic). Filed as a new backlog item
+(`backlog/items/2026-08-10-guard-testpath-not-kernel-protected-like-its-sibling.md`, `45bb6e60`)
+rather than silently fixed — the cost (the file becomes permanently uneditable under any window,
+same as `guard-gate-strength.mjs` today) is a real tradeoff the PO should weigh, not an obvious
+one-liner to slip in unasked.
+
+Dispatched round 2 as a full hunt (same reasoning as K-AC-05's round 2 — a kernel-protection
+security fix deserves fresh eyes, not assumed-correct scaffolding), scoped to commit `e872f8ea`
+alone, round 1's F1-F6 handed over as a neutral registry.
+
+**Live now:** K-AC-05 Critic round 2, O-1/O-2 Critic round 2.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
