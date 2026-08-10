@@ -731,5 +731,79 @@ check("GF-064: a secret-bearing Bash denial reaching the host-boundary route nev
   assert.equal(route.nextAction.action.command, null);
 });
 
+// GF-094: a Codex retry command relayed through the host-boundary route reached the
+// human as a raw, unrendered string; Codex itself failed to quote a multi-word,
+// non-ASCII `--goal` value and separately wrapped the long line when relaying it,
+// corrupting the human's real terminal. `copyCommand` is a bounded, pre-quoted
+// rendering of the exact same `command` value the route already carries -- present
+// under the identical `commandIsSafe` conjunct, never a second disclosure path.
+check("GF-094: a non-secret Bash host-boundary denial carries a bounded, pre-quoted copyCommand alongside the raw command", () => {
+  const root = hostBoundaryFixture();
+  const command = "node lib/project-onboarding-v3.mjs kickoff plan --root /some/project --goal HTML Minispiel gemäß Übergabe --language de";
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: { command },
+  }, root));
+  assert.equal(output.permissionDecision, "deny");
+  const route = guardRecoveryRoute(output.permissionDecisionReason);
+  assert.equal(route.code, "HGO-EXTERNAL-REPOSITORY-OBSERVATION");
+  assert.equal(route.nextAction.action.command, command);
+  const copy = route.nextAction.action.copyCommand;
+  assert.ok(copy, "copyCommand field is missing");
+  assert.deepEqual(Object.keys(copy).sort(), ["cmd", "maxColumns", "posix", "powershell"]);
+  assert.equal(copy.maxColumns, 72);
+  for (const [label, rendered, lineSep] of [
+    ["posix", copy.posix, "\n"],
+    ["powershell", copy.powershell, "\n"],
+    ["cmd", copy.cmd, "\r\n"],
+  ]) {
+    // A per-shell rendering may legitimately be null (that shell cannot safely
+    // represent this value at all) rather than thrown -- never required to be
+    // non-null, but whichever renders must stay within the shared bound.
+    if (rendered === null) continue;
+    assert.equal(typeof rendered, "string", label);
+    assert.equal(rendered.split(lineSep).every((line) => line.length <= copy.maxColumns), true,
+      `${label} rendering exceeds ${copy.maxColumns} columns`);
+  }
+  if (process.platform !== "win32" && copy.posix) {
+    const lines = copy.posix.split("\n");
+    assert.equal(lines.at(-1), 'eval "$CMD"');
+    const assignments = lines.slice(0, -1).join("\n");
+    const probe = spawnSync("bash", ["-c", `${assignments}\nprintf '%s' "$CMD"`], { encoding: "utf8" });
+    assert.equal(probe.status, 0, probe.stderr);
+    assert.equal(probe.stdout, command,
+      "the posix copyCommand rendering does not reconstruct the exact original command");
+  }
+});
+
+check("GF-094: a secret-bearing Bash host-boundary denial never leaks the secret through copyCommand either", () => {
+  const root = hostBoundaryFixture();
+  const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
+  const command = `touch ${secret}`;
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: { command },
+  }, root));
+  assert.equal(output.permissionDecision, "deny");
+  assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
+    "the secret-bearing Bash command leaked verbatim into the denial reason via copyCommand");
+  const route = guardRecoveryRoute(output.permissionDecisionReason);
+  assert.equal(route.nextAction.action.command, null);
+  assert.equal(route.nextAction.action.copyCommand, null,
+    "copyCommand must be suppressed exactly like command, never a bypass around the secret screen");
+});
+
+check("GF-094: a non-Bash host-boundary denial never carries a copyCommand field either", () => {
+  const root = hostBoundaryFixture();
+  const output = decision(run({
+    tool_name: "Write",
+    tool_input: { file_path: "notes.md", content: "plain content, nothing sensitive\n" },
+  }, root));
+  assert.equal(output.permissionDecision, "deny");
+  const route = guardRecoveryRoute(output.permissionDecisionReason);
+  assert.equal(route.nextAction.action.command, null);
+  assert.equal(route.nextAction.action.copyCommand, null);
+});
+
 if (process.exitCode) process.exit(process.exitCode);
 process.stdout.write(`1..${passed}\n`);

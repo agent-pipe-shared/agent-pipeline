@@ -16,6 +16,7 @@ import {
 } from "../lib/human-guard-override.mjs";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
+import { boundedOpaqueCopyCommand } from "../lib/project-onboarding-v3.mjs";
 import {
   nativeHookSessionId,
   rememberedNativeHookFailure,
@@ -536,11 +537,21 @@ if (denials.length > 0) {
         // emitted verbatim in this guidance, not a formality over an already-empty string.
         // Match the codebase's own null-for-no-command convention (actionPreview() at
         // lib/human-guard-override.mjs:669-684) instead.
+        const commandIsSafe = toolName === "Bash" && !secretBearing;
         hostBoundaryAction = {
           toolName,
           toolInputSha256,
           repositoryRoot: projectRoot,
-          command: toolName === "Bash" && !secretBearing ? command : null,
+          command: commandIsSafe ? command : null,
+          // GF-094: a bounded, pre-quoted rendering of that same exact command
+          // (analogous to restartCopyCommands()'s `launch.copyCommand`), so the
+          // relaying agent can copy this verbatim instead of re-quoting/re-wrapping
+          // the raw string itself -- the live failure this closes had Codex's own
+          // re-quoting of a multi-word, non-ASCII `--goal` value, plus its own line
+          // wrapping when relaying it, corrupt the human's real terminal. Never an
+          // additional disclosure path: gated by the exact same `commandIsSafe`
+          // conjunct as `command` above, never independently.
+          copyCommand: commandIsSafe ? boundedOpaqueCopyCommand(command) : null,
         };
       }
       overrideGuidance = [

@@ -1811,6 +1811,44 @@ function restartCopyCommands(executable, argv) {
   };
 }
 
+/**
+ * Bounded, copy-safe rendering of an ALREADY-ASSEMBLED, arbitrary command
+ * string -- distinct from restartCopyCommands(), which only ever renders one
+ * fixed, validated argv shape. This treats the entire string as ONE opaque
+ * bounded value (the same technique restartCopyCommands already uses for its
+ * barrier-sha256/root values): it is chunked and quoted by
+ * boundedAssignmentLines() without ever re-parsing or re-quoting the
+ * command's own internal structure, which is what keeps this correct for a
+ * command this function never validated the shape of.
+ *
+ * A per-shell rendering is `null`, never thrown, when that shell cannot
+ * safely represent the value at all (e.g. cmd.exe's SET expands `%`, `!` and
+ * other metacharacters, so boundedAssignmentLines() refuses a value
+ * containing one; a value containing a line break is unrenderable for every
+ * target). Every renderer failure is independent: one shell being
+ * unrenderable never blocks the others.
+ */
+export function boundedOpaqueCopyCommand(command) {
+  if (typeof command !== "string" || command.length === 0) {
+    throw new TypeError("copy command value must be a non-empty string");
+  }
+  const bounded = (renderer, name, invocationLine, lineJoin) => {
+    try {
+      const lines = [...boundedAssignmentLines(name, command, renderer), invocationLine];
+      if (!lines.every((line) => line.length <= COPY_COMMAND_MAX_COLUMNS)) return null;
+      return lines.join(lineJoin);
+    } catch {
+      return null;
+    }
+  };
+  return {
+    maxColumns: COPY_COMMAND_MAX_COLUMNS,
+    posix: bounded("posix", "CMD", 'eval "$CMD"', "\n"),
+    powershell: bounded("powershell", "$CMD", "Invoke-Expression $CMD", "\n"),
+    cmd: bounded("cmd", "CMD", "%CMD%", "\r\n"),
+  };
+}
+
 function continuityRepairPlanAction(root, runner, intent) {
   return commandAction(
     lifecycleArgv([ONBOARDING_SCRIPT, "plan-repair", "--root", root], runner, intent),
