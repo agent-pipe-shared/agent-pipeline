@@ -4803,6 +4803,59 @@ are all named, which they are here, and re-reviewing the entire track a fourth t
 one-paragraph comment fix and a three-line check reorder would spend the last round's scrutiny on
 already-passed material instead of on what actually changed.
 
+### K-AC-05 AND O-1/O-2: BOTH ROUND-4 (FINAL) CRITIC REVIEWS RETURNED PASS — BOTH PACKAGES CLOSED
+
+**K-AC-05 round 4: PASS**, three findings (F-A major, F-B/F-C minor), all verified myself against
+source. **F-A (major, real, out of scope):** `approve`/`approve-critical`'s confirmation summary
+(`po-human-approval.mjs:309-313`) never displays `intentSha256` — the digest actually signed — only
+`kind`/`candidate`/`subject`/`expiry`. An actor with write access to the external request directory
+can substitute a different critical request's intent digest while every displayed field still matches
+what the human expects, and the private key signs a value never shown. The Critic scoped this
+explicitly as **pre-existing** and **outside the reviewed delta's three files**, since it's the shared
+signing branch used by `push`/`deploy`/`publication` too, not anything ADR-0063 introduced, and
+recommended routing it as its own work package. Confirmed directly (`po-human-approval.mjs:303-316`);
+filed as `backlog/items/2026-08-10-po-approval-confirmation-does-not-name-the-signed-digest.md`
+(commit `97df4828`) rather than silently fixed or dropped — real blast radius exceeds this exhausted
+cap's scope, needs its own dedicated Critic cycle against all four kinds. **F-B (minor):** the F1
+comment fix still called the digest-forgery blind spot "*the* blind spot" (singular) while a second,
+cheaper one exists — `approval.mode` itself is unchecked on read, so a hand-edited record needs no
+forged digest at all, just `mode: "chat"`. Confirmed against source (`readPushApprovalMode` called
+only on the write side, `:1087`); fixed directly (`8e06ded0`, doc-comment only, zero behavior change,
+re-verified 52/52). **F-C (minor, process):** the F2 regression test was written after the fix, not
+before — QG-07 wants red-then-green, not reasoned-about-red. No retroactive fix possible; noted as a
+lesson for future confirmed-finding dispatches: use `goldfish-task.md`'s BUGFIX module (reproduce-first
+discipline), which would have caught this. **K-AC-05 booked `implemented`** in the evidence map
+(`WP-K-AC05`, commit `a781bfa7`) — every gap the prior verdict named is now closed; the mechanism this
+whole ADR-0063 track existed to build is done.
+
+**O-1/O-2 round 4: PASS**, one minor finding (F-A), verified myself. §15.1.6 (v)'s own text still said
+"GS-8's separate module" (singular, the exact label ADR-0058's own same-day correction had just
+retired as a mislabel) — a stale summary of a correction left behind in the sibling document that
+cites it. Fixed directly (`3e617b41`, one paragraph, names both modules correctly, drops the ambiguous
+"third case" ordinal the Critic also flagged as a byproduct); re-verified 10/10. No evidence-map
+booking needed — H-AC-02 was already `implemented` before this track started; O-1/O-2 are internal
+design-doc labels for a cost/assurance refinement, not a separate AC, and its five residuals are
+already properly tracked (owner + trigger) in §15.1.6, ADR-0058, and two backlog items.
+
+**Process lesson, disclosed by both Critics independently rather than by me:** both delta dispatches
+this round named a `base..head` **commit range** as the delta bound, on the assumption it would
+resolve to exactly the reviewed commits. In an actively multi-track session (K-AC-05 and O-1/O-2
+checkpoints interleaved in one linear history), the range silently pulled in unrelated intervening
+commits — for K-AC-05, two `docs(phoenix)` checkpoint commits including one whose subject line leaked
+a prior round's verdict; for O-1/O-2, an unrelated K-AC-05 commit and two checkpoint commits. Both
+Critics caught this themselves, reviewed only the two/four commits actually named as changed paths,
+and explicitly disclosed the discrepancy as a dispatch defect rather than silently absorbing the extra
+material or silently narrowing scope. Neither used the leaked content. **Fix for future delta
+dispatches:** name the exact commit SHAs to review (`git show <sha>` per commit), never a range, once
+a session has more than one active track — the range-equals-exactly-N-commits assumption breaks the
+moment two tracks interleave.
+
+Both K-AC-05 and O-1/O-2 are now closed for this stretch. Remaining open threads: PX0-AC-06/03/05/13
+(fully blocked on the PO's external GMW signature, unchanged since earlier this stretch); the
+Category-3 wiring-initiative document (complete, no further action pending unless the PO acts on it);
+the newly-filed `po-approval-confirmation-does-not-name-the-signed-digest` backlog defect (real,
+tracked, needs its own future work package).
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
