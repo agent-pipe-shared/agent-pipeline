@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { resolveMarketplaceUrl } from "../hooks/staleness-check.mjs";
 import { compareLoadedRulesetIdentity, normalizeRulesetSource } from "../lib/ruleset-source.mjs";
 import { PUBLIC_MARKETPLACE_URL } from "../lib/public-core-origin-allowlist.mjs";
+import { CODEX_APP_SERVER_HEALTH_SCHEMA, observeCodexAppServer } from "./codex-app-server-health.mjs";
 import {
   comparePipelineVersions,
   evaluateRulesetUpdatePolicy,
@@ -757,6 +758,116 @@ export function inspectCliRulesetFreshness({
   });
 }
 
+/* --------------------------------------------------------------------------
+ * PX0-AC-13 / design §B.2(b), §B.3: Codex-under-WSL host-attested spawn for
+ * `inspectPipelineUpdateAvailability`'s two network-touching git calls only
+ * (`ls-remote`, `fetch`). Composed fresh here rather than imported from
+ * `ruleset-freshness-host.mjs`:
+ *  - that file already imports 8 named bindings FROM this module (the
+ *    restored PHX-0B single-fixed-action family above), so an import in the
+ *    opposite direction here would be a circular ES-module dependency
+ *    between the two files;
+ *  - its `canonicalDaemonIdentity` helper is not exported at all -- only
+ *    `hostControlBinding` (which calls it internally) is.
+ * Design §B.3 names `hostControlBinding`/`canonicalDaemonIdentity` and the
+ * literal, sterile `/usr/bin/git` + closed-environment invocation as the
+ * pattern to reuse -- not the retired `executeRulesetFreshnessHostAction`/
+ * `createFreshnessHostAction` single-fixed-action model above, which this
+ * addition does not call, extend, or revive. Finalizing a fully typed/named
+ * closed action family for all 8 of `inspectPipelineUpdateAvailability`'s git
+ * invocations (design §B.3's two-class resolution) is explicitly deferred by
+ * design §B.8 to its own follow-up sub-design and Critic pass; the argv-shape
+ * discrimination below is the minimal surface needed to satisfy §B.2(b)
+ * without pre-empting that follow-up.
+ * ----------------------------------------------------------------------- */
+
+const WSL_UPDATE_AVAILABILITY_GIT = "/usr/bin/git";
+const WSL_UPDATE_AVAILABILITY_GIT_ENV = Object.freeze({
+  GIT_ASKPASS: "/bin/false",
+  GIT_CONFIG_COUNT: "0",
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_OPTIONAL_LOCKS: "0",
+  GIT_TERMINAL_PROMPT: "0",
+  HOME: "/nonexistent",
+  LANG: "C",
+  LC_ALL: "C",
+  PATH: "/usr/bin:/bin",
+  SSH_ASKPASS: "/bin/false",
+});
+const HOST_CONTROL_IDENTITY_KEYS = Object.freeze([
+  "status", "backend", "managedCodexPath", "managedCodexVersion", "socketPath", "cliVersion", "appServerVersion",
+]);
+
+/**
+ * Same validation `ruleset-freshness-host.mjs`'s own (non-exported)
+ * `canonicalDaemonIdentity` performs, composed fresh here (see the block
+ * comment above): a `CODEX_APP_SERVER_HEALTH_SCHEMA` observation is trusted
+ * only when it is a genuine, complete, version-consistent `CAS-READY` daemon
+ * identity.
+ */
+function wslHostControlAttested(observation) {
+  const daemon = observation?.daemon;
+  return observation?.schema === CODEX_APP_SERVER_HEALTH_SCHEMA
+    && observation.status === "ready"
+    && observation.code === "CAS-READY"
+    && observation.phase === "observe"
+    && daemon !== null && typeof daemon === "object" && !Array.isArray(daemon)
+    && JSON.stringify(Object.keys(daemon).sort()) === JSON.stringify([...HOST_CONTROL_IDENTITY_KEYS].sort())
+    && daemon.status === "running"
+    && daemon.cliVersion === daemon.appServerVersion
+    && daemon.managedCodexVersion === daemon.appServerVersion
+    && HOST_CONTROL_IDENTITY_KEYS.every((key) => typeof daemon[key] === "string" && daemon[key].length > 0);
+}
+
+/**
+ * `git` argv shapes that touch the network inside
+ * `inspectPipelineUpdateAvailability` -- exactly the two call sites design
+ * §B.3 identifies as its network-delegated class (`selectedChannelTarget`'s
+ * `ls-remote`, and the disposable-bare-repo `fetch`). Every other call this
+ * function makes (`rev-parse`, `show`, `update-ref`, `rev-list`,
+ * `init --bare`) is local-disk-only and stays on the ordinary local `spawn`,
+ * unattested and unchanged.
+ */
+function isNetworkDelegatedGitInvocation(command, args) {
+  return command === "git" && Array.isArray(args) && (args[0] === "ls-remote" || args.includes("fetch"));
+}
+
+/**
+ * Build a WSL-host-attested `options.spawn` substitute for
+ * `inspectPipelineUpdateAvailability`. Only the two network-touching argv
+ * shapes above are routed through Codex App-Server control-channel
+ * attestation plus a literal, sterile `/usr/bin/git` invocation from `/` with
+ * a closed environment (mirroring `ruleset-freshness-host.mjs`'s reviewed
+ * pattern); every other call passes straight through to the plain local
+ * `spawn`, because none of them ever leaves the local machine. A command that
+ * fails attestation returns a `spawnSync`-shaped non-zero result with no
+ * stdout, so existing callers see their ordinary `"remote-unavailable"`
+ * outcome (design §B.5) -- nothing new is invented for that branch.
+ */
+export function createWslHostAttestedSpawn({
+  observeHostControl = observeCodexAppServer,
+  spawn = spawnSync,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+} = {}) {
+  return function wslHostAttestedSpawn(command, args, spawnOptions = {}) {
+    if (!isNetworkDelegatedGitInvocation(command, args)) return spawn(command, args, spawnOptions);
+    let observation = null;
+    try { observation = observeHostControl(); } catch { observation = null; }
+    if (!wslHostControlAttested(observation)) {
+      return { status: 1, stdout: "", stderr: "", signal: null, error: undefined, pid: undefined };
+    }
+    return spawn(WSL_UPDATE_AVAILABILITY_GIT, args, {
+      cwd: "/",
+      encoding: "utf8",
+      timeout: spawnOptions.timeout ?? timeoutMs,
+      shell: false,
+      windowsHide: true,
+      env: WSL_UPDATE_AVAILABILITY_GIT_ENV,
+    });
+  };
+}
+
 function parseArgs(argv) {
   const parsed = { repo: process.env.CLAUDE_PROJECT_DIR || process.cwd() };
   for (let index = 0; index < argv.length; index += 1) {
@@ -768,13 +879,39 @@ function parseArgs(argv) {
   return parsed;
 }
 
+/**
+ * Design §B.2(a)'s corrected `executionBoundary` computation, duplicated here
+ * deliberately rather than imported: `pipeline-start-preflight.mjs` already
+ * imports `WSL_FRESHNESS_BOUNDARY_ID` FROM this module, so an import in the
+ * opposite direction here would be circular. Both the `env.CLAUDECODE`-based
+ * runner check and the `WSL_DISTRO_NAME`/`WSL_INTEROP` check are already
+ * duplicated verbatim across several other files in this codebase (design
+ * §B.4); this is the same established pattern, not a new one.
+ */
+function updateAvailabilityExecutionBoundary(env) {
+  const runner = env.CLAUDECODE === "1" ? "claude" : "codex";
+  const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
+    .some((value) => typeof value === "string" && value.trim() !== "");
+  return wsl && runner === "codex" ? "host-authorized-wsl" : "default";
+}
+
 export function runPipelineUpdateAvailabilityCli(argv, deps = {}) {
   const parsed = parseArgs(argv);
   if (!parsed) {
     (deps.stderr ?? process.stderr).write("ruleset-freshness: usage: ruleset-freshness.mjs [--repo <path>] [--loaded-version <version>] [--loaded-commit <sha>]\n");
     return { exitCode: 64, result: null };
   }
-  const inspected = (deps.inspect ?? inspectPipelineUpdateAvailability)(parsed.repo, parsed);
+  // design §B.2(b): supply a WSL-host-attested `options.spawn` only when the
+  // corrected boundary is "host-authorized-wsl" (Codex + WSL). Every other
+  // boundary is byte-for-byte the pre-existing call: `parsed` unmodified,
+  // falling through to `inspectPipelineUpdateAvailability`'s own default
+  // direct `spawnSync` path.
+  const executionBoundary = updateAvailabilityExecutionBoundary(deps.env ?? process.env);
+  const spawn = executionBoundary === "host-authorized-wsl"
+    ? (deps.createAttestedSpawn ?? createWslHostAttestedSpawn)()
+    : undefined;
+  const inspectOptions = spawn ? { ...parsed, spawn } : parsed;
+  const inspected = (deps.inspect ?? inspectPipelineUpdateAvailability)(parsed.repo, inspectOptions);
   (deps.stdout ?? process.stdout).write(`${JSON.stringify(inspected)}\n`);
   return { exitCode: inspected.blocking ? 2 : 0, result: inspected };
 }

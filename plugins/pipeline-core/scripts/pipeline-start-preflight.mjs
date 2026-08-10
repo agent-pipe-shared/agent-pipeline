@@ -257,7 +257,11 @@ export function observePipelineStartPreflight({
     && String(env.PIPELINE_CODEX_ONBOARDING_TOKEN) !== "";
   const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
     .some((value) => typeof value === "string" && value.trim() !== "");
-  const executionBoundary = wsl ? "host-authorized-wsl" : "default";
+  // PX0-AC-13 / design §B.2(a): "host-authorized-wsl" is a Codex-specific,
+  // App-Server-attested control-channel boundary. Claude Code under WSL has
+  // no such mechanism (`hostControlBinding`/`observeCodexAppServer` are
+  // Codex-only), so this must also gate on `runner`, not WSL presence alone.
+  const executionBoundary = wsl && runner === "codex" ? "host-authorized-wsl" : "default";
   // Captures the exact origin/content observation `evaluateSelfApplicationAttestation`
   // (unmodified, imported read-only) resolves and calls internally, without a
   // second, independent invocation of the real observer: `observe` (below) is
