@@ -1014,9 +1014,23 @@ function assertForkDispositionAuthorization(authorization) {
  * The DURABLE reference. The raw proof is deliberately not re-embedded: the
  * record references the verified approval by digest, mirroring how
  * `pushApproval.lastApproved` references an approval. Shared by the writer
- * (which builds it) and `readForkDisposition` (which re-validates it), so a
- * hand-edited persisted approval fails closed on read instead of being
- * surfaced as a trustworthy governed disposition.
+ * (which builds it) and `readForkDisposition` (which re-validates it).
+ *
+ * What this validates: shape and format ONLY -- exact keys, that
+ * `subjectSha256`/`intentSha256`/`proofSha256` are well-formed SHA-256 hex
+ * digests, that `keyReference`/`clearedBy`/`source` match their closed token
+ * grammars, and that `expiresAt`/`clearedAtEpochMs` are well-formed. It does
+ * NOT authenticate `intentSha256`, `proofSha256`, `keyReference` or
+ * `expiresAt` against anything; those fields are trusted verbatim once
+ * well-formed. The only reality-bound cross-checks performed anywhere on read
+ * are in `readForkDisposition` itself, which re-derives `subjectSha256` from
+ * the fork as it stands now and re-derives `acknowledgedEventIds` from the
+ * same fork -- not here. So a hand-edited record carrying a forged but
+ * well-formed `intentSha256`/`proofSha256`/`keyReference`/`expiresAt`, paired
+ * with the correct (publicly derivable) `subjectSha256`, passes every check
+ * this function and `readForkDisposition` perform and is surfaced as a
+ * trustworthy governed disposition (Critic round 3, F1; QG-05: this is the
+ * blind spot, not a claim this function closes).
  */
 function assertForkDispositionApprovalReference(approval, code) {
   if (!isRecord(approval)) fail(code, "A recorded fork disposition requires a closed approval reference.");

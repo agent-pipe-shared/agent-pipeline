@@ -358,6 +358,32 @@ test("the fork-disposition commands refuse every self-minting shortcut", async (
   }
 });
 
+test("approve-fork-disposition refuses a tampered approvalIntent before any signing side effect (F2)", async () => {
+  const dirs = await forkedRepositoryFixture();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    declareTrustAnchor(dirs.repoRoot, authority);
+    await runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, ["--expires-at", FAR_FUTURE])], {});
+    const requestPath = join(dirs.directory, "request-critical-governance-fork-disposition.json");
+    const request = JSON.parse(readFileSync(requestPath, "utf8"));
+    // action.kind/action.subjectSha256 stay correct (they pass the earlier
+    // check at :419-421); only the approvalIntent's own authority field is
+    // tampered, exactly the gap F2 closes.
+    request.approvalIntent.value.featureId = "tampered-feature-id";
+    writeFileSync(requestPath, `${JSON.stringify(request, null, 2)}\n`);
+
+    const confirmations = [];
+    await assert.rejects(
+      () => runForkDispositionApproval(["approve-fork-disposition", ...forkArgs(dirs)], { readConfirmation: (prompt) => { confirmations.push(prompt); return "approve"; } }),
+      /not issued for the fork-disposition authority/u,
+    );
+    assert.equal(confirmations.length, 0, "the confirmation prompt -- and therefore OpenSSL -- must never be reached once the intent is tampered");
+    assert.equal(existsSync(join(dirs.directory, "proof-critical-governance-fork-disposition.json")), false, "no signature may be produced for a request with a tampered approvalIntent");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("prepare-critical keeps composing push/deploy/publication requests exactly as before", () => {
   const dirs = fixtureDirs();
   try {

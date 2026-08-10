@@ -419,6 +419,22 @@ export async function runForkDispositionApproval(argv = process.argv.slice(2), d
   if (request?.action?.kind !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind || request?.action?.subjectSha256 !== subject.subjectSha256) {
     fail("the prepared request does not bind the conflicting entries that exist at this sequence now; prepare it again");
   }
+  // F2 fix (Critic round 3): pin the same three authority fields
+  // `verify-fork-disposition` checks further below, but HERE, before
+  // `approve-fork-disposition` delegates into a real OpenSSL signing
+  // operation. Without this, a prepared request with correct
+  // `action.kind`/`action.subjectSha256` but a tampered `approvalIntent.value`
+  // field would still reach signing -- wasting a real signature on a request
+  // that the store's own write-time check (`authorizeForkDisposition`) would
+  // later refuse to persist anyway, since it pins these same fields.
+  {
+    const pinnedIntent = request?.approvalIntent?.value;
+    if (pinnedIntent?.featureId !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.featureId
+      || pinnedIntent?.planSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.planSha256
+      || pinnedIntent?.specSha256 !== GOVERNANCE_FORK_DISPOSITION_APPROVAL.specSha256) {
+      fail("the prepared request was not issued for the fork-disposition authority");
+    }
+  }
   if (args.command === "approve-fork-disposition") {
     // Deliberately the EXISTING critical signing branch, unchanged: same
     // confirmation gate, same OpenSSL invocation, same artifact names, same
