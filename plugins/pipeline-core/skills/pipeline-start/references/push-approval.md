@@ -10,8 +10,11 @@ own job is to state it clearly and then wait.
 > two-step `prepare-critical`/`approve-critical` shape into a single
 > invocation. The sections below describe both the current shape and what it
 > replaced, because a repository running an older plugin build still walks the
-> old one. See `docs/push-release-flow.md` for the full, canonical, layer-by-layer
-> description this reference summarizes.
+> old one. See `docs/push-release-flow.md` (repo-root path; a hosted project
+> without that path reads the vendored copy at
+> `${PIPELINE_PLUGIN_ROOT}/docs/push-release-flow.md` instead, per
+> `pipeline-start` SKILL.md's canon-reference rule) for the full, canonical,
+> layer-by-layer description this reference summarizes.
 
 ## The one setting
 

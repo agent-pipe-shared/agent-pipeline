@@ -34,6 +34,10 @@ For local development also print:
 
 `Agent Pipeline source: local-development · registered local marketplace`
 
+A canon pointer here (`roles/`, `guardrails/`, `templates/prompts/`,
+`docs/push-release-flow.md`) means repo-root if present, else the vendored
+`${PIPELINE_PLUGIN_ROOT}` copy — rule: `references/canon-references.md`.
+
 ## Scratch space
 
 For any temporary file (probe script, held note, throwaway fixture) use the
@@ -105,14 +109,15 @@ deployment, publication, destructive work, or scope change.
    workarounds (a multi-line commit message: write it to a file and use
    `git commit -F <msgfile> -- <paths>`; capturing output to a file: write it
    from Node instead of `>`/`2>&1`/`| tee`), is
-   `templates/prompts/agent-obligations.md` §1 — read it before hitting the
-   same refusal live. This applies whether a Goldfish/Critic dispatch reads
+   `templates/prompts/agent-obligations.md` §1 (rule above) — read it before
+   hitting the same refusal live. This applies whether a Goldfish/Critic dispatch reads
    that file directly or an Elephant session acts undispatched: every
    agent-authored commit message ends with the anonymous `AI-Assisted: true`
    trailer and nothing else that identifies a provider, model, session,
    run, trace, or account — never a `Co-Authored-By:` line naming an AI
    provider or model, never a session/conversation URL (GIT-03,
-   `guardrails/git.md`; no override exists). `Dispatch: <TASK_ID> (goldfish)`
+   `guardrails/git.md` — same rule; no override exists).
+   `Dispatch: <TASK_ID> (goldfish)`
    may accompany it for a dispatched Goldfish, but the trailer contract
    itself binds every session, not only a dispatched one. Treat
    `executionBoundary: "host-authorized-wsl"` as mandatory: submit the exact

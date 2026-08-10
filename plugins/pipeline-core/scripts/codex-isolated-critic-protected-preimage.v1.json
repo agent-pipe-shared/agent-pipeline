@@ -8,7 +8,7 @@
     },
     {
       "path": "plugins/pipeline-core/agents/critic.md",
-      "rawSha256": "325b30ea172e47d4973c9de0f977e04749321c4a549dbaed53b3f60cf5a648ed"
+      "rawSha256": "7febd2d9913a4850c9ccfc2bd39b279488e87b0d3b3ecde35ee4a79fcdc364ee"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
@@ -32,7 +32,7 @@
     },
     {
       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
-      "rawSha256": "aeddc7d36af9e180947bf119c36e6d0668229da8e18f825370f79687ce1cf8b0"
+      "rawSha256": "c37b742126c5d249d4095c7ce25b5438e7a3661920526cba1e7b2f963f792896"
     },
     {
       "path": "roles/critic.md",
