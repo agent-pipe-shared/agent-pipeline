@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f8d9dac6682f01c03c642988ace5aea59616d615175a68822da2c1df1b00a407"
+    "transitionHead": "98c260a759a7e4d39efc927bc578d93208a8f3c12e8ab83125fb387fb0ef3df6"
   },
   "counts": {
-    "open": 117,
+    "open": 116,
     "in_progress": 21,
-    "closed": 39
+    "closed": 40
   },
   "items": [
     {
@@ -314,11 +314,15 @@
     },
     {
       "id": "pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Live Claude+Pipeline 0.5.4 greenfield test session, 2026-08-09 (session 6c12cf91): a full three-file browser game was implemented with zero Agent/Task dispatches — confirmed by an exhaustive grep of the whole transcript. PO's direct suspicion, independently confirmed: 'er hat die Entwicklung nicht dispatched sondern im Elephant selber gemacht.'"
+      "source": "Live Claude+Pipeline 0.5.4 greenfield test session, 2026-08-09 (session 6c12cf91): a full three-file browser game was implemented with zero Agent/Task dispatches — confirmed by an exhaustive grep of the whole transcript. PO's direct suspicion, independently confirmed: 'er hat die Entwicklung nicht dispatched sondern im Elephant selber gemacht.'",
+      "closedAt": "2026-08-10",
+      "closureRepository": "self",
+      "closureCommit": "4b730f41e036238369a5aba74057139f8581ed88",
+      "closureEvidence": "backlog/evidence/2026-08-10-goldfish-dispatch-instruction-closure.md"
     },
     {
       "id": "pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file",

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
+closed_at: 2026-08-10
+closure_repository: self
+closure_commit: 4b730f41e036238369a5aba74057139f8581ed88
+closure_evidence: backlog/evidence/2026-08-10-goldfish-dispatch-instruction-closure.md
 source: "Live Claude+Pipeline 0.5.4 greenfield test session, 2026-08-09 (session 6c12cf91): a full three-file browser game was implemented with zero Agent/Task dispatches — confirmed by an exhaustive grep of the whole transcript. PO's direct suspicion, independently confirmed: 'er hat die Entwicklung nicht dispatched sondern im Elephant selber gemacht.'"
 due: 2026-08-23
 ---
@@ -69,7 +73,18 @@ question already raised for push-approval.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — option (c), staged by profile, but enforced only
+  as a followed INSTRUCTION, not a guard-technical rule, per explicit PO
+  decision, 2026-08-10.
+- **Rationale:** PO's own words: "wir machen C: das ist doch Grundfunktion
+  gemäß Operating Modell, aber es muss nicht guardrailed durchgesetzt werden
+  aber befolgt werden im Sinne einer Anweisung, das reicht erstmal" —
+  Goldfish dispatch for heavier-profile implementation is already a basic
+  function of the operating model; a followed instruction is sufficient for
+  now, no guard-hook enforcement mechanism is being built. Implemented as
+  GF-088 (`4b730f41`): `epic`/`feature`-profile implementation is dispatched
+  to a Goldfish subagent, `mini`-profile plans may be implemented directly,
+  stated in `SKILL.md`'s core (non-lazy) text with no guard-enforcement claim.
+- **Assignment:** GF-088 (goldfish-implementor), self-verified by the
+  Elephant (diff read directly).
+- **Date:** 2026-08-10
