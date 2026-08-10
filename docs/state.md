@@ -4253,6 +4253,47 @@ further code-closeable work available without one of those three.
 
 **Live now: none.**
 
+### PO RETURNED, ALL FOUR PARKED-ITEM DECISIONS MADE (2026-08-10) — ADR-0063 WRITTEN, GMW PREPARED, THREE DISPATCHES LAUNCHED
+
+After the `/compact` boundary, the PO returned and was given a structured decision brief
+(context, options, effects, recommendation) for all four open threads via `AskUserQuestion`.
+All four decisions landed:
+
+1. **K-AC-05:** redesign (not narrow, not deferred) — *"wir machen 1. aber bewusst falls
+   möglich auch an die signature funktion und chat alternative binden (ja chat ist unsicher
+   aber wer das aktiv wählt nimmt das in kauf - default ist die externe signature funktion
+   die zB auch bei push genutzt wird)"*. Wrote **[ADR-0063](adr/0063-fork-disposition-approval-proof.md)**
+   (`984ea5e1`) formalizing this: fork disposition becomes a fourth `CRITICAL_ACTION_KINDS`
+   entry, reusing `po-approval-proof.mjs` unmodified and the existing `gates.push_approval`
+   mode (no new config key) rather than a disposition-specific mechanism — directly extending
+   ADR-0056/0058/0059's already-established pattern (confirmed by reading all three in full
+   before drafting; ADR-0059's own standing principle already generalizes this shape to
+   "every guard/action this repository ever adds"). Subject binds
+   `repositoryFingerprint`/`streamId`/`sequence`/forked-entries' `eventDigest` (content
+   digest, not `eventId` — fixes Finding 5 as a side effect). Findings 3/4/6 (read-path
+   re-check, symlink-ancestry check, compensating-record policy) explicitly in scope for the
+   same implementation pass, not deferred again.
+2. **O-1/O-2:** caching/memoization design, holding the 2026-08-09 "ledger read belongs in
+   increment 1" decision rather than walking it back — corrects round-5 Critic F1's false
+   "one more read" cost claim (~9-11 subprocess spawns + 2 O(n) rescans, independently
+   traced) with a real bounded-cost design instead.
+3. **PX0-AC-06 (+ PX0-AC-03/05/13):** Guard Maintenance Window over TP-5, not a single-edit
+   signature. Prepared and saved (`scratch/gmw-request-tp5.json`): scope `TP-5`, TTL 14400s
+   (the ADR-0058 `MAX_WINDOW_TTL_MS` ceiling), reason references all four PX0-AC criteria
+   sharing this wall. Intent digest to sign: `88b26f2bebce9a1bf5a975efa3b90b894e8ba95188932379f6a575e41691fc76`.
+   Awaiting the PO's external signature; `install` step is agent-safe once a genuine proof
+   exists (verify-and-place only, per ADR-0058 Decision 1 — no in-session activation).
+4. **Category 3 (wiring initiative):** start the design/scoping pass now — hooks.json stays
+   TP-4-protected regardless; this authorizes scoping where each event type belongs, not
+   wiring it in.
+
+Three goldfish-deep dispatches launched in parallel (file-disjoint: `governance-event-store.mjs`
++ CLI vs. the O-1/O-2 design doc vs. a new scoping document) — K-AC-05 implementation per
+ADR-0063, O-1/O-2 caching design, Category-3 scoping. PX0-AC work stays blocked on the PO's
+external signature (task #6, tracked) — cannot be dispatched until `install` succeeds.
+
+**Live now:** WP-K-AC05-REDESIGN, WP-O1O2-CACHING, WP-WIRING-SCOPE.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
