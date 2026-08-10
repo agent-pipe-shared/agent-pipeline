@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3c209f32f174d0d5c0d40833568c33fbcbd8e0ffc34f1b52c46422caf8bce734"
+    "transitionHead": "4ab9adcdeeb62cb78d820fdb730aca141da673189361ef8092006db8098e1fc4"
   },
   "counts": {
-    "open": 121,
+    "open": 123,
     "in_progress": 21,
     "closed": 44
   },
@@ -900,6 +900,14 @@
       "source": "PO, 2026-08-08: 'uns fehlt da noch eine art adr die die verzeichnisstrukturen besser hart vorgibt und definiert was wo hin gehört - agenten neigen bei jeder neuen session dazu neue strukturen zu erfinden. das muss die pipeline steuern.' Five corroborating instances from that same night are recorded below."
     },
     {
+      "id": "pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "Claude Code self-report from the 2026-08-10 greenfield test session (transcript: /home/skar667/.claude/projects/-home-skar667-src-Rune-Test1-Claude-054-44/c4750d7f-1f6a-4596-b970-3e382310c891.jsonl), point 13 of its final problem list."
+    },
+    {
       "id": "pipeline.no-sanctioned-way-to-start-over",
       "status": "open",
       "type": "defect",
@@ -1035,6 +1043,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Established while re-signposting the PO-language mismatch (commit b094cb5); the enumeration was produced by that dispatch and the remaining sites were deliberately left alone."
+    },
+    {
+      "id": "pipeline.plugin-package-should-vendor-canon-references-via-build-step",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "PO decision, 2026-08-10, on the plugin-packaging gap confirmed the same day (backlog item / commit tracking the quick copy-fix pending): 'jetzt a) und c) für später festhalten es sauber zu machen' — a direct copy now, this item tracks doing it properly afterward."
     },
     {
       "id": "pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority",

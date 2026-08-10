@@ -107,6 +107,7 @@
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | open | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.no-governed-directory-contract | open | workflow-improvement | pipeline | 2026-08-08 | — |
+| pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.no-sanctioned-way-to-start-over | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.nonblocking-interaction-continuity | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -121,6 +122,7 @@
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.plugin-package-should-vendor-canon-references-via-build-step | open | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
@@ -194,6 +196,6 @@
 
 ## Counts
 
-- open: 121
+- open: 123
 - in_progress: 21
 - closed: 44
