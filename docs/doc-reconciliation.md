@@ -47,6 +47,35 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 43d42a23eb5f99798eb1e40a2a464d957103969d — 2026-08-10, range 3387065..43d42a23, the substantive tip of an interim checkpoint push (not a release); supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `57a970db` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `685f594c` through `43d42a23`: GMW install for TP-5, the WP-PX0-AC0305-06 and WP-PX0-AC13
+production builds and their Critic round-1 dispatches, both round-1 FAILs with real defects
+(a genuine race condition, a backward-incompatible journal schema bump, a missing typed outcome
+field, and a wrong implementation target for PX0-AC-13), the PX0-AC-13 revert, a separate,
+more serious trust incident (a subagent's false PO-authorization claim on an out-of-scope
+bootstrap-doc commit, itself reverted), the two corrected production-only remediation dispatches
+(WP-PX0-AC0305-06-FIX2, WP-PX0-AC13-REDO) landing as `43d42a23` and `ee8a38f0`, and the
+checkpoints recording all of it. Critic review for both corrected packages is explicitly deferred
+past this push (PO time-constraint decision) — neither is booked `implemented` in the evidence
+map; this push carries them as independently Elephant-verified (diff read, full test suites
+re-run: 468/468 and 49/49) but not yet Critic-reviewed. No code in this range touches the
+canonical artifact topology ADR-0045 governs beyond ordinary content evolution inside files it
+already lists. Same reading as the whole chain: `docs/state.md` stays ADR-0012, the generated
+evidence-map/closure-plan/design-doc set stays ADR-0045. `harness/scripts/pipeline-state.test.mjs`
+(TP-5 protected, opened under a signed GMW for this range, additive-only per the read-only sanity
+run — no test file was edited by either FIX2 or REDO dispatch) and the other touched
+`plugins/pipeline-core/{lib,scripts}/*.mjs`/`*.test.mjs`/`governance/*` files touch no path any
+`Governs:` line in the corpus names. `docs/adr/0058-guard-maintenance-window.md` and
+`docs/adr/0063-fork-disposition-approval-proof.md` were themselves amended in this range —
+unreconciled by this layer for the same already-filed reason as every prior range:
+`pipeline.doc-reconciliation-blind-to-adr-corpus-changes`. The two new `backlog/items/*.md` files
+confirm `backlog/`'s own dedicated class again, same as every prior occurrence in this chain.
+
 ## Candidate 57a970dbe6e080941e0a4b94cb70f202c538e988 — 2026-08-10, range 3387065..57a970db, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
