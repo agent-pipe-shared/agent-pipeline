@@ -69,6 +69,111 @@ export function isExcludedRepoPath(value) {
   return posixPath(value).replace(/^\.\//, "") === EXCLUDED_PATH;
 }
 
+// --- GF-110: per-link exclusions for the byte-identical vendored canon copies
+//
+// GF-107/GF-108 (commits ae25b35e..cc192629) copied repo-root canon text --
+// guardrails/, roles/, templates/prompts/, docs/push-release-flow.md and the
+// ADRs that text cites -- verbatim into plugins/pipeline-core/ so a consumer
+// install carries them. A verbatim copy keeps its source file's relative
+// Markdown links, and those links only resolve from the SOURCE directory: the
+// vendored docs/adr/0005-quality-gates-dod.md still says `../operating-model.md`,
+// which is docs/operating-model.md from docs/adr/ and nothing at all from
+// plugins/pipeline-core/docs/adr/. This checker is right to call them dead; the
+// byte-identity is the deliberate part (GF-107/GF-108), so the link breakage is
+// a known, PO-accepted, EXPLICITLY TEMPORARY gap in the "quick copy now"
+// approach rather than an oversight. It is tracked by the deferred generated
+// build-step item that will rewrite these links at vendoring time:
+// backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md
+//
+// The exclusions below are deliberately one granularity TIGHTER than the
+// file-wide `filePattern` entries the sibling gate check-consumer-safe-paths.mjs
+// uses for the same files: an entry names one vendored file AND the exact link
+// destinations inherited from its origin, and suppresses only the
+// "target is not tracked" class. A new dead link in an already-listed vendored
+// file, any other finding class in it, and any not-yet-listed file all still
+// fail. Each entry carries a self-contained `reason` naming its own file, the
+// cause, and the backlog item; an entry that stops matching is itself reported
+// as a finding, because a stale exclusion is exactly where a real regression
+// would hide.
+
+const VENDOR_PREFIX = "plugins/pipeline-core/";
+
+function vendoringGapReason(origin) {
+  return (
+    `GF-110 (known-accepted vendoring gap): ${VENDOR_PREFIX}${origin} is a byte-identical vendored copy of ` +
+    `${origin} (GF-107/GF-108, commit 14ef8767). The link destinations listed on this entry are inherited ` +
+    `unchanged from that source, where they resolve to a tracked target relative to ${dirname(origin)}/; from ` +
+    `the vendored location they resolve to nothing, so this checker reports them as untracked targets. ` +
+    `Repairing them in the vendored copy would break the byte-identity GF-107/GF-108 established on purpose, ` +
+    `so only these exact destinations are exempt, and only from the "target is not tracked" class. Tracked ` +
+    `follow-up, a generated vendoring build step that will rewrite these links: ` +
+    `backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md`
+  );
+}
+
+function vendoredLinkExclusion(origin, destinations) {
+  return { source: `${VENDOR_PREFIX}${origin}`, origin, destinations, reason: vendoringGapReason(origin) };
+}
+
+export const VENDORED_LINK_EXCLUSIONS = Object.freeze([
+  vendoredLinkExclusion("docs/adr/0005-quality-gates-dod.md", ["../operating-model.md"]),
+  vendoredLinkExclusion("docs/adr/0010-session-bootstrap.md", [
+    "0001-distribution-plugin-marketplace.md",
+    "0006-model-effort-policy.md",
+    "../../harness/session-bootstrap.md",
+  ]),
+  vendoredLinkExclusion("docs/adr/0012-handover-canonicalization.md", ["0015-self-application.md"]),
+  vendoredLinkExclusion("docs/adr/0013-git-guard-union.md", [
+    "0001-distribution-plugin-marketplace.md",
+    "0007-workflows-ultracode-opt-in.md",
+  ]),
+  vendoredLinkExclusion("docs/adr/0017-push-policy-standing-approval.md", ["0034-deploy-precedence-central-vs-project.md"]),
+  vendoredLinkExclusion("docs/adr/0027-gate-philosophy.md", ["0021-prd-po-gate.md", "0030-governance-layer.md"]),
+  vendoredLinkExclusion("docs/adr/0028-manifest-approach.md", ["0001-distribution-plugin-marketplace.md"]),
+  vendoredLinkExclusion("docs/adr/0055-critical-human-proof-waiver.md", [
+    "0054-arbitheon-authority-directory-and-precedence-chain.md",
+  ]),
+  vendoredLinkExclusion("docs/adr/0061-uniform-human-approval-ceremony.md", [
+    "0058-guard-maintenance-window.md",
+    "0059-signed-human-guard-override.md",
+    "0060-handover-placement-and-rotation.md",
+  ]),
+]);
+
+/**
+ * True only for the exact (vendored source file, link destination) pairs listed
+ * above. Never a prefix, directory, or pattern match: an unlisted destination in
+ * a listed file is not excluded. Usage is recorded as source -> set of
+ * destinations, so no delimiter has to be invented for a composite key.
+ */
+function isVendoredExcludedLink(exclusions, source, destination, used) {
+  const matched = exclusions.some((entry) => entry.source === source && entry.destinations.includes(destination));
+  if (!matched) return false;
+  if (!used.has(source)) used.set(source, new Set());
+  used.get(source).add(destination);
+  return true;
+}
+
+/**
+ * Report every listed pair that no longer suppresses anything, so a repaired or
+ * removed link cannot leave a silent exemption behind. Scoped to files actually
+ * present in this scan: against a fixture repository that carries none of the
+ * vendored copies, the entries are simply not applicable rather than stale.
+ */
+function staleVendoredExclusionFindings(exclusions, scannedSources, used) {
+  const findings = [];
+  for (const entry of exclusions) {
+    if (!scannedSources.has(entry.source)) continue;
+    for (const destination of entry.destinations) {
+      if (used.get(entry.source)?.has(destination)) continue;
+      findings.push(
+        `vendored-link-exclusion: ${entry.source} -> ${destination}: exclusion no longer suppresses a "target is not tracked" finding -- remove it`,
+      );
+    }
+  }
+  return findings;
+}
+
 function inside(root, target) {
   const rel = relative(root, target);
   return rel === "" || (!rel.startsWith(`..${sep}`) && rel !== ".." && !isAbsolute(rel));
@@ -379,11 +484,14 @@ export function checkRepository(rootInput, options = {}) {
     .filter((entry) => !isExcludedRepoPath(entry))
     .sort();
   const trackedPaths = new Set((options.trackedPaths ?? gitList(root)).map(posixPath));
+  const vendoredLinkExclusions = options.vendoredLinkExclusions ?? VENDORED_LINK_EXCLUSIONS;
+  const usedVendoredExclusions = new Map();
   const findings = [];
   const cache = new Map();
   let linksChecked = 0;
   let anchorsChecked = 0;
   let excludedLinks = 0;
+  let vendoredExcludedLinks = 0;
 
   const readRepoText = (repoPath) => {
     if (isExcludedRepoPath(repoPath)) return null;
@@ -428,6 +536,10 @@ export function checkRepository(rootInput, options = {}) {
       const trackedTarget = trackedPaths.has(target.repoPath);
       const trackedDescendant = [...trackedPaths].some((entry) => entry.startsWith(`${target.repoPath.replace(/\/$/, "")}/`));
       if (!trackedTarget && !trackedDescendant) {
+        if (isVendoredExcludedLink(vendoredLinkExclusions, source, link.destination, usedVendoredExclusions)) {
+          vendoredExcludedLinks += 1;
+          continue;
+        }
         findings.push(finding(source, link.line, link.destination, "target is not tracked"));
         continue;
       }
@@ -455,6 +567,8 @@ export function checkRepository(rootInput, options = {}) {
       }
     }
   }
+
+  findings.push(...staleVendoredExclusionFindings(vendoredLinkExclusions, new Set(markdownPaths), usedVendoredExclusions));
 
   // Whichever tier the project's authority actually resolves to (ADR-0054).
   const calibrationPath = resolveAuthorityArtifactPath("calibration", { rootDir: root }).relPath;
@@ -527,6 +641,7 @@ export function checkRepository(rootInput, options = {}) {
       linksChecked,
       anchorsChecked,
       excludedLinks,
+      vendoredExcludedLinks,
       observationGovernance: observationGovernance.applicable ? "checked" : "not-applicable",
       statefulDesignContracts,
     },
@@ -550,7 +665,10 @@ function runCli() {
       process.exit(2);
     }
     process.stdout.write(
-      `Documentation contracts valid: ${result.stats.markdownFiles} Markdown file(s), ${result.stats.linksChecked} link(s), ${result.stats.anchorsChecked} anchor check(s).\n`,
+      `Documentation contracts valid: ${result.stats.markdownFiles} Markdown file(s), ${result.stats.linksChecked} link(s), ${result.stats.anchorsChecked} anchor check(s)` +
+        // Printed rather than silent: an accepted gap that leaves no trace in the
+        // gate's own output is indistinguishable from one nobody remembers.
+        `, ${result.stats.vendoredExcludedLinks} known vendored-copy link(s) excluded.\n`,
     );
   } catch (error) {
     process.stderr.write(`Documentation contracts unavailable: ${error.message}\n`);

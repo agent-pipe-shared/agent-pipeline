@@ -4,10 +4,11 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
+  VENDORED_LINK_EXCLUSIONS,
   checkRepository,
   collectAnchors,
   extractMarkdownLinks,
@@ -495,4 +496,98 @@ test("current repository integration passes and excludes the instruction path", 
   assert.deepEqual(result.findings, []);
   assert(result.stats.markdownFiles > 100);
   assert.equal(result.stats.observationGovernance, "checked");
+});
+
+const VENDORING_BACKLOG_ITEM = "backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md";
+const vendoredFixtureSource = "plugins/pipeline-core/docs/adr/0005-quality-gates-dod.md";
+const vendoredFixtureExclusions = [
+  {
+    source: vendoredFixtureSource,
+    origin: "docs/adr/0005-quality-gates-dod.md",
+    destinations: ["../operating-model.md"],
+    reason: `fixture entry; see ${VENDORING_BACKLOG_ITEM}`,
+  },
+];
+
+function runVendoredFixture(root, files) {
+  const trackedPaths = [...statefulDesignBaseTrackedPaths, ...files];
+  return checkRepository(root, {
+    trackedPaths,
+    markdownPaths: trackedPaths.filter((path) => path.endsWith(".md")),
+    vendoredLinkExclusions: vendoredFixtureExclusions,
+  });
+}
+
+test("a vendored link exclusion suppresses only its own listed destination", () => {
+  const { root } = fixture({
+    [vendoredFixtureSource]: [
+      "# Vendored copy",
+      "",
+      "[Inherited and listed](../operating-model.md)",
+      "[Inherited, not listed](0001-distribution-plugin-marketplace.md)",
+      "[Genuinely new breakage](../../nowhere.md)",
+      "",
+    ].join("\n"),
+  });
+  const result = runVendoredFixture(root, [vendoredFixtureSource]);
+
+  assert.deepEqual(result.findings, [
+    `${vendoredFixtureSource}:4 -> 0001-distribution-plugin-marketplace.md: target is not tracked`,
+    `${vendoredFixtureSource}:5 -> ../../nowhere.md: target is not tracked`,
+  ]);
+  assert.equal(result.stats.vendoredExcludedLinks, 1);
+  assert.equal(result.stats.excludedLinks, 0, "the vendoring exemption must not be counted as an instruction-path exclusion");
+});
+
+test("a vendored link exclusion is bound to its own source file", () => {
+  const otherSource = "plugins/pipeline-core/docs/adr/0010-session-bootstrap.md";
+  const { root } = fixture({ [otherSource]: "# Other vendored copy\n\n[Inherited](../operating-model.md)\n" });
+  const result = runVendoredFixture(root, [otherSource]);
+
+  assert.deepEqual(result.findings, [`${otherSource}:3 -> ../operating-model.md: target is not tracked`]);
+  assert.equal(result.stats.vendoredExcludedLinks, 0);
+});
+
+test("a vendored link exclusion that stops matching is reported, and stays inert where its file is absent", () => {
+  const repaired = fixture({
+    [vendoredFixtureSource]: "# Vendored copy\n\n[Repaired](../../../../docs/state.md)\n",
+  });
+  assert.deepEqual(runVendoredFixture(repaired.root, [vendoredFixtureSource]).findings, [
+    `vendored-link-exclusion: ${vendoredFixtureSource} -> ../operating-model.md: exclusion no longer suppresses a "target is not tracked" finding -- remove it`,
+  ]);
+
+  const absent = fixture();
+  assert.deepEqual(
+    runVendoredFixture(absent.root, []).findings,
+    [],
+    "a repository that carries none of the vendored copies must see the entries as not applicable, not stale",
+  );
+});
+
+test("every shipped vendored link exclusion is justified by a byte-identical origin whose links resolve", () => {
+  const tracked = new Set(execFileSync("git", ["ls-files", "-z"], { cwd: REPO, encoding: "utf8" }).split("\0").filter(Boolean));
+  assert(VENDORED_LINK_EXCLUSIONS.length > 0, "the exclusion list must not be silently emptied");
+
+  for (const entry of VENDORED_LINK_EXCLUSIONS) {
+    assert.equal(entry.source, `plugins/pipeline-core/${entry.origin}`, "an exclusion may only cover a vendored copy of a repo-root source");
+    assert(tracked.has(entry.source), `${entry.source} must be tracked`);
+    assert(tracked.has(entry.origin), `${entry.origin} must be tracked`);
+    assert(
+      readFileSync(join(REPO, entry.source)).equals(readFileSync(join(REPO, entry.origin))),
+      `${entry.source} must stay byte-identical to ${entry.origin}; once it diverges the vendoring rationale no longer holds`,
+    );
+    assert(entry.destinations.length > 0, `${entry.source} must list the destinations it exempts`);
+
+    for (const destination of entry.destinations) {
+      const target = relative(REPO, resolve(REPO, dirname(entry.origin), destination.split("#")[0])).split("\\").join("/");
+      assert(
+        tracked.has(target),
+        `${entry.origin} -> ${destination} must resolve to a tracked target from its origin directory (an inherited link, not a dead one); got ${target}`,
+      );
+    }
+
+    assert(entry.reason.includes(entry.source), "the reason must name the file it exempts");
+    assert(entry.reason.includes("vendored copy"), "the reason must state the vendoring cause");
+    assert(entry.reason.includes(VENDORING_BACKLOG_ITEM), "the reason must cite the tracked follow-up backlog item by path");
+  }
 });
