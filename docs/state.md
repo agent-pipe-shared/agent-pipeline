@@ -4850,11 +4850,72 @@ dispatches:** name the exact commit SHAs to review (`git show <sha>` per commit)
 a session has more than one active track — the range-equals-exactly-N-commits assumption breaks the
 moment two tracks interleave.
 
-Both K-AC-05 and O-1/O-2 are now closed for this stretch. Remaining open threads: PX0-AC-06/03/05/13
-(fully blocked on the PO's external GMW signature, unchanged since earlier this stretch); the
-Category-3 wiring-initiative document (complete, no further action pending unless the PO acts on it);
-the newly-filed `po-approval-confirmation-does-not-name-the-signed-digest` backlog defect (real,
-tracked, needs its own future work package).
+Both K-AC-05 and O-1/O-2 are now closed for this stretch. Remaining open threads at that point:
+PX0-AC-06/03/05/13 (fully blocked on the PO's external GMW signature); the Category-3 wiring-initiative
+document (complete, no further action pending unless the PO acts on it); the newly-filed
+`po-approval-confirmation-does-not-name-the-signed-digest` backlog defect (real, tracked, needs its own
+future work package).
+
+### PO SIGNED THE GMW REQUEST — TP-5 WINDOW ACTIVE, PX0-AC-05/06/03/13 DISPATCHED
+
+The PO asked to sign the prepared GMW request immediately. Before handing anything over, checked its
+freshness: the originally-prepared `scratch/gmw-request-tp5.json` was bound (`openingTreeSha256`) to
+commit `41a4d344`, 33 commits behind current HEAD (`10b1c33d`) — `installGuardMaintenanceWindow`
+re-derives the live plugin tree hash at install time and compares it byte-for-byte
+(`guard-maintenance-window.mjs:396-397`), so this would have failed at install even if signed. Same
+discipline as K-AC-05's own F2 finding this stretch (never let a signature be spent on a request that
+cannot verify): **re-prepared fresh** (`scratch/regenerate-gmw-request.mjs`, new `openingTreeSha256`/
+`nonce`/`expiresAtMs`, same scope `TP-5`, same reason, same 4h TTL), updated the already-prepared
+signing helper script's pinned digest to match (`scratch/phx-gmw-sign.sh`), and asked the PO to run it
+themselves (their passphrase, never mine to see). They did; proof written to
+`~/agent-pipeline-po-nova/proof-guard-maintenance-window.json`. Installed successfully:
+
+```
+{"ok":true,"value":{"status":"active","scopeRuleIds":["TP-5"],"expiresAtMs":1786362942134,"remainingMs":13253071}}
+```
+
+Window active, ~3h40m remaining from install (expires ~2026-08-10T11:55:42Z).
+
+**Scoped the actual work before dispatching** (TP-5 protects exactly
+`harness/scripts/pipeline-state.test.mjs`; the window is the only thing making these ACs currently
+achievable). Read the live `continuity-authority-revision-plan/-apply/-recover` code in
+`pipeline-state.mjs` directly rather than dispatching blind:
+
+- **PX0-AC-05** (receipt retention): the public-safe receipt `buildAuthorityRevisionPlan` already
+  builds (searchable by its own `PX0-AC-05` comment) is confirmed-absent from durable storage —
+  printed once to stdout or embedded in the private recovery journal, which gets deleted on success.
+- **PX0-AC-06** (recovered-preimage outcome): `runAuthorityRevisionRecoverCommand` has exactly three
+  outcome classes today (clean / recovered-postimage ×2 / diverged) and unconditionally completes
+  forward to postimage once the observed State matches the frozen preimage — even if the original
+  revision's approval window has since expired. **Design decision made and handed to the dispatch,
+  not left open:** recovery gains exactly ONE fresh binding check — the frozen intent's `expiresAt`
+  (a NEW field needed in the journal's MAC-protected schema, since today only `intentSha256`, a digest,
+  is retained) against `deps.now()`, the same comparison `AR-EXPIRED` already uses at plan time. Still
+  valid → unchanged behavior (recovered-postimage). Expired → refuse to write postimage, retire the
+  journal, report a new `"recovered-preimage"` outcome instead. Deliberately does NOT re-check
+  candidate or decision-scope — the function's own docstring already forbids selecting a new
+  candidate; expiry is the one check grounded in what the journal can be extended to carry without
+  reopening candidate-freshness territory.
+- **PX0-AC-03**: one remaining unpinned axis per the evidence map's own prior finding — a
+  phase-moved-away-from-design fixture at apply time, needing a full plan-approval fixture the
+  original dispatch's budget didn't cover.
+
+Dispatched **WP-PX0-AC0305-06** (goldfish-deep, xhigh, bundled since all three share the same
+functions/files) with the design decision stated as instruction, not left for the dispatch to invent,
+and an explicit note that a live GMW window is time-boxing its test-file edit.
+
+**PX0-AC-13** turned out to be a different, deeper gap than "just wire it": `ruleset-freshness-host.mjs`
+already correctly selects the host transport, and its preflight-binding half
+(`freshnessHostActionForPreflight` in `pipeline-start-preflight.mjs`) is already correctly wired — but
+`main()`'s one required dependency, `observeRulesetSource`, has no default producer at all (its own
+comment: "designed but not yet built"), so the CLI always fails closed regardless of transport
+selection, and no test suite exercises the file at all. Not time-boxed by TP-5 (its files aren't
+protected test paths), so dispatched separately without time pressure: **WP-PX0-AC13** (goldfish-deep,
+xhigh), pointed at `specs/sprint-phoenix-epic/design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md`
+as the likely source of the missing producer's design, with explicit stop conditions if that doc
+doesn't resolve the schema or the real bootstrap wiring point.
+
+**Live now:** WP-PX0-AC0305-06, WP-PX0-AC13.
 
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
