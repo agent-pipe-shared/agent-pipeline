@@ -160,6 +160,15 @@ deployment, publication, destructive work, or scope change.
    successful capture and state that the `available` card will be used in the
    next session; when no restart follows, use it as context for the current
    kickoff or planning step instead.
+   At the start of the NEXT session, when `resume-hint.mjs inspect` reports
+   status `available`, the agent MUST read `project/resume-hint.json`'s
+   content in that same turn and incorporate its `intent`, `constraints`,
+   `scope`, and `questions` into its understanding of the session's goal
+   before presenting the bootstrap confirmation line — noting the card's
+   availability without reading its content does not satisfy this step. A
+   failed or skipped read must be surfaced honestly, never silently skipped
+   or claimed as done when it was not; this is a MUST-DO consumption step, not
+   a new readiness precondition, so it never blocks or gates the session.
    The card is never a gate and capture failure must be surfaced honestly rather
    than claimed as persisted context.
    Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
