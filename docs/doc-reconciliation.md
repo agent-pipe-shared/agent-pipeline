@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate b1190dacd1eda26fa93a4af846f7ab2d6522d5dc — 2026-08-10, range 3387065..b1190dac, the substantive tip of the unpushed range; supersedes the entries below
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Supersedes the `16cfe3a0` entry below with the same one-entry-per-unpushed-range shape, now also
+covering `c4baa447` through `b1190dac`: the category-3 reclassification checkpoint. Pure
+documentation, no code. No code in this range touches the canonical artifact topology ADR-0045
+governs beyond ordinary content evolution inside files it already lists. Same reading as the whole
+chain: `docs/state.md` stays ADR-0012, the generated evidence-map/closure-plan/design-doc set stays
+ADR-0045.
+
 ## Candidate 16cfe3a0f8eaeadac84660c9e7e68cff250fb34a — 2026-08-10, range 3387065..16cfe3a0, the substantive tip of the unpushed range; supersedes the entries below
 
 - ADR-0012: checked, no change needed.
