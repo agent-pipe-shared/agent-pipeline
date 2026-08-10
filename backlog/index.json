@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "45ffd8ab90e26455f4de268e652330d763f59ddc4de4cb1afe5c7e80a5129320"
+    "transitionHead": "c4eb6e18aa4171162b719469aa054b0732b266a2287c199df19b9ba900c86437"
   },
   "counts": {
-    "open": 116,
+    "open": 117,
     "in_progress": 21,
     "closed": 44
   },
@@ -1140,6 +1140,14 @@
       "closureRepository": "self",
       "closureCommit": "4b730f41e036238369a5aba74057139f8581ed88",
       "closureEvidence": "backlog/evidence/2026-08-10-push-approval-profile-staging-declined.md"
+    },
+    {
+      "id": "pipeline.push-approval-signature-commands-also-line-wrap",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "PO live observation, 2026-08-10: 'auch die signatur aufforderungen für push kommen weiter mit zeilenumbrüchen das macht keinen spass in der ux' — reported while GF-094 (a same-class fix for the codex-pretool-guard.mjs attended-host-terminal path) was still in flight."
     },
     {
       "id": "pipeline.push-approval-skill-reference-predates-adr-0061",
