@@ -1945,9 +1945,16 @@ reviewed rebind, not here. `acceptance.md` is not touched by this dispatch.
 #### 15.1.6 The residuals of §15, stated plainly
 
 This subsection is the residual register for the **whole** of §15, not for §15.1 alone. It sits under §15.1
-because that is where it started and because §15.2.4 already points here by name; the first three entries below
-belong to O-1's identity registry, the last two to O-2's hook-path closure. Keeping one register is deliberate:
-a reader asking "what did §15 leave open" must not have to find two lists.
+because that is where it started and because §15.2.4 already points here by name; the first **two** entries below
+belong to O-1's identity registry, the last **four** — (i) to (iv) — to O-2's hook-path closure. (An earlier
+revision of this sentence read "the first three… the last two", which matched neither the entries then present
+nor the ones now: it is corrected here, and §15.4's O-2 bullet is corrected to the same count.) Keeping one
+register is deliberate: a reader asking "what did §15 leave open" must not have to find two lists. **Every entry
+in the O-2 block ((i)-(iv)) carries an owner and an explicit `Trigger:` clause** — a disclosed residual with an
+owner but no exit condition is the "documented instead of fixed" state QG-06 names as a finding rather than a
+mitigation. The two O-1 entries above state their exits in prose and are left in that form here; promoting them
+to the same labelled shape is named as a follow-up rather than done silently in a dispatch scoped to the O-2
+block.
 
 **What holds.** No portable record produced by this path, before or after this amendment, contains a
 natural-person identifier, a pseudonym, or any value derived from one (R-1 unchanged). Recovering an identity
@@ -1987,12 +1994,16 @@ proves that the *retained* stream is a contiguous hash chain and cannot prove th
 with local write access to the human stream's storage root can delete a disposition file and make a disposed
 grant continue to read as live — at the hook, and equally at §7.4's install readback and §7.5's reconcile,
 neither of which this document specifies to retain or pass a checkpoint either. §15.2.4 states the mechanics;
-this entry is the tracking. Owner `pipeline` (PHX-2). No date, and no exit is chosen here: the two available
-ones are for a producer to retain a ledger sequence it can witness later — which for GMW means changing
-`lib/guard-maintenance-window.mjs`, the file §7.1/A-3/§11 hold at "no change" — or for the boundaries that
-*can* retain one to do so, which is a change to §7.4/§7.5 that this amendment did not open. What must not
-happen is the third option an earlier revision took by accident: declaring the closure complete and leaving the
-disclosure three paragraphs upstream to contradict it.
+this entry is the tracking. Owner `pipeline` (PHX-2). **Trigger:** resolved when any read on this path passes a
+retained `checkpoint`, so that `verifyPortableGovernanceStream` can report completeness rather than
+`"unknown"` — reached by either of the two available exits, whichever is opened first: a producer retains a
+ledger sequence it can witness later (for GMW that means changing `lib/guard-maintenance-window.mjs`, the file
+§7.1/A-3/§11 hold at "no change"), or the boundaries that *can* retain one do so, which is a change to
+§7.4/§7.5 that this amendment did not open. Neither exit is chosen here and no calendar date is set, because
+the choice belongs to whichever of those two changes is opened first; what the trigger fixes is the condition
+under which this entry may be closed, not the date. What must not happen is the third option an earlier
+revision took by accident: declaring the closure complete and leaving the disclosure three paragraphs upstream
+to contradict it.
 
 **(ii) The grant memo is forgeable and unwitnessed, bounded by its TTL.** §15.2.3a's memo lives under
 `tmpdir()`, is not signed or MAC'd (deliberately, §15.2.3a), and an agent with local write access can forge
@@ -2002,15 +2013,81 @@ nothing new; what it does is suppress the ledger half of the intersection for at
 genuine delta over (i) is visibility: the stream is a worktree path where a tampered event is in principle
 reviewable, while the memo is not. A `<git-common-dir>` location plus one `GATE_STRENGTH_PATHS` entry would
 narrow the delta and was rejected on cost, with the reasoning in §15.2.3a rather than left implicit. Owner
-`pipeline` (PHX-2).
+`pipeline` (PHX-2). **Trigger:** resolved if and when `<git-common-dir>` resolution becomes available to this
+path without paying its own git subprocesses — the reason for the rejection, §15.2.3a — whether by a reusable
+production export replacing the test-only `guardMaintenanceWindowInternals.topology`
+(`guard-maintenance-window.mjs:578`) or by the two-subprocess cost being judged acceptable on reassessment;
+at that point the memo moves beside the window record and gains its `GATE_STRENGTH_PATHS` entry. Reassessed
+whenever either the memo's location or `topology`'s export status changes; until one of those happens the entry
+stands, bounded by `GMW_LEDGER_MEMO_TTL_MS`.
 
 **(iii) A miss still contains six git spawns with no per-spawn timeout.** `runGit` forwards a timeout only when
 its caller passes one (`worktree-lifecycle.mjs:110-122`) and the store's `assertPhysicalRoot` passes none, while
 GMW's own `git()` caps its two spawns at 5 s (`guard-maintenance-window.mjs:193`). `spawnSync` blocks the event
 loop, so nothing in this design can interrupt a hung `git` from outside. The memo bounds how often that path
 runs, not how long one invocation of it can take; B-1 pins the count. The fix is one argument at the store's own
-`discoverRepository` call — outside this dispatch and outside §2's non-scope, hence recorded rather than
-applied. Owner `pipeline` (PHX-2).
+`discoverRepository` call — outside this dispatch's scope, per §2's non-scope list, which holds
+`governance-event-store.mjs` and the rest of the ledger's internals out of this design — hence recorded rather
+than applied. Owner `pipeline` (PHX-2). **Trigger:** resolved when the store's `assertPhysicalRoot` →
+`discoverRepository` call passes a `timeout` to `runGit`, giving every spawn on this path the per-spawn bound
+GMW's own `git()` already has (`guard-maintenance-window.mjs:193`); that is a one-argument change in
+`governance-event-store.mjs`, and it belongs to whichever dispatch next holds that file in scope.
+
+**(iv) The module that hosts the new narrowing check is not a never-liftable kernel path, so one edit under any
+maintenance window removes the check permanently.** `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs`
+— the module §11/§15.3 specify to host `ledgerConfirmsLiveGmwGrant`, `readGrantMemo` and `writeGrantMemo` — is
+**not** a member of `NEVER_LIFTABLE_KERNEL_PATHS` (`guard-maintenance-window.mjs:120-128`), and nothing in this
+document as previously written would ever have made it one. It sits inside the live plugin root, so
+`guard-gate-strength.mjs` matches it as `LIVE_PLUGIN_RULE` (`:199-208`), finds it is not a kernel path, and
+admits the `Edit`/`Write` under any active, correctly-scoped, unexpired GS-6 window (`:227-240`) — a window
+legitimately armed for some entirely unrelated purpose. One line inside `ledgerConfirmsLiveGmwGrant` (an
+unconditional `return true;` ahead of the read) removes O-2's narrowing from **both** call sites at once, and
+**that effect outlives the window**: closing or expiring the window restores GS-6's refusal, but nothing
+restores a deleted check. This is why it is a separate entry rather than a variant of (i): every other residual
+here is either TTL-bounded ((ii)) or needs the adversary to keep tampering with state that the next read
+re-examines ((i), (iii)), whereas this one is a single edit with an unbounded, self-sustaining effect. The
+standard it fails is this document's own, quoted from §6's rejection of Option B: moving a capability-bearing
+record into the agent's write surface forces "the guards that protect it ... to protect the very record that
+lifts them — the recursive hole the never-liftable kernel list (`:120-128`) exists to close. Under an agent
+adversary this is the decisive argument." Once §15.2.3 makes `ledgerConfirmsLiveGmwGrant`'s return value a term
+of the lift condition, the code computing it is exactly such a capability-bearing artifact.
+
+*The fix, stated exactly.* One new entry in the `NEVER_LIFTABLE_KERNEL_PATHS` array at
+`plugins/pipeline-core/lib/guard-maintenance-window.mjs:120-128`:
+
+```js
+"plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs",
+```
+
+That is the whole change — the same repository-relative, forward-slashed, `plugins/pipeline-core/`-prefixed
+string shape as the six plugin-root entries already in the array, so it is derived unchanged into
+`PLUGIN_KERNEL_SUFFIXES` (`:139-141`) and checked against **both** the project-root and live-plugin-root anchors
+the comment at `:130-138` describes, which is the layout case that comment exists for. No new list, no new
+predicate, no change to `isNeverLiftableKernelPath`'s logic, no change to any caller.
+
+*Why it is proposed here and applied elsewhere.* `lib/guard-maintenance-window.mjs` is held at "no change" by
+§7.1/A-3/§11 ("deliberate: another session owns this file"), and §15.3's row for it says exactly that. This
+entry therefore follows the deferred-application path §9 already uses for the H-AC-11/H-AC-12 amendment text —
+specified precisely, reviewed together with this design, then applied by the dispatch that owns the file, **not**
+edited in-session. §15.3 carries it as a required companion change to the `guard-authority-ledger-intake.mjs`
+row so that the module cannot ship without it.
+
+Owner `pipeline` (PHX-2). **Trigger:** resolved when the entry above is present in
+`NEVER_LIFTABLE_KERNEL_PATHS`. Unlike (i)-(iii), this residual has a definite, cheap exit and no open design
+question behind it; it is open only for as long as this document does not edit the file holding the list.
+
+*What the one entry does and does not close, stated rather than assumed.* It closes the hole **this design
+itself opens**: a newly created module that becomes a term of the lift condition while remaining GS-6-liftable.
+It does not by itself make O-2's narrowing unremovable, because the second call site,
+`plugins/pipeline-core/hooks/guard-testpath.mjs` (§15.2.2, §15.3), is likewise not a
+`NEVER_LIFTABLE_KERNEL_PATHS` member, while the first, `hooks/guard-gate-strength.mjs`, already is (`:121`).
+Under the same window an edit there removes the ledger call — or the entire TP-* refusal — just as permanently.
+That exposure is **inherited, not created here**: it predates O-2 entirely and is a property of which hook files
+the kernel list names, not of anything §15 adds. Whether `guard-testpath.mjs` should join the list is a real
+decision with a real cost (a kernel entry makes the file uneditable under *any* window, exactly as
+`guard-gate-strength.mjs` is today), and it is deliberately **not decided here** — it is named so that the
+one-entry fix above is read as closing what this design opened, rather than as a claim that O-2's narrowing has
+become unremovable.
 
 ### 15.2 O-2 — closing the synchronous guard-hook gap inside increment 1
 
@@ -2248,6 +2325,14 @@ follow-up, not a precondition of this amendment.
   (`guard-maintenance-window.mjs:247-256`).
 - **What it holds, exactly.** `{schema: "pipeline.gmw-grant-memo.v1", rootDir` (realpath)`, ruleDigest,
   confirmed` (boolean)`, grantNotBeforeEpochMs, grantExpiresAtEpochMs, observedAtEpochMs, streamToken}`.
+  **Eight keys, and exactly eight for both polarities.** A negative memo (`confirmed: false`) describes the case
+  where no live grant exists, so there are no grant bounds to record: `grantNotBeforeEpochMs` and
+  `grantExpiresAtEpochMs` are then **`null` — present with the value `null`, never absent, never `0`, never
+  omitted**. This is specified rather than left to the implementer because the two obvious alternatives both
+  break the mechanism silently: omitting the keys makes every negative memo fail condition (1)'s closed-shape
+  check and therefore turn into an automatic miss, deleting negative memoization entirely while the prose below
+  still claims it; writing `0` makes a negative memo look like a positive one with an absurd validity range.
+  The positive memo carries the same eight keys with both bounds as finite integers.
   Deliberately **not** held: the window's `reason` — free text that `currentGuardMaintenanceWindow` does return
   to its caller (`:549`) — the proof, the decision, the decision id, or any event payload. The memo is a
   validity envelope, not a copy of the ledger; §5.1's exclusion list is honoured in a file that is not portable
@@ -2259,7 +2344,13 @@ follow-up, not a precondition of this amendment.
   directory mtime and the name set; any deletion changes the name set; a registry repointed at another storage
   root changes the registry's `stat`.
 - **When a memo may be served — all six, or it is a miss.** (1) it parses and passes an exact closed-shape
-  check; (2) `rootDir` equals `realpathSync(projectDir)`; (3) `ruleDigest` equals the digest recomputed from the
+  check: **all eight** keys above present, no ninth key, each with its declared type — `schema` the exact
+  literal, `rootDir`/`ruleDigest`/`streamToken` non-empty strings, `confirmed` a boolean, `observedAtEpochMs` a
+  finite integer, and `grantNotBeforeEpochMs`/`grantExpiresAtEpochMs` **either both finite integers or both
+  `null`**, with `null` admitted for exactly these two keys and required to agree with `confirmed` (both `null`
+  iff `confirmed === false`, both integers iff `confirmed === true`). The check is identical for positive and
+  negative memos — same key set, same closed-shape rejection of extras — so a negative memo passes (1) on its
+  own terms rather than by exception; (2) `rootDir` equals `realpathSync(projectDir)`; (3) `ruleDigest` equals the digest recomputed from the
   **live** window record this same call just read; (4) `0 <= nowMs - observedAtEpochMs <=
   GMW_LEDGER_MEMO_TTL_MS`, so a future-dated memo is a miss; (5) `streamToken` equals the token computed now;
   (6) for `confirmed: true` only, `grantNotBeforeEpochMs <= nowMs <= min(grantExpiresAtEpochMs,
@@ -2328,10 +2419,20 @@ Two things this design deliberately does **not** do about that:
   subprocesses gives back most of what it saves. The trade is recorded here so the next reader sees that it was
   taken, not missed.
 
-**What a hit costs.** `windowCoversRule` as today (2 spawns, one Ed25519 verification, two small reads), plus:
-one memo read, one `stat` of `registry.json`, one `stat` and one `readdir` of the stream directory, one sha256
-over a handful of short strings. **Zero added subprocesses, zero event files opened, zero hash-chain
-verification, and no term that grows with the size of the human stream.** A miss costs the 6 spawns and 2 scans
+**What a hit costs, including the term that does grow.** `windowCoversRule` as today (2 spawns, one Ed25519
+verification, two small reads), plus: one memo read, one `stat` of `registry.json`, one `stat` and one `readdir`
+of the stream directory, a sort of the returned names, and one sha256 whose input includes that sorted name
+list. **Zero added subprocesses, zero event files opened, zero parses, zero hash-chain verification.** What a
+hit is **not** is constant-time in the stream: `streamToken` is defined over `sortedEventFileNames`, so a hit
+performs a `readdir` and a sort across the *whole* retained-event **name** set and digests it — O(n log n) in
+the number of retained events, and n "only ever grows" for the same append-only reason stated above. An earlier
+revision of this paragraph claimed "no term that grows with the size of the human stream"; that was inconsistent
+with `streamToken`'s own definition three bullets earlier and is withdrawn. The distinction the memo actually
+buys is between two linear terms, not between linear and constant: a hit reads **names** out of one directory
+entry (no `open`, no parse, no envelope validation, no path/envelope binding check, no chain re-verification,
+no git subprocess), while a scan reads, parses and chain-verifies every **file** — twice per call. Both grow
+with n; they grow by different orders of magnitude and against different constants, and stating that honestly is
+what keeps the next reader from re-deriving the budget from a claim that does not hold. A miss costs the 6 spawns and 2 scans
 priced above plus one memo write, and occurs at most once per `GMW_LEDGER_MEMO_TTL_MS` per
 `(rootDir, ruleDigest)`, plus once whenever the stream, the registry or the window actually changes.
 
@@ -2339,7 +2440,7 @@ priced above plus one memo write, and occurs at most once per `GMW_LEDGER_MEMO_T
 miss still contains 6 `git` spawns with no per-spawn timeout, inside the store. The memo bounds how *often* that
 path runs; it cannot bound how long one hung `git` takes, because `spawnSync` blocks the event loop. Bounding
 that means passing a `timeout` at the store's own `discoverRepository` call — one argument in
-`governance-event-store.mjs`, which is outside this dispatch and outside §2's non-scope. It is recorded in
+`governance-event-store.mjs`, which is outside this dispatch's scope, per §2's non-scope list. It is recorded in
 §15.1.6 with that one-line fix named, and B-1 asserts the shape of the cost so the exposure cannot silently
 grow.
 
@@ -2384,6 +2485,14 @@ and flakes on shared CI:
    budget (`hooks/hooks.json:61-65`). The ceilings sit an order of magnitude above the expected cost and an
    order of magnitude below the timeout on purpose: assertions 1-2 pin the shape of the cost, and 7 fails only
    when something has gone badly wrong.
+8. **Negative memoization works structurally, not only in prose.** Given a prior `confirmed: false` memo whose
+   `grantNotBeforeEpochMs` and `grantExpiresAtEpochMs` are `null` (§15.2.3a's negative shape), still inside the
+   TTL and matching conditions (1)-(5), the next call returns `false` with a `queryDecisions` stub that
+   **throws if invoked at all** — the same seam assertion 1 uses for the positive warm hit, in the opposite
+   polarity. Without this case the bullet "negative memoization is included, deliberately" is untested, and the
+   most likely implementation slip — omitting the two `null` keys instead of writing them, so every negative
+   memo fails the closed-shape check and silently becomes a miss — passes every other assertion in this list,
+   because a permanent miss still returns `false`.
 
 #### 15.2.4 Failure mode, specified explicitly
 
@@ -2482,13 +2591,13 @@ The rows below are additions to, or modifications of, §11's table; §11 itself 
 
 | File | Change | Rationale |
 | --- | --- | --- |
-| `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs` | **extend** the create already specified in §11: add `ledgerConfirmsLiveGmwGrant` (§15.2.3) alongside the write-side builders, plus the memo and cost-bounding surface of §15.2.3a — `readGrantMemo`, `writeGrantMemo`, `readRegistryRepositoryFingerprint`, `GMW_LEDGER_MEMO_TTL_MS`. Same file, five more exports. | keeps every ledger-reading and ledger-writing entry point for this design in one module, per §7.1's own reasoning; the memo is the read path's own concern and belongs beside it, not in a new module |
+| `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs` | **extend** the create already specified in §11: add `ledgerConfirmsLiveGmwGrant` (§15.2.3) alongside the write-side builders, plus the memo and cost-bounding surface of §15.2.3a — `readGrantMemo`, `writeGrantMemo`, `readRegistryRepositoryFingerprint`, `GMW_LEDGER_MEMO_TTL_MS`. Same file, five more exports. **Required companion change — see the row for `lib/guard-maintenance-window.mjs` below:** this module must be a `NEVER_LIFTABLE_KERNEL_PATHS` member before or at the same time as it ships, or the check it hosts is removable by one edit under any GS-6 window (§15.1.6 (iv)). | keeps every ledger-reading and ledger-writing entry point for this design in one module, per §7.1's own reasoning; the memo is the read path's own concern and belongs beside it, not in a new module; the kernel-list companion is what stops "one module" from also meaning "one editable point of failure" |
 | `plugins/pipeline-core/scripts/guard-authority-ledger-intake.test.mjs` | **extend** the create already specified in §11: integration tests for the narrowing read (ledger confirms → lift proceeds; ledger silent/absent/corrupted → lift denied exactly like an absent window; a disposed grant → denied) | moves an O-2 non-conformance out of "no test exists for it" the same day it moves out of "not implemented" |
-| `plugins/pipeline-core/scripts/guard-authority-ledger-intake.test.mjs` | **extend a second time — the same row, not a duplicate of it** (the "one row, extended twice" direction §9 already uses for `scripts/governance-authority.mjs`): add **B-1**, the budget test specified in §15.2.3b — cold-miss/warm-hit through the injected `queryDecisions` seam, the 50-call burst, the four invalidation cases, expiry-never-served-stale, five miss-never-grants cases, and the wall-clock ceilings (< 1 000 ms cold, < 250 ms warm) against `guard-testpath.mjs`'s declared 10 s runner budget (`hooks/hooks.json:61-65`) | §15.2.3a corrects a false cost claim; a corrected claim with no test is the same claim one revision later. B-1 is what keeps the bound true after the next change to the store, and its structural assertions fail on a regression the wall clock would hide |
+| `plugins/pipeline-core/scripts/guard-authority-ledger-intake.test.mjs` | **extend a second time — the same row, not a duplicate of it** (the "one row, extended twice" direction §9 already uses for `scripts/governance-authority.mjs`): add **B-1**, the budget test specified in §15.2.3b — cold-miss/warm-hit through the injected `queryDecisions` seam, the 50-call burst, the four invalidation cases, expiry-never-served-stale, five miss-never-grants cases, the negative-memo warm hit that pins negative memoization structurally, and the wall-clock ceilings (< 1 000 ms cold, < 250 ms warm) against `guard-testpath.mjs`'s declared 10 s runner budget (`hooks/hooks.json:61-65`) | §15.2.3a corrects a false cost claim; a corrected claim with no test is the same claim one revision later. B-1 is what keeps the bound true after the next change to the store, and its structural assertions fail on a regression the wall clock would hide |
 | `plugins/pipeline-core/hooks/guard-testpath.mjs` | **modify**: call `ledgerConfirmsLiveGmwGrant` after `windowCoversRule` returns `covered: true` (§15.2.3) | closes H-AC-02 at the TP-* hook path (§15.2.2 identifies this as an actual call site; the original §11 named no hook file at all for increment 1) |
 | `plugins/pipeline-core/hooks/guard-gate-strength.mjs` | **modify**: same change, GS-6 only (§15.2.3) | closes H-AC-02 at the GS-6 hook path |
 | `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` | **no change** | §15.2.2's correction: this file does not call `windowCoversRule` and has no role in O-2's closure |
-| `plugins/pipeline-core/lib/guard-maintenance-window.mjs` | **no change** (§11's existing row stands) | §15.2.3's design deliberately avoids needing any export this file does not already have |
+| `plugins/pipeline-core/lib/guard-maintenance-window.mjs` | **no change to behaviour, exports or logic** (§11's existing row stands, and this document does not edit the file). **One data-only addition is *proposed* here and applied by the dispatch that owns this file** (§9's deferred-application pattern): the single array element `"plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs"` in `NEVER_LIFTABLE_KERNEL_PATHS` (`:120-128`), exact text and rationale in §15.1.6 (iv). It must land no later than the intake module itself. | §15.2.3's design deliberately avoids needing any export this file does not already have — but §15.2.3 also makes a *new* module a term of the lift condition, and a term of the lift condition that a maintenance window can edit re-opens exactly the recursive hole the kernel list exists to close (§6, Option B, reason 2). One array element, no logic touched, is the smallest change that closes it |
 | `plugins/pipeline-core/lib/human-governance-identity-registry.mjs` | **create** — `validateIdentityRegistryEntry`, `validateIdentityRegistry`, `resolveNaturalPersonIdentity`, `loadIdentityRegistry` (§15.1.2) | O-1's mechanism; no kernel file changes because of it |
 | `plugins/pipeline-core/lib/human-governance-identity-registry.test.mjs` | **create** — unit tests: shape validation, overlap rejection, resolved/unknown/ambiguous lookup outcomes | same H-AC-15-style discipline §12 already applies to the write-side builders |
 | `plugins/pipeline-core/scripts/governance-authority.mjs` | **extend** the modification already specified in §11: add the `--resolve-identity-file`/`--resolve-identity-json` verb pair to `parse(argv)`'s `Set` (`:13`) and one more early branch in `main()` (`:39-99`), each carrying the canonical-JSON payload `{authorityClass, occurredAtEpochMs}` — not the two-flag `resolve-identity --authority-class <class> --occurred-at-ms <n>` form §15.1.2 already rejects as not fitting `parse(argv)`'s closed shape (§15.1.2) | one read-only query surface, reusing the file §11 already touches for `reconcile` rather than adding a new script |
@@ -2502,13 +2611,20 @@ The rows below are additions to, or modifications of, §11's table; §11 itself 
   H-AC-11 amendment text is proposed in §15.1.5 and applied by the reviewed rebind, not here — and, unlike
   O-2, that step has not yet happened as of this document: §13 AC-14 is this document's own gate against
   declaring the mechanism complete before it does.
-- **O-2 — mechanism resolved; three assurance residuals open and tracked.** Mechanism specified in §15.2;
+- **O-2 — mechanism resolved; four assurance residuals open and tracked.** Mechanism specified in §15.2;
   D-2's *placement* is closed and pulled into increment 1 (§15.2.5, §15.3), with the real execution cost traced
   in §15.2.3a — nine added git subprocess spawns and two full O(n) hash-chain re-verifications per lifted tool
   call, not "one more read" — bounded by the memo specified there and pinned by budget test B-1 (§15.2.3b).
   H-AC-02 is satisfied at the guard hook against every state the hook's read can distinguish. It is **not**
   discharged against an agent with local write access to the human stream's storage root (§15.2.4) or to the
-  memo (§15.2.3a), and a miss still contains six git spawns with no per-spawn timeout; all three are in
-  §15.1.6, owner `pipeline` (PHX-2). An earlier revision of this bullet read "no non-conformance remains open
-  for it", which was wider than §15.2.4's own disclosure in the same document, and is corrected here.
+  memo (§15.2.3a), and a miss still contains six git spawns with no per-spawn timeout. **Fourth, and unlike the
+  other three unbounded in time:** the module hosting the narrowing check,
+  `lib/guard-authority-ledger-intake.mjs`, is not a `NEVER_LIFTABLE_KERNEL_PATHS` member, so one edit under any
+  active GS-6 window removes the check permanently — §15.1.6 (iv) states the defeat path and proposes the
+  one-element kernel-list addition that closes it, applied per §9's deferred-application pattern by the dispatch
+  that owns `lib/guard-maintenance-window.mjs` and carried in §15.3 as a required companion change. All
+  **four** are in §15.1.6, each with an owner (`pipeline`, PHX-2) and an explicit trigger; the count here and
+  the count in §15.1.6's preamble are the same four by construction. An earlier revision of this bullet read
+  "no non-conformance remains open for it", which was wider than §15.2.4's own disclosure in the same document;
+  a later one said "three", which stopped being true the moment (iv) was found. Both are corrected here.
 - **O-3, O-4, O-5 — unchanged.** Not reopened by this section.
