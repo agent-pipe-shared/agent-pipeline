@@ -4154,6 +4154,29 @@ work once picked up, since it would advance four criteria at once, but it needs 
 (where does each event type actually belong in orchestration?) before dispatch, not a rushed attempt
 at the tail of this stretch.
 
+### CATEGORY 3 RECLASSIFIED: ALSO PO-GATED, NOT JUST DESIGN-HEAVY
+
+Scoped category 3 further before leaving it as a loose "needs design" note. Finding:
+`plugins/pipeline-core/hooks/hooks.json` — the wiring registry any new hook call-site would need an
+entry in — is itself explicitly "TP-4-protected, edited only under explicit PO approval"
+(`hooks.json:2`). More tellingly, this repo's OWN established convention already treats "build the
+capability" and "wire it into live orchestration" as two deliberately separate, separately-gated
+steps: `stop-suggest.mjs`'s own header states it was intentionally left unwired, with "a later
+bundled wiring wave (W-WIRE) adds the Stop entry under one explicit PO-approved sentinel edit."
+Category 3 isn't merely harder design work — it's the SAME class of guard-protected situation as
+category 2 (TP-5 on `pipeline-state.test.mjs`), just gated via TP-4 on `hooks.json` instead. Per-
+producer integration-point hypotheses were still identified for whenever a PO-approved wiring wave
+happens (`guard-dispatch.mjs` for selection/escalation/fallback events; `pipeline-state.mjs`'s
+state-writer or `guard-push.mjs` for lifecycle events; `migrate-backlog-state.mjs` for legacy-import
+observations) — genuinely useful groundwork for that future wave, not wasted research.
+
+**Updated picture: of the five categories, four of five (1, 2, 3, 4) are now confirmed PO-gated one
+way or another** (design input, TP-5, TP-4, or explicit Class-P policy) **— only category 5
+(missing infrastructure like V-AC-06's visual-regression tooling, E-AC-20's cross-reference design)
+is purely an Elephant/Goldfish scoping question with no guard or PO-input dependency**, and even
+that carries real design ambiguity already noted. This is the honest, fully-mapped state of the
+remaining queue.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
