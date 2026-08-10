@@ -14,7 +14,6 @@
  */
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -30,9 +29,6 @@ import {
 } from "./ruleset-freshness.mjs";
 import { freshnessHostActionForPreflight, observePipelineStartPreflight } from "./pipeline-start-preflight.mjs";
 import { CODEX_APP_SERVER_HEALTH_SCHEMA, observeCodexAppServer } from "./codex-app-server-health.mjs";
-import { observeCodexPublicCoreIdentity } from "../lib/public-core-observation.mjs";
-import { PUBLIC_SELF_APPLICATION_ORIGINS } from "../lib/public-core-origin-allowlist.mjs";
-import { normalizeRulesetSource, RULESET_SOURCE_SCHEMA } from "../lib/ruleset-source.mjs";
 
 const SHA = /^[0-9a-f]{40,64}$/iu;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -221,83 +217,17 @@ function parseArgs(argv) {
 }
 
 /**
- * `observeRulesetSource` -- the successor this comment used to describe as
- * "designed but not yet built".  It is now built, below, and wired as
- * `main()`'s real default (see the destructured default a few lines down).
- *
- * The pre-merge default was `observeCodexRulesetSource`, whose retirement is a
- * recorded product decision.  Its designated successor shapes a
- * `pipeline.ruleset-source.v1` observation the same way the bootstrap gate
- * already does it (`evaluateSelfApplicationAttestation` in
- * `../lib/self-application-attestation-gate.mjs`, PX0-AC-08/Part A): a
- * self-referential `observeCodexPublicCoreIdentity` call -- the loaded root IS
- * the root being attested, `sourcePluginRoot === installedPluginRoot` -- gated
- * on `.git` presence at the self-application layout, its origin checked
- * against the same two reviewed Public-Core origins
- * (`PUBLIC_SELF_APPLICATION_ORIGINS`), then closed through
- * `normalizeRulesetSource` (reusing the existing `pipeline.ruleset-source.v1`
- * shape and validation, not inventing a new one).  `observeSelectedCodexPipelinePlugin`
- * is not called a second time here: `observeCodexPublicCoreIdentity` already
- * calls it internally for its own host-path cross-check
- * (`public-core-observation.mjs`'s `SNT-A2-CODEX-HOST-MISMATCH`), so a direct
- * second call here would only add a redundant host round-trip.
- *
- * `runner` is fixed at `"codex"` rather than re-derived from `CLAUDECODE`:
- * every other exported entry in this file depends on `observeCodexAppServer`'s
- * Codex-only App-Server control channel, so this file never runs for a Claude
- * session in the first place (design
- * `bootstrap-origin-allowlist-and-codex-wsl-freshness.md` §B.4's
- * `runner === "codex" && wsl` scoping condition, decided by the CALLER before
- * this executable is ever placed on the host boundary).
- *
- * Every failure path returns a typed `source-unavailable` result with a null
- * observation -- never a fabricated plugin id/version (the schema has no
- * "unavailable" variant for `selectedPlugin`, so a partial observation cannot
- * be validly constructed), and never a thrown exception.
+ * `observeRulesetSource` has no default producer.  The pre-merge default was
+ * `observeCodexRulesetSource`, whose retirement is a recorded product decision;
+ * its designated successor -- shaping a `pipeline.ruleset-source.v1` observation
+ * from `observeCodexPublicCoreIdentity`/`observeSelectedCodexPipelinePlugin` --
+ * is designed but not yet built.  Until a producer is injected this CLI
+ * therefore fails closed: `inspectCliRulesetFreshness` types the absent
+ * observation as `invalid-input` and `main` exits 2.  The exported host
+ * contract below is unaffected, because every exported entry takes the
+ * observation as a parameter.
  */
-export function observeRulesetSource({ loadedPluginRoot, selfApplicationRoot } = {}, { observe = observeCodexPublicCoreIdentity } = {}) {
-  if (typeof loadedPluginRoot !== "string" || loadedPluginRoot.length === 0
-    || typeof selfApplicationRoot !== "string" || selfApplicationRoot.length === 0
-    || typeof observe !== "function") {
-    return { status: "source-unavailable", observation: null, diagnostics: ["ruleset-source-input-invalid"] };
-  }
-  // Mirrors `pluginRootHasSelfApplicationGit`: skip the attestation entirely
-  // -- not attempted, not failed -- for the real installed (non-git) topology
-  // instead of paying for a `git` subprocess spawn that can only fail closed.
-  if (!existsSync(resolve(selfApplicationRoot, ".git"))) {
-    return { status: "source-unavailable", observation: null, diagnostics: ["self-application-git-absent"] };
-  }
-  let identity;
-  try {
-    identity = observe({ sourcePluginRoot: loadedPluginRoot, installedPluginRoot: loadedPluginRoot }, {});
-  } catch {
-    identity = null;
-  }
-  const originAllowlisted = identity?.status === "ready"
-    && PUBLIC_SELF_APPLICATION_ORIGINS.has(identity.candidate?.repository);
-  if (!originAllowlisted) {
-    return {
-      status: "source-unavailable",
-      observation: null,
-      diagnostics: identity?.status === "ready"
-        ? ["ruleset-source-origin-not-allowlisted"]
-        : identity?.reasonCodes ?? ["ruleset-source-identity-unavailable"],
-    };
-  }
-  return normalizeRulesetSource({
-    schema: RULESET_SOURCE_SCHEMA,
-    runner: "codex",
-    selectedPlugin: { id: identity.plugin.name, version: identity.plugin.version },
-    source: { class: "self-application" },
-    loadedIdentity: { status: "available", algorithm: "content-sha256", value: identity.plugin.contentSha256 },
-    installedIdentity: { status: "available", algorithm: "content-sha256", value: identity.plugin.contentSha256 },
-  });
-}
-
-export function main(argv = process.argv.slice(2), {
-  observePreflight = observePipelineStartPreflight,
-  observeRulesetSource: observeRulesetSourceDefault = observeRulesetSource,
-} = {}) {
+export function main(argv = process.argv.slice(2), { observePreflight = observePipelineStartPreflight, observeRulesetSource = null } = {}) {
   const parsed = parseArgs(argv);
   if (parsed === null) {
     process.stderr.write("ruleset-freshness-host: usage: ruleset-freshness-host.mjs --repo <existing-freshness-root> --preflight-sha256 <sha256>\n");
@@ -310,9 +240,9 @@ export function main(argv = process.argv.slice(2), {
   } catch { preflightBinding = null; }
   const loadedPluginRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
   let codexObservation = null;
-  if (typeof observeRulesetSourceDefault === "function") {
+  if (typeof observeRulesetSource === "function") {
     try {
-      codexObservation = observeRulesetSourceDefault({
+      codexObservation = observeRulesetSource({
         loadedPluginRoot,
         selfApplicationRoot: resolve(loadedPluginRoot, "..", ".."),
       });
