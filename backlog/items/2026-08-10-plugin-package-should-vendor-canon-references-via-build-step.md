@@ -66,6 +66,35 @@ effective behavior, then replace the one-time copy with a build step and
 add drift detection so the two copies (source and vendored) cannot silently
 diverge again.
 
+### Added scope (PO, 2026-08-10, same triage session): classify before vendoring, don't just copy everything
+
+The immediate "jetzt a)" fix vendors `templates/`, `roles/`, `guardrails/`,
+and `docs/push-release-flow.md` wholesale, without first asking whether
+every file in those directories is actually appropriate for a hosted/
+consumer project to read at all. Some content in `docs/adr/` (and plausibly
+in `templates/`/`roles/`/`guardrails/` too) may be Pipeline-self-application
+-only — decisions about how the Pipeline governs its OWN repo, not
+decisions meant to bind or inform a hosted project's own operating model.
+Blanket-vendoring that content into every consumer project's plugin install
+is a different, quieter problem than the path-resolution bug this whole
+item started from: it would leak internal process decisions into projects
+that have no reason to see them, and could actively confuse an agent
+working in a hosted project if it reads a Pipeline-self-only ADR as if it
+applied there.
+
+Before (or as part of) building the generated build step above, do a real
+classification pass over `docs/adr/` (and re-check `templates/`, `roles/`,
+`guardrails/` with the same lens once ADRs establish the pattern): which
+decisions are Pipeline-self-only, and which are universal — meant to apply
+to, or at least inform, any project the Pipeline governs, self or hosted.
+This probably needs its own ADR to formalize the split (a classification
+scheme, and where the line sits for existing ADRs), and may mean literally
+splitting some existing ADRs whose content mixes both concerns into a
+self-only part and a universal part, rather than just tagging them in
+place. Only the UNIVERSAL subset should ever be vendored into the plugin
+package for consumer projects; self-only content stays exactly where it is
+today (Pipeline repo root only, never shipped).
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted in principle (the PO explicitly wants "es sauber zu
