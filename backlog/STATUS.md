@@ -132,7 +132,7 @@
 | pipeline.push-gate-is-silent-in-every-consumer-project | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.push-release-flow-unusable-for-third-party-adopters | open | defect | pipeline | 2026-08-07 | — |
-| pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.recovery-preview-callback-attestation | in_progress | defect | pipeline | 2026-07-20 | — |
@@ -185,6 +185,6 @@
 
 ## Counts
 
-- open: 116
+- open: 115
 - in_progress: 21
-- closed: 40
+- closed: 41

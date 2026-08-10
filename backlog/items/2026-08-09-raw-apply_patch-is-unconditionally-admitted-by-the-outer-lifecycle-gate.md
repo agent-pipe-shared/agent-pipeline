@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
+closed_at: 2026-08-10
+closure_repository: self
+closure_commit: 7ceb8781a187310727c29b15a512bbce7e48a267
+closure_evidence: backlog/evidence/2026-08-10-apply-patch-invariant-closure.md
 source: "GF-078 (goldfish-deep), while fixing plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs's isRestartResumeHintInputWrite for Codex's apply_patch tool, 2026-08-09. The narrow fix landed (commit 92c4ee71) and is correct; this item documents a broader, adjacent reachability question the same investigation surfaced."
 due: 2026-08-23
 ---
@@ -70,7 +74,19 @@ a quick patch riding on an unrelated dispatch.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — option 1 (document the translate-first behavior
+  as a permanent architectural invariant, with regression coverage), per
+  explicit PO decision, 2026-08-10. Option 2 (widen the outer gate itself)
+  remains explicitly deferred, not decided against — a proper dedicated
+  audit of every downstream check the outer gate feeds is still needed
+  before that is attempted.
+- **Rationale:** PO's own words: "erst mal A" — the cheap, low-risk
+  documentation-plus-test fix closes the immediate gap (an unexplained,
+  undocumented dependency on a separate file) without touching
+  security-relevant surface that would need its own dedicated review.
+- **Assignment:** GF-089 (goldfish-deep), self-verified by the Elephant
+  (diff read directly) — confirmed the investigation held (the translate-
+  first invariant is real today, not just asserted) and that regression
+  coverage is genuinely load-bearing (GF-089 mutated a scratch-only copy of
+  the guard to confirm its new test fails without the real translation).
+- **Date:** 2026-08-10

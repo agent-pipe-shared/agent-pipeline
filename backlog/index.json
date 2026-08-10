@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "98c260a759a7e4d39efc927bc578d93208a8f3c12e8ab83125fb387fb0ef3df6"
+    "transitionHead": "a063eeb70c07a295eec2decb71333ad27818d9464d6b291c6ed6af5606c53f2a"
   },
   "counts": {
-    "open": 116,
+    "open": 115,
     "in_progress": 21,
-    "closed": 40
+    "closed": 41
   },
   "items": [
     {
@@ -1140,11 +1140,15 @@
     },
     {
       "id": "pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "GF-078 (goldfish-deep), while fixing plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs's isRestartResumeHintInputWrite for Codex's apply_patch tool, 2026-08-09. The narrow fix landed (commit 92c4ee71) and is correct; this item documents a broader, adjacent reachability question the same investigation surfaced."
+      "source": "GF-078 (goldfish-deep), while fixing plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs's isRestartResumeHintInputWrite for Codex's apply_patch tool, 2026-08-09. The narrow fix landed (commit 92c4ee71) and is correct; this item documents a broader, adjacent reachability question the same investigation surfaced.",
+      "closedAt": "2026-08-10",
+      "closureRepository": "self",
+      "closureCommit": "7ceb8781a187310727c29b15a512bbce7e48a267",
+      "closureEvidence": "backlog/evidence/2026-08-10-apply-patch-invariant-closure.md"
     },
     {
       "id": "pipeline.ready-gate-env-var-runner-authority",
