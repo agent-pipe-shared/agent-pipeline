@@ -40,13 +40,22 @@ directory and rejects a directory that reaches the repository.
 
 ## Before any signature: one explicit confirmation
 
-Every signing command — `approve`, `approve-critical`, `sign-intent`, and each
-signature `approve-all` performs on your behalf — first prints a plain-language
-summary of what is about to be authorized and waits for you to type the exact
-word `approve`. Anything else, including an empty line, cancels: OpenSSL is
-never invoked and no proof artifact is written. The summary names the approval
-kind and the exact candidate commit (plus the action subject digest and expiry
-for a critical action), or the intent digest for `sign-intent`.
+Every signing command — `approve`, `approve-critical`, `approve-fork-disposition`,
+`sign-intent`, and each signature `approve-all` performs on your behalf — first
+prints a plain-language summary of what is about to be authorized and waits for
+you to type the exact word `approve`. Anything else, including an empty line,
+cancels: OpenSSL is never invoked and no proof artifact is written. The summary
+names the approval kind and the candidate (plus the action subject digest and
+expiry for a critical action), or the intent digest for `sign-intent`.
+
+One exception to read carefully, because the line looks like a commit and is
+not: for the `governance-fork-disposition` kind the `candidate commit` field is
+a DERIVED binding value, not a Git commit that exists in this repository. A
+governance-stream fork is not commit-scoped (ADR-0063), so the disposition binds
+the repository fingerprint, stream, sequence and the content digests of the
+conflicting entries instead. Check the `action subject sha256` line against the
+digest the agent showed you; that is the value that identifies what you are
+authorizing for this kind.
 
 The confirmation is deliberately placed *before* the passphrase prompt, so the
 question "should this be authorized, with this consequence?" is answered while
@@ -56,7 +65,12 @@ passphrase. `setup` creates key material and signs nothing, so it does not ask.
 ## Which commands are yours
 
 Every command in this document that reads the private key is yours and only
-yours: `setup`, `approve`, `approve-all`, `approve-critical`, `sign-intent`.
+yours: `setup`, `approve`, `approve-all`, `approve-critical`,
+`approve-fork-disposition`, `sign-intent`. `approve-fork-disposition` is on that
+list for a reason that is easy to miss from its name: it re-checks the fork and
+then hands the signing itself to the same `approve-critical` branch, so it opens
+your private key exactly like the others.
+
 Everything else — `prepare*`, `verify*`, and the guard-side consumers such as
 `guard-maintenance-window.mjs install` and `guard-human-override.mjs` — reads
 only public artifacts and is executed by the agent. If an agent asks you to run
@@ -103,6 +117,15 @@ node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" prepare-all --re
 node "$REPO/plugins/pipeline-core/scripts/po-approval-gate.mjs" verify-all --repo-root "$REPO" --directory "$PO_DIR"
 ```
 
+The same script also carries the public half of the fork-disposition ceremony —
+`prepare-fork-disposition` and `verify-fork-disposition`. `approve-fork-disposition`
+is absent from it on purpose, exactly like `approve-critical`: it reads the
+private key. Note the narrower separate limit inside this repository: the
+lifecycle guard's agent allowlist admits only `prepare`, `prepare-all`, `verify`
+and `verify-all` through this script, so the `-critical` and `-fork-disposition`
+commands, though public, are run from an operator's terminal here until that
+allowlist is widened.
+
 ## Critical external effects
 
 For a remote push, a human-gated deployment or a publication, the control
@@ -112,11 +135,25 @@ digest of the exact writer-owned action subject. The human signs it on the
 hardened terminal with `approve-critical`; the agent can prepare and verify,
 but cannot sign.
 
-The repository policy enables this check only for `push`, `deploy` and
-`publication`. Planning, implementation, normal review and other chat-approved
-decisions do not require the external signer. A proof is single-purpose: a
-push proof cannot approve a deploy or publication, and candidate, subject or
-expiry drift requires a new request.
+The policy field behind this is `requiredKinds` in
+`project/critical-human-proof.json`. It is kind-scoped, it governs the State
+writer and the push guard, and this repository lists exactly `push`, `deploy`
+and `publication` in it. Removing a kind from that list does not stand the gate
+down — the writer action rejects instead (ADR-0055); standing the proof down
+takes an explicit, reasoned waiver.
+
+A fourth kind exists and is deliberately outside that field's reach:
+`governance-fork-disposition` (ADR-0063). The governance-event store never
+consults `requiredKinds` for it — it demands a verified approval
+unconditionally, reading only the `trustAnchor` from that same file, plus
+`gates.push_approval` to decide whether a `chat` clearance is admissible at all.
+So "add it to `requiredKinds`" is neither necessary nor sufficient for that
+kind; the trust anchor is what makes it verifiable.
+
+Planning, implementation, normal review and other chat-approved decisions do not
+require the external signer. A proof is single-purpose: a push proof cannot
+approve a deploy or publication, and candidate, subject or expiry drift requires
+a new request.
 
 ```sh
 # Agent/control plane: creates public external files only.

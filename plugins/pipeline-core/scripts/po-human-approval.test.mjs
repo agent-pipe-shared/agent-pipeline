@@ -23,6 +23,15 @@
  * governance-fork-disposition` route could also claim. One regression test
  * pins that `push`/`deploy`/`publication` keep composing the same request from
  * the real candidate and real repository file bytes.
+ *
+ * WP-K-AC05-REWORK2 adds what that round left open: the OLD route
+ * (`prepare-critical --kind governance-fork-disposition`) still parsed, still
+ * built the unverifiable request, and wrote it over the correct command's own
+ * artifact. Its refusal is proven below against a prepared, valid request — the
+ * file must survive byte-identical — and the public half of the ceremony is
+ * exercised through `po-approval-gate.mjs`, the script the lifecycle guard
+ * allowlists as agent-executable, rather than only through the human-terminal
+ * entry point.
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -33,8 +42,9 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
+import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
-import { createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "../lib/governance-event.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
@@ -378,6 +388,79 @@ test("prepare-critical keeps composing push/deploy/publication requests exactly 
       "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
       "--kind", "push", "--subject-sha256", subjectSha256, "--expires-at", FAR_FUTURE, "--stream-id", "lifecycle",
     ], {}), /Usage:/u);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("the -critical trio refuses the fork-disposition kind, so no operator route can build the unverifiable request or overwrite the correct one", async () => {
+  const dirs = await forkedRepositoryFixture();
+  try {
+    writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+    writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+    const prepared = await runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, ["--expires-at", FAR_FUTURE])], {});
+    const requestPath = join(dirs.directory, "request-critical-governance-fork-disposition.json");
+    const before = readFileSync(requestPath, "utf8");
+
+    // The exact escape route: the CORRECT receipt's subject digest, copied into
+    // prepare-critical. The request that produced used to satisfy
+    // approve-fork-disposition's kind/subject re-check while still carrying a
+    // git candidate and repository plan/spec bytes, so the whole signing
+    // ceremony ran before anything noticed.
+    assert.throws(() => runHumanApproval([
+      "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+      "--kind", "governance-fork-disposition", "--subject-sha256", prepared.subjectSha256, "--expires-at", FAR_FUTURE,
+    ], { observeCandidate: () => ({ commit: "d".repeat(40), tree: "e".repeat(40) }) }), /Usage:/u);
+    assert.equal(readFileSync(requestPath, "utf8"), before, "a refused prepare-critical cannot clobber the prepared fork-disposition request");
+
+    // Signing and readback are refused at the same point, so that re-check is no
+    // longer the only thing standing between a copied digest and OpenSSL.
+    for (const command of ["approve-critical", "verify-critical"]) {
+      assert.throws(() => runHumanApproval([command, "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--kind", "governance-fork-disposition"], {}), /Usage:/u, `${command} must refuse the kind outright`);
+    }
+
+    // Whatever the shared family grows next has to be an explicit decision for
+    // these three commands too, not automatic membership — which is exactly how
+    // the fourth kind arrived here unnoticed.
+    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication"].includes(entry))) {
+      assert.throws(() => runHumanApproval([
+        "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+        "--kind", kind, "--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE,
+      ], {}), /Usage:/u, `${kind} is not one of the three kinds these commands can compose`);
+    }
+
+    // The fork-disposition ceremony itself still works after the narrowing: its
+    // approve step reaches the same signing branch the refused argv named.
+    const { authority } = keyFixture(dirs.directory);
+    declareTrustAnchor(dirs.repoRoot, authority);
+    const approved = await runForkDispositionApproval(["approve-fork-disposition", ...forkArgs(dirs)], { readConfirmation: () => "approve" });
+    assert.equal(approved.code, "PO-HUMAN-PROOF-READY");
+    assert.equal((await runForkDispositionApproval(["verify-fork-disposition", ...forkArgs(dirs)], {})).value.verified, true);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("po-approval-gate.mjs drives the public half of the fork-disposition ceremony, and only the public half", async () => {
+  const dirs = await forkedRepositoryFixture();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    declareTrustAnchor(dirs.repoRoot, authority);
+
+    const prepared = await runApprovalGate(["prepare-fork-disposition", ...forkArgs(dirs, ["--expires-at", FAR_FUTURE])], {});
+    assert.equal(prepared.code, "PO-HUMAN-FORK-DISPOSITION-REQUEST-READY", "the agent-executable control plane must be able to prepare the request");
+
+    // The signing half is not the control plane's to run: it delegates to the
+    // approve-critical branch and therefore reads the private key.
+    assert.throws(() => runApprovalGate(["approve-fork-disposition", ...forkArgs(dirs)], { readConfirmation: () => "approve", spawn: () => ({ status: 0 }) }), /Usage:/u);
+    assert.equal(existsSync(join(dirs.directory, "proof-critical-governance-fork-disposition.json")), false, "no proof may exist before the human has signed");
+
+    await runForkDispositionApproval(["approve-fork-disposition", ...forkArgs(dirs)], { readConfirmation: () => "approve" });
+    const verified = await runApprovalGate(["verify-fork-disposition", ...forkArgs(dirs)], {});
+    assert.equal(verified.code, "PO-HUMAN-FORK-DISPOSITION-VERIFIED");
+    assert.equal(verified.value.verified, true);
   } finally {
     cleanup(dirs);
   }

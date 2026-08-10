@@ -18,7 +18,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
-import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApprovalSubject, inspectForkedGovernanceStream } from "../lib/governance-event-store.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -83,6 +83,26 @@ function artifactPath(directory, name) {
  * that fork replace the ones `prepare-critical` accepts verbatim.
  */
 const FORK_DISPOSITION_COMMANDS = new Set(["prepare-fork-disposition", "approve-fork-disposition", "verify-fork-disposition"]);
+
+/**
+ * The `--kind` values `prepare-critical`/`approve-critical`/`verify-critical`
+ * accept — deliberately the three ORIGINAL kinds, spelled out here rather than
+ * taken from `CRITICAL_ACTION_KINDS`.
+ *
+ * That import is what admitted `governance-fork-disposition` the moment the
+ * family grew a fourth member (ADR-0063), and every branch behind it is wrong
+ * for that kind: `prepare-critical` binds the git candidate and real repository
+ * plan/spec bytes, none of which the disposition's verifier accepts, and it
+ * writes the request to `request-critical-governance-fork-disposition.json` --
+ * the very file `prepare-fork-disposition` owns, so the broken request silently
+ * replaced a valid one. Refusing the kind at the parser closes that route, the
+ * artifact-name collision and the direct `approve-critical` signing bypass with
+ * a single check, at the exact point every other invalid `--kind` is refused.
+ *
+ * A literal, not a filter over the shared family: a fifth kind must be an
+ * explicit decision here too, not an automatic membership.
+ */
+const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication"]);
 const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
 const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 
@@ -110,7 +130,7 @@ export function parseHumanArgs(argv) {
     if (command === "prepare-fork-disposition" ? !isoTimestamp(values.expiresAt) : values.expiresAt !== undefined) return { error: USAGE };
   }
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
-  if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
+  if (command.endsWith("-critical") && !CRITICAL_COMMAND_KINDS.includes(values.kind)) return { error: USAGE };
   if (command === "sign-intent" && !SHA.test(values.intentSha256 ?? "")) return { error: USAGE };
   return values;
 }
@@ -165,6 +185,23 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   // async fork inspection this synchronous entry point cannot perform, and they
   // were rejected here (as unknown commands) before they existed.
   if (FORK_DISPOSITION_COMMANDS.has(args.command)) fail("fork-disposition commands run through runForkDispositionApproval");
+  return executeHumanApproval(args, dependencies);
+}
+
+/**
+ * Everything the command above does once its argv is parsed and accepted.
+ *
+ * Split out, and deliberately NOT exported, for exactly one reason:
+ * `runForkDispositionApproval` must still reach the single existing signing
+ * branch, and it can no longer do so by synthesizing the argv `approve-critical
+ * --kind governance-fork-disposition` — `parseHumanArgs` now refuses that, and
+ * must keep refusing it for every argv an operator can type. The alternatives
+ * were a second OpenSSL/confirmation path (two definitions of the ceremony) or
+ * an exported opt-out on the parser (the escape route again, one argument
+ * away). This split adds neither: every caller outside this module still enters
+ * through `runHumanApproval` and its parser.
+ */
+function executeHumanApproval(args, dependencies = {}) {
   if (args.command.endsWith("-all")) {
     const action = args.command.slice(0, -4);
     const results = ["cyb-4", "cyb-5"].map((featureId) => runHumanApproval([
@@ -384,8 +421,19 @@ export async function runForkDispositionApproval(argv = process.argv.slice(2), d
   }
   if (args.command === "approve-fork-disposition") {
     // Deliberately the EXISTING critical signing branch, unchanged: same
-    // confirmation gate, same OpenSSL invocation, same proof shape.
-    return runHumanApproval(["approve-critical", "--repo-root", args.repoRoot, "--directory", args.directory, "--kind", GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind], dependencies);
+    // confirmation gate, same OpenSSL invocation, same artifact names, same
+    // proof shape. Entered with the parsed form of the `approve-critical`
+    // invocation this used to spell as argv, because that argv is now correctly
+    // refused: `--kind governance-fork-disposition` on the `-critical` trio was
+    // itself an escape route (an unverifiable request written over this
+    // command's own artifact). The values below are the ones that argv produced.
+    return executeHumanApproval({
+      command: "approve-critical",
+      keyReference: args.keyReference,
+      repoRoot: args.repoRoot,
+      directory: args.directory,
+      kind: GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind,
+    }, dependencies);
   }
   if (!exists(paths.authority) || !exists(paths.proof)) fail("run approve-fork-disposition before verifying");
   const policy = readCriticalHumanProofPolicy(repository);
