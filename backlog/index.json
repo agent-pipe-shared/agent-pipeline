@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "83a0f4e0d8e616b50e01436e7bc4a411dc805c38be1c4b48cec84d2213b5fb58"
+    "transitionHead": "1304dbce4ff55c31c4f73b47aa97904c0f315a11a280a408ce18fc3e2968fdfe"
   },
   "counts": {
-    "open": 114,
+    "open": 115,
     "in_progress": 21,
     "closed": 44
   },
@@ -1060,6 +1060,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 8 of 12."
+    },
+    {
+      "id": "pipeline.prd-spec-depth-collapses-relative-to-design-input",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "PO live observation during two greenfield kickoff test sessions on 2026-08-10 (Claude Code test project `Rune-Test1-Claude-054-44`, and two Codex rollout sessions under `~/.codex/sessions/2026/08/10/`, both still in progress at the time this item was filed), reinforced by a standing, independently-noticed pattern from unrelated prior work: bound PRD/Spec documents come out consistently thinner than the GitHub Issues that originate the same scope of work."
     },
     {
       "id": "pipeline.pre-existing-failure-claims-need-evidence",

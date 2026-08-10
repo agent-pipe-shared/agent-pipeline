@@ -123,6 +123,7 @@
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.prd-spec-depth-collapses-relative-to-design-input | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | open | defect | pipeline | 2026-08-09 | — |
@@ -187,6 +188,6 @@
 
 ## Counts
 
-- open: 114
+- open: 115
 - in_progress: 21
 - closed: 44
