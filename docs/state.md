@@ -4693,6 +4693,44 @@ round 4 is the last permitted round for each). Dispatching Critic round 3 for bo
 the process fix recorded at the previous checkpoint: standard template hunt categories verbatim,
 no custom questions, no characterizing prose, no pre-answered categories.
 
+**Aside, disclosed rather than acted on:** the repository's `scratch/` directory carries a set of
+stray files (filenames referencing round numbers and work packages this stretch never dispatched,
+timestamped Aug-9 evening, hours before this stretch's own commits and with no corresponding entry
+anywhere in `git log`/`git reflog`) — evidence of an earlier, unmerged, unrelated attempt at this
+same saga, not of any real progress this session skipped recording. Not treated as authoritative;
+both round-3 Critic dispatches were told the same if they encountered it.
+
+### K-AC-05 CRITIC ROUND 3: PASS (2 MINOR) — BOTH VERIFIED, FIXING BEFORE THE FINAL ROUND
+
+Full-track review (204c71e9, 2ef28910, 22650672, c5058e20), template hunt categories verbatim, no
+custom dispatch text — first application of the process fix from the previous checkpoint. Returned
+**PASS**, the blocker this track exists to close (self-mintability) confirmed genuinely shut, plus
+two minors. Verified both myself directly against source before accepting either:
+
+- **F1:** `assertForkDispositionApprovalReference`'s doc comment
+  (`governance-event-store.mjs:1013-1019`) claims a hand-edited persisted approval "fails closed on
+  read" — true only for shape/format tampering and for a tampered `subjectSha256` (cross-checked
+  elsewhere against the real fork). A forged `intentSha256`/`proofSha256`/`keyReference`/`expiresAt`
+  paired with the correct `subjectSha256` is never re-validated on read and would be surfaced as a
+  trustworthy governed disposition. Confirmed: read the function body myself (`:1021-1039`, shape/
+  format checks only) and the read-side reality re-check (`:1249-1263`, `subjectSha256` and
+  `acknowledgedEventIds` only). Same overclaim class an earlier round already corrected once,
+  three functions away.
+- **F2:** `approve-fork-disposition` checks only `action.kind`/`action.subjectSha256`
+  (`po-human-approval.mjs:419-421`) before delegating into the real signing branch — the fuller
+  `intent.featureId`/`planSha256`/`specSha256` pin that `verify-fork-disposition` applies
+  (`:442-444`) never runs before a private-key operation, only after. Confirmed by reading both
+  branches directly; the store's own write-time authorization pins the same three fields
+  (`authorizeForkDisposition`), so a mismatched request cannot forge a written disposition — it can
+  only burn a real signature on a request that will fail at write. Minor, not blocking, matches the
+  exact harm class ADR-0063's round-2 correction already named for a different producer of the same
+  shape.
+
+Both are real but genuinely minor — a stale doc comment and a defense-in-depth gap, neither a path
+to a forged authorization. Fixing both directly rather than carrying them as tracked residuals: the
+fixes are small, well-scoped, and this is the last round in the cap, so a cheap fix now is cheaper
+than a residual entry that has to survive to a future fresh cap.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
