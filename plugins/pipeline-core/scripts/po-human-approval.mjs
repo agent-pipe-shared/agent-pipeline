@@ -20,6 +20,7 @@ import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
@@ -27,6 +28,7 @@ import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriti
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
+import { boundedOpaqueCopyCommand, renderProjectOnboardingAction } from "../lib/project-onboarding-v3.mjs";
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
@@ -307,6 +309,65 @@ function criticalApprovalRequest({ args, repository, featureId, dependencies }) 
     specBytes: readPublicRepositoryFile(repository, args.spec),
     action: { kind: args.kind, subjectSha256: args.subjectSha256, expiresAt: args.expiresAt },
   });
+}
+
+/**
+ * GF-105: the human's one `authorize-critical` command for a push
+ * (`references/push-approval.md`, "The human's one command (current shape)")
+ * had NO code-level construction at all before this -- that reference stated
+ * plainly "The agent constructs the command ... and hands it over", meaning
+ * every occurrence of this command was hand-formatted prose. That is exactly
+ * the class of bug GF-094 already found and fixed for the unrelated
+ * host-boundary retry route in codex-pretool-guard.mjs (Codex's own
+ * re-quoting and line-wrapping of a multi-word, non-ASCII value corrupting a
+ * human's real terminal) -- and it is if anything MORE consequential here: a
+ * signing ceremony, not a kickoff retry.
+ *
+ * This is a caller of the two renderers that fix already exists as, never a
+ * third re-implementation of either: `renderProjectOnboardingAction()`
+ * already turns an `{ kind: "command", executable, argv }` action into one
+ * exact, correctly-quoted shell line (the same `shellWord()` quoting used for
+ * every other onboarding action this plugin renders, already proven to
+ * single-quote a value containing spaces or non-ASCII characters correctly);
+ * `boundedOpaqueCopyCommand()` already turns an assembled command STRING into
+ * a bounded, multi-platform (posix/powershell/cmd), pre-quoted copy
+ * rendering. Composing the two here means the bounded-chunking algorithm
+ * keeps its one definition in project-onboarding-v3.mjs; this function never
+ * duplicates it.
+ *
+ * `--kind` is always `"push"`: this helper is specific to the push-approval
+ * ceremony (`references/push-approval.md`'s worked example), not a general
+ * `authorize-critical` renderer for `deploy`/`publication`.
+ *
+ * `launcher` defaults to this script's OWN resolved absolute path
+ * (`fileURLToPath(import.meta.url)`) so a caller can never relay a wrong or
+ * stale script location -- the one part of this command a hand-formatting
+ * caller could get wrong that has nothing to do with the ceremony's actual
+ * parameters. Every other value is relayed exactly as given: this function
+ * renders, it does not re-validate (`criticalRequestFieldError` and the
+ * `featureId`/`kind` checks in `runHumanApproval` above already own that).
+ */
+export function authorizeCriticalPushCommand({
+  repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt,
+  launcher = fileURLToPath(import.meta.url),
+} = {}) {
+  for (const [name, value] of Object.entries({ launcher, repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt })) {
+    if (typeof value !== "string" || value.length === 0) throw new TypeError(`authorizeCriticalPushCommand requires a non-empty ${name}`);
+  }
+  const argv = [
+    launcher, "authorize-critical",
+    "--repo-root", repoRoot,
+    "--directory", directory,
+    "--feature-id", featureId,
+    "--plan", plan,
+    "--spec", spec,
+    "--kind", "push",
+    "--subject-sha256", subjectSha256,
+    "--expires-at", expiresAt,
+  ];
+  const executable = "node";
+  const command = renderProjectOnboardingAction({ kind: "command", executable, argv });
+  return { executable, argv, command, copyCommand: boundedOpaqueCopyCommand(command) };
 }
 
 /**

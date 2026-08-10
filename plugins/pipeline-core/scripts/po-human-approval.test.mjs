@@ -21,6 +21,11 @@
  * validation errors the two-step `prepare-critical` now returns. The two-step flow
  * is characterised here too, because both halves were refactored onto the shared
  * request-construction and signing helpers the new command uses.
+ *
+ * GF-105 widened it further to `authorizeCriticalPushCommand`, the bounded,
+ * copy-safe RENDERING of that same `authorize-critical` command for a push
+ * approval -- construction and rendering only, never anything that touches key
+ * material or the signing flow itself.
  */
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
@@ -31,7 +36,7 @@ import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
+import { authorizeCriticalPushCommand, parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
@@ -1199,4 +1204,99 @@ test("GF-104: setup against an existing named authority record stays unchanged (
     cleanup(dirsMatching);
     rmSync(home, { recursive: true, force: true });
   }
+});
+
+/* ------------------------------------------------------------------ *
+ * GF-105: authorizeCriticalPushCommand -- a bounded, copy-safe RENDERING of
+ * the human's one authorize-critical push-approval command
+ * (references/push-approval.md, "The human's one command (current shape)"),
+ * so the constructing agent relays it VERBATIM instead of hand-formatting a
+ * long, multi-flag, hash-bearing command itself. Construction and rendering
+ * only -- never anything that touches the private key or the signing flow.
+ * ------------------------------------------------------------------ */
+
+const OWN_SCRIPT_PATH = fileURLToPath(new URL("./po-human-approval.mjs", import.meta.url));
+
+/** A value with a space AND a value with non-ASCII characters -- the same
+ * class of case that broke the earlier (already-fixed) kickoff bug this
+ * session (Codex's own re-quoting of a multi-word, non-ASCII value). */
+function pushCommandFixture(overrides = {}) {
+  return {
+    repoRoot: "/repo root",
+    directory: "/ext/dir üöä",
+    featureId: "cyb-6",
+    plan: "specs/x y/prd.md",
+    spec: "specs/x/spec.md",
+    subjectSha256: "a".repeat(64),
+    expiresAt: "2026-08-10T12:00:00.000Z",
+    ...overrides,
+  };
+}
+
+test("GF-105: authorizeCriticalPushCommand assembles the exact authorize-critical argv, defaulting launcher to this script's own resolved path", () => {
+  const built = authorizeCriticalPushCommand(pushCommandFixture());
+  assert.equal(built.executable, "node");
+  assert.equal(built.argv[0], OWN_SCRIPT_PATH,
+    "launcher must default to this script's own resolved path, never a value the caller could get wrong");
+  assert.deepEqual(built.argv.slice(1), [
+    "authorize-critical",
+    "--repo-root", "/repo root",
+    "--directory", "/ext/dir üöä",
+    "--feature-id", "cyb-6",
+    "--plan", "specs/x y/prd.md",
+    "--spec", "specs/x/spec.md",
+    "--kind", "push",
+    "--subject-sha256", "a".repeat(64),
+    "--expires-at", "2026-08-10T12:00:00.000Z",
+  ]);
+  assert.equal(typeof built.command, "string");
+  assert.ok(built.copyCommand);
+});
+
+test("GF-105: authorizeCriticalPushCommand refuses a missing/empty named value instead of silently rendering a broken command", () => {
+  for (const field of ["launcher", "repoRoot", "directory", "featureId", "plan", "spec", "subjectSha256", "expiresAt"]) {
+    assert.throws(
+      () => authorizeCriticalPushCommand(pushCommandFixture({ [field]: "" })),
+      new RegExp(`requires a non-empty ${field}`),
+      field,
+    );
+  }
+});
+
+test("GF-105: the copyCommand rendering is bounded on every shell, and the posix rendering round-trips through a real bash eval to the exact intended argv -- including a value with a space and a value with non-ASCII characters", () => {
+  const built = authorizeCriticalPushCommand(pushCommandFixture());
+  const copy = built.copyCommand;
+  assert.deepEqual(Object.keys(copy).sort(), ["cmd", "maxColumns", "posix", "powershell"]);
+  assert.equal(copy.maxColumns, 72);
+  for (const [label, rendered, lineSep] of [
+    ["posix", copy.posix, "\n"],
+    ["powershell", copy.powershell, "\n"],
+    ["cmd", copy.cmd, "\r\n"],
+  ]) {
+    // A per-shell rendering may legitimately be null (that shell cannot safely
+    // represent this value at all) rather than thrown -- never required to be
+    // non-null, but whichever renders must stay within the shared bound.
+    if (rendered === null) continue;
+    assert.equal(typeof rendered, "string", label);
+    assert.equal(rendered.split(lineSep).every((line) => line.length <= copy.maxColumns), true,
+      `${label} rendering exceeds ${copy.maxColumns} columns`);
+  }
+  if (process.platform === "win32") return;
+  assert.ok(copy.posix, "posix rendering must succeed for this input");
+  const lines = copy.posix.split("\n");
+  assert.equal(lines.at(-1), 'eval "$CMD"');
+  const assignments = lines.slice(0, -1).join("\n");
+  // A shell FUNCTION named "node" shadows the real binary for an unqualified
+  // call in bash, so this proves the exact argv a real shell reconstructs
+  // from the bounded rendering WITHOUT ever invoking po-human-approval.mjs
+  // for real -- this is a signing-adjacent command, so the round-trip proof
+  // must never risk actually running it (no key material, no passphrase
+  // prompt, no OpenSSL call reachable from this test).
+  const script = `node() { printf '%s\\0' "$@"; }\n${assignments}\neval "$CMD"`;
+  const probe = spawnSync("bash", ["-c", script], { encoding: "utf8" });
+  assert.equal(probe.status, 0, probe.stderr);
+  const tokens = probe.stdout.split("\0");
+  assert.equal(tokens.pop(), "");
+  assert.deepEqual(tokens, built.argv,
+    "the posix copyCommand rendering does not reconstruct the exact intended argv");
 });

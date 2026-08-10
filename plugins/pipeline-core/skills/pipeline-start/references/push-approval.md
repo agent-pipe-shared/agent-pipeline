@@ -113,9 +113,25 @@ Prepares the candidate-bound request and signs **that** request in one
 invocation, stating the action kind, candidate commit/tree, subject binding,
 expiry, and what the approval does not cover immediately before the passphrase
 prompt. The human types `approve`, then the passphrase. That is the whole human
-ceremony. The agent constructs the command (including `--subject-sha256`) and
-hands it over; the agent cannot run it — signing needs the private key, and
+ceremony. The agent cannot run it — signing needs the private key, and
 `po-approval-gate.mjs` deliberately cannot reach `authorize-critical` at all.
+
+**Do not hand-format this command.** It carries seven dynamic, hash-bearing
+values, and hand-quoting/line-wrapping a long multi-flag command is exactly
+the failure mode already found and fixed for the unrelated host-boundary
+retry route (`codex-pretool-guard.mjs`'s `copyCommand`, GF-094) — corrupting a
+human's real terminal is a worse outcome here, a signing ceremony, not a
+kickoff retry. Call `authorizeCriticalPushCommand({ repoRoot, directory,
+featureId, plan, spec, subjectSha256, expiresAt })`
+(`plugins/pipeline-core/scripts/po-human-approval.mjs`) instead of composing
+the command text yourself. It returns the exact assembled `argv` (with
+`launcher` defaulted to the script's own resolved path — never a value you
+could get wrong) and a `copyCommand` field shaped exactly like
+`launch.copyCommand` in `project-onboarding-v3.mjs`'s `restartCopyCommands`
+(`posix`/`powershell`/`cmd`, each bounded under `COPY_COMMAND_MAX_COLUMNS`).
+Relay `copyCommand`'s rendering to the human VERBATIM, line for line, exactly
+as the existing restart-process rule already requires (`SKILL.md`) — never
+hand-reconstruct it from memory, even for a value seen before.
 
 Two things to pass on to the human:
 
