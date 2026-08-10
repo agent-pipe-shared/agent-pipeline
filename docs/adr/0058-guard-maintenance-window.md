@@ -113,8 +113,15 @@ intake.mjs` as an eighth kernel entry once that module ships (it does not exist 
 Decision 3's own recursive-hole test. Endorsed here as the correct kernel classification, contingent
 on that module actually landing; the array itself is edited by whichever dispatch ships the module,
 not by this correction. This does not resolve the SEPARATE, already-pending question named at
-`self-application-attestation-gate.mjs:45-47` about GS-8's own module — a different capability-
-bearing artifact, outside this design's scope, left open for its own dated correction when addressed.
+`self-application-attestation-gate.mjs:45-47` — **which is about two modules, not one, and the first
+version of this paragraph named only one of them.** The source comment reads: "This module is
+deliberately not in `NEVER_LIFTABLE_KERNEL_PATHS`; GS-8's module is not either, and whether the
+kernel list should grow is one ADR-0058 decision about both." "This module" is
+`self-application-attestation-gate.mjs` itself — governed, for the live-enforcing copy, by GS-6 (the
+same window-liftable rule the intake module above sits under), not by GS-8. "GS-8's module" is the
+sibling file it imports and compares against, `./public-core-origin-allowlist.mjs`
+(`self-application-attestation-gate.mjs:22-23`). Both memberships are open, both are outside this
+design's scope, and both are left open below for their own dated correction when addressed.
 
 4. **Bounded TTL, enforced in code, fail-closed on a malformed clock.** The
    verifier clamps effective expiry to `min(signedExpiresAt, openedAt + MAX_TTL)`
@@ -210,6 +217,17 @@ its own right (see Follow-up).
   `NEVER_LIFTABLE_KERNEL_PATHS` (2026-08-10 correction above) is endorsed but
   not yet applied — the array itself is edited when that module ships, not
   here. Trigger: land alongside that module.
-- GS-8's module (`self-application-attestation-gate.mjs:45-47`) still has an
-  open kernel-membership question this ADR has not decided. Owner `pipeline`,
-  no date — a separate module, a separate decision.
+- Two kernel-membership questions raised at `self-application-attestation-gate.mjs:45-47` remain
+  undecided by this ADR — corrected here from an earlier version of this bullet, which named only
+  one of them and mislabeled it (see the 2026-08-10 correction above). Neither is the intake module
+  above; both are a separate module, a separate decision:
+  - `plugins/pipeline-core/lib/self-application-attestation-gate.mjs` itself (the live-enforcing
+    copy is governed by GS-6, the window-liftable rule).
+  - `plugins/pipeline-core/lib/public-core-origin-allowlist.mjs`, GS-8's actual module.
+
+  Owner `pipeline`. **Trigger:** resolved when a dated correction to this ADR either adds the
+  relevant path(s) to `NEVER_LIFTABLE_KERNEL_PATHS` or records, on the record, that the
+  maintenance-cost tradeoff (permanently uneditable under any window, per Decision 3) is accepted
+  and the exposure stays — the same two-way trigger shape §15.1.6 (v) of the caching design now uses
+  for the analogous `guard-testpath.mjs` question, not a default of leaving the question open
+  indefinitely.
