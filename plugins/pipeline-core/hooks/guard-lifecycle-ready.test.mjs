@@ -1014,6 +1014,12 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const hostApply = `node '${HOST_REPOSITORY_INIT_SCRIPT}' apply --root '${path}' --plan-sha256 ${"b".repeat(64)} --activate`;
     const kickoffPlan = `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game' --language de`;
     const kickoffApply = `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --language de --plan-sha256 ${"c".repeat(64)} --activate`;
+    // GF-093: a bare --help/-h must reach the CLI's own usage text even while non-ready, the
+    // same reasoning as the preflight and repair-map bare no-arg admissions above -- main()
+    // returns immediately on options.help with zero filesystem access (project-onboarding-v3.mjs
+    // main()/parse()), before --root is even required.
+    const onboardingHelp = `node '${ONBOARDING_SCRIPT}' --help`;
+    const onboardingHelpShort = `node '${ONBOARDING_SCRIPT}' -h`;
     const overlayRoute = `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root '${path}'`;
     const poRebind = `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at 2026-07-29T09:00:00.000Z --activate`;
     const poDecisionPlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-plan`;
@@ -1036,7 +1042,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
     const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
     const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
-    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
+    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -1072,6 +1078,14 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       // positional shape like every other branch in this function, not flag reordering.
       `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --language de --goal 'Build one HTML game'`,
       `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --language de --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`,
+      // GF-093: --help is a bare, argument-free admission only -- never an escape hatch
+      // bolted onto a real command. Combined with anything else it still falls through to
+      // exact refusal, same as every other malformed onboarding shape.
+      `node '${ONBOARDING_SCRIPT}' --root '${path}' --help`,
+      `node '${ONBOARDING_SCRIPT}' kickoff plan --help`,
+      `node '${ONBOARDING_SCRIPT}' --help --root '${path}'`,
+      `node '${ONBOARDING_SCRIPT}' -h --root '${path}'`,
+      `node '${ONBOARDING_SCRIPT}' --help --help`,
       `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root /tmp/other`,
       `node '${PRIVATE_OVERLAY_SCRIPT}' status --project-root '${path}'`,
       `node '${PIPELINE_STATE_SCRIPT}' po-authority-rebind-apply --plan-sha256 ${"d".repeat(64)} --updated-at invalid --activate`,

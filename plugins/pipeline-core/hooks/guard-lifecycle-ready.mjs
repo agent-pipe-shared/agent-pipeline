@@ -1226,6 +1226,15 @@ function withoutRunnerFlag(args) {
 
 function sanctionedOnboardingArgs(rawArgs, root) {
   const args = withoutRunnerFlag(rawArgs);
+  // GF-093: same reasoning as START_PREFLIGHT_SCRIPT's and REPAIR_MAP_SCRIPT's own bare
+  // no-arg admissions above -- a stuck agent needs the CLI's own usage text precisely in the
+  // state this function exists to gate. `main()` returns immediately on `options.help`
+  // (scripts/project-onboarding-v3.mjs:127) with zero filesystem access and zero mutation,
+  // and `--help`/`-h` is accepted before `--root` is even required (line 106). Narrow by
+  // construction: exactly one argument, exactly `--help` or `-h`, nothing else -- never an
+  // escape hatch bolted onto a real command (`--root <path> --help` and `kickoff plan --help`
+  // both still fall through to refusal below, same as every other malformed shape here).
+  if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) return true;
   if (args[0] === "inspect"
     && exactRoot(args, root, 1)
     && (args.length === 3
