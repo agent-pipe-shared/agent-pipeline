@@ -4234,6 +4234,25 @@ category-5 items turned out to be narrower than their evidence-map prose suggest
 
 **Live now:** WP-V-AC06.
 
+### V-AC-06 CLOSED — CATEGORY 5 IS NOW FULLY EXHAUSTED
+
+WP-V-AC06 landed clean (`8139f623`): a sibling test pins the sole `@media(max-width:42rem)` rule
+verbatim (mobile) and the exact default `body`/`dl`/`th,td` declarations it overrides (desktop),
+using V-AC-09's own established `assert.match(html, ...)` technique — no rendering infrastructure,
+no new dependency. Verified independently (8/8 tests, diff read, confirmed exactly one `@media`
+rule as the briefing's pre-resolved premise required). All four V-AC-06 clauses now closed. Booked
+`implemented` (`b2ef9631`).
+
+**Both category-5 items (R-AC-11, E-AC-20, V-AC-06 — three items, all three closed this stretch)
+are done.** Category 5, the one category this session's own synthesis identified as having no
+PO/guard dependency, is now fully exhausted. Every remaining `partial`/`not-started` criterion in
+the evidence map traces to one of: a parked design-latitude thread needing PO input (O-1/O-2,
+K-AC-05), a guard requiring PO/human authorization (TP-5 on `pipeline-state.test.mjs`, TP-4 on
+`hooks.json`), or an explicit Class-P/PO-only policy decision (EPIC-AC-01, H-AC-09). There is no
+further code-closeable work available without one of those three.
+
+**Live now: none.**
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
