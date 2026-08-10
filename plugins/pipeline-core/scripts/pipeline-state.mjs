@@ -3245,7 +3245,14 @@ const AUTHORITY_REVISION_PLAN_SCHEMA = "pipeline.continuity-authority-revision-p
 const AUTHORITY_REVISION_APPLY_SCHEMA = "pipeline.continuity-authority-revision-apply.v1";
 const AUTHORITY_REVISION_RECOVER_SCHEMA = "pipeline.continuity-authority-revision-recover.v1";
 const AUTHORITY_REVISION_RECEIPT_SCHEMA = "pipeline.continuity-authority-revision-receipt.v1";
-const AUTHORITY_REVISION_JOURNAL_SCHEMA = "pipeline.continuity-authority-revision-journal.v1";
+// F2: `.v1` predates `expiresAt` (added for PX0-AC-06); a journal a prior build left
+// pending across the upgrade must still load, not fail closed with AR-JOURNAL. Current
+// code only ever WRITES `.v2` -- there is no path that writes a `.v1` journal anymore.
+const AUTHORITY_REVISION_JOURNAL_SCHEMA_V1 = "pipeline.continuity-authority-revision-journal.v1";
+const AUTHORITY_REVISION_JOURNAL_SCHEMA_V2 = "pipeline.continuity-authority-revision-journal.v2";
+const AUTHORITY_REVISION_JOURNAL_SCHEMA = AUTHORITY_REVISION_JOURNAL_SCHEMA_V2;
+const AUTHORITY_REVISION_JOURNAL_KEYS_V1 = ["schema", "intentSha256", "planSha256", "preStateSha256", "postStateSha256", "postStateBase64", "receipt", "mac"];
+const AUTHORITY_REVISION_JOURNAL_KEYS_V2 = ["schema", "intentSha256", "planSha256", "preStateSha256", "postStateSha256", "postStateBase64", "expiresAt", "receipt", "mac"];
 // Must match phoenix-authority-approval.mjs's `approval` object schema and key order
 // EXACTLY: `deps.authorityRevisionApproval` performs a strict JSON.stringify comparison.
 const AUTHORITY_REVISION_APPROVAL_SCHEMA = "pipeline.continuity-authority-revision-approval.v1";
@@ -3327,6 +3334,20 @@ function buildAuthorityRevisionPlan(dir, existing, proposal, updatedAt, deps = {
   // public path+digest references, decision/candidate/evidence references, a typed
   // outcome. Deliberately excludes `dir`/`root`/any absolute path, any raw command,
   // any prompt text, and any user/account or machine identifier.
+  //
+  // F4/courseDecisionReceipts convention: `casOutcome`. This function runs exactly once
+  // per revision -- only from `-apply`, always BEFORE it is known whether that same
+  // invocation will finish the write itself or crash and leave it for a later
+  // `-recover` roll-forward to complete. `-recover` never re-derives this object; it
+  // replays the exact frozen bytes this call produces (PX0-AC-06's own "must not infer
+  // success from a temporary file" / exact-byte-replay contract, which this file's own
+  // AR05f test asserts by design: the SAME receipt is retained whichever path commits
+  // it). So `casOutcome` records the one fact that's true and stable at build time
+  // either way -- the revision is applied to State once this postimage is durably
+  // written -- not which invocation physically performed that write; "applied fresh"
+  // vs. "recovered via completing forward" remains visible instead in each command's
+  // own (non-durable) response `status` (`applied` vs. `recovered-postimage`), unchanged
+  // by this fix.
   const receipt = {
     schema: AUTHORITY_REVISION_RECEIPT_SCHEMA,
     operation: "continuity-authority-revision",
@@ -3337,6 +3358,7 @@ function buildAuthorityRevisionPlan(dir, existing, proposal, updatedAt, deps = {
     decision: value.decision,
     candidate: value.candidate,
     evidence: value.evidence,
+    casOutcome: "applied",
   };
 
   const nextState = structuredClone(state);
@@ -3403,20 +3425,27 @@ function loadAuthorityRevisionJournal(dir, deps = {}) {
   if (key === null || key.byteLength !== 32) return { ok: false, code: "AR-JOURNAL" };
   try {
     const value = JSON.parse(raw.toString("utf8"));
-    const keys = ["schema", "intentSha256", "planSha256", "preStateSha256", "postStateSha256", "postStateBase64", "expiresAt", "receipt", "mac"];
-    if (!exactObjectKeys(value, keys)
-      || value.schema !== AUTHORITY_REVISION_JOURNAL_SCHEMA
+    const isV2 = value?.schema === AUTHORITY_REVISION_JOURNAL_SCHEMA_V2;
+    const isV1 = !isV2 && value?.schema === AUTHORITY_REVISION_JOURNAL_SCHEMA_V1;
+    const keys = isV2 ? AUTHORITY_REVISION_JOURNAL_KEYS_V2 : AUTHORITY_REVISION_JOURNAL_KEYS_V1;
+    if (!(isV1 || isV2)
+      || !exactObjectKeys(value, keys)
       || !SHA256_RE.test(value.intentSha256)
       || !SHA256_RE.test(value.planSha256)
       || !SHA256_RE.test(value.preStateSha256)
       || !SHA256_RE.test(value.postStateSha256)
       || typeof value.postStateBase64 !== "string"
-      || typeof value.expiresAt !== "string" || !Number.isFinite(Date.parse(value.expiresAt))
+      || (isV2 && (typeof value.expiresAt !== "string" || !Number.isFinite(Date.parse(value.expiresAt))))
       || value.receipt === null || typeof value.receipt !== "object" || Array.isArray(value.receipt)
       || !SHA256_RE.test(value.mac)) return { ok: false, code: "AR-JOURNAL" };
     const { mac, ...core } = value;
     if (bootstrapJournalMac(key, core) !== mac) return { ok: false, code: "AR-JOURNAL" };
-    return { ok: true, journal: value, paths, key };
+    // F2: a `.v1` journal never had a frozen `expiresAt` to check against -- `expiresAt:
+    // null` here is the in-memory sentinel `runAuthorityRevisionRecoverCommand` reads to
+    // preserve the OLD unconditional-roll-forward behavior for this ONE legacy case only,
+    // never written back to disk.
+    const journal = isV1 ? { ...value, expiresAt: null } : value;
+    return { ok: true, journal, paths, key };
   } catch { return { ok: false, code: "AR-JOURNAL" }; }
 }
 
@@ -3615,25 +3644,14 @@ function runAuthorityRevisionRecoverCommand(dir, rest, deps) {
     return 2;
   }
 
-  // PX0-AC-06: the ONE fresh binding check recovery performs before completing forward --
-  // the frozen intent's own expiry against the injected clock. No candidate re-derivation,
-  // no re-check of AR-DECISION-SCOPE or any other buildAuthorityRevisionPlan check. If the
-  // decision's approval window has since lapsed, do not complete the write; retire the
-  // journal and report a genuine preimage-recovery outcome instead.
-  const nowIso = (deps.now ?? (() => new Date().toISOString()))();
-  if (!(Date.parse(journal.expiresAt) > Date.parse(nowIso))) {
-    const expiredPaths = authorityRevisionPrivatePaths(dir, deps);
-    if (!retireAuthorityRevisionJournal(expiredPaths)) {
-      console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL-RETIREMENT-UNRESOLVED); recovery journal retained.");
-      return 2;
-    }
-    console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-preimage", retained: false, mutated: false, receipt: journal.receipt }, null, 2));
-    return 0;
-  }
-
-  // Preimage confirmed byte-identical to the frozen journal's own preimage, and the
-  // decision's approval window is still valid -- then replays the frozen postimage bytes
-  // exactly as journaled. No plan re-derivation, no new candidate.
+  // F3: the expiry decision below (and the journal deletion it can trigger) must not run
+  // unlocked -- `-apply` holds this SAME lock across its entire publish-journal -> write-
+  // State -> retire-journal sequence, so acquiring it here first is what actually closes
+  // the race: a concurrent in-flight `-apply` either still holds the lock (this call fails
+  // closed with a lock-contention code, journal retained, no delete) or has already fully
+  // finished-or-failed-and-released it (in which case the fresh recheck below observes
+  // reality as it now stands). Either way the expiry decision never acts on a stale,
+  // unlocked read.
   const lock = acquireContinuityLock(dir, lockToken, deps);
   if (!lock.ok) { console.error(`Error: continuity-authority-revision-recover refused (${lock.code}); recovery journal retained.`); return 2; }
   try {
@@ -3642,6 +3660,28 @@ function runAuthorityRevisionRecoverCommand(dir, rest, deps) {
       console.error("Error: continuity-authority-revision-recover refused (AR-RECOVERY-PREIMAGE-DRIFT); recovery journal retained.");
       return 2;
     }
+
+    // PX0-AC-06: the ONE fresh binding check recovery performs before completing forward --
+    // the frozen intent's own expiry against the injected clock. No candidate re-derivation,
+    // no re-check of AR-DECISION-SCOPE or any other buildAuthorityRevisionPlan check. If the
+    // decision's approval window has since lapsed, do not complete the write; retire the
+    // journal and report a genuine preimage-recovery outcome instead. `expiresAt === null`
+    // is F2's legacy-`.v1`-journal sentinel (no expiry was ever frozen for it to check
+    // against) -- treated as always still valid, never taking this branch.
+    const nowIso = (deps.now ?? (() => new Date().toISOString()))();
+    if (journal.expiresAt !== null && !(Date.parse(journal.expiresAt) > Date.parse(nowIso))) {
+      const expiredPaths = authorityRevisionPrivatePaths(dir, deps);
+      if (!retireAuthorityRevisionJournal(expiredPaths)) {
+        console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL-RETIREMENT-UNRESOLVED); recovery journal retained.");
+        return 2;
+      }
+      console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-preimage", retained: false, mutated: false, receipt: journal.receipt }, null, 2));
+      return 0;
+    }
+
+    // Preimage confirmed byte-identical to the frozen journal's own preimage, and the
+    // decision's approval window is still valid -- then replays the frozen postimage bytes
+    // exactly as journaled. No plan re-derivation, no new candidate.
     let postState;
     try { postState = JSON.parse(Buffer.from(journal.postStateBase64, "base64").toString("utf8")); }
     catch { console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL); recovery journal retained."); return 2; }
