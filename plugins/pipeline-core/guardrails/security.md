@@ -1,0 +1,163 @@
+# Security Guardrails
+
+> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
+> Audience: every agent role in every pipeline-bound project and in this repo. Highest-stakes zone: <PROJECT_B> (real devices, alarm system, locks — a living house).
+
+**Precedence and enforcement:** as defined in `guardrails/global.md` (header). Security diffs are always risk class HIGH: every security-relevant change triggers a Critic review in `--bare` isolation, with the review tier escalated to a higher-capability model for these security-class diffs (canonical trigger wording: `docs/operating-model.md` §4.2).
+
+Rule IDs: `SEC-xx`.
+
+---
+
+## SEC-01 — Secrets never appear in artifacts
+
+- **MUST NOT** write secret values (tokens, API keys, passwords, credentials, private URLs/paths that grant access) into ANY persisted artifact: docs, specs, briefings, prompts, completion reports, commit messages, telemetry rows, HISTORY/handover entries, code comments, or test fixtures.
+- **MUST** reference secrets by NAME and location only (e.g. `{{ENV_VAR_NAME}} from the runtime environment`, `secrets.yaml key {{KEY_NAME}}`), never by value.
+- If a secret value has leaked into an artifact: STOP, report to the PO immediately (the value must be rotated — deleting the text does not un-leak a committed secret).
+- **Why:** The repos are distributed across two machines and a remote; git history makes every leak permanent. Briefings and reports are persisted and quoted (three-artifacts archive, `docs/operating-model.md` §7) — a secret placed there spreads uncontrollably.
+- **Verification:** Secret-hygiene step in the `/close` ritual; the Critic checks artifacts for credential-shaped strings in security reviews. **RESOLVED (SEC-06 below):** the deterministic secret scanner is `plugins/pipeline-core/scripts/security-scan.mjs`'s `gitleaks` adapter — a manifest-driven, opt-in verify-chain phase, not a per-project ad-hoc decision anymore.
+
+## SEC-02 — Secret-file staging block (guard-enforced)
+
+- **MUST NOT** stage, commit, or push secret-bearing files. Minimum deny set (union across projects): `.env` and `.env.*`, `secrets.yaml`, `.storage/`, credential/key/token files, live databases. Project calibration adds project-specific denies via committed `.claude/settings.json` / guard deny-config — configuration, never a guard fork.
+- **Why:** Staging is the last automated interception point before a secret becomes permanent history; the <PROJECT_B> guard proved this block in production.
+- **Verification:** git-guard union denies the staging commands with exit 2 + plain-text reason; the bootstrap check verifies the committed denies exist (`harness/session-bootstrap.md` step 3). Union implemented: `plugins/pipeline-core/hooks/guard-git.mjs`; per-deny-rule test cases: `plugins/pipeline-core/hooks/guard-git.test.mjs`.
+
+## SEC-03 — Goldfish receive no secrets
+
+- **MUST NOT** place secret values in Goldfish briefings, context files, or dispatch metadata. Goldfish work is designed to be secret-free: secrets live in the runtime environment or ignored local files, injected by the PO or the runtime where needed.
+- A Goldfish whose task appears to REQUIRE a secret value **MUST** trigger its stop condition and report back — never ask around, never read secret stores on its own initiative.
+- **Why:** Briefings and completion reports are persisted, versioned artifacts (three-artifacts archive) and get quoted into other contexts; fresh execution contexts have no need-to-know. The cheapest secret to protect is the one never handed out.
+- **Verification:** Briefing format check (6 mandatory fields, `docs/operating-model.md` §2.3 — none carries credential values); "task requires secret" is a listed stop condition in briefing templates; the Critic flags credential material in dispatch artifacts.
+
+## SEC-04 — Slopsquatting: verify every new dependency
+
+- Before adding ANY new dependency (package, action, container image, plugin), **MUST** verify: (a) it exists in the official registry under exactly that name (hallucinated names differ subtly), (b) it is the intended, maintained project (repo link, release history, download signals), (c) **the proposed VERSION is current in the registry right now — not a stale, training-cutoff version.** A model's training data freezes at a point in time; the version it "remembers" as latest may be several majors behind, deprecated, or yanked since — check the registry's actual current/recommended listing at verification time, do not pin from memory. Evidence: registry URL + version pinned.
+- **MUST** list every new dependency in the completion report under a "new dependencies" item with that evidence; **MUST NOT** slip dependencies in silently.
+- New dependencies are at least risk class MEDIUM → Critic trigger per matrix (`docs/operating-model.md` §4.2); CI actions are SHA-pinned (tooling-policy W7).
+- **Why:** Slopsquatting is an active attack vector: adversaries register the package names AI models frequently hallucinate. A typo-level name difference is a supply-chain compromise — and a stale training-cutoff version pinned with full confidence is the same failure mode one layer down: correct name, wrong evidence.
+- **Verification:** Completion report rubric "new dependencies" filled with registry evidence; lockfile diff is part of the reviewed diff; Critic rubric contains the dependency reality check "do all new imports/packages exist under exactly that name, with registry evidence?" — landed in `plugins/pipeline-core/agents/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`, and `harness/checklists/critic-review.md`.
+
+## SEC-06 — Security-scan phase is mandatory when declared; SKIPPED is never PASS
+
+- When the project manifest (`project/pipeline.yaml`, else `.claude/pipeline.yaml`) declares the `security-scan` phase and the `security` gate is not `mode: off`, the security-scan phase **MUST** run as part of the verify chain — adapters gitleaks (secrets), osv-scanner (known vulnerabilities), semgrep (rule-based static findings, `rules_dir` from the manifest), license-check (declared `third-party-licenses.json` vs. an allowlist).
+- Each adapter reports one of exactly four statuses: `PASS | FINDINGS | SKIPPED | ERROR`. **MUST NOT** treat `SKIPPED` (tool not installed/available) as `PASS` — it is reported honestly in the evidence artifact and in any completion report referencing it (QG-05 gate honesty: a gate that silently checks less than assumed produces confident-wrong "done").
+- `ERROR` (adapter crashed) is fail-closed — never treated as clean, always blocking-class regardless of findings.
+- A finding whose severity is contained in the manifest's `security.thresholds.block_on` (default `[critical, high]`; set-membership check — the list enumerates the blocking severities explicitly, not an ordinal "at or above" relation) blocks the push gate; the gate mode (`blocking|warn|off`) governs how the block surfaces (exit 2 / warn / no-op) — see `guardrails/quality-gates.md` QG-06 and `docs/adr/0027-gate-philosophy.md` for the mode-is-calibration argument.
+- **MUST NOT** run the security-scan phase itself inside the gate hook (10s hook budget) — the gate hook only validates the already-written evidence. For an active blocking security gate it requires `pipeline.security-evidence.v1`, a clean detached-worktree snapshot verified before and after scanning, the exact pushed commit and tree, a candidate inventory/repository identity, policy bindings, and a valid payload digest; it never recomputes a scan (`docs/adr/0029-file-handoffs-status.md`).
+- **Why:** Slopsquatting (SEC-04) and secret leaks (SEC-01) are exactly the failure modes a scanner catches mechanically and cheaply — but only if a skipped tool is never mistaken for a clean result, and a project without the manifest is never silently unprotected without saying so.
+- **Verification:** `evidence/security-latest.json` (schema `pipeline.security-evidence.v1`) carries every adapter's status, tool identity, coverage, policy/input digests, candidate commit/tree/inventory, detached-snapshot assurance, and payload digest. A non-Git diagnostic report remains readable but cannot satisfy a blocking Push admission; dirty, unsupported, mutated, or unverifiable Git candidates fail closed. `plugins/pipeline-core/scripts/security-scan.mjs` is the reference runner.
+
+## SEC-07 — Sandboxing is defense-in-depth, not a replacement for the guards
+
+- Running work inside a sandbox (isolated worktree, container, restricted execution environment) **complements** the guard union (git-guard, testpath-guard, security-scan) — it does **NOT** replace any rule in this file or in `guardrails/quality-gates.md` / `guardrails/token-budget.md`.
+- A sandboxed session still needs every SEC-xx rule in this file enforced inside it: secrets stay out of artifacts, staging denies still apply, dependency verification still happens, security-scan still runs where declared. A sandbox narrows the blast radius of a mistake; it does not make the mistake acceptable, and it does not make any guard rule optional.
+- **Why:** Defense-in-depth means layers that each hold independently. Treating a sandbox as "the guards are handled elsewhere" reintroduces exactly the single point of failure the layered approach exists to avoid.
+- **Verification:** No standalone check — this is a framing/discipline note. If a future sandbox mechanism is adopted for this pipeline, its calibration entry MUST name which guards remain active inside it; "none, the sandbox is enough" is not a valid answer.
+
+## SEC-08 — The agent never handles deploy-target credentials (Release/Deploy phase)
+
+- **MUST NOT** type, store, or otherwise handle DEPLOY-TARGET credentials (the secret that authenticates directly against the deploy destination — a cloud provider API key/token, a registry publish token, a hosting-platform deploy key). This is deliberately NARROW: ambient git-push credentials (the credential that authenticates `git push` itself) are sanctioned, ordinary practice and stay entirely untouched by this rule.
+- **MUST** use a reference mechanism instead of an inline value: the preferred form is OIDC/keyless (short-lived, workload-identity-federated tokens minted per CI run, never a long-lived secret at rest); a named CI secret (`ci-secret`, referenced by name only, injected by the CI runner) is the documented fallback where OIDC is unavailable.
+- **MUST** treat publish tokens (npm publish token, GitHub Release token, package-registry API keys) AS deploy-target credentials under this rule — they are not a lesser category just because the sanctioned publish path "looks like a normal push".
+- **MUST** restrict a deploy adapter's `credentials` field (`templates/deploy-adapter.md`) to exactly one of `{oidc, ci-secret, external}` — an inline credential value in that field is itself a finding, never a valid configuration.
+- **Why:** A deploy-target credential grants direct write access to a real destination (a cloud account, a package registry, a hosting platform) — exactly the class of secret SEC-01 already forbids in artifacts, restated here specifically for the deploy surface because the Release/Deploy phase is the first place the pipeline routinely talks to external deploy targets at all, and the ambient-git-push carve-out needs to be explicit so it is not read as a loophole for deploy secrets too.
+- **Verification:** `templates/deploy-adapter.md`'s reference form and every shipped example admit only `{oidc, ci-secret, external}` in the `credentials` field, never an inline value; the Critic checks new adapter/deploy diffs for an inline credential the same way it checks for any other secret-shaped string (SEC-01 pattern).
+
+## SEC-09 — Six-term completeness vocabulary is closed and non-conflating
+
+AC13 (`cyb-2-feature-spec.md`) defines a human-facing completeness vocabulary,
+a coarser doc/report-facing layer sitting on top of the machine-level enums in
+`plugins/pipeline-core/lib/security-evidence-evaluator.mjs` (`RUN_OUTCOMES`,
+`CONTROL_RESULTS`). This is prose vocabulary, not a fourth machine enum — a
+project doc reporting on completeness **MUST** use exactly these six terms
+with exactly these meanings, and **MUST NOT** treat any two of them as
+interchangeable synonyms even where the machine layer beneath them
+legitimately collapses distinctions humans still need to keep apart in prose.
+
+- **clean** — the scan ran and found no blocking-severity finding (the v1,
+  severity-based reading). Says nothing about whether every required
+  capability actually ran: a scan can be `clean` yet `incomplete` (a skipped
+  required capability produces no findings to be unclean about, but the plan
+  is still unsatisfied). This is why v2 (below) was added additively,
+  never replacing v1 (CYB-2F).
+- **complete** — the policy-based reading: `aggregateVerdict().blocking ===
+  false`, i.e. every capability the plan required reached an accepted
+  outcome. A scan can be `complete` yet NOT `clean` (an accepted `findings`
+  outcome means the capability ran and reported, while the underlying
+  finding may still separately block via the severity check). `clean` and
+  `complete` are independent axes — not synonyms, not a strict ordering of
+  one another.
+- **unavailable** — a capability that SHOULD apply (it is in scope for this
+  project/module) but could not be verified right now: the tool wasn't
+  installed, execution errored out, or coverage was cut short. This is a
+  TEMPORARY/environmental gap, never a statement about relevance. When the
+  capability was required, an `unavailable` reading is a hard block at the
+  policy layer even though the human-facing word stays "unavailable," not
+  "not-applicable."
+- **unsupported** — a capability that does not and CANNOT apply to this
+  ecosystem/environment at all (e.g. a JVM-dependency scanner run against a
+  pure-JS repo) — a STRUCTURAL fact about the project, not a transient gap.
+  **This is the term that MUST stay distinct from `not-applicable` in
+  prose**, even though both project onto the same machine-layer
+  control-result: the machine-layer collapse is a deliberate policy
+  simplification ("both mean it doesn't block"), but a reader still needs to
+  know WHICH one is true — an unsupported scanner is a standing
+  environmental fact worth noting once; a not-applicable control is a
+  per-resolution scoping decision. Conflating the two words in prose hides
+  which one actually happened.
+- **waived** — an explicit, authorized, time-bounded exception was granted
+  (the CYB-1d waiver lifecycle): the capability was NOT run or passed on its
+  own merits — a human explicitly accepted the gap. **MUST NOT** be written
+  as silently equivalent to `complete` in prose; always name that a waiver,
+  not a genuine pass, is in effect.
+- **not-applicable** — the capability was never in scope for this resolution
+  to begin with, independent of whether it COULD have run (a SCOPING fact,
+  decided once per policy resolution, not an execution-time observation).
+  **The prose distinction from `unavailable` is the one this rule exists
+  for**: `not-applicable` means "never relevant"; `unavailable` means
+  "relevant but not verifiable right now." These are opposite claims, not
+  degrees of the same thing — an `unavailable` required capability blocks
+  the policy outcome; a `not-applicable` one never did. A doc that uses the
+  two words interchangeably is actively misleading.
+
+Machine-layer mapping (compact; full design rationale and the ratified F-3
+projection logic live in `security-evidence-evaluator.mjs`'s own header
+comment — this table cross-references, it does not restate):
+
+| Prose term       | `RUN_OUTCOMES` member(s)                                                                    | `CONTROL_RESULTS` projection |
+| ----------------- | --------------------------------------------------------------------------------------------- | ----------------------------- |
+| clean             | (v1 concept — not a `RUN_OUTCOMES` member; severity-based read of findings)                   | n/a                            |
+| complete          | (v2 concept — `aggregateVerdict()` over all `RUN_OUTCOMES`, accepted set: `pass`/`findings`/`waived`) | n/a                    |
+| unavailable       | `execution-unavailable`, `partial-coverage`, `stale`, `required-capability-missing` (all four, unconditionally — none is conditionally grouped) | `not-met` when the capability was required, `unavailable` when it was not |
+| unsupported       | `unsupported`                                                                                  | `not-applicable`               |
+| waived            | `waived`                                                                                        | `waived`                       |
+| not-applicable    | `not-applicable`                                                                                | `not-applicable`               |
+
+`invalid` (`RUN_OUTCOMES`/`CONTROL_RESULTS` member, schema-invalid/tampered
+evidence) is deliberately **absent** from the table above: it falls OUTSIDE
+the closed six-term vocabulary entirely and MUST NOT be described using any
+of the six terms in prose, least of all `unavailable` — the conflation this
+rule exists to prevent. An `invalid` reading is a data-integrity finding, not
+a completeness reading, and MUST be reported through this repo's existing
+schema/tamper-failure mechanism instead (see
+`security-completeness-gate.mjs`'s own `"envelope schema is invalid"`
+failure-reason string for the precedent language to reuse — never invent a
+new term for this case).
+
+- **Why:** `unavailable` and `not-applicable` are the two terms most likely
+  to be used as if interchangeable by a careless writer, despite meaning
+  materially different things for policy purposes — one blocks a required
+  capability's outcome, the other never entered the policy calculation at
+  all. A report that blurs the two hides exactly the information a reader
+  needs to judge whether "the pipeline didn't check this" is a temporary gap
+  or a permanent, decided non-issue.
+- **Verification:** `plugins/pipeline-core/scripts/check-completeness-vocabulary-doclint.mjs`
+  scans the declared project-doc set for the specific `unavailable`/
+  `not-applicable` conflation pattern (direct-equivalence phrasing) and
+  separately verifies this file itself defines a distinct anchor for each of
+  the six terms above; either check fails closed (exit 2) on a match/gap;
+  its own test file (`check-completeness-vocabulary-doclint.test.mjs`) proves
+  the conflation-detection case, the six-term-presence case (including a
+  missing-term failure naming the term), and a clean pass against this
+  repo's real docs.
