@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "559150839ffe82c298760e81a23e26c888f8c17703361775dd857d6eae944679"
+    "transitionHead": "cecd9881413ae956e63c36e882debb4fb0925a1d82360842e0e11b8308bf1112"
   },
   "counts": {
-    "open": 125,
+    "open": 126,
     "in_progress": 22,
     "closed": 44
   },
@@ -319,6 +319,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.compare-three-parallel-happy-path-tests-in-detail",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-10",
+      "source": "PO instruction, 2026-08-10, mid pre-release review, explicitly deferred to a future session (\"nicht mehr heute\")."
     },
     {
       "id": "pipeline.concurrent-dispatches-share-one-index",

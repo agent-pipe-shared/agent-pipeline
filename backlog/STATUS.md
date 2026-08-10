@@ -41,6 +41,7 @@
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.compare-three-parallel-happy-path-tests-in-detail | open | idea | pipeline | 2026-08-10 | — |
 | pipeline.concurrent-dispatches-share-one-index | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
@@ -199,6 +200,6 @@
 
 ## Counts
 
-- open: 125
+- open: 126
 - in_progress: 22
 - closed: 44

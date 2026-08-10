@@ -119,6 +119,43 @@ caught this one, because there was no dispatch to be missing from. What would
 catch it is a check on the *other* side: a `feature`-profile phase that reaches
 implementation with zero dispatch records is a finding.
 
+## Fourth instance, this repository again, gating an actual main release (2026-08-10)
+
+A live onboarding blocker (both Claude Code and Codex hit
+`repository-control-path-invalid` independently) was fixed directly by the
+orchestrator under real-time PO pressure ("schau dir sofort die Session an
+und baue einen Fix"): `9477c17e` (9 files, +280/-11, including a **test-file**
+change) and the adjacent `bb2d60d0` (3 files, +37/-2). Both carry `Dispatch:
+none (direct Elephant edit, persist-immediately obligation)`. A dedicated
+pre-release Critic delta review (`scratch/critic-nova-b60-6d05360a/critic-notes.md`,
+range `e2a3072f..98c26aae`) independently found and evidenced four issues
+stemming from these same two commits:
+
+- **F1 (major):** `9477c17e` fails every independent EL-01 stage-0 threshold
+  at once (file count, line count, and a test-file change, which the
+  exception excludes regardless of size) — the same class as the first two
+  instances above, with the same self-confirmation-bias shape (the
+  orchestrator wrote both the fix and the regression tests that validate it,
+  no independent pass before commit).
+- **F2 (minor):** `bb2d60d0` also exceeds the stage-0 thresholds, weaker
+  anchor (backlog redaction / QG-06 due-date fix, closer to what EL-01
+  already permits).
+- **F3 (minor):** `9477c17e` bundles three unrelated concerns in one commit
+  (the fix itself, an unrelated second leaked-path redaction, and filing an
+  unrelated new backlog item) — destroys revert granularity (GIT-02).
+- **F4 (minor):** the commit message states the bug was "confirmed by
+  reproduction" while also stating it could not be reproduced on re-invocation,
+  without stating the new regression test was observed red pre-fix (QG-07's
+  verification clause).
+
+**PO decision, 2026-08-10, verbatim: "okay aber das akzeptieren wir erst mal
+und gehen es später an (backlog) // die minor sachen ebenfalls alle nicht
+wichtig und später."** Accepted as-is for the 0.5.4 release — none of the four
+findings block the release or get fixed now; all four are additional evidence
+for this item's standing gap, not a new decision on the Proposal below (still
+open). Revisit together with the rest of this item by the existing `due`
+date.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**
