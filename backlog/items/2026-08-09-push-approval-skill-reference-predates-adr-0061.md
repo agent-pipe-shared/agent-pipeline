@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-approval-skill-reference-predates-adr-0061
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Turn-efficiency root-cause analysis of the PO's private Claude+Pipeline 0.5.4 happy-path test run, 2026-08-09 (sanitized, no PO-identifying data). Confirmed by direct file comparison, not only transcript inference."
 due: 2026-08-16
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 873de39530f7eb977327b388d15997879d839d06
+closure_evidence: backlog/evidence/2026-08-11-push-approval-md-already-current.md
 ---
 
 # The `push-approval.md` skill reference agents load at runtime still describes the pre-ADR-0061 ceremony
@@ -56,7 +60,7 @@ digest-emission gap for the rest of that phase's cost).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted (direction 1 only).
-- **Rationale:** self-triaged in the same block, disclosed as such — PO is AFK, standing instruction to close bounded non-judgment items directly. Direction 1 (lead with the `authorize-critical` one-command shape, mirroring `docs/push-release-flow.md`'s already-canonical framing) is a content-sync fix with a named source of truth to mirror, not a new design. Direction 2 (a structural drift-prevention test) has real design latitude (schema/generation-step choice) — declined here, left for its own dispatch. Direction 3 (marketplace-shipped copy) is explicitly out of scope per the item's own text.
-- **Assignment (if accepted):** immediate, this block (GF-114).
+- **Decision:** closed — direction 1 already done, pre-dating this block.
+- **Rationale:** self-triaged as accepted and dispatched (GF-114, goldfish-implementor). The dispatch found direction 1 already implemented by commit `873de395` ("docs(skills): bring push-approval reference up to date with ADR-0061", 2026-08-09) — an ancestor of this session's own origin fast-forward, landed before this block started and before this item was even re-triaged. Verified directly: `push-approval.md` already leads with the `authorize-critical` one-command shape matching `docs/push-release-flow.md`'s exact flags, the old "run with no arguments" framing is gone, and the two-step shape is explicitly labeled superseded. GF-114 correctly made no edit rather than rewrite already-correct content (stop-condition: briefing-vs-repo contradiction), and separately flagged that its own worktree snapshot could not see this item's own same-block Triage edit — a known instance of the already-filed `2026-08-07-agent-tool-isolation-worktree-snapshots-stale-upstream-ref.md` class, not a new defect. Direction 2 (structural drift-prevention test) remains genuinely open — filed as its own scope, not closed by this item. Direction 3 (marketplace copy) stays out of scope per the item's own text.
+- **Assignment (if accepted):** closed this block; direction 2 (drift-prevention test) is a real open follow-up for a future session, not tracked under this item's id.
 - **Date:** 2026-08-11

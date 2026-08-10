@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4ca34484cde70e16e623c563666aeed846389a8fc71e8ea7708c33948e15a487"
+    "transitionHead": "019c4d2e64e845ea2b05e7e398e4c2ec95bc292f204de661e7efa483378ea693"
   },
   "counts": {
-    "open": 129,
+    "open": 128,
     "in_progress": 22,
-    "closed": 44
+    "closed": 45
   },
   "items": [
     {
@@ -1231,11 +1231,15 @@
     },
     {
       "id": "pipeline.push-approval-skill-reference-predates-adr-0061",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Turn-efficiency root-cause analysis of the PO's private Claude+Pipeline 0.5.4 happy-path test run, 2026-08-09 (sanitized, no PO-identifying data). Confirmed by direct file comparison, not only transcript inference."
+      "source": "Turn-efficiency root-cause analysis of the PO's private Claude+Pipeline 0.5.4 happy-path test run, 2026-08-09 (sanitized, no PO-identifying data). Confirmed by direct file comparison, not only transcript inference.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "873de39530f7eb977327b388d15997879d839d06",
+      "closureEvidence": "backlog/evidence/2026-08-11-push-approval-md-already-current.md"
     },
     {
       "id": "pipeline.push-gate-is-silent-in-every-consumer-project",
