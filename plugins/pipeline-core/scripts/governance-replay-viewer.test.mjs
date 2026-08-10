@@ -7,7 +7,7 @@ import test from "node:test";
 import { main } from "./governance-replay-viewer.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
-const source = { schema: "pipeline.governance-replay-readback.v1", status: "observed", authority: "non-authoritative", reason: null, checkpoint: { sequence: 1 }, timelines: [{ schema: "pipeline.governance-replay.v1", authority: "non-authoritative", dispatchId: "dispatch-1", status: "observed", events: [{ sequence: 1, eventDigest: "1".repeat(64), occurredAtEpochMs: 1, kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-17", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1" }, candidate, eventId: "event-1", invalidatesEventId: null, supersedesEventId: null }] }] };
+const source = { schema: "pipeline.governance-replay-readback.v1", status: "observed", authority: "non-authoritative", reason: null, checkpoint: { sequence: 1 }, timelines: [{ schema: "pipeline.governance-replay.v1", authority: "non-authoritative", dispatchId: "dispatch-1", status: "observed", events: [{ sequence: 1, eventDigest: "1".repeat(64), occurredAtEpochMs: 1, kind: "dispatch", status: "active", reasonCode: "DISPATCHED", correlation: { packageId: "phoenix-17", dispatchId: "dispatch-1", attemptId: "attempt-1", workerId: "worker-1", correlationId: "correlation-1", queueRevision: 0 }, candidate, eventId: "event-1", invalidatesEventId: null, supersedesEventId: null }] }] };
 
 test("creates a new offline replay report and refuses an overwrite", async () => {
   const root = mkdtempSync(join(tmpdir(), "replay-viewer-"));
