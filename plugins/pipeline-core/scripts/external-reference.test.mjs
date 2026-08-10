@@ -22,7 +22,7 @@ function featurePackage(root) {
 }
 function input(root) {
   const artifactSha256 = featurePackage(root);
-  const reference = { schema: "pipeline.external-reference.v1", systemClass: "issue-tracker", adapterProfile: "synthetic-issue", objectId: "issue-23", relation: "tracks", authorityDirection: "pipeline-to-external", pipelineArtifact: { path: ARTIFACT, sha256: artifactSha256 }, externalRevision: "rev-1", mode: "controlled-publication", freshness: { state: "fresh", observedAtEpochMs: 1 }, ownership: "pipeline-owned" };
+  const reference = { schema: "pipeline.external-reference.v1", systemClass: "issue-tracker", adapterProfile: "synthetic-issue", objectId: "issue-23", relation: "tracks", authorityDirection: "pipeline-to-external", pipelineArtifact: { path: ARTIFACT, sha256: artifactSha256, documentClass: null }, externalRevision: "rev-1", mode: "controlled-publication", freshness: { state: "fresh", observedAtEpochMs: 1 }, ownership: "pipeline-owned" };
   const capabilities = { schema: "pipeline.external-adapter-capabilities.v1", adapterProfile: "synthetic-issue", systemClass: "issue-tracker", operations: ["inspect", "preview", "apply", "readback", "reconcile"] };
   const desired = { requestId: "request-1", changes: [{ field: "summary", valueSha256: sha("b"), ownership: "pipeline-owned" }] };
   const inspection = { objectId: "issue-23", revision: "rev-1", state: "fresh" }; const preview = { previewDigest: sha("c") };
@@ -39,7 +39,7 @@ test("previews one bounded external write using local synthetic observations", a
 test("refuses to preview a publication whose artifact no feature package binds", async () => {
   const root = mkdtempSync(join(tmpdir(), "external-reference-")); input(root);
   const reference = JSON.parse(readFileSync(join(root, "reference.json"), "utf8"));
-  writeFileSync(join(root, "reference.json"), JSON.stringify({ ...reference, pipelineArtifact: { path: "specs/unbound.md", sha256: sha("a") } }));
+  writeFileSync(join(root, "reference.json"), JSON.stringify({ ...reference, pipelineArtifact: { path: "specs/unbound.md", sha256: sha("a"), documentClass: null } }));
   const result = await main(["preview", "--root", root, "--reference", "reference.json", "--capabilities", "capabilities.json", "--desired", "desired.json", "--inspection", "inspection.json", "--preview", "preview.json"]);
   assert.equal(result.status, "rejected"); assert.equal(result.reason, "canonical-identity");
 });

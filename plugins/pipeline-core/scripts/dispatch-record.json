@@ -1,0 +1,14 @@
+{
+  "taskId": "PHX-VF-EXTREF",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "agent-pipeline-shared_phoenix",
+  "outcome": "success",
+  "log": [
+    {"phase": "start", "toolUses": 2},
+    {"phase": "read-context", "toolUses": 5, "note": "read adapter validator, sibling test fixtures, and target test file"},
+    {"phase": "root-cause", "toolUses": 6, "note": "pipelineArtifact requires exact key set including documentClass (X-AC-11); test fixtures omitted it"},
+    {"phase": "fix", "toolUses": 8, "note": "added documentClass: null to both pipelineArtifact fixtures in external-reference.test.mjs"},
+    {"phase": "verify", "toolUses": 9, "outcome": "3/3 passed, exit 0"}
+  ]
+}
