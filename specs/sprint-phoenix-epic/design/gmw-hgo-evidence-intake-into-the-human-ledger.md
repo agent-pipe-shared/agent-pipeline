@@ -1668,7 +1668,9 @@ Gate: `node harness/scripts/check-doc-contracts.mjs` for this document;
   history stays readable. This design now **does** cite the ADR — §15.1.6 (iv),
   on ADR-0058 being the deciding authority for `NEVER_LIFTABLE_KERNEL_PATHS`
   growth — so F-1's "cites no line from them" no longer holds either. `docs/adr/`
-  now runs to 0059.
+  ran to 0063, sequentially, as observed by re-running `ls docs/adr/` at the time
+  this correction was written (2026-08-10) — a dated observation, per §10.1's
+  note above, not a standing count to be carried forward unchecked.
 - **Finding F-2 (spec drift, verified).** `pipeline.human-role-exception-decision.v1`
   is implemented and admitted by the kernel (`governance-event.mjs:170`) but is
   absent from `spec.md` §6.1's "closed" v1 schema family (`:278-301`). Not caused
@@ -2698,8 +2700,8 @@ The rows below are additions to, or modifications of, §11's table; §11 itself 
   declaring the mechanism complete before it does.
 - **O-2 — mechanism resolved; five assurance residuals open and tracked.** Mechanism specified in §15.2;
   D-2's *placement* is closed and pulled into increment 1 (§15.2.5, §15.3), with the real execution cost traced
-  in §15.2.3a — nine added git subprocess spawns and two full O(n) hash-chain re-verifications per lifted tool
-  call, not "one more read" — bounded by the memo specified there and pinned by budget test B-1 (§15.2.3b).
+  in §15.2.3a — six added git subprocess spawns and two full O(n) hash-chain re-verifications per cache miss,
+  not "one more read" — bounded by the memo specified there and pinned by budget test B-1 (§15.2.3b).
   H-AC-02 is satisfied at the guard hook against every state the hook's read can distinguish. It is **not**
   discharged against an agent with local write access to the human stream's storage root (§15.2.4) or to the
   memo (§15.2.3a), and a miss still contains six git spawns with no per-spawn timeout. **Fourth, and unlike the
