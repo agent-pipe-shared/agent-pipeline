@@ -5,15 +5,25 @@ itself needs explaining, rather than re-deriving it from the short mention in
 `SKILL.md`.
 
 A canon pointer in this plugin's agent-facing text — `roles/*.md`,
-`guardrails/*.md`, `templates/prompts/*.md`, or `docs/push-release-flow.md` —
-names a path relative to the Agent-Pipeline repository root. A
-self-application session (this repository's own checkout) has that path
+`guardrails/*.md`, `templates/prompts/*.md`, `docs/push-release-flow.md`, or
+`docs/adr/<NNNN>-*.md` (an ADR named either by its full path or bare as
+"ADR-<NNNN>") — names a path relative to the Agent-Pipeline repository root.
+A self-application session (this repository's own checkout) has that path
 directly; read it as written. A hosted/consumer project does not, because
 those directories are not part of that project's own tree — read the
 identical vendored copy at `${PIPELINE_PLUGIN_ROOT}/<same relative path>`
-instead (for example `${PIPELINE_PLUGIN_ROOT}/roles/goldfish.md` or
-`${PIPELINE_PLUGIN_ROOT}/docs/push-release-flow.md`). Try the repo-root path
-first; fall back to the plugin-root path only when it is absent.
+instead (for example `${PIPELINE_PLUGIN_ROOT}/roles/goldfish.md`,
+`${PIPELINE_PLUGIN_ROOT}/docs/push-release-flow.md`, or
+`${PIPELINE_PLUGIN_ROOT}/docs/adr/0061-uniform-human-approval-ceremony.md`).
+Try the repo-root path first; fall back to the plugin-root path only when it
+is absent.
+
+Only the ADRs an already-vendored canon file actually cites are vendored —
+not the full `docs/adr/` tree, and not an ADR that only a vendored ADR cites
+in turn (a second-level citation stays repo-root-only unless a future
+dispatch vendors it explicitly, with its own stated evidence). A bare
+"ADR-<NNNN>" mention still means `docs/adr/<NNNN>-*.md` under this same
+resolution rule, whether or not the citing text spells out the path.
 
 Every canon pointer of this shape anywhere in this plugin package resolves
 the same way — this file states the rule once instead of repeating it at
