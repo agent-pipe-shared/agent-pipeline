@@ -214,6 +214,7 @@
           "docs/adr/0060-handover-placement-and-rotation.md",
           "docs/adr/0061-local-supervisor-state-authority.md",
           "docs/adr/0062-governance-event-kernel.md",
+          "docs/adr/0063-fork-disposition-approval-proof.md",
           "docs/adr/README.md"
         ]
       },
