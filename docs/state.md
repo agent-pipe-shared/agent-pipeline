@@ -4395,6 +4395,55 @@ design stays whatever it was until the Critic returns a PASS.
 
 **Live now:** K-AC-05 Critic round 1, O-1/O-2 Critic round 1.
 
+### K-AC-05 CRITIC ROUND 1: FAIL (2 MAJOR) — BOTH VERIFIED MYSELF, ONE IS MY OWN DISPATCH-CONTAMINATION MISTAKE
+
+Round 1 truncated mid-turn (same pattern as several earlier rounds this session — "The dispatch
+record says the commit was NOT made by the Goldfish. Let me examine authorship..."); resumed via
+`SendMessage`, told to continue from where it left off using only its original sources, no new
+input added. Returned FAIL, 2 major + 2 minor. Verified the two majors myself against source
+before doing anything with them:
+
+- **F1:** ADR-0063's Decision text (line 24, as originally written) named Finding 6 (compensating/
+  superseding-record policy) unconditionally in scope for the implementation pass; the goldfish
+  briefing I wrote separately gave it a narrower, conditional carve-out (close it only if it stays
+  within file scope and invents no new cross-cutting machinery). The two were never reconciled.
+  The dispatch correctly followed ITS OWN briefing and disclosed Finding 6 as a residual — the ADR
+  simply was never amended to match. Confirmed by reading the ADR text myself.
+- **F2 (the more consequential one):** `CRITICAL_ACTION_KINDS` widening to four members makes
+  `po-human-approval.mjs`'s `prepare-critical --kind governance-fork-disposition` pass its
+  membership check, but the command still builds the request with a REAL git HEAD candidate and
+  REAL repository file bytes for plan/spec — neither matches what the disposition verifier expects
+  (a derived synthetic candidate, sentinel plan/spec label digests). Confirmed by reading
+  `po-human-approval.mjs:200-208` myself: `candidate: observeCleanCandidate(repository)`,
+  `planBytes: readPublicRepositoryFile(repository, args.plan)`. A request built this way can never
+  verify — there is today no sanctioned operator tool that can construct a valid signature-mode
+  disposition approval at all, which is the substance of the Finding 2 (CLI reachability) the
+  original commit claimed to close. Fails closed (not a blocker), but real.
+
+**Self-correction, recorded so it doesn't recur:** the Critic's own report caught that my dispatch
+text asserted *"ADR-0063's Follow-up section names Finding 6 ... as intentionally out of scope"* —
+false; the Follow-up section said no such thing, and the Decision section said the opposite. The
+Critic verified against the artifact itself, disregarded my mischaracterization, and flagged it as
+a briefing violation rather than being led by it. This is the same class of mistake CLAUDE.md
+already names a 2026-08-06 precedent for and this session's own K-AC-05 round-4 already hit once
+("now" leak) — a second instance this session, this time a flatly false claim about a document's
+content rather than a verdict leak. Lesson: re-read the actual cited section text immediately
+before writing a Critic dispatch that characterizes it, never rely on memory of having written it
+minutes earlier.
+
+Fixed: amended ADR-0063 with a dated correction (`2ef28910`) narrowing Finding 6 to an explicit
+tracked residual (owner `pipeline`, no date, resolved by a future ADR designing the compensating/
+superseding mechanism) and recording F2's gap and F3 (a minor, disclosed-not-blocking finding: the
+signed subject doesn't cover `reasonCode`/`idempotencyKey`/`disposedAtEpochMs`) as tracked
+residuals too, per QG-06. Dispatched **WP-K-AC05-REWORK1** for F2 (a new sanctioned CLI command
+reusing `governanceForkDispositionApprovalSubject`/`inspectForkedGovernanceStream` exports,
+required to prove an end-to-end sign-and-verify, never accepting caller-supplied digests or a bare
+subject hash) plus F4 (a doc-comment overclaim about committedness — the actual protection is
+GS-2 write-protection, not a check `readCriticalHumanProofPolicy` performs itself). Round 2 of
+K-AC-05's new 4-round cap follows once rework verifies.
+
+**Live now:** O-1/O-2 Critic round 1 (also resumed from a mid-turn truncation), WP-K-AC05-REWORK1.
+
 ### F3 DISPOSITIONED BY THE PO: OPTION A — acknowledge a documented, repeated practice
 
 *"A heißt jetzt: eine dokumentierte, wiederholte Praxis anerkennen — keine Ausnahme für
