@@ -66,6 +66,26 @@ amount of text, an assistant's preferred route, or a model preflight. The
 profile is a PO input, not a second confirmation for an already authorized
 local onboarding transaction.
 
+The exact invocation shape for `kickoff plan`/`kickoff apply` (guard-enforced,
+`guard-lifecycle-ready.mjs` `sanctionedOnboardingArgs`; CLI usage at
+`project-onboarding-v3.mjs:56`):
+
+```
+node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff plan \
+  --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex]
+node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff apply \
+  --root <project-dir> --goal <text> --language <de|en> \
+  --plan-sha256 <sha256> --activate [--runner claude|codex]
+```
+
+`--language <de|en>` is mandatory and sits in this exact fixed position
+between `--goal <text>` and (`--plan-sha256`/end) — no reordering tolerance;
+the CLI itself rejects a missing value ("kickoff plan/apply requires
+--language <de|en>") and the guard's allowlist checks the same position
+byte-for-byte. `--profile` is NOT a valid flag for `kickoff plan`/`kickoff
+apply` — it belongs only to `kickoff promote` (see below); the guard's
+exact-length match rejects any invocation that adds it here.
+
 The transaction-created `specs/kickoff-*` files are provisional bootstrap
 anchors, not the standard long-term design location. Once material design input
 exists, create the normal design package before presenting a planning result
@@ -91,6 +111,22 @@ node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <pl
   --design-input-path <path> [--runner claude|codex] \
   [--plan-sha256 <sha256>] [--activate]
 ```
+
+`kickoff promote plan`/`apply` additionally enforce, at the continuity layer
+(`lib/onboarding-continuity.mjs`, `promotionInput`/`promotionArtifacts`),
+three constraints not visible in the flag list above:
+
+- `--plan-path` must be byte-identical to `--prd-path`, and that path's
+  basename must match `prd_*.md`, else `KICKOFF-PROMOTION-PLAN-NOT-PRD`:
+  "promotion plan must be exactly the promoted prd_*.md".
+- `--id` must be a new feature id and must not start with the literal prefix
+  `kickoff-`, else `KICKOFF-PROMOTION-INPUT`: "promotion feature id is
+  invalid".
+- The files named by `--prd-path`, `--spec-path`, and `--design-input-path`
+  must already exist on disk before `kickoff promote plan` runs, else
+  `KICKOFF-PROMOTION-AUTHORITY`: "promotion PRD, specification, and design
+  input must already exist".
+
 Never edit the active provisional
 `specs/kickoff-*` PRD/Spec, or any already bound PRD/Spec, merely to add richer
 design documentation. Do not invoke a repair, generic continuity CAS, manifest
