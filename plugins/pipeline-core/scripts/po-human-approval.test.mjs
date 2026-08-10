@@ -1131,3 +1131,72 @@ test("GF-080 Gap A: a plane- or environment-sourced --directory is never written
     rmSync(home, { recursive: true, force: true });
   }
 });
+
+/* ------------------------------------------------------------------ *
+ * GF-104: `setup` against an EXISTING named authority record must not
+ * silently keep supplied --human-name/--key-reference values that differ
+ * from the persisted record, reporting an unqualified success as if the
+ * new values had been applied.
+ * ------------------------------------------------------------------ */
+
+test("GF-104: setup fails loudly when an explicit --human-name differs from an existing named authority record", () => {
+  const dirs = fixtureDirs();
+  const home = noMachinePlaneHomeFixture();
+  try {
+    keyFixture(dirs.directory); // writes humanName: "Test Operator", keyReference: "sign-intent-test-key"
+    const error = thrown(() => runHumanApproval(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "A Different Human"],
+      { homedirFn: () => home },
+    ));
+    assert.ok(error, "a differing --human-name against an existing record must fail, not silently succeed");
+    assert.match(error.message, /already exists under a different name\/key-reference/u);
+    assert.match(error.message, /not something setup does silently/u);
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("GF-104: setup fails loudly when an explicit --key-reference differs from an existing named authority record", () => {
+  const dirs = fixtureDirs();
+  const home = noMachinePlaneHomeFixture();
+  try {
+    keyFixture(dirs.directory); // writes keyReference: "sign-intent-test-key"
+    const error = thrown(() => runHumanApproval(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "a-different-key-reference"],
+      { homedirFn: () => home },
+    ));
+    assert.ok(error, "a differing --key-reference against an existing record must fail, not silently succeed");
+    assert.match(error.message, /already exists under a different name\/key-reference/u);
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("GF-104: setup against an existing named authority record stays unchanged (idempotent) when supplied values match, or when none are supplied at all", () => {
+  const dirsNoFlags = fixtureDirs();
+  const dirsMatching = fixtureDirs();
+  const home = noMachinePlaneHomeFixture();
+  try {
+    keyFixture(dirsNoFlags.directory);
+    const resultNoFlags = runHumanApproval(
+      ["setup", "--repo-root", dirsNoFlags.repoRoot, "--directory", dirsNoFlags.directory],
+      { homedirFn: () => home },
+    );
+    assert.equal(resultNoFlags.ok, true);
+    assert.equal(resultNoFlags.code, "PO-HUMAN-AUTHORITY-READY");
+
+    keyFixture(dirsMatching.directory);
+    const resultMatching = runHumanApproval(
+      ["setup", "--repo-root", dirsMatching.repoRoot, "--directory", dirsMatching.directory, "--human-name", "Test Operator", "--key-reference", "sign-intent-test-key"],
+      { homedirFn: () => home },
+    );
+    assert.equal(resultMatching.ok, true);
+    assert.equal(resultMatching.code, "PO-HUMAN-AUTHORITY-READY");
+  } finally {
+    cleanup(dirsNoFlags);
+    cleanup(dirsMatching);
+    rmSync(home, { recursive: true, force: true });
+  }
+});

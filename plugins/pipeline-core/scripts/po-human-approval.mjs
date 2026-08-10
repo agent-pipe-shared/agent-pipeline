@@ -166,6 +166,14 @@ export function parseHumanArgs(argv, dependencies = {}) {
     if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
+  // GF-104: keyReference always carries a default ("local-po-key") even when the
+  // caller never passed --key-reference, so `setup`'s own mismatch check (below,
+  // in po-human-approval.mjs) cannot tell "explicitly asked for this key-reference"
+  // from "never mentioned it" by reading values.keyReference alone. Recorded
+  // non-enumerable for the same reason as directorySource (FIXTURE-2 note above
+  // setDirectorySource): pre-existing deepStrictEqual shape assertions elsewhere
+  // must not see a new own-enumerable field on this object.
+  Object.defineProperty(values, "keyReferenceSupplied", { value: supplied.has("keyReference"), enumerable: false, configurable: true });
   if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent"]).has(command)) return { error: USAGE };
   // SETUP-2b/AC-11: precedence, in this exact order. An explicit --directory always
   // wins and is used exactly as before, never even consulting the machine plane. Absent
@@ -399,6 +407,18 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       }
       if (!namedShape || !text(authority.humanName)) {
         fail('existing PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
+      }
+      // GF-104: a named record already exists. Explicit --human-name/--key-reference
+      // values that differ from it are a deliberate identity change this command does
+      // not make silently -- fail loudly instead of quietly keeping the old values and
+      // reporting the unqualified success this used to return. Values the caller never
+      // supplied (including keyReference's own default) are never compared: an
+      // unqualified `setup` re-run against an existing record stays idempotent, exactly
+      // as before.
+      const humanNameMismatch = text(args.humanName) && args.humanName !== authority.humanName;
+      const keyReferenceMismatch = args.keyReferenceSupplied && args.keyReference !== authority.keyReference;
+      if (humanNameMismatch || keyReferenceMismatch) {
+        fail("a PO authority record already exists under a different name/key-reference than supplied; changing an established identity is not something setup does silently -- rerun without --human-name/--key-reference to keep the existing record, or remove the existing authority files first if a deliberate rebind is intended.");
       }
       persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false };
