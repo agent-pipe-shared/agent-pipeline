@@ -2152,8 +2152,11 @@ a real cost: a kernel entry makes the file uneditable under *any* window, exactl
 today, and that cost falls on legitimate maintenance of a hook whose rule family (TP-*) is itself the liftable
 one. It is deliberately **not decided here**, and — per the 2026-08-10 ADR-0058 correction cited under (iv) — it
 is **not this document's to decide**: kernel membership is ADR-0058's decision. That correction endorses
-`guard-authority-ledger-intake.mjs` and explicitly leaves GS-8's separate module open for its own dated
-correction; it says nothing about `guard-testpath.mjs`, which is therefore an undecided third case, not a
+`guard-authority-ledger-intake.mjs` and explicitly leaves two OTHER modules open for their own dated
+correction — `self-application-attestation-gate.mjs` itself (GS-6 for the live-enforcing copy) and
+`public-core-origin-allowlist.mjs` (GS-8's actual module; an earlier version of this sentence called the
+former "GS-8's module", which ADR-0058's own 2026-08-10 correction retired as a mislabel — corrected here
+to match). It says nothing about `guard-testpath.mjs`, which is therefore an undecided case of its own, not a
 decided one. Filed as its own backlog item,
 `backlog/items/2026-08-10-guard-testpath-not-kernel-protected-like-its-sibling.md`.
 
