@@ -54,7 +54,15 @@ Arguments received: `$ARGUMENTS`
 Parse STRICTLY as:
 
 1. 1st token = `{{SPEC_PATH}}` (the contract; for rigor 0: the issue brief path),
-2. 2nd token = `{{DIFF_RANGE}}` (e.g. `main..HEAD`, `{{BASE_REF}}..{{HEAD_REF}}`),
+2. 2nd token = `{{DIFF_RANGE}}` (e.g. `main..HEAD`, `{{BASE_REF}}..{{HEAD_REF}}`;
+   **root-commit case:** when the reviewed work IS the repository's root
+   commit (`git rev-parse HEAD^` fails — no parent commit exists), use
+   `4b825dc642cb6eb9a060e54bf8d69288fbee4904..HEAD`, git's well-known,
+   universal empty-tree object hash. It diffs cleanly against any
+   parentless commit: `git diff 4b825dc642cb6eb9a060e54bf8d69288fbee4904..HEAD`
+   is equivalent to `git show HEAD`'s content change, and
+   `git diff --name-only 4b825dc642cb6eb9a060e54bf8d69288fbee4904..HEAD`
+   lists every file the root commit introduced),
 3. every further unprefixed token = a guardrail/constraint path (e.g. project CLAUDE.md constraints block, `.claude/pipeline.json`, guard config),
 4. `evidence:{{PATH}}` = machine evidence artifact(s) of the submission,
 5. `sha:{{RULESET_SHA}}` = ruleset SHA fixed by the Elephant at dispatch,
