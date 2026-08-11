@@ -606,7 +606,13 @@ export function readState(dir = projectDir()) {
 }
 
 function writeState(dir, state, expectedState, options = {}) {
-  const lock = acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN);
+  // `options.reuseLock`, when supplied, is an already-acquired, still-held lock on this
+  // exact `dir` (PHX-WP-PAC08-LOCK-REENTRANCY): the caller verified the resolved paths
+  // match before handing it in (see `defaultFeaturePackageReconcileApproval`). Reusing it
+  // instead of acquiring a second lock avoids a self-collision on the same lock path; this
+  // call then does not own the lock's lifecycle and must not release it.
+  const reusedLock = options.reuseLock;
+  const lock = reusedLock ?? acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN);
   if (!lock.ok) return { ok: false, committed: false, code: lock.code };
   try {
     const observed = readState(dir);
@@ -657,7 +663,7 @@ function writeState(dir, state, expectedState, options = {}) {
     });
     return transition === undefined ? written : { ...written, transition };
   } finally {
-    releaseContinuityLock(lock);
+    if (!reusedLock) releaseContinuityLock(lock);
   }
 }
 
@@ -5781,15 +5787,32 @@ function runFeaturePackageReconcileCommand(argv, deps) {
     if (!observedCandidate.ok) {
       return refuseFeaturePackageRead(sub, "the current candidate identity is unavailable (FTP-RECONCILE-CANDIDATE-UNAVAILABLE); zero mutation");
     }
+    // `holderLock`/`holderRoot` let the approval closure recognize and reuse the
+    // exclusive lock THIS call already holds on `root`, rather than acquiring a second,
+    // colliding one on the same resolved path when the approving governing session's own
+    // `dir` happens to coincide with `root` (PHX-WP-PAC08-LOCK-REENTRANCY, closing Critic
+    // finding F1). It is inert for every other caller/topology: an injected test double
+    // that destructures only `{ manifest, planSha256, candidate }` never sees it, and
+    // `defaultFeaturePackageReconcileApproval` only acts on it when the resolved lock
+    // paths actually match.
     const approvalCheck = deps.featurePackageReconcileApproval({
       repoRoot: root,
       schema: FEATURE_PACKAGE_RECONCILE_APPROVAL_SCHEMA,
       manifest,
       planSha256,
       candidate: { commit: observedCandidate.commit, tree: observedCandidate.tree },
+      holderLock: lock,
+      holderRoot: root,
     });
     if (!approvalCheck?.ok) {
-      return refuseFeaturePackageRead(sub, "PO-bound approval was not confirmed for this exact candidate and plan digest (FTP-RECONCILE-APPROVAL-REJECTED); zero mutation");
+      // F3 (Critic pac08-fb-critic-review-5420c5e7.md): a replayed proof already verified
+      // and was already consumed -- the generic "not confirmed for this exact candidate and
+      // plan digest" text is false for this one cause. Every other refusal code keeps the
+      // existing generic message unchanged (RGk/RGl/RGm depend on it).
+      const message = approvalCheck?.code === "CRITICAL-PROOF-REPLAY"
+        ? "external proof was already consumed (CRITICAL-PROOF-REPLAY); zero mutation"
+        : "PO-bound approval was not confirmed for this exact candidate and plan digest (FTP-RECONCILE-APPROVAL-REJECTED); zero mutation";
+      return refuseFeaturePackageRead(sub, message);
     }
 
     const pending = loadFeaturePackageApplyJournal(root, deps);
@@ -5915,9 +5938,26 @@ function runFeaturePackageRecoverCommand(argv, deps) {
  * The proof is consumed HERE, at verification time -- before the caller publishes the journal
  * or touches the manifest -- a deliberate fail-closed choice: a proof that verifies but is
  * followed by an unrelated later failure is still burned, and a retry needs a fresh proof.
+ *
+ * PHX-WP-PAC08-LOCK-REENTRANCY (closing Critic finding F1): `dir` (this closure's own
+ * governing-session directory, `deps.dir ?? projectDir()`) can resolve to the exact same
+ * directory as `holderRoot` -- the mandated Phoenix self-governance topology, where this
+ * repository reconciles its own manifest from within its own governing session. In that
+ * case the write below (via `writeState`) would try to acquire a SECOND exclusive
+ * continuity lock on the identical resolved path `runFeaturePackageReconcileCommand`
+ * already holds via `holderLock` across its whole body, colliding with itself
+ * (PS-CONTINUITY-LOCKED) every time. Reusing the caller's already-held lock instead of
+ * acquiring a new one is safe precisely because it is the SAME writer, still inside the
+ * SAME critical section that already excluded every other writer (in-process or
+ * cross-process) from this exact path -- not a new contender admitted past the lock. This
+ * is a narrow, explicit hand-off (only from this one call site, only when the resolved
+ * paths genuinely match) rather than a generic "same process already holds this path"
+ * rule: a genuinely separate contender (e.g. a different token, not handed the lock
+ * explicitly) still goes through the normal file-based `acquireContinuityLock` and is
+ * still correctly refused -- see PS44Vc, which this design deliberately leaves intact.
  */
 function defaultFeaturePackageReconcileApproval(argv, deps) {
-  return ({ manifest, planSha256, candidate }) => {
+  return ({ manifest, planSha256, candidate, holderLock, holderRoot }) => {
     const dir = deps.dir ?? projectDir();
     const kind = "feature-package-reconcile";
     const parsedArgv = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_RECONCILE_FLAGS);
@@ -5972,7 +6012,16 @@ function defaultFeaturePackageReconcileApproval(argv, deps) {
         : [...consumed, { proofSha256: verified.proof.proofSha256, kind, consumedAt: now }],
       updatedAt: now,
     };
-    const writeResult = writeState(dir, next, state);
+    // Reuse the caller's already-held lock only when it is genuinely for THIS same
+    // resolved path -- comparing resolved absolute paths, not raw dir strings, so a
+    // relative vs. absolute spelling of the same directory still counts as the same path.
+    // In the ordinary `dir !== root` topology `reuseLock` stays undefined and `writeState`
+    // acquires its own lock exactly as before (untouched behavior).
+    const reuseLock = holderLock?.ok === true && holderRoot !== undefined
+      && resolve(continuityLockPath(dir)) === resolve(continuityLockPath(holderRoot))
+      ? holderLock
+      : undefined;
+    const writeResult = writeState(dir, next, state, reuseLock ? { reuseLock } : {});
     if (!stateWriteSucceeded(writeResult)) return { ok: false, code: writeResult.code };
     return { ok: true };
   };

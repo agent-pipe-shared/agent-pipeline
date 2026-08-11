@@ -4641,8 +4641,9 @@ function runFeaturePackageReconcileTests() {
     "--manifest", fxB.manifestRel, "--plan-sha256", digestB,
     "--by", "PO", "--proof-request", proofA.requestPath, "--proof-authority", proofA.authorityPath, "--proof", proofA.proofPath,
   ], commonDeps(fxB));
-  ok("RGq a proof already consumed by an earlier reconcile is refused, zero mutation on the new package's manifest",
-    refusedB.value === 2 && /FTP-RECONCILE-APPROVAL-REJECTED/.test(refusedB.err)
+  ok("RGq a proof already consumed by an earlier reconcile is refused with the accurate CRITICAL-PROOF-REPLAY message (F3: not the generic FTP-RECONCILE-APPROVAL-REJECTED text, which would falsely claim the candidate/plan digest binding failed when the proof actually verified and was already consumed), zero mutation on the new package's manifest",
+    refusedB.value === 2 && /external proof was already consumed \(CRITICAL-PROOF-REPLAY\)/.test(refusedB.err)
+    && !/FTP-RECONCILE-APPROVAL-REJECTED/.test(refusedB.err)
     && readFileSync(join(fxB.dir, fxB.manifestRel)).equals(beforeManifestB), refusedB.err);
   const stateAfterB = readState(governingDir);
   ok("RGq the governing session's state is byte-identical after the refused replay -- no second consumption entry, no lastApproved overwrite",
@@ -4694,6 +4695,70 @@ function runFeaturePackageReconcileTests() {
   ok("RGp no criticalProofConsumption entry is added in chat mode (nothing to consume)",
     governingState.state.criticalProofConsumption === undefined || governingState.state.criticalProofConsumption.length === 0,
     JSON.stringify(governingState.state.criticalProofConsumption));
+}
+
+{
+  // RGs -- PHX-WP-PAC08-LOCK-REENTRANCY (closes Critic finding F1 in
+  // pac08-fb-critic-review-5420c5e7.md; F2 in the same report is the gap this case closes:
+  // every RGi-RGr case above injects `dir: governingDir`, a directory SEPARATE from
+  // `--root`, so the mandated self-governing topology is never reached). Here `deps.dir` is
+  // OMITTED entirely -- exactly what the real CLI does, see run():6058 `deps` passed
+  // raw -- and `--root` names the SAME directory `projectDir()` resolves to, reproduced by
+  // temporarily pointing CLAUDE_PROJECT_DIR at the fixture's own root for the duration of
+  // this one call. This is the topology P-AC-08 mandates: this repository reconciling its
+  // own manifest from within its own governing session. Before the F1 fix, the approval
+  // closure's own writeState(dir, ...) tried to acquire a second exclusive continuity lock
+  // on the identical resolved path runFeaturePackageReconcileCommand already held,
+  // colliding with itself (PS-CONTINUITY-LOCKED) every time.
+  const fx = seedReconcilePackage("rgs-self-governing");
+  const grownPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), grownPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  // Seed this SAME directory as a valid governing session too -- seedPac08GoverningSession's
+  // own state-seeding logic (project/pipeline-state.json with activeFeature/planApproval
+  // .poGateAuthority matching the manifest under test, plus a committed
+  // pipeline.user.yaml), applied directly to fx.dir rather than to a fresh directory.
+  mkdirSync(join(fx.dir, "project"), { recursive: true });
+  writeFileSync(join(fx.dir, "project", "pipeline-state.json"), `${JSON.stringify({
+    schema: SCHEMA_ID, planApproved: true,
+    activeFeature: { id: PAC08_FEATURE_ID, planPath: `specs/${PAC08_FEATURE_ID}/prd.md`, phase: "implementation" },
+    planApproval: { poGateAuthority: { planSha256: PAC08_PLAN_SHA256, specSha256: PAC08_SPEC_SHA256 } },
+  }, null, 2)}\n`);
+  pac08GatesYaml(fx.dir, "signature");
+  const proof = pac08Proof({ manifest: fx.manifestRel, planSha256: digest });
+  const deps = {
+    // deliberately NO `dir` key at all -- the real CLI never injects one either.
+    now: () => PAC08_NOW,
+    gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
+    gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }),
+  };
+  const priorProjectDirSet = Object.hasOwn(process.env, "CLAUDE_PROJECT_DIR");
+  const priorProjectDir = process.env.CLAUDE_PROJECT_DIR;
+  let applied;
+  try {
+    process.env.CLAUDE_PROJECT_DIR = fx.dir;
+    applied = reconcileApplyCmd(fx.dir, [
+      "--manifest", fx.manifestRel, "--plan-sha256", digest,
+      "--by", "PO", "--proof-request", proof.requestPath, "--proof-authority", proof.authorityPath, "--proof", proof.proofPath,
+    ], deps);
+  } finally {
+    if (priorProjectDirSet) process.env.CLAUDE_PROJECT_DIR = priorProjectDir;
+    else delete process.env.CLAUDE_PROJECT_DIR;
+  }
+  const receipt = JSON.parse(applied.out || "{}");
+  ok("RGs the mandated self-governing topology (deps.dir omitted, --root resolving to the same directory as projectDir()) succeeds end-to-end -- a genuine PO-bound proof gates a real manifest rewrite even though the approval's own state write shares the reconcile's held lock path",
+    applied.value === 0 && receipt.status === "applied", applied.out || applied.err);
+  const persisted = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
+  ok("RGs-2 the manifest was actually rewritten in the self-governing topology, not a no-op",
+    persisted.artifacts[0].sha256 === sha256Hex(grownPrd), JSON.stringify(persisted));
+  const governingState = readState(fx.dir);
+  ok("RGs-3 the SAME directory's governing state now carries both the reconcile's usual approval side effects (lastApproved/criticalProofConsumption) proving the write genuinely happened despite sharing the lock path",
+    governingState.status === "ok"
+    && governingState.state.featurePackageReconcileApproval?.lastApproved?.approvedBy === "PO"
+    && governingState.state.featurePackageReconcileApproval.lastApproved.forCommit === PAC08_CANDIDATE.commit
+    && Array.isArray(governingState.state.criticalProofConsumption)
+    && governingState.state.criticalProofConsumption.some((entry) => entry.kind === "feature-package-reconcile"),
+    JSON.stringify(governingState));
 }
 
 }
