@@ -1161,6 +1161,55 @@ is the expected, honest result, not a blocker to record it.
 **P-AC-08 stays `partial`.** 127/26/3/0/1 unchanged. Critic-confirmed, not
 self-assessed.
 
+### `PHX-WP-PAC08-APPROVAL-LEDGER` landed (`5420c5e7`) — F-B fixed with genuine RED-before-GREEN proof, delta Critic review dispatched before flipping anything
+
+Dispatched the same night, scoped tightly to F-B alone: `pipeline-state.mjs`
+(unprotected) plus `pipeline-state.test.mjs` (TP-5, still active). Landed as
+one commit, `5420c5e7`, both files together — `defaultFeaturePackageReconcileApproval`
+now persists `featurePackageReconcileApproval.lastApproved`
+(`approvedBy`/`approvedAt`/`forCommit`/`criticalProof`) into the governing
+session's own state at the moment `verifyCriticalHumanProof` returns `ok:true`
+(before the journal/manifest write, in both signature and chat mode alike),
+and consumes the proof into the same `criticalProofConsumption` ledger
+`approve-push` already writes (shared, tagged `kind:
+"feature-package-reconcile"`), refusing `CRITICAL-PROOF-REPLAY` on a reused
+`proofSha256` with zero mutation. New tests `RGo`/`RGq`/`RGr`/`RGp`.
+
+Independently re-verified, not accepted from the dispatch report alone:
+`node --test harness/scripts/pipeline-state.test.mjs` → **501/501**, matching
+the commit message exactly. More significantly, when asked (via a resume,
+after the dispatch's own turn was cut off mid-report the same way earlier
+sibling dispatches were tonight) for genuine RED-before-GREEN evidence rather
+than green alone, the dispatch reverted only the source file to `HEAD~1`
+(keeping the new tests) and re-ran: **exactly the 5 predicted assertions
+failed** (`RGo`×2, `RGq`×1, `RGr`×1, `RGp`×1, `496/501`), everything
+proof-verification-independent still passed, then restored the commit and
+confirmed a clean tree. Read the raw TAP output myself
+(`specs/sprint-phoenix-epic/evidence/pac08-red-check.tap`,
+`pac08-green-final.tap`) rather than trusting the dispatch's count — the
+`grep`-able `FAIL`/`not ok` lines match exactly what the report claims. This
+is real, reproducible evidence that the new tests test something, not
+tautologies.
+
+One honestly-disclosed limitation, not silently resolved: the CLI's stderr
+for every reconcile-approval refusal, including a genuine
+`CRITICAL-PROOF-REPLAY`, stays the pre-existing generic
+`FTP-RECONCILE-APPROVAL-REJECTED` message — the specific code is
+distinguishable in the closure's return value and in persisted state, not
+literally printed to the operator. Left as-is deliberately (touching the call
+site would have risked `RGk`/`RGl`/`RGm`'s byte-identical assertions); flagged
+for the PO, not a defect of this fix.
+
+**Not self-declaring this closed.** Per this session's own repeated
+discipline (F3's original fix got an independent Critic pass before being
+called done; that pass is exactly what found F-B in the first place) and
+CLAUDE.md's self-application rule, a delta Critic review of `5420c5e7` alone
+(base `3fdf8b9f`) is dispatched — same neutral-findings-registry pattern as
+before but corrected against all four contamination mistakes named above (no
+directed hunt-list addition, no re-run instruction, no verdict word in the
+registry file `PAC08-FB-findings-registry.md`, no write-tool grant alongside
+the read-only assurance). P-AC-08 flips only if that comes back clean.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
