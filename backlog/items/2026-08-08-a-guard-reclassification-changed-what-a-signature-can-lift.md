@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-reclassification-changed-what-a-signature-can-lift
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-12
+closure_repository: self
+closure_commit: 431776c3f6ed0ab535224be804cb3ea18bcf518e
+closure_evidence: backlog/items/2026-08-08-a-guard-reclassification-changed-what-a-signature-can-lift.md
 created: 2026-08-08
 due: 2026-08-22
 source: "Critic round on the 2026-08-08 greenfield hardening block, finding F3, severity minor. Independently corroborated from the reviewing agent's own denial trajectory."
@@ -104,3 +108,29 @@ command and a bare refusal for another.
 - **Rationale:** PO, 2026-08-12: "empfehlung."
 - **Assignment (if accepted):** queued for implementation this session.
 - **Date:** 2026-08-12
+
+### Measurement result (NVA-BL-75, 2026-08-12)
+
+Both DoD items executed and committed (`431776c3`): the reasoning is now
+written down as a code comment above `hasExternalOutputRedirect()`, and a
+12-command corpus test pins override REACHABILITY (not just admit/deny) for
+both the never-liftable and signature-liftable classes.
+
+**The item's original central worry measures as factually false at current
+HEAD.** The specific commands `88d316d` reclassified (`cmd 2>/dev/null`
+and siblings) are NOT signature-liftable: `eligibility()` refuses any
+unparseable command containing `>` with `HGO-NONOVERRIDABLE-GRAMMAR`
+regardless of the cross-repository classification, a refusal that predates
+`88d316d` (`af5826e7`, 2026-07-29). Also, ADR-0059 Decision 6 (`b108b3e`)
+already reversed the item's premise structurally: `GUARD-CROSS-REPO-MUTATION`
+now routes through the override planner too, so "never-liftable vs.
+liftable" is no longer the right binary at HEAD — the corpus pins the
+current finer 3-subclass partition instead.
+
+**Disposition:** this item's own question 1 (was the reclassification
+correct?) is answered yes, with reasoning and measurement now on record.
+Recommend closing THIS item. A separate, more serious finding surfaced
+during the same investigation is filed as its own item — see
+`2026-08-12-cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary.md`
+— do not let that item's severity retroactively reopen this one; they are
+different questions.
