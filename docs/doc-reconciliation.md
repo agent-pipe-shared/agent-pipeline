@@ -47,6 +47,15 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 79f369394a17fcf40710b7681af47ab6fd0a04e3 — 2026-08-11, range 2c1f4cee..79f36939, clean security-scan against the committed candidate recorded
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`79f36939`), touching only `docs/state.md`
+(additive: records the security-scan verdict against `2c1f4cee`, run with
+the one known GMW-blocked file stashed and restored). No other governed
+path touched.
+
 ## Candidate 6dfd32f574b5273dca475eddc7a3bd73f9a15508 — 2026-08-11, range 1022df71..6dfd32f5, Class B multi-dispatch plan + H-AC-12/Class A checked empty
 
 - ADR-0012: checked, no change needed.
