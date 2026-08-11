@@ -137,6 +137,25 @@ function claudeLocalDevelopmentAttested(entry, knownMarketplaces) {
     && resolve(source.path) === source.path;
 }
 
+/**
+ * PO decision 2026-08-11 (backlog/items/2026-08-11-preflight-user-and-matching-
+ * project-scope-still-collide-as-ambiguous.md, option 2): a repo-committed
+ * `scope: "project"` registration is a team decision and beats a machine-wide
+ * `user`/`local`/absent-scope default for the SAME id -- it must shadow those
+ * entries rather than merely coexist and trip ambiguity. Within one id-class's
+ * already cwd-filtered eligible entries, if any `scope: "project"` entries are
+ * present, they alone determine that id-class's count; non-project entries for
+ * the same id are dropped from consideration. This is never a hardcoded
+ * "collapse to 1": two or more genuinely eligible project-scope entries for the
+ * SAME id (a real registry duplicate) still count as ambiguous. Only when NO
+ * project-scope entry is eligible for an id-class does the prior unconditional
+ * behavior (every eligible entry counts) remain unchanged.
+ */
+function shadowProjectScope(entries) {
+  const projectEntries = entries.filter((entry) => entry.scope === "project");
+  return projectEntries.length > 0 ? projectEntries : entries;
+}
+
 function installedPipelineIdentityClaude(payload, knownMarketplaces, cwd) {
   if (!Array.isArray(payload)) return null;
   const eligible = (entry) =>
@@ -150,8 +169,8 @@ function installedPipelineIdentityClaude(payload, knownMarketplaces, cwd) {
     // ("user", "local", or the field absent) keeps its unconditional eligibility unchanged.
     && (entry?.scope !== "project"
       || (typeof entry?.projectPath === "string" && resolve(entry.projectPath) === resolve(cwd)));
-  const localMatches = payload.filter((entry) => eligible(entry) && entry.id === LOCAL_PLUGIN_ID);
-  const officialMatches = payload.filter((entry) => eligible(entry) && entry.id === PLUGIN_ID);
+  const localMatches = shadowProjectScope(payload.filter((entry) => eligible(entry) && entry.id === LOCAL_PLUGIN_ID));
+  const officialMatches = shadowProjectScope(payload.filter((entry) => eligible(entry) && entry.id === PLUGIN_ID));
   if (localMatches.length + officialMatches.length > 1) {
     return { version: null, source: "unknown", ambiguous: true };
   }

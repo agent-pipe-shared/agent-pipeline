@@ -429,20 +429,48 @@ test("a Claude project-scope entry for an unrelated project never counts toward 
   assert.equal(result.installedSource, "unknown");
 });
 
-// GF-111 known-open sub-case (see dispatch report): cwd matching the "mine" project-scope
-// entry leaves it eligible ALONGSIDE the unrelated scope:"user" entry (two distinct enabled
-// entries for the same id) -- the briefing's Fix bullet explicitly keeps user-scope
-// eligibility unconditional and explicitly forbids inventing a project-shadows-user
-// precedence rule, so this sub-case still resolves ambiguous, unchanged from before the fix.
-// This assertion documents the actual, spec-compliant behavior -- not the briefing's DoD (a)
-// prediction of "ready", which is unreachable without the precedence rule the briefing forbids.
-test("a Claude project-scope entry matching cwd still coexists with an unrelated user-scope entry as ambiguous", () => {
+// PO decision 2026-08-11 (backlog/items/2026-08-11-preflight-user-and-matching-project-
+// scope-still-collide-as-ambiguous.md, option 2): a repo-committed scope:"project"
+// registration is a team decision and beats a machine-wide scope:"user" default for the
+// same id -- it now SHADOWS the coexisting scope:"user" entry rather than merely coexisting
+// with it as ambiguous. This supersedes the prior "explicitly forbidden" precedence-rule
+// stance: the PO has now explicitly authorized this precedence.
+test("a Claude project-scope entry matching cwd shadows a coexisting unrelated user-scope entry", () => {
   const cwd = "/projects/mine";
   const identity = installedPipelineIdentity(threeEntriesFixture, "claude", claudeKnownMarketplaces(), cwd);
-  assert.deepEqual(identity, { version: null, source: "unknown", ambiguous: true });
+  assert.deepEqual(identity, { version: "0.5.4", source: "unknown" });
   const result = observePipelineStartPreflight({
     env: { CLAUDECODE: "1" },
     pluginList: threeEntriesFixture,
+    knownMarketplaces: claudeKnownMarketplaces(),
+    read: () => JSON.stringify({ version: "0.5.4" }),
+    cwd,
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.installedVersion, "0.5.4");
+  assert.equal(result.installedSource, "unknown");
+});
+
+// The shadowing rule is never a hardcoded "collapse to 1": two genuinely eligible
+// scope:"project" entries for the SAME id and the SAME cwd are a real registry duplicate,
+// not a scope-precedence case, and must still fail closed as ambiguous.
+test("two eligible Claude project-scope entries for the same id and cwd still collide as ambiguous", () => {
+  const duplicateProjectFixture = () => JSON.stringify([
+    {
+      id: "pipeline-core@agent-pipeline", version: "0.5.4", scope: "project", enabled: true,
+      projectPath: "/projects/mine",
+    },
+    {
+      id: "pipeline-core@agent-pipeline", version: "0.5.5", scope: "project", enabled: true,
+      projectPath: "/projects/mine",
+    },
+  ]);
+  const cwd = "/projects/mine";
+  const identity = installedPipelineIdentity(duplicateProjectFixture, "claude", claudeKnownMarketplaces(), cwd);
+  assert.deepEqual(identity, { version: null, source: "unknown", ambiguous: true });
+  const result = observePipelineStartPreflight({
+    env: { CLAUDECODE: "1" },
+    pluginList: duplicateProjectFixture,
     knownMarketplaces: claudeKnownMarketplaces(),
     read: () => JSON.stringify({ version: "0.5.4" }),
     cwd,
