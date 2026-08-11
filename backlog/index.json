@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "019c4d2e64e845ea2b05e7e398e4c2ec95bc292f204de661e7efa483378ea693"
+    "transitionHead": "2b8b4b02e40d70d8e15b9cf3a39ae064bc2a8e44b276fe64b1ef721be7227530"
   },
   "counts": {
-    "open": 128,
+    "open": 127,
     "in_progress": 22,
-    "closed": 45
+    "closed": 46
   },
   "items": [
     {
@@ -1151,11 +1151,15 @@
     },
     {
       "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-11",
-      "source": "GF-111 dispatch report (commit 5f0af080, cherry-picked as 257444c8 onto feat/sprint-nova-codex-v046), stop condition 'genuine ambiguity the briefing does not resolve' — the goldfish caught a real self-contradiction in its own briefing and correctly stopped rather than inventing a fix."
+      "source": "GF-111 dispatch report (commit 5f0af080, cherry-picked as 257444c8 onto feat/sprint-nova-codex-v046), stop condition 'genuine ambiguity the briefing does not resolve' — the goldfish caught a real self-contradiction in its own briefing and correctly stopped rather than inventing a fix.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "c307e4b5e96a2f5cff0d31a27c01d5999b6055d5",
+      "closureEvidence": "backlog/evidence/2026-08-11-preflight-project-shadows-user-landed.md"
     },
     {
       "id": "pipeline.preimage-repin-disclosure-incomplete-for-roles-critic",

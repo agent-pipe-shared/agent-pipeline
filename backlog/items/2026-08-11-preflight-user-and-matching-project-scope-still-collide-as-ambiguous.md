@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
 source: "GF-111 dispatch report (commit 5f0af080, cherry-picked as 257444c8 onto feat/sprint-nova-codex-v046), stop condition 'genuine ambiguity the briefing does not resolve' — the goldfish caught a real self-contradiction in its own briefing and correctly stopped rather than inventing a fix."
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: c307e4b5e96a2f5cff0d31a27c01d5999b6055d5
+closure_evidence: backlog/evidence/2026-08-11-preflight-project-shadows-user-landed.md
 ---
 
 # `pipeline-start-preflight.mjs`: a `user`-scope entry plus a matching `project`-scope entry for the SAME id still resolve as ambiguous
@@ -91,7 +95,27 @@ answer its own dispatch's escalation):
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** option 2 — `project` scope shadows `user` scope for the same id.
+- **Rationale:** PO decision, 2026-08-11: "was ist die Empfehlung? ich würde
+  sagen project > lokal weil das bei Team-Arbeiten sauberer ist?" — a
+  repo-committed, team-shared project-scope registration should outrank a
+  machine-local user default. Option 3 (collapse on agreement) was explicitly
+  not put forward for this decision, per GF-111's own caution against picking
+  it without dedicated PO sign-off on loosening the local-vs-official
+  ambiguity guarantee.
+- **Assignment (if accepted):** GF-115 (`goldfish-deep`). First dispatch
+  attempt correctly self-aborted (stop condition: briefing-vs-repo
+  contradiction) when its isolated worktree was found created from
+  `origin/main` instead of this session's actual branch tip — a
+  session-wide dispatch-tooling defect, documented in `docs/state.md`, not a
+  defect in this item or its briefing. Re-dispatched with an explicit
+  worktree-realignment first step; landed `5f5808f6` in the second worktree,
+  cherry-picked onto `feat/sprint-nova-codex-v046` as `c307e4b5`. Adds a
+  `shadowProjectScope()` helper in `installedPipelineIdentityClaude`: an
+  eligible `project`-scope entry drops coexisting `user`/`local`/absent-scope
+  entries for the same id from the ambiguity count, but two-or-more eligible
+  `project`-scope entries for the same id (a genuine registry duplicate)
+  still count as ambiguous — covered by a new regression test. Target suite
+  `node --test plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs`:
+  25/25, exit 0, re-verified directly against the integrated commit.
+- **Date:** 2026-08-11

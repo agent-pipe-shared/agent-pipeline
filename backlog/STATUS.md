@@ -134,7 +134,7 @@
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | open | workflow-improvement | pipeline | 2026-08-08 | — |
-| pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | open | defect | pipeline | 2026-08-11 | — |
+| pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | open | defect | pipeline | 2026-08-09 | — |
@@ -203,6 +203,6 @@
 
 ## Counts
 
-- open: 128
+- open: 127
 - in_progress: 22
-- closed: 45
+- closed: 46
