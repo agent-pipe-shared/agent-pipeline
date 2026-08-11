@@ -466,6 +466,17 @@ function localPluginInstallSourceObservation(repo, options = {}) {
     fingerprintSha256: sha({ physicalRoot: repo.root, physicalCommon: repo.common }),
     head: null,
     tree: null,
+    // The observation itself, not only its hash. `statusSha256` below folds this
+    // exact object in, but a caller or operator reading the attestation could
+    // not tell WHICH branch applied -- verified, or which typed `unobserved`
+    // reason -- without recomputing the hash against every candidate. Exposing
+    // it costs nothing (it is the same value, hashes and typed tokens only, no
+    // filesystem path) and is what makes a `not-registered` observation legible
+    // in a request/plan/capability record instead of an opaque digest change.
+    // Adding this key changes `canonical(repository)`, so any capability armed
+    // before this change now fails the existing HGO-DRIFT comparison and is
+    // replanned -- fail-closed, and the intended one-time transition.
+    externalMarketplace,
     statusSha256: sha({
       kind: "local-plugin-install-source.v2",
       marketplaceSha256: sha(readFileSync(marketplace)),

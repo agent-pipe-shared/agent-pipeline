@@ -1609,6 +1609,49 @@ test("NVA-BL-20: an unobservable or unregistered marketplace registry is a typed
   }
 });
 
+test("NVA-BL-20: the attestation exposes the external-marketplace state it hashed, without changing the hash", { skip: JUNCTION_SKIP }, () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const external = externalMarketplace(base, "external");
+    symlinkSync(checkout.sourceRoot, join(external, "plugins", "pipeline-core"), "junction");
+    const repo = { root: checkout.root, common: join(checkout.root, ".git") };
+    const attest = (registryReader) =>
+      humanGuardOverrideInternals.localPluginInstallSourceObservation(repo, { registryReader });
+    // The value exposed is the SAME observation folded into statusSha256, not a
+    // separately recomputed one that could drift from what was actually hashed.
+    const verified = attest(localRegistry(external));
+    assert.deepEqual(
+      verified.externalMarketplace,
+      humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+        { root: checkout.root },
+        { registryReader: localRegistry(external) },
+      ),
+    );
+    assert.equal(verified.externalMarketplace.state, "verified");
+    // Each typed branch is legible from the return value alone -- previously
+    // only an opaque digest difference distinguished them.
+    assert.deepEqual(attest(() => null).externalMarketplace, { state: "unobserved", reason: "registry-unavailable" });
+    assert.deepEqual(attest(externalRegistry([])).externalMarketplace, { state: "unobserved", reason: "not-registered" });
+    // Hashes and typed tokens only: this object is persisted into the request,
+    // plan and capability records, so a raw filesystem path would be disclosure.
+    assert.deepEqual(
+      Object.keys(verified.externalMarketplace).sort(),
+      ["entryKind", "manifestSha256", "rootSha256", "state"],
+    );
+    assert.equal(JSON.stringify(verified.externalMarketplace).includes(base), false);
+    // The exposure is additive: statusSha256's own preimage is untouched. This
+    // digest is content-derived only (no temp path reaches it), so it is pinned
+    // here against the value the attestation produced before the field existed.
+    assert.equal(
+      attest(() => null).statusSha256,
+      "05f14cb8707b25d4f06714c3bea1354648d2cd6638b93b67caa83a79f440863e",
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
 // ---------------------------------------------------------------------------------
 // NOVA-HGOSIG-ROUTE-1 (ADR-0059 Decision 4): recordHumanGuardDenial() has three outcomes,
 // and consuming guards used to render only one of them. `planned` printed a route; every
