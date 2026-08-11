@@ -1020,6 +1020,66 @@ const DELTA = {
   // 52/52 governance-event-store/po-human-approval/po-approval-gate tests
   // pass.
   'K-AC-05': ['implemented', 'WP-K-AC05'],
+
+  // --- 2026-08-11 delta re-measurement (task PHX-WP-DELTA-PX0-0305-06-13) ---
+  // Re-measured PX0-AC-03/05/06/13 against HEAD, ~26 commits since this map's last
+  // data update (a781bfa7, 2026-08-10 09:32): a round-1 Critic FAIL on
+  // WP-PX0-AC0305-06 (fixed forward by 43d42a23: journal .v1/.v2 versioning,
+  // recover-side lock-ordering race, typed casOutcome field) and on WP-PX0-AC13
+  // (reverted, redone as ee8a38f0), then a SECOND independent Critic review of
+  // 43d42a23+ee8a38f0 together, also FAIL (F1-F6, recorded in docs/state.md's
+  // 2026-08-11 CHECKPOINT). Remediation is partial: F2 (stale threat-model doc)
+  // and F3 (AC-13 test coverage) are fixed, committed and independently
+  // re-verified here; F1 (a false casOutcome:"applied" echoed on recover's
+  // recovered-preimage refusal path) has its source fix sitting UNCOMMITTED in
+  // the working tree, no regression test; F4 (no test for the .v1
+  // legacy-journal backward-compat path) is zero bytes landed, confirmed by
+  // direct repo search. No independent Critic PASS exists for the current
+  // candidate on any of these four criteria -- ceiling for all four this pass
+  // is `partial` regardless of code/test completeness (this repo's own
+  // implemented-needs-Critic-PASS rule).
+  //
+  // PX0-AC-03: the one previously-named unpinned axis (active-feature phase !=
+  // design -> AR-DECISION-SCOPE) is now pinned (AR03h/i, a real plan-approval
+  // fixture), independently re-run and confirmed passing (468/468 total). All
+  // five recheck axes run under the continuity writer lock, confirmed by direct
+  // read of runAuthorityRevisionApplyCommand. Stays partial: no independent
+  // Critic PASS for this exact candidate.
+  //
+  // PX0-AC-05: the receipt is now durably retained -- RETRACTING the prior
+  // "CONFIRMED ABSENT ... no durable retention exists anywhere" claim.
+  // authorityRevisionReceipts (a top-level State sibling, correlated by
+  // intentSha256) is spliced into State on both a fresh apply (AR05d) and a
+  // recovery that completes forward to postimage (AR05f), independently re-run
+  // and confirmed passing; AR05b/c confirm no absolute path or machine
+  // identifier leaks. Narrower than full "retain": pinned immediately after the
+  // write, not survival across a LATER unrelated State write (the field sits
+  // outside continuity-state.mjs's own validated shape by design). Stays
+  // partial: this narrower gap plus no independent Critic PASS.
+  //
+  // PX0-AC-06: the recovered-preimage outcome now exists -- RETRACTING the
+  // prior "CONFIRMED ABSENT ... no recovered-preimage success outcome exists
+  // anywhere" claim. AR06e/f pin both recovered-preimage (expired decision) and
+  // recovered-postimage (not-yet-expired) under a fresh under-lock binding
+  // check, independently re-run and confirmed passing. Real residual: at HEAD
+  // the recovered-preimage branch echoes the frozen receipt's
+  // casOutcome:"applied" unmodified -- a false success claim the response's own
+  // status:"recovered-preimage" contradicts (Critic round-2 F1); the fix sits
+  // uncommitted in the working tree, and no test (AR06e never asserts
+  // casOutcome) pins either the bug or the fix. F4: zero regression-test
+  // coverage anywhere for the .v1 legacy-journal backward-compat path
+  // (confirmed by direct search). Stays partial.
+  //
+  // PX0-AC-13: code and tests are complete and green, independently re-run here
+  // (pipeline-start-preflight.test.mjs 36/36, ruleset-freshness.test.mjs 16/16,
+  // both exit 0) -- but awaiting the independent Critic re-review this exact
+  // candidate has never received (both prior Critic rounds on this surface
+  // FAILed; no PASS exists). Stays partial pending that review, not for any
+  // named code/test gap.
+  'PX0-AC-03': ['partial', 'DELTA-0811'],
+  'PX0-AC-05': ['partial', 'DELTA-0811'],
+  'PX0-AC-06': ['partial', 'DELTA-0811'],
+  'PX0-AC-13': ['partial', 'DELTA-0811'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -1029,17 +1089,17 @@ const DELTA = {
 const POINTERS = {
   'PX0-AC-01': 'pipeline-state-tests AR01a-d (PHX-WP-PX0, break-proofed, TP-5 window): a generic continuity-cas rewriting authority.prd or authority.spec is refused (CS-PROTECTED-AUTHORITY), zero mutation, both proved',
   'PX0-AC-02': 'continuity-authority-revision-plan emits the closed request; pinned in pipeline-state.test.mjs (registered)',
-  'PX0-AC-03': 'pipeline-state-tests AR03a-g (PHX-WP-PX0): apply rechecks both the next-authority artifact (AR03c) and its own fresh State preimage against a concurrent unrelated mutation (AR03e-g, new). One named axis remains unpinned: active-feature phase != design -> AR-DECISION-SCOPE, reachable in production but needing a full plan-approval fixture the dispatch\'s budget did not cover',
+  'PX0-AC-03': 'pipeline-state-tests AR03a-i (PHX-WP-PX0 + DELTA-0811 2026-08-11): apply rechecks the next-authority artifact (AR03c), its own fresh State preimage (AR03e-g), and now the active-feature decision-scope axis (AR03h/i, a real plan-approval fixture) -- all five recheck axes pinned, all under the continuity writer lock. 468/468 pipeline-state-tests pass (independently re-run). Partial only because no independent Critic PASS exists for this exact candidate (both prior Critic rounds on this package FAILed on other findings)',
   'PX0-AC-04': 'pipeline-state-tests AR04a-i (PHX-WP-PX0, measurement correction -- already fully covered pre-dispatch): feature/revision/prestate/old-and-next-authority/expiry/candidate/decision-scope/idempotency-reuse all pinned; no new test needed',
-  'PX0-AC-05': 'CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): the authority-revision receipt is only ever printed once to apply\'s stdout or embedded in the retired-on-success private journal -- no durable retention exists anywhere',
-  'PX0-AC-06': 'CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): recover has exactly three outcome classes (clean, recovered-postimage x2, diverged) -- no recovered-preimage success outcome exists anywhere',
+  'PX0-AC-05': 'pipeline-state-tests AR05a-f (PHX-WP-PX0 + DELTA-0811 2026-08-11): RETRACTS the prior CONFIRMED-ABSENT finding -- authorityRevisionReceipts (correlated by intentSha256, no absolute path/root/machine identifier) is now durably retained in State on both a fresh apply (AR05d) and a completed-forward recovery (AR05f), independently re-run and confirmed passing. Narrower than full retention: pinned immediately after the write, not across a later unrelated State write (the field sits outside continuity-state.mjs\'s own validated shape by design). No independent Critic PASS exists for this exact candidate',
+  'PX0-AC-06': 'pipeline-state-tests AR06a-f (PHX-WP-PX0 + DELTA-0811 2026-08-11): RETRACTS the prior CONFIRMED-ABSENT finding -- recovered-preimage now exists alongside recovered-postimage/clean/diverged, gated by one fresh under-lock expiry recheck (AR06e/f, independently re-run and confirmed passing). Real residual: at HEAD the recovered-preimage branch echoes the frozen receipt\'s casOutcome:"applied" unmodified -- a false success claim the response\'s own status:"recovered-preimage" contradicts (Critic round-2 F1); the fix sits uncommitted in the working tree, and no test (AR06e never asserts casOutcome) pins either the bug or the fix. F4: zero regression-test coverage anywhere for the .v1 legacy-journal backward-compat path (confirmed by direct search). No independent Critic PASS exists for this exact candidate',
   'PX0-AC-07': 'pipeline-state-tests AR07a-b (PHX-WP-PX0, measurement correction -- already fully covered pre-dispatch): exact zero-write replay (AR07a) and a second/conflicting writer failing closed with State preserved (AR07b) both pinned, reinforced incidentally by the new AR03e-g',
   'PX0-AC-08': 'pipeline-start-preflight-tests (PHX-WP-PX0AC08, break-proofed): observePipelineStartPreflight emits a closed rulesetSource observation on every bootstrap run that resolves a loaded distribution -- real content-hash identity for self-application/dev-checkout, honest {status:"unavailable"} elsewhere, both validated against ruleset-source.mjs\'s own closed schema',
   'PX0-AC-09': 'bootstrap-source-attestation-acceptance-tests (verify.mjs:333) — Codex-only marketplace resolution',
   'PX0-AC-10': 'bootstrap-source-attestation-acceptance-tests — pre-HEAD consumer compares loaded plugin identity',
   'PX0-AC-11': 'bootstrap-source-attestation-acceptance-tests — one common closed contract across the four source classes',
   'PX0-AC-12': 'ruleset-source-tests: source/loaded/installed/mismatch/remote unavailable each typed distinctly',
-  'PX0-AC-13': 'ruleset-freshness-host.mjs selects the host transport correctly, but no suite exercises it and bootstrap does not wire it',
+  'PX0-AC-13': 'pipeline-start-preflight-tests + ruleset-freshness-tests (PHX-WP-PX0AC13-TESTS, 7dffa72e + DELTA-0811 2026-08-11 independent re-run): createWslHostAttestedSpawn/executionBoundary\'s WSL host-transport gate is now exercised end-to-end through the real call path -- 36/36 and 16/16 pass, exit 0 both. Code and tests are complete and green; partial only because no independent Critic PASS exists for this exact candidate (both prior Critic rounds on this surface FAILed)',
   'PX0-AC-14': 'ruleset-source-tests: private-coordinate-rejected, private-remote-rejected',
   'PX0-AC-15': 'ruleset-source-tests: private-classification-preserved, local-classification-preserved',
   'PX0-AC-16': 'bootstrap-source-attestation-acceptance-tests — equality bound to exact loaded and observed public remote identity',

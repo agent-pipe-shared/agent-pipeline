@@ -1,0 +1,15 @@
+{
+  "taskId": "PHX-WP-DELTA-PX0-0305-06-13",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "done",
+  "log": [
+    {"phase": "bootstrap", "note": "git status confirmed only known dirty file (pipeline-state.mjs uncommitted casOutcome fix). Proceeding to orientation."},
+    {"phase": "orientation", "note": "Read acceptance.md criterion text; read acceptance-evidence-map.mjs verdict/DELTA/POINTERS/CLOSURE conventions; read docs/state.md 2026-08-11 CHECKPOINT section; cross-checked git log a781bfa7..HEAD (26 commits) against pipeline-state.mjs source (buildAuthorityRevisionPlan, runAuthorityRevisionApplyCommand, runAuthorityRevisionRecoverCommand), git diff on the uncommitted casOutcome fix, and harness/scripts/pipeline-state.test.mjs (AR03/AR05/AR06 series)."},
+    {"phase": "measurement", "note": "PX0-AC-03: AR-DECISION-SCOPE axis now pinned (AR03h/i). PX0-AC-05/06: retracted prior CONFIRMED-ABSENT findings -- durable receipt retention (AR05a-f) and recovered-preimage outcome (AR06a-f) both exist and are tested. AC-06 real residual: false casOutcome:\"applied\" echoed on recovered-preimage path at HEAD (round-2 Critic F1), fix uncommitted, untested; plus F4 (.v1 legacy-journal test gap, confirmed zero coverage by direct grep). PX0-AC-13: code+tests confirmed complete and green. All four kept at verdict 'partial' per the hard constraint (no independent Critic PASS exists for the current candidate on any of them)."},
+    {"phase": "edit", "note": "Added DELTA-0811 tag layer (new block, appended after K-AC-05 entry, before closing brace) with all four verdicts set to 'partial'. Edited POINTERS in place for all four IDs (not layered -- flat map). Did NOT touch CLOSURE (renders only in --mode closure, a separate design-doc output outside this task's DoD scope; left as a deliberately-not-changed item)."},
+    {"phase": "verify", "note": "Ran the exact DoD verify command (bare, no --out): exit 0, no INTEGRITY FAILURE, totals 127 implemented / 24 partial / 1 designed-only / 4 not-started / 1 constraint / 157 total, all four target IDs show verdict 'partial' with tag DELTA-0811. Regenerated the dated deliverable via --out to specs/sprint-phoenix-epic/evidence/acceptance-evidence-map-20260811.md (53356 bytes, exit 0). Ran plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs (36/36 pass, exit implied by 'pass 36/fail 0'), ruleset-freshness.test.mjs (16/16 pass), harness/scripts/pipeline-state.test.mjs (468/468 cases passed, node --test summary pass 1/fail 0) -- all re-run twice across the session (before and after the coordinator's resume message) with identical results."},
+    {"phase": "commit", "note": "git add + git commit -- specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs specs/sprint-phoenix-epic/evidence/acceptance-evidence-map-20260811.md specs/sprint-phoenix-epic/evidence/dispatch-record.json, message via git commit -F against a scratch/ file, trailers Dispatch: PHX-WP-DELTA-PX0-0305-06-13 (goldfish) + AI-Assisted: true."}
+  ]
+}
