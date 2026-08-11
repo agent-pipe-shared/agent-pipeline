@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 1d02fbe09775e8000d5549571e0d72f9baf35afe — 2026-08-11, range 98509db7..1d02fbe0, Git-guard override consumption measurement finding for H-AC-12
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`1d02fbe0`), touching
+`evidence/acceptance-evidence-map.mjs` (H-AC-12 inline comment only; short
+evidence-table string unchanged, confirmed by regenerating and diffing —
+rendered output byte-identical, no new snapshot committed) and
+`design/class-b-multi-dispatch-plan.md`, both under `specs/sprint-phoenix-
+epic/`, neither manifest-tracked in `lifecycle.json`.
+
 ## Candidate 98509db7caa67d1d10a44a83a3dbd51b38721b4d — 2026-08-11, range ff4558f2..98509db7, correct the H-AC-12 handover entry in state.md
 
 - ADR-0012: checked, no change needed.
