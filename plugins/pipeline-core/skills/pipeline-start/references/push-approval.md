@@ -145,6 +145,21 @@ Two things to pass on to the human:
   variable — in that precedence. Recording it once in the machine plane removes
   the question permanently.
 
+**When none of those sources resolve a value, this is a stop-and-ask
+condition, never a guess.** `po-human-approval.mjs` itself already refuses
+cleanly on a genuinely missing directory — a clear error naming all three
+routes, not a silent default or invented path — but a session must not read
+that refusal as license to invent a value either, and must not reach the
+refusal at all before asking. The same as kickoff's goal/profile/language
+questions (`pipeline-start` SKILL.md's kickoff-intake section): ask the PO
+once, as a real question with context, before running the command — never
+infer, default, or reuse a path the PO did not type, and never retry with a
+different guessed path after a refusal. Ask, in substance: "Where should
+your PO signing key material live? This directory holds the private key
+that proves your approvals — it must live **outside** this repository (nothing
+in it is ever committed), and if it is lost, that key can no longer sign
+approvals and a new key/authority record has to be created instead."
+
 ### The two-step shape (superseded as a human step, still supported)
 
 ```
