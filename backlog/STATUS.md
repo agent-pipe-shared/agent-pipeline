@@ -92,6 +92,7 @@
 | pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | open | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | open | defect | pipeline | 2026-08-08 | — |
@@ -209,6 +210,6 @@
 
 ## Counts
 
-- open: 88
+- open: 89
 - in_progress: 22
 - closed: 91

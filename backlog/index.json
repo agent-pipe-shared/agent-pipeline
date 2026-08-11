@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "cebb80de1690b19e03b5a5fb196e1ba6cab8328cb07c859e67b6a3851a7a8861"
+    "transitionHead": "21b4ddb1124809509d60346ffdeefdef3d70187e40d9162b9abf670a29a8e2f0"
   },
   "counts": {
-    "open": 88,
+    "open": 89,
     "in_progress": 22,
     "closed": 91
   },
@@ -842,6 +842,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Third measured instance of this class; the first two were on the push path."
+    },
+    {
+      "id": "pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-12",
+      "source": "NVA-BL-67, 2026-08-12, surfaced while measuring an unrelated manifest-seed divergence (backlog/items/2026-08-08-two-manifest-literals-still-bypass-the-single-seed-owner.md). Explicitly flagged as unconfirmed, not asserted as a production defect."
     },
     {
       "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
