@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 4a2a5e7b406b10fcf359dfb01f1b8f1df0eed2d6 — 2026-08-12, range 1d11c7f2..4a2a5e7b, GMW window status evidence artifact captured
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`4a2a5e7b`), touching only
+`specs/sprint-phoenix-epic/evidence/gmw-tp5-px0ac05-window-status-20260812.json`
+(a new evidence artifact, force-added past the normal `evidence/`
+gitignore per this package's established convention). File placement
+matches the existing `evidence/` topology.
+
 ## Candidate 2b9cfdad5e2fb534d0a589916d2d2d1214c9c615 — 2026-08-12, range 1739d1c6..2b9cfdad, PX0-AC-05 Critic FAIL recorded, GMW window closed
 
 - ADR-0012: checked, no change needed.
