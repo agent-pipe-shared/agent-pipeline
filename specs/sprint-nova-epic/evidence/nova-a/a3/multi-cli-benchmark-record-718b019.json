@@ -1,0 +1,2671 @@
+{
+  "schema": "pipeline.multi-cli-benchmark.v1",
+  "benchmarkId": "nova-a8-4",
+  "scoringVersion": "nova-efficiency-v1",
+  "candidate": {
+    "commit": "718b019e0b30ea8744ef2582f9d2c91af5cfe59b",
+    "tree": "0b00c0368660e2114b9d171fe7a4b227d8953a29"
+  },
+  "fixture": [
+    {
+      "class": "mini",
+      "path": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/mini.json",
+      "fileSha256": "27acdfda8347616ffa0497a1c07c91f4f71ba6802c62e5263af9ac15f17425e7",
+      "seed": "mini-seed"
+    },
+    {
+      "class": "feature",
+      "path": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/feature.json",
+      "fileSha256": "d00670aa6ec9128e156f3972b38f2c25710fb481a09da825101ac80bceea1e53",
+      "seed": "feature-seed"
+    },
+    {
+      "class": "review",
+      "path": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/review.json",
+      "fileSha256": "82060c2e61ad1a97b1dc2a6f21f2feea180280ea8da8e4e19e3a0e72c55116ba",
+      "seed": "review-seed"
+    },
+    {
+      "class": "migration",
+      "path": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/migration.json",
+      "fileSha256": "609ea0e957134d14be84562025d808a7f3e386df916a9fe01ca28814f8da4cd3",
+      "seed": "migration-seed"
+    },
+    {
+      "class": "failure-recovery",
+      "path": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/failure-recovery.json",
+      "fileSha256": "a34d7f2c91888c47052af37271039d548462fce53e47cbb2327ad94cb644c6fe",
+      "seed": "failure-recovery-seed"
+    }
+  ],
+  "adapterReportSha256": "f6e29989a93252647c866cfef1d871801665feb381ad2f7efff36c9db4283b30",
+  "subjects": [
+    {
+      "route": "native",
+      "subjectSha256": "5abc7c14b3b3096c80f4da15588a6fdd5342f24af4fe3ceff01a9a371749e4dd",
+      "hostClass": "session-local"
+    },
+    {
+      "route": "serial",
+      "subjectSha256": "9e4cc49d45840d944aa416439c8c74a135f90d5c530d1f5be178a6bbc3662574",
+      "hostClass": "session-local"
+    }
+  ],
+  "resourceEnvelope": {
+    "hostClass": "session-local",
+    "bounds": [
+      {
+        "resource": "wallClockMs",
+        "unit": "ms",
+        "hardLimit": 300000
+      }
+    ]
+  },
+  "warmups": [
+    {
+      "taskClass": "mini",
+      "observation": {
+        "route": "serial",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 56,
+          "wallTime": null,
+          "rawSha256": "9af202ae543467182c3428ed47ffb68c29babaf4dc09b0ad2904c86d2af186d5"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 55,
+          "cpuMs": 3,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 0,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": null,
+            "output": null,
+            "unit": "unknown"
+          },
+          "interventions": 0
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 55
+          }
+        ],
+        "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    },
+    {
+      "taskClass": "feature",
+      "observation": {
+        "route": "serial",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 390,
+          "wallTime": null,
+          "rawSha256": "d54eff85ebe3448c1559f48766a1c353d4e038e54a1d3b88a465b7fb3a7de109"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 57,
+          "cpuMs": 2,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 0,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": null,
+            "output": null,
+            "unit": "unknown"
+          },
+          "interventions": 0
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 57
+          }
+        ],
+        "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    },
+    {
+      "taskClass": "review",
+      "observation": {
+        "route": "serial",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 762,
+          "wallTime": null,
+          "rawSha256": "cab4f4fbd187b93fa51801c594901ba9e99ed076b219a4fddca52d46d53e0932"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 50,
+          "cpuMs": 2,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 0,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": null,
+            "output": null,
+            "unit": "unknown"
+          },
+          "interventions": 0
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 50
+          }
+        ],
+        "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    },
+    {
+      "taskClass": "migration",
+      "observation": {
+        "route": "serial",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 1086,
+          "wallTime": null,
+          "rawSha256": "0af40a5610a9f4b558ed1a4a84daf070b31798235f6acdfce07638294d35e51a"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 50,
+          "cpuMs": 2,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 0,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": null,
+            "output": null,
+            "unit": "unknown"
+          },
+          "interventions": 0
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 50
+          }
+        ],
+        "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    },
+    {
+      "taskClass": "failure-recovery",
+      "observation": {
+        "route": "serial",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 1449,
+          "wallTime": null,
+          "rawSha256": "568f707c8f872ca0b9d6b1ff070da85dc3b72c61dbff28b0017e5d62f5417ca9"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 103,
+          "cpuMs": 5,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 51,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": null,
+            "output": null,
+            "unit": "unknown"
+          },
+          "interventions": 1
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 103
+          }
+        ],
+        "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    },
+    {
+      "taskClass": "mini",
+      "observation": {
+        "route": "native",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 12409,
+          "wallTime": null,
+          "rawSha256": "310cf8afd3905c817fd6c55deaaeb10eac9e27e0665e53e2e5cfeb67b708a07e"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 10464,
+          "cpuMs": 18,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 0,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": 18,
+            "output": 278,
+            "unit": "tokens"
+          },
+          "interventions": 0
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 10464
+          }
+        ],
+        "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    },
+    {
+      "taskClass": "feature",
+      "observation": {
+        "route": "native",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 80295,
+          "wallTime": null,
+          "rawSha256": "3cef810eae1393e5cd088ca25ab944eb403201573d46027892ab0e9c2c37914f"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 10928,
+          "cpuMs": 9,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 0,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": 18,
+            "output": 288,
+            "unit": "tokens"
+          },
+          "interventions": 0
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 10928
+          }
+        ],
+        "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    },
+    {
+      "taskClass": "review",
+      "observation": {
+        "route": "native",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 144850,
+          "wallTime": null,
+          "rawSha256": "0f96b94941aaa9f1fbdd123334b8c372c0ee89d932a75ed039a00478ed13fc7f"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 11849,
+          "cpuMs": 10,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 0,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": 18,
+            "output": 277,
+            "unit": "tokens"
+          },
+          "interventions": 0
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 11849
+          }
+        ],
+        "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    },
+    {
+      "taskClass": "migration",
+      "observation": {
+        "route": "native",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 203883,
+          "wallTime": null,
+          "rawSha256": "8a705d17dde1f2f972200bfc4ddfeb0edb843f6f71f2ae68b314b356d3ee494d"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 9031,
+          "cpuMs": 9,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 0,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": 18,
+            "output": 263,
+            "unit": "tokens"
+          },
+          "interventions": 0
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 9031
+          }
+        ],
+        "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    },
+    {
+      "taskClass": "failure-recovery",
+      "observation": {
+        "route": "native",
+        "repetition": 0,
+        "clock": {
+          "source": "monotonic",
+          "monotonicMs": 287403,
+          "wallTime": null,
+          "rawSha256": "caa6c7c2f28a4e1de65ef697186ed53318e205e88589239b960f9ff68be7d3bf"
+        },
+        "outcome": "succeeded",
+        "measures": {
+          "wallMs": 31294,
+          "cpuMs": 23,
+          "concurrency": 1,
+          "stages": {
+            "orchestrationMs": 0,
+            "workspaceMs": 0,
+            "verificationMs": 0,
+            "reviewMs": 0,
+            "retryMs": 21146,
+            "cleanupMs": 0
+          },
+          "usage": {
+            "input": 18,
+            "output": 324,
+            "unit": "tokens"
+          },
+          "interventions": 1
+        },
+        "resourceUse": [
+          {
+            "resource": "wallClockMs",
+            "unit": "ms",
+            "value": 31294
+          }
+        ],
+        "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+        "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+        "cleanupOk": true,
+        "authorityOk": true
+      }
+    }
+  ],
+  "repetitions": {
+    "warmupExcluded": 1,
+    "measured": 5
+  },
+  "observations": [
+    {
+      "taskClass": "mini",
+      "samples": [
+        {
+          "route": "serial",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 117,
+            "wallTime": null,
+            "rawSha256": "29cf637918ad2860d02fa55c44bb312d7d4cab6e1a5bcb26148be8132ba34632"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 58,
+            "cpuMs": 3,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 58
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 168,
+            "wallTime": null,
+            "rawSha256": "d30fd30bdc4028afb5282478b7da2871812ad0487b98f9f9485bbc7fde798595"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 51,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 51
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 219,
+            "wallTime": null,
+            "rawSha256": "e8c4cda0da10a81634475a478936a36bb9456c80f267b53973c8fcdee719fd12"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 51,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 51
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 272,
+            "wallTime": null,
+            "rawSha256": "c715bb94c25b0c7115b04c18f839c6c54015f3f9e5dff73a011c4cd4f0a6b6a5"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 52,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 52
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 331,
+            "wallTime": null,
+            "rawSha256": "a1df9175e74dfa58ae3f1d148b29ec8d090f2d79b2ed39e87859219d760ce34a"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 58,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 58
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    },
+    {
+      "taskClass": "feature",
+      "samples": [
+        {
+          "route": "serial",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 450,
+            "wallTime": null,
+            "rawSha256": "cc7ec2de227906717701285a8a75f5d8b229cf5bfb30c130177f6de4f46ca23e"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 60,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 60
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 519,
+            "wallTime": null,
+            "rawSha256": "f41c632a6bb5b0873b3f0f9f8b251155120f0f5e26aef604cbae664757389817"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 68,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 68
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 584,
+            "wallTime": null,
+            "rawSha256": "7027eeb31dd9654ca6895620164a8bd0ebda454fe9e14e5760414207315cebce"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 64,
+            "cpuMs": 3,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 64
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 650,
+            "wallTime": null,
+            "rawSha256": "3d85b4ff794fdd773de3bd64a951dfee6d8ff73ddea6d19b0968f694725a8e7f"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 65,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 65
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 711,
+            "wallTime": null,
+            "rawSha256": "e9af7e83ed31a133f35b0eb688a14cfffa3767e1ce061e0f586e54550e85bb27"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 61,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 61
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    },
+    {
+      "taskClass": "review",
+      "samples": [
+        {
+          "route": "serial",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 821,
+            "wallTime": null,
+            "rawSha256": "0fb51de2bf1595dbf4064b38fbbe3bb524be2f1e93fd5dc915fd2d90a4dcec57"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 58,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 58
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 876,
+            "wallTime": null,
+            "rawSha256": "aa55d8bb0ce77a8abd7e28016ed2aacdb904bd57db63a1d341150ca3d7d9134a"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 55,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 55
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 928,
+            "wallTime": null,
+            "rawSha256": "3b5b01b976f39da44dc863772ae707d2493c7291d75c0b759969652229f14efc"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 52,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 52
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 980,
+            "wallTime": null,
+            "rawSha256": "c07ce2a4196092f1b57830976e4ea3772740b0bd33fb020b1a12e12376f14b92"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 51,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 51
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1036,
+            "wallTime": null,
+            "rawSha256": "f3f1d38ddb844151be68d61b891cf2030c5f93e8e67383cee7c60d1daf48311a"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 55,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 55
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    },
+    {
+      "taskClass": "migration",
+      "samples": [
+        {
+          "route": "serial",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1139,
+            "wallTime": null,
+            "rawSha256": "267e521a11546f8f36257d67ec55d18ccf4e9423b918fe592178f0d42a5799e3"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 53,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 53
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1192,
+            "wallTime": null,
+            "rawSha256": "038b37950976ad6cae779d697ead82711ca4a2395646141fbfba8bcff481b3bb"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 52,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 52
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1244,
+            "wallTime": null,
+            "rawSha256": "c894c19f9995d8f14d271957df4645f45fe61e3235f86745d4a3c19737844c17"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 51,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 51
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1294,
+            "wallTime": null,
+            "rawSha256": "b103bc3362e637d656a8fd5fca15dfb9700a017336aa6cb46cbe6b24d9a414e5"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 50,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 50
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1345,
+            "wallTime": null,
+            "rawSha256": "06efc939930f9738935693988cd0171f6fe5ab352c7aeb5dc07b9da8f55f9bde"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 50,
+            "cpuMs": 2,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 50
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    },
+    {
+      "taskClass": "failure-recovery",
+      "samples": [
+        {
+          "route": "serial",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1548,
+            "wallTime": null,
+            "rawSha256": "534da055ab51b55581c26e6de7d608234f978ef3b697298810534afd1c475b77"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 98,
+            "cpuMs": 10,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 50,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 98
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1648,
+            "wallTime": null,
+            "rawSha256": "5e16570807a36b16e3825bed7277ae00563dc0d0b294f4f484b4d960a9febbc7"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 99,
+            "cpuMs": 4,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 51,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 99
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1747,
+            "wallTime": null,
+            "rawSha256": "72ae9d20b9bdb67f114a6d01bc3ad0acb0c071e3e3dfbbf9946befbbf7af8f2d"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 99,
+            "cpuMs": 4,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 51,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 99
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1842,
+            "wallTime": null,
+            "rawSha256": "c74fb4686d5d84591f23cd9e949f21b7f8d7df696d2ccf24e75e6a1a361fb385"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 95,
+            "cpuMs": 4,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 47,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 95
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "serial",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 1945,
+            "wallTime": null,
+            "rawSha256": "74e8240a8315cac358795c35cff4800e71434157419da879d761f94cb92cb93f"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 102,
+            "cpuMs": 4,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 50,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": null,
+              "output": null,
+              "unit": "unknown"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 102
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    },
+    {
+      "taskClass": "mini",
+      "samples": [
+        {
+          "route": "native",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 26909,
+            "wallTime": null,
+            "rawSha256": "92dd8819c0371d8d8a425306a4251aff8faa04f229f62c86988b050695a0b786"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 14499,
+            "cpuMs": 9,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 220,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 14499
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 38283,
+            "wallTime": null,
+            "rawSha256": "d08b2874a7c1785a4358dfbbc7ee62fcbfaec85c5ba04e7e415d05fa469125e8"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 11373,
+            "cpuMs": 10,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 291,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 11373
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 49196,
+            "wallTime": null,
+            "rawSha256": "07da7f25d0f968c5e9260a54d2c35d0387f1bc3b48f8afc1c28d18a521591f0f"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 10913,
+            "cpuMs": 10,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 293,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 10913
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 58955,
+            "wallTime": null,
+            "rawSha256": "a226bfa3da616edd84636ad007b4a497febd58ce9717b4a6bee50efddc8acdcf"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 9758,
+            "cpuMs": 10,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 265,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 9758
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 69366,
+            "wallTime": null,
+            "rawSha256": "c6110aa101a9cc0e55167b3bc8d93c7db33f687daf7ede5301e804f4567b6fc0"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 10410,
+            "cpuMs": 8,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 301,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 10410
+            }
+          ],
+          "correctnessSha256": "9e90409c9f7cf53eba6f4742722b5f67e1b061a510fbb26a8f8a9c6a284226fd",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    },
+    {
+      "taskClass": "feature",
+      "samples": [
+        {
+          "route": "native",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 89821,
+            "wallTime": null,
+            "rawSha256": "a470f616f70388df677edccf61c704aa365b443ea8e691741bad2b9fa3d9c02f"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 9526,
+            "cpuMs": 9,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 265,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 9526
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 100962,
+            "wallTime": null,
+            "rawSha256": "359671ad5d6e42f0c824a2d99929c85dede985d022968df5dec9e228dc0643c2"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 11140,
+            "cpuMs": 13,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 289,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 11140
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 112565,
+            "wallTime": null,
+            "rawSha256": "5e4691bbaf5084605b1fac33108f13f41bc7e99a2368db778f0cc8958ed236e5"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 11602,
+            "cpuMs": 9,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 276,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 11602
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 123126,
+            "wallTime": null,
+            "rawSha256": "8eb5eda11c1f9fba663780a1364dd3e25b95a5f30f4389c5d44075471f69ca43"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 10561,
+            "cpuMs": 8,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 284,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 10561
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 133000,
+            "wallTime": null,
+            "rawSha256": "365c308fc7def4e920a90540915d3e10270dbb0bfcb66efb90430c01b4f6f179"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 9873,
+            "cpuMs": 6,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 261,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 9873
+            }
+          ],
+          "correctnessSha256": "99e6bea50877313eb7f06b574c1cd07e2c037c4dc08068ffcf0efb891a162490",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    },
+    {
+      "taskClass": "review",
+      "samples": [
+        {
+          "route": "native",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 155706,
+            "wallTime": null,
+            "rawSha256": "e06f06d4680905c8b3b87a0cf91e6d485c611b64f442fed2f0d4a67d7ddb442d"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 10855,
+            "cpuMs": 11,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 289,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 10855
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 165947,
+            "wallTime": null,
+            "rawSha256": "db90a0129da0227126f5e4ee8c1f7a4371c3cd7c6622311066049efad105036e"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 10240,
+            "cpuMs": 7,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 231,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 10240
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 175225,
+            "wallTime": null,
+            "rawSha256": "5c22a3229602eb59bfac38f3d4ab171b325d533cc214d214c923f07a3b1755e6"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 9277,
+            "cpuMs": 7,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 225,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 9277
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 184769,
+            "wallTime": null,
+            "rawSha256": "2779a635e9335346748ca09596e960be9a17c277528fbb6cc385e1d6cdaf9f0f"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 9544,
+            "cpuMs": 7,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 260,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 9544
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 194851,
+            "wallTime": null,
+            "rawSha256": "b2399c8cafc7a476631d4e8f0bd21cec9e6ba84d082dd8fb33a3b47f79ba1cad"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 10081,
+            "cpuMs": 7,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 212,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 10081
+            }
+          ],
+          "correctnessSha256": "1c7ca896b9267d3fc88ca7cfed96c5d7143f04265ce54201c14d670ea0934b4d",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    },
+    {
+      "taskClass": "migration",
+      "samples": [
+        {
+          "route": "native",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 216013,
+            "wallTime": null,
+            "rawSha256": "c7b46a6dbf17db0b8f26ed79de2a27563c1aca0c43e8f066bef4981c4eaed285"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 12129,
+            "cpuMs": 9,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 278,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 12129
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 226031,
+            "wallTime": null,
+            "rawSha256": "9f0fbcb2528dd1a683a99bb039c116ab2d655eeb7712dec1d023217e150d7df0"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 10018,
+            "cpuMs": 9,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 219,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 10018
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 235911,
+            "wallTime": null,
+            "rawSha256": "4750f4e61184e07e240697fde3495305cbd00cf744bf6da29a454211dbcb29bf"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 9879,
+            "cpuMs": 12,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 277,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 9879
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 246229,
+            "wallTime": null,
+            "rawSha256": "25626e7f23803cd72deb2f79b4e4811b904666b8be268cf427ce2287ccaba480"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 10318,
+            "cpuMs": 7,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 297,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 10318
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 256108,
+            "wallTime": null,
+            "rawSha256": "d6f87e5cf4b85392f45c92f2e7393d81d5b84464001709d316e7c56c4859431a"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 9878,
+            "cpuMs": 6,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 0,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 266,
+              "unit": "tokens"
+            },
+            "interventions": 0
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 9878
+            }
+          ],
+          "correctnessSha256": "da67adb8491f96870523bc7ec244dc61086dc3945cdec851720b67f7f1971e5c",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    },
+    {
+      "taskClass": "failure-recovery",
+      "samples": [
+        {
+          "route": "native",
+          "repetition": 1,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 317593,
+            "wallTime": null,
+            "rawSha256": "d4e95c29fd65f13182b7f3a285e4c0cc2ea13dabffeb9be353278d70e942df3e"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 30189,
+            "cpuMs": 21,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 20337,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 244,
+              "unit": "tokens"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 30189
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 2,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 352143,
+            "wallTime": null,
+            "rawSha256": "9936b47b1c47de57ed0b1f6aa9c592435b0a84ba8a27e72585debb1c6abf7769"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 34549,
+            "cpuMs": 22,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 22234,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 304,
+              "unit": "tokens"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 34549
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 3,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 382941,
+            "wallTime": null,
+            "rawSha256": "fc5f48149b4d56975be07266f3b4a5de286e0bfb696f806307398bfe0e0f0282"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 30797,
+            "cpuMs": 21,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 20985,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 319,
+              "unit": "tokens"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 30797
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 4,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 415411,
+            "wallTime": null,
+            "rawSha256": "1babdb79ae1705c2cb401a4da7b7396d3365ef32564d6a47d781602147c53059"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 32470,
+            "cpuMs": 21,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 22061,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 291,
+              "unit": "tokens"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 32470
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        },
+        {
+          "route": "native",
+          "repetition": 5,
+          "clock": {
+            "source": "monotonic",
+            "monotonicMs": 446380,
+            "wallTime": null,
+            "rawSha256": "50ad5b2670dc8bf2e2b2208c69c4e79f6e222c646fc11828c3000a6386ff7500"
+          },
+          "outcome": "succeeded",
+          "measures": {
+            "wallMs": 30968,
+            "cpuMs": 21,
+            "concurrency": 1,
+            "stages": {
+              "orchestrationMs": 0,
+              "workspaceMs": 0,
+              "verificationMs": 0,
+              "reviewMs": 0,
+              "retryMs": 21132,
+              "cleanupMs": 0
+            },
+            "usage": {
+              "input": 18,
+              "output": 220,
+              "unit": "tokens"
+            },
+            "interventions": 1
+          },
+          "resourceUse": [
+            {
+              "resource": "wallClockMs",
+              "unit": "ms",
+              "value": 30968
+            }
+          ],
+          "correctnessSha256": "004ea82dc53caf3c01dbf0bf2ae817dc203da9ce3b95767e49db699e976a4c9a",
+          "evidenceSha256": "dd8c7ec8d628df80899fd581af41a1a62c9a6c9c615eb8777bdff53626258a74",
+          "cleanupOk": true,
+          "authorityOk": true
+        }
+      ]
+    }
+  ],
+  "score": [
+    {
+      "taskClass": "mini",
+      "medianWallMs": 10913,
+      "p95WallMs": 14499,
+      "classImprovementPct": -20886.53846153846,
+      "classRegressionPct": 20886.53846153846,
+      "correctnessEqual": true,
+      "resourceWithinEnvelope": true,
+      "interventionsDelta": 0,
+      "usageKnown": false
+    },
+    {
+      "taskClass": "feature",
+      "medianWallMs": 10561,
+      "p95WallMs": 11602,
+      "classImprovementPct": -16401.5625,
+      "classRegressionPct": 16401.5625,
+      "correctnessEqual": true,
+      "resourceWithinEnvelope": true,
+      "interventionsDelta": 0,
+      "usageKnown": false
+    },
+    {
+      "taskClass": "review",
+      "medianWallMs": 10081,
+      "p95WallMs": 10855,
+      "classImprovementPct": -18229.090909090908,
+      "classRegressionPct": 18229.090909090908,
+      "correctnessEqual": true,
+      "resourceWithinEnvelope": true,
+      "interventionsDelta": 0,
+      "usageKnown": false
+    },
+    {
+      "taskClass": "migration",
+      "medianWallMs": 10018,
+      "p95WallMs": 12129,
+      "classImprovementPct": -19543.13725490196,
+      "classRegressionPct": 19543.13725490196,
+      "correctnessEqual": true,
+      "resourceWithinEnvelope": true,
+      "interventionsDelta": 0,
+      "usageKnown": false
+    },
+    {
+      "taskClass": "failure-recovery",
+      "medianWallMs": 30968,
+      "p95WallMs": 34549,
+      "classImprovementPct": -31180.808080808085,
+      "classRegressionPct": 31180.808080808085,
+      "correctnessEqual": true,
+      "resourceWithinEnvelope": true,
+      "interventionsDelta": 0,
+      "usageKnown": false
+    }
+  ],
+  "recommendation": "no-recommendation",
+  "recordSha256": "5f85a27a672fc50e8310fa2e64eec6260e101b97c33892de1ff24199df3dac60"
+}

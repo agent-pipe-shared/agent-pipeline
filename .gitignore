@@ -57,3 +57,8 @@ project/resume-hint.json
 # guardrails/git.md keeps committed as the durable audit trail (so negate it here).
 *.jsonl
 !.claude/guard-override.log.jsonl
+
+# NVA-A8 benchmark workload runtime output: each fixed workload's task.mjs
+# overwrites this on every run (nova-a8-benchmark-runner.mjs); regenerated,
+# never a deliverable.
+plugins/pipeline-core/scripts/fixtures/nova-benchmark/workloads/*/result.txt
