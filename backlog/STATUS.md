@@ -20,6 +20,7 @@
 | pipeline.anchor-check-passes-on-wrong-language-content | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.approval-mechanisms-require-out-of-session-po-acts | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.attestation-git-presence-gate-not-gs8-protected | in_progress | defect | pipeline | 2026-08-07 | — |
+| pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.authority-signing-terminal-contract | open | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
@@ -145,6 +146,6 @@
 
 ## Counts
 
-- open: 86
+- open: 87
 - in_progress: 26
 - closed: 25

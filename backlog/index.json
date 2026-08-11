@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f7153fd182015baadeffa70e91d3e3abf9bdc1240813489d0468804357ba1360"
+    "transitionHead": "8cac8077ccbcd8bdca9b00a6a978316a1b2a1bb27d501e01fcc74304be042b47"
   },
   "counts": {
-    "open": 86,
+    "open": 87,
     "in_progress": 26,
     "closed": 25
   },
@@ -139,6 +139,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Critic finding F-B, delta re-review of the F2 implementation fix (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md); recorded via the WP2-WP3-partA-rework-2 dispatch (which also fixed F-A/F-C/F-D from the same review)."
+    },
+    {
+      "id": "pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-11",
+      "source": "Recorded in docs/state.md as F5/F6 (minor) findings from the PX0-AC-05 authority-revision receipt review chain: real, tracked, not yet fixed at the time of that checkpoint, but left without an owner or due date in the handover prose itself. Filed as a proper owned, dated backlog item per QG-06 (a known gap with no due date is a finding, not a mitigation), without altering the docs/state.md checkpoint narrative."
     },
     {
       "id": "pipeline.authority-signing-terminal-contract",
