@@ -103,6 +103,7 @@ import {
 import { dirname, isAbsolute, join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { CRITICAL_HUMAN_PROOF_POLICY_PATH } from "../lib/critical-human-proof-policy.mjs";
 import {
   AUTHORITY_ARTIFACTS,
   LEGACY_MANIFEST,
@@ -140,6 +141,15 @@ const RESET_JOURNAL_SCHEMA = "pipeline.project-reset-journal.v1";
 
 const AUTHORITY_KINDS = Object.freeze(["manifest", "state", "calibration", "guardConfig", "guardAudit"]);
 const DEFAULT_HANDOVER_PATH = "docs/state.md";
+
+// The push-threat-model document, like `docs/state.md` above, is a fixed
+// single path the Pipeline seeds -- never tier-resolved, so it does not
+// belong in AUTHORITY_ARTIFACTS/AUTHORITY_KINDS. `pipeline-state.mjs`
+// (PUSH_THREAT_MODEL_DEFAULT_PATH) is not imported here for the same
+// reason DEFAULT_HANDOVER_PATH above is a local literal, not an import:
+// this module stays read-only-plan-scoped and does not pull in the writer
+// script's full side-effect surface for one path string.
+const PUSH_THREAT_MODEL_PATH = "project/push-threat-model.md";
 
 // Fixed regardless of project shape: the reset never enters these categories
 // at all, so the command states them rather than an agent guessing them.
@@ -347,6 +357,29 @@ export function planProjectReset({ rootDir } = {}) {
     } catch { /* malformed calibration: fall back to the documented default */ }
   }
   remove.push({ path: handoverPath, kind: "handover", type: "file", existed: existsSync(join(root, handoverPath)) });
+
+  // The critical-human-proof policy and push-threat-model documents are
+  // fixed, project-owned files the Pipeline materializes wholesale at
+  // onboarding -- never tier-resolved, unlike AUTHORITY_KINDS above -- so
+  // they are named individually here, the same "remove what was seeded,
+  // never a container" rule as `handover` above. Classified under the
+  // EXISTING `runtimeSeededFile` kind rather than a new one: like the
+  // `.codex/agents/*.toml` files that kind already covers, the whole file
+  // is Pipeline-materialized content, never a keys-level patch onto a
+  // project-owned document (see WHOLE_FILE_SEED_PROJECTIONS above).
+  // (backlog/items/2026-08-09-project-reset-does-not-classify-the-proof-policy-artifact.md)
+  remove.push({
+    path: CRITICAL_HUMAN_PROOF_POLICY_PATH,
+    kind: "runtimeSeededFile",
+    type: "file",
+    existed: existsSync(join(root, CRITICAL_HUMAN_PROOF_POLICY_PATH)),
+  });
+  remove.push({
+    path: PUSH_THREAT_MODEL_PATH,
+    kind: "runtimeSeededFile",
+    type: "file",
+    existed: existsSync(join(root, PUSH_THREAT_MODEL_PATH)),
+  });
 
   // Private Pipeline state (`.git/agent-pipeline/`) is a directory the
   // Pipeline creates wholesale -- the one case where a directory, not a

@@ -205,6 +205,30 @@ test("AC-2: a configured calibration.handover is removed; the default docs/state
   });
 });
 
+test("NVA-BL-64: project/critical-human-proof.json and project/push-threat-model.md are classified and actually removed by apply", () => {
+  withFixture(kickoffFixture("proof-policy-artifacts", { tier: "neutral" }), (root) => {
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "critical-human-proof.json"), "{}\n");
+    writeFileSync(join(root, "project", "push-threat-model.md"), "# Fixture push threat model\n");
+    const plan = planProjectReset({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    const proofEntry = plan.remove.find((entry) => entry.path === "project/critical-human-proof.json");
+    assert.ok(proofEntry, "expected project/critical-human-proof.json to be classified in remove");
+    assert.equal(proofEntry.kind, "runtimeSeededFile");
+    assert.equal(proofEntry.type, "file");
+    assert.equal(proofEntry.existed, true);
+    const threatModelEntry = plan.remove.find((entry) => entry.path === "project/push-threat-model.md");
+    assert.ok(threatModelEntry, "expected project/push-threat-model.md to be classified in remove");
+    assert.equal(threatModelEntry.kind, "runtimeSeededFile");
+    assert.equal(threatModelEntry.type, "file");
+    assert.equal(threatModelEntry.existed, true);
+    const result = applyProjectReset({ rootDir: root, expectedPlanSha256: plan.planSha256 });
+    assert.equal(result.status, "applied");
+    assert.equal(existsSync(join(root, "project", "critical-human-proof.json")), false, "expected the proof policy to be gone after apply");
+    assert.equal(existsSync(join(root, "project", "push-threat-model.md")), false, "expected the push threat model to be gone after apply");
+  });
+});
+
 test("AC-3: remove never contains a directory the Pipeline merely writes into, only the seeded file or a Pipeline-created anchor", () => {
   // R3: `kickoffFixture` seeds a genuine, UNPROMOTED kickoff anchor, so
   // `specs/kickoff-<hash>` is now legitimately a `remove` entry -- the exact
