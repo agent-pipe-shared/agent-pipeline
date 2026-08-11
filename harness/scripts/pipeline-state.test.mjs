@@ -14,7 +14,7 @@
  */
 import { chmodSync, fsyncSync, linkSync, lstatSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync, symlinkSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -4002,6 +4002,90 @@ function runAuthorityRevisionTests() {
     && !!report.receipt && report.receipt.casOutcome === "stale", recovered.out || recovered.err);
   ok("AR06g-2 State remains byte-identical to the preimage -- the postimage was NOT written",
     stateBytes(fx.dir).equals(preBytes), "state mutated despite an expired recovery window");
+}
+{
+  // AR06h -- PX0-AC-06/F2 legacy `.v1` journal regression (PHX-WP-PX0-V1JOURNAL-TESTS): a
+  // journal predating `expiresAt` (the 8-key shape: schema/intentSha256/planSha256/
+  // preStateSha256/postStateSha256/postStateBase64/receipt/mac -- no expiresAt) must still
+  // LOAD and complete recovery. loadAuthorityRevisionJournal maps it to the in-memory
+  // `expiresAt: null` sentinel, which runAuthorityRevisionRecoverCommand treats as "always
+  // still valid, never taking the expired-preimage branch" -- preserving the OLD
+  // unconditional-roll-forward behavior for this one legacy shape only. Built by
+  // interrupting apply after journal publication (the AR06b/AR06f pattern) to get a
+  // genuine `.v2` journal + on-disk 32-byte HMAC key, then hand-rewriting the persisted
+  // journal into the `.v1` shape using that SAME key, re-MACed correctly so the loader's
+  // MAC check still verifies.
+  const { fx, plan, request } = preparedRevision("ar06h-v1-journal-loads");
+  const preBytes = stateBytes(fx.dir);
+  const interrupted = arApplyCmd(fx, request.name, request.sha256, "ar-lock-001", authorityDeps(fx.dir, { afterAuthorityRevisionJournal: () => false }));
+  ok("AR06h-setup1 apply interrupted after journal publication, State still exactly the preimage",
+    interrupted.value === 2 && stateBytes(fx.dir).equals(preBytes), interrupted.err);
+  const journalBase = join(fx.dir, ".fake-git-common", "agent-pipeline", "continuity-authority-revision");
+  const journalPath = join(journalBase, "journal");
+  const keyPath = join(journalBase, "key");
+  const v2 = JSON.parse(readFileSync(journalPath, "utf8"));
+  ok("AR06h-setup2 the genuine interrupted journal is v2-shaped with a frozen expiresAt (setup sanity)",
+    v2.schema === "pipeline.continuity-authority-revision-journal.v2" && typeof v2.expiresAt === "string", JSON.stringify(v2));
+  const key = readFileSync(keyPath);
+  ok("AR06h-setup3 the on-disk HMAC key is the expected 32 bytes", key.byteLength === 32, String(key.byteLength));
+  const v1Core = {
+    schema: "pipeline.continuity-authority-revision-journal.v1",
+    intentSha256: v2.intentSha256,
+    planSha256: v2.planSha256,
+    preStateSha256: v2.preStateSha256,
+    postStateSha256: v2.postStateSha256,
+    postStateBase64: v2.postStateBase64,
+    receipt: v2.receipt,
+  };
+  const v1Mac = createHmac("sha256", key).update(JSON.stringify(v1Core)).digest("hex");
+  writeFileSync(journalPath, `${JSON.stringify({ ...v1Core, mac: v1Mac })}\n`);
+  chmodSync(journalPath, 0o600);
+  const recovered = arRecoverCmd(fx);
+  const report = JSON.parse(recovered.out || "{}");
+  ok("AR06h PX0-AC-06/F2: a .v1-shaped legacy journal loads via the expiresAt:null sentinel and completes recovery to the postimage",
+    recovered.value === 0 && report.status === "recovered-postimage" && report.retained === false && report.mutated === true, recovered.out || recovered.err);
+  const persisted = JSON.parse(stateBytes(fx.dir).toString("utf8"));
+  ok("AR06h-2 the persisted State carries exactly the planned postimage authority", persisted.continuity.revision === 1
+    && JSON.stringify(persisted.continuity.authority.prd) === JSON.stringify(plan.postimage.authority.prd), JSON.stringify(persisted.continuity.authority));
+  const again = arRecoverCmd(fx);
+  ok("AR06h-3 a second recover afterwards reports clean (journal retired)", JSON.parse(again.out || "{}").status === "clean", again.out);
+}
+{
+  // AR06i -- fails-closed contrast to AR06h (PHX-WP-PX0-V1JOURNAL-TESTS): a journal shaped
+  // like NEITHER a valid `.v1` NOR a valid `.v2` record (missing `receipt` entirely -- 7
+  // keys instead of either shape's 8/9) must still refuse with the existing AR-JOURNAL
+  // error, proving the loader doesn't silently accept an under-shaped legacy-looking
+  // document just because its `schema` string matches `.v1`. Same interrupted-apply setup
+  // as AR06h, reusing the same genuine on-disk key.
+  const { fx, request } = preparedRevision("ar06i-malshaped-journal-fails-closed");
+  const preBytes = stateBytes(fx.dir);
+  const interrupted = arApplyCmd(fx, request.name, request.sha256, "ar-lock-001", authorityDeps(fx.dir, { afterAuthorityRevisionJournal: () => false }));
+  ok("AR06i-setup1 apply interrupted after journal publication, State still exactly the preimage",
+    interrupted.value === 2 && stateBytes(fx.dir).equals(preBytes), interrupted.err);
+  const journalBase = join(fx.dir, ".fake-git-common", "agent-pipeline", "continuity-authority-revision");
+  const journalPath = join(journalBase, "journal");
+  const keyPath = join(journalBase, "key");
+  const v2 = JSON.parse(readFileSync(journalPath, "utf8"));
+  const key = readFileSync(keyPath);
+  const malformedCore = {
+    schema: "pipeline.continuity-authority-revision-journal.v1",
+    intentSha256: v2.intentSha256,
+    planSha256: v2.planSha256,
+    preStateSha256: v2.preStateSha256,
+    postStateSha256: v2.postStateSha256,
+    postStateBase64: v2.postStateBase64,
+    // `receipt` deliberately omitted -- this is the point of the case: neither the .v1
+    // nor the .v2 key set is satisfied, so exactObjectKeys must refuse before anything
+    // downstream ever inspects a (missing) receipt.
+  };
+  const malformedMac = createHmac("sha256", key).update(JSON.stringify(malformedCore)).digest("hex");
+  writeFileSync(journalPath, `${JSON.stringify({ ...malformedCore, mac: malformedMac })}\n`);
+  chmodSync(journalPath, 0o600);
+  const recovered = arRecoverCmd(fx);
+  ok("AR06i a journal shaped like neither valid .v1 nor .v2 (missing receipt) fails closed with AR-JOURNAL, not silently accepted",
+    recovered.value === 2 && /AR-JOURNAL/.test(recovered.err) && /manual repository inspection is required/.test(recovered.err), recovered.err);
+  ok("AR06i-2 State remains byte-identical to the preimage -- zero mutation on the malformed-journal refusal",
+    stateBytes(fx.dir).equals(preBytes), "state mutated despite a malformed journal");
 }
 
 // ---- PX0-AC-07: exact replay is a verified zero-write success; a conflicting replay / second writer fails closed ----
