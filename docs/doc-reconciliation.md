@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate d276cdf1e681827d289ec06d62ba49b919fa0e31 — 2026-08-11, range 022718b0..d276cdf1, PX0-AC-05 security fix + fix-landing note
+
+- ADR-0045: checked, no change needed.
+
+Covers two commits (`022718b0`, `d276cdf1`): `022718b0` touches
+`plugins/pipeline-core/lib/authority-revision-proof.mjs` and its own test
+file, neither carrying a `Governs:` line; `d276cdf1` touches only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`'s
+`PX0-AC-05` note (fix-landing update, no status/count change).
+
 ## Candidate 451196b9c17cc3b869f992c6768654333a0ae085 — 2026-08-11, range 80887ecd..451196b9, PX0 Critic verdict checkpoint + PX0-AC-05 fix dispatch
 
 - ADR-0012: checked, no change needed.
