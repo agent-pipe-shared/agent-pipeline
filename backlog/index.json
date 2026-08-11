@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1b53a137923de33882092b57234c360822bdaac40de1fff563ef3c610a6b7f4f"
+    "transitionHead": "64377d7bc0e66f8d294bb08dadbe14786dd51a5b28c55cacbf9af637275c6d7e"
   },
   "counts": {
-    "open": 90,
+    "open": 92,
     "in_progress": 22,
     "closed": 87
   },
@@ -606,6 +606,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.four-critic-preimage-pins-drifted-or-never-valid",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-12",
+      "source": "NVA-BL-42-FIX dispatch, 2026-08-12, while fixing the single stale critic.md pin this item's sibling (NVA-BL-42) named. The fix measured all 9 pins against their baseline-creation commit and found 5 non-matching, not the 1 originally believed."
     },
     {
       "id": "pipeline.fresh-repo-onboarding-never-asks-for-git-identity",
@@ -1659,6 +1667,14 @@
       "closureRepository": "self",
       "closureCommit": "256033ebdc80ae5055e3fdfe96a8492d18a34c04",
       "closureEvidence": "backlog/evidence/2026-08-11-po-keydir-01-landed.md"
+    },
+    {
+      "id": "pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-12",
+      "source": "Independently reported by three separate goldfish dispatches (NVA-BL-40-FIX, NVA-BL-42-FIX, NVA-BL-64) in one wave, 2026-08-12, each hitting the same shared-single-slot evidence artifact while running their own closing `verify.mjs`."
     },
     {
       "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",

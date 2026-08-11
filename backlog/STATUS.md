@@ -69,6 +69,7 @@
 | pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.four-critic-preimage-pins-drifted-or-never-valid | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.git-appears-despite-initializes-git-false | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | open | defect | pipeline | 2026-08-10 | — |
@@ -174,6 +175,7 @@
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.setup-promises-a-human-name-repair-it-cannot-perform | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof | closed | defect | pipeline | 2026-08-11 | — |
+| pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.shipped-artifacts-assume-the-pipelines-own-repository | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | open | defect | pipeline | 2026-08-08 | — |
@@ -207,6 +209,6 @@
 
 ## Counts
 
-- open: 90
+- open: 92
 - in_progress: 22
 - closed: 87
