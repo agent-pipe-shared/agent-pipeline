@@ -121,7 +121,6 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath) {
     if (artifact.class === "threat-model" && (artifact.authority || artifact.mutability !== "immutable")) findings.push(`${label}: threat-model evidence is immutable non-authority evidence`);
     classes.set(artifact.class, [...(classes.get(artifact.class) ?? []), artifact]);
   }
-  for (const paths of packageFiles.values()) for (const path of paths) if (path !== manifest && !seen.has(path)) findings.push(`FTP-ORPHANED: ${path} is not referenced by any artifact entry`);
   const required = value?.state === "draft" ? ["prd"] : ACTIVE_STATES.has(value?.state) ? ["prd", "spec", "acceptance", "result", "candidate-evidence"] : [];
   for (const kind of required) if ((classes.get(kind) ?? []).length === 0) findings.push(`FTP-REQUIRED: ${kind} is required for ${value?.state}`);
   if (ACTIVE_STATES.has(value?.state)) for (const kind of ["prd", "spec"]) {
