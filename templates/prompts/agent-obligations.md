@@ -165,9 +165,12 @@ deliberately carries no static copy of that; a second copy is the drift.
     judgment-light work with no dispatch behind it and therefore no record to
     bind. Stage-0 work is legitimate; the trailer exists so it stops being
     indistinguishable from unattributed work.
-  A commit with neither form is unbound to any evidence, and
-  `plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs` reports it
-  `UNVERIFIABLE`, never a pass. Declaring costs one line; silence does not buy one.
+  A commit with neither form is unbound to any evidence, and the
+  `dispatch-authorship-verify` tool shipped with this plugin
+  (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the
+  bootstrap prints — it is NOT a path relative to a consumer project root)
+  reports it `UNVERIFIABLE`, never a pass. Declaring costs one line; silence
+  does not buy one.
 - Commit as soon as a piece is green, not at the very end. A commit that exists
   survives a truncated run; a commit that is only planned does not.
 

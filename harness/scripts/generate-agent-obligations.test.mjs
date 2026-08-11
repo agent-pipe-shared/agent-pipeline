@@ -48,6 +48,21 @@ test("AC-2: the committed document is byte-identical to a fresh generation", () 
   );
 });
 
+test("AC-2b: the vendored plugin copy is byte-identical to the canonical document", () => {
+  // The allowlist entry in check-consumer-safe-paths.mjs justifies shipping this file
+  // by asserting the copy is byte-identical. That claim went false unnoticed once (the
+  // canonical file was regenerated, the vendored copy was not), so the claim is now a
+  // test rather than a comment. Scoped to this one file on purpose: it is the only
+  // vendored prompt whose canonical side is machine-generated.
+  const canonical = readFileSync(OBLIGATIONS_PATH, "utf8");
+  const vendored = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "templates", "prompts", "agent-obligations.md"), "utf8");
+  assert.equal(
+    vendored,
+    canonical,
+    "plugins/pipeline-core/templates/prompts/agent-obligations.md has drifted -- re-copy templates/prompts/agent-obligations.md over it after regenerating",
+  );
+});
+
 test("AC-3 (drift): a protected path added at the source changes the generated document", () => {
   const root = tempRootWithGuardConfig((config) => {
     config.protectedTestPaths.push({

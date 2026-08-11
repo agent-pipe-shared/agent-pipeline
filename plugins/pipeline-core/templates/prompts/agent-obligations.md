@@ -152,7 +152,25 @@ deliberately carries no static copy of that; a second copy is the drift.
   files ride along on your commit.
 - Commit messages carry **no** provider or model co-author trailers, **no**
   session URLs, **no** correlation identifiers (GIT-03; there is no override).
-  Only `Dispatch: <TASK_ID> (goldfish)` and `AI-Assisted: true`.
+  Only `AI-Assisted: true`, plus exactly one `Dispatch:` trailer saying who did
+  the work. There are two legitimate forms, and they are not interchangeable:
+  - `Dispatch: <TASK_ID> (goldfish)` — a dispatched fresh-context run. This is a
+    claim about a *specific* dispatch, so it has to survive being checked against
+    one: `evidence/dispatch-record-<TASK_ID>.json` must exist, its `outcome` must
+    be terminal rather than `in-progress`, and its `report.changedFiles` must
+    cover the paths the commit touches. Never borrow an ID whose own scope
+    excludes the work — that is the failure this pair exists to make visible.
+  - `Dispatch: stage-0 (elephant)` — the orchestrator committing directly under
+    the stage-0 fast path (operating-model §3.3): small, disclosed,
+    judgment-light work with no dispatch behind it and therefore no record to
+    bind. Stage-0 work is legitimate; the trailer exists so it stops being
+    indistinguishable from unattributed work.
+  A commit with neither form is unbound to any evidence, and the
+  `dispatch-authorship-verify` tool shipped with this plugin
+  (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the
+  bootstrap prints — it is NOT a path relative to a consumer project root)
+  reports it `UNVERIFIABLE`, never a pass. Declaring costs one line; silence
+  does not buy one.
 - Commit as soon as a piece is green, not at the very end. A commit that exists
   survives a truncated run; a commit that is only planned does not.
 

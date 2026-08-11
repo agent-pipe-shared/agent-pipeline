@@ -316,7 +316,7 @@ export const ALLOWLIST = Object.freeze([
   {
     filePattern: /^plugins\/pipeline-core\/templates\/prompts\/agent-obligations\.md$/u,
     reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/agent-obligations.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
+      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/agent-obligations.md (GF-107). Unlike the sibling entries, this identity is ENFORCED, not merely asserted: generate-agent-obligations.test.mjs AC-2b fails when the two files differ (the claim had gone false once, unnoticed, after the canonical file was regenerated alone). See the comment block above this group for the shared rationale and backlog-item citation.",
   },
   {
     filePattern: /^plugins\/pipeline-core\/templates\/prompts\/critic-review\.md$/u,

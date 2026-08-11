@@ -258,9 +258,12 @@ export function renderAgentObligations({ rootDir = REPO_ROOT } = {}) {
   put("    judgment-light work with no dispatch behind it and therefore no record to");
   put("    bind. Stage-0 work is legitimate; the trailer exists so it stops being");
   put("    indistinguishable from unattributed work.");
-  put("  A commit with neither form is unbound to any evidence, and");
-  put("  `plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs` reports it");
-  put("  `UNVERIFIABLE`, never a pass. Declaring costs one line; silence does not buy one.");
+  put("  A commit with neither form is unbound to any evidence, and the");
+  put("  `dispatch-authorship-verify` tool shipped with this plugin");
+  put("  (`scripts/dispatch-authorship-verify.mjs`, resolved under the plugin root the");
+  put("  bootstrap prints — it is NOT a path relative to a consumer project root)");
+  put("  reports it `UNVERIFIABLE`, never a pass. Declaring costs one line; silence");
+  put("  does not buy one.");
   put("- Commit as soon as a piece is green, not at the very end. A commit that exists");
   put("  survives a truncated run; a commit that is only planned does not.");
   put();
