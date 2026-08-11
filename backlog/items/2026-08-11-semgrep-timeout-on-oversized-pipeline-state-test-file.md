@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.semgrep-timeout-oversized-pipeline-state-test
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
 source: "Elephant session, 2026-08-11: node harness/scripts/security-scan.mjs turned BLOCKING (exit 2) for the first time this session after harness/scripts/pipeline-state.test.mjs grew to 4788 lines across many same-session dispatches."
 ---
@@ -62,7 +62,17 @@ confirming a genuine `CLEAN` verdict, not just a suppressed error.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, fixed same session (option (a) from the Proposal).
+- **Rationale:** `harness/scripts/security-adapters/semgrep.mjs` now passes
+  explicit `--timeout 45 --timeout-threshold 0` to the semgrep invocation
+  (commit `ba1a7d28`), giving semgrep's own per-rule budget headroom under
+  the shared 60s outer subprocess timeout, and disabling the "skip after N
+  timeouts" behavior that would otherwise leave a slow file's later rules
+  unchecked. Verified: `node --test harness/scripts/security-adapters/semgrep.test.mjs`
+  (11/11, no regression), then `node harness/scripts/security-scan.mjs`
+  re-run twice against the committed candidate — genuine `CLEAN` both times,
+  not a suppressed error (semgrep's own `results` and `errors` arrays both
+  confirmed empty). Options (b) and (c) from the Proposal were not needed
+  once (a) resolved it cleanly.
+- **Assignment (if accepted):** done.
+- **Date:** 2026-08-11.
