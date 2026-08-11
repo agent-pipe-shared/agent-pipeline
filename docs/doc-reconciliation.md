@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 6ba3238dd0ada5ee20379711fc8b67139a7d69c8 — 2026-08-11, range 39367f13..6ba3238d, host-delegation investigation result + final fix dispatch recorded
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`6ba3238d`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 39367f13516cb22cb6587450a6fbc370e4044bcd — 2026-08-11, range f2fc3026..39367f13, PO decision recorded + PX0-AC-13 host-delegation dispatch
 
 - ADR-0012: checked, no change needed.
