@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate aecc1d8cc1176ac63290bc062e1b5db83e6807f6 — 2026-08-11, range 3e1a727e..aecc1d8c, F1 fix landing checkpoint + F-A blocking-scope resolution
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`aecc1d8c`), touching only `docs/state.md`
+(additive checkpoint entry appended after the F1-blocker section,
+append-only discipline preserved — nothing rewritten). No other governed
+path touched; the F1 fix itself (`3e1a727e`, reviewed separately above)
+touches only `plugins/pipeline-core/scripts/pipeline-state.mjs` and
+`harness/scripts/pipeline-state.test.mjs`, neither of which carries a
+`Governs:` line.
+
 ## Candidate 5af57a2c17fcad2a8d2ad884bb72020bf302e813 — 2026-08-11, range 28edde05..5af57a2c, P-AC-08 note updated with F-B delta Critic FAIL (F1 blocker)
 
 - ADR-0045: checked, no change needed.
