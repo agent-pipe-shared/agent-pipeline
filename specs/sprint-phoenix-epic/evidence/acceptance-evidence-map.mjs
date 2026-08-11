@@ -1080,6 +1080,29 @@ const DELTA = {
   'PX0-AC-05': ['partial', 'DELTA-0811'],
   'PX0-AC-06': ['partial', 'DELTA-0811'],
   'PX0-AC-13': ['partial', 'DELTA-0811'],
+
+  // --- 2026-08-11 staleness audit (task PHX-WP-DELTA-STALE4) --------------
+  // A-AC-03 and EPIC-AC-02: reconfirmed, no carrier found -- direct grep for
+  // both criteria IDs and their subject-matter keywords across
+  // plugins/pipeline-core/{lib,scripts} returns nothing new. No change.
+  // A-AC-09: RETRACTS "no code enforces or measures it" -- a real, tested
+  // carrier exists (governance-event-store.mjs's sampled-out capture
+  // decision), landed 2026-08-10 (90283a0c) and never credited here. Partial
+  // only: the mechanism lets a caller avoid persisting a non-mandatory event,
+  // but nothing computes "routine/low-impact" itself -- the caller still
+  // decides -- and no independent Critic PASS exists for this candidate.
+  // P-AC-09: the "no export-backfill preview... exists" half of the prior
+  // finding is now false -- organization-policy-activation.mjs's
+  // backfillRange preview (already credited to P-AC-03 as implemented) is
+  // real and tested. Partial only: this is the preview half shared with
+  // P-AC-03; no distinct "explicit backfill consent" gate exists (the same
+  // generic activation authorize() covers the whole transition, not scoped
+  // to the backfill range) and no code actually exports/backfills the
+  // historical events themselves.
+  'A-AC-03': ['not-started', 'STALE4'],
+  'A-AC-09': ['partial', 'STALE4'],
+  'P-AC-09': ['partial', 'STALE4'],
+  'EPIC-AC-02': ['not-started', 'STALE4'],
 };
 
 // --- per-criterion evidence pointer ----------------------------------------
@@ -1255,6 +1278,12 @@ const POINTERS = {
   'EPIC-AC-04': 'Full Verify and blocking Security pass only on the last PUSHED candidate (`3387065`), not the integrated one measured here (see the gates table below). An independent high-risk Critic on the integrated candidate is no longer absent -- it ran 2026-08-09 and returned FAIL (5 major, 2 minor); privacy review and explicit PO acceptance remain absent',
   'EPIC-AC-05': 'a prohibition, and it currently bites -- see the summary count above for the exact figure; deliberately not hardcoded here after an independent Critic FAIL found this line stale against the generated total more than once (F4, 2026-08-09)',
   'EPIC-AC-06': 'the PRD header records the PO approval binding the first implementation dispatch',
+
+  // --- 2026-08-11 staleness audit (task PHX-WP-DELTA-STALE4) ---
+  'A-AC-03': 'reconfirmed 2026-08-11: NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption (direct grep of "A-AC-03" and "material assumption"/"invalidat*"/"revalidat*" across plugins/pipeline-core/{lib,scripts} finds nothing beyond unrelated Cyborg control-waiver revalidationTrigger fields; agent-decision-journal.mjs validates event shape only, no cascade logic)',
+  'A-AC-09': 'RETRACTS "no code enforces or measures it" -- governance-event-store.mjs\'s captureDecision:"sampled-out" path (assertMandatoryCaptureNotSkipped, landed 2026-08-10 commit 90283a0c for A-AC-07, never credited here) lets a caller avoid durably persisting a non-mandatory agent-origin event -- exactly the "avoid producing... telemetry" behavior for non-material activity this criterion names. Tested: governance-event-store.test.mjs "A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can" and "...only the policy-selected agent stream may ever be sampled out" (both pass). Partial only: nothing computes "routine/low-impact" itself (the caller decides captureDecision), and no independent Critic PASS exists for this candidate',
+  'P-AC-09': 'RETRACTS the "no export-backfill preview... exists" half -- organization-policy-activation.mjs\'s computeBackfillRange/backfillRange preview field (already credited to P-AC-03 as implemented, WP-P-AC01-AC03) is real and tested (organization-policy-activation.test.mjs "P-AC-03 computes newlyRequiredArtifacts, externalEffects, and backfillRange deterministically from the transition", 4/4 pass). Partial only: this is the preview half shared with P-AC-03; activateOrganizationPolicy\'s authorize() is one generic activation grant, not a distinct "explicit backfill consent" scoped to the identified historical range, and no code actually exports/backfills the historical events themselves',
+  'EPIC-AC-02': 'reconfirmed 2026-08-11: NO CARRIER: planParallelSprintIntegration (plugins/pipeline-core/lib/parallel-sprint-integration.mjs) still has no concept of "unpublished" (direct grep for "unpublished"/"Nova"/"Cyborg"/"Nightwing" in the file: zero hits) and is still imported only from its own test file (grep for the import across plugins/pipeline-core and harness: only parallel-sprint-integration.test.mjs)',
 };
 
 // --- closure classification -------------------------------------------------
@@ -1276,11 +1305,16 @@ const CLOSURE = {
   'PX0-AC-01': ['assert', 'WP-PX0'],
   'PX0-AC-03': ['assert', 'WP-PX0'],
   'PX0-AC-04': ['assert', 'WP-PX0'],
-  'PX0-AC-05': ['build', 'WP-PX0'],
+  // PX0-AC-05/PX0-AC-13 reclassified build -> po 2026-08-11 (PHX-WP-DELTA-STALE4):
+  // DELTA-0811 confirmed code+tests are complete and green for both; the only
+  // remaining blocker is an independent Critic PASS on this exact candidate
+  // (a human/process gate, not further code work) -- not closeable by writing
+  // code, matching the "po" class definition exactly.
+  'PX0-AC-05': ['po', 'WP-PX0'],
   'PX0-AC-06': ['build', 'WP-PX0'],
   'PX0-AC-07': ['assert', 'WP-PX0'],
   'PX0-AC-08': ['build', 'WP-PX0'],
-  'PX0-AC-13': ['build', 'WP-PX0'],
+  'PX0-AC-13': ['po', 'WP-PX0'],
 
   'K-AC-05': ['build', 'WP-K'],
   'K-AC-08': ['assert', 'WP-K'],
