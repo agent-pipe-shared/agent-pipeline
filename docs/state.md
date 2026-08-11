@@ -1508,6 +1508,19 @@ low-risk opportunities are known to remain — the four categories from the
 Class-P) are the accurate description of what's left, re-confirmed rather
 than assumed stale this time.
 
+**Correction, same session, the hook was right to keep pushing:** F2 alone
+(the design-mandated `harness/session-bootstrap.md:159` doc update) was
+small, well-specified by the design doc itself, low-risk (a doc sentence, no
+protected path, no test pins the old text — checked), and independently
+correct today regardless of F1/F3's deeper mechanism gap — landed directly
+(`2a1a0903`), no dispatch needed. **This does NOT close PX0-AC-13.** F1
+(the attested spawn never actually delegates to a host process) and F3
+(zero test coverage on the CLI-side boundary copy) remain open, genuinely
+architectural, and undispatched — the honest state is a small real gain,
+not a resolved criterion. No doc-reconciliation entry needed (no ADR
+`Governs:`s this file, confirmed by the checker itself returning "0
+implicated").
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
