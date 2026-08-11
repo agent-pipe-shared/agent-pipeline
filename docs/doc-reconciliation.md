@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 19badaa1b44de2c29953368559e62ba46cd65115 — 2026-08-12, range 6ba3238d..19badaa1, REMOVEATTESTATION self-stop + third PX0-AC-13 decision point recorded
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`19badaa1`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 6ba3238dd0ada5ee20379711fc8b67139a7d69c8 — 2026-08-11, range 39367f13..6ba3238d, host-delegation investigation result + final fix dispatch recorded
 
 - ADR-0012: checked, no change needed.
