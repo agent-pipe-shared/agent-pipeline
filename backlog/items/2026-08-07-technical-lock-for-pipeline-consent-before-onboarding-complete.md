@@ -73,3 +73,66 @@ instruction.
 - **Assignment (if accepted):** investigation queued for this session; not
   urgent (one historical incident, no repeat observed).
 - **Date:** 2026-08-12
+
+### Investigation finding (NVA-BL-83, 2026-08-12) — PARTIALLY covered, a real gap remains
+
+`evaluateLifecycleReadyGuard()` (`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`)
+gates every `Write`/`Edit`/`NotebookEdit` (and `Bash`) call behind a
+project-scoped precondition check, evaluated BEFORE any onboarding-readiness
+logic runs:
+
+```
+if (!governed) return verdict(0);   // line 1804 — unconditional allow
+```
+
+`governed` (lines 1797–1804) is `true` only if at least one of
+`GOVERNANCE_MARKERS` (line 91–99: `.agent-pipeline/core.lock.json`,
+`pipeline.user.yaml`, `project/pipeline.json`, `project/pipeline.yaml`,
+`.claude/pipeline.json`, `.claude/pipeline.yaml`, plus the runtime-projection-v3
+owned-key targets) already **exists on disk** in the project root. Only once
+`governed` is true does the guard reach `evaluateAfterGrammarAdmission()`
+(line 1703) and its call to `requireProjectOnboardingReady()` (line 1710),
+which is the part of the guard that DOES distinguish typed non-ready states —
+`restart-required`, `partial`, `kickoff-required`, `adoption-required`, etc.
+(`PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES`,
+`lib/project-onboarding-ready-gate.mjs:9-24`) — from `ready`.
+
+So the guard's readiness machinery has a real concept of "onboarding
+started but not complete," but it is only reachable once the filesystem
+already carries evidence that onboarding progressed far enough to write one
+of the six marker paths. Before that first marker write, `governed` is
+`false` and the function returns `verdict(0)` — allow — with **no
+distinction whatsoever** between "no consent was ever given" and "PO just
+consented, onboarding has not yet written anything." Both states are
+literally the same branch.
+
+`plugin-refresh-required` (the status implicated in the triggering incident)
+is not part of this guard's vocabulary at all — it belongs to a separate
+mechanism, the `SessionStart` preflight (`scripts/pipeline-start-preflight.mjs:249,294`),
+which is prose/exit-code advisory only and has no `PreToolUse` enforcement
+of its own (matches the item's own "Core gap" paragraph). `project-onboarding-v3.mjs`
+(the script `requireProjectOnboardingReady()` wraps) itself contains no
+filesystem-write calls (`grep -n "writeFile" ...` = no matches) — it is a
+pure inspector, not the writer of the governance markers, confirming the
+markers only appear as a side effect of onboarding actually having reached
+some later step, not at the moment consent is given.
+
+**Conclusion: PARTIALLY covered, not FULLY.** Once onboarding has written
+at least one governance marker file, further `Write`/`Edit` calls are
+correctly blocked (typed non-ready status) until a genuine `ready` receipt
+exists — that half of the scenario is closed. The half the item's own
+"Core gap" describes — the window between PO consent and the FIRST marker
+write, which is exactly where the triggering incident sat (a plugin
+registration conflict during `pipeline-core` activation, before any
+project-repo file was written) — has zero technical barrier today:
+`governed === false` short-circuits the whole guard to an unconditional
+allow, identical to a project that was never offered Pipeline at all. This
+is precisely the gap the item's proposed marker-at-consent-time mechanism
+targets, and it is real, not already closed.
+
+**Status:** left `open`. Per the briefing, designing/building the proposed
+new `PreToolUse` consent-marker hook is out of scope for this dispatch — a
+future dispatch should scope that work using this exact finding (the
+`governed` precondition on `!existsSync(<any GOVERNANCE_MARKERS path>)` at
+`guard-lifecycle-ready.mjs:1797-1804` is the precise code location the new
+mechanism must intercept ahead of, or fold into).
