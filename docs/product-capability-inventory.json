@@ -1331,6 +1331,12 @@
       "member": "nova-critic-packet-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-execution-plane-real-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-execution-plane-real-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-execution-plane-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1377,6 +1383,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "nova-sandbox-disposition-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-sandbox-launch-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-sandbox-launch-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-scheduling-lifecycle-tests",
@@ -2392,6 +2404,7 @@
         "verify-phase:harness/scripts/verify.mjs:nova-candidate-freeze-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-critic-lineage-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-critic-packet-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-execution-plane-real-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-execution-plane-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-increment-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-invocation-preflight-tests",
@@ -2400,6 +2413,7 @@
         "verify-phase:harness/scripts/verify.mjs:nova-release-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-runner-capability-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-sandbox-disposition-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-sandbox-launch-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-scheduling-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-verify-resume-tests",
