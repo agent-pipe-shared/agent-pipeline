@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 1a0a118698dcd6d58598d92b52f8fe2be96cfd30 — 2026-08-11, range 79f36939..1a0a1186, V-AC-02 scoping correction (not the smallest Class B candidate)
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`1a0a1186`), editing
+`specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md` in place
+(an existing design artifact under ADR-0045's `specs/**` scope; still not a
+tracked package artifact or `lifecycle.json` change). `docs/state.md` not
+touched in this range — ADR-0012 not implicated.
+
 ## Candidate 79f369394a17fcf40710b7681af47ab6fd0a04e3 — 2026-08-11, range 2c1f4cee..79f36939, clean security-scan against the committed candidate recorded
 
 - ADR-0012: checked, no change needed.
