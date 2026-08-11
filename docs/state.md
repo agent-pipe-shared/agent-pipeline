@@ -354,6 +354,37 @@ stale negative finding, two reconfirmed as genuinely open, none moved to
 exists for any of the newly-credited candidates). `EPIC-AC-05` still forbids
 any completion claim.
 
+### Session terminal state — everything left runs through one gate
+
+Stated plainly, in one place, so the next session doesn't reconstruct "what's
+left" from the eight sections above. **No further agent-executable work
+exists on this branch toward Phoenix completion.**
+Every remaining path to `implemented` funnels through exactly one PO act,
+already scoped and ready:
+
+**The `--scope TP-3,TP-5` GMW window** (division of labour and exact
+commands in the section above, "The signature-gated punch list is now
+exactly three items, one window"). It unblocks, in order: (1) the `AR06g`
+casOutcome regression test — source fix already written, verified, and
+handed to the PO as `casoutcome-fix-backup.diff` since `scratch/` doesn't
+survive a checkout change; (2) the `.v1`-legacy-journal regression tests —
+plan fully worked out, zero bytes written; (3) registering 5 unregistered
+suites in `verify.mjs`, closing the one remaining red Verify suite. Once
+those three land, the Critic re-review that's been correctly parked all
+session (no reviewable complete candidate existed before the window) becomes
+dispatchable — and only that review, PASS or FAIL, can move any of the 26
+`partial` criteria to `implemented`. Nothing about that sequencing changed
+today; two rounds of delta re-measurement changed the *count* (127/22/6/1/1
+→ 127/26/3/0/1) but not the *gate*.
+
+Everything else this session touched is closed: bootstrap repaired, 5 of 6
+pre-existing Verify failures fixed, two Critic-FAIL rounds' findings tracked
+and two of four fixed+verified, the doc-reconciliation ledger current, six
+criteria's stale verdicts corrected and independently re-verified. `git
+status` is clean except the one known, intentional, backed-up
+`pipeline-state.mjs` diff. No push occurred (local commits ahead of
+`origin/sprint_phoenix`, still deliberately deferred per PO instruction).
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
