@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 05ce87ecc71d4ea736e6a5f34eb7d9cebdf10edf — 2026-08-11, range 2f56a6fb..05ce87ec, P-AC-08/key-rotation/GMW-window checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`05ce87ec`), touching only `docs/state.md`
+(additive checkpoint entry appended after the H-AC-12 section, append-only
+discipline preserved — nothing rewritten). No other governed path touched;
+the range's other commit (`2f56a6fb`, the PO's own trust-anchor rotation)
+touches only `project/critical-human-proof.json`, which carries no
+`Governs:` line.
+
 ## Candidate 83a35689e1c7a6d685d8cee290e281c2a7bf7b3c — 2026-08-11, range 55e60f67..83a35689, P-AC-08 default-approval-fix note
 
 - ADR-0045: checked, no change needed.
