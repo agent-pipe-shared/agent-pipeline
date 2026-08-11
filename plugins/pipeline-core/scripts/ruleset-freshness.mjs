@@ -17,7 +17,6 @@ import { fileURLToPath } from "node:url";
 import { resolveMarketplaceUrl } from "../hooks/staleness-check.mjs";
 import { compareLoadedRulesetIdentity, normalizeRulesetSource } from "../lib/ruleset-source.mjs";
 import { PUBLIC_MARKETPLACE_URL } from "../lib/public-core-origin-allowlist.mjs";
-import { CODEX_APP_SERVER_HEALTH_SCHEMA, observeCodexAppServer } from "./codex-app-server-health.mjs";
 import {
   comparePipelineVersions,
   evaluateRulesetUpdatePolicy,
@@ -759,66 +758,27 @@ export function inspectCliRulesetFreshness({
 }
 
 /* --------------------------------------------------------------------------
- * PX0-AC-13 / design §B.2(b), §B.3: Codex-under-WSL host-attested spawn for
- * `inspectPipelineUpdateAvailability`'s two network-touching git calls only
- * (`ls-remote`, `fetch`). Composed fresh here rather than imported from
- * `ruleset-freshness-host.mjs`:
- *  - that file already imports 8 named bindings FROM this module (the
- *    restored PHX-0B single-fixed-action family above), so an import in the
- *    opposite direction here would be a circular ES-module dependency
- *    between the two files;
- *  - its `canonicalDaemonIdentity` helper is not exported at all -- only
- *    `hostControlBinding` (which calls it internally) is.
- * Design §B.3 names `hostControlBinding`/`canonicalDaemonIdentity` and the
- * literal, sterile `/usr/bin/git` + closed-environment invocation as the
- * pattern to reuse -- not the retired `executeRulesetFreshnessHostAction`/
- * `createFreshnessHostAction` single-fixed-action model above, which this
- * addition does not call, extend, or revive. Finalizing a fully typed/named
- * closed action family for all 8 of `inspectPipelineUpdateAvailability`'s git
- * invocations (design §B.3's two-class resolution) is explicitly deferred by
- * design §B.8 to its own follow-up sub-design and Critic pass; the argv-shape
- * discrimination below is the minimal surface needed to satisfy §B.2(b)
- * without pre-empting that follow-up.
+ * PX0-AC-13 (second clause only: "without consuming a known-failing sandbox
+ * attempt"): under the `host-authorized-wsl` execution boundary,
+ * `inspectPipelineUpdateAvailability`'s two network-touching git calls
+ * (`ls-remote`, the disposable-bare-repo `fetch`) are known to fail in this
+ * sandbox -- there is no genuine cross-sandbox transport in this codebase
+ * today (`docs/phoenix-governance-threat-model.md:53-57`: boundary-crossing
+ * is an agent/runner tool-tier decision, not in-process code). A prior
+ * version of this block spawned `/usr/bin/git` from inside the same
+ * sandboxed process after a purely local Codex App-Server health check --
+ * that never actually crossed any boundary and was a FAKE attestation,
+ * confirmed by two independent investigation dispatches this session. It has
+ * been removed. The replacement below is honest: it always returns a
+ * synthetic non-zero result for a network-delegated call, WITHOUT ever
+ * attempting to spawn a subprocess for it, so no doomed sandbox attempt is
+ * wasted or left hanging. Every local-only call still passes straight
+ * through to the real `spawn`, completely unmodified. This satisfies
+ * PX0-AC-13's second clause only; the first clause ("SHALL use the selected
+ * network-open/read-only host transport") requires a real cross-sandbox
+ * transport that does not exist in this codebase and is out of scope here --
+ * a separate, future work item.
  * ----------------------------------------------------------------------- */
-
-const WSL_UPDATE_AVAILABILITY_GIT = "/usr/bin/git";
-const WSL_UPDATE_AVAILABILITY_GIT_ENV = Object.freeze({
-  GIT_ASKPASS: "/bin/false",
-  GIT_CONFIG_COUNT: "0",
-  GIT_CONFIG_GLOBAL: "/dev/null",
-  GIT_CONFIG_NOSYSTEM: "1",
-  GIT_OPTIONAL_LOCKS: "0",
-  GIT_TERMINAL_PROMPT: "0",
-  HOME: "/nonexistent",
-  LANG: "C",
-  LC_ALL: "C",
-  PATH: "/usr/bin:/bin",
-  SSH_ASKPASS: "/bin/false",
-});
-const HOST_CONTROL_IDENTITY_KEYS = Object.freeze([
-  "status", "backend", "managedCodexPath", "managedCodexVersion", "socketPath", "cliVersion", "appServerVersion",
-]);
-
-/**
- * Same validation `ruleset-freshness-host.mjs`'s own (non-exported)
- * `canonicalDaemonIdentity` performs, composed fresh here (see the block
- * comment above): a `CODEX_APP_SERVER_HEALTH_SCHEMA` observation is trusted
- * only when it is a genuine, complete, version-consistent `CAS-READY` daemon
- * identity.
- */
-function wslHostControlAttested(observation) {
-  const daemon = observation?.daemon;
-  return observation?.schema === CODEX_APP_SERVER_HEALTH_SCHEMA
-    && observation.status === "ready"
-    && observation.code === "CAS-READY"
-    && observation.phase === "observe"
-    && daemon !== null && typeof daemon === "object" && !Array.isArray(daemon)
-    && JSON.stringify(Object.keys(daemon).sort()) === JSON.stringify([...HOST_CONTROL_IDENTITY_KEYS].sort())
-    && daemon.status === "running"
-    && daemon.cliVersion === daemon.appServerVersion
-    && daemon.managedCodexVersion === daemon.appServerVersion
-    && HOST_CONTROL_IDENTITY_KEYS.every((key) => typeof daemon[key] === "string" && daemon[key].length > 0);
-}
 
 /**
  * `git` argv shapes that touch the network inside
@@ -827,44 +787,29 @@ function wslHostControlAttested(observation) {
  * `ls-remote`, and the disposable-bare-repo `fetch`). Every other call this
  * function makes (`rev-parse`, `show`, `update-ref`, `rev-list`,
  * `init --bare`) is local-disk-only and stays on the ordinary local `spawn`,
- * unattested and unchanged.
+ * unchanged.
  */
 function isNetworkDelegatedGitInvocation(command, args) {
   return command === "git" && Array.isArray(args) && (args[0] === "ls-remote" || args.includes("fetch"));
 }
 
 /**
- * Build a WSL-host-attested `options.spawn` substitute for
- * `inspectPipelineUpdateAvailability`. Only the two network-touching argv
- * shapes above are routed through Codex App-Server control-channel
- * attestation plus a literal, sterile `/usr/bin/git` invocation from `/` with
- * a closed environment (mirroring `ruleset-freshness-host.mjs`'s reviewed
- * pattern); every other call passes straight through to the plain local
- * `spawn`, because none of them ever leaves the local machine. A command that
- * fails attestation returns a `spawnSync`-shaped non-zero result with no
- * stdout, so existing callers see their ordinary `"remote-unavailable"`
- * outcome (design §B.5) -- nothing new is invented for that branch.
+ * Build a fail-closed `options.spawn` substitute for
+ * `inspectPipelineUpdateAvailability` under the `host-authorized-wsl`
+ * boundary. A network-delegated call (see `isNetworkDelegatedGitInvocation`)
+ * NEVER reaches a subprocess spawn here -- it is known to fail in this
+ * sandbox, so no attempt is made, wasted, or left hanging; the function
+ * returns a `spawnSync`-shaped non-zero result with no stdout instead, so
+ * existing callers see their ordinary `"remote-unavailable"` outcome. Every
+ * other call passes straight through to the plain local `spawn`, completely
+ * unmodified, because none of them ever leaves the local machine.
  */
-export function createWslHostAttestedSpawn({
-  observeHostControl = observeCodexAppServer,
+export function createWslHostFailClosedSpawn({
   spawn = spawnSync,
-  timeoutMs = DEFAULT_TIMEOUT_MS,
 } = {}) {
-  return function wslHostAttestedSpawn(command, args, spawnOptions = {}) {
+  return function wslHostFailClosedSpawn(command, args, spawnOptions = {}) {
     if (!isNetworkDelegatedGitInvocation(command, args)) return spawn(command, args, spawnOptions);
-    let observation = null;
-    try { observation = observeHostControl(); } catch { observation = null; }
-    if (!wslHostControlAttested(observation)) {
-      return { status: 1, stdout: "", stderr: "", signal: null, error: undefined, pid: undefined };
-    }
-    return spawn(WSL_UPDATE_AVAILABILITY_GIT, args, {
-      cwd: "/",
-      encoding: "utf8",
-      timeout: spawnOptions.timeout ?? timeoutMs,
-      shell: false,
-      windowsHide: true,
-      env: WSL_UPDATE_AVAILABILITY_GIT_ENV,
-    });
+    return { status: 1, stdout: "", stderr: "", signal: null, error: undefined, pid: undefined };
   };
 }
 
@@ -901,14 +846,16 @@ export function runPipelineUpdateAvailabilityCli(argv, deps = {}) {
     (deps.stderr ?? process.stderr).write("ruleset-freshness: usage: ruleset-freshness.mjs [--repo <path>] [--loaded-version <version>] [--loaded-commit <sha>]\n");
     return { exitCode: 64, result: null };
   }
-  // design §B.2(b): supply a WSL-host-attested `options.spawn` only when the
-  // corrected boundary is "host-authorized-wsl" (Codex + WSL). Every other
-  // boundary is byte-for-byte the pre-existing call: `parsed` unmodified,
-  // falling through to `inspectPipelineUpdateAvailability`'s own default
-  // direct `spawnSync` path.
+  // PX0-AC-13 (second clause only): supply a fail-closed `options.spawn`
+  // only when the corrected boundary is "host-authorized-wsl" (Codex + WSL)
+  // -- it never spawns a subprocess for the two network-delegated calls (see
+  // `createWslHostFailClosedSpawn`). Every other boundary is byte-for-byte
+  // the pre-existing call: `parsed` unmodified, falling through to
+  // `inspectPipelineUpdateAvailability`'s own default direct `spawnSync`
+  // path.
   const executionBoundary = updateAvailabilityExecutionBoundary(deps.env ?? process.env);
   const spawn = executionBoundary === "host-authorized-wsl"
-    ? (deps.createAttestedSpawn ?? createWslHostAttestedSpawn)()
+    ? (deps.createFailClosedSpawn ?? createWslHostFailClosedSpawn)()
     : undefined;
   const inspectOptions = spawn ? { ...parsed, spawn } : parsed;
   const inspected = (deps.inspect ?? inspectPipelineUpdateAvailability)(parsed.repo, inspectOptions);

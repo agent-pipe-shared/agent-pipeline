@@ -9,7 +9,7 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 
 import {
-  createWslHostAttestedSpawn,
+  createWslHostFailClosedSpawn,
   inspectPipelineUpdateAvailability,
   migrateLegacyRulesetFreshness,
   PIPELINE_UPDATE_AVAILABILITY_SCHEMA,
@@ -22,7 +22,6 @@ import {
   readProjectPipelineUpdateChannel,
   resolvePipelineUpdateChannel,
 } from "./pipeline-update-channel.mjs";
-import { CODEX_APP_SERVER_HEALTH_SCHEMA } from "./codex-app-server-health.mjs";
 
 const roots = [];
 function git(cwd, ...args) {
@@ -92,8 +91,9 @@ function blockingPolicy(build) {
   };
 }
 
-// ---- PX0-AC-13 rework: Codex-under-WSL host-attested spawn for the CLI's
-// two network-touching git calls (`ls-remote`, disposable-repo `fetch`). ----
+// ---- PX0-AC-13: honest fail-closed spawn for the CLI's two network-touching
+// git calls (`ls-remote`, disposable-repo `fetch`) under the
+// host-authorized-wsl boundary -- no subprocess is ever attempted for them. ----
 
 /** A local disposable bare repo carrying exactly one valid stable release tag. */
 function tagFixture(name, version) {
@@ -120,31 +120,13 @@ function writeMarketplaceSettings(repo, url) {
   }));
 }
 
-const CODEX_HEALTH_DAEMON = {
-  status: "running", backend: "pid", managedCodexPath: "/opt/codex", managedCodexVersion: "0.144.6",
-  socketPath: "/tmp/codex.sock", cliVersion: "0.144.6", appServerVersion: "0.144.6",
-};
-function readyHostControlObservation() {
-  return {
-    schema: CODEX_APP_SERVER_HEALTH_SCHEMA, status: "ready", code: "CAS-READY", phase: "observe",
-    daemon: CODEX_HEALTH_DAEMON, recovery: "not-needed", operatorAction: null, detail: null,
-  };
-}
-function staleHostControlObservation() {
-  return {
-    schema: CODEX_APP_SERVER_HEALTH_SCHEMA, status: "stale", code: "CAS-DAEMON-UNREACHABLE", phase: "observe",
-    daemon: null, recovery: "not-attempted", operatorAction: "codex app-server daemon restart && codex doctor", detail: null,
-  };
-}
-
 /**
- * Inner spawn for `createWslHostAttestedSpawn`. Genuinely runs `git` for
- * every call it receives (both the unmodified local calls and the
- * attestation-rewritten `/usr/bin/git` network calls) -- it only ever
- * rewrites the one reviewed public-marketplace URL literal to a real local
- * disposable fixture repo path first, so the network-delegated calls stay
- * fully real (proving the exact literal executable/closed-env production
- * uses actually works) while never reaching the real network.
+ * Inner spawn for local (non-network-delegated) calls reaching the CLI's
+ * fail-closed `options.spawn` substitute. Genuinely runs `git` for every
+ * call it receives -- it only ever rewrites the one reviewed
+ * public-marketplace URL literal to a real local disposable fixture repo
+ * path first (unused once no network-delegated call ever reaches it, but
+ * kept so a local call, e.g. the loaded HEAD lookup, stays fully real).
  */
 function localNetworkSubstituteSpawn(localRemoteUrl, calls) {
   return (command, args, opts) => {
@@ -154,63 +136,28 @@ function localNetworkSubstituteSpawn(localRemoteUrl, calls) {
   };
 }
 
-test("PX0-AC-13: the update-availability CLI's real call path attests the daemon and routes both network-delegated git calls through the literal sterile host executable, reaching a genuine typed result", () => {
-  const remote = tagFixture("attested", "1.2.3");
-  const repo = mkdtempSync(join(tmpdir(), "ruleset-freshness-cli-network-attested-repo-"));
+test("PX0-AC-13: under the host-authorized-wsl boundary, the update-availability CLI's network-delegated ls-remote never reaches any spawn substitute, while a local call still genuinely spawns and returns real data", () => {
+  const remote = tagFixture("failclosed", "1.2.3");
+  const repo = mkdtempSync(join(tmpdir(), "ruleset-freshness-cli-network-failclosed-repo-"));
   roots.push(repo);
   writeMarketplaceSettings(repo, PUBLIC_MARKETPLACE_URL);
   const calls = [];
-  let observed = 0;
-  const createAttestedSpawn = () => createWslHostAttestedSpawn({
-    observeHostControl: () => { observed += 1; return readyHostControlObservation(); },
+  const createFailClosedSpawn = () => createWslHostFailClosedSpawn({
     spawn: localNetworkSubstituteSpawn(remote, calls),
   });
   let stdout = "";
   const execution = runPipelineUpdateAvailabilityCli(["--repo", repo], {
     env: { WSL_DISTRO_NAME: "Ubuntu" },
-    createAttestedSpawn,
+    createFailClosedSpawn,
     stdout: { write: (chunk) => { stdout += chunk; } },
   });
-  assert.ok(observed >= 1, "the daemon health must be (re-)observed for each network-delegated call");
-  const lsRemote = calls.find((call) => call.args[0] === "ls-remote");
-  const fetch = calls.find((call) => call.args.includes("fetch"));
-  assert.ok(lsRemote, "the CLI's real ls-remote must actually reach the attested spawn substitute");
-  assert.ok(fetch, "the CLI's real disposable-repo fetch must actually reach the attested spawn substitute");
-  for (const call of [lsRemote, fetch]) {
-    assert.equal(call.command, "/usr/bin/git", "network-delegated calls must use the literal sterile Git binary, never a PATH-resolved one");
-    assert.equal(call.env.HOME, "/nonexistent");
-    assert.equal(call.env.PATH, "/usr/bin:/bin");
-    assert.equal(call.env.GIT_CONFIG_GLOBAL, "/dev/null");
-  }
-  const local = calls.find((call) => call.args.includes("rev-parse") && call.args.includes("HEAD"));
-  assert.ok(local, "a genuinely local call (loaded HEAD) must also have been observed");
-  assert.equal(local.command, "git", "local calls must never be rewritten to the literal sterile binary");
-  const result = JSON.parse(stdout);
-  assert.equal(result.schema, PIPELINE_UPDATE_AVAILABILITY_SCHEMA);
-  assert.equal(result.marketplace.version, "1.2.3", "the attested ls-remote result was actually parsed into the real tag version");
-  assert.equal(execution.exitCode, result.blocking ? 2 : 0);
-});
-
-test("PX0-AC-13: an unattested Codex App-Server daemon fails the WSL-authorized network call closed, without the real ls-remote ever reaching the substitute spawn", () => {
-  const remote = tagFixture("unattested", "1.2.3");
-  const repo = mkdtempSync(join(tmpdir(), "ruleset-freshness-cli-network-unattested-repo-"));
-  roots.push(repo);
-  writeMarketplaceSettings(repo, PUBLIC_MARKETPLACE_URL);
-  const calls = [];
-  let observed = 0;
-  const createAttestedSpawn = () => createWslHostAttestedSpawn({
-    observeHostControl: () => { observed += 1; return staleHostControlObservation(); },
-    spawn: localNetworkSubstituteSpawn(remote, calls),
-  });
-  let stdout = "";
-  const execution = runPipelineUpdateAvailabilityCli(["--repo", repo], {
-    env: { WSL_DISTRO_NAME: "Ubuntu" },
-    createAttestedSpawn,
-    stdout: { write: (chunk) => { stdout += chunk; } },
-  });
-  assert.equal(observed, 1, "attestation must be checked for the ls-remote attempt");
   assert.equal(calls.some((call) => call.args[0] === "ls-remote"), false,
-    "a failed attestation must never let the substituted ls-remote actually spawn a process");
+    "a network-delegated call must never reach the substitute spawn -- no doomed sandbox attempt is made");
+  assert.equal(calls.some((call) => call.args.includes("fetch")), false,
+    "the disposable-repo fetch must likewise never reach the substitute spawn");
+  const local = calls.find((call) => call.args.includes("rev-parse") && call.args.includes("HEAD"));
+  assert.ok(local, "a genuinely local call (loaded HEAD) must still have been observed");
+  assert.equal(local.command, "git", "local calls must pass straight through to the real spawn, unmodified");
   const result = JSON.parse(stdout);
   assert.equal(result.status, "unknown");
   assert.equal(result.reason, "remote-unavailable");
