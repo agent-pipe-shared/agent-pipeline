@@ -833,6 +833,44 @@ disk). Holding here per advisor's repeated assessment: further hunting
 would keep surfacing PO-gated questions at the cost of a dispatch each
 time, and tonight found two of exactly that shape already.
 
+### H-AC-12: PO dispositions two of its three remaining open subsystems
+
+The Class B plan doc's own "next scoping step" for H-AC-12 (`design/class-
+b-multi-dispatch-plan.md`) turned out to be tractable without touching
+anything signature-gated: grepped the full `lib`/`scripts` tree for
+`release.plan`/`deploy.approv` variants, confirmed no third candidate
+module exists beyond the two the doc already named, and ruled out two false
+leads (`releasePlanSha256` in `session-cleanup-recovery.mjs`/`onboarding-
+continuity.mjs` means releasing a session binding lock, not a product
+release). Read both real candidates in full:
+
+- `release-version-plan.mjs`'s `decisionId` is a self-binding content hash
+  of the decision payload (`sha256("pipeline.release-version-decision.v1\0"
+  + canonicalJson(...))`), checked structurally on every read.
+- `critical-action-authorization.mjs`'s `authorizeRecordedDeploy()` (the
+  sole reader of `pipeline-state.mjs`'s `state.deployApprovals`) verifies a
+  detached Ed25519 proof against a committed trust anchor.
+
+Neither has a `decisionId` in the `pipeline.human-decision-reference.v1`
+sense, and neither can disagree with a second reader the way
+`dualEvaluateDecisionReference` is built to catch — a genuine disposition
+question, not a further-scopeable gap. Put both to the PO via
+`AskUserQuestion`; both resolved the same way, the recommended option each
+time: **the existing alternate mechanism (content-hash / Ed25519 proof)
+satisfies H-AC-12's intent, no code change, document the equivalence.**
+Landed in `17af46cb` (evidence-map comment + regenerated
+`evidence-map-20260811c.md`) and `class-b-multi-dispatch-plan.md`'s
+follow-up scoping section.
+
+**Verdict stays `partial`.** `guard-push.mjs`/`pipeline-state.mjs` remain
+TP-5/GMW-blocked, and **Git-guard override consumption remains open and
+unscoped** — the acceptance text's sixth named subsystem, not yet
+investigated at all; likely maps to `guard-human-override.mjs`
+(signature-adjacent, deliberately not touched while the GMW window stays
+postponed). 127/26/3/0/1 unchanged — this narrows H-AC-12's remaining gap
+from three named subsystems to two-and-one-unscoped, it does not close the
+criterion.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
