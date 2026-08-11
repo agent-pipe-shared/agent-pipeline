@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.decouple-hosted-project-document-language-from-operator-facing-language
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "PO directive during the 2026-08-09 Codex/Claude happy-path evaluation: for a HOSTED/consumer project (not this Pipeline repo, which stays ADR-0011 EN-canonical), the PRD/Spec document language should be free to differ from the project's operator-facing (chat/session) language, which itself stays a hard de/en choice per setup. Explicit follow-up refinement: keep the change thorough but minimally invasive, no new follow-on problems, an English structure/scaffold with only the prose content translated is an acceptable (preferred) shape, and the kickoff flow should actively ask which document language(s) a hosted project's PRD/Spec should use rather than silently assuming it equals the operator-facing choice."
 due: 2026-08-16

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Hit during the 0.5.4 candidate's closing Verify run on 2026-08-09: guard-push-tests failed, the same suite passed unchanged on the immediate re-run, and the diff between the two runs was a commit hash."
 due: 2026-08-16
