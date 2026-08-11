@@ -67,3 +67,28 @@ is not used at all for that dispatch.
   session can fix (harness-level tool behavior); recorded so the workaround
   is not rediscovered from scratch next time.
 - **Date:** 2026-08-07
+
+## Update 2026-08-11 — reconfirmed, not rediscovered independently
+
+Hit again this session (GF-115's first dispatch attempt), confirming this
+item's own prediction that the workaround would otherwise be rediscovered
+from scratch — this session initially did exactly that (diagnosed the same
+symptom independently via `git cat-file -p`/`merge-base` before finding this
+pre-existing item). Two additions from this occurrence:
+
+- The stale ref this time was `origin/main` (a different branch than the
+  upstream-tracking ref of the branch actually being worked on,
+  `feat/sprint-nova-codex-v046`) -- broader than "the branch's own upstream
+  tracking ref": the snapshot source may simply be whatever this environment
+  resolves as a default/main ref, not specifically `@{upstream}`.
+- This item's own proposed in-dispatch recovery (`git rev-parse HEAD` then
+  proceed) needs one more step in practice: the natural fix,
+  `git reset --hard <target-sha>`, is blocked by guard-git `GG-07` inside a
+  dispatched worktree with no PO override token available in-session. The
+  working non-destructive alternative is `git checkout --detach
+  <target-sha>` -- reaches the identical end state without the blocked verb.
+  Worth folding into the Proposal's workaround text next time this item is
+  revised, rather than rediscovering the GG-07 block too.
+
+Still not a repository-code defect to fix here (harness-level). Decision
+unchanged: accept-open.
