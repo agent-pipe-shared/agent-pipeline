@@ -175,10 +175,11 @@ test("normal bootstrap receipt retains exact envelope measurement and over-budge
   assert.equal(receipt.originalMeasurement.withinBudget, false);
 });
 
-test("preflight selects one host-authorized capability boundary for WSL", () => {
+test("preflight selects one host-authorized capability boundary for WSL under Codex, including an explicit CLAUDECODE=0", () => {
   for (const env of [
     { WSL_DISTRO_NAME: "Ubuntu" },
     { WSL_INTEROP: "/run/WSL/1_interop" },
+    { CLAUDECODE: "0", WSL_DISTRO_NAME: "Ubuntu" },
   ]) {
     const result = preflight({
       env,
@@ -186,9 +187,35 @@ test("preflight selects one host-authorized capability boundary for WSL", () => 
       read: () => manifest,
       cwd: "/projects/wsl",
     });
-    assert.equal(result.executionBoundary, "host-authorized-wsl");
-    assert.equal(result.nextAction.executionBoundary, "host-authorized-wsl");
+    assert.equal(result.executionBoundary, "host-authorized-wsl", JSON.stringify(env));
+    assert.equal(result.nextAction.executionBoundary, "host-authorized-wsl", JSON.stringify(env));
     assert.equal(result.nextAction.argv[3], "/projects/wsl");
+  }
+});
+
+// PX0-AC-13 rework: the pre-fix formula (`wsl ? "host-authorized-wsl" : "default"`)
+// granted the Codex-only host-authorized boundary to a Claude Code session
+// under WSL too, because it never consulted `runner`. This test discriminates
+// exactly that defect: reverting the one-line fix in
+// pipeline-start-preflight.mjs's `executionBoundary` computation (back to the
+// runner-blind formula) turns this assertion red, while every other test in
+// this file (all of which leave CLAUDECODE unset when combined with a WSL env,
+// or leave WSL env unset when combined with CLAUDECODE) stays green -- proven
+// manually during this task's verification pass, not left to reviewer trust.
+test("PX0-AC-13: a Claude Code session under WSL never receives the Codex-only host-authorized boundary", () => {
+  for (const env of [
+    { CLAUDECODE: "1", WSL_DISTRO_NAME: "Ubuntu" },
+    { CLAUDECODE: "1", WSL_INTEROP: "/run/WSL/1_interop" },
+  ]) {
+    const result = preflight({
+      env,
+      pluginList: pluginList(),
+      read: () => manifest,
+      cwd: "/projects/wsl",
+    });
+    assert.equal(result.executionBoundary, "default", JSON.stringify(env));
+    assert.equal(result.nextAction.executionBoundary, "default", JSON.stringify(env));
+    assert.deepEqual(result.nextAction.argv.slice(-2), ["--runner", "claude"], JSON.stringify(env));
   }
 });
 
