@@ -262,6 +262,46 @@ window lands. The continuity queue's next action reads `security-scan` —
 that action is genuinely unreachable right now, not skipped; do not retry it
 in this state.
 
+### The targeted delta re-measurement ran (`8f297633`) — 127/24/4/1/1, and two real retractions
+
+Corrects the "not re-run this session" paragraph above — done later the same
+session. Scoped exactly to the four criteria touched since the map's last
+data update (`a781bfa7`, 2026-08-10): PX0-AC-03/05/06/13. Dispatched as
+`PHX-WP-DELTA-PX0-0305-06-13` (goldfish-deep, xhigh); first pass did the real
+measurement work correctly but was cut off before committing (59 tool uses
+against a 35 budget — reported honestly as a deviation, not hidden), resumed
+via `SendMessage` to finish the mechanical closing steps rather than
+re-dispatched from scratch. Independently re-verified before and after
+resume: `AR03h/i`, `AR05a-f` exist in `harness/scripts/pipeline-state.test.mjs`
+at the cited line numbers (not new — pre-existing, just previously
+unmeasured); 468/468, 36/36, 16/16 all green.
+
+New total: **127 implemented / 24 partial / 4 not-started / 1 designed-only /
+1 constraint** (was 127/22/6/1/1 — two criteria moved partial-ward, none
+moved to `implemented`, per this pass's own hard constraint: no independent
+Critic PASS exists for the current candidate on any of the four, so
+`implemented` was off the table regardless of code/test completeness).
+
+- **PX0-AC-03** stays `partial`: the one previously-named unpinned axis
+  (decision-scope) is now pinned (`AR03h/i`), but no Critic PASS yet.
+- **PX0-AC-05 and PX0-AC-06 both move `not-started` → `partial`, retracting
+  a stale "CONFIRMED ABSENT" finding.** Both capabilities actually exist:
+  durable receipt retention (`AR05a-f`) and a recovered-preimage outcome
+  (`AR06a-f`) were already built and tested — just never credited in the
+  map. AC-06's real residual is exactly Critic finding F1 (the false
+  `casOutcome:"applied"` echo, fix uncommitted, no regression test) plus F4
+  (`.v1`-journal test gap) — both already tracked in this file's earlier
+  sections and the signature punch list; nothing new to sign for.
+- **PX0-AC-13** stays `partial`: code and tests are complete and green
+  (`7dffa72e`), the only thing missing is the Critic PASS itself.
+
+One follow-up noted, not fixed: the separate `--mode closure` output (a
+different rendering of the same generator, outside this task's scope) is now
+mildly stale for AC-05/AC-13's `build`→partial-capability-exists shift —
+small, real, left for whoever next regenerates that mode rather than
+invented an unclassified fix here. Full detail:
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map-20260811.md`.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
