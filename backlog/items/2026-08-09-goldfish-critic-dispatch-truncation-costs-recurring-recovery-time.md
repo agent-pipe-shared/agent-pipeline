@@ -121,7 +121,15 @@ mid-release. Revisit this item once the candidate has shipped.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** consolidate — same disposition as `2026-08-07`'s item. This
+  item's four/five measured instances and its "Direction (for the deferred
+  investigation)" section stay as historical evidence; ongoing tracking and
+  the fix move to `backlog/items/2026-08-08-long-dispatches-truncate-before-emitting-their-report.md`.
+  The PO's 2026-08-09 deferral ("do not investigate or fix this now... revisit
+  once the candidate has shipped") is satisfied — the candidate shipped, and
+  the PO explicitly resumed this on 2026-08-11 ("ja zusammen legen die
+  recherche und fixes aber jetzt machen weil jetzt zeit ist").
+- **Rationale:** same as `2026-08-07`'s item — one canonical thread instead of
+  three overlapping ones.
+- **Assignment (if accepted):** see `08-08` item's own Triage.
+- **Date:** 2026-08-11

@@ -111,7 +111,16 @@ does not wait for the first:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** consolidate — this item's own data (WSL hypothesis, the
+  57-68-vs-21 tool-use correlation, the diagnosis/mitigation split) stays as
+  historical evidence, but ongoing tracking, further measurement, and the
+  actual fix move to `backlog/items/2026-08-08-long-dispatches-truncate-before-emitting-their-report.md`,
+  which had already grown into the more complete item (14+ measured
+  occurrences, a PO-proposed "closing allowance" design, two mitigations
+  already landed) by the time this item's own investigation was deferred.
+- **Rationale:** three near-duplicate items (`2026-08-07`, `2026-08-08`,
+  `2026-08-09`) tracking the same defect from different angles is worse than
+  one canonical thread — a future session re-diagnosing from this item alone
+  would miss the richer data and the design work already done on `08-08`.
+- **Assignment (if accepted):** see `08-08` item's own Triage.
+- **Date:** 2026-08-11

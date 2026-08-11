@@ -249,9 +249,65 @@ An unattended hardening block, 2026-08-07/08, with four to five concurrent
 dispatches against the local `0.5.4` candidate. Reproduced fourteen times without
 being sought.
 
+## Consolidation, 2026-08-11 — this is now the canonical tracking item
+
+Two related items are folded into this one rather than tracked separately:
+`backlog/items/2026-08-07-dispatched-agents-return-truncated-mid-step.md`
+(the original discovery — WSL hypothesis, the 57-68-vs-21 tool-use
+correlation) and
+`backlog/items/2026-08-09-goldfish-critic-dispatch-truncation-costs-recurring-recovery-time.md`
+(PO-deferred-until-after-ship, now resumed). Both are marked
+consolidated in their own Triage sections and kept as historical evidence
+rather than merged/deleted.
+
+**Two more measured occurrences from an unrelated 2026-08-11 session, both
+Critic dispatches, both stopping mid-Phase-A (before Phase B/report):**
+
+| Dispatch | Tool uses | Subagent tokens | Duration | Stopped right before |
+|---|---|---|---|---|
+| Critic review of a 50-commit range | 46 | not recorded | 504,340 ms | reading the sealed nova-a8 benchmark JSON record (its own words: "Now the benchmark record against §5.6") |
+| Critic review of 6 commits (resume of the above, after a purely procedural resume message) | not yet known — in progress at time of writing | — | — | — |
+
+The first row is exact, machine-reported data (the harness's own
+`task-notification` `usage` block), not a reconstruction — the same standard
+the 2026-08-08 six-row table already set. It adds one data point to the
+"where does it stop" question this item's own direction #2 asks: like the
+2026-08-08 `SEEDINT-1`/`DOCS-1` cases, this did NOT stop mid-verification-sweep
+— it stopped right before what would have been reading a large (2671-line)
+JSON evidence file, which is at least consistent with (not yet confirmatory
+of) a large-tool-output hypothesis this item has not previously tested.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted — investigation resumes now per explicit PO
+  instruction (2026-08-11: "ja zusammen legen die recherche und fixes aber
+  jetzt machen weil jetzt zeit ist"). Two concrete actions taken in the same
+  session: (1) a forensic-analysis dispatch against this session's own raw
+  transcripts, to test the large-tool-output-before-cutoff hypothesis this
+  item's own data has not yet ruled in or out (per
+  `references/transcript-forensics.md`'s method — a fresh subagent mining
+  `tool_use`/`tool_result` pairs directly, not a reconstruction from memory);
+  (2) once that returns, the PO's own already-designed "closing allowance"
+  mechanism (this item, "PO direction, 2026-08-08" section) is the fix to
+  implement first — it is the most direct protection of the contract, already
+  has PO sign-off on the shape, and needs only an implementation decision, not
+  a fresh design. Implementation goes through a `goldfish-deep` dispatch
+  (`templates/prompts/goldfish-task.md`/`critic-review.md` are canon/template
+  files, not stage-0-exempt — Elephant-direct edits here would repeat the
+  exact EL-01/EL-16 authorship violation a Critic review just flagged
+  elsewhere this same session), held until no other dispatch is
+  concurrently reading/writing `evidence/verify-latest.json` or
+  `evidence/security-latest.json` (a goldfish-deep's own DoD Verify sweep
+  would overwrite those files exactly as this session's earlier
+  evidence-mutation mistake did, if run concurrently with another dispatch
+  reading them).
+- **Rationale:** the PO's own proposed design already answers "what should the
+  fix look like" (a small reserve beyond TB-09's cap, spendable only on
+  commit/record/report, converting a stop into a structured handover); what
+  remains is confirming/sharpening the mechanism against real data before
+  committing template text, and sequencing the write dispatch safely around
+  the two dispatches already in flight this session.
+- **Assignment (if accepted):** forensic-analysis dispatch (general-purpose,
+  background) dispatched 2026-08-11; template-fix `goldfish-deep` dispatch
+  planned, not yet sent.
+- **Date:** 2026-08-11
