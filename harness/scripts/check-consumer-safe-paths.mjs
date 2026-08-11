@@ -59,6 +59,99 @@ const SCAN_PREFIX = "plugins/pipeline-core/";
 // initial sweep.
 export const SOURCE_ONLY_PREFIXES = Object.freeze(["harness/", "specs/sprint-nova-epic/", "setup.mjs"]);
 
+// --- F2 fix (Critic review, 2026-08-10, over commits 4d0f8038..e2a3072f): a
+// per-line allowlist for the 19 byte-identical vendored guardrails/roles/
+// templates-prompts/ADRs (GF-107/GF-108), replacing whole-file `filePattern`
+// exemptions. Each entry is one exact offending line, derived from a scan of
+// these 19 files against SOURCE_ONLY_PREFIXES with no allowlist applied at
+// all (ground truth), so every `match` string is guaranteed both to suppress
+// a real finding and to be unique within its file (a stale or duplicate
+// entry would otherwise be reported by the "never matched anything" check
+// below). See backlog/items/2026-08-10-plugin-package-should-vendor-canon-
+// references-via-build-step.md (F2) and harness/scripts/generate-vendored-
+// canon.mjs (the generator that produces these files).
+function vendoredCanonAllowlistReason(origin) {
+  return (
+    `GF-108 (known-accepted vendoring gap): plugins/pipeline-core/${origin} is a byte-identical vendored copy of ` +
+    `${origin} (harness/scripts/generate-vendored-canon.mjs). This exact line is inherited unchanged from that ` +
+    `source, where it documents this repository's own harness/ tooling or setup.mjs in its self-application ` +
+    `voice -- not a new instruction telling a consumer to run it. Tracked by ` +
+    `backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md.`
+  );
+}
+
+export const VENDORED_CANON_ALLOWLIST = Object.freeze([
+  // guardrails/deploy.md (lines 25, 28, 36, 67, 75)
+  { file: "plugins/pipeline-core/guardrails/deploy.md", match: "ent}` (`harness/scripts/", reason: vendoredCanonAllowlistReason("guardrails/deploy.md") }, // L25
+  { file: "plugins/pipeline-core/guardrails/deploy.md", match: "ved`); `harness/scripts/", reason: vendoredCanonAllowlistReason("guardrails/deploy.md") }, // L28
+  { file: "plugins/pipeline-core/guardrails/deploy.md", match: "suite; `harness/scripts/", reason: vendoredCanonAllowlistReason("guardrails/deploy.md") }, // L36
+  { file: "plugins/pipeline-core/guardrails/deploy.md", match: ".v0`); `harness/scripts/", reason: vendoredCanonAllowlistReason("guardrails/deploy.md") }, // L67
+  { file: "plugins/pipeline-core/guardrails/deploy.md", match: "; `node harness/scripts/", reason: vendoredCanonAllowlistReason("guardrails/deploy.md") }, // L75
+  // guardrails/git.md (lines 77, 101, 106, 109)
+  { file: "plugins/pipeline-core/guardrails/git.md", match: "harness/session-", reason: vendoredCanonAllowlistReason("guardrails/git.md") }, // L77
+  { file: "plugins/pipeline-core/guardrails/git.md", match: "`GG-20`); `node harness/scripts/verify.m", reason: vendoredCanonAllowlistReason("guardrails/git.md") }, // L101
+  { file: "plugins/pipeline-core/guardrails/git.md", match: "ent}` (`harness/scripts/", reason: vendoredCanonAllowlistReason("guardrails/git.md") }, // L106
+  { file: "plugins/pipeline-core/guardrails/git.md", match: "proved\"`; `node harness/scripts/verify.m", reason: vendoredCanonAllowlistReason("guardrails/git.md") }, // L109
+  // guardrails/global.md (line 35)
+  { file: "plugins/pipeline-core/guardrails/global.md", match: "harness/", reason: vendoredCanonAllowlistReason("guardrails/global.md") }, // L35
+  // guardrails/quality-gates.md (lines 29, 59)
+  { file: "plugins/pipeline-core/guardrails/quality-gates.md", match: "harness/session-", reason: vendoredCanonAllowlistReason("guardrails/quality-gates.md") }, // L29
+  { file: "plugins/pipeline-core/guardrails/quality-gates.md", match: "harness/scripts/", reason: vendoredCanonAllowlistReason("guardrails/quality-gates.md") }, // L59
+  // guardrails/security.md (lines 24, 39)
+  { file: "plugins/pipeline-core/guardrails/security.md", match: "harness/session-", reason: vendoredCanonAllowlistReason("guardrails/security.md") }, // L24
+  { file: "plugins/pipeline-core/guardrails/security.md", match: "harness/checklis", reason: vendoredCanonAllowlistReason("guardrails/security.md") }, // L39
+  // roles/critic.md (lines 207, 224)
+  { file: "plugins/pipeline-core/roles/critic.md", match: "Per `harness/session-", reason: vendoredCanonAllowlistReason("roles/critic.md") }, // L207
+  { file: "plugins/pipeline-core/roles/critic.md", match: "- `harness/session-", reason: vendoredCanonAllowlistReason("roles/critic.md") }, // L224
+  // roles/elephant.md (lines 87, 117, 290, 295, 310)
+  { file: "plugins/pipeline-core/roles/elephant.md", match: "harness/checklis", reason: vendoredCanonAllowlistReason("roles/elephant.md") }, // L87
+  { file: "plugins/pipeline-core/roles/elephant.md", match: "harness/scripts/", reason: vendoredCanonAllowlistReason("roles/elephant.md") }, // L117
+  { file: "plugins/pipeline-core/roles/elephant.md", match: "tocol (`harness/session-", reason: vendoredCanonAllowlistReason("roles/elephant.md") }, // L290
+  { file: "plugins/pipeline-core/roles/elephant.md", match: "ep 1b (`harness/session-", reason: vendoredCanonAllowlistReason("roles/elephant.md") }, // L295
+  { file: "plugins/pipeline-core/roles/elephant.md", match: "- `harness/session-", reason: vendoredCanonAllowlistReason("roles/elephant.md") }, // L310
+  // roles/goldfish.md (lines 23, 123, 133)
+  { file: "plugins/pipeline-core/roles/goldfish.md", match: "nants (`harness/session-", reason: vendoredCanonAllowlistReason("roles/goldfish.md") }, // L23
+  { file: "plugins/pipeline-core/roles/goldfish.md", match: "Per `harness/session-", reason: vendoredCanonAllowlistReason("roles/goldfish.md") }, // L123
+  { file: "plugins/pipeline-core/roles/goldfish.md", match: "- `harness/session-", reason: vendoredCanonAllowlistReason("roles/goldfish.md") }, // L133
+  // templates/prompts/agent-obligations.md (lines 3, 4, 90, 92)
+  { file: "plugins/pipeline-core/templates/prompts/agent-obligations.md", match: "ced by: harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/agent-obligations.md") }, // L3
+  { file: "plugins/pipeline-core/templates/prompts/agent-obligations.md", match: "d by:   harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/agent-obligations.md") }, // L4
+  { file: "plugins/pipeline-core/templates/prompts/agent-obligations.md", match: "P-3` | `harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/agent-obligations.md") }, // L90
+  { file: "plugins/pipeline-core/templates/prompts/agent-obligations.md", match: "?:-v2)?|harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/agent-obligations.md") }, // L92
+  // templates/prompts/critic-review.md (line 7)
+  { file: "plugins/pipeline-core/templates/prompts/critic-review.md", match: "harness/", reason: vendoredCanonAllowlistReason("templates/prompts/critic-review.md") }, // L7
+  // templates/prompts/elephant-kickoff.md (lines 5, 87)
+  { file: "plugins/pipeline-core/templates/prompts/elephant-kickoff.md", match: "harness/session-", reason: vendoredCanonAllowlistReason("templates/prompts/elephant-kickoff.md") }, // L5
+  { file: "plugins/pipeline-core/templates/prompts/elephant-kickoff.md", match: "harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/elephant-kickoff.md") }, // L87
+  // templates/prompts/goldfish-task.md (line 8)
+  { file: "plugins/pipeline-core/templates/prompts/goldfish-task.md", match: "harness/", reason: vendoredCanonAllowlistReason("templates/prompts/goldfish-task.md") }, // L8
+  // templates/prompts/kickoff-new-project.md (lines 4, 57, 115, 122, 227)
+  { file: "plugins/pipeline-core/templates/prompts/kickoff-new-project.md", match: "truth: harness/session-", reason: vendoredCanonAllowlistReason("templates/prompts/kickoff-new-project.md") }, // L4
+  { file: "plugins/pipeline-core/templates/prompts/kickoff-new-project.md", match: "a root `setup.mjs`,", reason: vendoredCanonAllowlistReason("templates/prompts/kickoff-new-project.md") }, // L57
+  { file: "plugins/pipeline-core/templates/prompts/kickoff-new-project.md", match: "setup.mjs`, owns", reason: vendoredCanonAllowlistReason("templates/prompts/kickoff-new-project.md") }, // L115
+  { file: "plugins/pipeline-core/templates/prompts/kickoff-new-project.md", match: "uence, `harness/session-", reason: vendoredCanonAllowlistReason("templates/prompts/kickoff-new-project.md") }, // L122
+  { file: "plugins/pipeline-core/templates/prompts/kickoff-new-project.md", match: "harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/kickoff-new-project.md") }, // L227
+  // templates/prompts/session-bootstrap-check.md (line 5)
+  { file: "plugins/pipeline-core/templates/prompts/session-bootstrap-check.md", match: "harness/", reason: vendoredCanonAllowlistReason("templates/prompts/session-bootstrap-check.md") }, // L5
+  // docs/adr/0010-session-bootstrap.md (lines 21, 25, 69, 73)
+  { file: "plugins/pipeline-core/docs/adr/0010-session-bootstrap.md", match: "led out in [session-bootstrap.md](../../harness/session-bootstrap.md)):", reason: vendoredCanonAllowlistReason("docs/adr/0010-session-bootstrap.md") }, // L21
+  { file: "plugins/pipeline-core/docs/adr/0010-session-bootstrap.md", match: "strap.md](../../harness/session-bootstrap.md) st", reason: vendoredCanonAllowlistReason("docs/adr/0010-session-bootstrap.md") }, // L25
+  { file: "plugins/pipeline-core/docs/adr/0010-session-bootstrap.md", match: "muliert in [session-bootstrap.md](../../harness/session-bootstrap.md)):", reason: vendoredCanonAllowlistReason("docs/adr/0010-session-bootstrap.md") }, // L69
+  { file: "plugins/pipeline-core/docs/adr/0010-session-bootstrap.md", match: "strap.md](../../harness/session-bootstrap.md) Sc", reason: vendoredCanonAllowlistReason("docs/adr/0010-session-bootstrap.md") }, // L73
+  // docs/adr/0017-push-policy-standing-approval.md (lines 39, 74)
+  { file: "plugins/pipeline-core/docs/adr/0017-push-policy-standing-approval.md", match: "setup.mjs` genera", reason: vendoredCanonAllowlistReason("docs/adr/0017-push-policy-standing-approval.md") }, // L39
+  { file: "plugins/pipeline-core/docs/adr/0017-push-policy-standing-approval.md", match: "setup.mjs`-Genera", reason: vendoredCanonAllowlistReason("docs/adr/0017-push-policy-standing-approval.md") }, // L74
+  // docs/adr/0027-gate-philosophy.md (lines 9, 45)
+  { file: "plugins/pipeline-core/docs/adr/0027-gate-philosophy.md", match: "cally via `node harness/scripts/pipeline", reason: vendoredCanonAllowlistReason("docs/adr/0027-gate-philosophy.md") }, // L9
+  { file: "plugins/pipeline-core/docs/adr/0027-gate-philosophy.md", match: "bucht via `node harness/scripts/pipeline", reason: vendoredCanonAllowlistReason("docs/adr/0027-gate-philosophy.md") }, // L45
+  // docs/adr/0028-manifest-approach.md (lines 41, 49)
+  { file: "plugins/pipeline-core/docs/adr/0028-manifest-approach.md", match: "setup.mjs` produc", reason: vendoredCanonAllowlistReason("docs/adr/0028-manifest-approach.md") }, // L41
+  { file: "plugins/pipeline-core/docs/adr/0028-manifest-approach.md", match: "setup.mjs` valida", reason: vendoredCanonAllowlistReason("docs/adr/0028-manifest-approach.md") }, // L49
+  // docs/adr/0029-file-handoffs-status.md (lines 11, 50)
+  { file: "plugins/pipeline-core/docs/adr/0029-file-handoffs-status.md", match: "he CLI `harness/scripts/", reason: vendoredCanonAllowlistReason("docs/adr/0029-file-handoffs-status.md") }, // L11
+  { file: "plugins/pipeline-core/docs/adr/0029-file-handoffs-status.md", match: "ie CLI `harness/scripts/", reason: vendoredCanonAllowlistReason("docs/adr/0029-file-handoffs-status.md") }, // L50
+]);
+
 export const ALLOWLIST = Object.freeze([
   {
     file: "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
@@ -258,124 +351,20 @@ export const ALLOWLIST = Object.freeze([
     reason: "Class B: a `const` binding path embedded in a JSON Schema used only by this repository's own Nova-sprint candidate-freeze release tooling, self-application-only.",
   },
 
-  // --- GF-108: manual, byte-identical vendored copies of self-application
-  // canon text (guardrails/roles/templates-prompts, GF-107 ae25b35e) and the
-  // ADRs that text cites (GF-108). Each of these files is a verbatim mirror
-  // of a repo-root source file that legitimately documents THIS repository's
-  // own harness/ tooling in its self-application voice; every harness/- or
-  // setup.mjs-prefixed mention below is inherited unchanged from that source,
-  // not a new instruction telling a consumer to run it. This is a known,
-  // PO-accepted, EXPLICITLY TEMPORARY gap in the "quick copy now" vendoring
-  // approach -- not an oversight -- tracked by the deferred generated
-  // build-step item that will properly classify/reconcile this content:
-  // backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md
-  // File-wide filePattern (not per-line) matches this checker's own Class-C
-  // convention for files whose entire content is a known, accepted snapshot
-  // rather than hundreds of near-duplicate per-line entries.
-
-  {
-    filePattern: /^plugins\/pipeline-core\/guardrails\/deploy\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/deploy.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/guardrails\/git\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/git.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/guardrails\/global\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/global.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/guardrails\/quality-gates\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/quality-gates.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/guardrails\/security\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own guardrails/security.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/roles\/critic\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own roles/critic.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/roles\/elephant\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own roles/elephant.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/roles\/goldfish\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own roles/goldfish.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/agent-obligations\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/agent-obligations.md (GF-107). Unlike the sibling entries, this identity is ENFORCED, not merely asserted: generate-agent-obligations.test.mjs AC-2b fails when the two files differ (the claim had gone false once, unnoticed, after the canonical file was regenerated alone). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/critic-review\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/critic-review.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/elephant-kickoff\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/elephant-kickoff.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/goldfish-task\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/goldfish-task.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/kickoff-new-project\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/kickoff-new-project.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/templates\/prompts\/session-bootstrap-check\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of this repository's own templates/prompts/session-bootstrap-check.md (GF-107). See the comment block above this group for the shared rationale and backlog-item citation.",
-  },
-
-  // --- GF-108: vendored ADRs (plugins/pipeline-core/docs/adr/), the subset
-  // of the 14 files above's own docs/adr/ or bare ADR-<NNNN> citations that
-  // this dispatch's own grep re-confirmed. Same known-accepted-gap rationale
-  // as the group above; only the five that actually trip SOURCE_ONLY_PREFIXES
-  // need an entry -- the other thirteen vendored ADRs (0003, 0005, 0008,
-  // 0011, 0012, 0013, 0014, 0032, 0033, 0047, 0055, 0056, 0061) carry none.
-
-  {
-    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0010-session-bootstrap\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0010-session-bootstrap.md, cited by templates/prompts/session-bootstrap-check.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0017-push-policy-standing-approval\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0017-push-policy-standing-approval.md, cited by guardrails/git.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0027-gate-philosophy\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0027-gate-philosophy.md, cited by guardrails/quality-gates.md and guardrails/security.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0028-manifest-approach\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0028-manifest-approach.md, cited by templates/prompts/kickoff-new-project.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
-  },
-  {
-    filePattern: /^plugins\/pipeline-core\/docs\/adr\/0029-file-handoffs-status\.md$/u,
-    reason:
-      "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0029-file-handoffs-status.md, cited by guardrails/security.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
-  },
+  // --- F2 fix (Critic review, 2026-08-10, over commits 4d0f8038..e2a3072f):
+  // the vendored guardrails/roles/templates-prompts/ADRs (GF-107/GF-108) are
+  // byte-identical copies of repo-root files that legitimately document THIS
+  // repository's own harness/ tooling or setup.mjs in their self-application
+  // voice -- but they are files a consumer DOES read as instructions (that is
+  // the whole point of vendoring them), so a whole-file `filePattern` exemption
+  // was the wrong granularity: it registers as "used" before any line is
+  // inspected, and a repaired line's entry would never go stale. Replaced with
+  // one per-line `{file, match}` entry per exact offending line -- the same
+  // tighter, stale-checked shape check-doc-contracts.mjs's
+  // VENDORED_LINK_EXCLUSIONS already uses for these same files' dead links.
+  // See VENDORED_CANON_ALLOWLIST below (generated ground truth verified by
+  // scratch derivation against SOURCE_ONLY_PREFIXES with no allowlist).
+  ...VENDORED_CANON_ALLOWLIST,
   {
     file: "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
     match: "wired into `harness/scripts/verify.mjs`",
