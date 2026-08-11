@@ -302,6 +302,58 @@ small, real, left for whoever next regenerates that mode rather than
 invented an unclassified fix here. Full detail:
 `specs/sprint-phoenix-epic/evidence/acceptance-evidence-map-20260811.md`.
 
+### A second pass (`4c41a483`) found the same stale-negative pattern twice more — 127/26/3/0/1
+
+Follow-up to the paragraph above, same session, same finding class: the four
+criteria never re-measured since the very first two 2026-08-08 passes (tags
+`C`/`J`, the oldest in the file) were audited for the identical mistake —
+dispatched as `PHX-WP-DELTA-STALE4`, also cut off mid-run once (14 tool uses
+into a resumed pass after the first attempt spent its whole 50-use budget on
+orientation with zero edits — resumed via `SendMessage` rather than
+re-dispatched, same pattern as the PX0 task). `H-AC-09` was deliberately
+excluded: also old and also `not-started`, but its evidence-gap text already
+records a 2026-08-09 PO-confirmed reclassification tied to this repo's own
+Sprint-0 cross-repository-write prohibition — a real policy park, not a
+measurement gap.
+
+Of the remaining four: **two retract, two reconfirm.**
+
+- **A-AC-09** `designed-only` → `partial`: `governance-event-store.mjs`'s
+  `captureDecision:"sampled-out"` path (`assertMandatoryCaptureNotSkipped`)
+  landed 2026-08-10 for A-AC-07 and was simply never credited to this
+  sibling criterion it also satisfies. Independently re-verified by the
+  Elephant: `node --test plugins/pipeline-core/lib/governance-event-store.test.mjs`
+  → 37/37 green.
+- **P-AC-09** `not-started` → `partial`: `organization-policy-activation.mjs`'s
+  `computeBackfillRange`/`backfillRange` preview, already credited to P-AC-03
+  but not to this criterion. Independently re-verified:
+  `node --test plugins/pipeline-core/lib/organization-policy-activation.test.mjs`
+  → 4/4 green.
+- **A-AC-03** and **EPIC-AC-02** stay `not-started`, genuinely reconfirmed —
+  direct grep for the relevant subject-matter terms (cascade/invalidation
+  logic; `planParallelSprintIntegration`'s "unpublished"/Nova/Cyborg/
+  Nightwing handling) found nothing in either case. Not every old
+  unmeasured criterion is a stale negative; these two aren't.
+
+The dispatch also folded in the `--mode closure` staleness this checkpoint
+flagged as a loose end above: `PX0-AC-05`/`PX0-AC-13` move from closure
+class `build` to `po` in the `CLOSURE` map, matching that they're now
+code-and-test-complete and blocked only on the PO-gated Critic PASS.
+Independently re-verified by the Elephant:
+`node specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs --mode closure`
+renders clean, and both criteria now list correctly under that render's
+"Class P — not closeable by writing code" table instead of Class B. Left
+open, not a defect: `PX0-AC-06` shows the same pattern (per this checkpoint's
+DELTA-0811 section above) but sat outside this task's named scope — a cheap
+follow-up for whoever next touches this file.
+
+**New total: 127 implemented / 26 partial / 3 not-started / 0 designed-only
+/ 1 constraint** (157). Across both passes today: four criteria retracted a
+stale negative finding, two reconfirmed as genuinely open, none moved to
+`implemented` (same hard constraint both times — no independent Critic PASS
+exists for any of the newly-credited candidates). `EPIC-AC-05` still forbids
+any completion claim.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
