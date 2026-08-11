@@ -97,3 +97,16 @@ starting points for whoever picks this up:
   gates, purely to remove round-trip count.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Accepted — do the time-accounting pass first, before any
+  optimization work.
+- **Rationale:** PO, 2026-08-11: "A" of this item's own Proposal. Quantify
+  precisely where the ~2h went via a full transcript time-accounting pass
+  (kickoff, plan/design, implementation dispatch, Critic rounds, push),
+  before picking any of candidates B (name "CLI-syntax rediscovery" as its
+  own defect class), C (reduce Critic-round count by raising the bar on a
+  Goldfish's first submission) or D (collapse fixed sequential steps for an
+  already-decided profile).
+- **Assignment (if accepted):** Unassigned — a research/forensics-tier
+  dispatch once picked up; not started this session.
+- **Date:** 2026-08-11

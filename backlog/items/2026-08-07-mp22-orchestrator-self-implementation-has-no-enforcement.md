@@ -183,7 +183,26 @@ date.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Declined candidates 1/2 (verifiable trailer, mandatory
+  trailer) of this item's own Proposal. Accepted candidate 3 — attack the
+  incentive, not add a gate.
+- **Rationale:** PO, 2026-08-11 (presented as one of 8 grouped decision
+  clusters covering this item plus `2026-08-08-orchestrator-authored-production-commits-have-no-deterministic-control.md`,
+  `2026-08-09-elephant-writes-production-code-directly-without-a-goldfish-dispatch.md`
+  and `2026-08-08-no-design-to-implementation-handover-exists.md`, since all
+  four are the same root gap): "D" — make the re-dispatch path cheap and
+  well-defined instead of building a technical guard, matching this item's
+  own stated discomfort with a guard restricting the party that administers
+  guards (the GS-6 self-protection problem). Removes most of the motive
+  (a dispatch fell short, the orchestrator already had context loaded,
+  finishing personally looked responsible) without a new enforcement
+  surface. `2026-08-08-no-design-to-implementation-handover-exists.md`'s own
+  gap (zero dispatch at all, not just a fallen-short one) is a second entry
+  point this direction must also close, not only the "dispatch fell short"
+  case this item documents.
+- **Assignment (if accepted):** Unassigned — needs its own design pass
+  defining what a "cheap, well-defined re-dispatch path for a partially
+  completed task" concretely looks like (what triggers it, what the
+  orchestrator does instead of finishing personally). Not yet a dispatchable
+  spec.
+- **Date:** 2026-08-11

@@ -115,7 +115,30 @@ Not designed here. Three questions, and the third is the one that generalises:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Question 1 resolved — "A", with a concrete answer: the plan
+  gate's actual criterion is "PRD is content-sound AND consistent with/
+  matches the Spec," not a mechanical `planPath === specPath` /
+  `prd_*.md`-path check. Question 2 (should a gate-less project have zero
+  gates by default) is NOT answered by this decision — remains open.
+  Question 3 (this item is a second confirmed instance of
+  `2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md`'s gap) —
+  see that item's own 2026-08-11 update, which picked a narrower scope
+  (step 4 QG rule only) than the full systematic gate-walk framework that
+  would have caught this class structurally.
+- **Rationale:** PO, 2026-08-11, verbatim: "A und PRD inhaltlich okay und
+  passend zur Spec ist das gate." Redefines what `approve-plan` actually
+  validates: not a path-identity check between promotion's `planPath` and
+  the gate's expected `prd_*.md` naming, but a content-coherence property.
+  Neither `onboarding-continuity.mjs`'s promotion binding nor
+  `po-gate-authority.mjs`'s validation survives unmodified under this
+  reading — one of the two current mechanical checks has to be replaced,
+  not just relaxed.
+- **Assignment (if accepted):** Unassigned — real design + implementation
+  work. Open sub-question the PO's answer does not itself mechanically
+  resolve: HOW "PRD content-sound and Spec-consistent" is actually checked
+  — a property the human judges at the approval prompt itself (most likely
+  reading, given ADR-0061's "human decides, agent acts on it once decided"
+  framing elsewhere this session), an automatable heuristic, or something
+  else. Flag back to the PO if a design/implementation dispatch hits this
+  fork rather than picking one silently.
+- **Date:** 2026-08-11

@@ -91,3 +91,17 @@ directions, per the PO's dialogue-driven framing above:
   that itself never went deep enough.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Accepted, narrow candidate — treat a short initial goal as
+  a prompt to ask more, not as a signal that little PRD content is
+  warranted.
+- **Rationale:** PO, 2026-08-11: "B" of this item's own three candidate
+  directions. Explicitly NOT candidate A (a full completeness-gate with a
+  fixed coverage checklist blocking Spec authoring) and NOT candidate C
+  (revisiting whether `design-input.md`/resume-hint capture is itself too
+  lossy) — narrower in scope than the item's own broadest framing.
+- **Assignment (if accepted):** Unassigned — needs `kickoff-design.md`
+  wording that operationalizes "short goal → ask more" as an actual
+  behavioral instruction; currently only a principle, no concrete mechanism
+  specified.
+- **Date:** 2026-08-11

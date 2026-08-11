@@ -71,7 +71,27 @@ Not designed here. What has to be decided:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Question 1 (what legitimately unblocks the transition) is
+  now unblocked by the separate 2026-08-11 PO decision on
+  `2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md` (the plan
+  gate's own contradiction is resolved there — content-coherence between
+  PRD and Spec, not a path-equality check). Question 2 (proposal vs. gate)
+  leans toward "proposal, not a hard refusal" given the same 2026-08-11
+  enforcement-mechanism decision on
+  `2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md`
+  (decline new blocking mechanisms, attack the cause instead) — but this
+  was not asked or answered directly and stays a lean, not a confirmed
+  decision. Question 3 (`nextAction: null` at `ready` deserving scrutiny)
+  not addressed.
+- **Rationale:** Cross-referencing two separate PO decisions from the same
+  2026-08-11 batch rather than a direct answer to this item's own three
+  questions — this item was not itself one of the 8 presented clusters,
+  its Q1 dependency and Q2's directional lean are inferred consequences of
+  the other two.
+- **Assignment (if accepted):** Unassigned. Once the plan-gate fix
+  (`2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md`) lands,
+  revisit whether `set-phase --phase implementation` should be proposed by
+  the V4 inspection's `nextAction`, per Q2's lean above — needs an explicit
+  PO confirmation before building, not just an inference from an adjacent
+  decision.
+- **Date:** 2026-08-11

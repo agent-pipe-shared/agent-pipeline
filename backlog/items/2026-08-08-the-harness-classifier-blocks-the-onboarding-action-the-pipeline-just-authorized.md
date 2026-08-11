@@ -103,7 +103,18 @@ already adopted.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — introduce a settings-level allowlist for
+  Pipeline CLIs, strictly gated on verifying each guard already enforces a
+  closed, positional argv set before that CLI becomes a candidate.
+- **Rationale:** PO, 2026-08-11: "A" of this item's own Direction. Directly
+  resolves candidate #2 of
+  `2026-08-07-push-release-flow-unusable-for-third-party-adopters.md` as
+  well — same underlying question (pre-clear the harness classifier at the
+  settings level), same answer, cross-referenced there.
+- **Assignment (if accepted):** Unassigned — needs the verification pass
+  first (this item's own direction 1: "for each Pipeline CLI proposed for
+  an allowlist, establish that the guard admits a closed, positional argv
+  set and refuses everything else"); only CLIs that pass that check are
+  eligible. Directions 2 (granularity) and 3 (entry ownership) follow once
+  the eligible-CLI set is established.
+- **Date:** 2026-08-11

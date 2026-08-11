@@ -85,7 +85,24 @@ record less true rather than more.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Same bundled decision as
+  `2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md`
+  for the authorship-control question (direction 2/3 here): decline a
+  technical enforcement gate, attack the cause instead. Direction 1 (a
+  decidable commit-message-type check, independent of the authorship
+  question) is NOT covered by this decision — not asked, not answered,
+  stays open.
+- **Rationale:** PO, 2026-08-11: "D" on the grouped enforcement-mechanism
+  cluster. This item's own direction 3 ("ask instead what makes the
+  orchestrator commit production diffs at all... a dispatch that ends with
+  an uncommitted diff should be a visible, typed outcome") is exactly the
+  accepted direction, independently arrived at by this item before the PO's
+  decision. Direction 4 (must not block the OM §3.3 stage-0 fast path)
+  stands as a constraint on whatever the eventual re-dispatch-path design
+  produces.
+- **Assignment (if accepted):** Unassigned, same design pass as the mp22
+  item. Direction 1 (commit-type check, `guardrails/git.md` GIT-01) is a
+  separate, small, decidable fix that could proceed independently but has
+  not been asked about or approved — flag for a future explicit decision,
+  do not bundle into the enforcement-mechanism design.
+- **Date:** 2026-08-11

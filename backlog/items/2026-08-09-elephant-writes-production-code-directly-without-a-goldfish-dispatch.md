@@ -53,7 +53,19 @@ first real implementation step. Two angles worth investigating together:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Same bundled decision as
+  `2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md`.
+  This item's own direction 2 (a technical detection signal on whether the
+  active feature/phase had ≥1 dispatch before production writes accumulate)
+  is effectively what the PO declined — that is a guard, and the decision
+  was to not build one. Direction 1 (clearer skill guidance at the exact
+  point a fresh kickoff reaches its first implementation step) was not
+  asked about separately and is not decided either way.
+- **Rationale:** PO, 2026-08-11: "D" on the grouped enforcement-mechanism
+  cluster — make re-dispatch cheap instead of gating self-implementation
+  detection.
+- **Assignment (if accepted):** Unassigned, folds into the same design pass
+  as the mp22 item. Direction 1 (documentation/guidance wording) remains a
+  candidate cheap fix but is not yet approved — flag separately if picked
+  up.
+- **Date:** 2026-08-11

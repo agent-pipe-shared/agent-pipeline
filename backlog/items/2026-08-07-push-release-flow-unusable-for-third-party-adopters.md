@@ -255,3 +255,26 @@ commitment to any of them:
   separately, since both are instances of "guard drawn at a whole-directory
   boundary rather than at what actually needs protecting."
 - **Date:** 2026-08-07
+
+- **Update, 2026-08-11 (PO decision on candidate #4's cost/benefit
+  question):** **Decision:** "C", with a concrete answer rather than just a
+  review — PO, verbatim: "human intent nur 1x abfragen und erfassen für
+  alle gates" (human intent is asked and captured exactly once, and applies
+  across all gates). **Rationale:** this directly resolves candidate 7a
+  ("one signature covers the work, not one action") and aligns with
+  ADR-0061 Decision 0's disposal test already cited in this item — a step
+  that re-confirms an already-made decision is removable. Candidate #2
+  (harness-classifier pre-clearing) is answered by the same 2026-08-11
+  decision on
+  `2026-08-08-the-harness-classifier-blocks-the-onboarding-action-the-pipeline-just-authorized.md`
+  ("A", introduce a verified settings allowlist) — same underlying
+  question, cross-referenced there. Candidate #3 (narrow
+  `prepare-critical`'s cross-repo refusal) is NOT directly answered by this
+  decision; it may fold into the same redesign once "captured once, applies
+  to all gates" is actually designed, but stays open on its own until then.
+  **Assignment:** unassigned — now a real design task: redesign the
+  push/release approval binding so one recorded human intent covers the
+  multi-step chain (7a/7c's structural sign→fix→invalidate→sign-again loop,
+  already documented in this item, is exactly what this decision closes).
+  Substantial enough for its own design pass, not a quick fix.
+- **Date:** 2026-08-11

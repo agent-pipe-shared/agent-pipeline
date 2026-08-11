@@ -104,3 +104,18 @@ red test, which is agent work, instead of an apparent decision point.
   `c92eaca`. Generalizing steps 1-3 across every configured gate/action
   chain, and adding the step-4 QG rule, remains unassigned.
 - **Date:** 2026-08-06
+
+- **Update, 2026-08-11 (PO decision on scope):** presented alongside 7 other
+  decision clusters (`2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md`
+  cites this item as its own second confirmed instance of the same gap).
+  **Decision:** proceed with step 4 only for now — "C": codify "test what
+  the change altered, not only what it was meant to fix" as a rule in
+  `guardrails/quality-gates.md`. Steps 2 (assert remediation text is
+  executable, generalized across every guard) and 3 (consumer walkthrough
+  for every emitted action chain, not just the two existing instances) were
+  NOT picked and remain open, undecided either way — narrower scope than
+  this item's full systematic ask.
+- **Assignment, 2026-08-11:** unassigned — small, well-scoped: add a new QG
+  entry to `guardrails/quality-gates.md` for step 4. Steps 2/3's
+  generalization stays exactly as unassigned as the 2026-08-06 entry above
+  states.

@@ -123,6 +123,28 @@ Not designed here. Candidates for a future session:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged. Filed same-wave as the incidents, at the point of
-reconciling them, per this repo's "persist immediately" rule rather than
-leaving it only in chat history.
+- **Decision:** Accepted — "A": require `dispatch-record.json` to be named
+  per-task (`dispatch-record-<taskId>.json`) directly in
+  `templates/prompts/goldfish-task.md`, removing the fixed-filename-per-
+  directory assumption.
+- **Rationale:** PO, 2026-08-11. Note this session has already been
+  informally following exactly this convention throughout
+  (`evidence/dispatch-record-<TASK_ID>.json` for every dispatch this
+  block) — this decision formalizes it as a template requirement rather
+  than leaving it an ad hoc practice, and specifically closes failure mode
+  2 (the shared-filename clobber) structurally. This session ALSO
+  independently hit the class this item describes, in a different shape
+  (a solo `node harness/scripts/verify.mjs` run raced against a live,
+  concurrently-committing Goldfish dispatch on the same non-worktree
+  checkout, 2026-08-11 — caught via advisor consult and killed before
+  producing false evidence, `docs/state.md`'s 2026-08-11 checkpoint).
+  Candidates B (serialize/scratch-merge shared-file edits), C (tighten the
+  `Worktree: no` heuristic to any-file-either-touches, not just primary
+  scope) and D (forbid unverified `git reset`/history-altering self-
+  correction by a Goldfish) were NOT picked and remain open.
+- **Assignment (if accepted):** A small, mechanical template edit —
+  dispatchable as a `goldfish-mechanic` task once picked up. Not started
+  this session (holding all new dispatches until the current in-flight
+  fix-round work clears, per the one-committer-at-a-time rule this item's
+  own incident 2 already justified).
+- **Date:** 2026-08-11
