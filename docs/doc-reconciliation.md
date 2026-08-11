@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 9fa4e89d23fa3df03f4c07aeeda49391c026fbe4 — 2026-08-11, range c8b7847c..9fa4e89d, P-AC-08 note updated with Critic FAIL verdict
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`9fa4e89d`), touching only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`'s `P-AC-08`
+NOTES string (a prose append recording the fresh independent Critic FAIL
+verdict on the full `c6bd3a6b..3fdf8b9f` range: F3 closed, F-A/F-B open,
+F-C/F-D fixed directly; verdict unchanged at `partial`). Regenerated the
+report and diffed the summary table — `127/26/3/0/1` unchanged.
+
 ## Candidate c8b7847c5911e7c5dda5f98ef4de7e3cd738c5d2 — 2026-08-11, range 3fdf8b9f..c8b7847c, P-AC-08 Critic FAIL verdict + F-C/F-D remediation checkpoint
 
 - ADR-0012: checked, no change needed.
