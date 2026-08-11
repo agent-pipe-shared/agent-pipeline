@@ -47,6 +47,22 @@ something to do here without review.
 
 ## Entries
 
+## Candidate f188d5ebe517022ea7c33afb1c1aaf75a78d8645 — 2026-08-11, range bf46008e..f188d5eb, PO decides P-AC-06 (strike, blocked on digest coupling) + Journal-Gap backlog filing
+
+- ADR-0045: checked, no change needed.
+
+Covers two commits: `b545be4d`
+(`specs/sprint-phoenix-epic/design/p-ac-06-clause-disposition-proposal.md`,
+records the PO's strike decision, the drafted-then-reverted amendment text,
+and the newly-found digest-coupling blocker — an existing design artifact
+under `specs/**`, not a manifest or `lifecycle.json` change) and `f188d5eb`
+(`backlog/items/2026-08-11-agent-decision-journal-has-no-production-
+producer.md`, a new file; `backlog/**` carries no `Governs:` line in any
+ADR). `acceptance.md` itself is untouched in this range — the amendment
+was reverted before committing, exactly per the digest-coupling finding —
+so no artifact-topology or authority-binding change occurred despite the
+decision being made.
+
 ## Candidate bf46008eb4bc34e5e585e6d12e8006f644eeabec — 2026-08-11, range c5b13eae..bf46008e, PO resolves the guard-testpath.mjs kernel-membership question (rejected, exposure stays)
 
 - ADR-0058: amended in bf46008e.
