@@ -79,7 +79,13 @@ runs and before any artifact exists.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Elephant's recommendation accepted — translate the
+  human-facing PROMPT TEXT to `runtime.humanFacingLanguage` (English hard
+  fallback on any lookup failure, so the gate never fails open into "no
+  prompt"); keep the confirmation TOKEN a stable English constant always
+  accepted (a localized token may be accepted additionally, never as a
+  replacement); guard-denial next-step guidance stays English (agent-facing
+  under ADR-0011's target-scope rule).
+- **Rationale:** PO, 2026-08-12: "empfehlung."
+- **Assignment (if accepted):** queued for implementation this session.
+- **Date:** 2026-08-12

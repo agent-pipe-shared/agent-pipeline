@@ -78,7 +78,10 @@ implementation`. Runner- and platform-independent.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Option 2 — keep approval and implementation-start as
+  separate deliberate acts; have the approval-recording command itself
+  announce/surface the required `set-phase --phase implementation` step
+  immediately, rather than leaving it to be discovered by a refused write.
+- **Rationale:** PO, 2026-08-12: "option 2."
+- **Assignment (if accepted):** queued for implementation this session.
+- **Date:** 2026-08-12

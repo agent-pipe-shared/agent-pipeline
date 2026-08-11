@@ -79,3 +79,9 @@ original 2026-08-09/2026-08-10 git-identity bug closed.
 - **Assignment:** none yet — needs its own scoped design pass per GF-103's
   own recommendation, not a same-day quick dispatch.
 - **Date:** 2026-08-10
+
+### Confirmed (PO, 2026-08-12)
+
+- **Decision:** proceed as recommended — dispatch to goldfish-deep now.
+- **Rationale:** PO, 2026-08-12: "so machen."
+- **Date:** 2026-08-12

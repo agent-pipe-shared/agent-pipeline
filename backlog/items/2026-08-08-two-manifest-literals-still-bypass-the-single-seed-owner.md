@@ -66,7 +66,10 @@ defect, one layer further out.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — measure the host-managed-Codex fresh-project
+  path first (byte-for-byte compare of both seed dictionaries) before
+  deciding fix scope, per the item's own Direction 1.
+- **Rationale:** PO, 2026-08-12: "okay so machen." Cheap, bounded, no
+  design call needed until the measurement result is known.
+- **Assignment (if accepted):** queued for implementation this session.
+- **Date:** 2026-08-12

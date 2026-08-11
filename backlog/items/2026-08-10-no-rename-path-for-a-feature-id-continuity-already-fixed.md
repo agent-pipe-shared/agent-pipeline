@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
 source: "Claude Code self-report from the 2026-08-10 greenfield test session (exact transcript path redacted here — it is a machine-specific absolute path and must never appear in a committed artifact), point 13 of its final problem list."
 ---
@@ -67,3 +67,9 @@ narrow recovery needs.
 - **Assignment:** none — revisit if a live project actually hits this dead
   end again despite GF-099.
 - **Date:** 2026-08-10
+
+### Closed (PO, 2026-08-12)
+
+- **Decision:** Leave as-is (no rename mechanism built) and close.
+- **Rationale:** PO, 2026-08-12: "so lassen und close."
+- **Date:** 2026-08-12

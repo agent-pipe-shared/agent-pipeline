@@ -140,3 +140,10 @@ Due date added (`due: 2026-08-24`, two weeks out) specifically to satisfy
 item, cited as the accepted-gap justification for both the above and the
 19 ALLOWLIST entries themselves, had no expiry, which QG-06 requires for any
 documented-instead-of-fixed exception.
+
+### Execution confirmed (PO, 2026-08-12)
+
+- **Decision:** proceed as recommended — dispatch to goldfish-deep (design
+  latitude needed for the classification scheme) now that capacity allows.
+- **Rationale:** PO, 2026-08-12: "empfehlung."
+- **Date:** 2026-08-12

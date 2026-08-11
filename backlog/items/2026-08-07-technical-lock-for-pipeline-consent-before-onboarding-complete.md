@@ -62,6 +62,14 @@ instruction.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged -- the PO submitted this explicitly as "not relevant right
-now, but interesting hardening for the backlog." Left `status: open`,
-untriaged, for a future session with capacity for it.
+- **Decision:** Elephant's recommendation accepted — do the cheap read-only
+  investigation first (does `guard-lifecycle-ready.mjs`'s existing
+  PreToolUse machinery already close this, partially or fully?) before
+  designing the marker-based hook the item proposes. Only build the new
+  hook if a real gap remains after that check.
+- **Rationale:** PO, 2026-08-12: "empfehlung." Matches the item's own
+  triage note, which already asked for exactly this check before any new
+  hook is planned.
+- **Assignment (if accepted):** investigation queued for this session; not
+  urgent (one historical incident, no repeat observed).
+- **Date:** 2026-08-12

@@ -59,3 +59,13 @@ Owner: PO. Due: 2026-09-05.
   onboarding?), then a normal kickoff/PRD/Spec cycle. Not blocking 0.5.2 or
   Nova B.
 - **Date:** 2026-08-07
+
+### Scope decision (PO, 2026-08-12)
+
+- **Decision:** Option B — a full V4-onboarding-parity flow matching
+  Codex's, not a hint-text-only stopgap. Scheduled into the Nightwing
+  sprint, not this one.
+- **Rationale:** PO, 2026-08-12: "B in nightwing einplanen."
+- **Assignment:** kickoff/PRD/Spec cycle deferred to Nightwing planning; not
+  actioned in this sprint.
+- **Date:** 2026-08-12

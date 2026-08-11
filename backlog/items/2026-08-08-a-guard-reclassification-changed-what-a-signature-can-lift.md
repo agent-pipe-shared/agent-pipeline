@@ -95,7 +95,12 @@ command and a bare refusal for another.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Elephant's recommendation accepted — 1) accept the
+  reclassification as correct and write the reasoning down (the item
+  states this alone is the deliverable); 2) add override-reachability as
+  its own axis in the differential-testing corpus, so the next
+  reclassification's side effect on signature reach is caught
+  automatically.
+- **Rationale:** PO, 2026-08-12: "empfehlung."
+- **Assignment (if accepted):** queued for implementation this session.
+- **Date:** 2026-08-12

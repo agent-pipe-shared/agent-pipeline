@@ -92,7 +92,12 @@ the in-repo control passes.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Elephant's recommendation accepted — name the real reason
+  under its own code, classified as a narrower, override-reachable
+  read-scope-refusal class rather than the never-liftable
+  cross-repository-mutation family (reading is not the mutation risk that
+  family exists to stop); make the remedy text true or omit it; audit the
+  other rg-to-rg/rg-to-head exemption for the same asymmetry.
+- **Rationale:** PO, 2026-08-12: "empfehlung."
+- **Assignment (if accepted):** queued for implementation this session.
+- **Date:** 2026-08-12

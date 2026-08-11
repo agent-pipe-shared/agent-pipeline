@@ -86,7 +86,13 @@ the adoption path.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** D5 (empty-argument Critic skill refusal) already queued
+  separately as Task #65. D6 (the 13-step count): Option A — deliberately
+  count and rationale-document all 13 steps as load-bearing (or not) now;
+  defer merging any of them (Option B) until that accounting shows real
+  merge candidates.
+- **Rationale:** PO, 2026-08-12: "A" — cheap, no speculative bootstrap
+  redesign before the accounting exists.
+- **Assignment (if accepted):** queued for implementation this session
+  (write the per-step rationale into the bootstrap documentation).
+- **Date:** 2026-08-12

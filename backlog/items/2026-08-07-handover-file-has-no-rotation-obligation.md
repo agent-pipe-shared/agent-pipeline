@@ -81,7 +81,11 @@ Candidates, explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Elephant's recommendation accepted — start with candidate 5
+  (one-time extraction pass lifting every embedded durable rule into an
+  ADR/policy/guardrail file) unconditionally, since it is a prerequisite
+  for any of 1–4 to be safe; follow with candidate 2 (rotate at
+  block/feature boundaries) as the rotation mechanism.
+- **Rationale:** PO, 2026-08-12: "empfehlung."
+- **Assignment (if accepted):** queued for implementation this session.
+- **Date:** 2026-08-12

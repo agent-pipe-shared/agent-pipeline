@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.native-windows-verify-red-suite-class
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
 due: 2026-09-06
@@ -80,3 +80,10 @@ here rather than as isolated one-off items.
   a remainder is large enough to warrant it, record it as one dated
   inventory here rather than as isolated one-off items.
 - **Date:** 2026-08-07
+
+### Closed (PO, 2026-08-12)
+
+- **Decision:** Closed — the PO reports current native-Windows Verify
+  access shows everything passing now.
+- **Rationale:** PO, 2026-08-12: "close setzen akuell geht alles."
+- **Date:** 2026-08-12

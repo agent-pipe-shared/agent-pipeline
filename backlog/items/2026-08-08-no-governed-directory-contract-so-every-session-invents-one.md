@@ -105,7 +105,13 @@ not supersede it and does not claim to close it.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted as an ADR-track item, but scoped SIMPLE/minimal for
+  now rather than the full comprehensive treatment of all 6 decision
+  points — the Nightwing sprint will optimize this area further, so this
+  pass should resolve the six already-measured instances pragmatically
+  without over-engineering a taxonomy that gets revisited soon anyway.
+- **Rationale:** PO, 2026-08-12: "ja folge empfehlung aber in 'einfach'
+  machen da es in nightwing noch mal optimiert wird."
+- **Assignment (if accepted):** a lean ADR covering the 6 points at minimum
+  necessary depth, queued for this session; expect Nightwing to revise.
+- **Date:** 2026-08-12

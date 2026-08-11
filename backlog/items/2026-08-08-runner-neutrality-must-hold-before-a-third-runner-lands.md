@@ -93,7 +93,22 @@ preference is recorded.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Directions 1–3 (make the class measurable, make silent
+  defaults loud, adopt a third-runner readiness criterion) accepted as
+  future-sprint prep, not urgent now. Direction 4 (where AGY is tracked):
+  the PO states an AGY issue already exists outside this repository's own
+  backlog, with no sprint assigned — this item does NOT become that home;
+  assign/link to the existing issue instead.
+- **Rationale:** PO, 2026-08-12: "ja bitte dem issue für agy zuordnen das
+  schon in den issues ist und keinen sprint hat." A repo-wide search for an
+  existing AGY/Antigravity tracking issue at this session's disposal found
+  only the three prose locations this item's own Description already names
+  (ADR-0051, `docs/runner-support.md`, `docs/adr/README.md`) — no separate
+  issue-tracker entry was locatable from inside this checkout. **Open
+  sub-question for the PO on return:** where does that existing issue live
+  (which tracker), so this item can be linked to it rather than duplicating
+  it.
+- **Assignment (if accepted):** directions 1–3 queued as future-sprint prep,
+  not dispatched this session. Direction 4 blocked on the PO's pointer to
+  the existing issue.
+- **Date:** 2026-08-12

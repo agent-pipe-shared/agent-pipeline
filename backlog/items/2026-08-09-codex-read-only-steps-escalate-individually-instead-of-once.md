@@ -42,7 +42,14 @@ say so explicitly rather than leaving it open indefinitely.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Option A first (one bounded investigation into a Codex CLI
+  sandbox/approval-mode setting) — if it yields nothing quick/cheap, close
+  per Option B rather than leave it open. PO's own framing: the sandbox
+  approval-mode surface is a large problem outside what a same-session fix
+  can realistically move, so do not over-invest chasing it.
+- **Rationale:** PO, 2026-08-12: "so wie empfohlen, wenn A nichts schnelles
+  billiges liefert einfach B und schließen da sandbox ein riesen problem
+  ist."
+- **Assignment (if accepted):** one bounded investigation pass queued this
+  session; close immediately after if nothing cheap is found.
+- **Date:** 2026-08-12

@@ -133,7 +133,23 @@ Two things follow that the original section did not state:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Implement both cleanup events together as the item
+  recommends (bind on session start, sweep orphans on the NEXT session's
+  bootstrap; sweep/assert at the push gate). **Plus a stronger directive
+  than originally recommended, from the PO directly:** `scratch/` write
+  access must be UNCONDITIONAL, exactly like a host tmp path — writable
+  even when the Pipeline/dev-plan gate is not in a `ready`/`implementation`
+  state (draft phase included). This directly closes the "second gap" this
+  item's own text already documents (a real consumer project's
+  `Write(scratch/resume-card.json)` refused by `guard-devplan` in draft
+  phase). The dev-plan gate must exempt `scratch/` universally, not only in
+  this repository's own manifests but as the default shipped behavior.
+- **Rationale:** PO, 2026-08-12: "scratch sollte immer zugelassen werden
+  weil wie tmp pfad auch wenn pipeline nicht ready ist muss scratch immer
+  gehen."
+- **Assignment (if accepted):** SECURITY/GUARDRAIL-adjacent (touches
+  `guard-devplan.mjs`'s write-scope logic) — queued for implementation this
+  session. Push-gate question (finding/warning/silent cleanup for unswept
+  scratch state) resolved per Elephant's recommendation: soft warning, not
+  a hard block.
+- **Date:** 2026-08-12

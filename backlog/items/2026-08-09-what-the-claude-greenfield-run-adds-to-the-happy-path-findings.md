@@ -140,7 +140,16 @@ root-caused separately in
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision (finding 1, language-freeze):** fix upstream, not downstream —
+  locate the kickoff step that fixes `po-language` before the PO's actual
+  language answer exists, and reorder so language is asked/fixed before any
+  document is frozen with a value, rather than patching the mismatch at
+  `submit-plan` after both documents are byte-bound.
+- **Rationale:** PO, 2026-08-12: "so machen wie empfohlen upstream fix."
+- **Assignment (if accepted):** queued for implementation this session,
+  tied to item `2026-08-08-two-cheap-costs-...md`'s 13-step accounting
+  (same chain).
+- **Date:** 2026-08-12
+- Findings 2–5 (silent push gate, missing `--help`, authority-staleness
+  refusals, missing git-identity/repo warnings) are tracked by their own
+  separately-filed items where they exist; not re-triaged here.

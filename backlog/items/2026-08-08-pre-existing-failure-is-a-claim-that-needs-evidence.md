@@ -85,7 +85,12 @@ is a property of how the wave is orchestrated, not of the suite or of Verify.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Points 1–2 (evidence-carrying claims in the Goldfish
+  contract) already queued as Task #66. Points 3–4 (Verify cadence during a
+  wave): Option 1 — run one full Verify at the wave's midpoint, converting
+  a wave-long undetected breakage into a one-dispatch one; per-commit Verify
+  (Option 2) is too expensive at real wave scale.
+- **Rationale:** PO, 2026-08-12: "1."
+- **Assignment (if accepted):** Elephant-process change (how waves are
+  orchestrated), not a code dispatch — apply going forward this session.
+- **Date:** 2026-08-12

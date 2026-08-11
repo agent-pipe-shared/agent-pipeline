@@ -81,3 +81,33 @@ proper spec for it rather than a quick patch.
   than measured.
 - **Assignment:** n/a — revisit after the PO's next live Codex test.
 - **Date:** 2026-08-10
+
+### Re-triaged after the live retest (PO, 2026-08-12) — still broken, concrete design steer given
+
+- **Decision:** The PO retested and the loss-of-operational-context problem
+  is **still present** ("leider immer noch fehlerhaft") — the narrower
+  GF-078 resume-hint-capture fix alone did not resolve it. No longer
+  deferred; accepted with a concrete design direction from the PO:
+  1. **The resume-hint WRITE side needs to be more comprehensive.** The
+     current capture is too narrow to carry what a restart actually needs.
+  2. **The READ side is the part most often forgotten entirely** — a
+     working card is not enough if nothing reliably consumes it.
+     Reading the prior session's own transcript must become **mandatory**,
+     not best-effort, triggered at one of two points: the first
+     successful bootstrap after a restart, or the first time the session
+     reaches a `ready` state — whichever this item's implementation finds
+     the more reliable hook.
+- **Rationale:** PO, 2026-08-12, verbatim: "leider immer noch fehlerhaft -
+  design write muss umfassender sein und read wird oft vergessen muss
+  pflicht bei erstem erfolgreichem bootstrap werden oder bei erstem ready
+  werden transskript der vor session lesen."
+- **Assignment:** real design + implementation work, queued for this
+  session. Must still respect this item's own earlier-recorded constraints
+  (Codex rollout files live at a host/tool-specific path; the new-session
+  cannot trivially identify which prior rollout file is "the one" unless
+  the restart action itself passes it down; reading a full raw transcript
+  conflicts with the resume-hint mechanism's deliberate
+  privacy/payload-budget design — so "read the prior transcript" should be
+  bounded, e.g. recently-hit guard denials and their resolutions, not
+  unbounded raw content).
+- **Date:** 2026-08-12

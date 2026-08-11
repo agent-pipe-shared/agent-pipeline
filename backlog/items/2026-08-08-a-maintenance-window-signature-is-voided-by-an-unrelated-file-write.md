@@ -96,7 +96,16 @@ does it.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Option 3 — make `prepare` idempotent against its own signed
+  intent digest, so a re-prepare after drift yields the same digest when
+  scope/expiry/reason/feature are unchanged and the existing signature
+  still applies.
+- **Rationale:** PO, 2026-08-12: "option 3 aber ggf prüfen ob vorhin schon
+  mit anderem item gelöst." Checked: `GG-03` (the other token/override
+  mechanism referenced in `docs/state.md`) is a harness-classifier-denial
+  double-confirmation override, an unrelated mechanism to this item's
+  `openingTreeSha256` maintenance-window precondition — no overlap found,
+  this item is not already solved elsewhere.
+- **Assignment (if accepted):** SECURITY/GUARDRAIL-class (MP-07 max-tier
+  model), queued for implementation this session.
+- **Date:** 2026-08-12

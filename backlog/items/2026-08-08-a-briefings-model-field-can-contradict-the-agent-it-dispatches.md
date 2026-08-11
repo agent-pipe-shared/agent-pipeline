@@ -81,7 +81,11 @@ different dispatches against the same agent type.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Elephant's recommendation accepted — Option C combined with
+  B: drop the model field's hand-authored half and derive the record from
+  the dispatched agent's actual definition; keep a distinct explicit
+  override path for the genuine MP-05/07 upgrade case (dispatching
+  guardrail work at a higher tier with a stated rationale).
+- **Rationale:** PO, 2026-08-12: "empfehöung" [empfehlung].
+- **Assignment (if accepted):** queued for implementation this session.
+- **Date:** 2026-08-12

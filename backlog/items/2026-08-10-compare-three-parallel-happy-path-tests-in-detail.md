@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.compare-three-parallel-happy-path-tests-in-detail
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
 source: "PO instruction, 2026-08-10, mid pre-release review, explicitly deferred to a future session (\"nicht mehr heute\")."
 ---
@@ -46,3 +46,8 @@ difference. The unprompted-install observation is the concrete lead worth
 starting from.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Closed — the PO states this comparison is already done.
+- **Rationale:** PO, 2026-08-12: "ist erledigt close."
+- **Assignment:** n/a.
+- **Date:** 2026-08-12
