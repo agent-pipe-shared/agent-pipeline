@@ -994,6 +994,81 @@ separate GS-1 `pipeline.user.yaml` edit — a different guard, a different
 signature ceremony (`request-sha256 f8bf4510…`), explicitly told to the PO
 as a second, independent decision they have not yet made.
 
+### `PHX-GMW-TP3-REGISTER` landed (`123d09c0`) — and its own registration surfaced a real regression from earlier tonight, plus two pre-existing gaps
+
+The 5-suite registration itself is exactly as briefed and independently
+re-verified: all 5 new suites (`dispatch-provenance-tests`, `guard-git-
+phoenix-authority-grant-tests`, `decision-reference-dual-evaluation-tests`,
+`human-authority-grant-tests`, `po-approval-gate-tests`) pass standalone
+(53/53) and inside the full run. `check-verify-suite-registration.mjs`
+passes.
+
+The dispatch also reported 5 unrelated full-run failures and characterized
+all of them as "pre-existing." **That characterization was checked, not
+accepted, and was wrong for one of the four real ones:**
+
+- **`guard-testpath-override-tests` (OT09) — a REAL regression, caused by
+  this session's own `c6bd3a6b`, not pre-existing.** OT09 greps
+  `critical-human-proof-policy.mjs`'s own source for the literal text
+  `gates?.push_approval`, as a structural pin that the mode is read via a
+  direct property chain an agent cannot redirect. `c6bd3a6b`'s
+  generalization (`GATE_APPROVAL_MODE_KEYS`/`readGateApprovalMode`) replaced
+  that literal with `value?.gates?.[key]` — functionally identical for
+  `push` (the table is frozen, `key` is always `"push_approval"` for that
+  kind), but the literal text is now genuinely gone (confirmed:
+  `grep -c "gates?.push_approval" critical-human-proof-policy.mjs` → `0`,
+  not inferred from the diff). **The generalization itself is correct and
+  stays** — the fix is updating OT09's own assertion to pin the new
+  structure (e.g. assert `GATE_APPROVAL_MODE_KEYS` is frozen and
+  `GATE_APPROVAL_MODE_KEYS.push === "push_approval"`) instead of the old
+  literal-expression regex. **Blocked on TP-7**
+  (`guard-testpath-override.test.mjs` itself), which the active window does
+  not cover — a window's scope is fixed at install, cannot be widened after
+  the fact. Explicitly considered and rejected: patching a decorative
+  comment into the source purely to satisfy the old regex — that would make
+  a security-relevant test pass without re-verifying anything, the exact
+  failure class this repo has burned Critic rounds on before. Left for the
+  next signed window that includes TP-7.
+  **The generalizable lesson, worth more than this one fix:** verifying
+  `c6bd3a6b` at the time only ran the two suites that looked relevant
+  (31/31 `critical-human-proof-policy-tests` + 5/5
+  `critical-action-approval-request-tests`) — a third, *unregistered* suite
+  also depended on that file's literal source text and would have caught
+  this immediately. Until `123d09c0` moments ago, `verify.mjs` had no way to
+  say which suites those were. For any future `plugins/pipeline-core/lib/
+  *.mjs` edit: the blast radius is every suite that reads the file's
+  *source text*, not only the ones that exercise its exports — `rg` for the
+  changed literal across `plugins/pipeline-core/hooks/*.test.mjs` too, not
+  just the sibling `.test.mjs` next to the edited file.
+- **`product-capability-inventory-tests` (HAW-A02) — undiagnosed, not
+  labelled pre-existing.** Fails on `validated(inventory()).ok !== true`
+  (an attested-receipt/inventory-phase gate). Not yet traced to a cause;
+  recorded honestly as unknown rather than assumed benign.
+- **`backlog-ledger-reconciliation-tests` (RBL01) + `backlog-state-check` —
+  confirmed pre-existing, one shared root cause, dated 2026-08-10 (before
+  tonight).** `backlog/items/2026-08-10-guard-testpath-not-kernel-protected-
+  like-its-sibling.md` carries `status: rejected`; `check-backlog-state.mjs`
+  only accepts `open`/`in_progress`/`closed`. **This is a real, deeper
+  inconsistency, not a typo to silently correct**: `backlog/README.md`
+  itself documents `status: rejected` and `status: deferred` as the
+  intended dispositions for a reviewed-and-declined or reviewed-and-
+  postponed item — the checker's enum has fallen out of sync with the
+  workflow its own README describes. Fixing the item's status value without
+  first resolving which side is stale (checker or convention) would either
+  hide a real capability gap (no way to record "rejected" or "deferred"
+  going forward) or misrepresent this specific item's disposition. Left
+  unfixed, undiagnosed beyond this root-cause identification — worth its
+  own backlog item, not attempted tonight (scope discipline: stay off
+  `pipeline-state.test.mjs`/`verify.mjs` while `PHX-GMW-TP5-TESTS` is live
+  in the first, and this needs a real decision, not a window).
+- **`candidate-binding`** — benign: the automated `doc-reconciliation`
+  commits landing concurrently moved `HEAD` out from under the run's
+  candidate binding. Not a defect, correctly not treated as one.
+
+None of the above blocks `PHX-GMW-TP5-TESTS`, still running. 127/26/3/0/1
+unchanged — none of tonight's work has closed a criterion yet; the tests
+that would (TP-5) are the still-open piece.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
