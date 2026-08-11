@@ -1814,6 +1814,36 @@ audit-trail correction with no content risk — also fine to just leave as a
 disclosed anomaly if a rebase this far into the night isn't worth it to
 you.
 
+### PX0-AC-05 Critic dispatched — first round FAILed on my own dispatch error, not the code — re-dispatched correctly — 2026-08-12
+
+Dispatched an independent Critic review of the PX0-AC-05 security fix
+(`022718b0`, `979e579c`) per the standard two-phase protocol, built from
+`templates/prompts/critic-review.md`, paths/refs only. Per CLAUDE.md's
+model-discipline rule ("Model discipline: every dispatch... names its
+model explicitly... Subagents otherwise silently inherit the session's
+model; that silent inheritance is the failure mode this rule closes") the
+dispatch text correctly stated `claude-opus-5 at max` as the mandated
+route for this security-tier diff — but I did NOT also set the `Agent`
+tool's own `model` parameter, so the subagent silently inherited this
+session's model (`claude-sonnet-5`) instead. **Exactly the failure mode
+the rule names, caught by the Critic's own report-header self-check, not
+by me before dispatching.** The Critic correctly self-failed the gate on
+this basis alone: "Gate verdict: FAIL — not because of a defect in
+022718b0 or 979e579c's code, but because [the wrong model tier] makes
+this review instance invalid as a satisfaction of the mandated
+security-tier Critic gate." Its substantive (explicitly
+non-authoritative) assessment found no blocker/major defect in either
+commit and one minor finding (979e579c's missing commit trailer — already
+known, already tracked in the parallel-dispatch-race backlog item and the
+AR05G dispatch record, and independently corroborated by the Critic via
+direct git-object inspection rather than left as open authorship doubt).
+
+**Re-dispatched immediately, this time passing `model: "opus"` explicitly
+on the `Agent` tool call** (not only stating it in the dispatch text) —
+same spec/diff/guardrail/evidence references, unchanged. Live now;
+whichever verdict lands is the authoritative one for this gate, not the
+first round's substantive-but-non-authoritative read.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
