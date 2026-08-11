@@ -177,3 +177,75 @@ attempt narrowly.
    path is chosen is actually landed and independently Critic-reviewed —
    consistent with this session's standing rule that nothing moves to
    `implemented` without a Critic PASS on the current candidate.
+
+## PO decided, 2026-08-11: strike both clauses — landing is blocked on a fifth, newly-found gate
+
+The PO picked "strike both" directly (option "legacy"-1 and "orphaned"-3
+above), via a direct mobile question with this proposal in hand. The
+amendment text was drafted and staged, then **reverted before committing** —
+not because the decision changed, but because staging it exposed a real
+structural blocker this proposal's step 2 above didn't anticipate.
+
+**The drafted amendment (preserved here verbatim, so it doesn't need
+re-deriving):**
+
+> **Amendment for legacy/orphaned (PO, 2026-08-11).** The "legacy" and
+> "orphaned" trigger words originally in this criterion's list above are
+> struck, each for a proved reason, not an unfinished check. "Legacy" is
+> provably unreachable: an artifact path is structurally confined to
+> `specs/${id}/` by the validator's own `packageRelative` check, and a
+> package under validation always has the `lifecycle.json` manifest that
+> excludes it from `inventoryFeaturePackages`'s legacy classification — no
+> input reaching this criterion's validator can ever be legacy
+> (`design/p-ac-06-clause-disposition-proposal.md`, "legacy — investigation
+> result"). "Orphaned" has no structural predicate the current manifest
+> design can enforce: which files a manifest lists is a curatorial decision
+> made when it was last edited, not a property the file itself carries
+> (concrete counterexample in the same document, "orphaned — investigation
+> result": `specs/sprint-nova-epic/lifecycle.json` lists `evidence/nova-b/*`
+> as tracked artifacts while `evidence/nova-a/*` files of identical shape
+> aren't listed at all, same package, no separating rule). The five
+> remaining trigger words are unaffected and already pinned
+> (`audit-bundle-core-tests`). A real "orphaned" check would need a
+> baseline/grandfather mechanism the manifest schema does not have today —
+> named as future scope in the same document, not attempted here.
+
+Insert this as a new paragraph directly after the P-AC-06 bullet in
+`acceptance.md` (matching the existing "Amendment for GMW (PO, 2026-08-08)"
+precedent already in that file, under criterion H-AC-01), with the trigger
+list itself edited to drop "legacy," and "orphaned," from the enumerated
+words.
+
+**Why it's not landed yet.** `specs/sprint-phoenix-epic/lifecycle.json`
+tracks `acceptance.md` as an artifact with a recorded `sha256`
+(`mutability: "mutable"`, so editing the *content* is expected by the
+manifest's own model). But `validateFeaturePackage`'s digest-binding check
+(`feature-package-topology.mjs:116`) verifies that digest **unconditionally**,
+regardless of `mutability` — editing the file without re-syncing the
+manifest's recorded digest turns `check-artifact-topology.mjs` (a
+registered, currently-green Verify suite) red. Confirmed directly: staging
+the amendment and running that suite reproduced the failure; reverting and
+re-running confirmed clean (`findingCount: 0`) again.
+
+The sanctioned fix is `pipeline-state.mjs feature-package-reconcile` — built
+for exactly this (P-AC-08, this session's earlier "PHX-WP-GATE" work).
+It requires `deps.featurePackageReconcileApproval`, a PO-bound proof check
+in the same shape `continuity-authority-revision-apply` uses for
+`deps.authorityRevisionApproval` — i.e. the same signature class as the
+GMW window, which stays postponed tonight (PO answer 1). Worse: per this
+session's own recorded P-AC-08 finding (independent Critic FAIL, F3), **no
+shipped CLI entry point actually supplies that dependency** — the command
+is structurally uninvokable as shipped, test-file-only. **Hand-editing the
+recorded digest is explicitly refused as a bypass** (`P-AC-08`'s own case
+`RGf` tests exactly this and rejects it) — not attempted here, on the same
+principle this session held all night for `pipeline-state.mjs`'s TP-5
+gate.
+
+**Net: the decision is made and durable (this document); landing it needs
+either (a) the GMW-class signature once `feature-package-reconcile` has a
+real CLI-invokable approval path — which is itself P-AC-08's own remaining
+gap, not yet fixed — or (b) an explicit, PO-authorized one-time exception
+to the manual-digest-edit rule.** Neither was attempted tonight. Whoever
+picks this up next has the exact amendment text above ready to paste; the
+only remaining work is the digest-reconciliation route, not re-deriving the
+content decision.
