@@ -150,3 +150,42 @@ both incidents this item now documents involved a subagent making that call
 correctly once and incorrectly once, from inside the same blind spot.
 Two live incidents from the same unverified-self-correction root cause is
 enough evidence that this proposal should not wait indefinitely for triage.
+
+## Third occurrence — 2026-08-12, PHX-WP-PX0AC13-FAILCLOSED / PHX-WP-PX0AC05-AR05G
+
+Two Goldfish dispatches, both briefed `Worktree: no` on disjoint primary
+files (`ruleset-freshness.mjs`/`.test.mjs` vs.
+`harness/scripts/pipeline-state.test.mjs`), both explicitly warned in their
+briefings about the shared checkout and instructed to bundle
+stage+commit as one shell call. AR05G's first commit (`979e579c`) landed
+correctly-scoped but with a bare subject line — the multi-line body and
+required commit trailer couldn't be composed as a single `-m` under the
+closed shell grammar (a real, separate gap: the template's own final-report
+instructions assume a trailer is easy to attach in one commit, but say
+nothing about what to do when the shell grammar itself can't express a
+multi-line `-m` in one call). AR05G then ran an *unscoped*
+`git commit --amend -F <msgfile>` to attach the missing trailer — between
+its two commands, FAILCLOSED had committed on top of it, so the unscoped
+amend landed on FAILCLOSED's commit instead of AR05G's own, swapping their
+messages/trailers (content of each commit stayed correct; only the
+message/trailer pairing was wrong). Recovered by the Elephant via
+`git commit-tree` (content-preserving, no working-tree interaction) to
+rebuild both commits with correct pairing — but the actual branch-ref move
+to point at the corrected commits was refused by two independent guard
+layers (`guard-git.mjs` GG-07, the runner's own auto-mode classifier), both
+correctly treating an AFK agent force-moving a branch pointer as requiring
+a human in the loop. Left as a disclosed, content-safe provenance anomaly
+for the PO to resolve at their convenience (`docs/state.md`, 2026-08-12
+checkpoint) rather than a blocker.
+
+**This occurrence is the clean confirmation Proposal #4 asked for.** Both
+dispatches this time correctly refrained from a *second* unverified
+self-correction once they noticed something was wrong — AR05G explicitly
+reasoned "either risks racing the still-possibly-live other dispatch a
+second time" and stopped to report instead, and FAILCLOSED likewise
+reported rather than guessing at a fix. Contrast the second occurrence
+above, where `WP-DOC-1` reset anyway and got lucky. Three live incidents,
+one clean stop-and-report this time, is strong evidence Proposal #4
+(forbid unverified reset/history-altering self-correction outright, stop
+and report the exact SHA instead) is the right fix and should be formalized
+into the template rather than left as dispatch-briefing prose.
