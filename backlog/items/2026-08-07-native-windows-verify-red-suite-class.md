@@ -4,6 +4,10 @@ id: pipeline.native-windows-verify-red-suite-class
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-12
+closure_repository: self
+closure_commit: 344b49620f2353749b8bb44fc0dc2889dbdc339c
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md
 created: 2026-08-07
 source: "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
 due: 2026-09-06

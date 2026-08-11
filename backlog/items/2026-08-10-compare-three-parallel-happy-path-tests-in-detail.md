@@ -4,6 +4,10 @@ id: pipeline.compare-three-parallel-happy-path-tests-in-detail
 type: idea
 owner: pipeline
 status: closed
+closed_at: 2026-08-12
+closure_repository: self
+closure_commit: 344b49620f2353749b8bb44fc0dc2889dbdc339c
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md
 created: 2026-08-10
 source: "PO instruction, 2026-08-10, mid pre-release review, explicitly deferred to a future session (\"nicht mehr heute\")."
 ---

@@ -4,6 +4,10 @@ id: pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-12
+closure_repository: self
+closure_commit: 344b49620f2353749b8bb44fc0dc2889dbdc339c
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md
 created: 2026-08-10
 source: "Claude Code self-report from the 2026-08-10 greenfield test session (exact transcript path redacted here — it is a machine-specific absolute path and must never appear in a committed artifact), point 13 of its final problem list."
 ---
