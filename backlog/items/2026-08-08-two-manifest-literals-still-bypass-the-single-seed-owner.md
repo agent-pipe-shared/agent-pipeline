@@ -73,3 +73,28 @@ defect, one layer further out.
   design call needed until the measurement result is known.
 - **Assignment (if accepted):** queued for implementation this session.
 - **Date:** 2026-08-12
+
+### Measurement result (NVA-BL-67, 2026-08-12)
+
+Reproduced the host-managed-Codex fresh-project branch with a real
+filesystem root (genuine read-only empty `.codex/` directory). The literal
+byte divergence between `LEGACY_V3_RUNTIME_SEEDS[".claude/pipeline.yaml"]`
+and `freshManifestBytes()` is real and confirmed (the legacy seed carries
+no `gates:` chapter at all, ~900 bytes shorter) — but it is **inert on
+this branch**: `planRunnerProfileMigrationV3()` filters every `.claude/*`
+path out of the final target list whenever `hostManagedCodex` is true, so
+`.claude/pipeline.yaml` is never written to disk with the divergent
+content, or with any content, on this specific path. `readProjectAuthority`
+prefers the neutral tier seeded correctly elsewhere, which is why this was
+already masked in practice.
+
+**Disposition:** the specific divergence this item was measuring is
+measured-and-safe for the fresh-project host-managed-Codex branch. Left
+`status: open` rather than closed, because the item's own Directions 2 and
+3 (separating "fresh project" vs. "existing project repair" semantics;
+asserting the invariant structurally rather than per-instance) are
+unresolved design questions this measurement does not answer, and a
+separate, unconfirmed finding surfaced during the same investigation (see
+`2026-08-12-host-managed-codex-apply-may-fail-its-own-target-boundary-invariant.md`)
+that should be resolved or ruled out before this item is fully closed.
+- **Date:** 2026-08-12
