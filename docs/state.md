@@ -1269,8 +1269,65 @@ current code before the fix and passes after; explicit confirmation the
 existing `PS41` foreign-lock tests and `RGi`-`RGr` stay green unchanged.
 
 **P-AC-08 stays `partial`.** 127/26/3/0/1 unchanged. The evidence-map note
-has not yet been updated to reflect this second FAIL — pending, next action
-once `PHX-WP-PAC08-LOCK-REENTRANCY` lands and is itself re-verified.
+was updated the same commit (`5af57a2c`) to record this second FAIL.
+
+### `PHX-WP-PAC08-LOCK-REENTRANCY` landed (`3e1a727e`) — the dispatch found and rejected a real flaw in my own suggested fix, third Critic round dispatched
+
+Genuine reproduce-first this time, verified by file timestamp, not just
+trusted: the RED TAP (`20:30:26`) and GREEN TAP (`20:31:17`) both predate the
+commit (`20:33:00`) — the exact ordering F4 was faulted for missing last
+round. RED shows the new `RGs`/`RGs-2`/`RGs-3` (the self-governing topology
+this project actually uses) failing with `PS-CONTINUITY-LOCKED`, precisely
+the predicted mechanism; nothing else fails. GREEN: `504/504`, independently
+re-run and matched to the artifact myself.
+
+The fix itself deviated from the mechanism I offered as a starting point
+(a module-level, path-keyed reentrant-lock registry) — and for a good
+reason the dispatch found on its own: that design would have flipped `PS44Vc`
+(an existing test proving a genuine foreign-token contender nested inside the
+same held lock's critical section is correctly refused) from a correct
+refusal into a false success, because path alone can't distinguish a
+legitimate same-writer reentry from a different contender that happens to
+nest the same way. Instead: `runFeaturePackageReconcileCommand` hands its
+already-held lock down explicitly (`holderLock`/`holderRoot`) into the
+approval closure, which reuses it — only when the resolved lock paths
+genuinely match — via a new `writeState(..., { reuseLock })` option;
+`acquireContinuityLock`/`releaseContinuityLock` themselves are untouched.
+Independently traced myself before accepting it: `writeState`'s CAS re-read
+(`observedBase` vs. `expectedState`) runs unconditionally regardless of
+whether the lock was fresh or reused, so a stale base would still be caught,
+not silently accepted — the reuse only skips redundant lock ACQUISITION, not
+the write's own staleness check.
+
+Bundled the small F3 fix too (accurate `CRITICAL-PROOF-REPLAY` message,
+`RGq` updated to assert it and the absence of the generic text).
+
+**Third Critic round dispatched** on `3e1a727e` alone (no stated base/head —
+exactly one commit, confirmed via `git rev-list --count` before dispatching,
+correcting the range-description mistake the prior round caught). Two more
+dispatch-quality corrections applied this time, both advisor-caught before
+sending: the dispatch record is named ONLY under authorship-evidence now (its
+`log[].note` fields carry real design rationale, which the prior round
+correctly flagged when it was mis-scoped as a "mechanical DoD artifact" the
+first time) — the TAP files carry the actual claims/evidence instead; and a
+stray `PHX-WP-PAC08-LOCK-REENTRANCY.commit-msg.txt` the dispatch left sitting
+in the evidence directory (a workaround for the shell grammar guard blocking
+a heredoc) was deleted before dispatch rather than left for the Critic to
+stumble over.
+
+**P-AC-08 stays `partial`.** 127/26/3/0/1 unchanged, pending this round's
+verdict. Resolved the open question about F-A's blocking scope while
+waiting: `acceptance.md:346-370` (P-AC-08's own criterion text) requires
+preview/authority/candidate-evidence-binding/transactional-writer/readback
+and a named test in a *registered* suite — `pipeline-state-tests` at
+`harness/scripts/verify.mjs:373` already satisfies that, unconditionally on
+any OTHER suite's status. `spec.md:690`'s "Full Verify … pass on the exact
+integrated candidate" (the requirement F-A actually violates) lives in §13
+Definition of Done — an EPIC-CLOSE gate, not a per-criterion one; the same
+distinction that already lets the other 127 `implemented` criteria coexist
+with a not-fully-green Verify run. So: a clean PASS on this round CAN flip
+P-AC-08 to `implemented` on its own merits; F-A stays open as a separate,
+still-real blocker on the epic-level close gate, not on this criterion.
 
 ---
 
