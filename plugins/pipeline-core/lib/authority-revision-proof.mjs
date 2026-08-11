@@ -16,7 +16,7 @@ export const AUTHORITY_REVISION_PROOF_SCHEMA = "pipeline.continuity-authority-re
 export function createAuthorityRevisionIntent({ schema, featureId, expectedRevision, preStateSha256, oldAuthority, nextAuthority, decision, candidate, evidence, idempotencyKey, expiresAt } = {}) {
   if (schema !== "pipeline.continuity-authority-revision-request.v1" || typeof featureId !== "string" || !ID.test(featureId)
     || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0 || !SHA.test(preStateSha256 ?? "") || !authority(oldAuthority) || !authority(nextAuthority)
-    || !own(decision, ["id", "sha256", "scope"]) || typeof decision.id !== "string" || !SHA.test(decision.sha256) || !decisionScope(decision.scope, featureId)
+    || !own(decision, ["id", "sha256", "scope"]) || typeof decision.id !== "string" || !ID.test(decision.id) || !SHA.test(decision.sha256) || !decisionScope(decision.scope, featureId)
     || !own(candidate, ["commit", "tree"]) || !OID.test(candidate.commit) || !OID.test(candidate.tree)
     || !own(evidence, ["sha256"]) || !SHA.test(evidence.sha256) || typeof idempotencyKey !== "string" || !ID.test(idempotencyKey)
     || typeof expiresAt !== "string" || !Number.isFinite(Date.parse(expiresAt))) throw new TypeError("authority revision intent is invalid");

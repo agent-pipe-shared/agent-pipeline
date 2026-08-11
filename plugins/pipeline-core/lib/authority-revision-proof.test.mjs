@@ -26,3 +26,42 @@ test("external proof becomes the authority revision approval shape", () => {
     assert.throws(() => approval(["verify", "--repo-root", repo, "--directory", directory, "--proposal", "proposal.json"]), /does not bind/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
+
+// PX0-AC-05 negative clause (closes Critic Finding 1, px0-ac0305-06-critic-review-d827c1b3.md):
+// decision.id must be constrained the same way its sibling identifiers (featureId,
+// idempotencyKey) already are -- it must be IMPOSSIBLE to smuggle a private path, a
+// prompt/command fragment, or unbounded length through the one caller-controlled field
+// that lands verbatim in the durable, git-tracked receipt.
+test("decision.id rejects a plausible private absolute path", () => {
+  assert.throws(
+    () => createAuthorityRevisionIntent({ ...request, decision: { ...request.decision, id: "/home/someuser/secret-project/notes.txt" } }),
+    /authority revision intent is invalid/u,
+  );
+});
+
+test("decision.id rejects embedded whitespace/newline (a pasted prompt/command fragment)", () => {
+  assert.throws(
+    () => createAuthorityRevisionIntent({ ...request, decision: { ...request.decision, id: "please run\nrm -rf /home/someuser" } }),
+    /authority revision intent is invalid/u,
+  );
+  assert.throws(
+    () => createAuthorityRevisionIntent({ ...request, decision: { ...request.decision, id: "decision with a space" } }),
+    /authority revision intent is invalid/u,
+  );
+});
+
+test("decision.id enforces a bounded length -- accepted at the bound, refused one past it", () => {
+  const atBound = "a".repeat(64);
+  const intent = createAuthorityRevisionIntent({ ...request, decision: { ...request.decision, id: atBound } });
+  assert.equal(intent.value.decision.id, atBound);
+  const overBound = "a".repeat(65);
+  assert.throws(
+    () => createAuthorityRevisionIntent({ ...request, decision: { ...request.decision, id: overBound } }),
+    /authority revision intent is invalid/u,
+  );
+});
+
+test("decision.id still accepts the existing legitimate slug shape unchanged (regression protection)", () => {
+  const intent = createAuthorityRevisionIntent(request);
+  assert.equal(intent.value.decision.id, "phoenix-section-seven");
+});
