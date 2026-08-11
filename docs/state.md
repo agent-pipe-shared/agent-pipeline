@@ -1329,6 +1329,45 @@ with a not-fully-green Verify run. So: a clean PASS on this round CAN flip
 P-AC-08 to `implemented` on its own merits; F-A stays open as a separate,
 still-real blocker on the epic-level close gate, not on this criterion.
 
+### The third Critic round returned PASS — P-AC-08 flips to `implemented` (128/25/3/0/1)
+
+Full report: `specs/sprint-phoenix-epic/evidence/pac08-f1-critic-review-3e1a727e.md`.
+F1, F2 and F3 (this round's registry) all confirmed closed, each on
+mechanism, not on test colour — the reviewer traced all 16 `writeState` call
+sites, confirmed the lock is released exactly once, confirmed the CAS
+re-read runs unconditionally regardless of whether the lock was fresh or
+reused (independently spot-checked myself before accepting the verdict, same
+as the mechanism claim earlier), and confirmed `PS44Vc` — the exact test the
+dispatch's own design reasoning was built around — still passes.
+
+One minor, non-blocking, fail-closed finding: the `reuseLock` predicate
+compares `resolve()` paths, not real (symlink-resolved) ones, so a
+symlink-spelled `--root` would still hit the original self-collision.
+Independently spot-checked the underlying claim (`realpathSync` is indeed
+the primitive this same file already uses elsewhere for genuine
+path-identity comparisons, e.g. `safeRequestFile:926-927`) rather than
+trusting it — confirmed accurate. Filed as its own backlog item
+(`backlog/items/2026-08-11-reconcile-lock-reuse-uses-lexical-not-real-path-comparison.md`)
+rather than silently dropped or forced through a fourth same-night dispatch;
+not yet ledger-registered because `reconcile-backlog-ledger.mjs` refuses to
+run at all while the unrelated, already-documented 2026-08-10 item still
+carries an invalid `status: rejected` — a pre-existing, deliberately
+deferred gap, not something introduced or fixed here.
+
+**P-AC-08 flipped to `implemented`** (commit `fe6cbcdc`): the criterion's own
+text (`acceptance.md:346-373`) is satisfied and gate-registered
+(`pipeline-state-tests`, `harness/scripts/verify.mjs:373`); the separate
+epic-close "Full Verify passes" gate (`spec.md:690`, DoD §13) stays unmet via
+F-A, unchanged from before. Regenerated map: **128/25/3/0/1** (was
+127/26/3/0/1). Four independent Critic rounds ran on this one criterion
+across the night (2026-08-09 F3, 2026-08-11 F-B/F-A/F-C/F-D, 2026-08-11 F1,
+2026-08-11 PASS) — three of them FAIL, each catching something real that
+would otherwise have shipped as closed. This is the "same party measuring
+and closing an epic against its own criteria is a real trust-structure risk"
+discipline paying for itself in the most direct way it can: a criterion this
+session almost called done twice, on real evidence both times, before it
+actually was.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
