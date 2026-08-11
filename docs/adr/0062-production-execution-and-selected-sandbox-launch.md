@@ -2,7 +2,7 @@
 
 > Agent-Pipeline · Nova sprint (`sprint-nova-epic`) · as of 2026-08-11
 
-**Status:** proposed · **Basis:** `specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md` rows `#12`/`#14` and `#29`; `specs/sprint-nova-epic/plans/nova-a.md` Slices A2/A4; drafted at the PO's request ("ja bitte ADR entwerfen", 2026-08-11) — **not yet PO-accepted**.
+**Status:** accepted (2026-08-11, PO instruction, chat, "Annehmen wie entworfen" — accept as drafted) · **Basis:** `specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md` rows `#12`/`#14` and `#29`; `specs/sprint-nova-epic/plans/nova-a.md` Slices A2/A4; drafted at the PO's request ("ja bitte ADR entwerfen", 2026-08-11), accepted as drafted the same day.
 
 ## Context
 
@@ -104,8 +104,7 @@ issue closes.
 
 ## Follow-up
 
-PO acceptance is the immediate next step (status stays `proposed` until
-then). Once accepted: dispatch the actual implementation (goldfish-deep,
+Accepted 2026-08-11. Dispatch the actual implementation (goldfish-deep,
 real design latitude) for each of `#12`/`#14` and `#29` separately, each
 ending in its own Verify/Security/Critic-bound evidence update to
 `issue-acceptance-matrix.md`, before either row can move to

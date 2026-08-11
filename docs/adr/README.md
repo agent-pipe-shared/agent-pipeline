@@ -74,7 +74,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0059](0059-signed-human-guard-override.md) | Human Guard Override gains a signed admission path, usable in `signature` mode for everything else it already classifies | accepted | 2026-08-07 |
 | [0060](0060-handover-placement-and-rotation.md) | Mid-task findings go into the handover because a fresh context is a Goldfish; durable rules go into ADRs; the handover gains a retention obligation whose mechanism is still open | accepted (placement) / open (rotation) | 2026-08-07 |
 | [0061](0061-uniform-human-approval-ceremony.md) | The adversary is the agent, not the human: every human gate is the same three acts — copy one command, type approve, enter the PIN — whatever it authorizes, with the gate and the signature untouched | accepted (requirement) / open (mechanism) | 2026-08-07 |
-| [0062](0062-production-execution-and-selected-sandbox-launch.md) | Production execution and selected-sandbox launch extend ADR-0044's frozen boundary, within its own constraints | proposed | 2026-08-11 |
+| [0062](0062-production-execution-and-selected-sandbox-launch.md) | Production execution and selected-sandbox launch extend ADR-0044's frozen boundary, within its own constraints | accepted | 2026-08-11 |
 
 ### Resubmissions
 
@@ -97,7 +97,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0058](0058-guard-maintenance-window.md) | A dedicated guard against the same-session worktree-merge bypass path is not yet built (see ADR-0058 Consequences/Follow-up) |
 | [0060](0060-handover-placement-and-rotation.md) | Decision 5 open — the concrete handover rotation mechanism is a PO decision |
 | [0061](0061-uniform-human-approval-ceremony.md) | Decision 6 open — the one-command ceremony has to be designed (what one approval covers, prepare+sign collapsed, `OVERRIDE <rule-id>` folded in); every gate shipped today is non-conformant until it lands |
-| [0062](0062-production-execution-and-selected-sandbox-launch.md) | PO acceptance still open (drafted, not yet reviewed); once accepted, `#12`/`#14`/`#29` implementation dispatches follow |
+| [0062](0062-production-execution-and-selected-sandbox-launch.md) | Accepted 2026-08-11 — `#12`/`#14`/`#29` implementation dispatches, each Verify/Security/Critic-bound before its matrix row closes |
 
 ### Conventions
 
