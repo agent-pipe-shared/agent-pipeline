@@ -376,6 +376,18 @@ export const ALLOWLIST = Object.freeze([
     reason:
       "GF-108 (known-accepted vendoring gap): byte-identical vendored copy of docs/adr/0029-file-handoffs-status.md, cited by guardrails/security.md. See the guardrails/roles/templates-prompts group's comment block above for the shared rationale and backlog-item citation.",
   },
+  {
+    file: "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
+    match: "wired into `harness/scripts/verify.mjs`",
+    reason:
+      "Class B: header doc comment describing this standalone diagnostic's own relationship to the calibrated Verify gate (deliberately not registered in it), not a consumer-facing path assumption.",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/tmp-leak-guard.mjs",
+    match: "wired into `harness/scripts/verify.mjs`",
+    reason:
+      "Class B: header doc comment describing this standalone diagnostic's own relationship to the calibrated Verify gate (deliberately not registered in it), not a consumer-facing path assumption.",
+  },
 ]);
 
 function posixPath(value) {
