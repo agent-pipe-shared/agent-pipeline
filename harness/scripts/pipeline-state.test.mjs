@@ -3834,6 +3834,20 @@ function runAuthorityRevisionTests() {
   ok("AR05c the plan payload (the pre-image of the receipt) is equally free of any absolute path or root/dir key", planClean, planText.slice(0, 400));
 }
 
+// AR05g -- PX0-AC-05 security fix (022718b0): a decision.id crafted as an absolute
+// filesystem path is refused closed by the same slug-shape validation already applied
+// to featureId/idempotencyKey, and State is left byte-for-byte unchanged.
+{
+  const fx = seedAuthorityRevisionRoot("ar05-decision-id-path-injection");
+  const preBytes = stateBytes(fx.dir);
+  const { proposal } = reviseProposal(fx, { decision: { id: "/home/attacker/secret-project/notes.txt", sha256: "c".repeat(64), scope: { featureId: fx.id, phase: "design" } } });
+  const planned = planCmd(fx, writeProposal(fx, proposal));
+  ok("AR05g a decision.id crafted as an absolute path is refused closed (AR-INTENT-INVALID)",
+    planned.value === 2 && /AR-INTENT-INVALID/.test(planned.err), planned.err);
+  ok("AR05g refusing the hostile decision.id leaves State byte-for-byte unchanged",
+    stateBytes(fx.dir).equals(preBytes), "state mutated by a rejected plan");
+}
+
 // ---- PX0-AC-05 (durable retention): the receipt survives independently of the private
 // journal (retired on success) and of stdout -- read back from State itself. ----
 {
