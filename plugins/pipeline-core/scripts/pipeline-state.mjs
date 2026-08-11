@@ -5123,6 +5123,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       }
       syncNextActionDocs(dir, written.transition.state);
       console.log(`Plan approved by "${by}" on ${approvedAt}; lifecycle="approved".`);
+      console.log('Next: implementation writes remain refused until you run `set-phase --phase implementation` -- approval and implementation-start are separate deliberate acts.');
       return 0;
     }
 
