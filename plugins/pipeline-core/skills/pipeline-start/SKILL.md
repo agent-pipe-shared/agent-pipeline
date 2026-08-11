@@ -91,6 +91,12 @@ irreversible, or a typed hard block has no supplied safe recovery. Never
 treat this consent as approval for unrelated adoption, remote operations,
 deployment, publication, destructive work, or scope change.
 
+**Before this consent exists:** never create a deliverable file — reading,
+explaining, answering are fine, artifacts are not, even in the turn you say
+you will wait for a yes. Never volunteer whether the Pipeline fits the task;
+that call is the human's — if asked, state cost/benefit neutrally, not a
+recommendation.
+
 1. **Step 0 / V4 onboarding:** execute the exact read-only
    `project-onboarding-v3.mjs inspect --root "$PWD" --intent bootstrap` action
    returned by preflight. Accept only ready `pipeline.project-onboarding.v4`
