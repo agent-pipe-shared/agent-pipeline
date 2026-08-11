@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate c8b7847c5911e7c5dda5f98ef4de7e3cd738c5d2 — 2026-08-11, range 3fdf8b9f..c8b7847c, P-AC-08 Critic FAIL verdict + F-C/F-D remediation checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`c8b7847c`), touching only `docs/state.md`
+(additive checkpoint entry appended after the TP3-registration section,
+append-only discipline preserved — nothing rewritten). No other governed path
+touched; the F-C/F-D fixes this checkpoint describes landed in two
+gitignored, untracked evidence files (`evidence/PHX-WP-PX0-CASOUTCOME/
+dispatch-record.json`, `specs/sprint-phoenix-epic/evidence/PHX-GMW-TP5-
+TESTS.dispatch-record.json`), neither of which is a governed path.
+
 ## Candidate c5e2e6020663034042a201261ebab12a63f93f6a — 2026-08-11, range ddffcb63..c5e2e602, TP3 registration outcome + OT09 regression finding
 
 - ADR-0012: checked, no change needed.
