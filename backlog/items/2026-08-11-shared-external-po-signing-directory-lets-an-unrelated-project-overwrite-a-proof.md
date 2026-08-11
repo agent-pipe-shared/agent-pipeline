@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
 source: "docs/state.md 'Current block' section (0.5.4 release session, 2026-08-10): 'The external PO-signing directory (~/agent-pipeline-po-nova) is also shared with an unrelated parallel test project, which overwrote the first signed request/proof mid-ceremony; the PO re-signed and it was consumed immediately.' Noted there as not yet filed."
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 256033ebdc80ae5055e3fdfe96a8492d18a34c04
+closure_evidence: backlog/evidence/2026-08-11-po-keydir-01-landed.md
 ---
 
 # A shared external PO-signing directory lets an unrelated project overwrite a signed proof mid-ceremony
@@ -55,22 +59,24 @@ real gap even after that fix lands).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accept-defer.
-- **Rationale:** the defect is real and accepted (an unrelated project can
-  overwrite a signed proof mid-ceremony), but any actual fix touches
-  `po-human-approval.mjs`'s request/proof naming or the signing-ceremony
-  directory convention itself — squarely the class of change the PO asked
-  to hold back this block ("halte alles mit signieren etc erstmal zurück",
-  2026-08-11). The Proposal section also flags an open design question
-  (does the fix belong in `po-human-approval.mjs`, or is it fully subsumed
-  by `backlog/items/2026-08-10-po-key-directory-default-should-be-repo-scoped-not-machine-wide.md`
-  once that lands?) that is not assumption-executable — it changes the
-  signing ceremony's behavior and deserves the PO's live review, not a
-  unilateral pick. No signing-ceremony work happened this block after this
-  item was filed (0.5.4 already shipped; this repo has been push-free since,
-  per the PO's separate "kein Push bis inhaltlich fertig" instruction), so
-  leaving it open carries no live exposure right now.
-- **Assignment (if accepted):** not assigned this block — revisit together
-  with `2026-08-10-po-key-directory-default-should-be-repo-scoped-not-machine-wide.md`
-  once the PO is available to decide the design question above.
+- **Decision:** accept-defer, then superseded same day — accept-fix once the
+  PO reviewed the design question directly.
+- **Rationale:** initially triaged accept-defer (the fix touches the signing
+  ceremony, which the PO had asked to hold back generally). Superseded a few
+  turns later, 2026-08-11, when the PO was presented this exact open design
+  question ("Proof-Dateinamen an Repo/Kandidat binden" vs. "erst den
+  Key-Dir-Scope-Fix abwarten" vs. "zurückstellen") and picked the first
+  option explicitly, overriding the general hold-back for this specific,
+  now-decided item.
+- **Assignment:** PO-KEYDIR-01 (`goldfish-deep`), combined with the related
+  `2026-08-10-po-key-directory-default-should-be-repo-scoped-not-machine-wide.md`
+  fix in one dispatch (same file, adjacent concerns — two parallel dispatches
+  would have guaranteed a cherry-pick conflict). Landed `8a04490d` in an
+  isolated worktree, cherry-picked onto `feat/sprint-nova-codex-v046` as
+  `256033eb`. Request/proof/signature/intent/signer filenames now carry a
+  short repository-fingerprint segment (`derivePoGateRepositoryFingerprint`,
+  reused rather than a new scheme); private/public key and trust-policy
+  files stay unsuffixed, unchanged, still shared per human identity. Target
+  suite re-verified directly against the integrated commit: `node --test
+  plugins/pipeline-core/scripts/po-human-approval.test.mjs` → 48/48, exit 0.
 - **Date:** 2026-08-11

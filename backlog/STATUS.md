@@ -130,7 +130,7 @@
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | open | defect | pipeline | 2026-08-10 | — |
+| pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | open | workflow-improvement | pipeline | 2026-08-08 | — |
@@ -169,7 +169,7 @@
 | pipeline.session-told-ready-but-not-how-to-repair | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.setup-promises-a-human-name-repair-it-cannot-perform | open | defect | pipeline | 2026-08-09 | — |
-| pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof | open | defect | pipeline | 2026-08-11 | — |
+| pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.shipped-artifacts-assume-the-pipelines-own-repository | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | open | defect | pipeline | 2026-08-08 | — |
@@ -203,6 +203,6 @@
 
 ## Counts
 
-- open: 127
+- open: 125
 - in_progress: 22
-- closed: 46
+- closed: 48

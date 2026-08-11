@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide
 type: defect
 owner: pipeline
-status: open
 created: 2026-08-10
 source: "PO review of GF-080 (commits 2f8d813c/67c160c4), 2026-08-10, immediately after the fix landed: 'das der Pfad maschinenweit ist, ist nicht gut weil man ggf unterschiedliche Identitäten an der selben [Maschine] will aber den späteren Aufruf macht ja der agent. daher müssen wir den Standardpfad von Maschinenweit auf Repoweit umstellen.'"
 due: 2026-08-23
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 256033ebdc80ae5055e3fdfe96a8492d18a34c04
+closure_evidence: backlog/evidence/2026-08-11-po-keydir-01-landed.md
 ---
 
 # The `poKeyDirectory` default GF-080 added is machine-wide; it should default to repo-scoped instead
@@ -53,7 +57,27 @@ resolves the first repository's remembered directory.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-fix, exactly the direction already stated in the
+  source quote — implemented now on explicit PO instruction, overriding the
+  general "hold back signing work" stance for this specific, already-decided
+  item ("Jetzt umsetzen", 2026-08-11).
+- **Rationale:** the PO's own review comment already named the fix
+  direction in full; nothing left to design except the exact precedence
+  chain and storage location, both specified in this item's own Direction
+  section above.
+- **Assignment:** PO-KEYDIR-01 (`goldfish-deep`), combined with the related
+  `2026-08-11-shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof.md`
+  fix in one dispatch (same file, adjacent concerns). Landed `8a04490d` in
+  an isolated worktree, cherry-picked onto `feat/sprint-nova-codex-v046` as
+  `256033eb`. New repo-scoped store at `<git-common-dir>/agent-pipeline/
+  po-key-directory.json` (mirrors the existing `human-guard-overrides`
+  convention); precedence is now exactly as specified: explicit
+  `--directory` > repo-scoped remembered value > machine-plane
+  `poKeyDirectory` (kept, now third — the real value set earlier this block,
+  `~/agent-pipeline-po`, stays readable and untouched) > environment
+  variable. Regression coverage proves a second repository (different
+  git-common-dir) never inherits the first repository's remembered
+  directory. Target suite re-verified directly against the integrated
+  commit: `node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs`
+  → 48/48, exit 0.
+- **Date:** 2026-08-11

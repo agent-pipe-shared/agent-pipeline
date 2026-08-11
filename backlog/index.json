@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2b8b4b02e40d70d8e15b9cf3a39ae064bc2a8e44b276fe64b1ef721be7227530"
+    "transitionHead": "c39ddb83aaa3ad550a9eccfa8cdd945b1e0d2fa69d5cbde7ecf53f4b46a26bdb"
   },
   "counts": {
-    "open": 127,
+    "open": 125,
     "in_progress": 22,
-    "closed": 46
+    "closed": 48
   },
   "items": [
     {
@@ -1119,11 +1119,15 @@
     },
     {
       "id": "pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "PO review of GF-080 (commits 2f8d813c/67c160c4), 2026-08-10, immediately after the fix landed: 'das der Pfad maschinenweit ist, ist nicht gut weil man ggf unterschiedliche Identitäten an der selben [Maschine] will aber den späteren Aufruf macht ja der agent. daher müssen wir den Standardpfad von Maschinenweit auf Repoweit umstellen.'"
+      "source": "PO review of GF-080 (commits 2f8d813c/67c160c4), 2026-08-10, immediately after the fix landed: 'das der Pfad maschinenweit ist, ist nicht gut weil man ggf unterschiedliche Identitäten an der selben [Maschine] will aber den späteren Aufruf macht ja der agent. daher müssen wir den Standardpfad von Maschinenweit auf Repoweit umstellen.'",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "256033ebdc80ae5055e3fdfe96a8492d18a34c04",
+      "closureEvidence": "backlog/evidence/2026-08-11-po-keydir-01-landed.md"
     },
     {
       "id": "pipeline.po-language-is-set-without-asking-and-cannot-be-changed",
@@ -1490,11 +1494,15 @@
     },
     {
       "id": "pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-11",
-      "source": "docs/state.md 'Current block' section (0.5.4 release session, 2026-08-10): 'The external PO-signing directory (~/agent-pipeline-po-nova) is also shared with an unrelated parallel test project, which overwrote the first signed request/proof mid-ceremony; the PO re-signed and it was consumed immediately.' Noted there as not yet filed."
+      "source": "docs/state.md 'Current block' section (0.5.4 release session, 2026-08-10): 'The external PO-signing directory (~/agent-pipeline-po-nova) is also shared with an unrelated parallel test project, which overwrote the first signed request/proof mid-ceremony; the PO re-signed and it was consumed immediately.' Noted there as not yet filed.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "256033ebdc80ae5055e3fdfe96a8492d18a34c04",
+      "closureEvidence": "backlog/evidence/2026-08-11-po-keydir-01-landed.md"
     },
     {
       "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",
