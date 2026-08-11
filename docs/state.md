@@ -1583,6 +1583,23 @@ rather than left for "next session" since the fix, verification and closure
 all happened here. **Security-Scan is genuinely sauber again, this time
 checked, not assumed.**
 
+### PO answered directly (AskUserQuestion, 2026-08-11): build genuine host delegation for PX0-AC-13
+
+Asked the PO the concrete, well-specified decision recorded above — three
+options (build real delegation, remove the in-process attestation approach
+and rely on the doc-level instruction alone, or park it). **Answer: build
+genuine host delegation** (the recommended option, but a real answer, not
+an assumption). Dispatched immediately as `PHX-WP-PX0AC13-HOSTDELEGATION`
+(goldfish-deep), explicitly framed as investigation-first: Stage 1 must
+determine whether a genuine, reusable cross-sandbox execution primitive
+already exists in this codebase (pointed at `ruleset-freshness-host.mjs`'s
+own `hostTransport`/`FRESHNESS_HOST_RECEIPT_SCHEMA` machinery, the Codex
+App-Server health-check module, and every consumer of `executionBoundary`)
+before attempting any code change — an honest "nothing to build on, here's
+why" is an explicitly valid, complete outcome, not a failure. This is now
+the live, PO-authorized next step; not resolvable by more of my own
+investigation given the severe context state this session has reached.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
