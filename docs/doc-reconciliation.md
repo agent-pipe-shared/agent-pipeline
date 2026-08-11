@@ -47,6 +47,15 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 98509db7caa67d1d10a44a83a3dbd51b38721b4d — 2026-08-11, range ff4558f2..98509db7, correct the H-AC-12 handover entry in state.md
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`98509db7`), touching only `docs/state.md`
+(additive dated correction note appended after the original H-AC-12 entry,
+matching `ff4558f2`'s correction elsewhere — original text left in place
+per append-only discipline). No other governed path touched.
+
 ## Candidate ff4558f28ab8b8fef2e1663a0b9fdfb105cc9254 — 2026-08-11, range d328e307..ff4558f2, correct the H-AC-12 disposition (amendment, not measurement)
 
 - ADR-0045: checked, no change needed.
