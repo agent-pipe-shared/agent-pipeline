@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "64377d7bc0e66f8d294bb08dadbe14786dd51a5b28c55cacbf9af637275c6d7e"
+    "transitionHead": "b3029c31e7e0efbef5e7446e7693d5c34b225a36243b5c46f3f82f69d93524c3"
   },
   "counts": {
-    "open": 92,
+    "open": 89,
     "in_progress": 22,
-    "closed": 87
+    "closed": 90
   },
   "items": [
     {
@@ -366,11 +366,15 @@
     },
     {
       "id": "pipeline.compare-three-parallel-happy-path-tests-in-detail",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "PO instruction, 2026-08-10, mid pre-release review, explicitly deferred to a future session (\"nicht mehr heute\")."
+      "source": "PO instruction, 2026-08-10, mid pre-release review, explicitly deferred to a future session (\"nicht mehr heute\").",
+      "closedAt": "2026-08-12",
+      "closureRepository": "self",
+      "closureCommit": "344b49620f2353749b8bb44fc0dc2889dbdc339c",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md"
     },
     {
       "id": "pipeline.concurrent-dispatches-share-one-index",
@@ -985,11 +989,15 @@
     },
     {
       "id": "pipeline.native-windows-verify-red-suite-class",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
+      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation.",
+      "closedAt": "2026-08-12",
+      "closureRepository": "self",
+      "closureCommit": "344b49620f2353749b8bb44fc0dc2889dbdc339c",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md"
     },
     {
       "id": "pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates",
@@ -1037,11 +1045,15 @@
     },
     {
       "id": "pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "Claude Code self-report from the 2026-08-10 greenfield test session (exact transcript path redacted here — it is a machine-specific absolute path and must never appear in a committed artifact), point 13 of its final problem list."
+      "source": "Claude Code self-report from the 2026-08-10 greenfield test session (exact transcript path redacted here — it is a machine-specific absolute path and must never appear in a committed artifact), point 13 of its final problem list.",
+      "closedAt": "2026-08-12",
+      "closureRepository": "self",
+      "closureCommit": "344b49620f2353749b8bb44fc0dc2889dbdc339c",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-12-medium-low-triage-grouping.md"
     },
     {
       "id": "pipeline.no-sanctioned-way-to-start-over",
