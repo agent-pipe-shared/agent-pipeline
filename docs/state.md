@@ -700,6 +700,30 @@ the GMW window (postponed) or one of the five named scoping steps in the new
 planning document (real work, but investigation, not implementation, and
 not this session's remaining budget to start cold).
 
+### Security-scan run against the actual committed candidate — clean
+
+The Stop hook's own additional context named `security-scan` as the
+pipeline's next step (at a stale path, `plugins/pipeline-core/scripts/`; the
+real one is `harness/scripts/security-scan.mjs`). It refuses a dirty tree,
+and the tree carries exactly the one known, already-backed-up, GMW-blocked
+`pipeline-state.mjs` diff — so this couldn't run as-is. Rather than treat
+that as one more instance of the same wall, stashed that single file only
+(`git stash push -- plugins/pipeline-core/scripts/pipeline-state.mjs`),
+confirmed a clean tree, ran the scan against the actually-committed
+candidate (`2c1f4cee`), then popped the stash back and confirmed the restored
+diff matches (`16 insertions, 1 deletion`, same as before). Fully reversible,
+no state lost.
+
+**Result: `gitleaks`/`semgrep`/`license-check` all clean, `osv-scanner`
+skipped (no package sources in this project) — verdict `CLEAN`, exit 0.**
+This is new information, not previously gathered this session: the
+currently-committed candidate is security-clean and would pass this gate if
+pushed today. It does not unlock anything else — `partial` → `implemented`
+still requires an independent Critic PASS, which still requires the GMW
+window, which stays postponed (answer `1`). Recorded because it's real,
+verified progress on push-readiness, not because it changes the session's
+conclusion.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
