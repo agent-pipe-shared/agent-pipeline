@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate ff4558f28ab8b8fef2e1663a0b9fdfb105cc9254 — 2026-08-11, range d328e307..ff4558f2, correct the H-AC-12 disposition (amendment, not measurement)
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`ff4558f2`), touching the same three
+`specs/sprint-phoenix-epic/` files as `17af46cb`
+(`evidence/acceptance-evidence-map.mjs`, a new dated snapshot
+`evidence/acceptance-evidence-map-20260811d.md`, and
+`design/class-b-multi-dispatch-plan.md`), all still unmanifested in
+`lifecycle.json`. advisor()-flagged correction: reclassifies two of
+`17af46cb`'s dispositions from "documented, closed" to "PO decided, still
+open pending an `acceptance.md` amendment" — content-only, verdict tuple
+unchanged.
+
 ## Candidate d328e307dedbd61ea46ba40d34251e76123caab6 — 2026-08-11, range 17af46cb..d328e307, H-AC-12 disposition recorded in state.md handover
 
 - ADR-0012: checked, no change needed.
