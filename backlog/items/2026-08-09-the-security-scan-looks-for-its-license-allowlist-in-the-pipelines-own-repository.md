@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: c3e34d562fa0d155ec8382a072b5611775162261
+closure_evidence: evidence/dispatch-record-NVA-BL-32.json
 created: 2026-08-09
 source: "Measured on a freshly seeded consumer project, 2026-08-09, while establishing whether a `security` gate can be satisfied at all."
 due: 2026-08-16
@@ -65,7 +69,29 @@ adapter stays unsatisfiable, so the gate stays red.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11).
+- **Rationale:** `NVA-BL-32` (SECURITY-class, `claude-opus-5 at max` per
+  MP-07) fixed Direction point 1: an absent `allowlistPath` now classifies
+  `SKIPPED [success]` ("not configured") rather than `scanner_error`,
+  matching the existing `osv-scanner` clean-skip convention. Commit
+  `c3e34d562fa0d155ec8382a072b5611775162261`, verified via
+  `security-scan.test.mjs` (129/129, up from 126/126) and a live scan of
+  this repo's own tree confirming the configured case is unchanged.
+  **Mandatory Critic pass completed: PASS**, 3 minor findings, no
+  blockers — F1 (the "not configured" reason text technically covers
+  unreadable/dangling-symlink cases `existsSync` also returns false for,
+  not only genuine absence — cosmetic, exit code/status/findings all
+  unaffected), F2 (no red-check-before-fix artifact captured, though the
+  fix is provably discriminating by construction per the Critic's own
+  analysis), F3 (the sibling absent-`declaredPath` branch has the same
+  defect, documented but without an owner/expiry per QG-06 — **now filed
+  separately**, `backlog/items/2026-08-11-license-check-declared-path-absence-still-reads-as-scanner-error.md`,
+  which satisfies QG-06's owner/expiry requirement). F1/F2 accepted as
+  genuinely minor and not re-dispatched — full Critic report at
+  `scratch/critic-f321eca5f293/critic-notes.md`. Direction point 2 (full
+  end-to-end satisfiability re-measurement) remains open, unaddressed —
+  this closes only the allowlist half of point 1.
+- **Assignment (if accepted):** n/a — closed. Direction point 2's
+  end-to-end re-measurement and the newly filed sibling item are the
+  concrete remaining threads.
+- **Date:** 2026-08-11
