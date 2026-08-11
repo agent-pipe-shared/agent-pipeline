@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 28edde05a3bfd912d6f07ffba875868941c1fa8a — 2026-08-11, range f2d9cac5..28edde05, F-B delta Critic FAIL (F1 blocker) + remediation dispatch checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`28edde05`), touching only `docs/state.md`
+(additive checkpoint entry appended after the delta-Critic-dispatch section,
+append-only discipline preserved — nothing rewritten). No other governed
+path touched; the persisted Critic report
+(`specs/sprint-phoenix-epic/evidence/pac08-fb-critic-review-5420c5e7.md`) and
+the new dispatch briefing carry no `Governs:`-tagged path.
+
 ## Candidate f2d9cac5f9c18bfa82c0e596b2eaffe608081f64 — 2026-08-11, range 5420c5e7..f2d9cac5, F-B fix landing checkpoint (red-before-green evidence, delta Critic dispatched)
 
 - ADR-0012: checked, no change needed.
