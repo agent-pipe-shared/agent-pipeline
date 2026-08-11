@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   DEFAULT_EVIDENCE_DIR,
+  ELEPHANT_STAGE0_MAX_PATHS,
   VERDICT,
   coveringPath,
   declaredCommits,
@@ -228,6 +229,68 @@ test("exit codes: 0 all pass, 1 any fail, 2 unverifiable-only, and --strict fold
   assert.equal(exitCodeFor([pass, fail, unver]), 1);
   assert.equal(exitCodeFor([pass, unver]), 2);
   assert.equal(exitCodeFor([pass, unver], { strict: true }), 1);
+});
+
+test("(j) an Elephant trailer with an id other than stage-0 is UNVERIFIABLE, not a free PASS", () => {
+  const verdict = verifyCommit(
+    "f66f001",
+    commit({ message: "feat(x): a thing\n\nDispatch: NVA-BL-99 (elephant)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }),
+  );
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "elephant-direct-nonstandard-id");
+  assert.notEqual(verdict.verdict, VERDICT.pass, "an invented Elephant id must not mint a PASS with no record lookup");
+});
+
+test("(j2) a declared stage-0 commit over the size bound is UNVERIFIABLE and the count is named", () => {
+  const many = Array.from({ length: ELEPHANT_STAGE0_MAX_PATHS + 1 }, (_unused, index) => `src/file-${index}.mjs`);
+  const verdict = verifyCommit("f66f002", commit({ message: "chore(x): sweep\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true\n", paths: many }));
+  assert.equal(verdict.verdict, VERDICT.unverifiable);
+  assert.equal(verdict.classification, "elephant-direct-oversized");
+  assert.equal(verdict.pathCount, many.length);
+  assert.match(verdict.reason, new RegExp(String(ELEPHANT_STAGE0_MAX_PATHS), "u"));
+});
+
+test("(j3) exactly at the bound still PASSes, so the bound is a bound and not an off-by-one", () => {
+  const atBound = Array.from({ length: ELEPHANT_STAGE0_MAX_PATHS }, (_unused, index) => `src/file-${index}.mjs`);
+  const verdict = verifyCommit("f66f003", commit({ message: "chore(x): sweep\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true\n", paths: atBound }));
+  assert.equal(verdict.verdict, VERDICT.pass);
+  assert.equal(verdict.classification, "elephant-direct-declared");
+});
+
+test("(k) two Dispatch trailers on one commit are surfaced, never silently resolved to the topmost", () => {
+  const message = "feat(x): a thing\n\nDispatch: DOD-A (goldfish)\nDispatch: stage-0 (elephant)\nAI-Assisted: true\n";
+  const parsed = parseDispatchTrailer(message);
+  assert.equal(parsed.ambiguous, true);
+  assert.equal(parsed.count, 2);
+  assert.equal(parsed.id, null, "no id may be picked out of two competing claims");
+  const verdict = verifyCommit("f66f004", commit({ message, paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.fail);
+  assert.equal(verdict.classification, "trailer-ambiguous");
+  assert.notEqual(verdict.taskId, "DOD-A", "the topmost trailer must not become the verdict's task id");
+});
+
+test("(k2) ambiguity is judged over the trailer block only: prose plus one real trailer stays unambiguous", () => {
+  const message = "docs: explain\n\nThe rule is Dispatch: SHIP-2 (goldfish) on every commit.\n\nDispatch: stage-0 (elephant)\nAI-Assisted: true\n";
+  const parsed = parseDispatchTrailer(message);
+  assert.equal(parsed.ambiguous, undefined);
+  assert.equal(parsed.id, "stage-0");
+  assert.equal(verifyCommit("f66f005", commit({ message, paths: ["docs/x.md"] })).verdict, VERDICT.pass);
+});
+
+test("(l) a task id that is not a safe filename fragment is refused before it reaches the filesystem", () => {
+  const verdict = verifyCommit(
+    "f77f001",
+    commit({ message: "feat(x): a thing\n\nDispatch: ../../../../etc/passwd (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }),
+  );
+  assert.equal(verdict.verdict, VERDICT.fail);
+  assert.equal(verdict.classification, "trailer-taskid-unsafe");
+  assert.match(verdict.reason, /safe filename fragment/u);
+});
+
+test("(l2) readRecordFile itself refuses an unsafe id rather than joining it into a path", () => {
+  assert.throws(() => readRecordFile(EVIDENCE, "../../../../etc/passwd"), /unsafe task id/u);
+  assert.throws(() => readRecordFile(EVIDENCE, "a/b"), /unsafe task id/u);
+  assert.equal(readRecordFile(EVIDENCE, "NOT-WRITTEN-BY-ANY-TEST"), null, "a safe id that has no record is still a plain null");
 });
 
 test("the real git-backed readers work against this repository's own HEAD", () => {

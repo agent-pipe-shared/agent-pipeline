@@ -31,7 +31,8 @@
  * THE FOUR VERDICTS.
  *
  *   PASS          the trailer resolves to a terminal record that does not contradict the
- *                 commit, or the commit DECLARES itself Elephant-direct.
+ *                 commit, or the commit DECLARES itself Elephant-direct in the sanctioned
+ *                 `stage-0 (elephant)` form AND stays inside the size bound below.
  *   FAIL          the trailer names a record that is absent, unfinished, or contradicts
  *                 the commit.
  *   UNVERIFIABLE  the evidence does not decide. Notably: a commit carrying NO `Dispatch:`
@@ -57,6 +58,22 @@
  *     the story externally observed.
  *   - ABSENT A `commit` FIELD, THERE IS NO SHA BINDING. Most existing records predate the
  *     convention, so dimension 1 is frequently silent rather than satisfied.
+ *   - THE EVIDENCE IS READ FROM THE WORKING TREE, NEVER FROM THE COMMIT'S OWN GIT TREE.
+ *     Records are resolved under `DEFAULT_EVIDENCE_DIR` in the CURRENT working tree, and
+ *     `evidence/` is gitignored. A PASS is therefore a statement about this checkout at this
+ *     moment, not a property of the commit: a second party who checks the same commit out
+ *     fresh has no `evidence/` directory and gets `record-missing` for every commit that
+ *     passed here. Nothing in this script makes the verdict reproducible by a third party.
+ *   - THE ELEPHANT-DIRECT CHECK IS THIN, AND ITS SIZE BOUND IS THIS SCRIPT'S OWN CONVENTION.
+ *     A `stage-0 (elephant)` commit has no record to bind, so exactly two things are
+ *     checked: that the id IS the sanctioned `stage-0` (any other id under role `elephant`
+ *     is UNVERIFIABLE, not a PASS), and that the diff touches at most
+ *     `ELEPHANT_STAGE0_MAX_PATHS` files as a coarse stand-in for "small". The stage-0 fast
+ *     path is described only qualitatively in the obligations text ("small, disclosed,
+ *     judgment-light"); no source names a number, so the bound is chosen here and stated
+ *     rather than derived. "Disclosed" and "judgment-light" are not mechanically checked at
+ *     all — an in-bounds Elephant PASS asserts the declaration is well-formed and small,
+ *     nothing more.
  *
  * EXIT CODES: 0 = every commit PASS. 1 = at least one FAIL. 2 = at least one UNVERIFIABLE
  * and no FAIL (with `--strict`, 2 is folded into 1). 3 = usage/environment error.
@@ -86,6 +103,28 @@ export const NON_TERMINAL_OUTCOMES = Object.freeze(["in-progress", "in progress"
 
 export const VERDICT = Object.freeze({ pass: "PASS", fail: "FAIL", unverifiable: "UNVERIFIABLE" });
 
+/** The one sanctioned Elephant-direct form (`agent-obligations.md` §6). */
+export const ELEPHANT_STAGE0_ID = "stage-0";
+
+/**
+ * The coarse "small" bound for a stage-0 Elephant commit. A convention of this script, not a
+ * value any document exports — see the LIMITS header. It exists so the Elephant branch stops
+ * minting a PASS on a diff of any size for the price of one self-written trailer line.
+ */
+export const ELEPHANT_STAGE0_MAX_PATHS = 10;
+
+/**
+ * A task id is concatenated into a filename under the evidence directory, and it arrives from
+ * a commit trailer — i.e. from the party being vouched for. Constrain it to a safe filename
+ * fragment BEFORE it reaches the filesystem, so a crafted id (`../../..`) is refused as an
+ * invalid trailer rather than resolving somewhere outside `evidenceDir`.
+ */
+export const SAFE_TASK_ID = /^[A-Za-z0-9._-]+$/u;
+
+export function isSafeTaskId(taskId) {
+  return typeof taskId === "string" && SAFE_TASK_ID.test(taskId);
+}
+
 /**
  * Parse the trailer block: the trailing contiguous run of `Key: value` lines. Anchoring on
  * the block rather than on `/^Dispatch:/m` anywhere means a `Dispatch:` mentioned in the
@@ -109,8 +148,22 @@ export function parseTrailerBlock(message) {
  * classification is role-driven rather than a special-cased string.
  */
 export function parseDispatchTrailer(message) {
-  const trailer = parseTrailerBlock(message).find((entry) => entry.key.toLowerCase() === "dispatch");
-  if (!trailer) return null;
+  const entries = parseTrailerBlock(message).filter((entry) => entry.key.toLowerCase() === "dispatch");
+  if (entries.length === 0) return null;
+  if (entries.length > 1) {
+    // Two authorship claims on one commit are not a case where the topmost wins: the
+    // obligations text admits exactly one `Dispatch:` trailer, and picking silently would
+    // let a second, contradicting claim ride along unread. Surfaced, never resolved here.
+    return {
+      raw: entries.map((entry) => entry.value).join(" | "),
+      id: null,
+      role: null,
+      malformed: true,
+      ambiguous: true,
+      count: entries.length,
+    };
+  }
+  const trailer = entries[0];
   const match = /^(\S+)\s*\(([^)]+)\)$/u.exec(trailer.value);
   if (!match) return { raw: trailer.value, id: null, role: null, malformed: true };
   return { raw: trailer.value, id: match[1], role: match[2].trim().toLowerCase(), malformed: false };
@@ -205,19 +258,64 @@ export function verifyCommit(sha, deps) {
       "no `Dispatch:` trailer — unbound to any record; a stage-0 Elephant commit should declare `Dispatch: stage-0 (elephant)`",
     );
   }
+  if (dispatch.ambiguous) {
+    return result(
+      sha,
+      VERDICT.fail,
+      "trailer-ambiguous",
+      `${dispatch.count} \`Dispatch:\` trailers on one commit (\`${dispatch.raw}\`) — exactly one is admitted; the authorship claim is ambiguous and the topmost is deliberately NOT picked`,
+    );
+  }
   if (dispatch.malformed) {
     return result(sha, VERDICT.fail, "trailer-malformed", `\`Dispatch: ${dispatch.raw}\` does not match \`<ID> (<role>)\``);
   }
   if (dispatch.role === "elephant") {
-    return result(sha, VERDICT.pass, "elephant-direct-declared", `declared Elephant-direct (\`${dispatch.raw}\`); no dispatch record expected`, {
-      taskId: dispatch.id,
-    });
+    if (dispatch.id !== ELEPHANT_STAGE0_ID) {
+      return result(
+        sha,
+        VERDICT.unverifiable,
+        "elephant-direct-nonstandard-id",
+        `role \`elephant\` with id \`${dispatch.id}\`; the only sanctioned Elephant form is \`${ELEPHANT_STAGE0_ID} (elephant)\`, and no record is looked up for any other id`,
+        { taskId: dispatch.id },
+      );
+    }
+    let elephantPaths;
+    try {
+      elephantPaths = readChangedPaths(sha);
+    } catch (error) {
+      return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId: dispatch.id });
+    }
+    if (elephantPaths.length > ELEPHANT_STAGE0_MAX_PATHS) {
+      return result(
+        sha,
+        VERDICT.unverifiable,
+        "elephant-direct-oversized",
+        `declared Elephant-direct but touches ${elephantPaths.length} path(s), over the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; "small" is the one stage-0 condition this script can check and it does not hold`,
+        { taskId: dispatch.id, pathCount: elephantPaths.length },
+      );
+    }
+    return result(
+      sha,
+      VERDICT.pass,
+      "elephant-direct-declared",
+      `declared Elephant-direct (\`${dispatch.raw}\`) in the sanctioned form, ${elephantPaths.length} path(s), within the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; no dispatch record expected. "Disclosed" and "judgment-light" stay unchecked`,
+      { taskId: dispatch.id, pathCount: elephantPaths.length },
+    );
   }
   if (dispatch.role !== "goldfish") {
     return result(sha, VERDICT.unverifiable, "unknown-role", `unrecognised dispatch role \`${dispatch.role}\``, { taskId: dispatch.id });
   }
 
   const taskId = dispatch.id;
+  if (!isSafeTaskId(taskId)) {
+    return result(
+      sha,
+      VERDICT.fail,
+      "trailer-taskid-unsafe",
+      `task id \`${taskId}\` is not a safe filename fragment (\`${SAFE_TASK_ID.source}\`); refusing to resolve it into a path under the evidence directory`,
+      { taskId },
+    );
+  }
   let record;
   try {
     record = readRecord(taskId);
@@ -276,6 +374,12 @@ export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = DEFAULT_EVIDENCE_D
 
 /** The naming convention, confirmed against the real corpus: `dispatch-record-<TASK_ID>.json`. */
 export function readRecordFile(evidenceDir, taskId) {
+  // Second line of defence: `verifyCommit` refuses an unsafe id before it gets here, but this
+  // function is exported and is what any other caller reaches for, so it never builds a path
+  // out of an unvalidated id either.
+  if (!isSafeTaskId(taskId)) {
+    throw new Error(`unsafe task id \`${taskId}\`: expected \`${SAFE_TASK_ID.source}\``);
+  }
   const path = join(evidenceDir, `dispatch-record-${taskId}.json`);
   let raw;
   try {
