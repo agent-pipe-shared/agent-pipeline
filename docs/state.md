@@ -400,6 +400,61 @@ criteria are Class A/B/D work, not Class P — genuinely open, genuinely
 agent-executable, not blocked on anything. The next section below picks up
 exactly this thread rather than stopping here.
 
+### L-AC-01 scoped and ruled out as the next pick — real findings, wrong heuristic
+
+Dispatched `PHX-WP-LAC01-SCOPE` (read-only, no code) to find L-AC-01's
+producer site: the closure doc's own sequencing names it first ("no Pipeline
+path emits a lifecycle event at all... the single structural gap"). That
+ranking is by *dependency* ("everything waits on it"), not tractability —
+using it as a work-selection heuristic was the mistake; the two are
+different questions and this session conflated them a second time.
+
+**The gap is confirmed still real** (not a fourth stale-negative):
+`node specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs --mode
+closure` re-run fresh, no non-test file calls the event-store's append path
+with `origin: "lifecycle"`, `governance/events/lifecycle/` (the stream's
+storage dir) doesn't exist yet though the stream itself is registered in
+`governance/events/registry.json`.
+
+**Why it's not this session's next pick.** `validateLifecycleGovernanceEvent`
+requires `correlation.{packageId, dispatchId, attemptId, workerId,
+correlationId}` all non-null plus `queueRevision` — and those five co-exist
+only inside `lib/control-execution-exchange.mjs`'s `createControlExecutionExchange`,
+whose `orchestrationAssignment` input has **zero production callers**
+anywhere in the repo. The scoped top pick
+(`pipeline-state.mjs`'s `apply-legacy-v2-revocation-recovery` case, a
+legacy-plan repair path) is a real, unprotected, already-tested production
+site — its test lives in `plugins/pipeline-core/scripts/pipeline-state-revocation.test.mjs`,
+confirmed unprotected against `.claude/guard-config.json`'s TP-5 pattern
+(`(?:plugins/pipeline-core/hooks/guard-push(?:-v2)?|harness/scripts/pipeline-state)\.test\.mjs$`
+— matches only `harness/scripts/pipeline-state.test.mjs` literally) — but
+this path likely has no live dispatch/worker identity to populate the
+schema with. Wiring `createControlExecutionExchange`'s first production
+caller (the conceptually clean fit, covering 5 of the 9 EARS trigger words
+at once: admission/progress/terminal/cancellation/verification/review-
+handoff) is a seam-connection job, not a narrow one. Neither candidate is a
+safe one-dispatch implementation target as things stand. One more finding,
+unresolved: `acceptance.md` says "candidate change", the schema's `KINDS`
+enum calls it `candidate-invalidation` — worth a look, not chased here.
+
+**Not picking a replacement target tonight, on purpose.** The closure doc's
+own cost column names Class A ("one named test case in an already-
+registered, unprotected suite") as the cheapest remaining class — a more
+plausible next pick than any Class B item — but which specific Class A/B/D
+criterion is genuinely tractable needs the same close reading that just
+took three dispatches to reach one honest "not yet" on L-AC-01 alone.
+
+**Stopping here, and why: three dispatches in a row truncated mid-run on
+the same shape** (read a large generator/module file plus multiple
+subsystems, synthesize, then write) — 35→55 tool uses on the PX0 delta
+task, 50→cut-off twice on the stale-4 audit, 50→cut-off on this scoping
+task, all resumed via `SendMessage` rather than restarted. Budget size
+didn't fix it; the report-early instruction didn't either (the log came
+back empty each time — "after each milestone" never arrives inside one
+continuous read). This is a real, repeated failure mode, not bad luck, and
+it means the next tranche of Class A/B/D work needs a session that starts
+fresh against it rather than one more attempt bolted onto this one.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
