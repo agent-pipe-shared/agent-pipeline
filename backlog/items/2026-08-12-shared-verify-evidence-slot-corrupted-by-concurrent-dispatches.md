@@ -1,0 +1,79 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.shared-verify-evidence-slot-corrupted-by-concurrent-dispatches
+type: defect
+owner: pipeline
+status: open
+created: 2026-08-12
+source: "Independently reported by three separate goldfish dispatches (NVA-BL-40-FIX, NVA-BL-42-FIX, NVA-BL-64) in one wave, 2026-08-12, each hitting the same shared-single-slot evidence artifact while running their own closing `verify.mjs`."
+---
+
+# `evidence/verify-latest.json` is a single shared slot; concurrent dispatches on one checkout overwrite each other's closing evidence
+
+## What happened, three times independently
+
+In one wave of parallel goldfish dispatches sharing one checkout (no
+worktree isolation for this task class), three separate dispatches each ran
+`node harness/scripts/verify.mjs` as their own closing-evidence step and
+each hit the same failure shape:
+
+- **NVA-BL-40-FIX:** its own candidate commit (`05e6f1fe`) ran clean through
+  all 269 suites, then failed only at the final `candidate-binding` meta-step
+  with `VERIFY-CANDIDATE-DRIFT`, because another concurrent dispatch
+  committed on top of it mid-run (HEAD moved `05e6f1fe` → `4f8b1291` while
+  the ~5-minute suite was still executing).
+- **NVA-BL-42-FIX:** its background verify run's resulting
+  `evidence/verify-latest.json` turned out to bind an entirely different
+  candidate range (`05e6f1fe` → `4f8b1291`) than its own commit
+  (`fcc195e0`) — a concurrent dispatch had overwritten the single-slot file
+  mid-run with its own run's result.
+- **NVA-BL-64:** could not observe its own invocation's exit code at all —
+  it exceeded the foreground timeout, was moved to background, and by the
+  time it checked back HEAD had moved twice more from concurrent sessions,
+  so the shared artifact no longer necessarily reflected its own commit.
+
+All three dispatches handled this correctly: none fabricated a clean
+result, all disclosed the contention honestly as an evidence limitation.
+
+## Why this is a defect rather than expected friction
+
+`evidence/verify-latest.json` is a single file, written by one script
+invocation, read by the same script to assert `candidate.binding`. Nothing
+about its design anticipates more than one `verify.mjs` invocation running
+concurrently against the same checkout — which is exactly the operating
+mode this session's own parallel-dispatch wave used, and which
+`docs/operating-model.md` does not discourage.
+
+The practical effect: in a wave of N concurrent goldfish dispatches, at
+most one can obtain a genuinely clean, uncontaminated closing-evidence
+verify run per checkout — the others either see drift, see another
+dispatch's unrelated candidate range, or lose track of their own
+invocation's result entirely. This is a distinct failure from the
+already-filed shared-git-index race
+(`2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md`,
+about `git add`/`git commit` colliding on the index) — this one is about
+the verify *evidence artifact* being a shared single slot, not the commit
+mechanism itself.
+
+## Direction, not a design
+
+Not designed here. Candidates worth considering, not a commitment:
+
+1. Per-run evidence files (e.g. `evidence/verify-<runId>.json`), with
+   `verify-latest.json` as a pointer/symlink updated only by whichever run
+   finishes last — preserves every run's own record instead of one run
+   clobbering another's.
+2. Worktree isolation for any task class expected to run its own closing
+   `verify.mjs` invocation, so concurrent dispatches never share one
+   checkout for this specific step even if they share one for editing.
+3. A serialization discipline at the Elephant/orchestrator level: closing
+   verify runs are queued and run one at a time against a quiescent tree,
+   never dispatched to run concurrently across parallel goldfish briefings
+   in the same wave.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:**
+- **Rationale:**
+- **Assignment (if accepted):**
+- **Date:**
