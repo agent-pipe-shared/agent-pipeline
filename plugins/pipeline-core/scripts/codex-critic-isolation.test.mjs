@@ -902,6 +902,15 @@ async function candidateFixtureRepo() {
   return candidateFixture;
 }
 
+// Regression fixture for the defect class documented above: a genuine two-parent (merge) candidate
+// commit, built the same in-process synthetic-git way as candidateFixtureRepo(), never a throwaway
+// clone of a live repository.
+let mergeHeadCandidateFixture = null;
+async function candidateFixtureRepoWithMergeHead() {
+  if (!mergeHeadCandidateFixture) mergeHeadCandidateFixture = await syntheticRepoWithMergeHead();
+  return mergeHeadCandidateFixture;
+}
+
 await check("exact fixture and review bundle carry full committed UTF-8 content", async () => {
   const candidate = await candidateFixtureRepo();
   const fixture = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
@@ -919,6 +928,14 @@ await check("fixture rejects traversal and duplicate artifact inputs before acce
   const candidate = await candidateFixtureRepo();
   await assert.rejects(() => buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["../private"] }), /normalized relative/u);
   await assert.rejects(() => buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["harness/scripts/verify.mjs", "harness/scripts/verify.mjs"] }), /unique/u);
+});
+
+await check("fixture rejects a genuine two-parent merge candidate commit", async () => {
+  const merged = await candidateFixtureRepoWithMergeHead();
+  const ancestry = execFileSync("git", ["rev-list", "--parents", "-n", "1", merged.head], { cwd: merged.repo, encoding: "utf8" }).trim().split(/\s+/u);
+  assert.equal(ancestry.length, 3, "fixture setup must produce a real two-parent merge commit");
+  assert.equal(ancestry[0], merged.head);
+  await assert.rejects(() => buildExactFixture({ repoRoot: merged.repo, candidateCommit: merged.head, artifactPaths: ["seed.txt"] }), /exactly one bound parent/u);
 });
 
 function childProcess(exitCode, afterSpawn = async () => {}) {
@@ -1105,6 +1122,19 @@ async function syntheticRepo() {
     await writeFile(destination, bytes);
   }
   execFileSync("git", ["add", "--", ...CODEX_CRITIC_ARTIFACTS], { cwd: repo }); execFileSync("git", ["commit", "-qm", "fixture"], { cwd: repo });
+  return { repo, head: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim() };
+}
+
+async function syntheticRepoWithMergeHead() {
+  const repo = await mkdtemp(path.join(os.tmpdir(), "profile-aggregate-merge-repo-"));
+  execFileSync("git", ["init", "-q"], { cwd: repo }); execFileSync("git", ["config", "user.name", "Fixture"], { cwd: repo }); execFileSync("git", ["config", "user.email", "fixture@example.invalid"], { cwd: repo });
+  await writeFile(path.join(repo, "seed.txt"), "parent\n"); execFileSync("git", ["add", "--", "seed.txt"], { cwd: repo }); execFileSync("git", ["commit", "-qm", "parent"], { cwd: repo });
+  const base = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim();
+  execFileSync("git", ["checkout", "-qb", "branch-a"], { cwd: repo });
+  await writeFile(path.join(repo, "a.txt"), "a\n"); execFileSync("git", ["add", "--", "a.txt"], { cwd: repo }); execFileSync("git", ["commit", "-qm", "a"], { cwd: repo });
+  execFileSync("git", ["checkout", "-qb", "branch-b", base], { cwd: repo });
+  await writeFile(path.join(repo, "b.txt"), "b\n"); execFileSync("git", ["add", "--", "b.txt"], { cwd: repo }); execFileSync("git", ["commit", "-qm", "b"], { cwd: repo });
+  execFileSync("git", ["merge", "-q", "--no-ff", "-m", "merge", "branch-a"], { cwd: repo });
   return { repo, head: execFileSync("git", ["rev-parse", "HEAD"], { cwd: repo, encoding: "utf8" }).trim() };
 }
 
