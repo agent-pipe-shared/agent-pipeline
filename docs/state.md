@@ -614,6 +614,92 @@ honest state of the "Class A/B/D work is open and agent-executable"
 correction from earlier — open, yes; executable in one more dispatch
 tonight, no, not for these seven.
 
+### PO's four answers processed; two durable deliverables written; Class A/H-AC-12 also checked and found empty
+
+PO returned four short answers to the four open decision points named at the
+end of the previous session: `1` GMW signature timing → still postponed
+("noch aufschieben"); `2` PC-switch safeguarding → not needed, no switch
+imminent ("nein erstmal nicht"); `3` P-AC-06 disposition → wants the detailed
+writeup, not an in-place `acceptance.md` edit ("bitte detaillierten"); `4`
+Class-B multi-dispatch planning → start it and keep going ("damit dann
+anfangen und weiter machen").
+
+**Answer `3`, delivered as a proposal artifact, not an edit.**
+[`specs/sprint-phoenix-epic/design/p-ac-06-clause-disposition-proposal.md`](../specs/sprint-phoenix-epic/design/p-ac-06-clause-disposition-proposal.md)
+(commit `1324c266`, reconciliation `1022df71`, ADR-0045 checked). Per
+advisor's flag before writing it: `acceptance.md` is a frozen, authority-bound
+artifact for this feature's active revision (continuity pins its sha256) —
+amending it is a PO act, "bitte detaillierten" asked for the writeup, not
+authorization to edit. The proposal also checks all seven P-AC-06 trigger
+words, not just the two already investigated: five (missing, misplaced,
+stale, truncated, illegally mutable) are already pinned by
+`audit-bundle-core-tests`, confirmed by re-reading `feature-package-
+topology.mjs` against the evidence map's own line-1189 pointer text — only
+`legacy`/`orphaned` were ever open. For each it offers a "strike from the
+acceptance text, documented as structurally satisfied/unimplementable"
+option and a "build the real thing" option (a redefined artifact-level
+`legacy` concept; a baseline/grandfather mechanism for `orphaned`), with a
+recommendation to strike both for now and keep the real-fix options named
+for later.
+
+**Answer `4`: one more Class B/H-AC-12 check tonight, then a planning
+document, not a dispatch.** Before picking a target, checked whether
+`H-AC-12`'s two GMW-independent subsystems (release planning, deploy/
+override consumption) are actually tractable the way the session's one clean
+win (`PHX-WP-PAC06-ORPHAN`'s pattern) needs. They aren't, cleanly: the
+shared `dualEvaluateDecisionReference` primitive is already wired into both
+subsystems its own file header names (`guard-devplan.mjs`,
+`change-control.mjs`) — confirmed by grep, not assumed. Of the two
+remaining reachable candidates, `release-version-plan.mjs` has its own,
+different `decisionId` concept (a release-version-decision digest, not a
+`pipeline.human-decision-reference.v1`) with no single-reader gap found on a
+full read, and `critical-action-authorization.mjs` (push/deploy proof
+consumption) already uses full Ed25519 signature verification — a stronger
+mechanism than the ledger-reference pattern the primitive was built for, not
+an obvious instance of the gap it closes. Neither maps cleanly onto
+"wire the existing primitive into an existing path"; both need a
+disposition read first, same shape as P-AC-06. `guard-push.mjs` and
+`pipeline-state.mjs` stay TP-5-blocked as already known.
+
+**Also checked, not previously done: whether Class A was real headroom.**
+The closure doc's cost table names Class A ("one named test case in an
+already-registered, unprotected suite") as the cheapest remaining tier, 2
+criteria. Both turn out already done: `PX0-AC-03` per this session's own
+DELTA-0811 measurement, and `A-AC-14` confirmed tonight
+(`agent-decision-journal.test.mjs:419-420`) — 12 of 13 conformance scenarios
+pinned, the 13th ("decomposition") structurally unrepresentable, same
+ceiling shape as `R-AC-13`. **Class A is empty; both its listed criteria are
+Class P in substance** (done, Critic-PASS-gated), mislabeled in a report
+dated 2026-08-09 that predates this session's corrections.
+
+**Stated once, plainly, then dropped:** answer `1` forecloses any
+`partial` → `implemented` transition tonight by construction — the only
+route is an independent Critic PASS, and the Critic re-review has been
+correctly parked all session for lack of a reviewable, protected-file-complete
+candidate, which needs the GMW window first. Nothing found tonight — not the
+P-AC-06 proposal, not the H-AC-12 check, not the Class A check — changes
+that. This is not a new finding, just the session's existing gate restated
+against tonight's answers.
+
+**Deliverable for answer `4`:**
+[`specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md`](../specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md)
+(commit pending reconciliation below). Scopes `L-AC-01`, `A-AC-01`,
+`V-AC-02`, `R-AC-08` (the four Class B criteria that need a new producer or
+new upstream state, not a semantics decision) with a "next scoping step" for
+each and a recommended order (`V-AC-02` smallest first, `L-AC-01` second
+despite being hardest since other packages wait on it, `A-AC-01`/`R-AC-08`
+after, `H-AC-12`'s remaining subsystems last pending their own disposition
+read). Explicitly not a dispatch briefing for any of them — each needs its
+own Elephant-context scoping pass first, per this session's established
+rule.
+
+**Net effect: the session's tractable-target survey is now genuinely
+exhausted**, not just for Class B (seven criteria, previous section) but for
+Class A too (checked tonight, empty). Every remaining path forward is either
+the GMW window (postponed) or one of the five named scoping steps in the new
+planning document (real work, but investigation, not implementation, and
+not this session's remaining budget to start cold).
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
