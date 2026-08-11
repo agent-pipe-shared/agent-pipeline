@@ -9,7 +9,7 @@ source: "Live Codex+Pipeline 0.5.4 greenfield test session, 2026-08-09 (three ro
 due: 2026-08-23
 closed_at: 2026-08-12
 closure_repository: self
-closure_commit: PENDING-OWN-COMMIT
+closure_commit: 181b7730
 closure_evidence: "backlog/items/2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md#triage (this item's own Triage section, bounded investigation NVA-BL-71)"
 ---
 
