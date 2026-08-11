@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 43dfcbad302308c5016011a85f664318db04daee — 2026-08-12, range 24601573..43dfcbad, PO decisions + GMW window active + FAILCLOSED dispatched
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`43dfcbad`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 26c2d254b73dc3688891a4dbe055b617907cf814 — 2026-08-12, range 19badaa1..26c2d254, PX0-AC-13 evidence-map note updated with REMOVEATTESTATION finding
 
 - ADR-0045: checked, no change needed.
