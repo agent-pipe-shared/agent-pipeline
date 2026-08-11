@@ -36,6 +36,7 @@ import {
   verifyHumanGuardOverrideAudit,
 } from "./human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+import { probeSymlinkCapability, symlinkCapability, symlinkSkip } from "./symlink-capability.mjs";
 
 const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -1340,18 +1341,27 @@ test("F1 (dispatch CRITIC-REMEDY-09): the local-plugin-install attestation succe
 // behavioural.
 // ---------------------------------------------------------------------------------
 
-const EXTERNAL_SYMLINK_CAPABLE = (() => {
-  const probe = mkdtempSync(join(tmpdir(), "human-guard-symlink-probe-"));
-  try {
-    symlinkSync(join(probe, "target"), join(probe, "link"));
-    return true;
-  } catch {
-    process.stdout.write("[capability: symlink unavailable] skipping NVA-BL-20 link-shaped checks\n");
-    return false;
-  } finally {
-    rmSync(probe, { recursive: true, force: true });
-  }
-})();
+// The capability gate for every link-shaped check in this block. Two properties
+// matter, and the ad-hoc probe this constant replaced had neither:
+//
+//   1. It probes the link type these tests actually create. Every link below is
+//      an explicit `"junction"` -- the one link type ADR-0052's target platform
+//      (native Windows without Developer Mode) can create without elevation,
+//      whereas an ordinary file/directory symlink there throws EPERM. An
+//      UNTYPED probe therefore answers a different question than the one these
+//      tests ask, and can disable this file's link-shaped coverage on exactly
+//      the platform it exists to cover.
+//   2. It is the shared, tested primitive (symlink-capability.mjs), which
+//      treats ONLY EPERM/EACCES from the link operation itself as "capability
+//      unavailable" and rethrows every other error class. The blanket
+//      `try { symlinkSync(...) } catch { return false }` this replaced read a
+//      broken fixture environment -- a full disk, a missing temp root -- as a
+//      missing symlink capability, and silently dropped the assertions below.
+//
+// Hoisted to module scope: a typed probe is deliberately not memoized by the
+// shared module, and node:test evaluates a `skip` option once per definition.
+const JUNCTION_CAPABILITY = symlinkCapability({ type: "junction" });
+const JUNCTION_SKIP = symlinkSkip(JUNCTION_CAPABILITY);
 
 function pipelineCheckout(base, name) {
   const root = join(base, name);
@@ -1397,7 +1407,53 @@ function externalFixture() {
   return realpathSync(mkdtempSync(join(tmpdir(), "human-guard-external-marketplace-")));
 }
 
-test("NVA-BL-20: a correctly linked external agent-pipeline-local root is verified and folded into statusSha256", { skip: EXTERNAL_SYMLINK_CAPABLE ? false : "symlink capability unavailable" }, () => {
+test("NVA-BL-20: this suite's junction-capability gate is the shared typed probe, not a blanket catch", () => {
+  const calls = [];
+  const recordingFs = {
+    mkdirSync: (path) => { calls.push(["mkdirSync", path]); },
+    mkdtempSync: (prefix) => { calls.push(["mkdtempSync", prefix]); return `${prefix}fixture`; },
+    rmSync: (path) => { calls.push(["rmSync", path]); },
+    symlinkSync: (target, path, type) => { calls.push(["symlinkSync", target, path, type]); },
+    writeFileSync: (path) => { calls.push(["writeFileSync", path]); },
+  };
+  const probed = probeSymlinkCapability({ fs: recordingFs, tmpRoot: tmpdir(), type: "junction" });
+  assert.equal(probed.available, true);
+  // The probe creates the SAME link type the tests below create -- an untyped
+  // symlink is a different capability on this block's target platform.
+  assert.deepEqual(
+    calls.filter(([operation]) => operation === "symlinkSync").map(([, , , type]) => type),
+    ["junction"],
+  );
+  // A junction is a directory-only link type, so a junction probe's own target
+  // must be a directory; the untyped probe's file target would fail for a
+  // reason that has nothing to do with the privilege being probed.
+  assert.equal(calls.some(([operation]) => operation === "mkdirSync"), true);
+  assert.equal(calls.some(([operation]) => operation === "writeFileSync"), false);
+  assert.equal(calls.some(([operation]) => operation === "rmSync"), true);
+  // Only the two permission codes are read as "capability unavailable" ...
+  for (const code of ["EPERM", "EACCES"]) {
+    const denied = Object.assign(new Error(code), { code });
+    const result = probeSymlinkCapability({
+      fs: { ...recordingFs, symlinkSync() { throw denied; } }, tmpRoot: tmpdir(), type: "junction",
+    });
+    assert.equal(result.available, false);
+    assert.equal(result.reason.includes(code), true);
+    assert.equal(result.reason.includes("junction"), true);
+    assert.equal(symlinkSkip(result), result.reason);
+  }
+  // ... every other failure class is a broken fixture environment and surfaces
+  // as itself, instead of silently disabling the link-shaped coverage below.
+  const enospc = Object.assign(new Error("no space left on device"), { code: "ENOSPC" });
+  assert.throws(
+    () => probeSymlinkCapability({
+      fs: { ...recordingFs, symlinkSync() { throw enospc; } }, tmpRoot: tmpdir(), type: "junction",
+    }),
+    (error) => error === enospc,
+  );
+  assert.equal(symlinkSkip({ available: true, reason: null }), false);
+});
+
+test("NVA-BL-20: a correctly linked external agent-pipeline-local root is verified and folded into statusSha256", { skip: JUNCTION_SKIP }, () => {
   const base = externalFixture();
   try {
     const checkout = pipelineCheckout(base, "checkout");
@@ -1443,7 +1499,12 @@ test("NVA-BL-20: a correctly linked external agent-pipeline-local root is verifi
   }
 });
 
-test("NVA-BL-20: a repointed or mutated external agent-pipeline-local root fails closed", () => {
+// The two link-shaped refusals live in their OWN test rather than behind a bare
+// `if (capability)` inside the sibling below: a capability-gated branch inside a
+// test reports a full pass while several of its assertions never ran, which in
+// the reporter's output is indistinguishable from a real pass. As a separate,
+// `skip`-gated unit, an unavailable capability is visible as a skip instead.
+test("NVA-BL-20: a link-shaped external agent-pipeline-local root that points elsewhere, or nowhere, fails closed", { skip: JUNCTION_SKIP }, () => {
   const base = externalFixture();
   try {
     const checkout = pipelineCheckout(base, "checkout");
@@ -1453,24 +1514,35 @@ test("NVA-BL-20: a repointed or mutated external agent-pipeline-local root fails
       (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-EXTERNAL-MARKETPLACE",
     );
     // (a) the external root's plugins/pipeline-core points at a DIFFERENT checkout.
-    if (EXTERNAL_SYMLINK_CAPABLE) {
-      const repointed = externalMarketplace(base, "repointed");
-      symlinkSync(decoy.sourceRoot, join(repointed, "plugins", "pipeline-core"), "junction");
-      refuses(localRegistry(repointed));
-      // ... and the same root is accepted for the checkout it actually links to,
-      // so the refusal above is the binding, not a blanket rejection.
-      assert.equal(
-        humanGuardOverrideInternals.externalLocalMarketplaceObservation(
-          { root: decoy.root },
-          { registryReader: localRegistry(repointed) },
-        ).state,
-        "verified",
-      );
-      // (b) a dangling link target resolves nowhere at all.
-      const dangling = externalMarketplace(base, "dangling");
-      symlinkSync(join(base, "absent", "plugins", "pipeline-core"), join(dangling, "plugins", "pipeline-core"), "junction");
-      refuses(localRegistry(dangling));
-    }
+    const repointed = externalMarketplace(base, "repointed");
+    symlinkSync(decoy.sourceRoot, join(repointed, "plugins", "pipeline-core"), "junction");
+    refuses(localRegistry(repointed));
+    // ... and the same root is accepted for the checkout it actually links to,
+    // so the refusal above is the binding, not a blanket rejection.
+    assert.equal(
+      humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+        { root: decoy.root },
+        { registryReader: localRegistry(repointed) },
+      ).state,
+      "verified",
+    );
+    // (b) a dangling link target resolves nowhere at all.
+    const dangling = externalMarketplace(base, "dangling");
+    symlinkSync(join(base, "absent", "plugins", "pipeline-core"), join(dangling, "plugins", "pipeline-core"), "junction");
+    refuses(localRegistry(dangling));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BL-20: a repointed or mutated external agent-pipeline-local root fails closed", () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const refuses = (registryReader, root = checkout.root) => assert.throws(
+      () => humanGuardOverrideInternals.externalLocalMarketplaceObservation({ root }, { registryReader }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-EXTERNAL-MARKETPLACE",
+    );
     // (c) a real directory in place of the link never resolves into this checkout.
     const copied = externalMarketplace(base, "copied");
     mkdirSync(join(copied, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });

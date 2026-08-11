@@ -35,8 +35,12 @@ function fakeFs({ failWith = null, failAt = "symlink" } = {}) {
         calls.push(["writeFileSync", path]);
         if (failWith && failAt === "write") throw failWith;
       },
-      symlinkSync(target, path) {
-        calls.push(["symlinkSync", target, path]);
+      mkdirSync(path) {
+        calls.push(["mkdirSync", path]);
+        if (failWith && failAt === "mkdir") throw failWith;
+      },
+      symlinkSync(target, path, type) {
+        calls.push(["symlinkSync", target, path, type]);
         if (failWith && failAt === "symlink") throw failWith;
       },
       rmSync(path) {
@@ -114,6 +118,74 @@ for (const failAt of ["mkdtemp", "write"]) {
   resetSymlinkCapabilityCache();
   const result = symlinkCapability();
   check("SC10 the real, unmocked host probe returns a well-typed result", typeof result.available === "boolean" && (result.reason === null || typeof result.reason === "string"));
+}
+
+// NVA-BL-20: link TYPE is its own capability on Windows (module header, LINK TYPE).
+// A caller that creates directory junctions must be able to probe junctions.
+{
+  const { fs, calls } = fakeFs();
+  const result = probeSymlinkCapability({ fs, tmpRoot: "/tmp", type: "junction" });
+  const links = calls.filter(([op]) => op === "symlinkSync");
+  check(
+    "SC11 a junction probe passes the link type through to symlinkSync",
+    result.available === true && links.length === 1 && links[0][3] === "junction",
+    JSON.stringify(links),
+  );
+  check(
+    "SC12 a junction probe links a DIRECTORY target, never the untyped probe's file",
+    calls.some(([op]) => op === "mkdirSync") && !calls.some(([op]) => op === "writeFileSync"),
+    JSON.stringify(calls),
+  );
+}
+
+{
+  const { fs, calls } = fakeFs();
+  const result = probeSymlinkCapability({ fs, tmpRoot: "/tmp" });
+  const links = calls.filter(([op]) => op === "symlinkSync");
+  check(
+    "SC13 the untyped default is unchanged: no link type, file target, no mkdir",
+    result.available === true
+      && links[0][3] === undefined
+      && calls.some(([op]) => op === "writeFileSync")
+      && !calls.some(([op]) => op === "mkdirSync"),
+    JSON.stringify(calls),
+  );
+}
+
+{
+  const eperm = Object.assign(new Error("operation not permitted"), { code: "EPERM" });
+  const { fs } = fakeFs({ failWith: eperm });
+  const result = probeSymlinkCapability({ fs, tmpRoot: "/tmp", type: "junction" });
+  check(
+    "SC14 an EPERM junction probe names the type it probed in its skip reason",
+    result.available === false && result.reason.includes("EPERM") && result.reason.includes("junction"),
+    String(result.reason),
+  );
+}
+
+{
+  const enospc = Object.assign(new Error("no space left on device"), { code: "ENOSPC" });
+  const { fs } = fakeFs({ failWith: enospc });
+  let threw = null;
+  try { probeSymlinkCapability({ fs, tmpRoot: "/tmp", type: "junction" }); } catch (error) { threw = error; }
+  check("SC15 a typed probe rethrows an unrelated error class exactly like the untyped one", threw === enospc);
+}
+
+{
+  const eperm = Object.assign(new Error("EPERM during mkdir"), { code: "EPERM" });
+  const { fs } = fakeFs({ failWith: eperm, failAt: "mkdir" });
+  let threw = null;
+  try { probeSymlinkCapability({ fs, tmpRoot: "/tmp", type: "junction" }); } catch (error) { threw = error; }
+  check("SC16 EPERM from the junction probe's own directory setup surfaces, never a capability gap", threw === eperm);
+}
+
+{
+  const result = symlinkCapability({ type: "junction" });
+  check(
+    "SC17 the real, unmocked host junction probe returns a well-typed result",
+    typeof result.available === "boolean" && (result.reason === null || typeof result.reason === "string"),
+    JSON.stringify(result),
+  );
 }
 
 console.log(`\n${passed}/${passed + failed} checks passed.`);
