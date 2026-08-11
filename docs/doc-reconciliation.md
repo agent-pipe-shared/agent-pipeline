@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate a526e697826c977b745845619f4d44265a34ddca — 2026-08-12, range 43dfcbad..a526e697, both dispatches landed + commit-attribution race recorded
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`a526e697`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 43dfcbad302308c5016011a85f664318db04daee — 2026-08-12, range 24601573..43dfcbad, PO decisions + GMW window active + FAILCLOSED dispatched
 
 - ADR-0012: checked, no change needed.
