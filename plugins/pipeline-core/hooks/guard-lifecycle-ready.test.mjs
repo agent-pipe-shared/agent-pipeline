@@ -2440,7 +2440,19 @@ test("NOVA-XREPO-HGO-7: the guard union's absolute prohibitions gain no admissio
 // the state of the boundary; they are not an endorsement of any single row.
 
 /** The exact denial reason text each refusal prints; the capability binds to it verbatim. */
-const REACHABILITY_REASONS = { ...HGO_GRAMMAR_REASON, "GUARD-CROSS-REPO-MUTATION": XREPO_REASON };
+/**
+ * NVA-BL-76: the exact denial reason text the read-scope refusal binds into its HGO request.
+ * Kept out of HGO_GRAMMAR_REASON on purpose -- GUARD-READ-SCOPE-OUTSIDE-ROOT is not a grammar
+ * code, and the grammar remedy text is precisely what it must not print.
+ */
+const HGO_READ_SCOPE_REASON =
+  "GUARD-READ-SCOPE-OUTSIDE-ROOT: The bounded read-only diagnostic pipeline reads a path outside the project root.";
+
+const REACHABILITY_REASONS = {
+  ...HGO_GRAMMAR_REASON,
+  "GUARD-CROSS-REPO-MUTATION": XREPO_REASON,
+  "GUARD-READ-SCOPE-OUTSIDE-ROOT": HGO_READ_SCOPE_REASON,
+};
 
 /**
  * One command on the reachability axis: not "was it admitted", but "who, if anyone, could
@@ -3350,5 +3362,166 @@ test("GSSHELL-STAGE-1: staging and committing a gate-strength file is admitted, 
     }
   } finally {
     rmSync(path, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-BL-76 (backlog: 2026-08-08-a-bounded-diagnostic-outside-the-repo-is-refused-under-
+// the-wrong-reason.md). The bounded rg-to-head / rg-to-rg pipeline reading a path OUTSIDE
+// the project root was refused as GUARD-OPERATOR-UNAPPROVED -- a reason that is false (the
+// identical operator is admitted one directory over) under a remedy that cannot work (the
+// pipeline was never the objection), in a message whose closing line names the very shape
+// it is refusing as admitted. It now has its own code, its own true remedy, and -- because
+// reading is not the mutation risk the cross-repository family exists to stop -- an override
+// route a human signature can actually reach.
+// ---------------------------------------------------------------------------------
+
+/** The reproduction fixture: a governed repo plus a real file outside it. */
+function readScopeFixture() {
+  const projectDir = hgoGitFixture("signature");
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-read-scope-outside-"));
+  const outsideFile = join(outside, "verify-latest.json");
+  writeFileSync(outsideFile, '{"Overall":"pass"}\n');
+  writeFileSync(join(projectDir, "verify-latest.json"), '{"Overall":"pass"}\n');
+  return { projectDir, outside, outsideFile };
+}
+
+function readScopeRun(command, projectDir) {
+  return evaluateLifecycleReadyGuard(bash(command), { projectDir, ...hgoReadyDeps() });
+}
+
+test("NVA-BL-76: the exact reproduction is refused under its own read-scope code, never as an unapproved operator", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    const refused = readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir);
+    assert.equal(refused.exitCode, 2);
+    assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT: The bounded read-only diagnostic pipeline reads a path outside the project root\./u);
+    // The false reason, and every trace of it, is gone.
+    assert.doesNotMatch(refused.stderr, /GUARD-OPERATOR-UNAPPROVED/u);
+    assert.doesNotMatch(refused.stderr, /unapproved shell operator/u);
+    assert.doesNotMatch(refused.stderr, /Rejected element/u,
+      "there is no rejected grammar element -- the grammar accepted this command");
+    // The self-contradiction: a refusal must not close by listing the shape it just refused.
+    assert.doesNotMatch(refused.stderr, /Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions/u);
+    // The advice that cannot work.
+    assert.doesNotMatch(refused.stderr, /Do not construct a new composed command/u);
+    assert.doesNotMatch(refused.stderr, /Use one simple shell command per tool call/u);
+    // AC-5 hygiene: an absolute, machine-specific path never appears in the message.
+    assert.ok(!refused.stderr.includes(outside), "the message disclosed the outside-root path");
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BL-76: the new remedy is true -- each line is executed, not merely matched", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    const refused = readScopeRun(`rg -n 'Overall' ${outsideFile} | head -n 5`, projectDir);
+
+    // Line 1 claims the identical pipeline is admitted with an in-root target. Run it.
+    assert.match(refused.stderr, /The pipeline is not the objection: the identical bounded rg-to-rg \/ rg-to-head pipeline is admitted when every read target resolves inside the project root\./u);
+    assert.equal(readScopeRun("rg -n 'Overall' verify-latest.json | head -n 5", projectDir).exitCode, 0,
+      "the remedy claims the in-root pipeline is admitted; it was not");
+
+    // Line 3 claims one simple, un-piped read is admitted for any path. Run it, on the very
+    // path just refused -- this is the operator's real way out, and the old text never said it.
+    assert.match(refused.stderr, /issue it as ONE simple, un-piped read command \(rg, grep, cat, head, tail, wc, stat, file\), a shape this guard admits without a path-location restriction\./u);
+    for (const command of [`rg -n 'Overall' ${outsideFile}`, `cat ${outsideFile}`, `head -n 5 ${outsideFile}`]) {
+      assert.equal(readScopeRun(command, projectDir).exitCode, 0,
+        `the remedy claims this un-piped read is admitted; it was not: ${command}`);
+    }
+
+    // Line 2 warns that recomposition cannot help -- pinned as stated, and as measured:
+    // splitting the pipeline into a second piped stage still refuses.
+    assert.match(refused.stderr, /Recomposing the same read -- splitting it, adding operators, redirects or line continuation -- cannot lift this refusal\./u);
+    assert.equal(readScopeRun(`rg -n 'Overall' ${outsideFile} | rg -n Overall`, projectDir).exitCode, 2);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BL-76 audit: rg-to-rg carries the identical outside-root asymmetry, in either segment", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    // The item's third direction: the rg-to-rg exemption was never tested against an outside
+    // target. It has the same asymmetry by construction -- that branch calls validateRg() on
+    // BOTH segments through the same approvedReadPath() -- so both directions are pinned.
+    for (const command of [
+      `rg --files ${outside} | rg -n Overall`,
+      `rg --files . | rg -n Overall ${outsideFile}`,
+      `rg -n 'Overall' ${outsideFile} | rg -n pass`,
+    ]) {
+      const refused = readScopeRun(command, projectDir);
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u, command);
+      assert.doesNotMatch(refused.stderr, /GUARD-OPERATOR-UNAPPROVED/u, command);
+    }
+    // The in-root control of the same exemption is still admitted, unchanged.
+    assert.equal(readScopeRun("rg --files . | rg -n verify", projectDir).exitCode, 0);
+
+    // The admitted stderr suppressor is part of the bounded shape, so the outside-root
+    // variant is the same read-scope refusal -- previously mislabelled GUARD-REDIRECT-UNAPPROVED.
+    const suppressed = readScopeRun(`rg -n 'Overall' ${outsideFile} 2>/dev/null | head -n 5`, projectDir);
+    assert.equal(suppressed.exitCode, 2);
+    assert.match(suppressed.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u);
+    assert.doesNotMatch(suppressed.stderr, /GUARD-REDIRECT-UNAPPROVED/u);
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BL-76: nothing but the bounded diagnostic shape is reclassified", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    // Every other bound must still hold before the new code is reachable: an out-of-range
+    // head count, a non-rg producer, a writing consumer and a second real redirect all keep
+    // the code they had. A genuinely unbounded or writing outside-root command is untouched.
+    for (const [command, code] of [
+      [`rg -n 'Overall' ${outsideFile} | head -n 9999`, "GUARD-OPERATOR-UNAPPROVED"],
+      [`rg -n 'Overall' ${outsideFile} | tee out.txt`, "GUARD-OPERATOR-UNAPPROVED"],
+      [`cat ${outsideFile} | head -n 5`, "GUARD-OPERATOR-UNAPPROVED"],
+      [`rg -n 'Overall' ${outsideFile} | xargs rm`, "GUARD-OPERATOR-UNAPPROVED"],
+      [`rg -n 'Overall' ${outsideFile} > out.txt | head -n 5`, "GUARD-REDIRECT-UNAPPROVED"],
+      [`rg -n 'Overall' ${outsideFile} | head -n 5 > ${join(outside, "captured.txt")}`, "GUARD-CROSS-REPO-MUTATION"],
+      [`cp ${outsideFile} ${join(outside, "copy.json")}`, "GUARD-CROSS-REPO-MUTATION"],
+    ]) {
+      const refused = readScopeRun(command, projectDir);
+      assert.equal(refused.exitCode, 2, command);
+      assert.match(refused.stderr, new RegExp(code, "u"), command);
+      assert.doesNotMatch(refused.stderr, /GUARD-READ-SCOPE-OUTSIDE-ROOT/u,
+        `a shape that is not the bounded read-only diagnostic was reclassified as one: ${command}`);
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BL-76: the read-scope refusal is override-REACHABLE, and is not the cross-repository-mutation class", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    // Same instrument as the NVA-BL-75 corpus: not "was it admitted" but "who, if anyone,
+    // could subsequently admit it". The PO's classification decision for this item is that a
+    // human signature CAN authorize an outside-root READ -- unlike a never-liftable
+    // cross-repository mutation, which is what the old code implied by association.
+    for (const command of [
+      `rg -n 'Overall' ${outsideFile} | head -n 5`,
+      `rg --files ${outside} | rg -n Overall`,
+      `rg -n 'Overall' ${outsideFile} 2>/dev/null | head -n 5`,
+    ]) {
+      assert.deepEqual(
+        overrideReachability(command, projectDir),
+        { code: "GUARD-READ-SCOPE-OUTSIDE-ROOT", reach: "liftable-by-signature:cross-repository-target" },
+        "who may authorize an outside-root bounded read moved. This is the boundary NVA-BL-76 set "
+          + "deliberately (reading is not the mutation risk the cross-repository family exists to "
+          + "stop); record the decision before touching this expectation.",
+      );
+    }
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
   }
 });

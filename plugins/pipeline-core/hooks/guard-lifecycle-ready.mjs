@@ -174,6 +174,45 @@ const GRAMMAR_DENIAL_GUIDANCE = {
 };
 
 /**
+ * NVA-BL-76: the bounded read-only diagnostic pipeline (rg-to-head / rg-to-rg) whose only
+ * unmet condition is that a read target resolves OUTSIDE the project root. Before this code
+ * existed the same refusal was issued as GUARD-OPERATOR-UNAPPROVED (or, with the admitted
+ * `2>/dev/null` suppressor, GUARD-REDIRECT-UNAPPROVED) -- a reason that is false: the
+ * identical pipeline, identical operator, is admitted one directory over, and the refusal's
+ * own closing line names bounded rg-to-head as an admitted exception while refusing one.
+ *
+ * Deliberately NOT the cross-repository-mutation family: nothing here writes anywhere. It is
+ * a narrower READ-scope refusal, and it is routed through humanOverrideRoute() exactly like
+ * the grammar codes, so a human signature can authorize one exact outside-root read
+ * (measured class `cross-repository-target`, ADR-0059 Decision 6). Distinguishing this from
+ * a write is the whole point of giving it its own code: a signature that may authorize
+ * reading a background job's log outside the checkout is not a signature that may authorize
+ * mutating another repository.
+ */
+const READ_SCOPE_DENIAL_CODE = "GUARD-READ-SCOPE-OUTSIDE-ROOT";
+const READ_SCOPE_DENIAL_GUIDANCE = "The bounded read-only diagnostic pipeline reads a path outside the project root.";
+// The four lines every grammar denial has always printed, moved verbatim out of blocked()'s
+// template so a code that must NOT print them (READ_SCOPE_DENIAL_CODE) can say something
+// true instead. Byte-identical output for the three grammar codes.
+const GRAMMAR_DENIAL_REMEDY = [
+  "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.",
+  "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.",
+  "If typed retryActions are present, run only those exact read-only actions as separate tool calls.",
+  "Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions.",
+];
+// Every line here is executable advice that actually clears THIS refusal -- the item's
+// second requirement ("make the remedy true or omit it"), and the reason the old text was a
+// defect rather than a wording nit: it sent the operator to fix a pipeline that was never
+// the objection. Line 3 is admitted by isReadOnlyDiagnosticCommand() below, which imposes no
+// path-location restriction on a single, un-piped read command; both claims are pinned by
+// the NVA-BL-76 tests, which EXECUTE the advice rather than matching its wording.
+const READ_SCOPE_DENIAL_REMEDY = [
+  "The pipeline is not the objection: the identical bounded rg-to-rg / rg-to-head pipeline is admitted when every read target resolves inside the project root.",
+  "Recomposing the same read -- splitting it, adding operators, redirects or line continuation -- cannot lift this refusal.",
+  "Either re-target the read inside the project root, or issue it as ONE simple, un-piped read command (rg, grep, cat, head, tail, wc, stat, file), a shape this guard admits without a path-location restriction.",
+];
+
+/**
  * GRAMMARHINT-1 AC-1: name the specific construct the ALREADY-COMPLETED parse rejected,
  * using only what parseGuardCommand() (guard-command-grammar.mjs, out of this dispatch's
  * scope) determined -- never a second, competing parse.
@@ -223,22 +262,21 @@ function blocked(
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
     ? lifecycleStatus
     : null;
-  const grammarReason = GRAMMAR_DENIAL_GUIDANCE[code];
+  const readScope = code === READ_SCOPE_DENIAL_CODE;
+  const grammarReason = readScope ? READ_SCOPE_DENIAL_GUIDANCE : GRAMMAR_DENIAL_GUIDANCE[code];
   if (grammarReason) {
     const retryEnvelope = {
       schema: "pipeline.guard-retry-actions.v1",
       retryActions,
     };
+    const remedy = readScope ? READ_SCOPE_DENIAL_REMEDY : GRAMMAR_DENIAL_REMEDY;
     return verdict(
       2,
       "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
         + `${code}: ${grammarReason}\n`
         + (rejectedElement ? `Rejected element: ${rejectedElement}.\n` : "")
         + (remediation ? `${remediation}\n` : "")
-        + "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n"
-        + "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.\n"
-        + "If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n"
-        + "Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions.\n"
+        + remedy.map((line) => `${line}\n`).join("")
         + `${JSON.stringify(retryEnvelope)}\n`
         + overrideGuidance,
     );
@@ -1114,6 +1152,38 @@ function hasExternalOutputRedirect(command, root) {
   return false;
 }
 
+/**
+ * NVA-BL-76: is this command the bounded read-only diagnostic pipeline that
+ * isReadOnlyDiagnosticCommand() admits in every respect EXCEPT that a read target resolves
+ * outside the project root (and outside BOUNDED_PIPELINE_ADDITIONAL_ROOTS)?
+ *
+ * Answered by evaluating the SAME predicate twice -- never by a second, competing parse of
+ * the command, and never by re-deriving which argv token is a path (the rule against a rival
+ * parser that rejectedGrammarElement() states one screen up applies here verbatim). The
+ * second call passes every argv token, resolved against the invocation root, as its own
+ * approved read root; `approvedReadPath` resolves a candidate exactly the same way, so
+ * `pathInside(extra, target)` is true (rel === "") for precisely the path candidates and the
+ * call returns true iff every OTHER bound already holds: two segments, one `|`, rg as the
+ * producer, validateRg's flag allowlist on both sides, head's canonical 1..500 count, and
+ * the single admitted `2>/dev/null` suppressor. `rg … | tee out.txt`, `… | head -n 9999`
+ * and `… | head -n 5 > out.txt` therefore stay false and keep their existing codes.
+ *
+ * This never admits anything. Its only consumer picks WHICH refusal is printed, so the
+ * relaxed second evaluation cannot widen what the guard allows: the first call, with the
+ * real roots, is still the one that decides admission (isReadOnlyDiagnosticCommand).
+ */
+export function isOutsideRootBoundedDiagnosticRead(parsed, root) {
+  if (!parsed || parsed.parseStatus !== "accepted") return false;
+  if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return false;
+  const scopeLifted = parsed.segments.flatMap((segment) => segment.argv
+    .filter((token) => typeof token === "string" && token !== "" && !token.includes("\0"))
+    .map((token) => {
+      try { return resolve(root, token); } catch { return null; }
+    })
+    .filter((value) => value !== null));
+  return isBoundedReadOnlyPipeline(parsed, root, [...BOUNDED_PIPELINE_ADDITIONAL_ROOTS, ...scopeLifted]);
+}
+
 function poApprovalArgs(command, root, scriptPath) {
   const words = simpleWords(command, root);
   if (!words || words.length < 3 || resolve(root, words[1]) !== scriptPath) return null;
@@ -1938,9 +2008,17 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
       }
       lifts.push(route.admitted);
     } else if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
-      const code = parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
+      // NVA-BL-76: the read-scope refusal is decided FIRST, because for this one shape the
+      // operator/redirect codes state a reason that is demonstrably not the reason.
+      const readScope = isOutsideRootBoundedDiagnosticRead(parsed, root);
+      const code = readScope
+        ? READ_SCOPE_DENIAL_CODE
+        : parsed.redirects.length > 0 ? "GUARD-REDIRECT-UNAPPROVED" : "GUARD-OPERATOR-UNAPPROVED";
+      const reason = readScope
+        ? `${code}: ${READ_SCOPE_DENIAL_GUIDANCE}`
+        : `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`;
       const route = humanOverrideRoute(
-        code, `${code}: ${GRAMMAR_DENIAL_GUIDANCE[code]}`, "command", root, toolName, input.tool_input, dependencies,
+        code, reason, "command", root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) {
         return withLifts(lifts, blocked(
