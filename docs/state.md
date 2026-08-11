@@ -518,6 +518,45 @@ artifact level is an open question, not a code task — needs a PO/design
 decision before it can be briefed, same as L-AC-01's producer gap needed
 one first.
 
+### Correction, same session, minutes later: the orphan check was wrong, and it's reverted (`cc43a182`)
+
+`PHX-WP-PAC06-ORPHAN` (`fad0aa95`, described above as "the one tractable
+win") passed its own fixture-based tests and looked clean. It broke on the
+first thing that wasn't a fixture: `node
+plugins/pipeline-core/scripts/check-artifact-topology.mjs` — a
+**registered Verify suite** (`artifact-topology-check`, `verify.mjs:174`)
+— run against this repository's own real packages, returned 107 findings
+on `specs/sprint-nova-epic` and 57 on `specs/sprint-phoenix-epic`. Every
+single one was a legitimate, already-accumulated file (critic reviews,
+dispatch records, backlog snapshots, phase-plan docs) that lives under
+`specs/{id}/` by design without ever being listed as a manifest artifact.
+**"Orphaned" cannot mean "any file not in `artifacts[]`"** — that
+predicate was simply wrong, and the real repository was the counterexample
+the whole time; fixture-only testing couldn't have caught it.
+
+Reverted cleanly (`git revert fad0aa95` → `cc43a182`, local/unpushed, no
+history rewrite). Re-verified after revert: `check-artifact-topology.mjs`
+→ `{"ok":true,"status":"valid","findings":[]}`, exit 0 across all three
+packages; `audit-bundle.test.mjs` → 16/16 (back to the pre-fix count).
+
+**The briefing was the defect, not the goldfish.** It built exactly what
+was specified, and the specification was the gap: nothing in it required
+checking the change against live repository data, only against a
+purpose-built fixture with exactly one orphaned file. **Rule for every
+future briefing touching `validateFeaturePackage` or its callers:** the
+DoD must include running `node
+plugins/pipeline-core/scripts/check-artifact-topology.mjs` against the
+live repo and confirming exit 0 — a fixture passing is necessary, not
+sufficient, for this specific function.
+
+**P-AC-06's standing, corrected:** both remaining clauses — "legacy" and
+now "orphaned" — are semantics-undefined at the artifact level, not code
+tasks available now. Neither is a scoping gap closable by more reading;
+both need a PO decision about what the clause actually means before either
+can be briefed again. The session's one clean, verified, still-standing
+implementation win is `PX0-AC-13`'s test coverage (`7dffa72e`, from
+earlier) — not this.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
