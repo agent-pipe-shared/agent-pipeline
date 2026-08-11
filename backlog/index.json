@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "09754281bdc4fc802f6a1a21bfe6030b97183ae70b26034b6cb80c9f0491230a"
+    "transitionHead": "78902f0013c8593fc0b524c04a6808217819f52ed30fa1eaad5c9ab1e107caf4"
   },
   "counts": {
-    "open": 89,
+    "open": 88,
     "in_progress": 22,
-    "closed": 92
+    "closed": 93
   },
   "items": [
     {
@@ -653,11 +653,15 @@
     },
     {
       "id": "pipeline.git-identity-ask-step-unreachable-through-live-cli-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "GF-103's own final report (2026-08-10), self-disclosed as a caveat rather than papered over; confirmed independently by the Elephant reading applyLifecycle's 'portable' branch directly."
+      "source": "GF-103's own final report (2026-08-10), self-disclosed as a caveat rather than papered over; confirmed independently by the Elephant reading applyLifecycle's 'portable' branch directly.",
+      "closedAt": "2026-08-12",
+      "closureRepository": "self",
+      "closureCommit": "476ca6472635f15186f23568eab3e1951a599213",
+      "closureEvidence": "backlog/items/2026-08-10-git-identity-ask-step-unreachable-through-live-cli-path.md"
     },
     {
       "id": "pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation",
