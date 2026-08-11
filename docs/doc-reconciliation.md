@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 8595398114decb9f4b9f47716d05adeaf3b4acb5 — 2026-08-11, range c3e270a1..85953981, GMW window closed note
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`85953981`), touching only `docs/state.md`
+(a short additive note appended after the PASS/flip checkpoint, append-only
+discipline preserved — nothing rewritten). No other governed path touched.
+
 ## Candidate c3e270a128fe45d386a1530c78e6e8b0a6543ed9 — 2026-08-11, range 113d0bba..c3e270a1, F1 fix Critic PASS + P-AC-08 flip checkpoint
 
 - ADR-0012: checked, no change needed.
