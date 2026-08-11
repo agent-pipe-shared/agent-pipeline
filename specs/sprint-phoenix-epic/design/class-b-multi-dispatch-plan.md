@@ -82,11 +82,24 @@ in the repo.
 change"; the schema's `KINDS` enum calls it `candidate-invalidation`. Worth
 resolving before or during whichever path is picked.
 
-**Next scoping step:** read `control-execution-exchange.mjs` end to end and
-grep every call site that constructs an `orchestrationAssignment`-shaped
-object anywhere in the repo (not just this module) to confirm option 1's
-"zero callers" claim still holds and find the nearest existing dispatch path
-that could supply one.
+**Next scoping step — run same night, both halves confirmed:** a repo-wide
+grep for `orchestrationAssignment` returns exactly two files,
+`control-execution-exchange.mjs` and its own test — the "zero production
+callers" claim holds, re-verified rather than re-trusted. Reading
+`apply-legacy-v2-revocation-recovery`'s handler
+(`pipeline-state.mjs:6292-6331`) directly rules out option 2: its identity
+input is `by` (an operator's plain name, via `--by`), never a
+`dispatchId`/`workerId`/`attemptId`/`correlationId` — this is a human-
+attributed CLI recovery action, not a dispatch-scoped one, and has nothing
+close to the five fields L-AC-01's schema requires. **Option 1 is the only
+remaining path, and it's larger than a wiring task.** "First production
+caller" for a function with zero callers means this repository's own agent-
+dispatch mechanism would need an in-repo call site at all — and dispatch
+today happens through the runtime harness issuing `Agent()`-style calls
+from a chat session, not through a repo-internal orchestrator function.
+Whether such a call site should be *built* (new orchestration-layer code,
+not a caller for existing code) is a design question bigger than this
+plan's other three items, not a scoping gap that more reading closes.
 
 ### A-AC-01 — nothing enforces recording before dependent action
 
@@ -100,15 +113,35 @@ the acceptance text doesn't enumerate them, and no code marks a decision
 point as policy-requiring today. Same ordering-across-unknown-call-sites
 shape as L-AC-01's missing producer.
 
-**Next scoping step:** search for every existing call site that already
-constructs an `agent-decision-journal`-shaped record (there are several,
-per A-AC-05/A-AC-09/H-AC-08's dispatches this session) and determine which
-of them has a nearby dependent action whose ordering could actually be
-checked mechanically — vs. which are informational-only writes with no
-"dependent action" to order against. This determines whether the criterion
-is even satisfiable as a general enforcement rule or needs per-site
-judgment calls, which is itself the kind of finding that changes whether
-this is one dispatch or several.
+**Next scoping step — run same night, and it changes the shape of the
+problem.** `agent-decision-journal.mjs` exports exactly four names:
+`EVENT_CLASSES` and three `validate*` functions
+(`validateAgentDecisionEvent`, `validateCommandOfferEvent`,
+`validateLegacyImportObservationEvent`) plus `representedEventClasses`.
+**There is no constructor or builder anywhere in the module — nothing
+exported creates a decision record.** Its two production importers
+(`external-command-offer.mjs`, `governance-event-store.mjs`) both call it
+only to *validate* a caller-supplied payload, never to build one. This
+matches, and generalizes, what A-AC-05 and H-AC-08 already found
+independently this session ("CONFIRMED ABSENT: no production caller emits
+a selection/escalation/fallback event at all" / "...imports/migrates a
+legacy record at all") — A-AC-01 has the identical root cause, just not
+previously stated in those terms in the evidence map.
+
+**"Before dependent action" is not yet the operative question for A-AC-01.**
+It presupposes a recording call site to order against, and none exists in
+production. The real gap underneath at least three criteria (A-AC-01,
+A-AC-05, H-AC-08) is the same single missing thing: **no code path in this
+repository ever constructs and emits an agent-decision-journal event during
+real operation.** That is arguably the same shape of gap as L-AC-01's
+missing lifecycle-event producer — the actual decision-making activity
+(an Elephant/Goldfish/Critic session choosing an option, importing a
+legacy record, dispatching work) happens at the chat-harness level, outside
+this repository's own executable code, so nothing in the repo is ever in a
+position to observe it and write the event. Building one real producer
+(even for a single, well-chosen decision point) would likely move more
+than one criterion at once — worth flagging to whoever scopes this next
+rather than treating A-AC-01/A-AC-05/H-AC-08 as three independent tasks.
 
 ### V-AC-02 — estimate/assumption value classes unlabeled
 
@@ -213,21 +246,30 @@ other three, not a local fix. No item in this list currently has a
 confirmed-small scope; all four need their revised "next scoping step" run
 before any of them can be ranked by size in good faith.
 
-1. **L-AC-01** first despite being hardest to build — it's the epic's named
-   structural gap ("no Pipeline path emits a lifecycle event at all"),
-   several other packages' full closure depends on it existing, and its
-   scoping step (confirm zero callers, find the nearest dispatch path) is
-   at least well-defined, unlike V-AC-02's now-open-ended "find some other
-   producer somewhere in the repo."
-2. **A-AC-01** and **R-AC-08** next, in either order — both need their own
-   call-site scoping pass first; neither blocks the other.
-3. **V-AC-02** after those — its scoping step is now the least defined of
-   the four (either design a new evidence-viewer entry point for
-   organization-policy data, or search the whole repo for an alternative
-   producer with no specific place to look yet).
-4. **H-AC-12's remaining subsystems** last, and only after the disposition
-   question above is answered — building against the wrong module would be
-   the same class of mistake as the P-AC-06 orphan-check revert.
+**Revised again, same night — L-AC-01's own scoping step ran too, and it's
+now the largest of the four, not merely the hardest-but-well-defined one.**
+Both L-AC-01 candidate producers are ruled out (confirmed, not assumed):
+zero production callers of `orchestrationAssignment` anywhere in the repo,
+and `apply-legacy-v2-revocation-recovery` carries an operator name, not a
+dispatch identity. What's left isn't "wire an existing caller" — it's
+"decide whether this repository should grow an in-repo orchestration layer
+at all," since dispatch today happens at the chat-harness level, outside
+the codebase. That is a genuine architecture question, appropriately the
+PO's to weigh in on, not a scoping gap.
+
+1. **A-AC-01** and **R-AC-08** first, in either order — both still have a
+   concrete, bounded next step (enumerate existing journal-write call sites;
+   read the `recoverability` field and its readers) that hasn't been run
+   yet tonight. Neither is confirmed small, but neither is confirmed to
+   need new architecture either — they're the two genuine unknowns left.
+2. **V-AC-02** after those, once someone either designs the evidence-viewer/
+   organization-policy seam or finds an alternative producer.
+3. **L-AC-01** and **H-AC-12's remaining subsystems** last, both now known
+   to need a decision above the scoping level — L-AC-01 whether to build
+   in-repo orchestration at all, H-AC-12 which module the acceptance text's
+   "release planning"/"deploy approval" actually name. Both are PO/design
+   questions, not dispatch targets, however the closure doc's dependency
+   ordering ranks them.
 
 None of this is authorized for dispatch yet. Each item's "next scoping
 step" is Elephant-context investigation, matching the pattern that made
