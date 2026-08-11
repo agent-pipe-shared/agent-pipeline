@@ -348,8 +348,11 @@ statements explicit:
    individually, never summarised as "the rest".
 4. **What the next dispatch would have to say differently:** SCOPE AND MECHANICS
    ONLY — which commits/paths remain unexamined, what split or budget would
-   cover them. Never a suspicion, never a hint about the unreached material,
-   never a partial judgement of it. A successor Critic arriving with your
+   cover them. Write it as a BARE ENUMERATION of commits, paths and numbers,
+   never as narrative: it exists to be copied into the next dispatch verbatim,
+   where only that category is admissible input at all. Never a suspicion, never
+   a hint about the unreached material, never a partial judgement of it. A
+   successor Critic arriving with your
    framing is exactly the contamination this template exists to exclude, and it
    is worse coming from you, because you sound informed.
 
