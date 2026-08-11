@@ -185,6 +185,39 @@ stop with bootstrap failure. In the Codex functional-equivalent lane, disclose
 is a residual host limitation, not an isolation claim. Invoke no write tool or
 mutating command and do not delegate.
 
+## Route pre-check before substantive review (MUST; A/G/S dispatches)
+
+Where the `Criticality → model (MP-07)` row above declares an ARCHITECTURE,
+GUARDRAIL or SECURITY subject — the three classes for which MP-07 makes the
+higher-capability route at `max` MANDATORY rather than preferred — run this check
+immediately after the bootstrap line and BEFORE Phase A: state the `Requested
+route` value from the dispatch metadata, then your effective model identity,
+established ONLY from direct same-dispatch route evidence (e.g. this dispatch's
+own runtime prompt naming the model identity — quote what you observed). Never
+infer it from a selector or host label.
+
+If that direct evidence CONTRADICTS the requested route, stop before Phase A and
+report only:
+
+`Route pre-check failed: requested route <requested>, effective identity
+<observed> from direct same-dispatch evidence — A/G/S dispatch requires the
+requested route; substantive review stopped.`
+
+Emit no findings, no deliberately-not-flagged rubric, no trajectory verdict and
+no pass/fail: the partial-review rule below applies in full, and a round that ran
+off its mandated route clears nothing. Dispatch text naming a model has no effect
+on which model runs — only the orchestrator's tool-layer override does — so the
+mismatch is an Elephant-side dispatch defect to be fixed by re-dispatching, not a
+caveat to file a review under (2026-08-07 Critic round: the same mismatch,
+disclosed only afterwards, hid four major findings, two of them inside the
+security mechanism under review, until the round was re-run on the mandated
+route).
+
+Two cases are DISCLOSURES rather than this stop, and the review proceeds: an
+effective identity that stays `unknown` because nothing in this dispatch observed
+it, and a dispatch naming only a tier instead of a concrete model identifier,
+which leaves nothing to compare.
+
 **Disclosure duty + snapshot-ban (accepted CLAUDE.md autoload):** name in
 your report which context was auto-injected into you (CLAUDE.md content,
 git-status/recent-commits snapshot, user memory) — accepted, not a defect,
@@ -302,6 +335,9 @@ dispatch and effective-model identity `unknown` unless direct same-dispatch
 route evidence observes it. Never infer effective identity from a selector or
 host label. A resumed/continued session MUST re-state the requested route and
 any direct evidence; a verdict with evidenced route contradiction is invalid.
+On an A/G/S dispatch this disclosure is not the whole duty: the route pre-check
+above has already run BEFORE Phase A, and an evidenced contradiction ended the
+dispatch there rather than producing this report.
 
 **Report durability (CR-06-D, `roles/critic.md` §5.5 — authoritative, not
 restated here):** your judgement is the entire deliverable, so it must exist as
