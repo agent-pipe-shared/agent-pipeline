@@ -1,0 +1,14 @@
+{
+  "taskId": "NVA-BL-25",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "a26653093a499b6e3302bae755e7aea9a5d30432",
+  "dispatcher": "elephant",
+  "outcome": "completed",
+  "log": [
+    { "phase": "opening-write-readback-confirmed", "toolUses": 3 },
+    { "phase": "edits-applied-roles-and-template-and-three-agent-files", "toolUses": 10 },
+    { "phase": "verify-suite-green-36-tests", "toolUses": 12 },
+    { "phase": "committed-ec824529", "toolUses": 16 }
+  ],
+  "report": "1. DoD results: (a) roles/goldfish.md GF-09-D gains readback sentence - passed. (b) templates/prompts/goldfish-task.md field-6 bullet gains matching sentence - passed. (c) three agent .md files restate duty inline (confirmed by reading each) so each got the same one-line addition - passed. (d) verify command node harness/scripts/check-doc-contracts.test.mjs exits 0, 36/36 tests pass - passed. (e) both canonical files read coherently at edit site, no dangling refs - passed.\n2. Evidence: command 'node harness/scripts/check-doc-contracts.test.mjs' run interactively, output showed 'tests 36 / pass 36 / fail 0'; commit ec8245295fff5fc83a44cccebf2637edfa95fdf3 on branch feat/sprint-nova-codex-v046.\n3. Changed files: roles/goldfish.md (GF-09-D readback sentence, authoritative source), templates/prompts/goldfish-task.md (matching sentence in the record-first bullet, field 6), plugins/pipeline-core/agents/goldfish-implementor.md, goldfish-deep.md, goldfish-mechanic.md (each restates the opening-write duty inline, not merely by citation, so each got the identical one-line addition).\n4. Deliberately not changed: backlog item frontmatter/Triage (Elephant's job); dispatch-record JSON schema (only prose duty edited); no other roles/templates files touched.\n5. Deviations from spec: none - stayed within named scope and wording pattern.\n6. Open items: none triggered. Backlog item's Triage section still needs Elephant fill-in (out of this dispatch's scope, as instructed)."
+}

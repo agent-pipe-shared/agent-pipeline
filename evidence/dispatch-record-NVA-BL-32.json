@@ -1,0 +1,57 @@
+{
+  "taskId": "NVA-BL-32",
+  "model": "claude-opus-5",
+  "rulesetSha": "a26653093a499b6e3302bae755e7aea9a5d30432",
+  "dispatcher": "elephant",
+  "outcome": "success",
+  "commit": "c3e34d56",
+  "log": [
+    { "step": "orient", "note": "Located the defect: adapters live in scripts/security-adapters/, not inside security-scan.mjs." },
+    { "step": "root-cause", "note": "security-scan.mjs:443 scannerEntry defaults SKIPPED-without-classification to scanner_error; license-check.mjs:76 omitted classification; osv-scanner.mjs:263-267 sets classification 'success'; security-scan.mjs:548 confirms SKIPPED+success is the codebase's clean-skip signal." },
+    { "step": "baseline", "note": "security-scan.test.mjs 126/126 exit 0 before the change. Live repo-root scan blocked: working-tree-not-clean (concurrent writer, not this dispatch)." },
+    { "step": "fix", "note": "license-check.mjs absent-allowlist branch now returns classification 'success' and a 'not configured' reason; header documents the deliberate declaredPath asymmetry." },
+    { "step": "tests", "note": "+3 assertions in security-scan.test.mjs: adapter classification, adapter reason wording, and the load-bearing runner-level rendered-entry regression on a fixture rootDir with no governance/ dir." },
+    { "step": "verify", "note": "security-scan.test.mjs 129/129 exit 0; security-scan-v2-integration.test.mjs 9/9; security-adapters/license-check.test.mjs 10/10." },
+    { "step": "commit", "note": "c3e34d56, pathspec-scoped to the two touched files." },
+    { "step": "live-verify", "note": "Tree went clean post-commit; live repo-root scan exit 0 with 'license-check: OK [success] (0 findings)'." }
+  ],
+  "evidence": [
+    { "command": "node plugins/pipeline-core/scripts/security-scan.test.mjs", "exitCode": 0, "result": "129/129 cases passed (126/126 pre-change)" },
+    { "command": "node plugins/pipeline-core/scripts/security-scan.mjs", "exitCode": 0, "artifact": "evidence/security-latest.json", "artifact2": "evidence/security-latest.v2.json", "result": "license-check: OK [success] (0 findings); Verdict CLEAN" },
+    { "command": "node plugins/pipeline-core/scripts/security-scan-v2-integration.test.mjs", "exitCode": 0, "result": "9/9 pass" },
+    { "command": "node plugins/pipeline-core/scripts/security-adapters/license-check.test.mjs", "exitCode": 0, "result": "10/10 pass" }
+  ],
+  "report": {
+    "dodResults": [
+      { "check": "Absent allowlistPath renders as a clean SKIPPED/not-configured, not scanner_error", "result": "passed" },
+      { "check": "Configured case (allowlist present) behavior unchanged", "result": "passed", "strands": "126/126 pre-change baseline including every configured-case license-check assertion; post-fix live run 'license-check: OK [success]' exit 0 (evidence/security-latest.json); the diff is confined inside the !existsSync(allowlistPath) early return, so the present-allowlist path is textually untouched." },
+      { "check": "The LITERAL before/after live-scan comparison required by DoD check 2", "result": "not verifiable", "why": "The pre-change live run produced no license-check output at all -- all four scanners short-circuited on working-tree-not-clean, caused by a concurrent writer, not by this dispatch. The comparison was never executed and is not claimed as passed." },
+      { "check": "NEW regression test on a fixture rootDir with no governance/ directory asserting the clean-skip status", "result": "passed" },
+      { "check": "node plugins/pipeline-core/scripts/security-scan.test.mjs exits 0", "result": "passed" },
+      { "check": "Live scan against this repo root still reports license-check OK", "result": "passed" },
+      { "check": "Behavioral (not source-text) check", "result": "passed", "note": "Both new assertions invoke real code and assert on runtime status/classification values." }
+    ],
+    "changedFiles": [
+      { "path": "plugins/pipeline-core/scripts/security-adapters/license-check.mjs", "rationale": "The defect site: absent-allowlist branch now carries classification 'success' so the runner cannot render an unconfigured project as a broken scanner." },
+      { "path": "plugins/pipeline-core/scripts/security-scan.test.mjs", "rationale": "+3 assertions; the runner-level one proves the RENDERED entry changed, which an adapter-only assertion would have missed." }
+    ],
+    "deliberatelyNotChanged": [
+      "security-scan.mjs:443 scannerEntry default (SKIPPED without classification -> scanner_error): flipping it would make every future unclassified skip read as success, a fail-open change in a SECURITY-class file.",
+      "The sibling absent-declaredPath branch in license-check.mjs: same defect class, still renders scanner_error. Outside the DoD and outside the backlog item's Direction point 1. Asymmetry documented in the file header. Highest-value follow-up.",
+      "CAPABILITY_CONTRACT_V2.coverageLimitations: its text stays factually true after the change; left frozen.",
+      "governance/examples/policies/**, the semgrep and osv-scanner adapters: untouched per the prohibitions.",
+      "The semgrep metrics-configuration error named in the same backlog item: a separate, explicitly separated concern."
+    ],
+    "deviations": [
+      "Field 4 scoped the fix to security-scan.mjs and its test file, but the defect site is scripts/security-adapters/license-check.mjs (adapters live in a subdirectory). Field 2 directed me to find the site by searching the 'license allowlist not found' string and called it 'the exact place your fix changes the result status', and field 4's adapter prohibition enumerates only semgrep and osv-scanner, so the license-check adapter is the intended subject and the path list is a factual error about repo layout. Fixed at the correct site; security-scan.mjs itself is unmodified.",
+      "Reason text changed from 'license allowlist not found' to 'license allowlist not configured'. Repo-wide grep found no functional coupling; only the backlog item quotes the old wording as the measured defect.",
+      "The DoD asked for a before/after live-scan comparison. The 'before' half is missing because the tree was dirty at that moment through no action of this dispatch."
+    ],
+    "openItems": [
+      "CRITIC PASS REQUIRED before this counts as done (SECURITY-class diff, CLAUDE.md self-application).",
+      "A concurrent writer modified plugins/pipeline-core/skills/pipeline-start/SKILL.md and a backlog item during this session; those edits appeared and then reverted on their own. Not touched, not stashed.",
+      "declaredPath absent-file branch still classifies as scanner_error: recommended follow-up backlog item.",
+      "The backlog item's Direction point 2 (re-run the end-to-end satisfiability measurement) and the semgrep cause remain open; this dispatch closes only the allowlist half of Direction point 1."
+    ]
+  }
+}

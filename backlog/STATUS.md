@@ -11,8 +11,8 @@
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-definitions-pin-the-review-tier-model | open | defect | pipeline | 2026-08-07 | — |
-| pipeline.agent-never-asks-po-for-key-directory-invents-one-instead | open | defect | pipeline | 2026-08-10 | — |
-| pipeline.agent-talks-itself-out-of-the-pipeline | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.agent-never-asks-po-for-key-directory-invents-one-instead | closed | defect | pipeline | 2026-08-10 | — |
+| pipeline.agent-talks-itself-out-of-the-pipeline | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.agents-read-the-source-because-nothing-describes-the-interface | open | workflow-improvement | pipeline | 2026-08-09 | — |
@@ -50,6 +50,7 @@
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | in_progress | defect | pipeline | 2026-08-10 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
@@ -58,7 +59,7 @@
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-provenance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-does-not-bind-to-its-commit | open | defect | pipeline | 2026-08-09 | — |
-| pipeline.dispatch-reported-creating-a-record-it-never-created | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.dispatch-reported-creating-a-record-it-never-created | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.dispatched-agents-return-truncated-mid-step | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path | open | defect | pipeline | 2026-08-10 | — |
@@ -97,6 +98,7 @@
 | pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | closed | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | 2026-08-06 | — |
@@ -163,7 +165,7 @@
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
-| pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -205,6 +207,6 @@
 
 ## Counts
 
-- open: 92
+- open: 90
 - in_progress: 22
-- closed: 83
+- closed: 87

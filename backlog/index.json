@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d67229fab9ed7df8871cd0c9536a5d8e0ff198cab1790c3d8e97bd1284c4ce47"
+    "transitionHead": "1b53a137923de33882092b57234c360822bdaac40de1fff563ef3c610a6b7f4f"
   },
   "counts": {
-    "open": 92,
+    "open": 90,
     "in_progress": 22,
-    "closed": 83
+    "closed": 87
   },
   "items": [
     {
@@ -70,19 +70,27 @@
     },
     {
       "id": "pipeline.agent-never-asks-po-for-key-directory-invents-one-instead",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "PO live observation, 2026-08-10, during the Claude Code greenfield test: 'er hat das key verzeichnis im setup nicht nachgefragt aber denkt sich jetzt die ganze zeit was aus.'"
+      "source": "PO live observation, 2026-08-10, during the Claude Code greenfield test: 'er hat das key verzeichnis im setup nicht nachgefragt aber denkt sich jetzt die ganze zeit was aus.'",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "351a5a74473d28bd92bd262329a52df3850ba065",
+      "closureEvidence": "evidence/dispatch-record-NVA-BL-24.json"
     },
     {
       "id": "pipeline.agent-talks-itself-out-of-the-pipeline",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Happy-path test of the local 0.5.4 build in a fresh empty directory, 2026-08-08, observed by the PO."
+      "source": "Happy-path test of the local 0.5.4 build in a fresh empty directory, 2026-08-08, observed by the PO.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "94ee0b4049dfeab280a252d7a2064b409da46d46",
+      "closureEvidence": "evidence/dispatch-record-NVA-BL-28.json"
     },
     {
       "id": "pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref",
@@ -429,6 +437,14 @@
       "closureEvidence": "backlog/evidence/2026-08-10-critic-root-commit-example-closure.md"
     },
     {
+      "id": "pipeline.critic-route-pre-check-not-in-force-in-installed-plugin",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-11",
+      "source": "Critic review (FAIL, F3) of NVA-BL-42 (plugins/pipeline-core/agents/critic.md, goldfish-deep.md, templates/prompts/critic-review.md, commit 08684e7874b79c04a44601c487f343be0dfaefa5), 2026-08-11."
+    },
+    {
       "id": "pipeline.critical-human-proof-not-materialized-for-signature-mode",
       "status": "closed",
       "type": "defect",
@@ -502,11 +518,15 @@
     },
     {
       "id": "pipeline.dispatch-reported-creating-a-record-it-never-created",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Found when a Critic delta review stopped fail-closed on a missing required reference, 2026-08-08. The reference was a dispatch record the dispatch's own report claimed to have created."
+      "source": "Found when a Critic delta review stopped fail-closed on a missing required reference, 2026-08-08. The reference was a dispatch record the dispatch's own report claimed to have created.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "ec8245295fff5fc83a44cccebf2637edfa95fdf3",
+      "closureEvidence": "evidence/dispatch-record-NVA-BL-25.json"
     },
     {
       "id": "pipeline.dispatched-agents-return-truncated-mid-step",
@@ -870,6 +890,14 @@
       "closureRepository": "self",
       "closureCommit": "485613cfd9d336ee8c6d9abed63aa5e84892ff07",
       "closureEvidence": "backlog/evidence/2026-08-09-language-selection-scope-fix-closure.md"
+    },
+    {
+      "id": "pipeline.license-check-declared-path-absence-still-reads-as-scanner-error",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-11",
+      "source": "Critic review (PASS, F3) of NVA-BL-32 (backlog/items/2026-08-09-the-security-scan-looks-for-its-license-allowlist-in-the-pipelines-own-repository.md), 2026-08-11 — flagged as documented-instead-of-fixed without an owner/expiry (QG-06), not as a blocker to that diff."
     },
     {
       "id": "pipeline.lifecycle-guard-does-not-know-the-human-signing-commands",
@@ -1533,11 +1561,15 @@
     },
     {
       "id": "pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Measured on a freshly seeded consumer project, 2026-08-09, while establishing whether a `security` gate can be satisfied at all."
+      "source": "Measured on a freshly seeded consumer project, 2026-08-09, while establishing whether a `security` gate can be satisfied at all.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "c3e34d562fa0d155ec8382a072b5611775162261",
+      "closureEvidence": "evidence/dispatch-record-NVA-BL-32.json"
     },
     {
       "id": "pipeline.seeded-verify-contract-is-always-green",
