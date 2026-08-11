@@ -23,6 +23,7 @@ import {
   DEFAULT_EVIDENCE_DIR,
   VERDICT,
   coveringPath,
+  declaredCommits,
   declaredPaths,
   exitCodeFor,
   gitDeps,
@@ -117,6 +118,30 @@ test("(f) record naming a different commit -> FAIL (item failure shape 3)", () =
   const verdict = verifyCommit("f00f666", commit({ message: "feat(x): a thing\n\nDispatch: DOD-F (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
   assert.equal(verdict.verdict, VERDICT.fail);
   assert.equal(verdict.classification, "record-names-different-commit");
+});
+
+test("(f2) a multi-commit dispatch binds every sha it declares in `commits`", () => {
+  writeRecord("DOD-F2", {
+    taskId: "DOD-F2",
+    outcome: "done",
+    commits: ["6ad81155", "8161c31a"],
+    report: { changedFiles: ["src/thing.mjs - x"] },
+  });
+  const fixture = { message: "feat(x): a thing\n\nDispatch: DOD-F2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] };
+  for (const sha of ["6ad81155f000aa", "8161c31af6c5bb"]) {
+    assert.equal(verifyCommit(sha, commit(fixture)).verdict, VERDICT.pass, sha);
+  }
+  const stranger = verifyCommit("deadbeef0000", commit(fixture));
+  assert.equal(stranger.verdict, VERDICT.fail);
+  assert.equal(stranger.classification, "record-names-different-commit");
+});
+
+test("declaredCommits reads both the singular and the plural field, and null when neither", () => {
+  assert.deepEqual(declaredCommits({ commit: "abc1234" }), ["abc1234"]);
+  assert.deepEqual(declaredCommits({ commits: ["abc1234", "def5678"] }), ["abc1234", "def5678"]);
+  assert.equal(declaredCommits({ outcome: "done" }), null);
+  assert.equal(declaredCommits({ commit: "   " }), null);
+  assert.equal(declaredCommits({ commits: [] }), null);
 });
 
 test("(g) terminal record with no machine-readable paths -> UNVERIFIABLE, not PASS", () => {

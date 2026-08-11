@@ -123,6 +123,20 @@ export function isTerminalOutcome(outcome) {
   return !NON_TERMINAL_OUTCOMES.includes(normalized);
 }
 
+/**
+ * The SHAs a record claims. A dispatch that commits as soon as each piece is green — which
+ * is exactly what the briefings ask for, because a commit that exists survives a truncated
+ * run — produces SEVERAL commits under one task id, so a single `commit` field cannot bind
+ * them all. Both `commit` (string) and `commits` (array) are read, and binding succeeds if
+ * ANY declared sha binds. Returns null when the record declares none, which leaves this
+ * dimension silent rather than failed: most existing records predate the convention.
+ */
+export function declaredCommits(record) {
+  const raw = record?.commits ?? record?.commit;
+  const list = (Array.isArray(raw) ? raw : [raw]).filter((entry) => typeof entry === "string" && entry.trim() !== "");
+  return list.length > 0 ? list : null;
+}
+
 /** Two SHAs bind if either is a prefix of the other — records abbreviate inconsistently. */
 export function shasBind(a, b) {
   const left = String(a ?? "").trim().toLowerCase();
@@ -219,8 +233,9 @@ export function verifyCommit(sha, deps) {
   if (!isTerminalOutcome(record.outcome)) {
     return result(sha, VERDICT.fail, "record-not-terminal", `record outcome \`${record.outcome ?? "(absent)"}\` is not terminal`, { taskId });
   }
-  if (typeof record.commit === "string" && record.commit.trim() !== "" && !shasBind(sha, record.commit)) {
-    return result(sha, VERDICT.fail, "record-names-different-commit", `record names commit \`${record.commit}\``, { taskId });
+  const declaredShas = declaredCommits(record);
+  if (declaredShas !== null && !declaredShas.some((candidate) => shasBind(sha, candidate))) {
+    return result(sha, VERDICT.fail, "record-names-different-commit", `record names commit(s) \`${declaredShas.join("`, `")}\``, { taskId, declaredShas });
   }
 
   let changed;
