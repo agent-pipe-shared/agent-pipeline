@@ -3970,6 +3970,39 @@ function runAuthorityRevisionTests() {
   ok("AR06f-2 the persisted State carries exactly the planned postimage authority", persisted.continuity.revision === 1
     && JSON.stringify(persisted.continuity.authority.prd) === JSON.stringify(plan.postimage.authority.prd), JSON.stringify(persisted.continuity.authority));
 }
+{
+  // AR06g -- PX0-AC-06 casOutcome regression (PHX-WP-PX0-CASOUTCOME): on the SAME
+  // recovered-preimage branch AR06e exercises, the CLI's echoed `receipt.casOutcome` must
+  // read "stale", not the frozen journal's own "applied" (buildAuthorityRevisionPlan
+  // always freezes casOutcome:"applied" at apply-build time, before it is known whether
+  // the write will land -- see runAuthorityRevisionRecoverCommand's
+  // "F4/courseDecisionReceipts convention" comment). Echoing the frozen receipt unmodified
+  // here would contradict this same response's own status:"recovered-preimage"/
+  // mutated:false: the postimage was never written. Same fixture construction as AR06e
+  // (an expiresAt that has passed BY THE TIME RECOVERY RUNS), asserted alongside the
+  // existing status/mutated invariant rather than replacing it.
+  const fx = seedAuthorityRevisionRoot("ar06g-casoutcome-stale");
+  const { proposal } = reviseProposal(fx, { expiresAt: "2026-08-08T12:00:05.000Z" });
+  const proposalFile = writeProposal(fx, proposal);
+  const planned = planCmd(fx, proposalFile);
+  const plan = JSON.parse(planned.out || "{}");
+  ok("AR06g-setup0 plan still valid against the fixed 12:00:00 clock (expires 12:00:05)", planned.value === 0, planned.err);
+  ok("AR06g-setup1 the frozen plan's own receipt carries casOutcome \"applied\" (the value this branch must NOT echo)",
+    plan.receipt?.casOutcome === "applied", JSON.stringify(plan.receipt));
+  const request = writeRequestFile(fx, plan);
+  const preBytes = stateBytes(fx.dir);
+  const interrupted = arApplyCmd(fx, request.name, request.sha256, "ar-lock-001", authorityDeps(fx.dir, { afterAuthorityRevisionJournal: () => false }));
+  ok("AR06g-setup2 apply interrupted after journal publication, State still exactly the preimage",
+    interrupted.value === 2 && stateBytes(fx.dir).equals(preBytes), interrupted.err);
+  const expiredDeps = authorityDeps(fx.dir, { now: () => "2026-08-08T12:00:10.000Z" });
+  const recovered = arRecoverCmd(fx, "ar-lock-001", expiredDeps);
+  const report = JSON.parse(recovered.out || "{}");
+  ok("AR06g PX0-AC-06 casOutcome regression: recovered-preimage echoes receipt.casOutcome \"stale\", alongside the existing status/mutated invariant (not weakened, added to)",
+    recovered.value === 0 && report.status === "recovered-preimage" && report.retained === false && report.mutated === false
+    && !!report.receipt && report.receipt.casOutcome === "stale", recovered.out || recovered.err);
+  ok("AR06g-2 State remains byte-identical to the preimage -- the postimage was NOT written",
+    stateBytes(fx.dir).equals(preBytes), "state mutated despite an expired recovery window");
+}
 
 // ---- PX0-AC-07: exact replay is a verified zero-write success; a conflicting replay / second writer fails closed ----
 {
