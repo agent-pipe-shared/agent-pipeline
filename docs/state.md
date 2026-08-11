@@ -1564,6 +1564,25 @@ clean, and semgrep genuinely had nothing to report at those smaller file
 sizes) — this is a newly crossed threshold, not a retroactive falsehood,
 but it needs to be said plainly rather than left implicit.
 
+**Fixed, same session (`ba1a7d28`) — this one WAS tractable, unlike
+PX0-AC-13.** The distinction that matters: this was a scanner-configuration
+tuning problem with one clearly correct lever (semgrep's own internal
+per-rule timeout, distinct from the adapter's 60s outer subprocess timeout),
+not a design question needing PO/architectural input. Added explicit
+`--timeout 45 --timeout-threshold 0` to the semgrep invocation
+(`harness/scripts/security-adapters/semgrep.mjs`) — real headroom under the
+shared outer budget, and disables semgrep's own "skip the rest of a slow
+file's rules after N timeouts" behavior so nothing goes silently unchecked.
+Verified properly before declaring it fixed: `node --test
+harness/scripts/security-adapters/semgrep.test.mjs` (11/11, no regression),
+then `node harness/scripts/security-scan.mjs` re-run **twice** against the
+committed candidate — genuine `CLEAN` both times, not a suppressed error
+(both `results` and `errors` confirmed empty in the raw semgrep JSON).
+Backlog item closed same session (`26ea6a34`), triage filled honestly
+rather than left for "next session" since the fix, verification and closure
+all happened here. **Security-Scan is genuinely sauber again, this time
+checked, not assumed.**
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
