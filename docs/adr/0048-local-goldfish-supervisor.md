@@ -171,11 +171,15 @@ tests proves the functional local process/workspace adapter, not model
 identity, selected-sandbox execution, OS isolation or B1 issue closure.
 
 **Deferred live-provider/capability risk disposition (B1-I):** Accountable
-owner: the Nova Product Owner. Expiry: **2026-08-09**. Until that owner renews
-or replaces this disposition with a separately accepted observation, the Codex
-provider adapter remains inactive, B1 capability remains unadvertised, and
-Issue `#21` remains open. This disposition authorizes neither activation nor
-implementation, credentials, network access, issue closure, push or release.
+owner: the Nova Product Owner. Expiry: **2026-08-30** (renewed 2026-08-09, PO
+instruction: extend three weeks from the original 2026-08-09 expiry — recorded
+authoritatively in `specs/sprint-nova-epic/plans/nova-b.md`'s own B1-I section;
+this ADR's copy went stale until corrected 2026-08-11). Until that owner
+renews or replaces this disposition with a separately accepted observation,
+the Codex provider adapter remains inactive, B1 capability remains
+unadvertised, and Issue `#21` remains open. This disposition authorizes
+neither activation nor implementation, credentials, network access, issue
+closure, push or release.
 
 ## B1-I goals
 
