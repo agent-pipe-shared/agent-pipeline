@@ -47,6 +47,15 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 7fa07d5420b6db5770a8bc142629f47ebcbe6857 — 2026-08-12, range de79f7b5..7fa07d54, PX0-AC-13 acceptance.md amendment
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`7fa07d54`), touching only
+`specs/sprint-phoenix-epic/acceptance.md` (an inline amendment paragraph
+added under the PX0-AC-13 bullet, same form as the existing H-AC-11
+amendment). File placement, naming and directory shape are unaffected.
+
 ## Candidate a526e697826c977b745845619f4d44265a34ddca — 2026-08-12, range 43dfcbad..a526e697, both dispatches landed + commit-attribution race recorded
 
 - ADR-0012: checked, no change needed.
