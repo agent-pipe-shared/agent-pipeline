@@ -194,12 +194,26 @@ inside `recoverability`.
 data — closer to L-AC-01's shape (new producer) than V-AC-02's (new value
 class only).
 
-**Next scoping step:** read `external-command-offer.mjs`'s `recoverability`
-field and every call site that currently performs an actual rollback/
-cleanup/apply-recovery operation (the GMW's own `close`/`apply-recovery`
-verbs, `pipeline-state.mjs`'s recovery cases) to determine whether any of
-them already has the data a new `occurred` event would need, or whether the
-data itself (not just the event kind) is missing at the point of action.
+**Next scoping step — run same night; corrects the plan's own file pointer
+and sharpens the gap.** `recoverability` doesn't live in
+`external-command-offer.mjs` (that file exports exactly one function,
+`acknowledgeNonMaterialOfferWithoutJournal`, unrelated) — it's a field on
+`agent-decision-journal.mjs`'s `command-offer`-kind event, alongside an
+optional `requiredCleanup: {cleanupClass, status, digest}` companion field
+whose `status` enum is **already** `["pending", "completed", "verified"]`
+(`agent-decision-journal.mjs:13`). The vocabulary for "cleanup occurred" is
+not missing, contrary to the plan's first-pass read — what's missing is any
+mechanism to *append* a follow-up event carrying an updated status; every
+fixture (`agent-decision-journal.test.mjs:39-47`) sets `requiredCleanup`
+once, at construction, never demonstrating a second event referencing the
+first via `offerEventId` with a transitioned status.
+
+That question turned out moot for a sharper reason: **a repo-wide grep for
+`kind.*command-offer` outside test files returns nothing.** No production
+code anywhere constructs a `command-offer` event at all — the same
+"validators only, no constructor" finding already made for A-AC-01 above,
+just confirmed for this event kind specifically. R-AC-08 isn't a distinct
+fourth gap; it's another symptom of the same one root cause.
 
 ### H-AC-12's remaining two reachable subsystems — investigated tonight, not resolved
 
@@ -236,6 +250,46 @@ acceptance text (the two guesses above may both be wrong), then determine
 for each whether it already satisfies H-AC-12's intent through a different
 mechanism (as `critical-action-authorization.mjs` plausibly does) or is a
 genuine gap needing the dual-evaluation primitive wired in.
+
+## The unifying finding: one root cause behind at least four criteria
+
+Running every scoping step tonight converged on the same fact from four
+different directions. `agent-decision-journal.mjs` exports validators for
+three event shapes (`validateAgentDecisionEvent`, `validateCommandOfferEvent`,
+`validateLegacyImportObservationEvent`) and nothing else — no constructor,
+no builder, anywhere in the module. Its two production importers
+(`external-command-offer.mjs`, `governance-event-store.mjs`) call it only to
+validate a caller-supplied payload. A repo-wide grep for
+`kind.*command-offer` outside test files returns zero results. **No code
+path in this repository, during real operation, ever constructs and appends
+one of these events.**
+
+That single fact is the actual blocker behind:
+
+- **A-AC-01** (record before dependent action) — moot until a record is
+  ever written at all.
+- **A-AC-05** (selection/escalation/fallback identity) — already found
+  "CONFIRMED ABSENT: no production caller" independently, earlier this
+  session.
+- **H-AC-08** (legacy-import observation) — same, independently found.
+- **R-AC-08** (rollback/cleanup as occurred events) — the vocabulary exists
+  (`requiredCleanup.status`), the append-mechanism and the producer both
+  don't.
+
+The schema, validator, and storage layers for this entire capability are
+built, tested, and green. What's missing is a bridge from where the
+decisions this schema describes actually happen — an Elephant/Goldfish/
+Critic session choosing an option, offering a command, importing a record —
+to this repository's own code. That activity happens at the chat-harness
+level today, outside the repo entirely, which is also exactly the shape of
+L-AC-01's gap (no lifecycle-event producer) above. **Five of this plan's
+originally-separate items may reduce to one architectural question:
+should this repository grow a real integration point between live agent
+sessions and its own governance/journal/lifecycle stores, and if so, where
+does it live and who builds it first.** That's a question sized well above
+"pick a Class B criterion and dispatch it" — worth surfacing to the PO
+explicitly rather than continuing to scope its five symptoms as if they
+were independent.
 
 ## Recommended sequencing, once any of this is picked up
 
