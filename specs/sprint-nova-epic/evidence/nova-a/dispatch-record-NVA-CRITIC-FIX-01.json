@@ -1,0 +1,34 @@
+{
+  "taskId": "NVA-CRITIC-FIX-01",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "259409341e12dedd4c21949b26fa7f4cfc79bddf",
+  "dispatcher": "Elephant",
+  "outcome": "completed",
+  "log": [
+    {
+      "finding": "F1",
+      "result": "passed",
+      "commit": "5d0bfc4f",
+      "note": "observation/failureObservation now store stdoutSha256 instead of raw stdout; verified via node --test on selected-sandbox-launch.test.mjs"
+    },
+    {
+      "finding": "F7",
+      "result": "passed",
+      "commit": "5d0bfc4f",
+      "note": "realProbeRunner returns parent-observed pid; childIdSha256/observation.pid now use probe.pid; test mocks updated; verified via node --test on selected-sandbox-launch.test.mjs"
+    },
+    {
+      "finding": "F2",
+      "result": "passed",
+      "commit": "516bc451",
+      "note": "issue-acceptance-matrix.md #12 row corrected to state the companion package is independent and resource-blocked, not a dependent; spec Section 5.4 propagation path noted as unexercised"
+    },
+    {
+      "finding": "F5",
+      "result": "not verifiable",
+      "commit": null,
+      "note": "no pure/deterministic exported surface exists in execution-plane-launch.mjs; only main() is exported, which is the whole real-run orchestration, and the module itself executes main() via top-level await at import time -- no test file written, per briefing's explicit three-valued allowance"
+    }
+  ],
+  "report": "see final Goldfish report in dispatch transcript"
+}
