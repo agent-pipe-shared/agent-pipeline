@@ -71,7 +71,7 @@ Not designed here. The questions:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** bootstrap now asks the operator-facing language as a kickoff question instead of assuming `en`, per the item's Proposal question 1, giving a PO working from a consumer checkout a route to set/correct it (`closure_commit` `1174512bc78911af47640faebfd9f025da492492`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

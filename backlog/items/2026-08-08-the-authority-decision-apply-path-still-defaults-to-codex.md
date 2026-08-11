@@ -79,7 +79,7 @@ That measurement is the first task, not the fix.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the decision-apply path's silent Codex fallthrough was resolved per the item's Direction — the runner is now measured/passed explicitly to `runPoAuthorityRebindApply` rather than left `undefined` to fall through to a lower-layer default (`closure_commit` `e5a6a9b2bffc691be0610275c14a5c5b82036047`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

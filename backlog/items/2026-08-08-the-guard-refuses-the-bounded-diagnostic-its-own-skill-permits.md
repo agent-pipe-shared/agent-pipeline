@@ -107,7 +107,7 @@ The outside-repository variant reproduces in any adopted repository.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the same guard fix that resolved the string-match uncommittable-file defect also aligned the guard's enumerated exceptions with what the skill documents as permitted (bounded `rg | head`, read-only queries), removing the guard-versus-text disagreement per the item's Direction (`closure_commit` `b68b611417f8ab0b1adf7b9604fc391ec4e961cf`, shared with `2026-08-08-a-guard-string-match-makes-a-file-uncommittable-by-any-agent.md`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

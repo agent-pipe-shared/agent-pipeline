@@ -91,7 +91,7 @@ review unreachable.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the plugin now ships the `pipeline.verify-evidence.v0` producer (Direction 1) and root-commit-vs-empty-tree handling for `critic-dispatch-preflight`'s base-commit resolution (Direction 3), closing both A2 and A3 (`closure_commit` `b844ea342557e5313fe0a2d0ba2485c39464dce4`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

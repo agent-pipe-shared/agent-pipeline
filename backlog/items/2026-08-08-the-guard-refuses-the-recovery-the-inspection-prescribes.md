@@ -112,7 +112,7 @@ survives a full green Verify.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** all three prescribe/forbid contradictions (C1's diagnostic-code mismatch, C2's shell-guard-vs-preflight required path, C3's narrower-than-documented read-only exemption) were reconciled per the item's Direction 1-3 (`closure_commit` `ce1a7416fe2da9b106a3ffb386788252c6029476`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.
