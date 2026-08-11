@@ -47,6 +47,15 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 2d87c0ec857f00425ec8853daf162c17872ea219 — 2026-08-11, range d276cdf1..2d87c0ec, task-tracking correction + PX0-AC-13 Critic dispatch checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`2d87c0ec`), touching only `docs/state.md`
+(additive checkpoint entry appended after the PX0-AC-05 fix note,
+append-only discipline preserved — nothing rewritten). No other governed
+path touched.
+
 ## Candidate d276cdf1e681827d289ec06d62ba49b919fa0e31 — 2026-08-11, range 022718b0..d276cdf1, PX0-AC-05 security fix + fix-landing note
 
 - ADR-0045: checked, no change needed.
