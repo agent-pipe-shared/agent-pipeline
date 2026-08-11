@@ -47,6 +47,15 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 669e551af6e7e72fe887a78eb99ebe890441cc36 — 2026-08-11, range 6a96fb1d..669e551a, PX0-AC-13 FAIL checkpoint, tonight's PX0 sweep closed out
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`669e551a`), touching only `docs/state.md`
+(additive checkpoint entry appended after the PX0-AC-13 dispatch section,
+append-only discipline preserved — nothing rewritten). No other governed
+path touched.
+
 ## Candidate ebdb00a58d54bf1266e4930f1d66fb108bf20144 — 2026-08-11, range 2d87c0ec..ebdb00a5, PX0-AC-13 Critic FAIL recorded (no status change)
 
 - ADR-0045: checked, no change needed.
