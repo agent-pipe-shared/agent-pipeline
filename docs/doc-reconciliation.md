@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 5dabc5669da64baa30cdca7d69db15f98b78c763 — 2026-08-11, range 5f533257..5dabc566, P-AC-06 both clauses resolved as spec problems
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`5dabc566`), touching only `docs/state.md`.
+Purely additive: records that both remaining P-AC-06 clauses ("legacy",
+"orphaned") were investigated to a definitive negative answer against
+live repository data after PO approval of the Elephant's framing — one
+is a structurally dead branch, one has no discoverable predicate — and
+that this closes the session's seven-criteria Class B survey. No other
+governed path touched.
+
 ## Candidate 5f53325731d21a8278d37bc5b1cc8fd268973e05 — 2026-08-11, range 75b75f9b..5f533257, P-AC-06 orphan-check attempt and revert
 
 - ADR-0012: checked, no change needed.
