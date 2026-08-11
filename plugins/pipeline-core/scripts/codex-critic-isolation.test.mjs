@@ -893,23 +893,32 @@ await check("profile contract requires named profiles and tool-free exec control
   assert.throws(() => verifyProfileContract({ codexBinary: "/tmp/codex", execFileSync: () => "missing" }));
 });
 
+// buildExactFixture binds exactly one parent, so its candidate commit must be single-parent. This
+// repository's own live HEAD carries no such guarantee -- the first real merge commit on main broke
+// these checks -- so the suite builds and reuses its own synthetic single-parent candidate instead.
+let candidateFixture = null;
+async function candidateFixtureRepo() {
+  if (!candidateFixture) candidateFixture = await syntheticRepo();
+  return candidateFixture;
+}
+
 await check("exact fixture and review bundle carry full committed UTF-8 content", async () => {
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const candidate = await candidateFixtureRepo();
+  const fixture = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
   try {
     const bundle = await buildReviewBundle(fixture);
     assert.equal(bundle.value.artifacts.length, 1);
     assert.match(bundle.value.artifacts[0].content, /Critic verdict/u);
     assert.equal(bundle.value.artifacts[0].content.length > 0, true);
     assert.match(bundle.hash, /^[0-9a-f]{64}$/u);
-    assert.throws(() => criticPrompt({ bundle: { hash: bundle.hash }, taskId: "task", nonce: fixture.manifest.nonce, candidateCommit: head, candidateTree: fixture.manifest.tree, candidateParent: fixture.manifest.parent, candidateParentTree: fixture.manifest.parentTree }));
+    assert.throws(() => criticPrompt({ bundle: { hash: bundle.hash }, taskId: "task", nonce: fixture.manifest.nonce, candidateCommit: candidate.head, candidateTree: fixture.manifest.tree, candidateParent: fixture.manifest.parent, candidateParentTree: fixture.manifest.parentTree }));
   } finally { await rm(fixture.root, { recursive: true, force: true }); }
 });
 
 await check("fixture rejects traversal and duplicate artifact inputs before acceptance", async () => {
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  await assert.rejects(() => buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["../private"] }), /normalized relative/u);
-  await assert.rejects(() => buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["harness/scripts/verify.mjs", "harness/scripts/verify.mjs"] }), /unique/u);
+  const candidate = await candidateFixtureRepo();
+  await assert.rejects(() => buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["../private"] }), /normalized relative/u);
+  await assert.rejects(() => buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["harness/scripts/verify.mjs", "harness/scripts/verify.mjs"] }), /unique/u);
 });
 
 function childProcess(exitCode, afterSpawn = async () => {}) {
@@ -983,8 +992,8 @@ function criticSpawn({ toolEvent = false, badBinding = false, badVerdict = false
 }
 
 await check("tool-less critic receives full content and accepts only bound clean verdict", async () => {
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const candidate = await candidateFixtureRepo();
+  const fixture = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
   const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-critic-runtime-"));
   try {
     const bundle = await buildReviewBundle(fixture); let prompt = "";
@@ -994,8 +1003,8 @@ await check("tool-less critic receives full content and accepts only bound clean
 });
 
 await check("tool events, replay binding and unclean verdict each fail closed", async () => {
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] }); const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-critic-red-"));
+  const candidate = await candidateFixtureRepo();
+  const fixture = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] }); const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-critic-red-"));
   try {
     const bundle = await buildReviewBundle(fixture); const profile = buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: runtime }); const schemaPath = path.join(fixture.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json");
     for (const options of [{ toolEvent: true }, { badBinding: true }, { badVerdict: true }, { schemaInvalid: true }, { missingResult: true }, { oversizedResult: true }, { differentMessage: true }, { oversizedStream: true }, { oversizedStderr: true }, { exitCode: 2 }]) {
@@ -1006,8 +1015,8 @@ await check("tool events, replay binding and unclean verdict each fail closed", 
 });
 
 await check("critic timeout terminates its owned process group and fails closed", async () => {
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const candidate = await candidateFixtureRepo();
+  const fixture = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
   const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-timeout-runtime-"));
   try {
     const bundle = await buildReviewBundle(fixture);
@@ -1017,8 +1026,8 @@ await check("critic timeout terminates its owned process group and fails closed"
 });
 
 await check("debug critic timeout is classified response-stalled only after durable lease evidence", async () => {
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const candidate = await candidateFixtureRepo();
+  const fixture = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
   const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-debug-timeout-runtime-")); const traceDirectory = await mkdtemp(path.join(os.tmpdir(), "profile-debug-timeout-trace-")); const tracePath = path.join(traceDirectory, "trace.jsonl");
   try {
     const store = await createSecureTraceStore({ tracePath, repoRoot: root, fixtureRoot: fixture.root, privateRoots: [root, fixture.root, runtime] }); await beginTraceStep(store, "critic");
@@ -1038,8 +1047,8 @@ await check("debug critic timeout is classified response-stalled only after dura
 });
 
 await check("debug hard lease force-settles a child that never closes without inventing close evidence", async () => {
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const candidate = await candidateFixtureRepo();
+  const fixture = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
   const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-debug-forced-runtime-")); const traceDirectory = await mkdtemp(path.join(os.tmpdir(), "profile-debug-forced-trace-")); const tracePath = path.join(traceDirectory, "trace.jsonl");
   try {
     const store = await createSecureTraceStore({ tracePath, repoRoot: root, fixtureRoot: fixture.root }); await beginTraceStep(store, "critic");
@@ -1065,8 +1074,8 @@ await check("residual owned process group is detected when TERM and KILL cannot 
 });
 
 await check("synchronous spawn failure, asynchronous process error and signal fail closed", async () => {
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const candidate = await candidateFixtureRepo();
+  const fixture = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
   const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-process-fail-runtime-"));
   try {
     const reviewBundle = await buildReviewBundle(fixture); const permissionProfile = buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: runtime }); const schemaPath = path.join(fixture.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json");
@@ -1142,14 +1151,14 @@ await check("bundle fails closed on total oversize, content drift and extra fixt
     try { await assert.rejects(() => buildReviewBundle(fixture), /bundle exceeds/u); } finally { await rm(fixture.root, { recursive: true, force: true }); }
   } finally { await rm(total.repo, { recursive: true, force: true }); }
 
-  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
-  const drifted = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const candidate = await candidateFixtureRepo();
+  const drifted = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
   try {
     await writeFile(path.join(drifted.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json"), "drift\n");
     await assert.rejects(() => buildReviewBundle(drifted), /drifted/u);
   } finally { await rm(drifted.root, { recursive: true, force: true }); }
 
-  const extra = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const extra = await buildExactFixture({ repoRoot: candidate.repo, candidateCommit: candidate.head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
   const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-extra-runtime-"));
   try {
     const bundle = await buildReviewBundle(extra); await writeFile(path.join(extra.root, "unexpected-public-extra.txt"), "extra\n");
@@ -1302,6 +1311,8 @@ await check("local failure diagnostics are bounded and remain separate from publ
   const stdout = { bytes: 3, totalBytes: 3, parts: [Buffer.from("abc")] }; const stderr = { bytes: 5, totalBytes: 5, parts: [Buffer.from("error")] };
   const diagnostic = localFailureDiagnostic(stdout, stderr); assert.equal(diagnostic.stdoutTail, "abc"); assert.match(diagnostic.stderrSha256, /^[0-9a-f]{64}$/u);
 });
+
+if (candidateFixture) await rm(candidateFixture.repo, { recursive: true, force: true });
 
 process.stdout.write(`\n${passed}/${passed + failures.length} checks passed.\n`);
 if (failures.length) { process.stdout.write(`${failures.join("\n")}\n`); process.exitCode = 1; }
