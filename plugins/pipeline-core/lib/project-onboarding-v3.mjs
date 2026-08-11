@@ -3744,8 +3744,8 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
  * does not own, or any probe failure resolves to "nothing missing" rather than
  * a false alarm.
  */
-function unresolvedAuthorIdentityKeys(root, state, fs) {
-  if (state.hostManaged) return [];
+function unresolvedAuthorIdentityKeys(root, hostManaged, fs) {
+  if (hostManaged) return [];
   const configured = (key) => {
     try {
       const probe = fs.spawnSync("git", ["config", "--get", key], { cwd: root, encoding: "utf8" });
@@ -3917,7 +3917,7 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     // same "applied" status: a real ask-the-PO step, never a passive
     // diagnostic entry the caller has to notice on its own (see
     // `unresolvedAuthorIdentityKeys()`'s doc comment for the full history).
-    const missingIdentity = unresolvedAuthorIdentityKeys(root, state, fs);
+    const missingIdentity = unresolvedAuthorIdentityKeys(root, state.hostManaged, fs);
     if (missingIdentity.length > 0) {
       return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: gitResult, authority, nextAction: collectAuthorIdentityAction(missingIdentity), diagnostics: [] };
     }
@@ -4225,6 +4225,46 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner) {
   return observed;
 }
 
+// GF-103 built a real `collect-input` ask-step for a missing commit-author
+// identity at the `applyProjectOnboardingV3()` function level, but the real
+// `apply-portable-seed --activate` CLI path never observes it:
+// `applyLifecycle()`'s "portable" branch calls that function and discards its
+// return value, then returns a completely fresh `v4Inspection()` instead
+// (backlog: 2026-08-10-git-identity-ask-step-unreachable-through-live-cli-
+// path.md). This re-surfaces it, ADDITIVELY, on exactly the "portable" apply
+// path: never a new terminal status (that would reopen the fakeDeps/fakeGit
+// test breakage GF-103 avoided) and never a change to the primary
+// `nextAction` a caller already chains through to reach the next lifecycle
+// step. The three statuses checked are exactly the ones the portable apply's
+// own contract already declares as its resting points a few lines below
+// (`["runtime-initialization-required", "restart-required", "kickoff-required"]`)
+// -- a root whose portable seed lands directly on a plugin-managed Codex
+// runtime reaches "restart-required" or "kickoff-required" without ever
+// passing through "runtime-initialization-required", and the ask must reach
+// those callers too, not just the common case.
+//
+// Deliberately re-probed here rather than threading the one-shot result
+// `applyProjectOnboardingV3()` itself returned: a zero-write replay of the
+// exact same apply call takes the early "plan is no longer ready" return
+// below WITHOUT calling `applyProjectOnboardingV3()` again, and the existing
+// replay-identity test (`assert.deepEqual(portableReplayed, portableApplied)`)
+// requires both call shapes to compute this field identically -- a captured,
+// one-shot value would desync the second call from the first.
+const PORTABLE_APPLY_IDENTITY_ASK_STATUSES = ["runtime-initialization-required", "restart-required", "kickoff-required"];
+function withPendingAuthorIdentityAsk(observed, fs) {
+  if (observed.repository?.mode !== "local") return observed;
+  if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
+  const missing = unresolvedAuthorIdentityKeys(observed.root, false, fs);
+  if (missing.length === 0) return observed;
+  // Reuses the exact, already-tested ask-step shape `applyProjectOnboardingV3()`
+  // returns directly (AUTHORID-1). Its `expected: { schema: PLAN_SCHEMA,
+  // statuses: ["applied"] }` describes the direct library call's own contract,
+  // not this envelope's `pipeline.project-onboarding.v4` status -- left as-is
+  // rather than rebuilt for this embedding, since it is still an accurate,
+  // self-contained description of what fulfilling the ask itself resolves to.
+  return { ...observed, authorIdentityAction: collectAuthorIdentityAction(missing) };
+}
+
 function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "onboarding", runner) {
   if (!activate || typeof planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(planSha256)) return v4Inspection(rootDir, fs, intent, runner);
   if (operation === "portable") {
@@ -4232,9 +4272,9 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
     // digest was produced with, or the digests never match and the apply is a
     // silent no-op that loops the caller back to adoption-required.
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: v4Inspection(rootDir, fs, intent, runner).runner });
-    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return v4Inspection(rootDir, fs, intent, runner);
+    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs);
     applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
-    return v4Inspection(rootDir, fs, intent, runner);
+    return withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs);
   }
   const beforeApply = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "repair" && beforeApply.status === "continuity-damaged") {

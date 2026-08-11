@@ -1981,6 +1981,69 @@ test("public CLI emits typed inspect, plan, and explicit-apply results", () => {
   } finally { dispose(path); }
 });
 
+// Regression for backlog 2026-08-10-git-identity-ask-step-unreachable-through-
+// live-cli-path.md: GF-103's `collect-input` ask-step for a missing commit
+// author was correct but unreachable through the real `apply-portable-seed
+// --activate` CLI path, because `applyLifecycle()`'s "portable" branch
+// discarded `applyProjectOnboardingV3()`'s return value and returned a fresh
+// `v4Inspection()` instead. This drives the exact CLI entry point (not a
+// direct `applyProjectOnboardingV3()` unit call) and proves the ask now
+// surfaces there, additively, without changing the resting status a live
+// caller already chains through.
+test("apply-portable-seed --activate surfaces the missing-author-identity ask-step through the real CLI path", () => {
+  const missing = root();
+  const configured = root();
+  const invoke = (args, deps) => {
+    let output = "";
+    const code = onboardingCli(args, { deps, write: (chunk) => { output += chunk; } });
+    return { code, result: JSON.parse(output) };
+  };
+  try {
+    // (a) Missing identity: the live CLI apply now carries the ask-step
+    // alongside its unchanged resting status and unchanged primary nextAction.
+    const planned = invoke(["plan", "--root", missing, "--runner", "codex"], fakeDeps);
+    assert.equal(planned.code, 0);
+    const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const applied = invoke(["apply-portable-seed", "--root", missing, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
+    assert.equal(applied.code, 0);
+    assert.equal(applied.result.status, "runtime-initialization-required",
+      "the ask-step must never replace or change the lifecycle's own resting status");
+    assert.equal(applied.result.nextAction.kind, "command",
+      "the ask-step must never replace the primary chained nextAction");
+    assert.equal(applied.result.authorIdentityAction.kind, "collect-input");
+    assert.equal(applied.result.authorIdentityAction.mutation, false);
+    const fieldNames = applied.result.authorIdentityAction.inputs.map((input) => input.name).sort();
+    assert.deepEqual(fieldNames, ["gitAuthorEmail", "gitAuthorName"]);
+
+    // A replay of the exact same apply call (zero-write, same digest) must
+    // observe the identical ask-step -- this is the same invariant the
+    // existing "portable and runtime apply replays are zero-write with
+    // identical canonical responses" test already pins for the rest of the
+    // envelope.
+    const replayed = invoke(["apply-portable-seed", "--root", missing, "--plan-sha256", digest, "--activate", "--runner", "codex"], fakeDeps);
+    assert.deepEqual(replayed.result, applied.result);
+
+    // (b) A repository whose author identity IS resolved gets no ask-step at
+    // all -- exactly current behavior, additive only.
+    const knowsItsAuthor = {
+      ...fakeDeps,
+      spawnSync(command, args, options) {
+        if (command === "git" && args[0] === "config" && args[1] === "--get") {
+          return { status: 0, stdout: "configured\n", stderr: "" };
+        }
+        return fakeDeps.spawnSync(command, args, options);
+      },
+    };
+    const quietPlanned = invoke(["plan", "--root", configured, "--runner", "codex"], knowsItsAuthor);
+    const quietDigest = quietPlanned.result.nextAction.argv[quietPlanned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const quietApplied = invoke(["apply-portable-seed", "--root", configured, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], knowsItsAuthor);
+    assert.equal(quietApplied.code, 0);
+    assert.equal(quietApplied.result.status, "runtime-initialization-required");
+    assert.equal(Object.prototype.hasOwnProperty.call(quietApplied.result, "authorIdentityAction"), false,
+      "a configured repository must not be asked");
+  } finally { dispose(missing); dispose(configured); }
+});
+
 test("shared command renderer derives one copy-safe line from exact argv in a spaced root", () => {
   const path = root();
   try {
