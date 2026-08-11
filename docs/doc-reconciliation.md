@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 77907f43b8649c3e1ec24ff0082e2529d04f08f4 — 2026-08-11, range d827c1b3..77907f43, PX0-AC-13 grouping correction + PX0 Critic dispatch checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`77907f43`), touching only `docs/state.md`
+(a correction to the prior next-action note, plus a record of the dispatched
+first-pass Critic review, appended in place after the prior checkpoint
+paragraph — append-only discipline preserved, nothing rewritten out from
+under it). No other governed path touched.
+
 ## Candidate 5a2e339759b82fd1f3eb1b5cd0f71748ef65071e — 2026-08-11, range 27b0390f..5a2e3397, next-action checkpoint (PX0-AC-03/05/06/13 Critic-PASS opportunity)
 
 - ADR-0012: checked, no change needed.
