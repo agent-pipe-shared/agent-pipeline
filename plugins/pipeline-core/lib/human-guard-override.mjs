@@ -222,7 +222,10 @@ function controlPathTopology(root) {
 // ADR-0052 symlink arrangement is structurally outside the tree this
 // function ever walks; the hard-fail on an internal symlink stays exactly as
 // strict as before -- it still fail-closes if a checkout's own source tree
-// is tampered with to contain one.
+// is tampered with to contain one. That external symlink is now observed
+// SEPARATELY, by `externalLocalMarketplaceObservation()` below (NVA-BL-20),
+// which follows exactly that one link in order to verify where it points and
+// still never walks the tree behind it.
 function pluginSourceTreeSha256(sourceRoot) {
   const entries = [];
   const visit = (directory, prefix = "") => {
@@ -247,7 +250,181 @@ function pluginSourceTreeSha256(sourceRoot) {
   return sha(entries);
 }
 
-function localPluginInstallSourceObservation(repo) {
+// ---------------------------------------------------------------------------------
+// NVA-BL-20: the one admitted command of this class, `codex plugin add
+// pipeline-core@agent-pipeline-local`, does not install from this checkout
+// directly. Per ADR-0052 it resolves through a SEPARATE marketplace root that
+// lives outside every checkout and carries a symlink (native Windows: a
+// directory junction) at its own `plugins/pipeline-core` pointing back at a
+// checkout's real source tree. Hashing only this checkout (above) therefore
+// attested the wrong thing for this command class: an external root that is
+// repointed or mutated between attestation and use was entirely outside what
+// was observed.
+//
+// The locator is Codex's own marketplace registry, read through the host CLI in
+// the same shape `lib/codex-host-plugin-list.mjs` reads the plugin registry:
+// `codex plugin marketplace list --json` answers `{ "marketplaces": [ { "name":
+// ..., "root": ..., "marketplaceSource": { "sourceType": ..., "source": ... } }
+// ] }`. Registry entries carry no fixed key set -- a curated built-in entry
+// records no `marketplaceSource` at all -- so only the fields relied on here are
+// validated and unknown fields are ignored.
+//
+// `marketplaceSource.source`, NOT `root`, is the located directory: for a
+// git-sourced marketplace `root` is a Codex-managed cache copy, whereas the
+// in-place local topology is the one this repository's own preflight already
+// asserts, `resolve(marketplaceSource.source, "plugins", "pipeline-core")` ===
+// the installed plugin source path (scripts/pipeline-start-preflight.mjs).
+//
+// The registry answer is a LOCATOR ONLY and is never itself evidence: the proof
+// is the filesystem verification below. A wrong or hostile answer can therefore
+// only fail this observation closed, or hide a root -- and a hidden root is
+// recorded as the typed `unobserved` state, which is folded into `statusSha256`
+// like any other, so a later transition to `verified` (or to a different root)
+// invalidates the request, the plan and any armed capability through the
+// existing HGO-DRIFT comparison rather than passing unnoticed.
+// ---------------------------------------------------------------------------------
+const EXTERNAL_LOCAL_MARKETPLACE_NAME = "agent-pipeline-local";
+const EXTERNAL_REGISTRY_TIMEOUT_MS = 5_000;
+const EXTERNAL_REGISTRY_MAX_BYTES = 64 * 1024;
+
+function codexMarketplaceRegistry(spawn) {
+  let result;
+  try {
+    result = spawn("codex", ["plugin", "marketplace", "list", "--json"], {
+      encoding: "utf8",
+      // A closed environment, exactly like codex-host-plugin-list.mjs. PATH is
+      // the one inherited value: the executable is looked up by name, the same
+      // way this module already spawns `git`.
+      env: {
+        GIT_TERMINAL_PROMPT: "0",
+        LANG: "C",
+        LC_ALL: "C",
+        NO_COLOR: "1",
+        PATH: typeof process.env.PATH === "string" ? process.env.PATH : "",
+      },
+      maxBuffer: 2 * EXTERNAL_REGISTRY_MAX_BYTES,
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: EXTERNAL_REGISTRY_TIMEOUT_MS,
+    });
+  } catch { return null; }
+  if (!object(result)
+    || result.status !== 0
+    || (result.error !== undefined && result.error !== null)
+    || (result.signal !== undefined && result.signal !== null)
+    || typeof result.stdout !== "string") return null;
+  const bytes = Buffer.byteLength(result.stdout, "utf8");
+  if (bytes === 0 || bytes > EXTERNAL_REGISTRY_MAX_BYTES) return null;
+  try { return JSON.parse(result.stdout); } catch { return null; }
+}
+
+function localAbsolutePath(value) {
+  return typeof value === "string"
+    && value.length > 0
+    && !value.includes("\0")
+    && isAbsolute(value)
+    && resolve(value) === value;
+}
+
+function externalStat(path, message) {
+  try { return lstatSync(path); }
+  catch { return fail("HGO-EXTERNAL-MARKETPLACE", message); }
+}
+
+function externalRealpath(path, message) {
+  try { return realpathSync(path); }
+  catch { return fail("HGO-EXTERNAL-MARKETPLACE", message); }
+}
+
+/** Locate the registered external root, or null when the registry names none. */
+function externalLocalMarketplaceLocation(registry) {
+  if (!object(registry) || !Array.isArray(registry.marketplaces)) return null;
+  const named = registry.marketplaces.filter((entry) =>
+    object(entry) && entry.name === EXTERNAL_LOCAL_MARKETPLACE_NAME);
+  if (named.length === 0) return null;
+  // Two registrations under the reserved name are an ambiguous authority, never
+  // a preference for either -- the same posture codex-host-plugin-list.mjs takes
+  // for a doubly enabled plugin identity.
+  if (named.length > 1) {
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace registration is ambiguous");
+  }
+  const source = named[0].marketplaceSource;
+  // An entry that records no source locates nothing. That is an ABSENT
+  // observation, not a mismatch: nothing has been contradicted yet.
+  if (!object(source)) return null;
+  // ADR-0052 reserves this name for the local development root. Serving it from
+  // anywhere else means the admitted install does not resolve into any local
+  // checkout, which is a contradiction, not an absence.
+  if (source.sourceType !== "local") {
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace is not registered from a local source");
+  }
+  if (!localAbsolutePath(source.source)) {
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace source path is unsafe");
+  }
+  return source.source;
+}
+
+function externalLocalMarketplaceObservation(repo, {
+  registryReader = codexMarketplaceRegistry,
+  spawn = spawnSync,
+} = {}) {
+  const registry = registryReader(spawn);
+  // A registry that is unreadable, or that does not answer in the documented
+  // shape, observes nothing. It is never treated as "no local marketplace".
+  if (!object(registry) || !Array.isArray(registry.marketplaces)) {
+    return { state: "unobserved", reason: "registry-unavailable" };
+  }
+  const located = externalLocalMarketplaceLocation(registry);
+  if (located === null) return { state: "unobserved", reason: "not-registered" };
+  const rootInfo = externalStat(located, "external local marketplace root is unavailable");
+  if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink()
+    || externalRealpath(located, "external local marketplace root is unavailable") !== located) {
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace root is unsafe");
+  }
+  const manifestPath = join(located, ".claude-plugin", "marketplace.json");
+  const manifestInfo = externalStat(manifestPath, "external local marketplace declaration is unavailable");
+  if (!manifestInfo.isFile() || manifestInfo.isSymbolicLink() || manifestInfo.nlink !== 1
+    || externalRealpath(manifestPath, "external local marketplace declaration is unavailable") !== manifestPath) {
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace declaration is unsafe");
+  }
+  let manifest;
+  try { manifest = JSON.parse(readFileSync(manifestPath, "utf8")); }
+  catch { fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace declaration is malformed"); }
+  const binds = manifest?.name === EXTERNAL_LOCAL_MARKETPLACE_NAME
+    && Array.isArray(manifest?.plugins)
+    && manifest.plugins.some((entry) => entry?.name === "pipeline-core" && entry?.source === "./plugins/pipeline-core");
+  if (!binds) fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace does not bind pipeline-core");
+  const pluginsDirectory = join(located, "plugins");
+  const pluginsInfo = externalStat(pluginsDirectory, "external local marketplace plugins directory is unavailable");
+  if (!pluginsInfo.isDirectory() || pluginsInfo.isSymbolicLink()
+    || externalRealpath(pluginsDirectory, "external local marketplace plugins directory is unavailable") !== pluginsDirectory) {
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace plugins directory is unsafe");
+  }
+  // The ONE entry that is legitimately a symlink or a directory junction, and is
+  // therefore followed instead of refused (pluginSourceTreeSha256 above still
+  // hard-fails on any symlink inside the tree it walks). Where this entry points
+  // IS the question, so it is resolved and required to be exactly this
+  // checkout's own plugin source root -- already content-hashed above by
+  // `pluginTreeSha256`, which is why the external tree is never walked twice.
+  const entryPath = join(pluginsDirectory, "pipeline-core");
+  const entryInfo = externalStat(entryPath, "external local marketplace plugin entry is unavailable");
+  const entryTarget = externalRealpath(entryPath, "external local marketplace plugin entry does not resolve");
+  if (entryTarget !== join(repo.root, "plugins", "pipeline-core")) {
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace does not resolve to this checkout");
+  }
+  const targetInfo = externalStat(entryTarget, "external local marketplace plugin entry is unavailable");
+  if (!targetInfo.isDirectory()) {
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace plugin entry is not a directory");
+  }
+  return {
+    state: "verified",
+    rootSha256: sha(located),
+    manifestSha256: sha(readFileSync(manifestPath)),
+    entryKind: entryInfo.isSymbolicLink() ? "link" : "directory",
+  };
+}
+
+function localPluginInstallSourceObservation(repo, options = {}) {
   if (!isPipelineSourceRoot(repo.root)) fail("HGO-PLUGIN-SOURCE", "repository is not a Pipeline plugin source checkout");
   const marketplace = join(repo.root, ".claude-plugin", "marketplace.json");
   const sourceRoot = join(repo.root, "plugins", "pipeline-core");
@@ -279,15 +456,22 @@ function localPluginInstallSourceObservation(repo) {
     && Array.isArray(marketplaceValue?.plugins)
     && marketplaceValue.plugins.some((entry) => entry?.name === "pipeline-core" && entry?.source === "./plugins/pipeline-core");
   if (!registered) fail("HGO-PLUGIN-SOURCE", "local marketplace does not bind pipeline-core");
+  // NVA-BL-20: the external root the admitted command actually resolves
+  // through, folded into the SAME attestation hash -- so a repointed or mutated
+  // external root, and equally a transition into or out of the typed
+  // `unobserved` state, invalidates the request/plan/capability chain that
+  // `statusSha256` binds.
+  const externalMarketplace = externalLocalMarketplaceObservation(repo, options);
   return {
     fingerprintSha256: sha({ physicalRoot: repo.root, physicalCommon: repo.common }),
     head: null,
     tree: null,
     statusSha256: sha({
-      kind: "local-plugin-install-source.v1",
+      kind: "local-plugin-install-source.v2",
       marketplaceSha256: sha(readFileSync(marketplace)),
       manifestSha256: sha(readFileSync(manifest)),
       pluginTreeSha256: pluginSourceTreeSha256(sourceRoot),
+      externalMarketplace,
     }),
   };
 }
@@ -717,7 +901,7 @@ function decisionPreview({ toolName, toolInput, paths, commandClass, denials }) 
   const effect = commandClass === "local-plugin-install"
     ? {
       repository: "does not change the bound repository working tree, index, refs, or configuration",
-      external: "adds exactly pipeline-core@agent-pipeline-local to the host Codex plugin registry; only this checkout's manifest identity and plugin-source tree digest are attested, not the external agent-pipeline-local marketplace root the install actually resolves through",
+      external: "adds exactly pipeline-core@agent-pipeline-local to the host Codex plugin registry; attested are this checkout's manifest identity and plugin-source tree digest AND, whenever the host marketplace registry names a local agent-pipeline-local root, that root's own marketplace.json plus the fact that its plugins/pipeline-core resolves back into exactly this checkout, so a repointed or mutated external root refuses or invalidates this authorization; where the registry names no such root the external root stays unobserved and is NOT attested, and only this checkout's own manifest identity and plugin-source tree digest are",
       rollbackRecovery: "read back the native plugin registry; removal/restart remains a separately attended operator action",
       residualRisk: "the host-wide Codex plugin selection changes and existing sessions keep their already-loaded plugin until the attended refresh boundary",
     }
@@ -2223,4 +2407,8 @@ export const humanGuardOverrideInternals = {
   // in the real repository manifest.
   isPipelineSourceRoot,
   localPluginInstallSourceObservation,
+  // NVA-BL-20: exposed so the suite can drive both external-root outcomes from
+  // synthetic fixtures with an injected registry reader, instead of depending on
+  // the machine's own Codex registry state, which a test cannot control.
+  externalLocalMarketplaceObservation,
 };

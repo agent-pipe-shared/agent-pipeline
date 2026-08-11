@@ -10,6 +10,7 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -1326,6 +1327,214 @@ test("F1 (dispatch CRITIC-REMEDY-09): the local-plugin-install attestation succe
   const observation = humanGuardOverrideInternals.localPluginInstallSourceObservation({ root: repoRoot });
   assert.match(observation.statusSha256, /^[a-f0-9]{64}$/u);
   assert.match(observation.fingerprintSha256, /^[a-f0-9]{64}$/u);
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-BL-20: the admitted command `codex plugin add pipeline-core@agent-pipeline-local`
+// installs through an EXTERNAL marketplace root (ADR-0052) that lives outside every
+// checkout and links back into one. The attestation above hashes only this checkout,
+// so a repointed or mutated external root used to be entirely outside what the
+// override observed. These fixtures drive both outcomes through an injected registry
+// reader: the machine's own Codex registry state is neither readable nor controllable
+// from a test, and depending on it would make the assertion environmental rather than
+// behavioural.
+// ---------------------------------------------------------------------------------
+
+const EXTERNAL_SYMLINK_CAPABLE = (() => {
+  const probe = mkdtempSync(join(tmpdir(), "human-guard-symlink-probe-"));
+  try {
+    symlinkSync(join(probe, "target"), join(probe, "link"));
+    return true;
+  } catch {
+    process.stdout.write("[capability: symlink unavailable] skipping NVA-BL-20 link-shaped checks\n");
+    return false;
+  } finally {
+    rmSync(probe, { recursive: true, force: true });
+  }
+})();
+
+function pipelineCheckout(base, name) {
+  const root = join(base, name);
+  const sourceRoot = join(root, "plugins", "pipeline-core");
+  mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
+  mkdirSync(join(root, "harness", "scripts"), { recursive: true });
+  mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+  writeFileSync(join(root, "harness", "scripts", "verify.mjs"), "// verify\n");
+  writeFileSync(join(sourceRoot, ".codex-plugin", "plugin.json"), JSON.stringify({
+    name: "pipeline-core",
+    version: "0.0.0-test",
+  }));
+  writeFileSync(join(root, ".claude-plugin", "marketplace.json"), JSON.stringify({
+    name: "agent-pipeline",
+    plugins: [{ name: "pipeline-core", source: "./plugins/pipeline-core" }],
+  }));
+  return { root, sourceRoot };
+}
+
+function externalMarketplace(base, name, { marketplaceName = "agent-pipeline-local", plugins } = {}) {
+  const root = join(base, name);
+  mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+  mkdirSync(join(root, "plugins"), { recursive: true });
+  writeFileSync(join(root, ".claude-plugin", "marketplace.json"), JSON.stringify({
+    name: marketplaceName,
+    plugins: plugins ?? [{ name: "pipeline-core", source: "./plugins/pipeline-core" }],
+  }));
+  return root;
+}
+
+function externalRegistry(marketplaces) {
+  return () => ({ marketplaces });
+}
+
+function localRegistry(root) {
+  return externalRegistry([
+    { name: "openai-curated", root: join(root, "irrelevant") },
+    { name: "agent-pipeline-local", root, marketplaceSource: { sourceType: "local", source: root } },
+  ]);
+}
+
+function externalFixture() {
+  return realpathSync(mkdtempSync(join(tmpdir(), "human-guard-external-marketplace-")));
+}
+
+test("NVA-BL-20: a correctly linked external agent-pipeline-local root is verified and folded into statusSha256", { skip: EXTERNAL_SYMLINK_CAPABLE ? false : "symlink capability unavailable" }, () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const external = externalMarketplace(base, "external");
+    symlinkSync(checkout.sourceRoot, join(external, "plugins", "pipeline-core"), "junction");
+    const registryReader = localRegistry(external);
+    const verified = humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+      { root: checkout.root },
+      { registryReader },
+    );
+    assert.equal(verified.state, "verified");
+    assert.equal(verified.entryKind, "link");
+    assert.match(verified.rootSha256, /^[a-f0-9]{64}$/u);
+    assert.match(verified.manifestSha256, /^[a-f0-9]{64}$/u);
+    // The verification is not decorative: it reaches the attestation hash the
+    // request/plan/capability chain is bound to.
+    const observed = humanGuardOverrideInternals.localPluginInstallSourceObservation(
+      { root: checkout.root, common: join(checkout.root, ".git") },
+      { registryReader },
+    );
+    const unobserved = humanGuardOverrideInternals.localPluginInstallSourceObservation(
+      { root: checkout.root, common: join(checkout.root, ".git") },
+      { registryReader: () => null },
+    );
+    assert.match(observed.statusSha256, /^[a-f0-9]{64}$/u);
+    assert.notEqual(observed.statusSha256, unobserved.statusSha256);
+    // A mutation of the external root's own manifest that keeps it valid still
+    // changes the attestation, so the armed capability no longer matches (HGO-DRIFT).
+    writeFileSync(join(external, ".claude-plugin", "marketplace.json"), JSON.stringify({
+      name: "agent-pipeline-local",
+      plugins: [
+        { name: "pipeline-core", source: "./plugins/pipeline-core" },
+        { name: "smuggled", source: "./plugins/smuggled" },
+      ],
+    }));
+    const mutated = humanGuardOverrideInternals.localPluginInstallSourceObservation(
+      { root: checkout.root, common: join(checkout.root, ".git") },
+      { registryReader },
+    );
+    assert.notEqual(mutated.statusSha256, observed.statusSha256);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BL-20: a repointed or mutated external agent-pipeline-local root fails closed", () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const decoy = pipelineCheckout(base, "decoy");
+    const refuses = (registryReader, root = checkout.root) => assert.throws(
+      () => humanGuardOverrideInternals.externalLocalMarketplaceObservation({ root }, { registryReader }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-EXTERNAL-MARKETPLACE",
+    );
+    // (a) the external root's plugins/pipeline-core points at a DIFFERENT checkout.
+    if (EXTERNAL_SYMLINK_CAPABLE) {
+      const repointed = externalMarketplace(base, "repointed");
+      symlinkSync(decoy.sourceRoot, join(repointed, "plugins", "pipeline-core"), "junction");
+      refuses(localRegistry(repointed));
+      // ... and the same root is accepted for the checkout it actually links to,
+      // so the refusal above is the binding, not a blanket rejection.
+      assert.equal(
+        humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+          { root: decoy.root },
+          { registryReader: localRegistry(repointed) },
+        ).state,
+        "verified",
+      );
+      // (b) a dangling link target resolves nowhere at all.
+      const dangling = externalMarketplace(base, "dangling");
+      symlinkSync(join(base, "absent", "plugins", "pipeline-core"), join(dangling, "plugins", "pipeline-core"), "junction");
+      refuses(localRegistry(dangling));
+    }
+    // (c) a real directory in place of the link never resolves into this checkout.
+    const copied = externalMarketplace(base, "copied");
+    mkdirSync(join(copied, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });
+    writeFileSync(join(copied, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"), "{}\n");
+    refuses(localRegistry(copied));
+    // (d) the external manifest no longer names the reserved marketplace identity.
+    const renamed = externalMarketplace(base, "renamed", { marketplaceName: "agent-pipeline" });
+    refuses(localRegistry(renamed));
+    // (e) the external manifest no longer binds pipeline-core to its own source.
+    const unbound = externalMarketplace(base, "unbound", {
+      plugins: [{ name: "pipeline-core", source: "/somewhere/else" }],
+    });
+    refuses(localRegistry(unbound));
+    // (f) the external manifest is missing or malformed.
+    const malformed = externalMarketplace(base, "malformed");
+    writeFileSync(join(malformed, ".claude-plugin", "marketplace.json"), "{ not json\n");
+    refuses(localRegistry(malformed));
+    const absent = join(base, "absent-root");
+    refuses(localRegistry(absent));
+    // (g) the reserved name is served from a non-local source, or twice over.
+    const external = externalMarketplace(base, "external");
+    refuses(externalRegistry([{
+      name: "agent-pipeline-local",
+      root: external,
+      marketplaceSource: { sourceType: "git", source: "https://example.invalid/x.git" },
+    }]));
+    refuses(externalRegistry([
+      { name: "agent-pipeline-local", root: external, marketplaceSource: { sourceType: "local", source: external } },
+      { name: "agent-pipeline-local", root: base, marketplaceSource: { sourceType: "local", source: base } },
+    ]));
+    refuses(externalRegistry([{
+      name: "agent-pipeline-local",
+      root: external,
+      marketplaceSource: { sourceType: "local", source: "relative/path" },
+    }]));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("NVA-BL-20: an unobservable or unregistered marketplace registry is a typed, distinctly hashed state", () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const observe = (registryReader) => humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+      { root: checkout.root },
+      { registryReader },
+    );
+    assert.deepEqual(observe(() => null), { state: "unobserved", reason: "registry-unavailable" });
+    assert.deepEqual(observe(() => undefined), { state: "unobserved", reason: "registry-unavailable" });
+    assert.deepEqual(observe(() => ({ marketplaces: "nope" })), { state: "unobserved", reason: "registry-unavailable" });
+    assert.deepEqual(observe(externalRegistry([])), { state: "unobserved", reason: "not-registered" });
+    assert.deepEqual(
+      observe(externalRegistry([{ name: "agent-pipeline-local", root: base }])),
+      { state: "unobserved", reason: "not-registered" },
+    );
+    const attest = (registryReader) => humanGuardOverrideInternals.localPluginInstallSourceObservation(
+      { root: checkout.root, common: join(checkout.root, ".git") },
+      { registryReader },
+    ).statusSha256;
+    assert.notEqual(attest(() => null), attest(externalRegistry([])));
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------------------------
