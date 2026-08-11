@@ -47,6 +47,15 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 5375ace64ff8c8d763aafc226b2f7b0bcdc07b15 — 2026-08-12, range 3452c5db..5375ace6, PX0-AC-13 resolution + PX0-AC-05 AR05g landing recorded in evidence map
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`5375ace6`), touching only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs` (two
+POINTERS note extensions, verdicts unchanged, totals regenerated and
+confirmed 130/157). File placement, naming and directory shape unaffected.
+
 ## Candidate 7fa07d5420b6db5770a8bc142629f47ebcbe6857 — 2026-08-12, range de79f7b5..7fa07d54, PX0-AC-13 acceptance.md amendment
 
 - ADR-0045: checked, no change needed.
