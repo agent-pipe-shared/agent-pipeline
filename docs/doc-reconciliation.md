@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 57fc68b6fa157c7ebcb25d498bfe5785db323f20 — 2026-08-11, range 2a1a0903..57fc68b6, F2 doc fix landed + state.md checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers two commits (`2a1a0903`, `57fc68b6`): `2a1a0903` touches only
+`harness/session-bootstrap.md` (the design-mandated §B.6 sentence, no
+`Governs:` line points at this file — confirmed by the checker's own "0
+implicated" result over this exact commit, run before this entry was
+written); `57fc68b6` touches only `docs/state.md` (additive checkpoint
+entry, append-only discipline preserved).
+
 ## Candidate 669e551af6e7e72fe887a78eb99ebe890441cc36 — 2026-08-11, range 6a96fb1d..669e551a, PX0-AC-13 FAIL checkpoint, tonight's PX0 sweep closed out
 
 - ADR-0012: checked, no change needed.
