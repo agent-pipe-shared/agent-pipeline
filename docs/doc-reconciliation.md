@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 39367f13516cb22cb6587450a6fbc370e4044bcd — 2026-08-11, range f2fc3026..39367f13, PO decision recorded + PX0-AC-13 host-delegation dispatch
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`39367f13`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate f2fc3026a08fdd797b10d50580d0f55329fd9b3a — 2026-08-11, range 755a3959..f2fc3026, PX0-AC-13 formalized as a PO decision point
 
 - ADR-0045: checked, no change needed.
