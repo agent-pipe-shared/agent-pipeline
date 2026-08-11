@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "82198d731eecda47f7b2677c369270140fdf9b6b49bf48e981d4db8b39483dc3"
+    "transitionHead": "d67229fab9ed7df8871cd0c9536a5d8e0ff198cab1790c3d8e97bd1284c4ce47"
   },
   "counts": {
-    "open": 127,
+    "open": 92,
     "in_progress": 22,
-    "closed": 48
+    "closed": 83
   },
   "items": [
     {
@@ -21,11 +21,15 @@
     },
     {
       "id": "pipeline.absent-runner-flag-silently-defaults-to-codex",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md."
+      "source": "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "5918d9d6b6d6b0ca72acd19a90cb2cfc6207728d",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.adr-0047-numbering-collision",
@@ -90,11 +94,15 @@
     },
     {
       "id": "pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO hypothesis, 2026-08-08: 'kann es sein dass sie durch die vielen neuen guards und vorgaben zu wenig Pflichtwissen darüber haben was erlaubt ist und was nicht und dadurch zu viele guard blocks und hook blocks produzieren?' — measured and confirmed by the Elephant the same day."
+      "source": "PO hypothesis, 2026-08-08: 'kann es sein dass sie durch die vielen neuen guards und vorgaben zu wenig Pflichtwissen darüber haben was erlaubt ist und was nicht und dadurch zu viele guard blocks und hook blocks produzieren?' — measured and confirmed by the Elephant the same day.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "d71aa710abe437ac1c81bece5bacb12c0355529b",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.agents-read-the-source-because-nothing-describes-the-interface",
@@ -106,11 +114,15 @@
     },
     {
       "id": "pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "Codex self-report from a live 2026-08-10 greenfield test session: 'Beim setup der Freigabeautorität wich die Rückmeldung von den übergebenen Werten ab: Trotz --human-name <value> --key-reference <value> meldete sie APS-PO und local-po-key.' (exact supplied values redacted here — they are the PO's real identity strings and must never appear in a committed artifact; the point is that the echoed identifiers did not match what was passed at all)."
+      "source": "Codex self-report from a live 2026-08-10 greenfield test session: 'Beim setup der Freigabeautorität wich die Rückmeldung von den übergebenen Werten ab: Trotz --human-name <value> --key-reference <value> meldete sie APS-PO und local-po-key.' (exact supplied values redacted here — they are the PO's real identity strings and must never appear in a committed artifact; the point is that the echoed identifiers did not match what was passed at all).",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "0717f1f5361e28d0bdcd45cc03e31bc2dac42952",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.approve-push-rejects-any-fresh-post-setup1-authority-file",
@@ -134,11 +146,15 @@
     },
     {
       "id": "pipeline.authority-decision-apply-defaults-to-codex",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Found while checking the approval layer for runner neutrality on 2026-08-08, after the PO named that layer as a target for the next candidate. The residue is documented in the source itself."
+      "source": "Found while checking the approval layer for runner neutrality on 2026-08-08, after the PO named that layer as a target for the next candidate. The residue is documented in the source itself.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "e5a6a9b2bffc691be0610275c14a5c5b82036047",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.authority-decision-candidate-is-a-literal",
@@ -203,11 +219,15 @@
     },
     {
       "id": "pipeline.blocking-push-gate-has-no-terminal-exception-boundary",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Residual of GitHub issue #100 (P0/Security, 'Fail closed when the push approval record is absent'), established by reading the current tree on 2026-08-08. The PO independently reached this state in a greenfield test the same day."
+      "source": "Residual of GitHub issue #100 (P0/Security, 'Fail closed when the push approval record is absent'), established by reading the current tree on 2026-08-08. The PO independently reached this state in a greenfield test the same day.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "2ae06d9133beed3859f8e0a5ca1b61b1d97a4771",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection",
@@ -346,11 +366,15 @@
     },
     {
       "id": "pipeline.concurrent-dispatches-share-one-index",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Observed directly on 2026-08-08: commit 598a78b, trailered Dispatch: HGOELIG-1 (goldfish), contains a backlog-item edit written by the Elephant and staged seconds earlier."
+      "source": "Observed directly on 2026-08-08: commit 598a78b, trailered Dispatch: HGOELIG-1 (goldfish), contains a backlog-item edit written by the Elephant and staged seconds earlier.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "7003b2fd221a48d583569505c817013cd551397c",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation",
@@ -450,11 +474,15 @@
     },
     {
       "id": "pipeline.decouple-hosted-project-document-language-from-operator-facing-language",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "PO directive during the 2026-08-09 Codex/Claude happy-path evaluation: for a HOSTED/consumer project (not this Pipeline repo, which stays ADR-0011 EN-canonical), the PRD/Spec document language should be free to differ from the project's operator-facing (chat/session) language, which itself stays a hard de/en choice per setup. Explicit follow-up refinement: keep the change thorough but minimally invasive, no new follow-on problems, an English structure/scaffold with only the prose content translated is an acceptable (preferred) shape, and the kickoff flow should actively ask which document language(s) a hosted project's PRD/Spec should use rather than silently assuming it equals the operator-facing choice."
+      "source": "PO directive during the 2026-08-09 Codex/Claude happy-path evaluation: for a HOSTED/consumer project (not this Pipeline repo, which stays ADR-0011 EN-canonical), the PRD/Spec document language should be free to differ from the project's operator-facing (chat/session) language, which itself stays a hard de/en choice per setup. Explicit follow-up refinement: keep the change thorough but minimally invasive, no new follow-on problems, an English structure/scaffold with only the prose content translated is an acceptable (preferred) shape, and the kickoff flow should actively ask which document language(s) a hosted project's PRD/Spec should use rather than silently assuming it equals the operator-facing choice.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "695cd8e59aa7131c5c9595c1d713f6a1951d9620",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.dispatch-provenance",
@@ -589,19 +617,27 @@
     },
     {
       "id": "pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "PO instruction during today's (2026-08-10) live greenfield test observation window: 'die lokale git identitäten name und mail sollten direkt im setup abgefragt und festgelegt werden und nicht erst immer beim ersten commit als fehler auftauchen.' This supersedes the closure rationale recorded in backlog/items/2026-08-09-fresh-repo-onboarding-never-asks-for-git-identity.md, which treated a warn-only diagnostic as having resolved the underlying gap."
+      "source": "PO instruction during today's (2026-08-10) live greenfield test observation window: 'die lokale git identitäten name und mail sollten direkt im setup abgefragt und festgelegt werden und nicht erst immer beim ersten commit als fehler auftauchen.' This supersedes the closure rationale recorded in backlog/items/2026-08-09-fresh-repo-onboarding-never-asks-for-git-identity.md, which treated a warn-only diagnostic as having resolved the underlying gap.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "018d523b707d8ae2b72a13e30ac8a2e013c1f1e0",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "PO observation during the 2026-08-09 evaluation/fix session: dispatched Goldfish/Critic subagents keep ending their turn mid-task without a final report, each requiring an Elephant-side diagnose-and-resume cycle; explicit PO instruction to defer investigation until after the current local candidate ships, since fixing it now would itself cost more of the time it is meant to save."
+      "source": "PO observation during the 2026-08-09 evaluation/fix session: dispatched Goldfish/Critic subagents keep ending their turn mid-task without a final report, each requiring an Elephant-side diagnose-and-resume cycle; explicit PO instruction to defer investigation until after the current local candidate ships, since fixing it now would itself cost more of the time it is meant to save.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "a6fa43f2fc191ecf76ef7c5b13a02ff64034b24b",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.grammar-refusal-does-not-say-which-part-failed",
@@ -649,27 +685,39 @@
     },
     {
       "id": "pipeline.guard-lifecycle-ready-blocks-claude-memory-writes",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-29",
-      "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
+      "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "a32e1b99ba3abc71165014227064bba261064f14",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
+      "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "4d19def0ac9e5c2c6112b72e923bb95b6400be28",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.guard-lifecycle-ready-runner-allowlist-incomplete",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Direct code inspection of guard-lifecycle-ready.mjs vs. session-cleanup.mjs's own documented CLI surface, while investigating the PO's private Codex + 0.5.4 test run, 2026-08-09. Independent of that run's actual failure chain — see the note below."
+      "source": "Direct code inspection of guard-lifecycle-ready.mjs vs. session-cleanup.mjs's own documented CLI surface, while investigating the PO's private Codex + 0.5.4 test run, 2026-08-09. Independent of that run's actual failure chain — see the note below.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "9427caa6a2e02ed78e49c3babb28df9d7195eef9",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.guard-maintenance-window-rejects-a-fresh-setup1-authority-file",
@@ -693,27 +741,39 @@
     },
     {
       "id": "pipeline.guard-refuses-documented-bounded-diagnostic",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-3). Independently hit in the Pipeline's own repository in the same session."
+      "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-3). Independently hit in the Pipeline's own repository in the same session.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "b68b611417f8ab0b1adf7b9604fc391ec4e961cf",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.guard-refuses-the-prescribed-recovery",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, findings C1, C2 and C3 from the Claude greenfield transcript against the 0.5.4 local candidate. All three verified in code by the Elephant before filing."
+      "source": "PO, 2026-08-08, findings C1, C2 and C3 from the Claude greenfield transcript against the 0.5.4 local candidate. All three verified in code by the Elephant before filing.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "ce1a7416fe2da9b106a3ffb386788252c6029476",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.guard-string-match-makes-a-file-uncommittable",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "SCRATCH-1 dispatch, 2026-08-08: it edited templates/pipeline.yaml.example, its tests went green, and it could not commit the file. It reported the block and attempted no workaround, which is correct behaviour."
+      "source": "SCRATCH-1 dispatch, 2026-08-08: it edited templates/pipeline.yaml.example, its tests went green, and it could not commit the file. It reported the block and attempted no workaround, which is correct behaviour.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "b68b611417f8ab0b1adf7b9604fc391ec4e961cf",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
@@ -949,11 +1009,15 @@
     },
     {
       "id": "pipeline.no-sanctioned-way-to-start-over",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, unhappy-path transcripts from fresh Claude and Codex sessions on greenfield projects against the 0.5.4 local candidate. The Claude session composed a destructive `rm -rf` for the human to run, because no typed reset exists; the Codex session asked the human for permission to repair the Pipeline by hand."
+      "source": "PO, 2026-08-08, unhappy-path transcripts from fresh Claude and Codex sessions on greenfield projects against the 0.5.4 local candidate. The Claude session composed a destructive `rm -rf` for the human to run, because no typed reset exists; the Codex session asked the human for permission to repair the Pipeline by hand.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "2dd0623fbb92d6f665fa3f5ef28dbfc35b6831e3",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.nonblocking-interaction-continuity",
@@ -978,11 +1042,15 @@
     },
     {
       "id": "pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Left open by 2026-08-08-shipped-guidance-sends-agents-to-a-directory-a-gate-refuses.md, whose closure evidence (backlog/evidence/2026-08-09-devplan-scratch-exemption-closure.md, 'What this closure does NOT decide') recorded it as a direction rather than deciding it; carried in docs/state.md as an open item needing its own backlog entry."
+      "source": "Left open by 2026-08-08-shipped-guidance-sends-agents-to-a-directory-a-gate-refuses.md, whose closure evidence (backlog/evidence/2026-08-09-devplan-scratch-exemption-closure.md, 'What this closure does NOT decide') recorded it as a direction rather than deciding it; carried in docs/state.md as an open item needing its own backlog entry.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "d7a52fedbccb6fbce30492227b48c65059a1d1ef",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner",
@@ -998,11 +1066,15 @@
     },
     {
       "id": "pipeline.onboarding-ready-path-unconditional-restart-barrier-read",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
+      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "864c7f1f84b5e0a874e360bf26e168fa92f14aaf",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware",
@@ -1078,11 +1150,15 @@
     },
     {
       "id": "pipeline.plan-path-guidance-attached-to-unlike-causes",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Established while re-signposting the PO-language mismatch (commit b094cb5); the enumeration was produced by that dispatch and the remaining sites were deliberately left alone."
+      "source": "Established while re-signposting the PO-language mismatch (commit b094cb5); the enumeration was produced by that dispatch and the remaining sites were deliberately left alone.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "5415923bb6336a7a816d2cbd8fe2cbe75554c424",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.plugin-package-should-vendor-canon-references-via-build-step",
@@ -1118,11 +1194,15 @@
     },
     {
       "id": "pipeline.po-gate-authority-receipt-readback",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-25",
-      "source": "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; reproduced a second time 2026-07-25 (see docs/state.md, \"PO GATE ANSWERED\" entry) — repro confirmed, root cause still not isolated."
+      "source": "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; reproduced a second time 2026-07-25 (see docs/state.md, \"PO GATE ANSWERED\" entry) — repro confirmed, root cause still not isolated.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "259b7f3b23447415982bdd3697d197fb03396739",
+      "closureEvidence": "backlog/evidence/2026-08-11-po-gate-authority-receipt-readback-po-confirmed-resolved.md"
     },
     {
       "id": "pipeline.po-gate-worktree-authority",
@@ -1147,11 +1227,15 @@
     },
     {
       "id": "pipeline.po-language-is-set-without-asking-and-cannot-be-changed",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 8 of 12."
+      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 8 of 12.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "1174512bc78911af47640faebfd9f025da492492",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.prd-spec-depth-collapses-relative-to-design-input",
@@ -1219,19 +1303,27 @@
     },
     {
       "id": "pipeline.promotion-freezes-a-prd-the-po-gate-will-reject",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, two independent unhappy-path transcripts against the 0.5.4 local candidate, one per runner, on separate greenfield browser-game projects. The Claude session reached a deadlock it could not leave without the human running `sed -i` by hand; the Codex session reached a circular gate block with no typed recovery and stopped correctly."
+      "source": "PO, 2026-08-08, two independent unhappy-path transcripts against the 0.5.4 local candidate, one per runner, on separate greenfield browser-game projects. The Claude session reached a deadlock it could not leave without the human running `sed -i` by hand; the Codex session reached a circular gate block with no typed recovery and stopped correctly.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "fb918b86dc0b02f27ff3478f9e579c353525c888",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Both greenfield happy-path tests the PO ran against the 0.5.4 local candidate on 2026-08-09, one per runner, read read-only by the Elephant at the PO's invitation. Two independent runs, same two symptoms."
+      "source": "Both greenfield happy-path tests the PO ran against the 0.5.4 local candidate on 2026-08-09, one per runner, read read-only by the Elephant at the PO's invitation. Two independent runs, same two symptoms.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "765ca6c1b9cf6482b41b4ad8e53d33fabf1e695f",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",
@@ -1247,11 +1339,15 @@
     },
     {
       "id": "pipeline.push-approval-signature-commands-also-line-wrap",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "PO live observation, 2026-08-10: 'auch die signatur aufforderungen für push kommen weiter mit zeilenumbrüchen das macht keinen spass in der ux' — reported while GF-094 (a same-class fix for the codex-pretool-guard.mjs attended-host-terminal path) was still in flight."
+      "source": "PO live observation, 2026-08-10: 'auch die signatur aufforderungen für push kommen weiter mit zeilenumbrüchen das macht keinen spass in der ux' — reported while GF-094 (a same-class fix for the codex-pretool-guard.mjs attended-host-terminal path) was still in flight.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "28818f162168b818a1cb48c4a099658e22950bd4",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.push-approval-skill-reference-predates-adr-0061",
@@ -1445,11 +1541,15 @@
     },
     {
       "id": "pipeline.seeded-verify-contract-is-always-green",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 7 of 12."
+      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 7 of 12.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "674b1c0c85986a7d4a0aed0f8b1a124c99003d68",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.sentinel-go-live-completion",
@@ -1482,11 +1582,15 @@
     },
     {
       "id": "pipeline.session-told-ready-but-not-how-to-repair",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08: 'einer frischen session fehlt scheinbar die info wie sie gates lifted und wie sie reparaturen macht ... das verschwendet total viele token'. Observed in both the Claude and the Codex greenfield transcripts against the 0.5.4 local candidate."
+      "source": "PO, 2026-08-08: 'einer frischen session fehlt scheinbar die info wie sie gates lifted und wie sie reparaturen macht ... das verschwendet total viele token'. Observed in both the Claude and the Codex greenfield transcripts against the 0.5.4 local candidate.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "598601b441207f70da632a660fffe14a88c3ed67",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
@@ -1502,11 +1606,15 @@
     },
     {
       "id": "pipeline.setup-promises-a-human-name-repair-it-cannot-perform",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Hit live on 2026-08-09 PO-nova machine while signing the PUSHWARN-1/PG11e-FLAKE TP-5 override: `sign-intent` failed with \"external trust policy does not match the local public key\" against a PO key directory whose key and repo binding were both actually correct."
+      "source": "Hit live on 2026-08-09 PO-nova machine while signing the PUSHWARN-1/PG11e-FLAKE TP-5 override: `sign-intent` failed with \"external trust policy does not match the local public key\" against a PO key directory whose key and repo binding were both actually correct.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "dd1eb9eedeb7ac48860c8ec9745750c9a8367b32",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.shared-external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof",
@@ -1522,11 +1630,15 @@
     },
     {
       "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, consolidated findings A1 and A4 from the Claude greenfield transcript against the 0.5.4 local candidate. Both verified in code by the Elephant before filing."
+      "source": "PO, 2026-08-08, consolidated findings A1 and A4 from the Claude greenfield transcript against the 0.5.4 local candidate. Both verified in code by the Elephant before filing.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "0acee407adbe2d57c1b904c3c40e958b12b61105",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses",
@@ -1558,11 +1670,15 @@
     },
     {
       "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, on reading that a lost key has no signature path back: 'auch im team werden ja verschiedene schlüssel benutzt. Meine Erwartungshaltung war hier, dass wir sicherstellen das ein mensch auditiert aber bewusst nicht welcher. Sprich für eine neue freigabe muss auch ein neuer human key funktionieren den es vorher nicht gab.'"
+      "source": "PO, 2026-08-08, on reading that a lost key has no signature path back: 'auch im team werden ja verschiedene schlüssel benutzt. Meine Erwartungshaltung war hier, dass wir sicherstellen das ein mensch auditiert aber bewusst nicht welcher. Sprich für eine neue freigabe muss auch ein neuer human key funktionieren den es vorher nicht gab.'",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "4a61bf1d099da48e33f37b356021e1e78a0c6141",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.skill-arguments-and-bootstrap-length",
@@ -1636,11 +1752,15 @@
     },
     {
       "id": "pipeline.three-smaller-greenfield-defects",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, findings 9, 11 and 12 of 12. Grouped because each is small and self-contained; none needs a design round of its own."
+      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, findings 9, 11 and 12 of 12. Grouped because each is small and self-contained; none needs a design round of its own.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "4a3534ce970962eda367f6eeb523e69ceb84da94",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.two-manifest-literals-bypass-the-single-seed-owner",
@@ -1677,19 +1797,27 @@
     },
     {
       "id": "pipeline.verify-authorship-defaults-to-source-markers-not-behavior",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "Codex self-report from a live 2026-08-10 greenfield test session: 'Die erste Verify-Version prüfte nur Quelltextmarker. Erst nach Critic-Befund wurde sie zu Verhaltenstests ausgebaut. Es gab keine echte visuelle Browser-/Touch-Prüfung.'"
+      "source": "Codex self-report from a live 2026-08-10 greenfield test session: 'Die erste Verify-Version prüfte nur Quelltextmarker. Erst nach Critic-Befund wurde sie zu Verhaltenstests ausgebaut. Es gab keine echte visuelle Browser-/Touch-Prüfung.'",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "a655437ce8dbb785173b65961c60f1599670e92c",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.verify-evidence-has-no-producer",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, findings A2 and A3 from the Claude greenfield transcript against the 0.5.4 local candidate. Both verified in code by the Elephant before filing. The session had to write its own verify runner and invent an empty parent commit to get a Critic review at all."
+      "source": "PO, 2026-08-08, findings A2 and A3 from the Claude greenfield transcript against the 0.5.4 local candidate. Both verified in code by the Elephant before filing. The session had to write its own verify runner and invent an empty parent commit to get a Critic review at all.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "b844ea342557e5313fe0a2d0ba2485c39464dce4",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.verify-gate-scoped-registration",
@@ -1702,19 +1830,27 @@
     },
     {
       "id": "pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Hit during the 0.5.4 candidate's closing Verify run on 2026-08-09: guard-push-tests failed, the same suite passed unchanged on the immediate re-run, and the diff between the two runs was a commit hash."
+      "source": "Hit during the 0.5.4 candidate's closing Verify run on 2026-08-09: guard-push-tests failed, the same suite passed unchanged on the immediate re-run, and the diff between the two runs was a commit hash.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "635f348b4c29d52ab2db0672719421abd96ba4f7",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.warn-security-gate-hard-blocks-every-push",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Found by measuring whether a freshly seeded consumer can satisfy a `security` gate, 2026-08-09, while closing `pipeline.push-gate-is-silent-in-every-consumer-project`."
+      "source": "Found by measuring whether a freshly seeded consumer can satisfy a `security` gate, 2026-08-09, while closing `pipeline.push-gate-is-silent-in-every-consumer-project`.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "635f348b4c29d52ab2db0672719421abd96ba4f7",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
       "id": "pipeline.windows-directory-durability",
@@ -1795,11 +1931,15 @@
     },
     {
       "id": "pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-11",
-      "source": "GF-111 dispatch (worktree isolation), 2026-08-11 — first Full Verify attempt against the cherry-picked commit failed at VERIFY-CANDIDATE-PREFLIGHT with 'Commit or stash tracked changes before Verify; no suite was started', caused by the leftover .claude/worktrees/ directory, not by any real dirty change."
+      "source": "GF-111 dispatch (worktree isolation), 2026-08-11 — first Full Verify attempt against the cherry-picked commit failed at VERIFY-CANDIDATE-PREFLIGHT with 'Commit or stash tracked changes before Verify; no suite was started', caused by the leftover .claude/worktrees/ directory, not by any real dirty change.",
+      "closedAt": "2026-08-11",
+      "closureRepository": "self",
+      "closureCommit": "847c637aead568c6b40d870266f2fc5c2f9818be",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     }
   ]
 }
