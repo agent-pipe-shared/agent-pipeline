@@ -10,6 +10,7 @@ import { fileURLToPath } from "node:url";
 
 import { measureBootstrapPayload } from "../lib/bootstrap-payload-budget.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { bindScratchDescriptor, retireOrphanScratchDescriptors } from "../lib/session-cleanup-recovery.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 /**
@@ -294,9 +295,76 @@ export function pipelineStartPreflightExitCode(result) {
   return result?.status === "ready" || result?.status === "plugin-refresh-required" ? 0 : 2;
 }
 
+export const SCRATCH_LIFECYCLE_SCHEMA = "pipeline.bootstrap-scratch-lifecycle.v1";
+
+/**
+ * The scratch-descriptor lifecycle's two BOOTSTRAP events, in the order the backlog item
+ * (2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-calls-it.md) requires after
+ * the PO's correction: sweep the PREVIOUS session's orphans first, then bind this session's
+ * own directory. Neither event is the close — a close is the least reliable moment to
+ * schedule cleanup, because the sessions whose scratch directories most need collecting are
+ * exactly the ones that ended abruptly and never reached one. Correctness therefore comes
+ * from the sweep alone, and `releaseScratchDescriptor` stays a fast path nothing depends on.
+ *
+ * The sweep is descriptor-bound, never a wholesale clear: `retireOrphanScratchDescriptors`
+ * removes only the exact directory a verified-dead session's own descriptor claims, re-reading
+ * and re-validating each descriptor immediately before deleting. A bootstrap runs against a
+ * tree whose other contents it did not create, so that binding matters more here, not less.
+ *
+ * FAIL-OPEN, ALWAYS. This is housekeeping attached to the bootstrap, never a gate on it: any
+ * fault is recorded as a typed code and the bootstrap continues. Faults carry the library's
+ * own `WT-*` codes only — never a message or a path, which is what would leak a machine-local
+ * directory layout into a bootstrap log.
+ *
+ * SESSION IDENTITY: binding needs a stable per-session id and the preflight has no session
+ * identity of its own (it reads no hook stdin, where `session_id` is delivered). A caller
+ * that knows its own id supplies it via `PIPELINE_SCRATCH_SESSION_ID`; without one this
+ * reports `unbound-no-session-identity` and performs the sweep only. Inventing an id per
+ * invocation is deliberately NOT done — it would mint a fresh descriptor on every bootstrap
+ * that no later sweep could ever match to a dead process, which is the unbounded growth this
+ * whole mechanism exists to stop.
+ */
+export function runBootstrapScratchLifecycle({
+  rootDir = process.cwd(),
+  env = process.env,
+  deps = {},
+} = {}) {
+  const faults = [];
+  const faultCode = (error) => String(error?.code ?? "unknown");
+  let sweep = null;
+  try {
+    const retired = retireOrphanScratchDescriptors({ rootDir, deps });
+    sweep = { retiredCount: retired.retiredCount, retainedCount: retired.retained.length };
+  } catch (error) {
+    faults.push(`sweep:${faultCode(error)}`);
+  }
+  const sessionId = typeof env.PIPELINE_SCRATCH_SESSION_ID === "string" && env.PIPELINE_SCRATCH_SESSION_ID !== ""
+    ? env.PIPELINE_SCRATCH_SESSION_ID
+    : null;
+  let binding = { status: "unbound-no-session-identity" };
+  if (sessionId !== null) {
+    try {
+      const bound = bindScratchDescriptor({ rootDir, sessionId, deps });
+      binding = { status: bound.status, scratchRelativePath: bound.scratchRelativePath };
+    } catch (error) {
+      binding = { status: "unavailable" };
+      faults.push(`bind:${faultCode(error)}`);
+    }
+  }
+  return { schema: SCRATCH_LIFECYCLE_SCHEMA, sweep, binding, faults };
+}
+
 export function main() {
   const result = observePipelineStartPreflight();
   process.stdout.write(`${JSON.stringify(result)}\n`);
+  // Deliberately on stderr and deliberately NOT a field of the typed preflight result:
+  // stdout is a parsed `pipeline.start-preflight.v1` envelope under a measured payload
+  // budget, so the housekeeping receipt travels beside it rather than inside it.
+  try {
+    process.stderr.write(`${JSON.stringify(runBootstrapScratchLifecycle())}\n`);
+  } catch {
+    // Housekeeping never decides a bootstrap's exit code.
+  }
   return pipelineStartPreflightExitCode(result);
 }
 
