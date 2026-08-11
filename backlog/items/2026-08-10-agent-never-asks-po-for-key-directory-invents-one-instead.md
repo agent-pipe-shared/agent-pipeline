@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agent-never-asks-po-for-key-directory-invents-one-instead
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 351a5a74473d28bd92bd262329a52df3850ba065
+closure_evidence: evidence/dispatch-record-NVA-BL-24.json
 created: 2026-08-10
 source: "PO live observation, 2026-08-10, during the Claude Code greenfield test: 'er hat das key verzeichnis im setup nicht nachgefragt aber denkt sich jetzt die ganze zeit was aus.'"
 ---
@@ -67,3 +71,19 @@ today, or does it silently default/invent something?) before writing the
 fix, since the two have different remedies.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Closed (2026-08-11).
+- **Rationale:** investigation (required first per this item's own Proposal)
+  found `po-human-approval.mjs`'s directory-resolution chain
+  (`parseHumanArgs`, `po-human-approval.mjs:306-345`) already fails cleanly
+  today when `--directory`, the machine-scoped plane, and the environment
+  variable all resolve to nothing — exit code 2, explicit message naming all
+  three routes — never silently defaulting or inventing a path; the observed
+  incident was purely an instructional gap. `push-approval.md` now states
+  the missing-directory case as an explicit stop-and-ask condition,
+  mirroring kickoff's goal/profile/language blocking-question pattern
+  (commit `351a5a74473d28bd92bd262329a52df3850ba065`, verified via
+  `po-human-approval.test.mjs` 48/48 and `check-doc-contracts.test.mjs`
+  36/36).
+- **Assignment (if accepted):** n/a — closed.
+- **Date:** 2026-08-11
