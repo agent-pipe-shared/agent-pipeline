@@ -165,7 +165,10 @@ export function invokeSerial(taskFilePath, args, spawnSyncFn = nodeSpawnSync) {
   return { stdout: res.stdout ?? "", stderr: res.stderr ?? "", exitCode: res.status ?? 1, usage: undefined };
 }
 
-export function invokeNative(taskFilePath, args, spawnFn = nodeSpawn) {
+/** One `claude -p` attempt. Rejects if no result event arrives, or if the child never actually
+ *  ran the Bash tool call (transient model/CLI non-determinism, observed empirically -- retried
+ *  by invokeNative() below, never silently papered over). */
+function invokeNativeOnce(taskFilePath, args, spawnFn) {
   return new Promise((resolvePromise, reject) => {
     const cmd = `node ${taskFilePath}${args.length ? ` ${args.join(" ")}` : ""}`;
     const promptText = buildPrompt(cmd);
@@ -220,6 +223,22 @@ export function invokeNative(taskFilePath, args, spawnFn = nodeSpawn) {
       }
     });
   });
+}
+
+/** Up to 2 real attempts: a transient non-execution (model didn't call Bash, or a stream-json
+ *  hiccup) is retried once before this bubbles up as a genuine, reportable failure -- this is
+ *  resilience against flakiness in the CLI-dispatch mechanism itself, never a retry of the
+ *  workload's own outcome (that is the separately-modeled failure-recovery class). */
+export async function invokeNative(taskFilePath, args, spawnFn = nodeSpawn, maxAttempts = 2) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await invokeNativeOnce(taskFilePath, args, spawnFn);
+    } catch (err) {
+      lastErr = err;
+    }
+  }
+  throw lastErr;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -335,9 +354,11 @@ export async function runRoute(routeId, clockEpoch, deps) {
   const classes = [];
   for (const cls of BENCHMARK_CLASSES) {
     const warmup = await runObservation(routeId, cls, 0, clockEpoch, deps);
+    process.stderr.write(`nova-a8: ${routeId} ${cls} warmup done\n`);
     const samples = [];
     for (let repetition = 1; repetition <= 5; repetition++) {
       samples.push(await runObservation(routeId, cls, repetition, clockEpoch, deps));
+      process.stderr.write(`nova-a8: ${routeId} ${cls} repetition ${repetition}/5 done\n`);
     }
     classes.push({ taskClass: cls, warmup, samples });
   }
@@ -371,8 +392,8 @@ export function getClaudeVersion(spawnSyncFn = nodeSpawnSync) {
 
 export function structurallyValidateRecord(record, schema) {
   const errors = [];
-  const idPattern = new RegExp(schema.$defs.id.pattern.slice(1, -1));
-  const digestPattern = new RegExp(schema.$defs.digest.pattern.slice(1, -1));
+  const idPattern = new RegExp(schema.$defs.id.pattern);
+  const digestPattern = new RegExp(schema.$defs.digest.pattern);
   if (record.schema !== schema.properties.schema.const) errors.push("schema constant mismatch");
   if (!idPattern.test(record.benchmarkId)) errors.push("benchmarkId fails id pattern");
   if (record.scoringVersion !== schema.properties.scoringVersion.const) errors.push("scoringVersion constant mismatch");
@@ -448,7 +469,7 @@ async function main() {
     return;
   }
   mkdirSync(OUT_DIR, { recursive: true });
-  const shortSha = record.candidate.commit.slice(0, 12);
+  const shortSha = record.candidate.commit.slice(0, 7); // mirrors the a6 sealed-record naming convention
   const outPath = join(OUT_DIR, `multi-cli-benchmark-record-${shortSha}.json`);
   writeFileSync(outPath, `${JSON.stringify(record, null, 2)}\n`);
   process.stdout.write(
