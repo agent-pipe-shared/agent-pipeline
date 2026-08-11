@@ -1,0 +1,277 @@
+{
+  "schema": "pipeline.nva-a1214-exec-01-real-launch-evidence.v1",
+  "dispatchId": "nva-a1214-exec-01-e2e",
+  "candidateShortSha": "4be63d36",
+  "realWorkerOutcomeObserved": {
+    "taskId": "task-a4-e2e",
+    "subjectSha256": "a5033da832c2a2b1ae59589f426af4f9064dcaa8e554556b5616b0ced0f0a219",
+    "leaseId": "lease-a4-e2e",
+    "writePathsSha256": "d52ada72a66fbe2ea37fbb5be55d049ab75b8940ba33cf1ec579d1178c58968f",
+    "workspaceMember": "lease-a4-e2e",
+    "workspacePathSha256": "8fec55bc6dfd7388fa9611f8b288475a052803548abb467af087527a53c46253",
+    "state": "failed",
+    "cleanupState": "cleanup-pending",
+    "process": {
+      "nonce": "6ea177b313f048da3d3fc65a14b58462",
+      "pid": 777652,
+      "processStartSha256": "3b620691cf38ee7ab25268486fc71ff4dc02b73904ddd73c836d98c7c6baa0d0",
+      "bootSha256": "d55f8c29615ce9974ace841d5c03bb45c459cb4817ddc47e2a131dd970a70e80",
+      "executableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
+    },
+    "startedMonotonicMs": 44955290,
+    "completedMonotonicMs": 44955750,
+    "result": {
+      "schema": "pipeline.local-worker-supervisor-result.v1",
+      "taskId": "task-a4-e2e",
+      "subjectSha256": "a5033da832c2a2b1ae59589f426af4f9064dcaa8e554556b5616b0ced0f0a219",
+      "candidateCommit": "bd5280c3e507d06317af79fe495d16a48b3d4fa5",
+      "status": "failed",
+      "exitCode": 7,
+      "signal": null,
+      "changed": [],
+      "changeManifestSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "stdoutSha256": "93676349797c467366cf5827ed7a310957bd9f35ff19be90bb05ae63d2e7a191",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "startedMonotonicMs": 44955290,
+      "completedMonotonicMs": 44955750,
+      "resultSha256": "fc01a012f4458484d2bc481f34fcd8fab5194e452494f1beb30ea90796ae84a6"
+    }
+  },
+  "localWorkerSupervisorRecord": {
+    "schema": "pipeline.local-worker-supervisor-record.v1",
+    "repositoryFingerprint": "6ceb7ddbc02cd3e961a7d5c7f5009d8254eb97b8e35ae427f51a1c0b82f02abe",
+    "sourceRootSha256": "6ceb7ddbc02cd3e961a7d5c7f5009d8254eb97b8e35ae427f51a1c0b82f02abe",
+    "sourceStatusSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "candidate": {
+      "baseCommit": "bd5280c3e507d06317af79fe495d16a48b3d4fa5",
+      "candidateCommit": "bd5280c3e507d06317af79fe495d16a48b3d4fa5",
+      "candidateSha256": "1da3ca2ce3b9c11021651f61ae611f4d3fae28e9d72f6e8b22017b1dde8c0683"
+    },
+    "dispatch": {
+      "dispatchId": "nva-a1214-exec-01-e2e",
+      "attempt": 0,
+      "queueRevision": 0,
+      "packageSha256": "1a962b09ac56039390f895241c5f86abbe9fed40f2201c433d7de27b63c978d4"
+    },
+    "requestSha256": "bcec1053e850b835a36ea7dc4f570c62badbfec9f39fc433598f491cf3b96c6a",
+    "planSha256": "9218850355d8306c2ddd86fd0a61be40328a91f1935974f51a940a7f6e38410d",
+    "poolSha256": "0a4664f848fbacad1724f6ae6c698bd0d21c63f6e255f7d5e4529ed98a45fd33",
+    "status": "degraded",
+    "owner": {
+      "nonce": "supervisor-owner",
+      "pid": 777621,
+      "processStartSha256": "e91b67855dc51e1cf2fa4482cf6506a348e8d02fa3b3ce4f9c388b625eb959bc",
+      "bootSha256": "d55f8c29615ce9974ace841d5c03bb45c459cb4817ddc47e2a131dd970a70e80",
+      "executableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
+    },
+    "lease": {
+      "heartbeatMs": 1000,
+      "orphanAfterMs": 3000,
+      "lastHeartbeatMonotonicMs": 44955680,
+      "cleanupExpiresMonotonicMs": 45015190
+    },
+    "effectiveCapacity": 1,
+    "workers": [
+      {
+        "taskId": "task-a4-e2e",
+        "subjectSha256": "a5033da832c2a2b1ae59589f426af4f9064dcaa8e554556b5616b0ced0f0a219",
+        "leaseId": "lease-a4-e2e",
+        "writePathsSha256": "d52ada72a66fbe2ea37fbb5be55d049ab75b8940ba33cf1ec579d1178c58968f",
+        "workspaceMember": "lease-a4-e2e",
+        "workspacePathSha256": "8fec55bc6dfd7388fa9611f8b288475a052803548abb467af087527a53c46253",
+        "state": "failed",
+        "cleanupState": "cleanup-pending",
+        "process": {
+          "nonce": "6ea177b313f048da3d3fc65a14b58462",
+          "pid": 777652,
+          "processStartSha256": "3b620691cf38ee7ab25268486fc71ff4dc02b73904ddd73c836d98c7c6baa0d0",
+          "bootSha256": "d55f8c29615ce9974ace841d5c03bb45c459cb4817ddc47e2a131dd970a70e80",
+          "executableSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12"
+        },
+        "startedMonotonicMs": 44955290,
+        "completedMonotonicMs": 44955750,
+        "result": {
+          "schema": "pipeline.local-worker-supervisor-result.v1",
+          "taskId": "task-a4-e2e",
+          "subjectSha256": "a5033da832c2a2b1ae59589f426af4f9064dcaa8e554556b5616b0ced0f0a219",
+          "candidateCommit": "bd5280c3e507d06317af79fe495d16a48b3d4fa5",
+          "status": "failed",
+          "exitCode": 7,
+          "signal": null,
+          "changed": [],
+          "changeManifestSha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "stdoutSha256": "93676349797c467366cf5827ed7a310957bd9f35ff19be90bb05ae63d2e7a191",
+          "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "startedMonotonicMs": 44955290,
+          "completedMonotonicMs": 44955750,
+          "resultSha256": "fc01a012f4458484d2bc481f34fcd8fab5194e452494f1beb30ea90796ae84a6"
+        }
+      }
+    ],
+    "recordSha256": "349a9c76436dc9e7dc27abcd3d34019e7e7af8152957eb25ef441d4f9dc31089"
+  },
+  "executionPlaneRealOutcome": {
+    "schema": "pipeline.nova-execution-state.v1",
+    "subject": {
+      "schema": "pipeline.nova-execution-subject.v1",
+      "repository": "self",
+      "baseCommit": "bd5280c3e507d06317af79fe495d16a48b3d4fa5",
+      "baseTree": "06dd82d20ef3022f40e4fa328d9eb81604f3691f",
+      "candidateCommit": "bd5280c3e507d06317af79fe495d16a48b3d4fa5",
+      "candidateTree": "06dd82d20ef3022f40e4fa328d9eb81604f3691f",
+      "packageId": "nova-a4-e2e",
+      "dispatchId": "nva-a1214-exec-01-e2e",
+      "attempt": 0,
+      "queueRevision": 0,
+      "authorityDigests": [
+        {
+          "kind": "adr-0062",
+          "sha256": "c0ca43750b114248750922afdad1952bf1cae245a0ec036300e6d00fa3b5a432"
+        }
+      ],
+      "writePaths": [
+        "src/e2e.txt"
+      ],
+      "resources": [
+        "cpu"
+      ]
+    },
+    "subjectSha256": "a5033da832c2a2b1ae59589f426af4f9064dcaa8e554556b5616b0ced0f0a219",
+    "state": "failed",
+    "revision": 3,
+    "observation": {
+      "source": "local-worker-supervisor",
+      "monotonicMs": 1786443725921,
+      "wallTime": "2026-08-11T10:22:05.921Z",
+      "rawSha256": "fc01a012f4458484d2bc481f34fcd8fab5194e452494f1beb30ea90796ae84a6",
+      "adapterState": "failed",
+      "rawStateSha256": "fc01a012f4458484d2bc481f34fcd8fab5194e452494f1beb30ea90796ae84a6"
+    },
+    "result": null,
+    "reason": "worker:task-a4-e2e state:failed exitCode:7",
+    "previousSha256": "05a67370789842cd771cdc25ad4c54e83517ba039511513f4138bc64b8832e34"
+  },
+  "schedulingLifecycleProjectedOutcome": {
+    "packageId": "nova-a4-e2e",
+    "state": "failed",
+    "evidenceSha256": "9b4be6f3dda342ac37a41beb3c24867e73e5057ec50a22a2ed091778313a97de",
+    "subjectSha256": "a5033da832c2a2b1ae59589f426af4f9064dcaa8e554556b5616b0ced0f0a219"
+  },
+  "schedulingLifecycleRev0": {
+    "schema": "pipeline.scheduling-lifecycle.v1",
+    "queue": {
+      "queueId": "nva-a1214-exec-01",
+      "candidate": {
+        "commit": "bd5280c3e507d06317af79fe495d16a48b3d4fa5",
+        "tree": "06dd82d20ef3022f40e4fa328d9eb81604f3691f"
+      },
+      "revision": 0,
+      "packagesSha256": "60cdcc00fabb556af8d92e3d26a81805b7977943cc7f6aa8471caa6a5d918bc9"
+    },
+    "plannerInputSha256": "ee30cfaa7e57a9f8a5ed4ce5e53683d04028ea3a33fb0123bef2955f67448458",
+    "plannerReceiptSha256": "9aa9cf1678f02e2531ef855ee723d9f91631b6d2fd47ea1a167f513f018ba767",
+    "subjectSetSha256": "b887d7164f88b239c55d0e09728c005a1226393d780dfff6543e392052dd500c",
+    "revision": 0,
+    "selected": [
+      {
+        "packageId": "nova-a4-e2e",
+        "reason": "selected",
+        "evidenceSha256": "9aa9cf1678f02e2531ef855ee723d9f91631b6d2fd47ea1a167f513f018ba767"
+      }
+    ],
+    "blocked": [
+      {
+        "packageId": "nova-a4-e2e-companion",
+        "reason": "PDP-BLOCKED-RESOURCE:nova-a4-e2e",
+        "evidenceSha256": "9aa9cf1678f02e2531ef855ee723d9f91631b6d2fd47ea1a167f513f018ba767"
+      }
+    ],
+    "completed": [],
+    "failed": [],
+    "cancelled": [],
+    "invalidated": [],
+    "previousSha256": null
+  },
+  "schedulingLifecycleRev1": {
+    "schema": "pipeline.scheduling-lifecycle.v1",
+    "queue": {
+      "queueId": "nva-a1214-exec-01",
+      "candidate": {
+        "commit": "bd5280c3e507d06317af79fe495d16a48b3d4fa5",
+        "tree": "06dd82d20ef3022f40e4fa328d9eb81604f3691f"
+      },
+      "revision": 1,
+      "packagesSha256": "60cdcc00fabb556af8d92e3d26a81805b7977943cc7f6aa8471caa6a5d918bc9"
+    },
+    "plannerInputSha256": "35cc44f9b107cfc7aad9de33baebc354eaf4012c96b2fbe17b940cf25ed4bb89",
+    "plannerReceiptSha256": "59e7e9ab92196ad09d31928da9a9e69ae65465a98c3fc155c446701f683c9ae5",
+    "subjectSetSha256": "b887d7164f88b239c55d0e09728c005a1226393d780dfff6543e392052dd500c",
+    "revision": 1,
+    "selected": [
+      {
+        "packageId": "nova-a4-e2e-companion",
+        "reason": "selected",
+        "evidenceSha256": "59e7e9ab92196ad09d31928da9a9e69ae65465a98c3fc155c446701f683c9ae5"
+      }
+    ],
+    "blocked": [],
+    "completed": [],
+    "failed": [
+      {
+        "packageId": "nova-a4-e2e",
+        "reason": "failed",
+        "evidenceSha256": "9b4be6f3dda342ac37a41beb3c24867e73e5057ec50a22a2ed091778313a97de"
+      }
+    ],
+    "cancelled": [],
+    "invalidated": [],
+    "previousSha256": "35b61e9dedf55b78fcd31095363757fb08d1d491dff8312932d4127583c509b4"
+  },
+  "steps": [
+    {
+      "step": "execution-subject",
+      "subjectSha256": "a5033da832c2a2b1ae59589f426af4f9064dcaa8e554556b5616b0ced0f0a219"
+    },
+    {
+      "step": "lws-plan",
+      "code": "LWS-PLAN-READY",
+      "planSha256": "9218850355d8306c2ddd86fd0a61be40328a91f1935974f51a940a7f6e38410d",
+      "requestSha256": "bcec1053e850b835a36ea7dc4f570c62badbfec9f39fc433598f491cf3b96c6a"
+    },
+    {
+      "step": "lws-run",
+      "code": "LWS-DEGRADED",
+      "ok": false,
+      "workerState": "failed"
+    },
+    {
+      "step": "execution-plane-real-outcome",
+      "state": "failed",
+      "code": "STATE:applied",
+      "observationSource": "local-worker-supervisor"
+    },
+    {
+      "step": "scheduling-lifecycle-rev0",
+      "selected": [
+        "nova-a4-e2e"
+      ]
+    },
+    {
+      "step": "scheduling-lifecycle-rev1",
+      "failed": [
+        {
+          "packageId": "nova-a4-e2e",
+          "reason": "failed",
+          "evidenceSha256": "9b4be6f3dda342ac37a41beb3c24867e73e5057ec50a22a2ed091778313a97de"
+        }
+      ],
+      "cancelled": [],
+      "invalidated": [],
+      "completed": []
+    },
+    {
+      "step": "lws-cleanup",
+      "code": "LWS-CLEANED"
+    }
+  ]
+}
