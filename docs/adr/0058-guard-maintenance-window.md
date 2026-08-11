@@ -256,3 +256,17 @@ its own right (see Follow-up).
   directly, or a separate installed-plugin-copy workflow) — the same
   limitation this repository already accepts for `guard-gate-strength.mjs`
   today. That tradeoff is the PO's to weigh, not a default either way.
+
+  **Resolved, 2026-08-11 (PO decision).** The exposure stays;
+  `guard-testpath.mjs` is NOT added to `NEVER_LIFTABLE_KERNEL_PATHS`. PO
+  rationale, recorded as given: a GMW window is itself human-authorized to
+  open — it requires the PO's own signature — and this repository's guard
+  system is built to bound what an AGENT can do without a human step, not
+  to bound the PO, who can already change any file directly, guard or no
+  guard, outside a session entirely. Any edit reachable through an active
+  window, including one to `guard-testpath.mjs`, only becomes reachable
+  after the PO has already signed that window into existence. On that
+  reasoning, the marginal exposure this bullet raised is not accepted as a
+  live risk worth the permanent-uneditability cost. This resolves the
+  two-way trigger above by the second branch: the tradeoff was weighed, not
+  defaulted, and the exposure stays.

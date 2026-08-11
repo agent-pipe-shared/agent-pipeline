@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-testpath-not-kernel-protected
 type: defect
 owner: pipeline
-status: open
+status: rejected
 created: 2026-08-10
 source: "Found on 2026-08-10 by the WP-O1O2-CACHING-REWORK1 dispatch while fixing a related, narrower gap (the module hosting O-2's new ledger-narrowing check was not a NEVER_LIFTABLE_KERNEL_PATHS member). While proposing that fix, the dispatch checked the two real GS-6/TP-* call sites named in the O-1/O-2 design doc and found the same class of exposure already existed, independent of anything this sprint added. Verified independently by the Elephant against source before filing."
 due: 2026-09-09
@@ -79,10 +79,34 @@ Same string shape as the six existing entries; derives unchanged through
 `PLUGIN_KERNEL_SUFFIXES`. No change to `isNeverLiftableKernelPath`'s logic or
 to any caller.
 
+## Resolution — rejected, 2026-08-11 (PO decision)
+
+`PIPE-WP-GTP-KERNEL` (goldfish-deep) attempted this exact repair and
+correctly stopped: `docs/adr/0058-guard-maintenance-window.md`'s own
+process requires a dated ADR correction naming the module before a
+`NEVER_LIFTABLE_KERNEL_PATHS` addition ships, and none existed. Rather than
+self-author an endorsement, the question was recorded as an open Follow-up
+item in the ADR and put to the PO directly.
+
+**PO decision: reject the repair; the exposure stays.** Rationale, recorded
+as given: a GMW window is itself human-authorized to open — it requires the
+PO's own signature — and the guard system is built to bound what an AGENT
+can do without a human step, not to bound the PO, who can already change
+any file directly, guard or no guard, outside a session entirely. Any edit
+reachable through an active window only becomes reachable after the PO has
+already signed that window into existence, so the marginal exposure this
+item raised is not accepted as a live risk worth the permanent-
+uneditability cost `guard-gate-strength.mjs` already carries.
+
+Recorded in full in `docs/adr/0058-guard-maintenance-window.md`'s Follow-up
+section (the "Resolved, 2026-08-11" paragraph) — that is now the canonical
+record; this item stays filed, rejected, for traceability.
+
 ## Related
 
 - `specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-into-the-human-
   ledger.md` §15.1.6 (iv) — the narrower, already-fixed sibling gap that
   surfaced this one.
 - `docs/adr/0058-guard-maintenance-window.md` — the kernel-protection model
-  this item is scoped against.
+  this item is scoped against, and the canonical record of the PO's
+  resolution.
