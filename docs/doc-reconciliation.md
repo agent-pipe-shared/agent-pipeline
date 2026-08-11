@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 755a395935b8ae3243f18597af77030c230f1783 — 2026-08-11, range 26ea6a34..755a3959, security-scan fix confirmed + re-verified checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`755a3959`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched. (The fix commit `ba1a7d28` and backlog-closure
+commit `26ea6a34` were already reconciled: 0 implicated over
+`bccedbc6..26ea6a34`, verified before this entry was written.)
+
 ## Candidate b1fc5ba51227f4f63e05a60a6f735efe2a30bbb7 — 2026-08-11, range 029587d2..b1fc5ba5, security-scan BLOCKING (semgrep timeout) recorded
 
 - ADR-0012: checked, no change needed.
