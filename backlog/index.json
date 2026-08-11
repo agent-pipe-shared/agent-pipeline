@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "21b4ddb1124809509d60346ffdeefdef3d70187e40d9162b9abf670a29a8e2f0"
+    "transitionHead": "09754281bdc4fc802f6a1a21bfe6030b97183ae70b26034b6cb80c9f0491230a"
   },
   "counts": {
     "open": 89,
     "in_progress": 22,
-    "closed": 91
+    "closed": 92
   },
   "items": [
     {
@@ -497,6 +497,14 @@
       "source": "Public V3 Foundation close residue review"
     },
     {
+      "id": "pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-12",
+      "source": "NVA-BL-75, 2026-08-12, surfaced while measuring override-reachability for backlog/items/2026-08-08-a-guard-reclassification-changed-what-a-signature-can-lift.md. Explicitly disclosed by the dispatch as a measurement, not a claimed exploit."
+    },
+    {
       "id": "pipeline.decouple-hosted-project-document-language-from-operator-facing-language",
       "status": "closed",
       "type": "workflow-improvement",
@@ -769,11 +777,15 @@
     },
     {
       "id": "pipeline.guard-reclassification-changed-what-a-signature-can-lift",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Critic round on the 2026-08-08 greenfield hardening block, finding F3, severity minor. Independently corroborated from the reviewing agent's own denial trajectory."
+      "source": "Critic round on the 2026-08-08 greenfield hardening block, finding F3, severity minor. Independently corroborated from the reviewing agent's own denial trajectory.",
+      "closedAt": "2026-08-12",
+      "closureRepository": "self",
+      "closureCommit": "431776c3f6ed0ab535224be804cb3ea18bcf518e",
+      "closureEvidence": "backlog/items/2026-08-08-a-guard-reclassification-changed-what-a-signature-can-lift.md"
     },
     {
       "id": "pipeline.guard-refuses-documented-bounded-diagnostic",

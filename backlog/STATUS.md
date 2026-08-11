@@ -56,6 +56,7 @@
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.critical-push-signing-ceremony-gives-no-path-feedback | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-provenance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-does-not-bind-to-its-commit | open | defect | pipeline | 2026-08-09 | — |
@@ -84,7 +85,7 @@
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-runner-allowlist-incomplete | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-maintenance-window-rejects-a-fresh-setup1-authority-file | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.guard-reclassification-changed-what-a-signature-can-lift | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.guard-reclassification-changed-what-a-signature-can-lift | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-documented-bounded-diagnostic | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-the-prescribed-recovery | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-string-match-makes-a-file-uncommittable | closed | defect | pipeline | 2026-08-08 | — |
@@ -212,4 +213,4 @@
 
 - open: 89
 - in_progress: 22
-- closed: 91
+- closed: 92
