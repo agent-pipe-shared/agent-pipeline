@@ -10,7 +10,7 @@ due: 2026-08-23
 closed_at: 2026-08-12
 closure_repository: self
 closure_commit: 181b7730
-closure_evidence: "backlog/items/2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md#triage (this item's own Triage section, bounded investigation NVA-BL-71)"
+closure_evidence: backlog/items/2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md
 ---
 
 # Every host-bound read-only Codex step escalates individually — a session-scoped read grant would cut most of it
