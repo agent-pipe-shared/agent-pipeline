@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-11
+**Last updated:** 2026-08-12
 
 ---
 
@@ -1624,6 +1624,46 @@ time (delete dead/misleading code, reuse the EXISTING, already-validated
 `selectHostTransport`/`host-transport-required` refusal path instead of
 inventing anything new), with the same reproduce-first discipline as every
 other fix tonight. This is the last piece of tonight's PX0-AC-13 work.
+
+### REMOVEATTESTATION also self-stopped — a third PX0-AC-13 decision point, not "last piece" — 2026-08-12
+
+`PHX-WP-PX0AC13-REMOVEATTESTATION` did not land any edit. Briefed to delete
+`createWslHostAttestedSpawn`'s fake attestation and re-wire the CLI through
+the existing, already-validated `selectHostTransport`/`host-transport-required`
+refusal path, it investigated first (per its own stop-condition instructions)
+and correctly self-stopped on two independent findings:
+
+1. `runPipelineUpdateAvailabilityCli` — what the CLI actually calls — is
+   never connected to `observePublicRemoteIdentity`, the one function that
+   owns the `selectHostTransport` machinery. Confirmed via the `run()`/`git()`
+   helpers at `ruleset-freshness.mjs:42-50`, which consult only
+   `options.spawn`, never `networkPreflight`/`hostTransport`. These are two
+   disconnected subsystems, not one path with a missing wire.
+2. Even granting that connection, no legitimate value for the schema-required
+   `expectedControlIdentitySha256` field is reachable from inside the
+   sandboxed CLI process — its only real producer needs a live
+   `observeCodexAppServer` daemon observation made from OUTSIDE the sandbox
+   (`ruleset-freshness-host.mjs:72-96`). Supplying anything else here would
+   recreate the exact fake-attestation defect this task was dispatched to
+   remove.
+
+This corrects the prior section's "This is the last piece of tonight's
+PX0-AC-13 work" framing — it was wrong; the "remove attestation" path also
+needs real design work, not a bounded deletion. PX0-AC-13 now has a THIRD
+open decision point (F1/F3 still unresolved), with three concrete options on
+the table: (a) redesign `inspectPipelineUpdateAvailability`'s two network
+call sites to genuinely thread a host transport through, which first needs
+the preflight step to supply a real `expectedControlIdentitySha256` — actual
+new implementation work; (b) delete `createWslHostAttestedSpawn` and let the
+`host-authorized-wsl` boundary fail closed via a plain no-network-attempt
+path (no typed `host-transport-required` reason, since that machinery isn't
+reachable from here) — removes the misleading code, satisfies clause 2 more
+crudely but honestly, leaves clause 1 open; (c) reconsider whether clause 1
+is achievable for this CLI at all today, i.e. an acceptance.md amendment/
+rescoping, the same route already used for other structurally-unsatisfiable
+clauses in this epic (e.g. H-AC-11's GMW no-join-handle clause). Presented to
+the PO with a recommendation rather than guessed a third time. Verdict stays
+`partial`; not resolvable by more autonomous dispatch work.
 
 ---
 
