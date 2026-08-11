@@ -47,7 +47,7 @@ something to do here without review.
 
 ## Entries
 
-## Candidate d328e307 — 2026-08-11, range 17af46cb..d328e307, H-AC-12 disposition recorded in state.md handover
+## Candidate d328e307dedbd61ea46ba40d34251e76123caab6 — 2026-08-11, range 17af46cb..d328e307, H-AC-12 disposition recorded in state.md handover
 
 - ADR-0012: checked, no change needed.
 
