@@ -424,6 +424,14 @@ function externalLocalMarketplaceObservation(repo, {
   };
 }
 
+// NVA-BL-20 F5: `options` is forwarded verbatim to
+// `externalLocalMarketplaceObservation()`, whose `spawn` option runs the `codex` CLI --
+// NOT the `git` binary. The three exported entry points therefore carry a second,
+// separately named `codexSpawn` parameter for it and pass it as `{ spawn: codexSpawn }`
+// here. Their existing `spawn` parameter is the host-Git topology adapter and stays
+// bound to `topology()`/`repositoryObservation()`: the suite's global-plugin-install
+// fixtures deliberately stub git-unavailable at some stages while relying on the real
+// `spawnSync` at others, so one parameter serving both roles cannot express them.
 function localPluginInstallSourceObservation(repo, options = {}) {
   if (!isPipelineSourceRoot(repo.root)) fail("HGO-PLUGIN-SOURCE", "repository is not a Pipeline plugin source checkout");
   const marketplace = join(repo.root, ".claude-plugin", "marketplace.json");
@@ -1722,6 +1730,7 @@ export function recordHumanGuardDenial({
   nowMs = Date.now(),
   ttlMs = DEFAULT_TTL_MS,
   spawn = spawnSync,
+  codexSpawn = spawnSync,
 } = {}) {
   if (!Array.isArray(denials) || denials.length === 0) fail("HGO-DENIAL", "denial set is empty");
   const physicalRootDir = physicalRoot(rootDir);
@@ -1731,7 +1740,7 @@ export function recordHumanGuardDenial({
     ? controlPathTopology(physicalRootDir)
     : topology(physicalRootDir, spawn);
   const repository = isLocalPluginInstall
-    ? localPluginInstallSourceObservation(repo)
+    ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
     : repositoryObservation(repo.root, spawn);
   if (denials.some(({ guard }) => String(guard) === "guard-push.mjs")) {
     return recoveryRoute("HGO-PUBLICATION-REQUIRED", toolName, toolInput, [], {
@@ -1818,6 +1827,7 @@ export function planHumanGuardOverride({
   requestSha256,
   nowMs = Date.now(),
   spawn = spawnSync,
+  codexSpawn = spawnSync,
   scriptPath,
   authorSourceRoot: selectedAuthorSourceRoot = null,
 } = {}) {
@@ -1843,7 +1853,7 @@ export function planHumanGuardOverride({
   if (request.root !== repo.root || new Date(request.expiresAt).getTime() <= nowMs) fail("HGO-EXPIRED", "override request expired");
   const plugin = pluginIdentity(pluginRoot);
   const repository = isLocalPluginInstall
-    ? localPluginInstallSourceObservation(repo)
+    ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
     : repositoryObservation(repo.root, spawn);
   const policy = policyIdentity(repo.root, pluginRoot, request.denials);
   if (canonical(plugin) !== canonical(request.plugin)
@@ -2288,6 +2298,7 @@ export function consumeHumanGuardOverride({
   denials,
   nowMs = Date.now(),
   spawn = spawnSync,
+  codexSpawn = spawnSync,
 } = {}) {
   let repo;
   try { repo = topology(rootDir, spawn); }
@@ -2335,7 +2346,7 @@ export function consumeHumanGuardOverride({
         return { status: "replan", code: "HGO-PLUGIN-INSTALL-SHAPE" };
       }
       const repository = isLocalPluginInstall
-        ? localPluginInstallSourceObservation(repo)
+        ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
         : repositoryObservation(repo.root, spawn);
       const expired = new Date(capability.expiresAt).getTime() <= nowMs;
       const drifted = capability.status !== "armed" || capability.root !== repo.root

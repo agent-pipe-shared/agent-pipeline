@@ -1652,6 +1652,119 @@ test("NVA-BL-20: the attestation exposes the external-marketplace state it hashe
   }
 });
 
+// NVA-BL-20 F5: every assertion above reaches the external-marketplace observation by
+// calling the two INTERNAL functions directly. That proved the observation's own contract
+// and nothing about whether the seam is reachable at all from the three exported entry
+// points a guard actually calls -- and it was not: all three called
+// `localPluginInstallSourceObservation(repo)` with no options, so the `spawn`/`registryReader`
+// seam could never be driven from production. The `spawn` parameter those three already
+// carry is the HOST-GIT topology adapter (`topology()`, `repositoryObservation()`), a
+// different subprocess concern; routing it into the Codex registry lookup as well is what
+// broke this suite's three global-plugin-install fixtures with HGO-DRIFT, because they
+// deliberately stub git-unavailable at some stages and use the real `spawnSync` at others.
+// Hence a SECOND, separately named parameter, `codexSpawn`, defaulting to the same real
+// `spawnSync`, threaded down as the `spawn` OPTION of the observation only.
+//
+// Both arms of every comparison below are injected stubs. Comparing an injected stub
+// against the real default would assert whether a `codex` binary exists on the machine
+// running the suite -- environmental, not behavioural (see the block comment above
+// JUNCTION_CAPABILITY). The stubs deliberately do NOT assert inside themselves either:
+// `codexMarketplaceRegistry()` wraps the spawn call in `try { ... } catch { return null; }`,
+// so a throwing stub would be silently read as an unavailable registry and both arms would
+// collapse into the same state while the test still went green. The calls are recorded and
+// asserted from outside instead.
+test("NVA-BL-20 F5: the Codex marketplace-registry spawn is injectable from all three production entry points", () => {
+  const root = fixture();
+  try {
+    // The global-plugin-install shape, identical to the sibling fixtures above.
+    mkdirSync(join(root, "harness", "scripts"), { recursive: true });
+    mkdirSync(join(root, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });
+    mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+    writeFileSync(join(root, "harness", "scripts", "verify.mjs"), "// verify\n");
+    writeFileSync(join(root, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"), JSON.stringify({
+      name: "pipeline-core",
+      version: "0.0.0-test",
+    }));
+    writeFileSync(join(root, ".claude-plugin", "marketplace.json"), JSON.stringify({
+      name: "agent-pipeline",
+      plugins: [{ name: "pipeline-core", source: "./plugins/pipeline-core" }],
+    }));
+    const toolInput = { command: "codex plugin add pipeline-core@agent-pipeline-local" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    // The host-Git adapter this fixture simulates. It stays exactly what it is: nothing
+    // below routes it into the Codex registry lookup.
+    const noGit = () => ({ status: null, error: { code: "EPERM" }, stdout: "" });
+    const codexCalls = [];
+    // Drives the REAL codexMarketplaceRegistry() -- so the argv, the exit-status check and
+    // the JSON parse are all on the proven path, which the `registryReader` seam bypasses.
+    const notRegistered = (file, args) => {
+      codexCalls.push(["not-registered", file, args]);
+      return { status: 0, stdout: JSON.stringify({ marketplaces: [] }) };
+    };
+    const unreadable = (file, args) => {
+      codexCalls.push(["registry-unavailable", file, args]);
+      return { status: 1, stdout: "" };
+    };
+    const record = (codexSpawn) => recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial,
+      nowMs: 1_000, spawn: noGit, codexSpawn,
+    });
+    // (1) recordHumanGuardDenial: the injected spawn reaches the registry lookup with the
+    // exact documented argv ...
+    const request = record(notRegistered);
+    assert.equal(request.status, "planned");
+    assert.deepEqual(codexCalls, [["not-registered", "codex", ["plugin", "marketplace", "list", "--json"]]]);
+    // ... and the state it observes reaches the attestation the whole chain is bound to:
+    // same fixture, same clock, same git adapter, different Codex spawn, different request.
+    const other = record(unreadable);
+    assert.equal(other.status, "planned");
+    assert.equal(codexCalls.at(-1)[0], "registry-unavailable");
+    assert.notEqual(other.requestSha256, request.requestSha256);
+    const plan = (codexSpawn) => planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      nowMs: 2_000, spawn: noGit, scriptPath, codexSpawn,
+    });
+    // (2) planHumanGuardOverride: a different Codex spawn than the request was recorded
+    // under is a drifted preimage, which is only observable if the seam is threaded.
+    assert.throws(
+      () => plan(unreadable),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DRIFT",
+    );
+    const planned = plan(notRegistered);
+    assert.equal(planned.mode, "global-plugin-install");
+    const reason = "PO approves the exact local candidate installation under an injected registry";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      planSha256: planned.planSha256, reason, nowMs: 2_500, spawn: noGit, scriptPath,
+    });
+    // `authorize` uses the real default git spawn for the same reason the sibling fixtures
+    // above give: it is the PO's own step from an ordinary terminal. It never recomputes
+    // the marketplace observation, so it takes no codexSpawn.
+    authorizeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      planSha256: planned.planSha256, selectionSha256: prepared.selectionSha256, reason,
+      reasonSha256: reasonDigest(reason), activate: true, nowMs: 3_000, scriptPath,
+    });
+    const consume = (codexSpawn, nowMs) => consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial,
+      nowMs, spawn: noGit, codexSpawn,
+    });
+    // (3) consumeHumanGuardOverride: the armed capability is refused under a different
+    // Codex spawn ...
+    assert.deepEqual(consume(unreadable, 4_000), { status: "replan", code: "HGO-DRIFT" });
+    // ... and the refusal is the binding, not a blanket rejection: the same capability is
+    // still consumable under the spawn it was armed with (a drifted consume leaves it
+    // armed). Without this control, a seam that broke every consume would also pass.
+    assert.deepEqual(
+      consume(notRegistered, 5_000),
+      { status: "consumed", planSha256: planned.planSha256, requestSha256: request.requestSha256 },
+    );
+    assert.equal(new Set(codexCalls.map(([, file]) => file)).size, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 // ---------------------------------------------------------------------------------
 // NOVA-HGOSIG-ROUTE-1 (ADR-0059 Decision 4): recordHumanGuardDenial() has three outcomes,
 // and consuming guards used to render only one of them. `planned` printed a route; every
