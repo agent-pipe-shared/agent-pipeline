@@ -27,8 +27,12 @@
  *         "remote": "<safe-remote>", "destination": "<full-ref>", "criticalProof": <verified-proof> }
  *     } | absent,
  *     "criticalProofConsumption": [
- *       { "proofSha256": "<sha256>", "kind": "push", "consumedAt": "<ISO-8601>" }
+ *       { "proofSha256": "<sha256>", "kind": "push" | "feature-package-reconcile", "consumedAt": "<ISO-8601>" }
  *     ] | absent,
+ *     "featurePackageReconcileApproval": {
+ *       "lastApproved": { "approvedBy": "<string>", "approvedAt": "<ISO-8601>", "forCommit": "<sha>",
+ *         "criticalProof": <verified-proof>|null, "criticalProofWaiver": <waiver>? }
+ *     } | absent,
  *     "closedFeatures": [
  *       { "id": "<string>", "planPath": "<string>", "phaseAtClose": "<string>|null",
  *         "closedAt": "<ISO-8601>", "closedBy": "<string>", "forCommit": "<sha>|null" }
@@ -52,6 +56,20 @@
  *   agent immediately after the triggering push succeeds. Additive within
  *   `pipeline.state.v0` -- no schema-id bump, same additive-optional discipline as
  *   every other field here.
+ *
+ *   `featurePackageReconcileApproval` (PHX-WP-PAC08-APPROVAL-LEDGER, closing Critic
+ *   finding F-B): the durable, attributed record of a PO-bound `feature-package-reconcile`
+ *   approval, written by `defaultFeaturePackageReconcileApproval` into the GOVERNING
+ *   session's own state (never `--root`'s) at the moment `verifyCriticalHumanProof`
+ *   returns `ok:true` -- before the reconcile journal is published or any manifest byte
+ *   is touched, so a verified proof is burned even if a later, unrelated step fails.
+ *   `criticalProof` is `null` in chat mode (ADR-0056), but `approvedBy`/`approvedAt`/
+ *   `forCommit` are always recorded, which is what binds a chat-cleared reconcile to an
+ *   exact commit. `criticalProofConsumption` is SHARED with `push` (not kind-restricted --
+ *   entries are told apart only by their `kind` field); a `proofSha256` already present
+ *   there, of any `kind`, refuses a repeat `feature-package-reconcile` presentation of
+ *   that same proof with `CRITICAL-PROOF-REPLAY`, mirroring `approve-push`'s own
+ *   consumption-ledger shape (~6554-6576 as of this writing).
  *
  *   DEVIATION NOTE (declared during the F1 fix, commit 1c0a181 -- see the `set-feature`/
  *   `set-phase` entries below for that fix itself, which moved `phase` INSIDE
@@ -5888,6 +5906,15 @@ function runFeaturePackageRecoverCommand(argv, deps) {
  * `runFeaturePackageReconcileCommand` already uses to invoke this closure is untouched,
  * so an existing or future test injection of `deps.featurePackageReconcileApproval` keeps
  * working unmodified.
+ *
+ * PHX-WP-PAC08-APPROVAL-LEDGER (closing Critic finding F-B): once `verifyCriticalHumanProof`
+ * returns `ok:true`, this closure ALSO persists a durable attribution record --
+ * `featurePackageReconcileApproval.lastApproved` -- into the governing `dir`'s own state, and
+ * refuses (`CRITICAL-PROOF-REPLAY`, zero mutation) a `proofSha256` already present in the
+ * SAME `criticalProofConsumption` ledger `approve-push` writes (shared, not kind-restricted).
+ * The proof is consumed HERE, at verification time -- before the caller publishes the journal
+ * or touches the manifest -- a deliberate fail-closed choice: a proof that verifies but is
+ * followed by an unrelated later failure is still burned, and a retry needs a fresh proof.
  */
 function defaultFeaturePackageReconcileApproval(argv, deps) {
   return ({ manifest, planSha256, candidate }) => {
@@ -5914,7 +5941,40 @@ function defaultFeaturePackageReconcileApproval(argv, deps) {
       subject: { manifest, planSha256, candidate },
       flags, now, required: true,
     });
-    return verified.ok ? { ok: true } : { ok: false, code: verified.code };
+    if (!verified.ok) return { ok: false, code: verified.code };
+    // Consume-at-verify, mirroring `approve-push`'s own consumption-ledger/attribution
+    // shape (~6554-6576 as of this writing): a malformed consumption array fails closed,
+    // and a `proofSha256` already present in `criticalProofConsumption` (any `kind` -- the
+    // array is not kind-restricted) is refused as a replay. Both checks run BEFORE the
+    // write below, so a replayed proof causes zero mutation here and the caller never
+    // reaches the journal/manifest write.
+    const priorConsumption = state.criticalProofConsumption;
+    if (priorConsumption !== undefined && (!Array.isArray(priorConsumption)
+      || priorConsumption.some((entry) => !entry || typeof entry !== "object" || typeof entry.proofSha256 !== "string"))) {
+      return { ok: false, code: "CRITICAL-PROOF-CONSUMPTION-INVALID" };
+    }
+    const consumed = Array.isArray(priorConsumption) ? priorConsumption : [];
+    if (verified.proof !== null && consumed.some((entry) => entry.proofSha256 === verified.proof.proofSha256)) {
+      return { ok: false, code: "CRITICAL-PROOF-REPLAY" };
+    }
+    // The record states on its face what backed it, mirroring `approve-push`'s own
+    // `approvalRecord` -- chat mode still binds `approvedBy`/`approvedAt`/`forCommit` even
+    // though `criticalProof` is null, which is what closes F-B's "chat mode nothing is
+    // commit-bound" half.
+    const approvalRecord = { approvedBy: flags.by, approvedAt: now, forCommit: candidate.commit, criticalProof: verified.proof };
+    if (verified.waived !== undefined) approvalRecord.criticalProofWaiver = verified.waived;
+    const next = {
+      ...state,
+      schema: SCHEMA_ID,
+      featurePackageReconcileApproval: { lastApproved: approvalRecord },
+      criticalProofConsumption: verified.proof === null
+        ? consumed
+        : [...consumed, { proofSha256: verified.proof.proofSha256, kind, consumedAt: now }],
+      updatedAt: now,
+    };
+    const writeResult = writeState(dir, next, state);
+    if (!stateWriteSucceeded(writeResult)) return { ok: false, code: writeResult.code };
+    return { ok: true };
   };
 }
 

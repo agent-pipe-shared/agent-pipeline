@@ -4586,6 +4586,116 @@ function runFeaturePackageReconcileTests() {
   ok("RGn-2 state is left absent -- zero mutation on the kind-required refusal", readState(dir).status === "absent", JSON.stringify(readState(dir)));
 }
 
+// ---- PHX-WP-PAC08-APPROVAL-LEDGER: a verified feature-package-reconcile approval is
+// durably recorded and replay-protected (closing Critic finding F-B). RGo/RGq/RGr share one
+// governing session's state to prove persist-on-success, replay-refusal (zero mutation), and
+// that the refusal is scoped to the specific proof, not a blanket per-session lockout. ----
+{
+  const governingDir = seedPac08GoverningSession("rgo-governing", { mode: "signature" });
+  const commonDeps = (fx) => ({
+    dir: governingDir, now: () => PAC08_NOW,
+    gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
+    gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }),
+  });
+  const growPrd = (fx) => writeFileSync(join(fx.dir, fx.files.prd.rel), "# rec-pkg PRD (grown)\n");
+
+  // RGo -- a successful signature-mode reconcile persists featurePackageReconcileApproval
+  // .lastApproved (approvedBy/approvedAt/forCommit/criticalProof) and a criticalProofConsumption
+  // entry tagged kind: "feature-package-reconcile", read back directly from the governing
+  // session's own state.json -- not accepted from the CLI's exit code alone.
+  const fxA = seedReconcilePackage("rgo-first");
+  growPrd(fxA);
+  const { digest: digestA } = reconcilePlanDigest(fxA);
+  const proofA = pac08Proof({ manifest: fxA.manifestRel, planSha256: digestA });
+  const appliedA = reconcileApplyCmd(fxA.dir, [
+    "--manifest", fxA.manifestRel, "--plan-sha256", digestA,
+    "--by", "PO", "--proof-request", proofA.requestPath, "--proof-authority", proofA.authorityPath, "--proof", proofA.proofPath,
+  ], commonDeps(fxA));
+  ok("RGo first signature-mode reconcile applies", appliedA.value === 0, appliedA.out || appliedA.err);
+  const stateAfterA = readState(governingDir);
+  ok("RGo governing state records featurePackageReconcileApproval.lastApproved with approvedBy/approvedAt/forCommit and a real criticalProof",
+    stateAfterA.status === "ok"
+    && stateAfterA.state.featurePackageReconcileApproval?.lastApproved?.approvedBy === "PO"
+    && stateAfterA.state.featurePackageReconcileApproval.lastApproved.approvedAt === PAC08_NOW
+    && stateAfterA.state.featurePackageReconcileApproval.lastApproved.forCommit === PAC08_CANDIDATE.commit
+    && typeof stateAfterA.state.featurePackageReconcileApproval.lastApproved.criticalProof?.proofSha256 === "string", JSON.stringify(stateAfterA));
+  ok("RGo criticalProofConsumption carries exactly one entry tagged kind: feature-package-reconcile, matching the recorded criticalProof",
+    Array.isArray(stateAfterA.state.criticalProofConsumption) && stateAfterA.state.criticalProofConsumption.length === 1
+    && stateAfterA.state.criticalProofConsumption[0].kind === "feature-package-reconcile"
+    && stateAfterA.state.criticalProofConsumption[0].proofSha256 === stateAfterA.state.featurePackageReconcileApproval.lastApproved.criticalProof.proofSha256,
+    JSON.stringify(stateAfterA.state.criticalProofConsumption));
+
+  // RGq -- the IDENTICAL proof (proofA) presented again, against a FRESH, independent package
+  // that reproduces the byte-identical subject (manifestRel/planSha256 are content-derived,
+  // not tied to the --root path, so an identical PRD growth on a fresh seed reproduces the
+  // same digest), is refused as a replay BEFORE any journal is published or the manifest is
+  // touched -- zero mutation, and the governing session's state is left byte-identical.
+  const fxB = seedReconcilePackage("rgq-replay-fresh-package");
+  growPrd(fxB);
+  const { digest: digestB } = reconcilePlanDigest(fxB);
+  ok("RGq-setup the fresh package's subject (manifestRel/planSha256) is byte-identical to RGo's, so proofA's subject binding still matches",
+    fxB.manifestRel === fxA.manifestRel && digestB === digestA, `${fxB.manifestRel}/${digestB} vs ${fxA.manifestRel}/${digestA}`);
+  const beforeManifestB = readFileSync(join(fxB.dir, fxB.manifestRel));
+  const stateBeforeB = readState(governingDir);
+  const refusedB = reconcileApplyCmd(fxB.dir, [
+    "--manifest", fxB.manifestRel, "--plan-sha256", digestB,
+    "--by", "PO", "--proof-request", proofA.requestPath, "--proof-authority", proofA.authorityPath, "--proof", proofA.proofPath,
+  ], commonDeps(fxB));
+  ok("RGq a proof already consumed by an earlier reconcile is refused, zero mutation on the new package's manifest",
+    refusedB.value === 2 && /FTP-RECONCILE-APPROVAL-REJECTED/.test(refusedB.err)
+    && readFileSync(join(fxB.dir, fxB.manifestRel)).equals(beforeManifestB), refusedB.err);
+  const stateAfterB = readState(governingDir);
+  ok("RGq the governing session's state is byte-identical after the refused replay -- no second consumption entry, no lastApproved overwrite",
+    JSON.stringify(stateAfterB) === JSON.stringify(stateBeforeB), JSON.stringify(stateAfterB));
+
+  // RGr -- a DIFFERENT, never-before-used genuine proof against the SAME governing dir
+  // succeeds -- proves the replay refusal is scoped to the specific proof, not a blanket
+  // "already approved once" lockout on the session.
+  const fxC = seedReconcilePackage("rgr-fresh-proof-succeeds");
+  growPrd(fxC);
+  const { digest: digestC } = reconcilePlanDigest(fxC);
+  const proofC = pac08Proof({ manifest: fxC.manifestRel, planSha256: digestC });
+  const appliedC = reconcileApplyCmd(fxC.dir, [
+    "--manifest", fxC.manifestRel, "--plan-sha256", digestC,
+    "--by", "PO", "--proof-request", proofC.requestPath, "--proof-authority", proofC.authorityPath, "--proof", proofC.proofPath,
+  ], commonDeps(fxC));
+  ok("RGr a different, never-before-used genuine proof against the SAME governing dir succeeds",
+    appliedC.value === 0, appliedC.out || appliedC.err);
+  const stateAfterC = readState(governingDir);
+  ok("RGr the governing state now carries TWO consumption entries (RGo's + RGr's), both tagged feature-package-reconcile, and lastApproved now reflects RGr's own distinct proof",
+    Array.isArray(stateAfterC.state.criticalProofConsumption) && stateAfterC.state.criticalProofConsumption.length === 2
+    && stateAfterC.state.criticalProofConsumption.every((entry) => entry.kind === "feature-package-reconcile")
+    && stateAfterC.state.featurePackageReconcileApproval.lastApproved.criticalProof.proofSha256
+      !== stateAfterA.state.featurePackageReconcileApproval.lastApproved.criticalProof.proofSha256,
+    JSON.stringify(stateAfterC.state.criticalProofConsumption));
+}
+{
+  // RGp -- a successful CHAT-mode reconcile persists approvedBy/approvedAt/forCommit even
+  // though criticalProof is null (closes F-B's "chat mode nothing is commit-bound" half), and
+  // adds no criticalProofConsumption entry (there is no proof to consume).
+  const fx = seedReconcilePackage("rgp-chat-persist");
+  writeFileSync(join(fx.dir, fx.files.prd.rel), "# rec-pkg PRD (grown)\n");
+  const { digest } = reconcilePlanDigest(fx);
+  const governingDir = seedPac08GoverningSession("rgp-governing", { mode: "chat" });
+  const deps = {
+    dir: governingDir, now: () => PAC08_NOW,
+    gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
+    gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }),
+  };
+  const applied = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest, "--by", "PO"], deps);
+  ok("RGp chat-mode reconcile applies", applied.value === 0, applied.out || applied.err);
+  const governingState = readState(governingDir);
+  ok("RGp chat-mode approval is commit-bound and attributed even though criticalProof is null",
+    governingState.status === "ok"
+    && governingState.state.featurePackageReconcileApproval?.lastApproved?.approvedBy === "PO"
+    && governingState.state.featurePackageReconcileApproval.lastApproved.approvedAt === PAC08_NOW
+    && governingState.state.featurePackageReconcileApproval.lastApproved.forCommit === PAC08_CANDIDATE.commit
+    && governingState.state.featurePackageReconcileApproval.lastApproved.criticalProof === null, JSON.stringify(governingState));
+  ok("RGp no criticalProofConsumption entry is added in chat mode (nothing to consume)",
+    governingState.state.criticalProofConsumption === undefined || governingState.state.criticalProofConsumption.length === 0,
+    JSON.stringify(governingState.state.criticalProofConsumption));
+}
+
 }
 
 runFeaturePackageReadTests();
