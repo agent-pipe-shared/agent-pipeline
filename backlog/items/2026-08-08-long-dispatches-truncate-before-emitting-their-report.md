@@ -286,25 +286,87 @@ that already weakened "sweep" as the trigger site. Both dispatches used a
 tool-count in the 46-65 band, consistent with this item's existing
 correlation (not a hard cliff, but the higher end of observed ranges).
 
+## Forensic-analysis findings, 2026-08-11 (`references/transcript-forensics.md` method, general-purpose dispatch against this session's own raw transcripts)
+
+**Source correction (methodological, worth keeping):** subagent turns do NOT
+live inline in the main session JSONL as `isSidechain:true` entries in this
+harness version — that field appears (3,722 times) but never as `true`. Each
+dispatch is its own file: `<session-dir>/subagents/agent-<id>.jsonl` +
+`agent-<id>.meta.json` (carries `agentType`, `toolUseId` linking back to the
+dispatching `Agent`/`Task` tool_use, `model`). The `/tmp/.../tasks/*.output`
+files are byte-identical mirrors of the same file, not a separate source.
+
+**Large-tool-output-before-cutoff hypothesis — refuted, not merely
+unconfirmed.** Of 4 confirmed truncations found (excluding two still-running
+dispatches caught and correctly excluded via a live re-`stat`, not
+misclassified), 3 were preceded by SMALL tool results (160-1,748 characters);
+the fourth's preceding result was 7,985 characters — still far short of
+"large". This closes off the hypothesis this item's own 2026-08-11 data (the
+two-Critic-dispatch table above) had raised but not settled — it does not
+hold up against this session's own transcripts. Retire it; do not carry it
+into the fix design.
+
+**Tool-use-count / token-volume — correlates, still no hard cliff, margin
+narrower than previously known.** Confirmed-clean max 50 tool uses; confirmed-
+truncated min 54 — only a 4-use gap, and actively undercut by a dispatch that
+passed 63 uses live without truncating (it went on to complete cleanly at 65).
+`cache_read_input_tokens` (a token-volume proxy) shows the same non-cliff
+shape this item's original 105k/108k pair already showed: one clean run
+reached 211,260 tokens, one truncated run died at only 117,522.
+
+**New correlation this item did not previously have: truncation was
+tier-exclusive in this session.** 4 of 7 `goldfish-deep` dispatches truncated
+(57%); 0 of 4 `goldfish-implementor`/`goldfish-mechanic` dispatches did.
+Confounded with task length (deep-tier tasks run longer by design), so this
+is not yet causal — but no prior data in this item broke the sample down by
+effort tier, and this is worth carrying into any fix that might scale the
+closing-allowance size by tier rather than using one fixed reserve.
+
+**A second, mechanistically distinct failure mode exists.** One dispatch's
+last message was a COMPLETE, grammatical sentence explicitly announcing a
+deliberate pause ("I'll stop polling now... to preserve the ~7 calls
+remaining for the completion sequence") — not a mid-word cutoff — and then
+simply never resumed on its own. This is not the same defect as the other
+three (which do look like the classic runs-out-of-turn pattern); a fix aimed
+only at "recognize a report-shaped final message" would not catch this one,
+since there was no final message to recognize as wrong-shaped — there was no
+further turn at all.
+
+**Engineering note for any future auto-detection:** `stop_reason` in the
+transcript is NOT a usable truncated/clean signal on its own — `null` appears
+on the final block of both a confirmed-clean and confirmed-truncated
+dispatch in this sample.
+
+**The sharpest signal for the fix design comes from pairing with this item's
+own live data, not from the forensic dispatch alone:** both 2026-08-11 Critic
+dispatches truncated on their first leg, then their PURELY PROCEDURAL resume
+completed in a handful of calls — 46 tool uses then resumed to completion in
+4; 65 tool uses then resumed to completion in 5. In both cases the dispatch
+already HELD everything needed to finish; it was not missing information or
+still reasoning toward an answer, it had simply run out of room to say it in
+the frame it was given. This is direct, first-party evidence for exactly the
+mechanism the PO's "closing allowance" design (below) targets — a small
+reserve to close out costs far less than the 4-65 uses already spent, because
+the material already exists.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted — investigation resumes now per explicit PO
   instruction (2026-08-11: "ja zusammen legen die recherche und fixes aber
-  jetzt machen weil jetzt zeit ist"). Two concrete actions taken in the same
-  session: (1) a forensic-analysis dispatch against this session's own raw
-  transcripts, to test the large-tool-output-before-cutoff hypothesis this
-  item's own data has not yet ruled in or out (per
-  `references/transcript-forensics.md`'s method — a fresh subagent mining
-  `tool_use`/`tool_result` pairs directly, not a reconstruction from memory);
-  (2) once that returns, the PO's own already-designed "closing allowance"
-  mechanism (this item, "PO direction, 2026-08-08" section) is the fix to
-  implement first — it is the most direct protection of the contract, already
-  has PO sign-off on the shape, and needs only an implementation decision, not
-  a fresh design. Implementation goes through a `goldfish-deep` dispatch
-  (`templates/prompts/goldfish-task.md`/`critic-review.md` are canon/template
-  files, not stage-0-exempt — Elephant-direct edits here would repeat the
-  exact EL-01/EL-16 authorship violation a Critic review just flagged
-  elsewhere this same session), held until no other dispatch is
+  jetzt machen weil jetzt zeit ist"). Forensic-analysis dispatch completed
+  (see section above) — the large-tool-output hypothesis is retired, the
+  tool-count/token correlation stands but stays soft, and the
+  resume-completes-fast pairing confirms the PO's own already-designed
+  "closing allowance" mechanism (this item, "PO direction, 2026-08-08"
+  section) as the fix to implement first — it is cause-agnostic (works
+  whether the underlying trigger is a host turn-limit, a context-budget
+  effect, or something else never identified), already has PO sign-off on the
+  shape, and this session's data now directly supports its mechanism rather
+  than only its plausibility. Implementation goes through a `goldfish-deep`
+  dispatch (`templates/prompts/goldfish-task.md`/`critic-review.md` are
+  canon/template files, not stage-0-exempt — Elephant-direct edits here would
+  repeat the exact EL-01/EL-16 authorship violation a Critic review just
+  flagged elsewhere this same session), held until no other dispatch is
   concurrently reading/writing `evidence/verify-latest.json` or
   `evidence/security-latest.json` (a goldfish-deep's own DoD Verify sweep
   would overwrite those files exactly as this session's earlier
@@ -317,6 +379,7 @@ correlation (not a hard cliff, but the higher end of observed ranges).
   committing template text, and sequencing the write dispatch safely around
   the two dispatches already in flight this session.
 - **Assignment (if accepted):** forensic-analysis dispatch (general-purpose,
-  background) dispatched 2026-08-11; template-fix `goldfish-deep` dispatch
-  planned, not yet sent.
+  background) dispatched and completed 2026-08-11 (findings above);
+  template-fix `goldfish-deep` dispatch planned, not yet sent — held pending
+  the concurrently-running Critic review clearing `evidence/*.json`.
 - **Date:** 2026-08-11
