@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 6dfd32f574b5273dca475eddc7a3bd73f9a15508 — 2026-08-11, range 1022df71..6dfd32f5, Class B multi-dispatch plan + H-AC-12/Class A checked empty
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`6dfd32f5`), touching `docs/state.md`
+(additive, ADR-0012's subject) and adding
+`specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md`
+(ADR-0045's subject: `specs/**`). The new file is a design/planning
+artifact, not a tracked package artifact or a `lifecycle.json` change — no
+amendment needed. No other governed path touched.
+
 ## Candidate 1324c266302674c6064c0082a0f1c98b9167a840 — 2026-08-11, range 5dabc566..1324c266, P-AC-06 clause disposition proposal (design doc, not an acceptance.md edit)
 
 - ADR-0045: checked, no change needed.
