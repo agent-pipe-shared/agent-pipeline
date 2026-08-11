@@ -393,3 +393,235 @@ duplicate.
 
 **Batch 3 summary:** 15 total, 1 closed-sprint-residue, 1 future-sprint, 13
 loose (4 High, 5 Medium, 4 Low).
+
+---
+
+## Batch 4 — 2026-08-07 (19 items, 0 closed-sprint-residue, 2 future-sprint, 17 loose)
+
+**Source-list note:** the persisted triage report's STILL-OPEN-REAL header
+says "20 open" but lists exactly 19 bullets (verified by direct line-count
+twice) — 19 is the authoritative set; the header number is a report-internal
+off-by-one. For the 12 of 19 also covered by the report's Second-pass
+verification section, used the second-pass entry's evidence.
+
+**Two corrections to this batch's own briefing assumptions, found via
+primary-source reads:**
+
+- `2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md`
+  was **not** deferred to the Phoenix sprint — its own Triage block is
+  still entirely blank. The only recorded PO disposition is 2026-08-10,
+  verbatim: "okay aber das akzeptieren wir erst mal und gehen es später an
+  (backlog)" — accepted-for-now, generic backlog, no named sprint. Only
+  `adr-0047-numbering-collision.md` is actually Phoenix-deferred.
+- `2026-08-07-native-windows-verify-red-suite-class.md` initially looked
+  like Sentinel Epic residue (issue #36) based on a stale 2026-07-24
+  `docs/state.md` entry — the item's own more recent (2026-08-07) Triage
+  text confirms every individually-filed Sentinel-era Windows item is
+  already closed; this is instead a new Nova-era gap sourced from
+  ADR-0051's own Follow-up section (nobody tracks the aggregate
+  native-Windows red-suite *class* count). Correctly LOOSE, not residue.
+
+### CLOSED-SPRINT-RESIDUE
+
+None. All 19 are Nova-session-native discoveries, not carried-over
+closed-sprint work.
+
+### FUTURE-SPRINT
+
+- `2026-08-07-adr-0047-numbering-collision.md` — **Phoenix sprint** — PO
+  decision 2026-08-11, verbatim in the item's own Triage: "das wird vom
+  phoenix sprint... Not a Nova A/B scope item." Stays open only because
+  Phoenix has no directory yet (pure forward reference); already scheduled.
+- `2026-08-07-greenfield-onboarding-writes-mixed-authority-tiers.md` —
+  **Nova B, Slice B7** (`.arbitheon/` authority directory) — explicitly
+  admitted to Nova B by PO instruction 2026-08-08
+  (`specs/sprint-nova-epic/plans/nova-b.md:378-411`), whose own Order step
+  1 names this exact tier-literal defect class as the entry point. Still
+  open because Nova B's entry gate itself is unmet.
+
+### LOOSE
+
+- `2026-08-07-agent-tool-isolation-worktree-snapshots-stale-upstream-ref.md`
+  — **tooling/harness** — **Medium** — a harness-level `Agent`-tool bug
+  (not fixable in this repo) that already cost real recovery time once and
+  recurred independently on 2026-08-11 despite a documented workaround.
+- `2026-08-07-native-windows-verify-red-suite-class.md` —
+  **testing/tracking gap** — **Low** — a class-level tracking gap only
+  (all individually-filed Windows defects already closed); an unmeasured
+  aggregate count this session cannot re-run (Linux/WSL).
+- `2026-08-07-push-release-flow-unusable-for-third-party-adopters.md` —
+  **push/approval** — **High** — a stack of undocumented layers made a
+  real release require the PO to run `git push` to `main` personally,
+  defeating the pipeline's core "agent executes the release" value.
+- `2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md`
+  — **guard/lifecycle** — **Medium** — an over-broad guard blocks a
+  harmless `plugin.json` version bump identically to a guard-code edit,
+  forcing a manual out-of-band step on every release.
+- `2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md`
+  — **dispatch process** — **High** — zero technical enforcement, failed 4
+  times, including once in a live consumer project and once gating an
+  actual release.
+- `2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md`
+  — **push/approval** — **Medium** — the pre-signature confirmation is
+  English-only regardless of configured language, weakening informed
+  consent for a non-English-fluent operator.
+- `2026-08-07-technical-lock-for-pipeline-consent-before-onboarding-complete.md`
+  — **onboarding** — **Medium** — no technical barrier stops silent drift
+  from "PO consented" into unguarded implementation; needs an unusual
+  precondition combination, and the PO already deprioritized it.
+- `2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md`
+  — **guard/lifecycle** — **Low** — a guard's recognition list is stale
+  for 3 of 6 human-signing commands, but the trust boundary holds
+  independently (no in-session agent can reach the signer).
+- `2026-08-07-handover-file-has-no-rotation-obligation.md` —
+  **docs/handover** — **Medium** — `docs/state.md` grows unbounded (now
+  6,500+ lines) with no rotation mechanism; ADR-0060 flagged it, mechanism
+  undecided.
+- `2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md`
+  — **guard/lifecycle** — **High** — silently defeats a mandatory
+  Critic-contract clause (per-dispatch scratchpad isolation), degrading
+  review rigor with no disclosure signal in the resulting report.
+- `2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md` —
+  **testing gap** — **High** — a real red test suite has been invisible to
+  Verify for an unknown period while Verify reports fully green — the
+  third recorded instance of this exact family of gap.
+- `2026-08-07-codex-critic-isolation-fixture-rejects-merge-commit-head.md`
+  — **testing gap** — **High** — breaks a security-isolation-tier test
+  suite whenever `main`'s HEAD is a merge commit, and the worktree-dispatch
+  flow now regularly produces merge commits.
+- `2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md` —
+  **onboarding/gates** — **High** — the plan-approval gate is unsatisfiable
+  by any legal input for a promoted feature and silently inert by default;
+  a real project went from kickoff to finished implementation with the
+  human never asked to approve PRD/Spec.
+- `2026-08-07-agent-definitions-pin-the-review-tier-model.md` —
+  **dispatch process** — **High** — shipped agent frontmatter silently
+  defeats MP-07's mandatory model-tier escalation for security-relevant
+  reviews; the one measured correct-tier re-run surfaced 4 major findings,
+  2 inside the security mechanism, the degraded run missed entirely.
+- `2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md` —
+  **dispatch process** — **High** — concrete, already-occurred data loss:
+  one dispatch's unverified self-correcting `git reset --soft` destroyed a
+  different dispatch's real completed commit from branch history.
+- `2026-08-07-human-approval-ux-directory-clarity-and-single-command.md` —
+  **push/approval** — **Medium** — narrowed by second-pass evidence to
+  1-of-3 proposals still open: `sign-intent`'s confirmation still shows
+  only an opaque digest rather than the scope/effect/duration authorized.
+- `2026-08-07-maintenance-window-selectivity-is-untested-at-both-levels.md`
+  — **testing gap** — **Medium** — the maintenance window's core safety
+  property is currently verified intact but has no regression test at
+  either library or hook level guarding against future silent regression.
+
+**Batch 4 summary:** 19 total, 0 closed-sprint-residue, 2 future-sprint, 17
+loose (8 High, 7 Medium, 2 Low).
+
+---
+
+## Batch 6 — 2026-08-08 part B, items 26-48 alphabetical (14 items, 4 closed-sprint-residue, 0 future-sprint, 9 loose, 1 current-sprint match outside the schema)
+
+**Method note:** "current sprint" required a literal acceptance-criterion
+match in `issue-acceptance-matrix.md`/`nova-a.md`/`nova-b.md`, not just
+"found during a Nova session" (this whole batch originates from Nova's own
+2026-08-08 hardening day, so that looser test would wrongly capture all 14).
+
+### CLOSED-SPRINT-RESIDUE
+
+- `2026-08-08-the-authority-decision-offers-two-candidates-and-one-of-them-is-a-literal.md`
+  — 0.4.7 hotfix (`specs/2026-07-27-agent-pipeline-0.4.7-hotfix`,
+  AC-047-30–34, `pipeline.po-authority-decision-plan.v1`) — `result.md`
+  confirms delivery (Verify/Security clean, PO-approved), AC-047-31
+  requires the planner to "list both document candidates... and SHALL NOT
+  decide which candidate is authoritative," yet the shipped code still
+  hardcodes `status: "unavailable"` as a bare literal for the `prd`
+  candidate with no repository-state derivation.
+- `2026-08-08-the-authority-gate-reads-the-worktree-so-its-verdict-need-not-survive-a-checkout.md`
+  — same 0.4.7 hotfix planner (AC-047-30–34) — delivered the
+  `provenance`-carrying candidate description AC-047-31 requires, but never
+  specified the consequence when the worktree and `HEAD` diverge — a
+  semantics gap the closure's acceptance criteria didn't require covering.
+- `2026-08-08-the-signed-guard-override-has-no-command-that-emits-the-digest-to-sign.md`
+  — `specs/2026-08-02_nova-human-authorization` (HAO-1..6) via ADR-0059
+  (accepted 2026-08-07) — shipped as `guard-human-override.mjs`'s five
+  commands, but none emits the signable digest ADR-0059 Decision 1
+  promises — a residual gap the ADR acceptance didn't verify end-to-end.
+- `2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md`
+  — same `specs/2026-08-02_nova-human-authorization` closure (ADR-0059/0061)
+  — the PO's own post-acceptance live walkthrough (2026-08-08) found 8
+  concrete UX/disclosure gaps the accepted ceremony design didn't
+  anticipate for the human actually executing it.
+
+### FUTURE-SPRINT
+
+None. Several items cite a "Phoenix" session/project as their *source*
+(not a deferral target — those findings were explicitly forwarded *into*
+Nova/0.5.4 by the PO as one package). No item names an actual
+not-yet-created future sprint.
+
+### Current-sprint match outside the three-bucket schema (not counted in totals)
+
+- `2026-08-08-the-bootstrap-skill-grows-by-budget-raise-instead-of-by-module.md`
+  — **#60 / Nova B0, NVA-B60-17** — the matrix's own acceptance text
+  ("10–15k-token budget... 15,000-unit hard maximum") and the code's single
+  shared constant `BOOTSTRAP_PAYLOAD_MAX_BYTES` are the same mechanism — a
+  genuine open current-sprint criterion match, already tracked under #60,
+  no separate priority needed.
+
+### LOOSE
+
+- `2026-08-08-temp-directories-leak-until-the-filesystem-refuses-every-write.md`
+  — **testing infra / resource leak** — **High** — already caused a full
+  write-stop across the entire machine while `df -h` read a reassuring
+  21%; CI/build servers with no reboot are most exposed and least
+  protected.
+- `2026-08-08-the-test-path-guard-blocks-the-briefed-edit-and-offers-no-route.md`
+  — **guard/authorization gap (test-path guard)** — **High** — already
+  caused the exact bypass it exists to prevent once (GF-056: refused, then
+  walked around with a raw shell write).
+- `2026-08-08-the-harness-classifier-blocks-the-onboarding-action-the-pipeline-just-authorized.md`
+  — **onboarding UX / host-harness friction** — **High** — third confirmed
+  instance of the class; a fresh adopter's very first mutating step is
+  refused and escalates to a "review the transcript" warning.
+- `2026-08-08-pre-existing-failure-is-a-claim-that-needs-evidence.md` —
+  **dispatch process / evidence discipline** — **Medium** — happened twice
+  in one wave, nearly let 3 real ADR-0059 regressions be permanently
+  mislabeled as flakes.
+- `2026-08-08-runner-neutrality-must-hold-before-a-third-runner-lands.md` —
+  **runner neutrality / dispatch infra** — **Medium** — a repeating real-cost
+  pattern (4 rounds of fixes needed for the second runner) that will recur
+  for AGY, explicitly self-declared non-blocking for Nova.
+- `2026-08-08-the-grammar-refusal-does-not-say-which-part-of-the-command-failed.md`
+  — **guard UX / error messaging** — **Medium** — already cost one
+  dispatch a finished commit after 40 tool uses; partially fixed, remaining
+  gap is a false "no narrower path" signal on two denial codes.
+- `2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-calls-it.md`
+  — **lifecycle wiring / cleanup gap** — **Medium** — unbounded growth
+  already observed (128.7KB listing), a shipped Resume-Hint capability is
+  silently lost in consumer projects, but bounded and non-crashing.
+- `2026-08-08-two-cheap-costs-a-skill-invoked-without-arguments-and-a-thirteen-step-bootstrap.md`
+  — **token/cost efficiency, dispatch UX** — **Low** — PO's own framing is
+  token waste, cheap to fix, no correctness/security impact.
+- `2026-08-08-two-manifest-literals-still-bypass-the-single-seed-owner.md`
+  — **manifest/authority-tier consistency** — **Low** — the effective
+  manifest is unaffected today (neutral tier preferred); a latent
+  inconsistency on an unmeasured branch.
+
+**Batch 6 summary:** 14 total, 4 closed-sprint-residue, 0 future-sprint, 9
+loose (3 High, 4 Medium, 2 Low), plus 1 current-sprint match reported
+separately (#60/NVA-B60-17).
+
+---
+
+## Running totals across all 6 batches (excludes the DACL item, closed separately)
+
+| Batch | Total | Closed-sprint-residue | Future-sprint | Current-sprint-tracked (extra bucket) | Loose |
+|---|---|---|---|---|---|
+| 1 | 10 | 4 | 2 | 0 | 4 |
+| 2 | 11 | 0 | 1 | 0 | 10 |
+| 3 | 15 | 1 | 1 | 0 | 13 |
+| 4 | 19 | 0 | 2 | 0 | 17 |
+| 5 | 17 | 0 | 0 | 2 | 15 |
+| 6 | 14 | 4 | 0 | 1 | 9 |
+| **Total** | **86** | **9** | **6** | **3** | **68** |
+
+Within LOOSE (68 total): High/Medium/Low per batch — 1: 2/2/0, 2: 3/3/4, 3:
+4/5/4, 4: 8/7/2, 5: 7/6/2, 6: 3/4/2 → **27 High, 27 Medium, 14 Low**.
