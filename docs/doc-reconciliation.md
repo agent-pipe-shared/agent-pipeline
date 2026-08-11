@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate e1265678fe0b85008c4b76016c5f0c94e4a3d3b5 — 2026-08-11, range 60b324ad..e1265678, docs-only follow-up (Critic re-review parking + persistence-gap note)
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`e1265678`), touching only `docs/state.md`.
+Purely additive: records the decision to park the Critic re-review pending
+a complete GMW-landed candidate, the second-round report persistence gap
+and its going-forward rule, the `AR06g` naming collision between the two
+blocked test dispatches, and the `scratch/casoutcome-fix-backup.diff`
+backup location. No other governed path touched.
+
 ## Candidate 60b324ad8173ae3bc612ac637bb2bee86ab49cf5 — 2026-08-11, range 5b0278d7..60b324ad, second Critic round + fix-dispatch checkpoint
 
 - ADR-0012: checked, no change needed.
