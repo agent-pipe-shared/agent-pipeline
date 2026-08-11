@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 75b75f9b9e1ae0a990f671a68536c9d433a00d2b — 2026-08-11, range 18acfb52..75b75f9b, L-AC-01 scoping findings + session close
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`75b75f9b`), touching only `docs/state.md`.
+Purely additive: records the `PHX-WP-LAC01-SCOPE` dispatch's findings
+(gap confirmed real, correlation-identity blocker found, TP-5 pattern
+confirmed unprotected for the sibling revocation test file), corrects the
+dependency-vs-tractability conflation in the ranking that picked L-AC-01,
+and states why the session closes here (three consecutive dispatch
+truncations on the same investigation shape). No other governed path
+touched.
+
 ## Candidate 18acfb525c6db0c2b611e79f96c7896120a95e86 — 2026-08-11, range 97c069c9..18acfb52, correct the terminal-state overclaim
 
 - ADR-0012: checked, no change needed.
