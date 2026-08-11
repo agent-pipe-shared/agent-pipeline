@@ -1,0 +1,86 @@
+{
+  "schema": "pipeline.selected-sandbox-launch-evidence.v1",
+  "generatedAtIso": "2026-08-11T09:49:29.716Z",
+  "outcome": "available-attested",
+  "log": [
+    {
+      "step": "created",
+      "state": "unprobed",
+      "dispositionId": "nva-a29-launch-da738505c661"
+    },
+    {
+      "step": "probe-start",
+      "ok": true,
+      "code": null,
+      "launch": true
+    },
+    {
+      "step": "probe-success",
+      "ok": true,
+      "code": null,
+      "state": "available-attested"
+    }
+  ],
+  "disposition": {
+    "schema": "pipeline.selected-sandbox-disposition.v1",
+    "dispositionId": "nva-a29-launch-da738505c661",
+    "duty": "selected-sandbox-launch",
+    "transport": "selected-network-open-read-only-v1",
+    "fingerprint": {
+      "runnerSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "hostBootSha256": "d78a2924ce9757ea3579bec56e5ec264411647b41506be94b7e4afe00ef76d8d",
+      "platformClass": "linux",
+      "architectureClass": "x64",
+      "sandboxSha256": "b68caacd476fd90c51bdaa339882274c0dd4644320b805f1b05a7e13ec4d9bfc",
+      "profileSha256": "3c257f2afe2bd1bda1656588d3a6059f575096ab5faef2fa99a6b95072d15731",
+      "policySha256": "459c9ef9d59217d5d7a9385fafb7313d1708b695840f528a2ee6ca82bd0cab00",
+      "duty": "selected-sandbox-launch",
+      "contractVersion": "nova-a29-launch-v1"
+    },
+    "state": "available-attested",
+    "failure": null,
+    "attempt": {
+      "attemptId": "attempt-8a18ebed00a07e95",
+      "index": 0,
+      "startedMonotonicMs": 469
+    },
+    "challenge": {
+      "nonceSha256": "7a90ca88d29c143924bbfd5e5ded5e8be52f7faf0a24af7410fb12220e4247b9",
+      "bits": 256
+    },
+    "childReceipt": {
+      "childIdSha256": "152b684804d17fed60f561ad5daa68f7ff5ff0e13c011d6e303b4d3da97a4324",
+      "attemptId": "attempt-8a18ebed00a07e95",
+      "nonceSha256": "7a90ca88d29c143924bbfd5e5ded5e8be52f7faf0a24af7410fb12220e4247b9",
+      "duty": "selected-sandbox-launch",
+      "transport": "selected-network-open-read-only-v1",
+      "subjectSha256": "a8eda3cb2a160869e7741e0805f4d3f4d6606cd2559fc9397aaf8111360bf2ec",
+      "assurance": "sandbox-read-only-except-coordinator-scratch-network-open",
+      "resultSha256": "c6d41205e2a6c49ed80d0fafca6b062bae30af35984c4915dc7333ff949e7151",
+      "terminal": true
+    },
+    "expiry": {
+      "kind": "none",
+      "eligibleAfterMonotonicMs": null
+    },
+    "forceReprobe": null,
+    "assurance": {
+      "requested": "selected-sandbox",
+      "observed": "sandbox-read-only-except-coordinator-scratch-network-open",
+      "evidenceSha256": "c6d41205e2a6c49ed80d0fafca6b062bae30af35984c4915dc7333ff949e7151"
+    },
+    "previousSha256": "4fe18af81a8c1202a73c86ac60332f2f8def0704ef9cd1396fd03c6e8ad7c6c7",
+    "recordSha256": "b3cad7d9ff8f9055344fbc89e386e73a8e02bee6bf6c3b79d3c46d37f1945255"
+  },
+  "observation": {
+    "pid": 713911,
+    "platform": "linux",
+    "arch": "x64",
+    "nowMs": 1786441769710,
+    "stdout": "{\"pid\":713911,\"nonce\":\"cd8fd2aefe5d016eb5713d46b9831cd3486262384704a581d44bdadeaaaa5205\",\"platform\":\"linux\",\"arch\":\"x64\",\"nowMs\":1786441769710}",
+    "stderr": "",
+    "status": 0,
+    "durationMs": 69
+  },
+  "failureObservation": null
+}
