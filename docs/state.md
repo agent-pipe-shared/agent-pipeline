@@ -724,6 +724,59 @@ window, which stays postponed (answer `1`). Recorded because it's real,
 verified progress on push-readiness, not because it changes the session's
 conclusion.
 
+### One non-Phoenix item looked open; it wasn't — a second PO-decision wall, found and recorded, nothing shipped
+
+With Phoenix's own tractable-work survey exhausted, checked whether any
+open, non-Phoenix backlog item was genuinely actionable without PO input —
+per the standing "erledige andere sachen" (do other things) instruction from
+earlier tonight. `backlog/items/2026-08-10-guard-testpath-not-kernel-
+protected-like-its-sibling.md` looked like exactly that: a real,
+Critic-adjacent security finding (`guard-testpath.mjs`, the TP-* enforcement
+hook, is missing from `NEVER_LIFTABLE_KERNEL_PATHS` unlike its sibling
+`guard-gate-strength.mjs`) with a one-line proposed fix, in unprotected
+files not blocked by TP-5 or the GMW.
+
+Dispatched `PIPE-WP-GTP-KERNEL` (goldfish-deep, per this repo's guardrail/
+hook-code routing) with a properly pre-scoped briefing. **It correctly
+stopped rather than ship the change** (13/25 tool uses, zero-diff commit):
+`docs/adr/0058-guard-maintenance-window.md`'s own 2026-08-10 correction
+establishes a standing process — any `NEVER_LIFTABLE_KERNEL_PATHS` addition
+needs a dated correction to that ADR *naming the module first*, never merely
+a code-review outcome on the array's host file — and no such correction
+existed for `guard-testpath.mjs` (only an unrelated analogy reference at
+line 232, for a different, still-open pair of modules).
+
+**advisor() consulted before acting on this** — the natural next move
+looked like writing that ADR correction myself, endorsing the addition, the
+same way the file's one existing precedent (`guard-authority-ledger-
+intake.mjs`) reads. Correctly redirected: that precedent was written by an
+*independent Critic review* finding the gap, not by the same actor whose
+own dispatch proposed the change — and the backlog item itself names a real
+cost (permanent uneditability under any GMW window, forcing "a different,
+out-of-session route" to fix a genuine future bug in TP-*'s own logic) that
+the PO should weigh, not one an Elephant session should assume away solo,
+especially while TP-5 is the exact rule family already blocking two other
+items on tonight's punch list for the same reason.
+
+**What actually landed:** a third Follow-up bullet in ADR-0058
+(`5d81e857`), in the same shape as its two existing ones — naming the
+question, the Decision-3 recursive-hole rationale, the two-way trigger, and
+the cost — without deciding it. `PIPE-WP-GTP-KERNEL` is NOT re-dispatched.
+No code changed anywhere. This reconciliation entry uses `ADR-0058: amended
+in 5d81e857` — the first `amended` (not `checked, no change needed`) line
+this session has needed, since this is the first commit that actually
+touches a `Governs:`-listed ADR rather than one of the four that only ever
+needed checking.
+
+**Net effect: the session hit the same shape of wall twice in one turn,**
+first on Phoenix (GMW postponed), now on the one non-Phoenix item that
+looked open (a different PO-decision gate, found only by actually trying).
+Both are honestly recorded, nothing was shipped past either, and continuing
+to hunt for further "other work" would likely keep surfacing PO-gated
+questions at the cost of a dispatch or a deep read each time — advisor's
+assessment, and it matches what actually happened twice tonight. Holding
+here.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
