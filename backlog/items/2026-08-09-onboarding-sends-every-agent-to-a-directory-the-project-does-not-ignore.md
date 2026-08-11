@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Left open by 2026-08-08-shipped-guidance-sends-agents-to-a-directory-a-gate-refuses.md, whose closure evidence (backlog/evidence/2026-08-09-devplan-scratch-exemption-closure.md, 'What this closure does NOT decide') recorded it as a direction rather than deciding it; carried in docs/state.md as an open item needing its own backlog entry."
 due: 2026-08-23
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: d7a52fedbccb6fbce30492227b48c65059a1d1ef
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 ---
 
 # Onboarding mandates `scratch/` and leaves it untracked-and-unignored in every consumer project

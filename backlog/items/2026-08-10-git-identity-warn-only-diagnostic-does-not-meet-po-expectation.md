@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 018d523b707d8ae2b72a13e30ac8a2e013c1f1e0
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 source: "PO instruction during today's (2026-08-10) live greenfield test observation window: 'die lokale git identitäten name und mail sollten direkt im setup abgefragt und festgelegt werden und nicht erst immer beim ersten commit als fehler auftauchen.' This supersedes the closure rationale recorded in backlog/items/2026-08-09-fresh-repo-onboarding-never-asks-for-git-identity.md, which treated a warn-only diagnostic as having resolved the underlying gap."
 ---
 

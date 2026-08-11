@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-ready-path-unconditional-restart-barrier-read
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 864c7f1f84b5e0a874e360bf26e168fa92f14aaf
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-07
 source: "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
 due: 2026-09-06

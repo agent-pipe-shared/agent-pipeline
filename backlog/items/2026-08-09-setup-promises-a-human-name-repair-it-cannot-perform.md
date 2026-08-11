@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.setup-promises-a-human-name-repair-it-cannot-perform
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: dd1eb9eedeb7ac48860c8ec9745750c9a8367b32
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-09
 source: "Hit live on 2026-08-09 PO-nova machine while signing the PUSHWARN-1/PG11e-FLAKE TP-5 override: `sign-intent` failed with \"external trust policy does not match the local public key\" against a PO key directory whose key and repo binding were both actually correct."
 due: 2026-08-16

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 4d19def0ac9e5c2c6112b72e923bb95b6400be28
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-07
 source: "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
 due: 2026-09-06

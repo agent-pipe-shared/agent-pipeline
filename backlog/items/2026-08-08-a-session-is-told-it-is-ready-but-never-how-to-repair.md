@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.session-told-ready-but-not-how-to-repair
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 598601b441207f70da632a660fffe14a88c3ed67
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-15
 source: "PO, 2026-08-08: 'einer frischen session fehlt scheinbar die info wie sie gates lifted und wie sie reparaturen macht ... das verschwendet total viele token'. Observed in both the Claude and the Codex greenfield transcripts against the 0.5.4 local candidate."

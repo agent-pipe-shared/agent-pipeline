@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-string-match-makes-a-file-uncommittable
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: b68b611417f8ab0b1adf7b9604fc391ec4e961cf
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-22
 source: "SCRATCH-1 dispatch, 2026-08-08: it edited templates/pipeline.yaml.example, its tests went green, and it could not commit the file. It reported the block and attempted no workaround, which is correct behaviour."

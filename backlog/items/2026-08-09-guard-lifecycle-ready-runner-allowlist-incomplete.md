@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-lifecycle-ready-runner-allowlist-incomplete
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 9427caa6a2e02ed78e49c3babb28df9d7195eef9
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-09
 source: "Direct code inspection of guard-lifecycle-ready.mjs vs. session-cleanup.mjs's own documented CLI surface, while investigating the PO's private Codex + 0.5.4 test run, 2026-08-09. Independent of that run's actual failure chain — see the note below."
 due: 2026-08-16

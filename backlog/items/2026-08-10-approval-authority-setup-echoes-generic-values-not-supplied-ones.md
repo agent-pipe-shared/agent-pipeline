@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 0717f1f5361e28d0bdcd45cc03e31bc2dac42952
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 source: "Codex self-report from a live 2026-08-10 greenfield test session: 'Beim setup der Freigabeautorität wich die Rückmeldung von den übergebenen Werten ab: Trotz --human-name <value> --key-reference <value> meldete sie APS-PO und local-po-key.' (exact supplied values redacted here — they are the PO's real identity strings and must never appear in a committed artifact; the point is that the echoed identifiers did not match what was passed at all)."
 ---
 

@@ -7,6 +7,10 @@ status: open
 created: 2026-08-09
 source: "Hit during the 0.5.4 candidate's closing Verify run on 2026-08-09: guard-push-tests failed, the same suite passed unchanged on the immediate re-run, and the diff between the two runs was a commit hash."
 due: 2026-08-16
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 635f348b4c29d52ab2db0672719421abd96ba4f7
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 ---
 
 # PG11e passes or fails on where a second boundary falls, inside the Verify gate

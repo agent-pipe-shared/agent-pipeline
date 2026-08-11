@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-lifecycle-ready-blocks-claude-memory-writes
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-07-29
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: a32e1b99ba3abc71165014227064bba261064f14
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 source: "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
 ---
 

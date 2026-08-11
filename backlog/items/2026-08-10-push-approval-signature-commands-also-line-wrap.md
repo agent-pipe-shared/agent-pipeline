@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-approval-signature-commands-also-line-wrap
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 28818f162168b818a1cb48c4a099658e22950bd4
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 source: "PO live observation, 2026-08-10: 'auch die signatur aufforderungen für push kommen weiter mit zeilenumbrüchen das macht keinen spass in der ux' — reported while GF-094 (a same-class fix for the codex-pretool-guard.mjs attended-host-terminal path) was still in flight."
 ---
 

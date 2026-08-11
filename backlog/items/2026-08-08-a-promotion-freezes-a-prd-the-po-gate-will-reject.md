@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.promotion-freezes-a-prd-the-po-gate-will-reject
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: fb918b86dc0b02f27ff3478f9e579c353525c888
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-15
 source: "PO, 2026-08-08, two independent unhappy-path transcripts against the 0.5.4 local candidate, one per runner, on separate greenfield browser-game projects. The Claude session reached a deadlock it could not leave without the human running `sed -i` by hand; the Codex session reached a circular gate block with no typed recovery and stopped correctly."

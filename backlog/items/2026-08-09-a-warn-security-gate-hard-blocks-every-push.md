@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.warn-security-gate-hard-blocks-every-push
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 635f348b4c29d52ab2db0672719421abd96ba4f7
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-09
 source: "Found by measuring whether a freshly seeded consumer can satisfy a `security` gate, 2026-08-09, while closing `pipeline.push-gate-is-silent-in-every-consumer-project`."
 due: 2026-08-16

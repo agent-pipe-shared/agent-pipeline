@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.single-trust-anchor-excludes-key-rotation-and-teams
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 4a61bf1d099da48e33f37b356021e1e78a0c6141
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-22
 source: "PO, 2026-08-08, on reading that a lost key has no signature path back: 'auch im team werden ja verschiedene schlüssel benutzt. Meine Erwartungshaltung war hier, dass wir sicherstellen das ein mensch auditiert aber bewusst nicht welcher. Sprich für eine neue freigabe muss auch ein neuer human key funktionieren den es vorher nicht gab.'"

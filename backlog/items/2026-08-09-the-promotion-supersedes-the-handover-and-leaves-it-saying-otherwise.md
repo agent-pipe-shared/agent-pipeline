@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 765ca6c1b9cf6482b41b4ad8e53d33fabf1e695f
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-09
 source: "Both greenfield happy-path tests the PO ran against the 0.5.4 local candidate on 2026-08-09, one per runner, read read-only by the Elephant at the PO's invitation. Two independent runs, same two symptoms."
 due: 2026-08-16

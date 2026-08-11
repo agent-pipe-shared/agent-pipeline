@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: a6fa43f2fc191ecf76ef7c5b13a02ff64034b24b
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-09
 source: "PO observation during the 2026-08-09 evaluation/fix session: dispatched Goldfish/Critic subagents keep ending their turn mid-task without a final report, each requiring an Elephant-side diagnose-and-resume cycle; explicit PO instruction to defer investigation until after the current local candidate ships, since fixing it now would itself cost more of the time it is meant to save."
 due: 2026-08-23

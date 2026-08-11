@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 847c637aead568c6b40d870266f2fc5c2f9818be
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 source: "GF-111 dispatch (worktree isolation), 2026-08-11 — first Full Verify attempt against the cherry-picked commit failed at VERIFY-CANDIDATE-PREFLIGHT with 'Commit or stash tracked changes before Verify; no suite was started', caused by the leftover .claude/worktrees/ directory, not by any real dirty change."
 ---
 

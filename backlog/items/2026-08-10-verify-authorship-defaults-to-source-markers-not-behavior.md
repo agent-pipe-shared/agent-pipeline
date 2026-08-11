@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-authorship-defaults-to-source-markers-not-behavior
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: a655437ce8dbb785173b65961c60f1599670e92c
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 source: "Codex self-report from a live 2026-08-10 greenfield test session: 'Die erste Verify-Version prüfte nur Quelltextmarker. Erst nach Critic-Befund wurde sie zu Verhaltenstests ausgebaut. Es gab keine echte visuelle Browser-/Touch-Prüfung.'"
 ---
 
