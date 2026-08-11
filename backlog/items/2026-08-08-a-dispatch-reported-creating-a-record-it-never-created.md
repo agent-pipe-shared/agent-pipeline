@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatch-reported-creating-a-record-it-never-created
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: ec8245295fff5fc83a44cccebf2637edfa95fdf3
+closure_evidence: evidence/dispatch-record-NVA-BL-25.json
 created: 2026-08-08
 due: 2026-08-22
 source: "Found when a Critic delta review stopped fail-closed on a missing required reference, 2026-08-08. The reference was a dispatch record the dispatch's own report claimed to have created."
@@ -83,7 +87,27 @@ looking at when diagnosing, but it is not itself evidence for either branch.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11), partial — Direction point 2 landed,
+  points 1 and 4 not pursued.
+- **Rationale:** Direction point 2 ("require a readback for the opening
+  record write... one read, once, at the point where the claim is cheapest
+  to check") is now implemented — `roles/goldfish.md` GF-09-D and
+  `templates/prompts/goldfish-task.md` field 6 both require a readback
+  immediately after the dispatch record's opening write, with a failed
+  readback now an explicit stop condition rather than silent continuation;
+  the three shipped agent definitions restate it inline (commit
+  `ec8245295fff5fc83a44cccebf2637edfa95fdf3`, verified via
+  `check-doc-contracts.test.mjs` 36/36). This closes the operational gap for
+  BOTH branches point 1 asked to distinguish (refused/lost vs. never
+  attempted) — either failure mode now fails the readback before a report
+  can claim success. Point 1 itself (forensic reconstruction of which branch
+  actually happened for the original `FIXTURE-1` run) was not pursued: days
+  removed from the incident, the transcript-forensic exercise has little
+  remaining value now that the preventive fix is in place regardless of the
+  answer. Point 4 ("consider whether a report claim about a file should be
+  machine-checkable at all") stays an open, broader design question beyond
+  this one dispatch-record field — not blocking, but not decided.
+- **Assignment (if accepted):** n/a — closed. Point 4 could be filed as a
+  separate idea-type item if the PO wants it pursued later; not filed here
+  to avoid inventing scope unprompted.
+- **Date:** 2026-08-11
