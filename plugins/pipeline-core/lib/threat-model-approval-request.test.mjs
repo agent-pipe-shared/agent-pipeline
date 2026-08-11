@@ -7,6 +7,7 @@ import { join } from "node:path";
 
 import { createThreatModelApprovalRequest, verifyThreatModelApprovalRequest } from "./threat-model-approval-request.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "./po-approval-proof.mjs";
+import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { approvalRequestFromExternalJson, parseArgs, run as runApprovalRequest } from "../scripts/po-approval-request.mjs";
 import { parseGateArgs, run as runApprovalGate } from "../scripts/po-approval-gate.mjs";
 import { parseHumanArgs, runHumanApproval } from "../scripts/po-human-approval.mjs";
@@ -36,6 +37,13 @@ assert.ok(parseGateArgs(["approve", "--repo-root", "/repo", "--directory", "/hum
 assert.ok(parseGateArgs(["prepare-all", "--repo-root", "/repo", "--directory", "/human-po", "--feature-id", "cyb-4"]).error);
 assert.ok(parseHumanArgs(["approve", "--directory", "relative"]).error);
 const external = mkdtempSync(join(tmpdir(), "po-human-approval-")); const nominalRepo = mkdtempSync(join(tmpdir(), "po-human-repo-"));
+// PO-KEYDIR-01: `resolveGitCommonDir()` returns null for `nominalRepo` (a plain
+// mkdtempSync temp dir, never `git init`-ed), so po-human-approval.mjs falls back to
+// `repository` (== nominalRepo) as the fingerprint's gitCommonDir input, exactly
+// mirroring lines 559-582 of scripts/po-human-approval.mjs.
+const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: nominalRepo, primaryRoot: nominalRepo }).slice(0, 12);
+const cyb4Suffix = `-${repositoryFingerprint}`;
+const cyb5Suffix = `-${repositoryFingerprint}-cyb-5`;
 writeFileSync(join(external, "request.json"), JSON.stringify({ ok: true, value: request })); writeFileSync(join(external, "authority.json"), JSON.stringify(trustPolicy)); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
 assert.equal(runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => candidate }).value.verified, true);
 assert.throws(() => runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => ({ ...candidate, tree: "f".repeat(40) }) }), /current clean candidate/u);
@@ -45,7 +53,12 @@ assert.throws(() => runApprovalRequest(["verify", "--repo-root", nominalRepo, "-
 // legacy 2-field shape above, not unconditionally rejected.
 writeFileSync(join(external, "authority-setup1.json"), JSON.stringify({ ...trustPolicy, humanName: "Test Operator" }));
 assert.equal(runApprovalRequest(["verify", "--repo-root", nominalRepo, "--request", join(external, "request.json"), "--authority", join(external, "authority-setup1.json"), "--proof", join(external, "proof.json")], { observeCandidate: () => candidate }).value.verified, true);
-writeFileSync(join(external, "trust-policy.json"), JSON.stringify({ ...trustPolicy, humanName: "Test Operator" })); writeFileSync(join(external, "po-public.pem"), publicKey); writeFileSync(join(external, "proof.json"), JSON.stringify(proof));
+// PO-KEYDIR-01(B): po-human-approval.mjs's own directory-convention paths (request/
+// proof) carry the repository-fingerprint suffix computed above; trust-policy.json and
+// po-public.pem stay unsuffixed by design (only request/proof/signature/intent/signer
+// carry it -- see po-human-approval.mjs lines 583-596).
+writeFileSync(join(external, `request${cyb4Suffix}.json`), JSON.stringify({ ok: true, value: request }));
+writeFileSync(join(external, "trust-policy.json"), JSON.stringify({ ...trustPolicy, humanName: "Test Operator" })); writeFileSync(join(external, "po-public.pem"), publicKey); writeFileSync(join(external, `proof${cyb4Suffix}.json`), JSON.stringify(proof));
 assert.equal(runHumanApproval(["verify", "--repo-root", nominalRepo, "--directory", external], { observeCandidate: () => candidate }).value.verified, true);
 assert.equal(runApprovalGate(["verify", "--repo-root", nominalRepo, "--directory", external], { observeCandidate: () => candidate }).value.verified, true);
 assert.throws(() => runHumanApproval(["verify", "--repo-root", nominalRepo, "--directory", external], { observeCandidate: () => ({ ...candidate, commit: "f".repeat(40) }) }), /current clean candidate/u);
@@ -93,8 +106,8 @@ writeFileSync(join(external, "po-private.pem"), "encrypted-private-key-placehold
 // human confirmation (NOVA-PO-CONFIRM-1); these checks cover the request/proof shape,
 // not the gate, which has its own coverage in scripts/po-human-approval.test.mjs.
 assert.equal(runHumanApproval(["approve", "--repo-root", nominalRepo, "--directory", external], { readConfirmation: () => "approve", spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-PROOF-READY");
-assert.equal(JSON.parse(readFileSync(join(external, "proof.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
-writeFileSync(join(external, "request-cyb-5.json"), JSON.stringify({ ok: true, value: request }));
+assert.equal(JSON.parse(readFileSync(join(external, `proof${cyb4Suffix}.json`), "utf8")).intentSha256, request.approvalIntent.sha256);
+writeFileSync(join(external, `request${cyb5Suffix}.json`), JSON.stringify({ ok: true, value: request }));
 assert.equal(runHumanApproval(["approve-all", "--repo-root", nominalRepo, "--directory", external], { readConfirmation: () => "approve", spawn: (_executable, args) => { writeFileSync(args[args.indexOf("-out") + 1], "detached-signature"); return { status: 0 }; } }).code, "PO-HUMAN-APPROVE-ALL-READY");
-assert.equal(JSON.parse(readFileSync(join(external, "proof-cyb-5.json"), "utf8")).intentSha256, request.approvalIntent.sha256);
+assert.equal(JSON.parse(readFileSync(join(external, `proof${cyb5Suffix}.json`), "utf8")).intentSha256, request.approvalIntent.sha256);
 console.log("39 threat-model approval request checks passed");
