@@ -557,6 +557,63 @@ can be briefed again. The session's one clean, verified, still-standing
 implementation win is `PX0-AC-13`'s test coverage (`7dffa72e`, from
 earlier) — not this.
 
+### Both P-AC-06 clauses reach a definitive, negative answer — not a scoping gap, a spec problem
+
+PO asked both semantics questions above; PO approved "the recommended
+framing" for both. The Elephant's framing turned out wrong on both counts,
+confirmed against live data before any second implementation attempt — the
+error is the Elephant's, not a bad PO call on bad information.
+
+**"legacy" is provably vacuous — a hard result, not a judgment call.**
+`packageRelative(id, artifact.path)` (`feature-package-topology.mjs`)
+requires every artifact path to start with `specs/${id}/`; the validation
+loop already rejects any path that doesn't. A package under validation has
+a `lifecycle.json` by construction — `inventoryFeaturePackages`'s `legacy`
+list is exactly the directories that DON'T. So a package being validated
+can never itself be legacy, and an artifact path can never point outside
+its own package into someone else's directory. **The approved check
+("reject an artifact path pointing into a legacy directory") cannot fire
+on any input that reaches it — a dead branch, not a narrow feature.** This
+isn't a scope question to re-answer; the acceptance text's "legacy" clause
+needs revisiting at the PRD/acceptance level, not at the code level.
+
+**"orphaned" is unimplementable as a structural rule** — confirmed with
+the exact counterexample pair the earlier revert's data already contained,
+re-examined more closely: `specs/sprint-nova-epic/lifecycle.json` lists
+`evidence/nova-b/*` files as tracked artifacts while `evidence/nova-a/*`
+files of the identical shape, same package, same directory depth, are
+not listed at all. Same split at the top level: `RECOVERY.md` (listed,
+class `design`) vs. `phase-plan_gate-integrity.md` (unlisted), both
+top-level `.md` files in the same package, no naming or location predicate
+separates them. **Tracking which files belong in a manifest is a
+curatorial decision made when the manifest was last edited, not a
+structural property of the file itself** — there is no rule of the shape
+"files matching X must be listed" that both packages' real, valid history
+satisfies. The only artifact classes that ARE deterministic — prd, spec,
+acceptance, result — are already enforced by the existing `FTP-REQUIRED`/
+`FTP-AUTHORITY` checks, so a new check restricted to just those would be
+redundant with code already there. One more data point for whoever revisits
+this: Nova uses `implementation/` and `plans/` directories Phoenix doesn't
+have at all — any directory-based rule would need to be per-package, which
+is itself a sign this isn't a repo-wide structural property.
+
+**What a real fix would need, named so it isn't re-derived from scratch:**
+a baseline/grandfather mechanism — record a snapshot of currently-known
+files per package, and only flag files that appear *after* that baseline
+and are still unlisted. That's real design work (where does the baseline
+live, who updates it, what happens when a legitimately-untracked file is
+added on purpose), not a narrow fix, and not attempted here.
+
+**Net effect on the session's Class B survey: seven criteria now
+investigated to the same shape of conclusion** — L-AC-01, A-AC-01, V-AC-02,
+R-AC-08, R-AC-13, H-AC-12, and P-AC-06's two remaining clauses. None of the
+seven is closable by another narrow, well-scoped dispatch tonight; each
+needs either a producer/enforcement point wired (real multi-dispatch
+feature work) or a semantics/acceptance-text decision first. That is the
+honest state of the "Class A/B/D work is open and agent-executable"
+correction from earlier — open, yes; executable in one more dispatch
+tonight, no, not for these seven.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
