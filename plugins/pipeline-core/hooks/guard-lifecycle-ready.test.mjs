@@ -3525,3 +3525,24 @@ test("NVA-BL-76: the read-scope refusal is override-REACHABLE, and is not the cr
     rmSync(outside, { recursive: true, force: true });
   }
 });
+
+test("NVA-BL-76: a real signed capability reaches the read-scope denial end to end", () => {
+  const { projectDir, outside, outsideFile } = readScopeFixture();
+  try {
+    // overrideReachability() above only PLANS. This arms and consumes a genuine detached
+    // Ed25519 proof, which is also the only check that proves the reason string the denial
+    // prints is byte-identical to the one the capability is bound to -- a drift between them
+    // would leave the measured route unusable while every plan-level assertion stayed green.
+    const command = `rg -n 'Overall' ${outsideFile} | head -n 5`;
+    hgoArmBySignature(projectDir, { command }, [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_READ_SCOPE_REASON }]);
+    const admitted = evaluateLifecycleReadyGuard(bash(command), { projectDir, ...hgoReadyDeps() });
+    assert.match(
+      admitted.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-READ-SCOPE-OUTSIDE-ROOT: exact one-time capability consumed/u,
+      "the read-scope denial measured as liftable-by-signature did not consume a genuine signed capability",
+    );
+  } finally {
+    rmSync(projectDir, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
