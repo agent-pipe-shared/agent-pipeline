@@ -169,3 +169,52 @@ zero regression. Full findings:
 `specs/sprint-phoenix-epic/evidence/wp2wp3-design-critic-delta-review-3-0d8ed74.md`.
 **Design phase DONE for the combined package — ready for implementation
 dispatch.**
+
+**Sub-design for §B.8's deferred action-family item (2026-08-08):** produced
+— commit `e844bcf1`,
+`specs/sprint-phoenix-epic/design/codex-wsl-freshness-host-action-family.md`.
+Opus/xhigh, DESIGN ONLY. Specifies the eight-member closed action family
+(schema, dispatch rule, rejection path, receipt shape, threat-model
+amendments, full test plan) that §11 states would serve PX0-AC-13, PX0-AC-14,
+PX0-AC-11, PX0-AC-12 in full. Its own §13 leaves one open PO question
+(Option A/B/C on the threat model's "no repository mutation" sentence) and
+§1 explicitly excludes repairing `ruleset-freshness-host.mjs`'s broken
+import chain, naming both as the implementation dispatch's work. **Never
+implemented.**
+
+**What actually got implemented instead (2026-08-11, commit `7dffa72e`,
+"PX0-AC-13 rework"): a deliberate interim placeholder, not the sub-design
+above — and it did not work.** `createWslHostAttestedSpawn` was added to
+`ruleset-freshness.mjs`, with its own code comment explicitly citing this
+item's design lineage and naming itself as "the minimal surface needed to
+satisfy §B.2(b) without pre-empting" the eight-action-family sub-design —
+i.e. a disclosed, deliberate stopgap, not a hidden shortcut. But the
+stopgap only checked a local Codex App-Server health observation and then
+spawned git in the SAME sandboxed process with a sterile env swap — it
+never actually delegated to a genuine host-side process. Two independent
+investigation dispatches this session (2026-08-11/12,
+`PHX-WP-PX0AC13-HOSTDELEGATION` and `-REMOVEATTESTATION`) confirmed this
+directly, tracing the call graph to `run()`/`git()` at
+`ruleset-freshness.mjs:42-50` (`options.spawn` only, never
+`hostTransport`) and to `ruleset-freshness-host.mjs`'s own header comment
+stating genuine boundary-crossing is an agent/runner tool-tier decision,
+not in-process code.
+
+**Resolved 2026-08-12 (`PHX-WP-PX0AC13-FAILCLOSED`, commit `cd38619e`\*):
+the fake placeholder is removed, replaced with an honest fail-closed
+substitute** (network-delegated calls under `host-authorized-wsl` now
+always refuse without ever attempting to spawn — no misleading "attested
+success" path remains). `specs/sprint-phoenix-epic/acceptance.md`'s
+PX0-AC-13 amended (commit `7fa07d54`) to record this precisely: clause 2
+("without consuming a known-failing sandbox attempt") satisfied; clause 1
+("use the selected host transport") stays open, pointing at this item's
+own `codex-wsl-freshness-host-action-family.md` sub-design as the real,
+already-specified, still-unbuilt path — not a proved impossibility, an
+unbuilt one. \* the object exists and is content-verified but the branch
+ref move to it was blocked pending PO action — see `docs/state.md`'s
+2026-08-12 checkpoint; the tree is correct either way.
+
+**This item stays open.** The eight-action-family sub-design
+(`codex-wsl-freshness-host-action-family.md`) is still the concrete next
+step whenever implementation is picked up — its own §13 open question
+needs a PO answer first.
