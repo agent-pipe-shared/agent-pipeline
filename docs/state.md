@@ -1375,6 +1375,37 @@ regression tests, TP-3 suite registration) is fully landed. Closed early
 rather than left to expire — reduces the exposure window, no work was still
 pending under it.
 
+### Stop hook correctly reasserted incompleteness — the concrete next action, found and recorded, not yet dispatched (context boundary)
+
+128/25/3/0/1. Re-checked the 2026-08-09 five-category synthesis (line ~5490
+below) against the CURRENT 25-partial/3-not-started list rather than trusting
+it as still accurate — most of it held (categories 1/2/3/4 are still
+genuinely PO-gated: design input, TP-5, TP-4/`hooks.json`, or explicit
+Class-P policy; category 5 was already exhausted). **One new, concrete,
+PO-independent opportunity found**: `PX0-AC-03`, `PX0-AC-05`, `PX0-AC-06`,
+`PX0-AC-13` are each already code-complete and fully tested (`pipeline-state-tests`
+AR03/AR05/AR06/AR13 families, 504/504 in the same run that verified
+`3e1a727e`) — every one of their own notes says the SAME thing: `partial`
+**only** because no independent Critic PASS exists for that exact candidate.
+`PX0-AC-06`'s own note was additionally stale (still describing a bug and a
+coverage gap AR06g/AR06h/AR06i, both landed earlier tonight, already close)
+— corrected in place (`27b0390f`), no verdict change, but now for the
+accurate reason.
+
+This is a materially cheaper path to more `implemented` criteria than any of
+the five categories: no PO design input, no TP-4/TP-5 window, just a Critic
+review of code that already exists and already passes. **Not dispatched
+this turn** — context was already flagged OVERDUE for compaction when this
+was found, and starting a fresh multi-round Critic-dispatch cycle (the same
+shape that took four rounds and three FAILs to get P-AC-08 right tonight) in
+an already-overloaded context risks exactly the kind of contamination
+mistake this session has spent all night catching and correcting. Recorded
+here as the explicit next action instead: dispatch an independent Critic
+review of the PX0 continuity-authority-revision package (likely one review
+covering all four criteria together, since they share one test family and
+one underlying mechanism, rather than four separate dispatches) as the very
+next piece of work, before sampling anything else from the five categories.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
