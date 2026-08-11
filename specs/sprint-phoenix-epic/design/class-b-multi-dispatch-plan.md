@@ -121,19 +121,34 @@ an approximate or unverified-premise value at all — this needs a new value
 class to exist upstream before the renderer could label it, not just a
 rendering fix.
 
-**Why this is likely the smallest of the four:** unlike L-AC-01/A-AC-01, this
-doesn't need cross-cutting call-site enumeration — it needs exactly one new,
-well-defined value-class concept (what makes a value an "estimate" vs a
-"fact"? what makes it an "assumption" vs "unknown"?) threaded through
-whichever producer(s) currently emit `fact`-typed values that are actually
-approximations, plus the renderer's existing seven-way label switch.
+**CORRECTED same night, after actually doing the scoping step below: this is
+NOT the smallest of the four.** The assessment above assumed a same-package
+producer would turn up. It doesn't. `evidence-view-model.mjs` has exactly
+one place that assigns a `valueClass` to per-artifact data
+(`buildEvidenceViewModelFromFeaturePackage`, line 93) and it is
+unconditionally `"fact"` — every artifact field it renders is a
+digest-verified exact value from `validateFeaturePackage`'s receipt, never
+an approximation. The one plausible estimate-shaped value found anywhere in
+the codebase, `organization-policy-activation.mjs`'s `computeBackfillRange`/
+`backfillRange` preview field (a projected date range, genuinely estimate-
+shaped, already credited to P-AC-03/P-AC-09) — grep confirms
+`evidence-view-model.mjs` and `evidence-view-renderer.mjs` contain **zero**
+references to `organization-policy` anywhere. The two subsystems don't
+share a seam today. Closing V-AC-02 for real means either building that
+seam (project a `backfillRange`-shaped preview through the evidence viewer,
+itself real cross-package wiring — Class S territory, not Class B) or
+finding a different, still-unidentified estimate producer somewhere else in
+the repo. Reclassify this as needing the same kind of investigation as
+L-AC-01, not a quick local fix.
 
-**Next scoping step:** find every current producer of the `fact` value class
-in `evidence-view-model.mjs` and its callers, and check whether any of them
-already compute or receive a value that is actually an estimate (e.g. a
-derived count, a projected date) mislabeled as `fact` today — that would be
-the natural first caller to convert, giving the new value class a real
-production emitter on day one rather than a schema addition nothing uses.
+**Next scoping step, revised:** either (a) scope what projecting
+`organization-policy-activation`'s preview data through the evidence viewer
+would actually require (a new `evidence-view-model.mjs` entry point
+alongside `buildEvidenceViewModelFromFeaturePackage`, not an edit to it), or
+(b) grep the rest of the repo (`plugins/pipeline-core/lib/*.mjs`, not just
+the evidence-viewer family) for any other computed-not-verified value —
+a projected date, a derived count, a heuristic score — that could serve as
+a smaller first producer than the organization-policy seam.
 
 ### R-AC-08 — rollback/cleanup as occurred events
 
@@ -191,13 +206,25 @@ genuine gap needing the dual-evaluation primitive wired in.
 
 ## Recommended sequencing, once any of this is picked up
 
-1. **V-AC-02** first — smallest, most self-contained, no call-site
-   enumeration needed.
-2. **L-AC-01** second despite being hardest — it's the epic's named
-   structural gap ("no Pipeline path emits a lifecycle event at all") and
-   several other packages' full closure depends on it existing.
-3. **R-AC-08** and **A-AC-01** after, in either order — both need their own
+**Revised same night — none of the four is a clean "smallest first" pick
+anymore.** V-AC-02 was named smallest before its own scoping step ran; that
+step (above) found it needs a new cross-package seam, same shape as the
+other three, not a local fix. No item in this list currently has a
+confirmed-small scope; all four need their revised "next scoping step" run
+before any of them can be ranked by size in good faith.
+
+1. **L-AC-01** first despite being hardest to build — it's the epic's named
+   structural gap ("no Pipeline path emits a lifecycle event at all"),
+   several other packages' full closure depends on it existing, and its
+   scoping step (confirm zero callers, find the nearest dispatch path) is
+   at least well-defined, unlike V-AC-02's now-open-ended "find some other
+   producer somewhere in the repo."
+2. **A-AC-01** and **R-AC-08** next, in either order — both need their own
    call-site scoping pass first; neither blocks the other.
+3. **V-AC-02** after those — its scoping step is now the least defined of
+   the four (either design a new evidence-viewer entry point for
+   organization-policy data, or search the whole repo for an alternative
+   producer with no specific place to look yet).
 4. **H-AC-12's remaining subsystems** last, and only after the disposition
    question above is answered — building against the wrong module would be
    the same class of mistake as the P-AC-06 orphan-check revert.
