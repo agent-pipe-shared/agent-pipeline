@@ -6,12 +6,29 @@
 the 13 steps named in D6 are not the six numbered steps of the session-bootstrap
 protocol (§3 of that file, which govern ruleset/calibration/handover loading at
 EVERY session start). They are the onboarding/lifecycle transaction sequence a
-fresh project walks through once, spanning two different CLI families
-(`project-onboarding-v3.mjs` for steps 1–10, `pipeline-state.mjs` for steps
-11–13). Folding this into `session-bootstrap.md` would misfile it under the
-wrong protocol; a standalone doc keeps the two concerns — "does this session
-start correctly" versus "does this project reach a governed, approved state"
-— separately addressable.
+fresh project walks through once, spanning three scripts: step 1
+(`pipeline-start-preflight.mjs`), steps 2–10 (`project-onboarding-v3.mjs`,
+9 steps), steps 11–13 (`pipeline-state.mjs`, 3 steps). Folding this into
+`session-bootstrap.md` would misfile it under the wrong protocol; a
+standalone doc keeps the two concerns — "does this session start correctly"
+versus "does this project reach a governed, approved state" — separately
+addressable.
+
+**Not every adopter necessarily executes all 13 in one run.** Per
+`plugins/pipeline-core/skills/pipeline-start/SKILL.md`, the actual sequence
+is dynamic: preflight returns a `nextAction`, inspect reports a status, and
+the agent "executes each returned digest-bound action and readback" —
+i.e. only the steps whose preconditions are currently unmet fire; a project
+already past a given transition (e.g. runtime already initialized) is not
+made to repeat it. The 13 named in D6 are the steps observed firing on a
+fresh/first-run adopter path, which is the worst case the accounting below
+is written against. Steps 5–6 (`plan-runtime`/`init-runtime`) are further
+runtime-target-specific: the library code paths they invoke
+(`runtime-initialization-required`, `runtime-attestation-required`,
+`restart-required`) are conditioned on the runner's runtime-readback
+capability, so a runner without a native runtime readback follows a
+different, narrower branch of this same code rather than skipping steps
+5–6 outright.
 
 **The property that must be preserved:** per-step digest rebinding (plan →
 apply pairs gated on the exact sha256 of the plan just computed; submit →
@@ -35,8 +52,10 @@ be misread as "project setup is complete," because the check never read
 distribution identity (which code is loaded) and repository state (what the
 project's own files say) are different facts that can drift independently —
 conflating them is the exact ambiguity the `STATUS_SCOPE` fix closed.
-**Verdict: load-bearing.** Merging it into inspect (step 2) would recreate
-the documented ambiguity this step's own history exists to prevent.
+**Binding:** observation-only — no plan digest is produced or consumed;
+this step reads live distribution identity and reports it. **Verdict:
+load-bearing.** Merging it into inspect (step 2) would recreate the
+documented ambiguity this step's own history exists to prevent.
 
 ## 2. inspect (`inspectProjectOnboardingV3` → `v4Inspection`)
 
@@ -47,29 +66,39 @@ downstream plan step branches on. **Why separately digest-bound:** it
 depends on repository content preflight deliberately never reads (see
 step 1); it is the single point where "what does this repo actually look
 like right now" gets established before any plan is computed against it.
-**Verdict: load-bearing.** Every later step's branch logic (e.g. `kickoff`
-requires status `kickoff-required`; `promote` requires status `ready` with
-valid continuity) reads this result directly; skipping it means guessing.
+**Binding:** observation-only, same as step 1 — inspect produces a status,
+not a digest; the digest chain begins at step 3. **Verdict: load-bearing.**
+Every later step's branch logic (e.g. `kickoff` requires status
+`kickoff-required`; `promote` requires status `ready` with valid
+continuity) reads this result directly; skipping it means guessing.
 
 ## 3. plan (`planProjectOnboardingLifecycleV4`, `operation: "portable"`)
 
 **Purpose:** computes, read-only, the deterministic plan for seeding the
 baseline `pipeline.user.yaml`/manifest files, without writing anything.
 **Why separately digest-bound:** this is the first half of the plan/apply
-two-phase-commit pattern used throughout this CLI family — apply steps are
-structurally refused unless handed back the exact sha256 of the plan just
-computed (a compare-and-swap against a stale plan). That pattern is the
-actual anti-drift mechanism, not incidental ceremony: it catches the case
-where repository state changes between planning and applying.
-**Verdict: load-bearing.**
+two-phase-commit pattern used throughout this CLI family. Read directly
+from `applyLifecycle` (`lib/project-onboarding-v3.mjs`, `operation ===
+"portable"` branch): the apply call recomputes the plan itself under the
+identity inspect resolved, and compares `lifecyclePlanDigest(plan)` against
+the caller-supplied `planSha256` byte-for-byte; on any mismatch (or a
+missing/malformed digest, or `--activate` absent) it performs **no
+mutation** and returns the current inspection unchanged — a fail-closed
+no-op, not a thrown error. That is the actual anti-drift mechanism, not
+incidental ceremony: it catches the case where repository state changes
+between planning and applying. **Binding:** produces a digest
+(`lifecyclePlanDigest(plan)`), consumed by step 4. **Verdict:
+load-bearing.**
 
 ## 4. apply-seed (`apply-portable-seed` → `applyProjectOnboardingLifecycleV4`)
 
 **Purpose:** the write step that creates the seeded files, gated on the
-plan's sha256 (`--plan-sha256`) plus `--activate`. **Why separately
-digest-bound:** same plan/apply pairing reasoning as step 3 — the CAS check
-is what makes this step catch drift rather than silently applying a plan
-that no longer matches the repository. **Verdict: load-bearing.**
+plan's sha256 (`--plan-sha256`) plus `--activate`; see step 3 for the exact
+gate mechanics (recompute-and-compare, fail-closed no-op on mismatch).
+**Why separately digest-bound:** same plan/apply pairing reasoning as step
+3 — the CAS check is what makes this step catch drift rather than silently
+applying a plan that no longer matches the repository. **Binding:** bound
+by the digest step 3 produced. **Verdict: load-bearing.**
 
 ## 5. plan-runtime (`planProjectOnboardingLifecycleV4`, `operation: "runtime"`)
 
@@ -79,14 +108,18 @@ the portable seed files — a materially different target with different
 content. **Why separately digest-bound:** reusing step 3's plan digest here
 would let a runtime-relevant apply be approved on stale seed-plan content;
 the two targets need independent digests precisely because they can go
-stale independently. **Verdict: load-bearing.**
+stale independently. **Binding:** produces its own digest via
+`lifecyclePlanDigest(plan)`, distinct from step 3's. **Verdict:
+load-bearing.**
 
 ## 6. init-runtime (`initialize-runtime` → `applyProjectOnboardingLifecycleV4`, `operation: "runtime"`)
 
 **Purpose:** the write step applying the runtime plan, gated on that plan's
-own digest. **Why separately digest-bound:** identical plan/apply CAS
-reasoning as steps 3–4, applied to the runtime target. **Verdict:
-load-bearing.**
+own digest — the same recompute-and-compare, fail-closed no-op mechanic as
+step 4, confirmed in the same `applyLifecycle` function's `operation ===
+"runtime"` branch. **Why separately digest-bound:** identical plan/apply
+CAS reasoning as steps 3–4, applied to the runtime target. **Binding:**
+bound by the digest step 5 produced. **Verdict: load-bearing.**
 
 ## 7. kickoff plan (`planProjectOnboardingKickoffV4`)
 
@@ -100,16 +133,21 @@ to the wrong value and dropped the whole kickoff for non-Codex runners
 **Why separately digest-bound:** the plan's content (goal/language) is
 caller-supplied and changes every kickoff; each kickoff needs its own
 digest, and the runner-identity requirement is itself a distinct guard this
-step alone carries. **Verdict: load-bearing.**
+step alone carries. **Binding:** produces its own digest (this CLI's plan
+functions each call `reconstructOnboardingKickoffPlan`/its digest helper;
+not read line-by-line here, but consumed identically to steps 3/5 by the
+matching apply call). **Verdict: load-bearing.**
 
 ## 8. kickoff apply (`applyProjectOnboardingKickoffV4`)
 
 **Purpose:** the write step; for local repositories it additionally
 performs `correctSeededKickoffLanguage` and `initializeKickoffPoProfile` as
-side effects, all gated on the exact kickoff plan digest. **Why separately
-digest-bound:** same CAS reasoning as the other apply steps, plus it is the
-step that actually establishes the local PO profile — a side effect that
-must not fire on a stale or mismatched plan. **Verdict: load-bearing.**
+side effects, all gated on the exact kickoff plan digest
+(`expectedPlanSha256: planSha256` threaded into `applyOnboardingKickoff`).
+**Why separately digest-bound:** same CAS reasoning as the other apply
+steps, plus it is the step that actually establishes the local PO profile —
+a side effect that must not fire on a stale or mismatched plan. **Binding:**
+bound by the digest step 7 produced. **Verdict: load-bearing.**
 
 ## 9. promote plan (`planProjectOnboardingKickoffPromotionV4`)
 
@@ -122,12 +160,15 @@ with valid continuity (a stricter precondition than kickoff's
 shape (profile, four distinct paths) is materially different from
 kickoff's (goal, language); collapsing the two digests would let a
 promotion plan built for one feature id be applied against another's
-context. **Verdict: load-bearing.**
+context. **Binding:** produces its own digest, distinct from step 7's.
+**Verdict: load-bearing.**
 
 ## 10. promote apply (`applyProjectOnboardingKickoffPromotionV4`)
 
 **Purpose:** the write step for promotion, gated on the promotion plan's
-own digest — same CAS reasoning as every other apply step in this list.
+own digest (`expectedPlanSha256: planSha256` into
+`applyOnboardingKickoffPromotion`) — same CAS reasoning as every other
+apply step in this list. **Binding:** bound by the digest step 9 produced.
 **Verdict: load-bearing.**
 
 ## 11. submit-plan (`pipeline-state.mjs submit-plan`)
@@ -145,7 +186,11 @@ different actors at two different moments — submit is the agent proposing
 (`--profile`, no `--by` attribution requirement beyond the submitter), and
 the code explicitly refuses `approve-plan` unless "an exact current
 submitted plan" exists, i.e. `submit-plan` must have already run.
-**Verdict: load-bearing.** Collapsing submit+approve into one step would
+**Binding:** state-CAS-bound (`expectedStateSha256: sha256CanonicalJson(observed)`
+plus a `beforeCommit` re-validation of authority/profile against the
+current repository state) — a different mechanism from the plan-digest
+binding of steps 3–10, but the same fail-closed principle: no match, no
+write. **Verdict: load-bearing.** Collapsing submit+approve into one step would
 erase the audit distinction between "proposed" and "approved," which is the
 actual governance requirement this pair encodes, not a formality.
 
@@ -158,8 +203,9 @@ mandatory and non-blank — the code explicitly refuses an "unattributed
 approval" as exactly the kind of unauditable state change this CLI exists
 to prevent. **Why separately digest-bound:** it is the PO-attributed
 counterpart to step 11's agent-attributed submission; the two must remain
-distinguishable in the audit trail. **Verdict: load-bearing** (same
-reasoning as step 11).
+distinguishable in the audit trail. **Binding:** state-CAS-bound, same
+mechanism as step 11 (requires an exact current SUBMITTED plan state).
+**Verdict: load-bearing** (same reasoning as step 11).
 
 ## 13. set-phase (`pipeline-state.mjs set-phase`)
 
