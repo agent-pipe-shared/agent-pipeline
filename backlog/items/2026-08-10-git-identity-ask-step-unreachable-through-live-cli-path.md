@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.git-identity-ask-step-unreachable-through-live-cli-path
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-12
+closure_repository: self
+closure_commit: 476ca6472635f15186f23568eab3e1951a599213
+closure_evidence: backlog/items/2026-08-10-git-identity-ask-step-unreachable-through-live-cli-path.md
 created: 2026-08-10
 source: "GF-103's own final report (2026-08-10), self-disclosed as a caveat rather than papered over; confirmed independently by the Elephant reading applyLifecycle's 'portable' branch directly."
 due: 2026-08-17
@@ -85,3 +89,17 @@ original 2026-08-09/2026-08-10 git-identity bug closed.
 - **Decision:** proceed as recommended — dispatch to goldfish-deep now.
 - **Rationale:** PO, 2026-08-12: "so machen."
 - **Date:** 2026-08-12
+
+### Closed (NVA-BL-67B, 2026-08-12)
+
+Fixed and verified end to end (commit `476ca647`): `applyLifecycle()`'s
+portable branch now wraps both its return paths in
+`withPendingAuthorIdentityAsk()`, surfacing an additive
+`authorIdentityAction` field on the `apply-portable-seed --activate` CLI
+response itself, not just on a direct unit call. 116/116 pre-existing
+tests unchanged, one new end-to-end regression test proves the fix at the
+real CLI entry point (not just the inner function). Gated on all three of
+the portable-apply's own resting statuses, not just the common case, after
+Advisor review flagged that a root landing directly on a plugin-managed
+Codex runtime would otherwise skip past the first status and still
+reproduce the bug.

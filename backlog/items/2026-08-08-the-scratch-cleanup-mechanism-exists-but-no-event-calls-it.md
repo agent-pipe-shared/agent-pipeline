@@ -153,3 +153,45 @@ Two things follow that the original section did not state:
   scratch state) resolved per Elephant's recommendation: soft warning, not
   a hard block.
 - **Date:** 2026-08-12
+
+### Partial execution (NVA-BL-82, 2026-08-12)
+
+Committed (`c6bcc307`, `49c7b760`): (1) `guard-devplan.mjs` now exempts any
+write under `scratch/` unconditionally, before any manifest/lifecycle
+read — the real defect was ordering (scratch/ was exempt but not
+unconditional; a portable-State check could still block it first), not
+absence of an exemption. (2) The bootstrap-sweep half of the cleanup
+wiring is live in `pipeline-start-preflight.mjs`.
+
+**Not done, real open items, not stop-condition artifacts:**
+
+1. **The bind half is unreached** — nothing currently supplies a session
+   identity (`PIPELINE_SCRATCH_SESSION_ID`) to preflight, and the dispatch
+   correctly refused to mint one per-invocation (that would create orphan
+   descriptors no later sweep could ever match to a dead process — the
+   exact unbounded-growth failure this mechanism exists to prevent).
+   Needs the `pipeline-start` skill or a PO-approved `hooks.json`
+   SessionStart hook to pass the session's own UUID down.
+2. **Regression risk, should be fixed soon:** the sweep unconditionally
+   `mkdir`s `scratch/` on every bootstrap, even in a project where it
+   doesn't exist yet — this can dirty a consumer project's tree on first
+   bootstrap and trip `security-scan.mjs`'s dirty-tree refusal. Described
+   by the dispatch as a two-line fix (skip the sweep when `scratch/`
+   doesn't already exist).
+3. **Push-gate soft warning not built** (budget, not ambiguity) — a
+   precise handover exists: integration point is
+   `plugins/pipeline-core/hooks/guard-push.mjs` (append to the existing
+   advisory `message`, replace the all-green `exit(0)` around line 1800
+   with `emit(1, [advisory])`); needs a prerequisite read-only,
+   non-mutating observer added to `session-cleanup-recovery.mjs` first
+   (`planOrphanScratchRetirement` currently spawns `git` and creates the
+   descriptor directory as a side effect, which a push-gate read must not
+   do — mirror the existing `{ create: false }` pattern already used by
+   `recoveryJournalPaths`).
+4. Direction point 4 from this item's own original Proposal (exempt
+   `scratch/` in this repo's own manifests) is now moot — the exemption no
+   longer depends on manifest config at all.
+
+**Status:** left `open` — points 1-3 above are real remaining work,
+tracked together rather than re-splitting into new items since they share
+one dispatch's context.
