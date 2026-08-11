@@ -1368,6 +1368,13 @@ discipline paying for itself in the most direct way it can: a criterion this
 session almost called done twice, on real evidence both times, before it
 actually was.
 
+**GMW window closed** (`guard-maintenance-window.mjs close`, `status: closed`
+then `status: absent`): the PO-authorized punch list it was opened for (AR06g
+casOutcome, AR06h/i v1-journal, P-AC-08 wiring/approval-ledger/lock-reentrancy
+regression tests, TP-3 suite registration) is fully landed. Closed early
+rather than left to expire — reduces the exposure window, no work was still
+pending under it.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
