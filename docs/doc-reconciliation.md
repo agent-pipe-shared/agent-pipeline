@@ -47,6 +47,23 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 17af46cb2127ea9befb352e7bf431205334ca0c3 — 2026-08-11, range 06ec4e74..17af46cb, PO dispositions H-AC-12's release-planning/deploy-consumption subsystems
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`17af46cb`), touching three files under
+`specs/sprint-phoenix-epic/`: `evidence/acceptance-evidence-map.mjs`
+(H-AC-12 verdict comment/note updated, verdict tuple unchanged at
+`['partial', 'WP-H-AC12']`), a new dated snapshot
+`evidence/acceptance-evidence-map-20260811c.md` (regenerated via the
+generator's own `--out`, diffed against `-20260811b.md` to confirm exactly
+one table row changed and totals held at 127/26/3/0/1), and
+`design/class-b-multi-dispatch-plan.md` (an existing design artifact,
+extended with tonight's follow-up scoping). None of the three is manifest-
+tracked in `lifecycle.json` (checked: only the eight named root/design
+docs are), so no artifact-topology or digest-coupling constraint applies —
+unlike `acceptance.md`, which stayed untouched here.
+
 ## Candidate 06ec4e74911d8b7f3162fa582c2c9bc3aa8a60af — 2026-08-11, range f188d5eb..06ec4e74, four-question decision matrix summary
 
 - ADR-0012: checked, no change needed.
