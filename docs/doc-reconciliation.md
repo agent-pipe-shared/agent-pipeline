@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate ebdb00a58d54bf1266e4930f1d66fb108bf20144 — 2026-08-11, range 2d87c0ec..ebdb00a5, PX0-AC-13 Critic FAIL recorded (no status change)
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`ebdb00a5`), touching only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`'s
+`PX0-AC-13` POINTERS note (correcting the prior "just needs a Critic PASS"
+belief with the FAIL's real findings). No verdict/count change — stays
+`partial`.
+
 ## Candidate 2d87c0ec857f00425ec8853daf162c17872ea219 — 2026-08-11, range d276cdf1..2d87c0ec, task-tracking correction + PX0-AC-13 Critic dispatch checkpoint
 
 - ADR-0012: checked, no change needed.
