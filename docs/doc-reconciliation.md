@@ -47,6 +47,15 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 27b0390f2103cc351139101a041ba35f7e70afb6 — 2026-08-11, range 85953981..27b0390f, PX0-AC-06 stale-note correction
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`27b0390f`), touching only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`'s
+`PX0-AC-06` POINTERS note (correcting it to reflect AR06g/AR06h/AR06i, all
+landed earlier the same night; no verdict change, still `partial`).
+
 ## Candidate 8595398114decb9f4b9f47716d05adeaf3b4acb5 — 2026-08-11, range c3e270a1..85953981, GMW window closed note
 
 - ADR-0012: checked, no change needed.
