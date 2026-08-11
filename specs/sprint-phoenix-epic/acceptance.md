@@ -87,6 +87,35 @@ architecture prose or an implementation briefing.
   network-denied workspace sandbox, THE SYSTEM SHALL use the selected
   network-open/read-only host transport without consuming a known-failing
   sandbox attempt.
+
+  **Amendment (PO, 2026-08-12).** The second clause is satisfied
+  (`plugins/pipeline-core/scripts/ruleset-freshness.mjs`'s
+  `createWslHostFailClosedSpawn`, replacing the removed
+  `createWslHostAttestedSpawn`): under the `host-authorized-wsl` boundary,
+  the two network-delegated git calls now always return a synthetic
+  refusal without ever attempting to spawn a subprocess — no known-failing
+  sandbox attempt is consumed. The first clause is NOT satisfied by
+  Increment 1. `createWslHostAttestedSpawn` never delegated to a genuine
+  host-side process in the first place — two independent investigation
+  dispatches (2026-08-11/12) confirmed it only checked a local Codex
+  App-Server health observation, then spawned git in the calling process's
+  own sandbox; removing it deletes a misleading mechanism, not a working
+  one. A genuine host transport for this clause is not an unfinished
+  stub: it is fully designed and unbuilt —
+  `design/codex-wsl-freshness-host-action-family.md` §4 (the eight-member
+  closed action family), §6 (dispatch/rejection rules) and §11 (states
+  explicitly that implementing it would serve this criterion in full) —
+  but implementing it requires answering that design's own open §13
+  question (Option A/B/C on the threat model's "no repository mutation"
+  sentence) and repairing `ruleset-freshness-host.mjs`'s nine broken
+  imports (§1, out of scope there). This clause closes only once that
+  design is implemented and its own open question is answered — not
+  before, and not by another interim placeholder. Recorded in
+  `docs/state.md`'s 2026-08-12 checkpoint alongside this amendment;
+  `O-1`..`O-5` are a distinct, already-fully-assigned numbering scheme
+  belonging to `design/gmw-hgo-evidence-intake-into-the-human-ledger.md`
+  (H-AC-11/H-AC-12's design, unrelated to this criterion) — this clause
+  is not part of that scheme and is referenced here by criterion ID only.
 - **PX0-AC-14:** WHEN source/freshness diagnostics are rendered or persisted,
   THE SYSTEM SHALL omit tokens, credentials, home paths, cache paths, private
   remotes, SSH key paths, and account coordinates.
