@@ -24,6 +24,7 @@
 | pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-gate-verdict-need-not-survive-checkout | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
+| pipeline.backlog-ledger-baseline-migration-commit-unreachable | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
@@ -203,6 +204,6 @@
 
 ## Counts
 
-- open: 125
+- open: 126
 - in_progress: 22
 - closed: 48
