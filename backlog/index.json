@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "90a57de2a3bbae8f210ac7275e40ef05d3dd22bc5e2de75d8fa5ee240586a5e7"
+    "transitionHead": "82198d731eecda47f7b2677c369270140fdf9b6b49bf48e981d4db8b39483dc3"
   },
   "counts": {
-    "open": 126,
+    "open": 127,
     "in_progress": 22,
     "closed": 48
   },
@@ -192,6 +192,14 @@
       "closureRepository": "self",
       "closureCommit": "19c5bf0f2e2eb0835c1980edaacdae26316934f0",
       "closureEvidence": "backlog/evidence/2026-08-07-nova-gwm-backlog-fixes.md"
+    },
+    {
+      "id": "pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-11",
+      "source": "Critic review (F4, minor) of NVA-A8-4's real benchmark implementation, dispatched against commits 7132c5c7..de0b16fc, 2026-08-11."
     },
     {
       "id": "pipeline.blocking-push-gate-has-no-terminal-exception-boundary",
