@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 18acfb525c6db0c2b611e79f96c7896120a95e86 — 2026-08-11, range 97c069c9..18acfb52, correct the terminal-state overclaim
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`18acfb52`), touching only `docs/state.md`.
+Purely additive: a dated correction to the immediately preceding
+terminal-state section, distinguishing the four gate-blocked criteria
+measured today from the ~22 Class A/B/D `partial` criteria that remain
+genuinely open and agent-executable. No other governed path touched.
+
 ## Candidate 97c069c91febe14e0dc505bc2a4eb24315769d8c — 2026-08-11, range 680d971f..97c069c9, session terminal-state summary
 
 - ADR-0012: checked, no change needed.
