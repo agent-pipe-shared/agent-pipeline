@@ -29,6 +29,7 @@ import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { boundedOpaqueCopyCommand, renderProjectOnboardingAction } from "../lib/project-onboarding-v3.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
@@ -43,6 +44,7 @@ const PO_APPROVAL_DIRECTORY_ENV = "PIPELINE_PO_APPROVAL_DIRECTORY";
 function directorySourceLabel(source) {
   if (source === "environment") return `the ${PO_APPROVAL_DIRECTORY_ENV} environment variable`;
   if (source === "machine-plane") return "the machine-scoped configuration plane (poKeyDirectory)";
+  if (source === "repo-scope") return "this repository's own remembered PO key directory";
   return "--directory";
 }
 // GF-080 Gap A: the read side above (values.directory = plane.plane.poKeyDirectory) was
@@ -81,6 +83,120 @@ function persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies)
       updatedAt: new Date().toISOString(),
     };
   try { writePlane(next, dependencies); } catch { /* best-effort: never fails setup itself */ }
+}
+
+// PO-KEYDIR-01(A), 2026-08-11 PO decision (backlog/items/2026-08-10-po-key-directory-
+// default-should-be-repo-scoped-not-machine-wide.md): `setup`'s own auto-persist call
+// (runHumanApproval, below) now targets THIS repo-scoped store instead of the machine
+// plane -- persistExplicitDirectoryIntoMachinePlane above is kept exactly as it was,
+// simply no longer called from that one call site, purely so its own write primitive
+// stays defined and its READ side (parseHumanArgs, below) keeps working as the
+// third-tier fallback; nothing here removes or repurposes either. Same best-effort,
+// additive-only, never-clobber-a-different-value discipline as its sibling above: a
+// write failure here never fails `setup` itself, an already-identical value is a
+// silent no-op, and a different already-valid stored value is never silently
+// overwritten.
+const REPO_KEY_DIRECTORY_SCHEMA = "pipeline.po-key-directory.v1";
+function repoScopedKeyDirectoryPath(gitCommonDir) { return join(gitCommonDir, "agent-pipeline", "po-key-directory.json"); }
+
+/**
+ * Resolves this repository's Git common directory. Used both by the repo-scoped
+ * store above (fix (A)) and by the filename fingerprint below (fix (B)) -- ONE
+ * resolution primitive, not two competing ones. `dependencies.gitCommonDirFn
+ * (repository)` is the injectable seam a test uses to supply a distinct fake
+ * common dir per fixture repository; this is deliberately never routed through
+ * `dependencies.spawn`, which existing tests already override to observe/refuse
+ * the OpenSSL invocation inside signIntentIntoProof()/command() and must not
+ * also start receiving `git` argv.
+ *
+ * lib/human-guard-override.mjs implements the equivalent `physicalRoot`/
+ * `topology` pair, but it is a read-only reference for this script (never to be
+ * modified) and exports neither in an importable form -- so this is an
+ * intentional, narrow, local copy of the same pattern already duplicated a
+ * second time in lib/guard-maintenance-window.mjs (see that file's own
+ * "DUPLICATION NOTE"), not an oversight.
+ *
+ * Never throws; returns null whenever resolution is unavailable for any reason
+ * (not a Git checkout, `git` missing, a hostile/symlinked control path). A null
+ * result means different things to its two callers: fix (A)'s repo-scoped tier
+ * simply does not resolve (falls through to the machine plane, exactly as if
+ * this repository had never been set up); fix (B)'s fingerprint falls back to
+ * the repository root itself, still a deterministic, repository-distinguishing
+ * value on its own (see its call site in runHumanApproval).
+ */
+function resolveGitCommonDir(repository, dependencies) {
+  if (typeof dependencies.gitCommonDirFn === "function") return dependencies.gitCommonDirFn(repository);
+  let physical;
+  try {
+    physical = realpathSync(resolve(repository));
+    const info = lstatSync(physical);
+    if (!info.isDirectory() || info.isSymbolicLink()) return null;
+  } catch { return null; }
+  let result;
+  try { result = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { cwd: physical, encoding: "utf8", shell: false, timeout: 5000 }); }
+  catch { return null; }
+  if (result?.status !== 0 || result?.error) return null;
+  const raw = String(result.stdout ?? "").trim();
+  if (raw === "") return null;
+  try {
+    const common = realpathSync(isAbsolute(raw) ? raw : resolve(physical, raw));
+    const info = lstatSync(common);
+    if (!info.isDirectory() || info.isSymbolicLink()) return null;
+    return common;
+  } catch { return null; }
+}
+
+/** Three-valued, never-throwing reader mirroring readMachinePlane()'s own
+ * shape/discipline (status: "absent" | "invalid" | "valid"), scoped to exactly
+ * one field instead of the machine plane's wider schema. */
+function readRepoKeyDirectory(gitCommonDir, dependencies) {
+  const path = repoScopedKeyDirectoryPath(gitCommonDir);
+  const exists = dependencies.existsSyncFn ?? existsSync;
+  if (!exists(path)) return { status: "absent", directory: null };
+  const read = dependencies.readFileSyncFn ?? readFileSync;
+  let raw;
+  try { raw = read(path, "utf8"); } catch { return { status: "invalid", directory: null, code: "RKD-UNREADABLE" }; }
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { return { status: "invalid", directory: null, code: "RKD-MALFORMED" }; }
+  if (!own(parsed, ["schema", "poKeyDirectory", "updatedAt"]) || parsed.schema !== REPO_KEY_DIRECTORY_SCHEMA
+    || !text(parsed.poKeyDirectory) || !isAbsolute(parsed.poKeyDirectory) || !text(parsed.updatedAt)) {
+    return { status: "invalid", directory: null, code: "RKD-SHAPE" };
+  }
+  return { status: "valid", directory: parsed.poKeyDirectory };
+}
+
+/** The directory is created owner-private (0700, mirroring lib/human-guard-
+ * override.mjs's secureDirectory() convention this script cannot import -- see
+ * resolveGitCommonDir's own doc comment) and the file itself owner-private
+ * (0600), matching every other artifact this script writes. */
+function writeRepoKeyDirectory(gitCommonDir, value, dependencies) {
+  const dir = join(gitCommonDir, "agent-pipeline");
+  const mkdir = dependencies.mkdirSyncFn ?? mkdirSync;
+  mkdir(dir, { recursive: true, mode: 0o700 });
+  const chmod = dependencies.chmodSyncFn ?? chmodSync;
+  try { chmod(dir, 0o700); } catch { /* best-effort hardening only */ }
+  const write = dependencies.writeFileSyncFn ?? writeFileSync;
+  write(repoScopedKeyDirectoryPath(gitCommonDir), `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+}
+
+function resolveRepoScopedDirectory(repoRoot, dependencies) {
+  const gitCommonDir = resolveGitCommonDir(resolve(repoRoot), dependencies);
+  if (gitCommonDir === null) return { status: "absent", directory: null };
+  return (dependencies.readRepoKeyDirectoryFn ?? readRepoKeyDirectory)(gitCommonDir, dependencies);
+}
+
+function persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies) {
+  if (args.directorySource !== "flag") return;
+  if (gitCommonDir === null) return; // best-effort: no git-common-dir resolved, nothing to persist into
+  const read = dependencies.readRepoKeyDirectoryFn ?? readRepoKeyDirectory;
+  const write = dependencies.writeRepoKeyDirectoryFn ?? writeRepoKeyDirectory;
+  const current = read(gitCommonDir, dependencies);
+  if (current.status === "invalid") return; // never silently repair a corrupt store here (mirrors AC-12's discipline)
+  if (current.status === "valid" && current.directory === directory) return;
+  if (current.status === "valid" && text(current.directory)) return; // never overwrite a different already-valid value
+  try {
+    write(gitCommonDir, { schema: REPO_KEY_DIRECTORY_SCHEMA, poKeyDirectory: directory, updatedAt: new Date().toISOString() }, dependencies);
+  } catch { /* best-effort: never fails setup itself */ }
 }
 // Recorded as non-enumerable: pre-existing exact-shape assertions elsewhere
 // (lib/threat-model-approval-request.test.mjs) compare the whole parseHumanArgs()/
@@ -177,35 +293,56 @@ export function parseHumanArgs(argv, dependencies = {}) {
   // must not see a new own-enumerable field on this object.
   Object.defineProperty(values, "keyReferenceSupplied", { value: supplied.has("keyReference"), enumerable: false, configurable: true });
   if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent"]).has(command)) return { error: USAGE };
-  // SETUP-2b/AC-11: precedence, in this exact order. An explicit --directory always
-  // wins and is used exactly as before, never even consulting the machine plane. Absent
-  // that, the machine-scoped configuration plane's own poKeyDirectory (SS2/SS6a of
-  // nova-setup-bootstrap.md); absent that in turn, the PIPELINE_PO_APPROVAL_DIRECTORY
-  // environment variable, exactly as before this task. Whichever route resolves a
-  // value, that value then runs through the identical isAbsolute check below and,
-  // downstream, the identical externalDirectory() safety checks (AC-14) -- there is no
-  // separate, weaker path for a plane- or environment-sourced value.
+  // PO-KEYDIR-01(A)/SETUP-2b/AC-11: precedence, in this exact order. An explicit
+  // --directory always wins and is used exactly as before, never even consulting
+  // any of the tiers below. Absent that, this repository's OWN remembered directory
+  // (the repo-scoped store, below) -- absent that, the machine-scoped configuration
+  // plane's own poKeyDirectory (SS2/SS6a of nova-setup-bootstrap.md); absent that in
+  // turn, the PIPELINE_PO_APPROVAL_DIRECTORY environment variable, exactly as before
+  // this task. Whichever route resolves a value, that value then runs through the
+  // identical isAbsolute check below and, downstream, the identical
+  // externalDirectory() safety checks (AC-14) -- there is no separate, weaker path
+  // for a repo-scope-, plane- or environment-sourced value.
   if (supplied.has("directory")) {
     setDirectorySource(values, "flag");
   } else {
-    const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
-    // AC-12: an invalid or unreadable plane is a reported failure, never silently
-    // treated as absent -- it must NOT fall through to the environment variable as
-    // though nothing were there. An ABSENT plane (the ordinary case: a machine that
-    // has not been set up yet) falls through normally and silently, exactly as before.
-    if (plane.status === "invalid") {
-      return { error: `machine-scoped configuration plane is invalid (${plane.code}): fix or remove ~/.agent-pipeline/machine.json, or pass --directory explicitly.` };
+    // The repo-scoped tier needs values.repoRoot to compute a git-common-dir, but the
+    // authoritative repoRoot validation stays exactly where it always was (below,
+    // unchanged) -- this inline check only ever SKIPS the tier when repoRoot is not
+    // yet a usable absolute path; it never duplicates or preempts that check's own
+    // error text or shape.
+    const repoScope = (text(values.repoRoot) && isAbsolute(values.repoRoot))
+      ? resolveRepoScopedDirectory(values.repoRoot, dependencies)
+      : { status: "absent", directory: null };
+    // Mirrors AC-12's discipline one tier up: an invalid repo-scoped store is a
+    // reported failure, never silently treated as absent -- it must NOT fall
+    // through to the machine plane or environment as though nothing were there.
+    if (repoScope.status === "invalid") {
+      return { error: `this repository's own remembered PO key-directory store is invalid (${repoScope.code}): fix or remove it, or pass --directory explicitly.` };
     }
-    if (plane.status === "valid" && text(plane.plane?.poKeyDirectory)) {
-      values.directory = plane.plane.poKeyDirectory;
-      setDirectorySource(values, "machine-plane");
+    if (repoScope.status === "valid" && text(repoScope.directory)) {
+      values.directory = repoScope.directory;
+      setDirectorySource(values, "repo-scope");
     } else {
-      const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
-      if (text(fromEnv)) { values.directory = fromEnv; setDirectorySource(values, "environment"); }
+      const plane = (dependencies.readMachinePlaneFn ?? readMachinePlane)(dependencies);
+      // AC-12: an invalid or unreadable plane is a reported failure, never silently
+      // treated as absent -- it must NOT fall through to the environment variable as
+      // though nothing were there. An ABSENT plane (the ordinary case: a machine that
+      // has not been set up yet) falls through normally and silently, exactly as before.
+      if (plane.status === "invalid") {
+        return { error: `machine-scoped configuration plane is invalid (${plane.code}): fix or remove ~/.agent-pipeline/machine.json, or pass --directory explicitly.` };
+      }
+      if (plane.status === "valid" && text(plane.plane?.poKeyDirectory)) {
+        values.directory = plane.plane.poKeyDirectory;
+        setDirectorySource(values, "machine-plane");
+      } else {
+        const fromEnv = process.env[PO_APPROVAL_DIRECTORY_ENV];
+        if (text(fromEnv)) { values.directory = fromEnv; setDirectorySource(values, "environment"); }
+      }
     }
   }
   if (!text(values.directory) || !isAbsolute(values.directory)) {
-    return { error: `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, configure poKeyDirectory in the machine-scoped configuration plane, or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides the plane, which overrides the environment variable).` };
+    return { error: `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, let this repository remember one (persisted automatically by 'setup --directory'), configure poKeyDirectory in the machine-scoped configuration plane, or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides this repository's own remembered value, which overrides the machine-scoped plane, which overrides the environment variable).` };
   }
   if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
   // FIXTURE-2: --human-name is validated where the authority directory's state is known
@@ -420,6 +557,9 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     };
   }
   const repository = resolve(args.repoRoot);
+  // PO-KEYDIR-01: resolved once and reused by both fixes below -- fix (A)'s setup
+  // auto-persist target and fix (B)'s filename fingerprint segment.
+  const gitCommonDir = resolveGitCommonDir(repository, dependencies);
   const directory = externalDirectory(repository, resolve(args.directory), {
     create: args.command === "setup" || args.command === "prepare" || args.command === "prepare-critical" || args.command === "authorize-critical",
     source: directorySourceLabel(args.directorySource),
@@ -428,7 +568,18 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   if (critical && (args.command === "prepare-critical" || args.command === "authorize-critical") && !text(args.featureId)) fail("critical approval requires a feature id");
   const featureId = args.featureId ?? "cyb-4";
   if (!/^[a-z][a-z0-9-]{0,63}$/u.test(featureId)) fail("feature id is invalid");
-  const suffix = critical ? `-critical-${args.kind}` : (featureId === "cyb-4" ? "" : `-${featureId}`);
+  const featureSuffix = critical ? `-critical-${args.kind}` : (featureId === "cyb-4" ? "" : `-${featureId}`);
+  // PO-KEYDIR-01(B) (backlog/items/2026-08-11-shared-external-po-signing-directory-
+  // lets-an-unrelated-project-overwrite-a-proof.md): every per-transaction artifact
+  // filename below carries this repository-fingerprint segment as an ADDITION to the
+  // suffix shape above, never a replacement of it -- two different repositories
+  // sharing one external directory can no longer collide. Reuses
+  // derivePoGateRepositoryFingerprint() exactly as it already exists
+  // (lib/po-gate-authority.mjs), never a second fingerprint scheme; only its first 12
+  // hex characters are used -- the full 64-char digest would make every filename
+  // unwieldy for no added disambiguation value here.
+  const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: gitCommonDir ?? repository, primaryRoot: repository }).slice(0, 12);
+  const suffix = `-${repositoryFingerprint}${featureSuffix}`;
   const paths = {
     request: artifactPath(directory, `request${suffix}.json`),
     privateKey: artifactPath(directory, "po-private.pem"),
@@ -452,7 +603,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
       const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
-      persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
+      persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: true };
     }
     if (present.privateKey && present.publicKey && present.authority) {
@@ -475,7 +626,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
         }
         const upgraded = localAuthority(publicKey, authority.keyReference, args.humanName);
         write(paths.authority, `${JSON.stringify(upgraded, null, 2)}\n`, { mode: 0o600 });
-        persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
+        persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
         return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority: upgraded, recovered: true };
       }
       // GF-104: a named record already exists. Explicit --human-name/--key-reference
@@ -490,7 +641,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       if (humanNameMismatch || keyReferenceMismatch) {
         fail("a PO authority record already exists under a different name/key-reference than supplied; changing an established identity is not something setup does silently -- rerun without --human-name/--key-reference to keep the existing record, or remove the existing authority files first if a deliberate rebind is intended.");
       }
-      persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
+      persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false };
     }
     if (present.privateKey || present.publicKey || present.authority) fail("partial PO authority exists; refusing to overwrite it");
@@ -498,7 +649,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     command("openssl", ["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], dependencies);
     command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
     const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
-    persistExplicitDirectoryIntoMachinePlane(args, directory, dependencies);
+    persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority };
   }
   if (args.command === "authorize-critical") {

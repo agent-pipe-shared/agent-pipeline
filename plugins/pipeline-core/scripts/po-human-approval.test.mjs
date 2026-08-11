@@ -32,7 +32,7 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -41,6 +41,7 @@ import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 // Namespace import ON PURPOSE (same reason as in lib/guard-maintenance-window.test.mjs):
 // a not-yet-existing named export must fail the checks that use it, not ESM linking for
 // the whole suite.
@@ -300,12 +301,27 @@ function criticalArgv(command, dirs, { kind = "push", subjectSha256, expiresAt, 
   ];
 }
 
+/**
+ * PO-KEYDIR-01(B): mirrors production's own fallback exactly (runHumanApproval's
+ * `gitCommonDir ?? repository`) -- these fixture repositories are plain tmpdirs, not
+ * real Git checkouts, so `resolveGitCommonDir` (po-human-approval.mjs) always returns
+ * null for them and the fingerprint falls back to the repository root itself for
+ * both `gitCommonDir` and `primaryRoot`. Never hardcodes a hex value: computed the
+ * same way production computes it, from the same derivePoGateRepositoryFingerprint()
+ * this script reuses.
+ */
+function repositoryFingerprintFor(repoRoot) {
+  const repository = resolve(repoRoot);
+  return derivePoGateRepositoryFingerprint({ gitCommonDir: repository, primaryRoot: repository }).slice(0, 12);
+}
+
 function criticalArtifacts(dirs, kind = "push") {
+  const fp = repositoryFingerprintFor(dirs.repoRoot);
   return {
-    request: join(dirs.directory, `request-critical-${kind}.json`),
-    proof: join(dirs.directory, `proof-critical-${kind}.json`),
-    intent: join(dirs.directory, `intent-critical-${kind}.txt`),
-    signature: join(dirs.directory, `signature-critical-${kind}.bin`),
+    request: join(dirs.directory, `request-${fp}-critical-${kind}.json`),
+    proof: join(dirs.directory, `proof-${fp}-critical-${kind}.json`),
+    intent: join(dirs.directory, `intent-${fp}-critical-${kind}.txt`),
+    signature: join(dirs.directory, `signature-${fp}-critical-${kind}.bin`),
   };
 }
 
@@ -333,8 +349,9 @@ test("authorize-critical prepares and signs in ONE invocation, and the proof is 
     // request, the exact digest bytes handed to OpenSSL, and the proof. The digest that
     // was signed is read from the request THIS invocation wrote -- no second file, no
     // second digest computation, no window between the two steps.
+    const fp = repositoryFingerprintFor(dirs.repoRoot);
     assert.deepEqual(writes.map((entry) => basename(entry.path)), [
-      "request-critical-push.json", "intent-critical-push.txt", "proof-critical-push.json", "signer-critical-push.json",
+      `request-${fp}-critical-push.json`, `intent-${fp}-critical-push.txt`, `proof-${fp}-critical-push.json`, `signer-${fp}-critical-push.json`,
     ]);
     const request = JSON.parse(writes[0].data);
     assert.equal(writes[1].data, request.approvalIntent.sha256, "the bytes signed by OpenSSL must be this invocation's own intent digest");
@@ -1062,78 +1079,185 @@ test("AC-11/AC-14: a full sign-intent ceremony resolved entirely from the machin
 });
 
 /* ------------------------------------------------------------------ *
- * GF-080 Gap A: setup's own WRITE side of the machine plane's
- * poKeyDirectory. Reading it back (AC-11..AC-14 above) was already wired
- * in; nothing ever populated it outside a hand-authored fixture until now.
+ * PO-KEYDIR-01(A), 2026-08-11 PO decision (backlog/items/2026-08-10-po-key-
+ * directory-default-should-be-repo-scoped-not-machine-wide.md): `setup`'s
+ * auto-persist call now targets a NEW repo-scoped store instead of the
+ * machine plane (superseding GF-080 Gap A's original tests below, which
+ * asserted the OLD machine-plane write target this task deliberately
+ * changes). `dependencies.gitCommonDirFn` supplies a distinct fake
+ * git-common-dir per fixture repository, exactly like the production seam
+ * `resolveGitCommonDir` (po-human-approval.mjs) exposes -- these fixture
+ * repositories are plain tmpdirs, not real Git checkouts.
  * ------------------------------------------------------------------ */
 
-test("GF-080 Gap A: setup with an explicit --directory persists it into the machine plane, and a later command in a DIFFERENT project resolves it without repeating --directory", () => {
+/** A fresh, writable fake git-common-dir fixture (stands in for `.git` for the
+ * repo-scoped store's own location, `<gitCommonDir>/agent-pipeline/
+ * po-key-directory.json`). Never a real `.git`: injected only via
+ * `dependencies.gitCommonDirFn`, which the production code never routes
+ * through real `git`. */
+function repoScopeCommonDirFixture() {
+  return mkdtempSync(join(tmpdir(), "po-human-approval-repo-scope-common-"));
+}
+
+function repoScopeStorePath(gitCommonDir) {
+  return join(gitCommonDir, "agent-pipeline", "po-key-directory.json");
+}
+
+test("PO-KEYDIR-01(A): setup with an explicit --directory persists it into the REPO-SCOPED store (not the machine plane); a later command in the SAME repo resolves it without repeating --directory; the SAME command in a DIFFERENT repo (different git-common-dir) does NOT inherit it", () => {
   const dirs = fixtureDirs();
   const home = noMachinePlaneHomeFixture();
   const otherRepo = mkdtempSync(join(tmpdir(), "po-gapA-other-repo-"));
+  const commonA = repoScopeCommonDirFixture();
+  const commonOther = repoScopeCommonDirFixture();
   try {
     keyFixture(dirs.directory);
+    const repoRootA = resolve(dirs.repoRoot);
+    const gitCommonDirFn = (repository) => (repository === repoRootA ? commonA : commonOther);
     const setupResult = runHumanApproval(
       ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory],
-      { homedirFn: () => home },
+      { homedirFn: () => home, gitCommonDirFn },
     );
     assert.equal(setupResult.ok, true);
 
+    // The machine plane must stay untouched: setup's auto-persist no longer targets it.
     const plane = readMachinePlane({ homedirFn: () => home });
-    assert.equal(plane.status, "valid");
-    assert.equal(plane.plane.poKeyDirectory, realpathSync(dirs.directory), "setup must persist its explicit --directory into the machine plane");
+    assert.equal(plane.status, "absent", "setup with an explicit --directory must no longer auto-persist into the machine plane");
 
-    // A LATER command, in a DIFFERENT project (a different --repo-root), omitting
-    // --directory entirely, must resolve it from the machine plane and actually work.
-    const intentSha256 = createHash("sha256").update("gap-a-later-command-fixture").digest("hex");
-    const result = runHumanApproval(
-      ["sign-intent", "--repo-root", otherRepo, "--intent-sha256", intentSha256],
-      { readConfirmation: () => "approve", homedirFn: () => home },
+    // Repo A's own repo-scoped store now carries it.
+    const stored = JSON.parse(readFileSync(repoScopeStorePath(commonA), "utf8"));
+    assert.equal(stored.poKeyDirectory, realpathSync(dirs.directory), "setup must persist its explicit --directory into THIS repository's repo-scoped store");
+
+    // A LATER command in the SAME repo, omitting --directory, resolves it.
+    const intentSha256Same = createHash("sha256").update("po-keydir-01-a-same-repo-fixture").digest("hex");
+    const resultSame = runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--intent-sha256", intentSha256Same],
+      { readConfirmation: () => "approve", homedirFn: () => home, gitCommonDirFn },
     );
-    assert.equal(result.ok, true);
-    assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(resultSame.ok, true);
+    assert.equal(resultSame.code, "PO-HUMAN-SIGN-INTENT-READY");
+
+    // The SAME command in a DIFFERENT repo (its own, empty repo-scoped store; no
+    // machine plane; no env) must NOT inherit it -- must fail closed instead.
+    assert.equal(existsSync(repoScopeStorePath(commonOther)), false, "a different repository's repo-scoped store must never be populated by another repository's setup");
+    const otherError = thrown(() => runHumanApproval(
+      ["sign-intent", "--repo-root", otherRepo, "--intent-sha256", intentSha256Same],
+      { homedirFn: () => home, gitCommonDirFn },
+    ));
+    assert.ok(otherError, "a different repository must never silently resolve another repository's remembered directory");
+    assert.match(otherError.message, /approval directory is required/u);
   } finally {
     cleanup(dirs);
     rmSync(home, { recursive: true, force: true });
     rmSync(otherRepo, { recursive: true, force: true });
+    rmSync(commonA, { recursive: true, force: true });
+    rmSync(commonOther, { recursive: true, force: true });
   }
 });
 
-test("GF-080 Gap A: a subsequent setup --directory <other-dir> never silently overwrites an already-populated, different poKeyDirectory", () => {
+test("PO-KEYDIR-01(A): a subsequent setup --directory <other-dir> never silently overwrites an already-populated, different REPO-SCOPED poKeyDirectory", () => {
   const dirs = fixtureDirs();
   const otherDirs = fixtureDirs();
-  const home = machinePlaneHomeFixture(dirs.directory);
+  const common = repoScopeCommonDirFixture();
   try {
-    keyFixture(otherDirs.directory);
-    const result = runHumanApproval(
-      ["setup", "--repo-root", otherDirs.repoRoot, "--directory", otherDirs.directory],
-      { homedirFn: () => home },
+    keyFixture(dirs.directory);
+    const gitCommonDirFn = () => common;
+    const first = runHumanApproval(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory],
+      { gitCommonDirFn },
     );
-    assert.equal(result.ok, true, "setup itself must still succeed even though the plane write is skipped");
+    assert.equal(first.ok, true);
+    const afterFirst = JSON.parse(readFileSync(repoScopeStorePath(common), "utf8"));
+    assert.equal(afterFirst.poKeyDirectory, realpathSync(dirs.directory));
 
-    const plane = readMachinePlane({ homedirFn: () => home });
-    assert.equal(plane.status, "valid");
-    assert.equal(plane.plane.poKeyDirectory, dirs.directory, "a different, already-valid poKeyDirectory must never be silently overwritten");
+    keyFixture(otherDirs.directory);
+    const second = runHumanApproval(
+      ["setup", "--repo-root", otherDirs.repoRoot, "--directory", otherDirs.directory],
+      { gitCommonDirFn },
+    );
+    assert.equal(second.ok, true, "setup itself must still succeed even though the repo-scoped store write is skipped");
+
+    const stored = JSON.parse(readFileSync(repoScopeStorePath(common), "utf8"));
+    assert.equal(stored.poKeyDirectory, realpathSync(dirs.directory), "a different, already-valid repo-scoped poKeyDirectory must never be silently overwritten");
   } finally {
     cleanup(dirs);
     cleanup(otherDirs);
-    rmSync(home, { recursive: true, force: true });
+    rmSync(common, { recursive: true, force: true });
   }
 });
 
-test("GF-080 Gap A: a plane- or environment-sourced --directory is never written back (nothing new to persist)", () => {
+test("PO-KEYDIR-01(A): a repo-scope-, plane- or environment-sourced --directory is never written back into the repo-scoped store either (nothing new to persist)", () => {
   const dirs = fixtureDirs();
   const home = machinePlaneHomeFixture(dirs.directory);
+  const common = repoScopeCommonDirFixture();
   try {
     keyFixture(dirs.directory);
+    const gitCommonDirFn = () => common;
     const before = readMachinePlane({ homedirFn: () => home });
-    const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot], { homedirFn: () => home });
+    const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot], { homedirFn: () => home, gitCommonDirFn });
     assert.equal(result.ok, true);
     const after = readMachinePlane({ homedirFn: () => home });
     assert.deepEqual(after, before, "a directory resolved FROM the plane must not trigger a redundant write back to it");
+    assert.equal(existsSync(repoScopeStorePath(common)), false, "a plane-sourced directory must not be written into the repo-scoped store either");
   } finally {
     cleanup(dirs);
     rmSync(home, { recursive: true, force: true });
+    rmSync(common, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * PO-KEYDIR-01(A): precedence order, proved at each boundary --
+ * --directory (flag) > repo-scope > machine plane > environment variable.
+ * The last boundary (machine plane > environment) is unchanged behaviour
+ * already covered above (AC-11: "the machine plane's poKeyDirectory
+ * resolves ... and wins over the environment variable").
+ * ------------------------------------------------------------------ */
+
+test("PO-KEYDIR-01(A): an explicit --directory still overrides a present, valid repo-scoped value", () => {
+  const dirs = fixtureDirs();
+  const otherDirectory = mkdtempSync(join(tmpdir(), "po-repo-scope-unused-"));
+  const common = repoScopeCommonDirFixture();
+  try {
+    const gitCommonDirFn = () => common;
+    keyFixture(otherDirectory);
+    const setupResult = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", otherDirectory], { gitCommonDirFn });
+    assert.equal(setupResult.ok, true);
+
+    const parsed = parseHumanArgs(
+      ["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"],
+      { gitCommonDirFn },
+    );
+    assert.equal(parsed.error, undefined);
+    assert.equal(parsed.directory, dirs.directory);
+    assert.equal(parsed.directorySource, "flag");
+  } finally {
+    cleanup(dirs);
+    rmSync(otherDirectory, { recursive: true, force: true });
+    rmSync(common, { recursive: true, force: true });
+  }
+});
+
+test("PO-KEYDIR-01(A): a repo-scoped value resolves the directory when --directory is absent, and wins over a present, valid machine plane", () => {
+  const dirs = fixtureDirs();
+  const home = machinePlaneHomeFixture("/should/never/be/read/machine-plane-directory");
+  const common = repoScopeCommonDirFixture();
+  try {
+    const gitCommonDirFn = () => common;
+    keyFixture(dirs.directory);
+    const setupResult = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { homedirFn: () => home, gitCommonDirFn });
+    assert.equal(setupResult.ok, true);
+
+    const parsed = parseHumanArgs(
+      ["setup", "--repo-root", dirs.repoRoot, "--human-name", "Test Operator"],
+      { homedirFn: () => home, gitCommonDirFn },
+    );
+    assert.equal(parsed.error, undefined);
+    assert.equal(parsed.directory, realpathSync(dirs.directory));
+    assert.equal(parsed.directorySource, "repo-scope");
+  } finally {
+    cleanup(dirs);
+    rmSync(home, { recursive: true, force: true });
+    rmSync(common, { recursive: true, force: true });
   }
 });
 
@@ -1284,6 +1408,65 @@ test("GF-112: setup still fails with the original message for a legacy-shape rec
   } finally {
     cleanup(dirs);
     rmSync(home, { recursive: true, force: true });
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * PO-KEYDIR-01(B), 2026-08-11 PO decision (backlog/items/2026-08-11-shared-
+ * external-po-signing-directory-lets-an-unrelated-project-overwrite-a-proof.md):
+ * two DIFFERENT repositories sharing one external directory (the actual
+ * incident) must get DISJOINT request/proof/signature/intent/signer filenames,
+ * while the shared private/public key and trust-policy filenames stay
+ * unsuffixed.
+ * ------------------------------------------------------------------ */
+
+test("PO-KEYDIR-01(B): two repositories sharing one external directory and the same feature id get DISJOINT request/proof/signer filenames (repository-fingerprint segment), while the shared key/authority filenames stay UNCHANGED and usable by both", () => {
+  const directory = mkdtempSync(join(tmpdir(), "po-fingerprint-shared-external-"));
+  const dirsA = { repoRoot: mkdtempSync(join(tmpdir(), "po-fingerprint-repo-a-")), directory };
+  const dirsB = { repoRoot: mkdtempSync(join(tmpdir(), "po-fingerprint-repo-b-")), directory };
+  writeFileSync(join(dirsA.repoRoot, PLAN), "# plan A\n");
+  writeFileSync(join(dirsA.repoRoot, SPEC), "# spec A\n");
+  writeFileSync(join(dirsB.repoRoot, PLAN), "# plan B\n");
+  writeFileSync(join(dirsB.repoRoot, SPEC), "# spec B\n");
+  try {
+    const { authority } = keyFixture(directory); // ONE shared key pair for both repositories
+    const expiresAt = futureExpiry();
+    const subjectSha256 = subjectDigest("po-keydir-01-b-fixture");
+    const dependencies = { observeCandidate: () => ({ ...CANDIDATE }), readConfirmation: () => "approve" };
+
+    const resultA = runHumanApproval(criticalArgv("authorize-critical", dirsA, { subjectSha256, expiresAt }), dependencies);
+    const resultB = runHumanApproval(criticalArgv("authorize-critical", dirsB, { subjectSha256, expiresAt }), dependencies);
+    assert.equal(resultA.ok, true);
+    assert.equal(resultB.ok, true);
+
+    const fpA = repositoryFingerprintFor(dirsA.repoRoot);
+    const fpB = repositoryFingerprintFor(dirsB.repoRoot);
+    assert.notEqual(fpA, fpB, "two different repository roots must fingerprint differently");
+
+    for (const name of ["request", "proof", "signer"]) {
+      const pathA = join(directory, `${name}-${fpA}-critical-push.json`);
+      const pathB = join(directory, `${name}-${fpB}-critical-push.json`);
+      assert.notEqual(pathA, pathB);
+      assert.equal(existsSync(pathA), true, `${name} for repo A must exist at its fingerprinted path`);
+      assert.equal(existsSync(pathB), true, `${name} for repo B must exist at its fingerprinted path`);
+    }
+    // Both authorize-critical calls above ran end to end without the second
+    // overwriting the first's request/intent mid-flight -- proving no collision.
+    const requestA = JSON.parse(readFileSync(join(directory, `request-${fpA}-critical-push.json`), "utf8"));
+    const requestB = JSON.parse(readFileSync(join(directory, `request-${fpB}-critical-push.json`), "utf8"));
+    assert.notEqual(requestA.approvalIntent.sha256, requestB.approvalIntent.sha256);
+
+    // The shared private/public key and trust-policy filenames carry NO fingerprint
+    // segment and are the SAME, single key pair both repositories just used.
+    assert.equal(existsSync(join(directory, "po-private.pem")), true);
+    assert.equal(existsSync(join(directory, "po-public.pem")), true);
+    assert.equal(existsSync(join(directory, "trust-policy.json")), true);
+    assert.equal(resultA.signer.publicKeySha256, authority.publicKeySha256);
+    assert.equal(resultB.signer.publicKeySha256, authority.publicKeySha256);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(dirsA.repoRoot, { recursive: true, force: true });
+    rmSync(dirsB.repoRoot, { recursive: true, force: true });
   }
 });
 
