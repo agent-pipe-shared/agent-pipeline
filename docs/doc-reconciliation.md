@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 76d9ba1d18afc47cd56b00362de447f974d151d1 — 2026-08-12, range 0debe151..76d9ba1d, PX0-AC-05 Critic model-tier mistake recorded, re-dispatched
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`76d9ba1d`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 5375ace64ff8c8d763aafc226b2f7b0bcdc07b15 — 2026-08-12, range 3452c5db..5375ace6, PX0-AC-13 resolution + PX0-AC-05 AR05g landing recorded in evidence map
 
 - ADR-0045: checked, no change needed.
