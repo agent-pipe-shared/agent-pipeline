@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 5a2e339759b82fd1f3eb1b5cd0f71748ef65071e — 2026-08-11, range 27b0390f..5a2e3397, next-action checkpoint (PX0-AC-03/05/06/13 Critic-PASS opportunity)
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`5a2e3397`), touching only `docs/state.md`
+(additive checkpoint entry appended after the GMW-close note, append-only
+discipline preserved — nothing rewritten). No other governed path touched.
+
 ## Candidate 27b0390f2103cc351139101a041ba35f7e70afb6 — 2026-08-11, range 85953981..27b0390f, PX0-AC-06 stale-note correction
 
 - ADR-0045: checked, no change needed.
