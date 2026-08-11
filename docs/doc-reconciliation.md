@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 60b324ad8173ae3bc612ac637bb2bee86ab49cf5 — 2026-08-11, range 5b0278d7..60b324ad, second Critic round + fix-dispatch checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers `5d1705d6` (doc-reconciliation entry for the prior candidate, touches
+only this file), `61203fdb` (threat-model fix + new backlog item, neither
+path ADR-`Governs:`-listed), `d002fd8e` (backlog ledger reconciliation,
+not ADR-governed), `7dffa72e` (new test coverage, not ADR-governed), and
+`60b324ad` itself (`docs/state.md`, purely additive: Critic re-review
+findings F1-F6, the four fix-dispatch outcomes, and the collapsed
+`--scope TP-3,TP-5` signature punch list). No other governed path touched;
+ADR-0045/0040/0056/0058 not implicated (no `specs/<id>/`, `pipeline.user.yaml`,
+`setup.mjs`, or guard-hook path changed in this range).
+
 ## Candidate 5b0278d76bb8ac914b80b003ca4073d4cfc03015 — 2026-08-11, range 89570dfc..5b0278d7, docs-only handover checkpoint
 
 - ADR-0012: checked, no change needed.
