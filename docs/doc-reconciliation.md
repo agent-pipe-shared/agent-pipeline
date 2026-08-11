@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 2b9cfdad5e2fb534d0a589916d2d2d1214c9c615 — 2026-08-12, range 1739d1c6..2b9cfdad, PX0-AC-05 Critic FAIL recorded, GMW window closed
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`2b9cfdad`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 76d9ba1d18afc47cd56b00362de447f974d151d1 — 2026-08-12, range 0debe151..76d9ba1d, PX0-AC-05 Critic model-tier mistake recorded, re-dispatched
 
 - ADR-0012: checked, no change needed.
