@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 26c2d254b73dc3688891a4dbe055b617907cf814 — 2026-08-12, range 19badaa1..26c2d254, PX0-AC-13 evidence-map note updated with REMOVEATTESTATION finding
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`26c2d254`), touching only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs` (a prose
+note extension inside an existing POINTERS entry; no schema/topology
+change). File placement, naming and directory shape are unaffected and
+remain within the canonical `specs/<id>/` topology this ADR governs.
+
 ## Candidate 19badaa1b44de2c29953368559e62ba46cd65115 — 2026-08-12, range 6ba3238d..19badaa1, REMOVEATTESTATION self-stop + third PX0-AC-13 decision point recorded
 
 - ADR-0012: checked, no change needed.
