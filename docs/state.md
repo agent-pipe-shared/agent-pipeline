@@ -455,6 +455,69 @@ continuous read). This is a real, repeated failure mode, not bad luck, and
 it means the next tranche of Class A/B/D work needs a session that starts
 fresh against it rather than one more attempt bolted onto this one.
 
+### PO said keep going — one tractable shape found, and why the others aren't
+
+PO instruction: "bitte fixen und weiter machen, warten löst keine tasks."
+Correction to the section above: stopping wasn't the fix — going smaller
+was. Instead of dispatching another open-ended investigation (the failure
+shape all three prior dispatches shared), the Elephant did the exploratory
+reading itself first, in-session, and only dispatched once a change was
+fully specified down to the exact function, exact existing variables, and
+exact line to insert at. That's the actual fix for the truncation pattern:
+**move the read phase out of the dispatch, not into a bigger budget.**
+
+**The shape that makes a Class B item tractable in one dispatch: the check
+can be built entirely from data the function already computes** — no new
+producer, no new call site, no cross-cutting wiring. Found exactly one:
+**P-AC-06's "orphaned artifact" clause.** `validateFeaturePackage`
+(`plugins/pipeline-core/lib/feature-package-topology.mjs`) already computes
+`packageFiles` (every file physically under `specs/{id}/`, via the
+pre-existing `caseFoldedPackageFiles`/`walk` helpers) and `seen` (every
+file an artifact entry references) — the orphan check is just "what's in
+the first set and not the second, minus the manifest itself," a genuine
+comparison bug/gap, not new functionality. Dispatched as
+`PHX-WP-PAC06-ORPHAN`, fully pre-scoped (exact file, exact function, exact
+finding-code convention, exact existing test-naming pattern to follow) —
+see the next entry for its outcome once verified.
+
+**Five other Class B candidates scanned and ruled out for tonight, same
+wall as L-AC-01 each time — recorded so the next session doesn't re-derive
+this:**
+
+- **A-AC-01** ("nothing enforces recording BEFORE dependent action where
+  policy requires") — an ordering/enforcement guarantee across an unknown
+  set of call sites, same shape as L-AC-01's missing producer, not a
+  contained check.
+- **V-AC-02** (estimate/assumption value classes unlabeled) — the evidence
+  gap already states no field anywhere represents an approximate or
+  unverified-premise value at all; needs a new value class to exist
+  upstream before the renderer could label it, not just a rendering fix.
+- **R-AC-08** (rollback/cleanup as occurred events) — "no such state exists
+  at all, only prospective values inside recoverability"; needs a new event
+  kind plus wiring, not a check over existing data.
+- **R-AC-13** (approval-without-run, duplicate/retry) — already at its
+  ceiling: both gaps are proven structurally unreachable, each pinned by a
+  dedicated test showing exactly that; there's no further check to add.
+- **H-AC-12** (2 of 5 subsystems open: guard-push.mjs, release planning,
+  deploy/override paths) — `guard-push.mjs`'s test is ALSO TP-5-protected
+  (same rule pattern that gates `harness/scripts/pipeline-state.test.mjs`:
+  `(?:plugins/pipeline-core/hooks/guard-push(?:-v2)?|harness/scripts/pipeline-state)\.test\.mjs$`),
+  narrowing this to at most 2 of the 5 remaining subsystems being reachable
+  without the GMW window — not independently scoped tonight.
+
+**P-AC-06's "legacy" clause stays open, deliberately, and here's why it's
+not just deferred laziness.** `inventoryFeaturePackages` classifies whole
+package *directories* lacking a `lifecycle.json` as legacy — a
+whole-repository-inventory concept. `validateFeaturePackage` operates
+per-artifact *within* one package that, by definition, already has a
+`lifecycle.json` (the manifest is required and read before anything else).
+The two functions don't compose: nothing in `validateFeaturePackage`'s
+scope could ever observe a package as "legacy" in `inventoryFeaturePackages`'s
+sense. What P-AC-06's "legacy" clause is actually supposed to mean at the
+artifact level is an open question, not a code task — needs a PO/design
+decision before it can be briefed, same as L-AC-01's producer gap needed
+one first.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
