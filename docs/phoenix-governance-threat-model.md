@@ -12,7 +12,7 @@ states the technical model that review must inspect.
 | --- | --- | --- |
 | Selected Pipeline source identity | Codex registry and loaded-plugin observation | Typed source observation; no local path is published. |
 | Public ruleset freshness | Public-Core `HEAD` only | A fixed, read-only `git ls-remote` action; private marketplace coordinates are never a freshness authority. |
-| Host network capability | Workspace sandbox to selected host boundary | WSL/restricted preflight binds one network-open, read-only host action by boundary ID and request hash. |
+| Host network capability | Workspace sandbox to selected host boundary | WSL/restricted preflight binds two network-open, read-only host actions (`ls-remote-refs-heads-main`/`ls-remote-refs-tags`, `fetch-commit`) by boundary ID and request hash. |
 | Consumer repository and private runtime | Project, HOME, plugin cache, credentials | Never include paths, cache roots, environment values, tokens, or private remotes in action/result diagnostics. |
 | Freshness result | Host adapter back to bootstrap | Accept only a schema-valid receipt that binds the exact action, fixed Git completion, public object ID, and validated host-control identity digest. |
 | Recovery Bridge authority | Existing repository-scoped PO gate to Phoenix lifecycle writer | New decisions bind the exact revalidated PO-gate approval digest plus active PRD/Spec paths and hashes; an attribution string is never authority. |
