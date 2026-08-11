@@ -47,6 +47,24 @@ something to do here without review.
 
 ## Entries
 
+## Candidate c5b13eae85086aa1a32ab8446c45bc1b116dfc97 — 2026-08-11, range 1a359938..c5b13eae, ADR-0058 Follow-up bullet (guard-testpath.mjs kernel membership, undecided) + state.md note
+
+- ADR-0012: checked, no change needed.
+- ADR-0058: amended in 5d81e857.
+
+Covers two commits: `5d81e857` (adds a third Follow-up bullet to
+`docs/adr/0058-guard-maintenance-window.md`, recording — not deciding —
+`guard-testpath.mjs`'s open `NEVER_LIFTABLE_KERNEL_PATHS` membership
+question, after `PIPE-WP-GTP-KERNEL` correctly stopped short of shipping
+that addition without it) and `c5b13eae` (`docs/state.md`, additive: records
+the dispatch outcome and the advisor consult that redirected away from
+self-authoring an endorsement). First `amended` entry this session — every
+prior touched ADR was `checked, no change needed`; this is the first commit
+that actually edits a `Governs:`-listed ADR body. `docs/adr/0058-guard-
+maintenance-window.md`'s own `Governs:` line lists `guard-testpath.mjs`
+among its files, confirming the amendment sits inside this ADR's declared
+authority.
+
 ## Candidate 1a359938fb7227266fedc99711736422ad68c130 — 2026-08-11, range 8ba9d410..1a359938, R-AC-08 scoping run, unifying root cause named across four criteria
 
 - ADR-0045: checked, no change needed.
