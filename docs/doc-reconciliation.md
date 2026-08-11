@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 113d0bba84c95713819d01ea93f777838977115a — 2026-08-11, range aecc1d8c..113d0bba, P-AC-08 flipped to implemented + backlog item filed
+
+- ADR-0045: checked, no change needed.
+
+Covers two commits (`fe6cbcdc`, `113d0bba`): `fe6cbcdc` touches only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs` (the
+`P-AC-08` verdict flip in `DELTA` plus its closing `POINTERS` note —
+regenerated report confirms `128/25/3/0/1`); `113d0bba` touches only
+`backlog/items/2026-08-11-reconcile-lock-reuse-uses-lexical-not-real-path-comparison.md`,
+which carries no `Governs:` line and is not implicated by ADR-0045 or any
+other governed ADR.
+
 ## Candidate aecc1d8cc1176ac63290bc062e1b5db83e6807f6 — 2026-08-11, range 3e1a727e..aecc1d8c, F1 fix landing checkpoint + F-A blocking-scope resolution
 
 - ADR-0012: checked, no change needed.
