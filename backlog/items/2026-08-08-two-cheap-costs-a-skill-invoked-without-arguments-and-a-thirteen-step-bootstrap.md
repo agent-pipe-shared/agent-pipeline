@@ -96,3 +96,13 @@ the adoption path.
 - **Assignment (if accepted):** queued for implementation this session
   (write the per-step rationale into the bootstrap documentation).
 - **Date:** 2026-08-12
+- **D6 executed (2026-08-12, NVA-BL-69):** the deliberate per-step accounting
+  is written up in `docs/bootstrap-step-accounting.md` — all 13 named steps
+  covered, each with purpose, why it is digest-bound separately from its
+  neighbors, and an explicit load-bearing verdict. Outcome: all 13 verdicts
+  are load-bearing; the two most plausible merge candidates (plan/apply-seed,
+  plan-runtime/init-runtime) were considered and rejected because merging
+  either would remove the compare-and-swap window that currently catches
+  repository-state drift between planning and applying. No code changed
+  (accounting only, per Option A). D5 remains tracked separately as Task #65,
+  untouched by this entry.
