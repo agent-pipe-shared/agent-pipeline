@@ -1665,6 +1665,83 @@ clauses in this epic (e.g. H-AC-11's GMW no-join-handle clause). Presented to
 the PO with a recommendation rather than guessed a third time. Verdict stays
 `partial`; not resolvable by more autonomous dispatch work.
 
+### PO decided all three open forks, signed the TP-5 window, went AFK with standing authorization through to epic closure — 2026-08-12
+
+Presented the full open-decision inventory (freshly re-verified against live
+state, not the pre-compaction summary — K-AC-05 and O-1/O-2, which that
+summary still listed as open, turned out already closed). PO answered via
+`AskUserQuestion`:
+
+1. **PX0-AC-13: (b)+(c)** — remove the fake attestation, fail closed
+   honestly; rescope clause 1 rather than claim it satisfied.
+2. **GMW window: yes, TP-5 now** — for the deferred PX0-AC-05 AR05g
+   end-to-end test.
+3. **Push timing: "wenn Phoenix abgeschlossen ist"** (when Phoenix is
+   complete) — not tied to PX0-AC-13 landing specifically; push waits for
+   the whole epic, not this session's next commit.
+
+**Before dispatching, found a real correction to my own inventory and
+stopped to reconcile it rather than executing on stale framing:**
+`specs/sprint-phoenix-epic/design/codex-wsl-freshness-host-action-family.md`
+(2026-08-08, opus/xhigh, DESIGN ONLY) is a complete, already-written design
+for a genuine host-transport mechanism — eight typed action shapes, schema,
+dispatch rule, rejection path, receipt shape, threat-model amendments, a
+full test plan — that its own §11 states would serve PX0-AC-13 in full. It
+predates `createWslHostAttestedSpawn` (2026-08-11) and the fake function's
+own doc comment cites it directly: *"Finalizing a fully typed/named closed
+action family ... is explicitly deferred by design §B.8 to its own
+follow-up sub-design"* — i.e. the fake attestation was always a disclosed,
+deliberate interim placeholder for this exact design, not an undisclosed
+shortcut. Grepped the design doc for `createWslHostAttestedSpawn`: zero
+hits, confirming removal deletes nothing this design depends on. This
+means option (a) was materially undersold to the PO as "new design work"
+when a full design already exists — but per fresh advisor review the two
+investigation dispatches' finding stands regardless: the design assumes a
+caller-supplied `hostTransport` ("`NEG-4` — with `hostTransport`
+**present**..."), and nothing in this codebase can BE that transport
+in-process; the design also flags `ruleset-freshness-host.mjs` as
+non-loading (9 broken imports) and leaves its own §13 Option A/B/C
+threat-model question unanswered. (a) is bigger, not smaller, than
+believed — confirming (b)+(c) rather than reopening it. The correction
+that DOES land: (c)'s wording must be the conditional H-AC-11 form ("does
+not satisfy ... would satisfy once the already-designed action family is
+implemented"), never "not achievable" — the path exists, just unbuilt.
+
+**GMW signed and installed.** Fresh TP-5-only request (unlike the earlier
+TP-3+TP-5 window, `ruleset-freshness.mjs`/`ruleset-freshness.test.mjs` are
+in NO `protectedTestPaths` entry, so PX0-AC-13's own code work needs no
+window at all — confirmed against `project/guard-config.json` before
+scoping). Prepared bound to `24601573` (intent
+`5732481e8bafe2ffbb9f430634320f7f734d7d41767f8d6ee0ef8ad185fdf4e3`,
+`scratch/gmw-prepare-tp5.mjs`/`scratch/gmw-sign-tp5.mjs`, fresh scripts
+pinned to this digest, not reused from the earlier window's stale ones).
+PO signed externally (`~/agent-pipeline-po/po-private.pem`,
+`~/agent-pipeline-po/proof-tp5-20260812.json`) and installed before any
+further commit could move HEAD off the bound tree — active, scope `TP-5`,
+`expiresAtMs: 1786501143903` (~3.8h from install).
+
+**PO went AFK: "ziehe jetzt durch bis epic phoenix finally closed ist und
+wir final pushen könnten"** — standing authorization to drive the epic
+through to closure and push-readiness while AFK. Read as: implementation,
+verification and documentation work proceeds autonomously; the actual
+`git push` still needs its own signature ceremony (`gates.push_approval:
+signature`) which the PO cannot clear while AFK — so this session drives
+to a genuinely push-ready state (candidate landed, Full Verify bound to
+it, epic gates addressed as far as agent-executable) and PREPARES the
+push-approval request, but does not execute the push itself without a
+fresh signature. Stated back to the PO; will restate in the final report
+rather than silently push on an ambiguous reading.
+
+**Dispatched `PHX-WP-PX0AC13-FAILCLOSED`** (goldfish-deep): remove
+`createWslHostAttestedSpawn`/`wslHostControlAttested`/the WSL-attestation
+constants from `ruleset-freshness.mjs`, replace with an honestly-named
+fail-closed substitute (network-delegated calls never spawn under
+`host-authorized-wsl`, local calls unchanged), rewrite
+`ruleset-freshness.test.mjs`'s two PX0-AC-13 CLI tests to match. Scoped to
+those two files only — `acceptance.md`'s amendment, the backlog item for
+the unbuilt-design continuity note, and this checkpoint's own
+doc-reconciliation are this session's own work, not the dispatch's.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
