@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 97c069c91febe14e0dc505bc2a4eb24315769d8c — 2026-08-11, range 680d971f..97c069c9, session terminal-state summary
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`97c069c9`), touching only `docs/state.md`.
+Purely additive: one consolidated close-out section stating that every
+remaining path to Phoenix completion runs through the single
+`--scope TP-3,TP-5` GMW window, so a later session does not have to
+reconstruct "what's left" from the checkpoint's scattered sections. No
+other governed path touched.
+
 ## Candidate 680d971fbe34c904a85d321cabdfa4341c1fd295 — 2026-08-11, range 9ae13b10..680d971f, second stale-negative audit (A-AC-03/09, P-AC-09, EPIC-AC-02)
 
 - ADR-0012: checked, no change needed.
