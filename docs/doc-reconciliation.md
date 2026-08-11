@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 5af57a2c17fcad2a8d2ad884bb72020bf302e813 — 2026-08-11, range 28edde05..5af57a2c, P-AC-08 note updated with F-B delta Critic FAIL (F1 blocker)
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`5af57a2c`), touching only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`'s `P-AC-08`
+NOTES string (a prose append recording the delta Critic FAIL on `5420c5e7`:
+F1 blocker, F2/F3/F4 minor-to-major, remediation dispatched; verdict
+unchanged at `partial`). Regenerated the report and diffed the summary table
+— `127/26/3/0/1` unchanged.
+
 ## Candidate 28edde05a3bfd912d6f07ffba875868941c1fa8a — 2026-08-11, range f2d9cac5..28edde05, F-B delta Critic FAIL (F1 blocker) + remediation dispatch checkpoint
 
 - ADR-0012: checked, no change needed.
