@@ -128,6 +128,7 @@ export function realProbeRunner({ nonceHex, timeoutMs = 10_000 }) {
     stdout: result.stdout ?? "",
     stderr: result.stderr ?? "",
     durationMs: Date.now() - startedAt,
+    pid: result.pid ?? null,
   };
 }
 
@@ -185,7 +186,7 @@ export function launchSelectedSandbox({
       errorCode: probe.error ? String(probe.error.code || probe.error.message || probe.error) : null,
       status: probe.status ?? null,
       signal: probe.signal ?? null,
-      stdout: probe.stdout ?? null,
+      stdoutSha256: sha256Hex(probe.stdout ?? ""),
       stderr: probe.stderr ?? null,
       durationMs: probe.durationMs,
       parseFailed,
@@ -205,10 +206,10 @@ export function launchSelectedSandbox({
     };
   }
 
-  const childIdSha256 = sha256Json({ pid: payload.pid, attemptId: attempt.attemptId, nonceSha256 });
+  const childIdSha256 = sha256Json({ pid: probe.pid, attemptId: attempt.attemptId, nonceSha256 });
   const observation = {
-    pid: payload.pid, platform: payload.platform, arch: payload.arch, nowMs: payload.nowMs,
-    stdout: probe.stdout, stderr: probe.stderr, status: probe.status, durationMs: probe.durationMs,
+    pid: probe.pid, platform: payload.platform, arch: payload.arch, nowMs: payload.nowMs,
+    stdoutSha256: sha256Hex(probe.stdout ?? ""), stderr: probe.stderr, status: probe.status, durationMs: probe.durationMs,
   };
   const observationReceiptSha256 = sha256Json(observation);
   const childReceipt = {

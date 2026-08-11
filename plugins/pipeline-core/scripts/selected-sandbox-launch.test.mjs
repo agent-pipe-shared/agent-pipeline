@@ -51,7 +51,7 @@ check("A29L01 probe-start -> real-shaped success reaches available-attested with
   const mockProbeRunner = ({ nonceHex }) => ({
     error: null, status: 0, signal: null,
     stdout: JSON.stringify({ pid: 4242, nonce: nonceHex, platform: "linux", arch: "x64", nowMs: 1 }),
-    stderr: "", durationMs: 3,
+    stderr: "", durationMs: 3, pid: 4242,
   });
   const result = launchSelectedSandbox({ probeRunner: mockProbeRunner, nowMs: counterClock(), fingerprint });
   assert.equal(result.outcome, "available-attested");
@@ -93,7 +93,7 @@ check("A29L04 a child that echoes the wrong nonce is treated as a genuine failur
   const mockProbeRunner = () => ({
     error: null, status: 0, signal: null,
     stdout: JSON.stringify({ pid: 1, nonce: "not-the-real-nonce", platform: "linux", arch: "x64", nowMs: 1 }),
-    stderr: "", durationMs: 1,
+    stderr: "", durationMs: 1, pid: 1,
   });
   const result = launchSelectedSandbox({ probeRunner: mockProbeRunner, nowMs: counterClock(4_000), fingerprint });
   assert.equal(result.outcome, "terminal-unavailable");
