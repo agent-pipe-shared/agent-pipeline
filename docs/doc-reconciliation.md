@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate f2d9cac5f9c18bfa82c0e596b2eaffe608081f64 — 2026-08-11, range 5420c5e7..f2d9cac5, F-B fix landing checkpoint (red-before-green evidence, delta Critic dispatched)
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`f2d9cac5`), touching only `docs/state.md`
+(additive checkpoint entry appended after the P-AC-08-FAIL section,
+append-only discipline preserved — nothing rewritten). No other governed path
+touched; `5420c5e7` itself (the F-B fix, reviewed separately above) touches
+only `plugins/pipeline-core/scripts/pipeline-state.mjs` and
+`harness/scripts/pipeline-state.test.mjs`, neither of which carries a
+`Governs:` line.
+
 ## Candidate 9fa4e89d23fa3df03f4c07aeeda49391c026fbe4 — 2026-08-11, range c8b7847c..9fa4e89d, P-AC-08 note updated with Critic FAIL verdict
 
 - ADR-0045: checked, no change needed.
