@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate c3e270a128fe45d386a1530c78e6e8b0a6543ed9 — 2026-08-11, range 113d0bba..c3e270a1, F1 fix Critic PASS + P-AC-08 flip checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`c3e270a1`), touching only `docs/state.md`
+(additive checkpoint entry appended after the F-A blocking-scope-resolution
+section, append-only discipline preserved — nothing rewritten). No other
+governed path touched; the persisted Critic report
+(`specs/sprint-phoenix-epic/evidence/pac08-f1-critic-review-3e1a727e.md`)
+carries no `Governs:`-tagged path.
+
 ## Candidate 113d0bba84c95713819d01ea93f777838977115a — 2026-08-11, range aecc1d8c..113d0bba, P-AC-08 flipped to implemented + backlog item filed
 
 - ADR-0045: checked, no change needed.
