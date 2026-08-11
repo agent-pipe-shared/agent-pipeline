@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.shipped-artifacts-assume-the-pipelines-own-repository
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 0acee407adbe2d57c1b904c3c40e958b12b61105
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-15
 source: "PO, 2026-08-08, consolidated findings A1 and A4 from the Claude greenfield transcript against the 0.5.4 local candidate. Both verified in code by the Elephant before filing."

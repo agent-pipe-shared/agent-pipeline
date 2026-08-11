@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-sanctioned-way-to-start-over
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 2dd0623fbb92d6f665fa3f5ef28dbfc35b6831e3
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-15
 source: "PO, 2026-08-08, unhappy-path transcripts from fresh Claude and Codex sessions on greenfield projects against the 0.5.4 local candidate. The Claude session composed a destructive `rm -rf` for the human to run, because no typed reset exists; the Codex session asked the human for permission to repair the Pipeline by hand."

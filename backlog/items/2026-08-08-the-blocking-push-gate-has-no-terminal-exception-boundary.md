@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.blocking-push-gate-has-no-terminal-exception-boundary
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 2ae06d9133beed3859f8e0a5ca1b61b1d97a4771
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-15
 source: "Residual of GitHub issue #100 (P0/Security, 'Fail closed when the push approval record is absent'), established by reading the current tree on 2026-08-08. The PO independently reached this state in a greenfield test the same day."

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.seeded-verify-contract-is-always-green
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 674b1c0c85986a7d4a0aed0f8b1a124c99003d68
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-22
 source: "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 7 of 12."

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-refuses-the-prescribed-recovery
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: ce1a7416fe2da9b106a3ffb386788252c6029476
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-15
 source: "PO, 2026-08-08, findings C1, C2 and C3 from the Claude greenfield transcript against the 0.5.4 local candidate. All three verified in code by the Elephant before filing."

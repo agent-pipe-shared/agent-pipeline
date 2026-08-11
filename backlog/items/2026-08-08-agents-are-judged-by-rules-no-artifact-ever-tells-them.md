@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: d71aa710abe437ac1c81bece5bacb12c0355529b
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-15
 source: "PO hypothesis, 2026-08-08: 'kann es sein dass sie durch die vielen neuen guards und vorgaben zu wenig Pflichtwissen darüber haben was erlaubt ist und was nicht und dadurch zu viele guard blocks und hook blocks produzieren?' — measured and confirmed by the Elephant the same day."

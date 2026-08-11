@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-evidence-has-no-producer
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: b844ea342557e5313fe0a2d0ba2485c39464dce4
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-15
 source: "PO, 2026-08-08, findings A2 and A3 from the Claude greenfield transcript against the 0.5.4 local candidate. Both verified in code by the Elephant before filing. The session had to write its own verify runner and invent an empty parent commit to get a Critic review at all."

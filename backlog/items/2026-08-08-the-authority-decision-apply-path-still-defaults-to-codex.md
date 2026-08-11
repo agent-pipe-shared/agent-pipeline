@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.authority-decision-apply-defaults-to-codex
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: e5a6a9b2bffc691be0610275c14a5c5b82036047
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-22
 source: "Found while checking the approval layer for runner neutrality on 2026-08-08, after the PO named that layer as a target for the next candidate. The residue is documented in the source itself."

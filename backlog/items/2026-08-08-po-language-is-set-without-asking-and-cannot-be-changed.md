@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-language-is-set-without-asking-and-cannot-be-changed
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 1174512bc78911af47640faebfd9f025da492492
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-22
 source: "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 8 of 12."

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.plan-path-guidance-attached-to-unlike-causes
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 5415923bb6336a7a816d2cbd8fe2cbe75554c424
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-22
 source: "Established while re-signposting the PO-language mismatch (commit b094cb5); the enumeration was produced by that dispatch and the remaining sites were deliberately left alone."

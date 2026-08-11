@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.three-smaller-greenfield-defects
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 4a3534ce970962eda367f6eeb523e69ceb84da94
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-22
 source: "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, findings 9, 11 and 12 of 12. Grouped because each is small and self-contained; none needs a design round of its own."

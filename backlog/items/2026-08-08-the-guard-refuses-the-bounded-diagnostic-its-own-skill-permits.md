@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-refuses-documented-bounded-diagnostic
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: b68b611417f8ab0b1adf7b9604fc391ec4e961cf
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-22
 source: "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-3). Independently hit in the Pipeline's own repository in the same session."

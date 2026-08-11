@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.concurrent-dispatches-share-one-index
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 7003b2fd221a48d583569505c817013cd551397c
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md
 created: 2026-08-08
 due: 2026-08-22
 source: "Observed directly on 2026-08-08: commit 598a78b, trailered Dispatch: HGOELIG-1 (goldfish), contains a backlog-item edit written by the Elephant and staged seconds earlier."
