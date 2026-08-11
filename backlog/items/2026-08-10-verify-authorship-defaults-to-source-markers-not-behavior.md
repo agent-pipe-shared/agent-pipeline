@@ -66,3 +66,8 @@ named Critic hunt category (or both) is a design choice for whoever picks
 this item up, not decided here.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the item's own proposed direction — an explicit rule that DoD/Verify checks for interactive or user-facing behavior must exercise actual behavior rather than only confirm source-text markers — was landed (`closure_commit` `a655437ce8dbb785173b65961c60f1599670e92c`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

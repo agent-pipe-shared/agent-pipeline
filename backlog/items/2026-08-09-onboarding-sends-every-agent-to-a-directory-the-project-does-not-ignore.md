@@ -109,7 +109,7 @@ caused in a consumer's repository.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** onboarding now appends `scratch/` to the project's `.gitignore` per the item's own recommended candidate 1, closing the security-scan dirty-tree consequence the item measured (`closure_commit` `d7a52fedbccb6fbce30492227b48c65059a1d1ef`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

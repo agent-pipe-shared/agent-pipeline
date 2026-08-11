@@ -76,7 +76,7 @@ This Pipeline governs consumer projects whose team, PO, or target audience may w
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the additive `documentLanguage` field and the four-file wiring this item scoped (continuity-state, po-gate-authority, pipeline-state, onboarding-continuity) were landed, decoupling PRD/Spec document language from the hard de/en operator-facing axis while leaving that axis unchanged (`closure_commit` `695cd8e59aa7131c5c9595c1d713f6a1951d9620`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

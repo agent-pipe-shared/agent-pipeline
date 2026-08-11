@@ -113,7 +113,7 @@ done and verified.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the item's own "Fixed" section records that `guard-push.mjs` now dispatches security findings under `gates.security.mode` independently of the push gate's mode, with `PG08b`/`PG08c` pinning both directions (`closure_commit` `635f348b4c29d52ab2db0672719421abd96ba4f7`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

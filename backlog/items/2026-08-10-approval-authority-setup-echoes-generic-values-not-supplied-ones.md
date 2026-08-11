@@ -79,3 +79,8 @@ scratch repo (running `setup` twice with different `--human-name`/
 shape before writing a fix.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** `setup`'s "authority already exists" branch was changed so a later invocation with differing `--human-name`/`--key-reference` no longer silently discards the supplied values while reporting unqualified success, per the item's own proposal (`closure_commit` `0717f1f5361e28d0bdcd45cc03e31bc2dac42952`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

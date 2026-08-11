@@ -79,3 +79,8 @@ rather than left as an informational field for the agent to notice and act on
 several steps later.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Closed (2026-08-11) — superseded, premise no longer holds.
+- **Rationale:** the warn-only diagnostic this item objects to was itself superseded by a setup-time identity question along the item's own proposed direction, closing the gap by replacing the mechanism rather than patching it (`closure_commit` `018d523b707d8ae2b72a13e30ac8a2e013c1f1e0`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

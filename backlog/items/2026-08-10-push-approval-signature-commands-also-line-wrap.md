@@ -78,3 +78,8 @@ value chunks) that the agent must apply when filling in placeholders, mirror
 of what SKILL.md already requires for `launch.copyCommand`.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the sequenced fix (reusing GF-094's bounded-rendering primitive for the `authorize-critical` push-approval command, per the item's own Proposal direction) landed (`closure_commit` `28818f162168b818a1cb48c4a099658e22950bd4`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.
