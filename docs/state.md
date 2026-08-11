@@ -112,6 +112,102 @@ criteria count, (3) work the "blocking set, ranked" table from the last
 measurement (`P-AC-11`, `P-AC-06`, `H-AC-12` were the top blockers) if that
 measurement still holds after re-running it.
 
+### Independent Critic review found two never-reviewed commits, both genuine FAIL
+
+Same session, continued. `43d42a23` and `ee8a38f0` (both cited above) had
+landed without any Critic pass. Dispatched two proper positional-grammar
+Critic reviews (after two earlier attempts were correctly rejected for
+key=value syntax / missing T1 tokens / unresolvable evidence — see
+`critic-review` skill's strict grammar). Both independently re-verified in
+detached worktrees before dispatch, not just trusted from the goldfish
+reports (`scratch/evidence-redo.json`, `scratch/evidence-fix2.json`).
+
+Verdicts: **FAIL** on both. Real, evidence-backed findings, not process
+noise — F1: `runAuthorityRevisionRecoverCommand`'s expired-decision branch
+echoed a frozen `casOutcome:"applied"` receipt on a refusal path, a false
+success claim in an audit-trail field. F2 (**blocker**): `docs/`
+`phoenix-governance-threat-model.md:15` still said "one" network-open host
+action after `ee8a38f0` widened it to two — a stale doc violating the
+project's own governance checklist (hunt category 11: any item ticked NOT
+MET is blocking by definition). F3/F4: both commits share a genuine
+test-coverage gap (QG-07 red-before/green-after) — no regression test for
+the WSL/Codex host-attestation fix, none for the `.v1` legacy journal
+backward-compat path. F5/F6 (minor): an undated risk note, a narrow
+evidence-artifact scope.
+
+### Four parallel fix dispatches: two land clean, two prove the signature gate is real
+
+- **PHX-WP-PX0-THREATMODEL** (`61203fdb`) — F2 fixed, verified by the
+  Elephant directly against the design doc's own prescribed wording
+  (`specs/sprint-phoenix-epic/design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md`
+  §B.6: "two network-open, read-only host actions
+  (`ls-remote-refs-heads-main`/`ls-remote-refs-tags`, `fetch-commit`)") —
+  exact match. Also filed the F5/F6 backlog item
+  (`backlog/items/2026-08-11-authority-revision-receipt-dedup-and-recovery-integrity-gaps.md`),
+  which needed one follow-up: its own DoD check
+  (`check-backlog-state.mjs`) failed for a missing transition-ledger entry,
+  fixed by `reconcile-backlog-ledger.mjs --activate` (never hand-edit
+  `transitions.ndjson`) and committed separately (`d002fd8e`). Neither
+  commit touches an ADR-`Governs:`-listed path (checked directly against
+  all five ADRs carrying a `Governs:` line) — no doc-reconciliation entry
+  needed for this pair.
+- **PHX-WP-PX0-CASOUTCOME** (F1) — source fixed in
+  `pipeline-state.mjs` (`casOutcome:"stale"` instead of the frozen
+  `"applied"`, reusing the existing formal enum from
+  `course-decision.schema.json`), existing 468/468 tests still green. The
+  required `AR06g` regression test hit `guard-testpath.mjs` (**TP-5**) on
+  `harness/scripts/pipeline-state.test.mjs` and was correctly refused —
+  the dispatch made the right call and **left the source fix uncommitted**
+  rather than ship it without its test (QG-04/TP-5's whole point). Diff
+  sits in the working tree; `AR06g`'s exact assertion text is prepared and
+  ready to paste once the path is clear.
+- **PHX-WP-PX0-V1JOURNAL-TESTS** (F4) — same TP-5 wall, zero bytes landed
+  (confirmed via `git diff --stat`). Exact `.v1` journal shape and test
+  construction plan fully worked out and recorded in the dispatch's own
+  evidence file for whoever picks this up next.
+- **PHX-WP-PX0AC13-TESTS** (F3, `7dffa72e`) — targets the sibling test
+  files (`pipeline-start-preflight.test.mjs`, `ruleset-freshness.test.mjs`),
+  neither TP-protected. Both new tests reach the real fixed call path
+  (`createWslHostAttestedSpawn` → `runPipelineUpdateAvailabilityCli`) via
+  URL-substitution on the real spawn chain, not mocked internals.
+  Independently re-run by the Elephant post-commit: 36/36 and 16/16 green.
+  One process deviation noted honestly by the dispatch itself: ~48-50 tool
+  uses against a 40 nominal budget (multi-line commit message forced the
+  `git commit -F <msgfile>` workaround under the closed shell grammar) —
+  discovered only after the deliverable was already complete and
+  committed, not worth unwinding.
+
+### The signature-gated punch list is now exactly three items, one window
+
+Per this file's own 2026-08-08 precedent (§ "The three outstanding
+protected-path acts are ONE signature, not three" above):
+`isLiftableRuleId` admits any `TP-`-prefixed id, and a GMW scope is a list —
+so TP-3 and TP-5 collapse into **one** `--scope TP-3,TP-5` window
+(`MAX_WINDOW_TTL_MS` confirmed still 4h, `lib/guard-maintenance-window.mjs:175`).
+Three edits, one lift, PO's part is one signature:
+
+| item | file | rule |
+| --- | --- | --- |
+| `AR06g` casOutcome regression test (text ready) | `harness/scripts/pipeline-state.test.mjs` | TP-5 |
+| `.v1` legacy-journal regression tests (plan ready) | `harness/scripts/pipeline-state.test.mjs` | TP-5 |
+| register 5 unregistered suites (`check-dispatch-provenance.test.mjs`, `guard-git-phoenix-authority-grant.test.mjs`, `decision-reference-dual-evaluation.test.mjs`, `human-authority-grant.test.mjs`, `po-approval-gate.test.mjs`) | `harness/scripts/verify.mjs` | TP-3 |
+
+Division of labour (unchanged from the 2026-08-08 precedent): Elephant runs
+`prepare --repo-root <path> --scope TP-3,TP-5 --ttl-seconds <n> --reason <text>`;
+PO signs the emitted digest externally, proof JSON written **outside** the
+repo; Elephant runs `install --repo-root <path> --request <path> --proof <path>`,
+lands the three edits + their tests + a focused Verify, then `close`.
+**Deliberately not started this session** — PO asked to hold everything
+signing-related while AFK. `prepare` is cheap to run later (window clock
+starts at prepare, not before), so waiting costs nothing.
+
+Once this window lands, `verify-suite-registration-check` goes green (368/368),
+and both open Critic findings (F3/F4) get their missing regression tests —
+at which point a fresh Critic re-review (`PREVIOUS_CANDIDATE..NEW_CANDIDATE`,
+prior reports as `evidence:`) can actually reach PASS instead of re-failing
+on coverage. Until then, `EPIC-AC-05` still forbids any Phoenix completion
+claim — this is a known, named, single-signature gate, not an open-ended one.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
