@@ -47,6 +47,24 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 9ae13b104d79ed76819b292b1a471b2582e5e2b0 — 2026-08-11, range e1265678..9ae13b10, targeted delta re-measurement of PX0-AC-03/05/06/13
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Covers `8f297633` (the delta-measurement data edit and its new dated
+`acceptance-evidence-map-20260811.md` deliverable, dispatch
+`PHX-WP-DELTA-PX0-0305-06-13`), `587f562a` (a trailing dispatch-record.json
+enrichment, same task), and `9ae13b10` itself (`docs/state.md`, purely
+additive: records the 127/24/4/1/1 result and the PX0-AC-05/06 CONFIRMED-
+ABSENT retraction). No code in this range touches the canonical artifact
+topology ADR-0045 governs beyond ordinary content evolution inside files it
+already lists — the new dated `.md` follows the exact pre-existing
+`acceptance-evidence-map-<date>.md` naming convention (see e.g. the
+`-20260809` sibling), and the generated evidence-map/closure-plan/design-doc
+set stays ADR-0045 as in every prior occurrence in this chain. `docs/state.md`
+stays ADR-0012, purely additive as always.
+
 ## Candidate e1265678fe0b85008c4b76016c5f0c94e4a3d3b5 — 2026-08-11, range 60b324ad..e1265678, docs-only follow-up (Critic re-review parking + persistence-gap note)
 
 - ADR-0012: checked, no change needed.
