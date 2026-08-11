@@ -139,3 +139,8 @@ pre-existing, harmless, not part of this defect; left untouched, flagged here
 for a future cleanup pass.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** `withoutRunnerFlag` was generalized to a scan-and-remove strip of the first `--runner <claude|codex>` pair anywhere in the argv (not only trailing), and the `plan*` branch was given the `inspect` branch's optional-`--intent` pattern, per the item's corrected Proposal (`closure_commit` `4d19def0ac9e5c2c6112b72e923bb95b6400be28`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

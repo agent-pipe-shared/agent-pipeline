@@ -61,7 +61,7 @@ per subcommand, alongside the existing GF-059 test.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** `sanctionedSessionCleanupArgs()`'s optional `--runner` tail admission was widened to cover `confirm-privatization`, `apply-recovery`, and `apply-privatization`, matching `session-cleanup.mjs`'s own documented flag table per the item's Direction (`closure_commit` `9427caa6a2e02ed78e49c3babb28df9d7195eef9`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

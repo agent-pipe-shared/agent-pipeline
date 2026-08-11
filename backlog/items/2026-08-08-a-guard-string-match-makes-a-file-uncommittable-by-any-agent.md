@@ -87,7 +87,7 @@ moment. With two dirty files under `templates/`, it would not have been availabl
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** `guard-gate-strength.mjs` was changed to key its refusal to the operation performed on the protected file rather than to the filename substring appearing anywhere in the command text, admitting read-only/VCS-staging verbs (`git add`/`commit`/`diff`) per the item's Direction option 1/2 (`closure_commit` `b68b611417f8ab0b1adf7b9604fc391ec4e961cf`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

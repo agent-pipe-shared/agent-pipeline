@@ -190,7 +190,7 @@ cause; the missing precondition check is the defect.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** `kickoff promote plan` now checks, before freezing anything, that the PRD carries the markers the PO gate requires (both `technical-spec-sha256` and `po-language`), per the item's Direction 1/2, converting the session-bricking dead end into an early, precise refusal (`closure_commit` `fb918b86dc0b02f27ff3478f9e579c353525c888`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

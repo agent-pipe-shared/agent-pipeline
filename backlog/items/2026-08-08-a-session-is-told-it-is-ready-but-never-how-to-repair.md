@@ -95,7 +95,7 @@ Three concrete absences the transcripts show:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the repair-map direction (1) was shipped as `scripts/repair-map.mjs`, a runtime query point separating never-liftable, never-liftable-by-policy, and author-repair-required refusal classes for an agent to consult instead of reading plugin source (`closure_commit` `598601b441207f70da632a660fffe14a88c3ed67`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

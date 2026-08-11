@@ -100,7 +100,7 @@ progress. Not urgent: the manual workaround above is safe, quick, and per-machin
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** `setup`'s `present.authority && !namedShape` branch now writes `humanName` into `trust-policy.json` when supplied, giving the promised repair a working code path per the item's first Direction option (`closure_commit` `dd1eb9eedeb7ac48860c8ec9745750c9a8367b32`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.
