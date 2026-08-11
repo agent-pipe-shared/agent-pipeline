@@ -300,3 +300,96 @@ scheduled — see CURRENT-SPRINT-TRACKED).
 
 **Batch 5 summary:** 17 total, 0 closed-sprint-residue, 0 future-sprint
 (sole), 2 current-sprint-tracked, 15 loose (7 High, 6 Medium, 2 Low).
+
+---
+
+## Batch 3 — 2026-08-09 (15 items, 1 closed-sprint-residue, 1 future-sprint, 13 loose)
+
+### CLOSED-SPRINT-RESIDUE
+
+- `2026-08-09-guard-denial-escalates-benign-commands-to-human-in-terminal.md`
+  — `2026-07-27-agent-pipeline-0.4.7-hotfix` / issue `047-HOV` (Attended
+  one-action guard override, AC-047-41–47, delivering
+  `human-guard-override.mjs`/`guard-human-override.mjs`/the central Codex
+  guard adapter, marked "Implemented" and closed) — the closure validated
+  the override's own internal correctness but its acceptance criteria never
+  scoped whether the fallback should fire when the underlying guard already
+  supplied agent-executable recovery text; confirmed a residual gap, not an
+  explicit deferral (0.4.7-hotfix's own "Deferred work and non-claims"
+  section does not list this item).
+
+### FUTURE-SPRINT
+
+- `2026-08-09-kickoff-promotion-cleanup-readback-has-no-in-session-recovery.md`
+  — Nova B / `NVA-B61-7` (`issue-acceptance-matrix.md:70,72-77` names
+  exactly this failing acceptance outcome) — stays open because Nova B has
+  not started: entry gate (accepted Nova A Result + explicit PO activation)
+  is unmet, `nova-b0` deliberately not dispatched. (Note: the item's own
+  text cites "#57/NVA-B61-7" — #57 is actually the unrelated Nova A1
+  canonical-reconciliation issue; only NVA-B61-7 is the real match.)
+
+### LOOSE (13)
+
+- `2026-08-09-the-security-scan-looks-for-its-license-allowlist-in-the-pipelines-own-repository.md`
+  — **security gate / consumer-project fit** — **High** — makes the
+  `security` gate structurally unsatisfiable for every consumer project
+  (hardcoded Pipeline-repo-relative allowlist path), reports the failure as
+  a generic scanner error rather than "not configured."
+- `2026-08-09-elephant-writes-production-code-directly-without-a-goldfish-dispatch.md`
+  — **dispatch process** — **High** — a core governance safeguard was
+  silently bypassed with zero technical detection; caught only because the
+  PO happened to notice live.
+- `2026-08-09-agents-read-the-pipelines-source-because-nothing-describes-its-interface.md`
+  — **onboarding/discoverability** — **Medium** — measured ~40 of 114
+  commands in one run spent rediscovering the CLI surface from source; real
+  efficiency drag, not correctness/security.
+- `2026-08-09-project-reset-does-not-classify-the-proof-policy-artifact.md`
+  — **onboarding hygiene** — **Low** — item's own text confirms the
+  leftover is fail-closed (can only make a later `approve-push` MORE
+  restrictive, never less).
+- `2026-08-09-two-minor-happy-path-retries-in-the-final-codex-run.md` —
+  **onboarding/discoverability** — **Low** — item's own text: "this is the
+  guard system working as designed, not a defect."
+- `2026-08-09-what-the-claude-greenfield-run-adds-to-the-happy-path-findings.md`
+  — **onboarding/discoverability** — **Medium** — priced on the still-open
+  sub-points only (late language-gate firing, authority-staleness ordering,
+  no git-identity onboarding); the `--help` sub-point is already fixed.
+- `2026-08-09-bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection.md`
+  — **onboarding/discoverability** — **Medium** — ~17 minutes and 8
+  guard-level errors before any implementation starts, entirely
+  documentation-completeness gaps in already-correct enforcement.
+- `2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md`
+  — **runner/tooling config (Codex-side)** — **Low** — item's own text:
+  primarily Codex CLI's own behavior, "may not be actionable from the
+  Pipeline side at all."
+- `2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript.md`
+  — **restart/continuity design** — **Low/deferred** — already carries a
+  PO-recorded Triage decision (2026-08-10, "Deferred, not declined")
+  pending a live Codex retest — not a fresh prioritization call.
+- `2026-08-09-restart-resume-hint-write-misses-the-project-prefix.md` —
+  **guard UX / messaging** — **Medium** — a cheap, well-scoped fix whose
+  absence let one real restart lose the human's actual project intent
+  entirely.
+- `2026-08-09-the-dispatch-record-does-not-bind-to-the-commit-it-vouches-for.md`
+  — **dispatch/authorship evidence integrity** — **High** — found
+  independently by three separate Critic rounds across twenty commits;
+  authorship entirely self-reported with nothing external verifying it.
+- `2026-08-09-critical-push-signing-ceremony-gives-no-path-feedback.md` —
+  **push/approval ceremony UX** — **Medium** — a wrong subcommand guess or
+  missing path confirmation forces a manual `ls`/polling fallback, wasting
+  time on a critical-path ceremony without defeating any gate.
+- `2026-08-09-critical-human-proof-policy-seeded-without-trust-anchor.md` —
+  **push/approval — trust-anchor security** — **High** — signature mode
+  currently accepts any well-formed externally supplied proof key, not
+  specifically the PO's own, defeating the core purpose of the check.
+
+**Methodology note:** two items (the CLOSED-SPRINT-RESIDUE item and
+`critical-push-signing-ceremony-gives-no-path-feedback`) share one root
+mechanism (the 047-HOV human-override fallback) — only the item whose own
+Direction section names files 047-HOV actually delivered is filed as
+residue; the other's defect is a different file outside that closed scope
+and stays LOOSE/prioritized rather than being silently dropped as a
+duplicate.
+
+**Batch 3 summary:** 15 total, 1 closed-sprint-residue, 1 future-sprint, 13
+loose (4 High, 5 Medium, 4 Low).
