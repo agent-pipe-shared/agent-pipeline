@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 705c6114a1fc70c55848a0253e451ac1390e325c — 2026-08-11, range 57fc68b6..705c6114, F1/F3 design-question finding recorded
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`705c6114`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 57fc68b6fa157c7ebcb25d498bfe5785db323f20 — 2026-08-11, range 2a1a0903..57fc68b6, F2 doc fix landed + state.md checkpoint
 
 - ADR-0012: checked, no change needed.
