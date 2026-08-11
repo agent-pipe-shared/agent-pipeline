@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agent-talks-itself-out-of-the-pipeline
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 94ee0b4049dfeab280a252d7a2064b409da46d46
+closure_evidence: evidence/dispatch-record-NVA-BL-28.json
 created: 2026-08-08
 due: 2026-08-22
 source: "Happy-path test of the local 0.5.4 build in a fresh empty directory, 2026-08-08, observed by the PO."
@@ -76,7 +80,23 @@ already adopted and therefore cannot exhibit the unadopted-session case.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11), partial — Direction points 1 and 2
+  landed, point 3 explicitly deferred.
+- **Rationale:** `plugins/pipeline-core/skills/pipeline-start/SKILL.md`'s
+  onboarding-consent section (the file actually read at the opening turn of
+  a fresh unadopted session — confirmed the briefed candidate,
+  `onboarding-recovery.md`, is lazily loaded and would NOT have been read at
+  the point this incident occurred) now states both rules explicitly: no
+  deliverable-file creation before the human's actual adoption answer, and
+  no unprompted proportionality recommendation by the agent (commit
+  `94ee0b4049dfeab280a252d7a2064b409da46d46`, verified via
+  `check-doc-contracts.test.mjs` 36/36 plus two more real suites touching
+  this area, both green). Point 3 ("whether the consent sentence is true by
+  construction should be a wording rule or a technically enforced one") is
+  explicitly NOT decided — the item's own text frames this as open, and the
+  dispatch correctly implemented only the wording-rule half rather than
+  picking an enforcement mechanism unprompted.
+- **Assignment (if accepted):** point 3's enforcement question is PO
+  territory if it is ever picked up — not filed as a new item here to avoid
+  inventing scope unprompted.
+- **Date:** 2026-08-11
