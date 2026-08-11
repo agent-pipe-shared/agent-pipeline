@@ -1844,6 +1844,91 @@ same spec/diff/guardrail/evidence references, unchanged. Live now;
 whichever verdict lands is the authoritative one for this gate, not the
 first round's substantive-but-non-authoritative read.
 
+### PX0-AC-05 Critic verdict: FAIL — on the branch's history, not on the code — GMW window closed, one citation independently corrected — 2026-08-12
+
+**The opus-tier review returned.** Route confirmed correct this time
+(`claude-opus-5`, direct same-dispatch environment-block evidence, no
+route contradiction). **Verdict: FAIL.** Two findings, both about commit
+provenance, NEITHER about the `decision.id` fix itself:
+
+- **Finding 1 (blocker as filed):** the `979e579c`/`ad5a537e` commit-
+  attribution swap (recorded here already, previous section) is a
+  currently-live defect in reachable branch history: `ad5a537e` carries
+  PX0-AC-13's diff under PX0-AC-05's message/trailer, and the reverse-
+  correct commit (`f51d6348`) is off-branch. Confirmed independently by
+  the Critic via primary `git show`/`git log --grep` — not taken on my
+  disclosure alone.
+- **Finding 2 (major):** `979e579c` itself (the AR05g diff, correctly
+  attributed in content) still carries no `Dispatch:`/`AI-Assisted:`
+  trailer at all — already known, already in the AR05G dispatch record
+  and the parallel-dispatch-race backlog item.
+
+Explicitly, in the Critic's own words: *"I found no code defect... the
+`decision.id` constraint is correctly placed, tight against the bypass
+vectors I probed independently... A pass cannot issue over a hard-rule
+violation that is still present in the repository's history."* Its own
+Phase-A edge-case probe (regex tested directly against private-path,
+newline, null-byte, case, Unicode-homoglyph, fullwidth, and length-
+boundary inputs, independently of the diff's own tests) found no bypass
+either.
+
+**One independent correction to Finding 1's citation, checked before
+accepting the verdict as-is rather than taken at face value** (the same
+discipline this session has applied to every Goldfish claim, now applied
+to a Critic claim too): Finding 1 cites CLAUDE.md's "never rewrite
+history" hard rule as the violated rule. Read against its own normative
+source, `guardrails/git.md:44`, that rule is scoped explicitly to
+*"history that has been pushed/shared"* — `979e579c`/`ad5a537e` are
+local and entirely unpushed (`origin/sprint_phoenix` is still at
+`eb735ae1`). `guard-git.mjs`'s own header comment confirms this by
+design, not omission: *"History rewrites are enforced at the push
+boundary: rebase/amend/filter-branch stay local and only become
+destructive via force-push/+refspec — which is blocked"* and lists
+local `rebase/amend/filter-branch` explicitly under "WHAT THIS GUARD
+DOES NOT BLOCK." **This is not a guard gap** — the guard behaved exactly
+as documented; no backlog item filed for one. The underlying GAP Finding
+1 names (a commit falsely attributing one dispatch's work to another) is
+still real, still evidenced, still present in branch history, and still
+blocking on its own terms — its true anchor is dispatch/commit-trailer
+authorship discipline (`templates/prompts/goldfish-task.md`'s Final
+report section; the same root cause already tracked as the "Third
+occurrence" in
+`backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md`),
+not the pushed-history hard rule specifically. **This correction changes
+the citation, not the verdict** — Finding 2 alone, uncontested, already
+keeps this from a clean PASS, and Finding 1's substance stands regardless
+of which rule best names it.
+
+**Own this plainly, not softened:** the parallel dispatch into one
+shared checkout is what produced this blocker, and I chose to run
+FAILCLOSED and AR05G concurrently rather than with worktree isolation —
+both dispatches were warned about the shared checkout in their briefings
+and it happened anyway. Third live occurrence of this exact failure
+class this session (see the backlog item); the strongest evidence yet
+that worktree isolation should be the parallel-dispatch default, not a
+per-dispatch judgment call.
+
+**GMW window (TP-5) closed.** Its one purpose — landing AR05g — is done;
+the Critic's findings are about commit history, not test-file content,
+so nothing needs the window open further. Status captured as evidence
+BEFORE closing (`specs/sprint-phoenix-epic/evidence/gmw-tp5-px0ac05-window-status-20260812.json`)
+— the Critic explicitly flagged *"an in-repository or evidence-artifact
+record of the window's arming"* as the one claim it could not verify
+(`window.json` lives outside the tracked tree and is TTL-bounded); this
+closes that gap for whoever reviews this next. Then
+`guard-maintenance-window.mjs close` → `{"status":"closed"}`.
+
+**PX0-AC-05 verdict stays `partial`.** Not flipped — a FAIL is a FAIL
+regardless of which half of it concerns code vs. provenance. Fix (the
+`git commit-tree` recovery already built, `6c889079`/`cd38619e`, or the
+rebase-form fallback recorded above) then a delta Critic re-review are
+both PO-only from here: the ref-move needs the PO's own terminal or a
+GG-07 double-confirmation override (`OVERRIDE GG-07`, typed by the PO,
+never self-armed by an agent — the exact distinction
+`backlog/items/2026-08-08-an-agent-can-arm-the-git-override-itself-and-only-prose-forbids-it.md`
+already tracks for a different command; not attempted here, correctly,
+given the PO is AFK).
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
