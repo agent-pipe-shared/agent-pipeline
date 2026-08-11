@@ -1210,6 +1210,68 @@ directed hunt-list addition, no re-run instruction, no verdict word in the
 registry file `PAC08-FB-findings-registry.md`, no write-tool grant alongside
 the read-only assurance). P-AC-08 flips only if that comes back clean.
 
+### The delta review came back — that discipline just caught a real blocker the green suite could not see
+
+**Verdict: FAIL.** Full report:
+`specs/sprint-phoenix-epic/evidence/pac08-fb-critic-review-5420c5e7.md`.
+This is a materially more serious result than F-B's own original gap, and it
+would have shipped as "closed" without the delta round: F-B's persistence/
+replay logic is genuinely correct, but the state write it added is placed
+INSIDE a continuity lock the caller (`runFeaturePackageReconcileCommand`)
+already holds on `root` for the whole reconcile transaction. When the
+governing session's directory and the repository being reconciled are the
+SAME directory — which is exactly the topology Phoenix itself uses,
+reconciling its own `specs/sprint-phoenix-epic/lifecycle.json` from within
+its own checkout, `deps.dir` omitted so it defaults to `projectDir()` — the
+inner `writeState` call's own lock acquisition collides with the still-held
+outer one at the identical lock path (`continuityLockPath` is a pure function
+of the directory, blind to which token asked), refuses
+`PS-CONTINUITY-LOCKED`, and the reconcile is unconditionally refused every
+time, misreported to the operator as "PO-bound approval was not confirmed
+for this exact candidate and plan digest." **F-B did not just leave a gap
+this time — it broke the capability outright, for the one topology that
+matters.**
+
+Independently reproduced the mechanism myself before accepting the finding,
+in isolation, touching no real project state: a fresh temp directory,
+`acquireContinuityLock(dir, "pipeline-feature-package-apply-v1", {})`
+(success), then `acquireContinuityLock(dir, "pipeline-legacy-writer-v0", {})`
+against the identical directory while the first is still held — refused
+`PS-CONTINUITY-LOCKED` every time; released, the second then succeeds.
+Mechanism confirmed directly; the premise (`dir === root` is the real
+Phoenix topology, not a hypothetical) rests on `defaultFeaturePackageReconcileApproval`'s
+own design comment plus P-AC-08's stated purpose, not on a live end-to-end
+run against this repo's own state (deliberately not risked).
+
+Two more findings, both minor: **F3**, a genuinely replayed proof is reported
+to the operator with a message that is factually wrong for that specific
+cause (claims the proof doesn't bind the candidate/digest; it verified fine,
+it was already spent) — bundled into the same remediation. **F4**, the
+red-before-green evidence for F-B's own fix was reconstructed AFTER the
+commit landed (my own resume asked for it late) rather than produced before
+the fix as QG-07 wants — mine to own, not the dispatch's; recorded as a
+process lesson (memory: `feedback-critic-dispatch-contamination`, items 5-6,
+alongside a genuine range-mismatch mistake in how I described the delta
+scope to the Critic itself — caught by the Critic, no contamination actually
+occurred, but worth the same seriousness as the original four).
+
+**Remediation dispatched same night**, scoped to F1 (primary) + F3 (bundled):
+`PHX-WP-PAC08-LOCK-REENTRANCY` (goldfish-deep). Recommended approach handed
+over as a starting point, not a mandate: make `acquireContinuityLock`/
+`releaseContinuityLock` reentrant-safe for the same process re-acquiring the
+identical resolved lock path it already holds (depth-counted, released only
+at depth 0) — safe because the outer lock has already excluded every other
+genuine writer, so a nested same-process acquisition is the same critical
+section continuing, not a new one. Required: a genuine reproduce-first RED
+run (built into the dispatch's own DoD this time, not requested after the
+fact) proving the new dir-omitted/root-matching test fails against the
+current code before the fix and passes after; explicit confirmation the
+existing `PS41` foreign-lock tests and `RGi`-`RGr` stay green unchanged.
+
+**P-AC-08 stays `partial`.** 127/26/3/0/1 unchanged. The evidence-map note
+has not yet been updated to reflect this second FAIL — pending, next action
+once `PHX-WP-PAC08-LOCK-REENTRANCY` lands and is itself re-verified.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
