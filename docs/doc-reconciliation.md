@@ -47,6 +47,15 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 80887ecded4e78e3776835bc1f1128a5605dfea4 — 2026-08-11, range 77907f43..80887ecd, PX0-AC-03/06 flipped to implemented, PX0-AC-05 Critic FAIL recorded
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`80887ecd`), touching only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs` (verdict
+flips for `PX0-AC-03`/`PX0-AC-06` in `DELTA`, plus their and `PX0-AC-05`'s
+closing `POINTERS` notes). Regenerated report confirms `130/23/3/0/1`.
+
 ## Candidate 77907f43b8649c3e1ec24ff0082e2529d04f08f4 — 2026-08-11, range d827c1b3..77907f43, PX0-AC-13 grouping correction + PX0 Critic dispatch checkpoint
 
 - ADR-0012: checked, no change needed.
