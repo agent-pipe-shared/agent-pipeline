@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 451196b9c17cc3b869f992c6768654333a0ae085 — 2026-08-11, range 80887ecd..451196b9, PX0 Critic verdict checkpoint + PX0-AC-05 fix dispatch
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`451196b9`), touching only `docs/state.md`
+(additive checkpoint entry appended after the PX0-dispatch note, append-only
+discipline preserved — nothing rewritten). No other governed path touched.
+
 ## Candidate 80887ecded4e78e3776835bc1f1128a5605dfea4 — 2026-08-11, range 77907f43..80887ecd, PX0-AC-03/06 flipped to implemented, PX0-AC-05 Critic FAIL recorded
 
 - ADR-0045: checked, no change needed.
