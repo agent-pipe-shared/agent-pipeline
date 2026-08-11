@@ -260,22 +260,31 @@ correlation) and
 consolidated in their own Triage sections and kept as historical evidence
 rather than merged/deleted.
 
-**Two more measured occurrences from an unrelated 2026-08-11 session, both
-Critic dispatches, both stopping mid-Phase-A (before Phase B/report):**
+**Three measured occurrences from this same 2026-08-11 session, all Critic
+dispatches, all stopping mid-Phase-A (before Phase B/report) on their FIRST
+leg — two of three genuinely independent dispatches (fresh Agent calls, not
+resumes of each other), the third each one's own resumed continuation:**
 
-| Dispatch | Tool uses | Subagent tokens | Duration | Stopped right before |
-|---|---|---|---|---|
-| Critic review of a 50-commit range | 46 | not recorded | 504,340 ms | reading the sealed nova-a8 benchmark JSON record (its own words: "Now the benchmark record against §5.6") |
-| Critic review of 6 commits (resume of the above, after a purely procedural resume message) | not yet known — in progress at time of writing | — | — | — |
+| Dispatch | Tool uses | Duration | Stopped right before |
+|---|---|---|---|
+| Critic review of a 50-commit range | 46 | 504,340 ms | reading the sealed nova-a8 benchmark JSON record (its own words: "Now the benchmark record against §5.6") |
+| Critic review of 6 commits (independent fresh dispatch, corrected guardrails/scope, NOT a resume of the row above) | 65 | 578,161 ms | concluding a check on Verify suite registration (its own words: "Neither new suite is registered or present in the verify evidence. Let me confirm how verify enumerates suites before concluding.") |
+| (row 2's own resumed continuation, after a purely procedural resume message) | not yet known — in progress at time of writing | — | — |
 
-The first row is exact, machine-reported data (the harness's own
-`task-notification` `usage` block), not a reconstruction — the same standard
-the 2026-08-08 six-row table already set. It adds one data point to the
-"where does it stop" question this item's own direction #2 asks: like the
-2026-08-08 `SEEDINT-1`/`DOCS-1` cases, this did NOT stop mid-verification-sweep
-— it stopped right before what would have been reading a large (2671-line)
-JSON evidence file, which is at least consistent with (not yet confirmatory
-of) a large-tool-output hypothesis this item has not previously tested.
+Both independent dispatches (rows 1-2) are exact, machine-reported data (the
+harness's own `task-notification` `usage` block), not a reconstruction — the
+same standard the 2026-08-08 six-row table already set. They add two data
+points to the "where does it stop" question this item's own direction #2
+asks, and the two do not point the same way: row 1 stopped right before what
+would have been reading a large (2671-line) JSON evidence file, consistent
+with (not yet confirmatory of) a large-tool-output-before-cutoff hypothesis
+this item had not previously tested; row 2 stopped mid-reasoning about a
+mechanical fact (how Verify enumerates suites) with no obvious large read
+pending, which does not fit that same hypothesis as cleanly. Neither stopped
+mid-verification-sweep, matching the 2026-08-08 `SEEDINT-1`/`DOCS-1` cases
+that already weakened "sweep" as the trigger site. Both dispatches used a
+tool-count in the 46-65 band, consistent with this item's existing
+correlation (not a hard cliff, but the higher end of observed ranges).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
