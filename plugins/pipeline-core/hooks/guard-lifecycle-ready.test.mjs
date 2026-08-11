@@ -2419,6 +2419,147 @@ test("NOVA-XREPO-HGO-7: the guard union's absolute prohibitions gain no admissio
 });
 
 // ---------------------------------------------------------------------------------
+// NVA-BL-75 (backlog: guard-reclassification-changed-what-a-signature-can-lift): override
+// REACHABILITY as its own measured axis.
+//
+// GUARDFIX-1 above measures exitCode and denial code. That is the right instrument for
+// "this change admits nothing" and completely silent on "this change moved a command
+// between override classes" -- which is what 88d316d actually did, and why it took a Critic
+// round rather than a test to notice. A denial code is also an override class: whether a
+// human with a private key may subsequently authorize the exact command, and under which
+// eligible class. A reclassification can leave every verdict untouched and still move that.
+//
+// So this corpus pins the PAIR (denial code, override reachability) per command, derived
+// from the planner itself -- recordHumanGuardDenial()'s status/code and, where it plans, the
+// persisted plan's own commandClass -- and cross-checked against what the refusal TELLS the
+// operator. Prose in a plan is not the measurement; the plan's typed fields are.
+//
+// A red here is the signal, not the problem. It means some change altered who may authorize
+// a command, and the answer is a decision (and a note in the record) -- not re-pinning the
+// expected value until it matches. The expectations below are measured at HEAD, and record
+// the state of the boundary; they are not an endorsement of any single row.
+
+/** The exact denial reason text each refusal prints; the capability binds to it verbatim. */
+const REACHABILITY_REASONS = { ...HGO_GRAMMAR_REASON, "GUARD-CROSS-REPO-MUTATION": XREPO_REASON };
+
+/**
+ * One command on the reachability axis: not "was it admitted", but "who, if anyone, could
+ * subsequently admit it". Returns a flat, comparable pair so a diff names the axis that moved.
+ */
+function overrideReachability(command, projectDir) {
+  const result = evaluateLifecycleReadyGuard(bash(command), { projectDir, ...hgoReadyDeps() });
+  if (result.exitCode === 0) return { code: "<admitted>", reach: "admitted" };
+  const code = (result.stderr.match(/GUARD-[A-Z-]+/u) ?? ["<none>"])[0];
+  const reason = REACHABILITY_REASONS[code];
+  if (reason === undefined) {
+    // A code that never calls the planner at all (GUARD-LIFECYCLE-NOT-READY).
+    assert.doesNotMatch(result.stderr, /Human override available/u, command);
+    return { code, reach: "never-liftable:not-routed" };
+  }
+  const recorded = recordHumanGuardDenial({
+    rootDir: projectDir,
+    pluginRoot: HGO_PLUGIN_ROOT,
+    toolName: "Bash",
+    toolInput: { command },
+    denials: [{ guard: "guard-lifecycle-ready.mjs", reason }],
+  });
+  if (recorded.status !== "planned") {
+    // The operator must be told exactly what the planner concluded -- a class that cannot be
+    // armed and a refusal that implies one can be are two different failures.
+    assert.doesNotMatch(result.stderr, /Human override available/u, command);
+    assert.match(result.stderr, /No human override route is offered/u, command);
+    return { code, reach: `never-liftable:${recorded.status}:${recorded.code ?? "<none>"}` };
+  }
+  assert.match(result.stderr, /Human override available for this exact command/u, command);
+  assert.match(result.stderr, /authorize-by-signature --repo/u, command);
+  const planned = planHumanGuardOverride({
+    rootDir: projectDir,
+    pluginRoot: HGO_PLUGIN_ROOT,
+    scriptPath: HGO_OVERRIDE_SCRIPT,
+    requestSha256: recorded.requestSha256,
+  });
+  return { code, reach: `liftable-by-signature:${planned.commandClass}` };
+}
+
+test("NVA-BL-75: the guard-classification corpus measures override reachability, not only the verdict", () => {
+  const sigRoot = hgoGitFixture("signature");
+  try {
+    for (const [command, code, reach] of [
+      // Admitted outright: no denial, so no override class to reach for.
+      ["which a b c", "<admitted>", "admitted"],
+      // The shape 88d316d is about, in its parseable form: refused by the grammar, and
+      // liftable -- the exemption's whole point is that the reason it is refused is truthful.
+      ["which a b c 2>/dev/null", "GUARD-REDIRECT-UNAPPROVED", "liftable-by-signature:closed-shell-exact"],
+      // The three shapes the reclassification actually moved (cross-repo -> parse). Their
+      // reachability did NOT move with them: an unparseable command carrying `>` is refused
+      // by HGO's own eligibility before any class is assigned, under either denial code.
+      ["which a b c 2>/dev/null; which d", "GUARD-PARSE-UNSUPPORTED", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      ["which a b c 2>/dev/null && which d", "GUARD-PARSE-UNSUPPORTED", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      ["which a b c 2>NUL; which d", "GUARD-PARSE-UNSUPPORTED", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      // Narrowness controls: neither is stderr suppression, so both stay cross-repository.
+      ["which a b c &>/dev/null", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      ["which a b c >/dev/null 2>&1", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      // Genuine writes outside the root: still cross-repository, and (ADR-0059 Decision 6)
+      // routable through the narrowed class whose plan states what it cannot prove.
+      ["printf implementation 2>/etc/passwd", "GUARD-CROSS-REPO-MUTATION", "liftable-by-signature:cross-repository-target"],
+      ["printf implementation 2>/dev/null > /tmp/elsewhere/out.txt", "GUARD-CROSS-REPO-MUTATION", "liftable-by-signature:cross-repository-target"],
+      ["cp /etc/hosts /tmp/elsewhere/hosts", "GUARD-CROSS-REPO-MUTATION", "liftable-by-signature:cross-repository-target"],
+      // A suppressor standing next to a real external write launders neither the code nor the
+      // class: composition removes the route the same command would otherwise have had.
+      ["printf implementation 2>/dev/null > /tmp/elsewhere/out.txt; printf done", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
+      ["codex plugin add pipeline-core@agent-pipeline-local", "GUARD-CROSS-REPO-MUTATION", "liftable-by-signature:exact-command"],
+    ]) {
+      const measured = overrideReachability(command, sigRoot);
+      assert.deepEqual(
+        measured,
+        { code, reach },
+        `override reachability changed for ${JSON.stringify(command)}: expected ${code} / ${reach}, `
+          + `measured ${measured.code} / ${measured.reach}. Who may authorize this command moved. `
+          + "Record the decision (ADR-0059 Decision 3/4/5/6) before touching this expectation.",
+      );
+    }
+  } finally { rmSync(sigRoot, { recursive: true, force: true }); }
+});
+
+test("NVA-BL-75: the reachability labels are proven against a real capability, not read off the message", () => {
+  const liftable = hgoGitFixture("signature");
+  const unliftable = hgoGitFixture("signature");
+  try {
+    // "liftable-by-signature" means a real signed capability reaches this denial. Whether the
+    // lifted command then survives the checks HGO may not clear is NOVA-LCR-HGO-2's subject,
+    // deliberately not re-asserted here: the axis under test is reach, not the tail.
+    const grammarDenials = [{ guard: "guard-lifecycle-ready.mjs", reason: HGO_GRAMMAR_REASON["GUARD-REDIRECT-UNAPPROVED"] }];
+    hgoArmBySignature(liftable, { command: "which a b c 2>/dev/null" }, grammarDenials);
+    const admitted = evaluateLifecycleReadyGuard(bash("which a b c 2>/dev/null"), { projectDir: liftable, ...hgoReadyDeps() });
+    assert.match(
+      admitted.stderr,
+      /\[pipeline-human-override\] guard-lifecycle-ready GUARD-REDIRECT-UNAPPROVED: exact one-time capability consumed/u,
+      "a class measured as liftable-by-signature did not consume a genuine signed capability",
+    );
+
+    // "never-liftable" means no capability can be armed at all -- proven by the planner
+    // refusing to classify the command, not by the absence of a line in the message.
+    const composed = "which a b c 2>/dev/null; which d";
+    for (const reason of [HGO_GRAMMAR_REASON["GUARD-PARSE-UNSUPPORTED"], XREPO_REASON]) {
+      const recorded = recordHumanGuardDenial({
+        rootDir: unliftable,
+        pluginRoot: HGO_PLUGIN_ROOT,
+        toolName: "Bash",
+        toolInput: { command: composed },
+        denials: [{ guard: "guard-lifecycle-ready.mjs", reason }],
+      });
+      assert.equal(recorded.status, "external-operator-required", `a capability became armable for ${composed}`);
+    }
+    const refused = evaluateLifecycleReadyGuard(bash(composed), { projectDir: unliftable, ...hgoReadyDeps() });
+    assert.equal(refused.exitCode, 2, composed);
+    assert.doesNotMatch(refused.stderr, /capability consumed/u, composed);
+  } finally {
+    rmSync(liftable, { recursive: true, force: true });
+    rmSync(unliftable, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
 // NOVA-LCR-HGO-2 (ADR-0059 Decision 5): a consumed grammar capability clears ONLY the
 // shell-grammar objection -- every other check in evaluateLifecycleReadyGuard() still
 // applies to the lifted command, in particular the LAUNCH_SCRIPT external-restart

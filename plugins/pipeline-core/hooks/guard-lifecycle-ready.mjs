@@ -1044,6 +1044,42 @@ function isNullDeviceStderrRedirect(fd, target) {
   return fd === 2 && (target === "/dev/null" || target.toLowerCase() === "nul");
 }
 
+/**
+ * NVA-BL-75 (backlog: guard-reclassification-changed-what-a-signature-can-lift). WHY the
+ * exemption above is correct -- not merely harmless. 88d316d proved that it admits nothing;
+ * the reasoning for the classification itself lived only in the backlog item that reviewed
+ * it, which is exactly the kind of thing that has to be readable next to the code.
+ *
+ * The claim, on its own terms: `2>/dev/null` writes nothing, anywhere -- least of all into
+ * another repository. It therefore never was a cross-repository mutation, and was never a
+ * member of the class this function selects. Skipping it removes a FALSE POSITIVE; it does
+ * not carve an exception out of a true one. What such commands are actually refused for --
+ * composition the closed grammar does not accept -- is untouched and keeps its own code.
+ *
+ * Why that distinction is worth stating: the class this function selects is not only a
+ * denial code, it is an OVERRIDE class. At 88d316d, GUARD-CROSS-REPO-MUTATION was a bare
+ * refusal (ADR-0059 Decision 5) while the three grammar codes routed through the human
+ * override planner (Decisions 3/4), so reclassifying looked like moving a command from
+ * "never liftable" into "liftable by a signed human override" while its verdict stayed put.
+ * Correctness of the classification is what settles that: a command that is not a
+ * cross-repository mutation must not be held in the non-liftable class BY a cross-repository
+ * label it does not deserve. A guard may refuse a command for what it is; it may not keep a
+ * human from authorizing it on the strength of a fact that is untrue.
+ *
+ * Two things keep that from being a mere assertion:
+ *   - ADR-0059 Decision 6 has since made the cross-repository class routable too, through its
+ *     own narrower `cross-repository-target` class whose plan carries a scopeAttestation. So
+ *     today BOTH classes route, on different terms -- which is why the difference is measured
+ *     rather than argued: guard-lifecycle-ready.test.mjs's NVA-BL-75 corpus pins the pair
+ *     (denial code, override class) per command, so the next reclassification that moves a
+ *     command between override classes fails a test instead of needing a reviewer.
+ *   - For the exact shapes 88d316d moved (`cmd 2>/dev/null; cmd2` and siblings) the measured
+ *     reachability delta is zero, under either code: HGO's own eligibility()
+ *     (lib/human-guard-override.mjs) refuses an unparseable command containing `>` before it
+ *     can be classified, so no capability is armable for one and the guard says so
+ *     ("No human override route ... status=external-operator-required"). That refusal
+ *     predates the reclassification (af5826e7, 2026-07-29), so no signature gained reach.
+ */
 function hasExternalOutputRedirect(command, root) {
   let quote = null;
   for (let index = 0; index < command.length; index += 1) {
