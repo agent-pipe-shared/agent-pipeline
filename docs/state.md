@@ -1541,6 +1541,29 @@ before any further code, not a Goldfish wiring task. Standing firm on not
 dispatching this tonight is the correct call, now on stronger evidence than
 before, not weaker.
 
+**Correction: the security-scan gate went BLOCKING, and every "sauber"
+report to the user for the last several turns needs a caveat.** After the
+`harness/session-bootstrap.md` fix, `node harness/scripts/security-scan.mjs`
+returned `BLOCKING` (exit 2) for the first time all night — `semgrep: ERROR
+[scanner_error]`. Traced directly rather than dismissed: semgrep's own raw
+JSON has an EMPTY `results` array (zero actual matches) and exactly one
+`errors` entry, `level: "warn"`, `type: "Timeout"`, for rule
+`no-eval-usage` against `harness/scripts/pipeline-state.test.mjs` — which
+tonight's own many dispatches grew to 4788 lines. The adapter treats any
+non-empty `errors` array as fatal regardless of level, so a single rule
+timing out on one oversized file blocks exactly as hard as a genuine
+finding would. Not a security defect; a scanning-infrastructure limitation
+this session's own extensive, legitimate test authorship exposed for the
+first time. Filed: `backlog/items/2026-08-11-semgrep-timeout-on-oversized-
+pipeline-state-test-file.md`. NOT fixed tonight (touching semgrep config or
+splitting a 4788-line test file are both real decisions, not a rushed
+end-of-session patch) — the gate is genuinely BLOCKING right now and stays
+that way until a real fix lands. Every earlier "Security-Scan sauber"
+statement this session was accurate for its own moment (gitleaks/license
+clean, and semgrep genuinely had nothing to report at those smaller file
+sizes) — this is a newly crossed threshold, not a retroactive falsehood,
+but it needs to be said plainly rather than left implicit.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
