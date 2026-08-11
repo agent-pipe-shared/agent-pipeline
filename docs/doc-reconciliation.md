@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 1a359938fb7227266fedc99711736422ad68c130 — 2026-08-11, range 8ba9d410..1a359938, R-AC-08 scoping run, unifying root cause named across four criteria
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`1a359938`), editing
+`specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md` in place.
+Same reasoning as the two immediately preceding entries: an existing design
+artifact under `specs/**`, not a tracked package artifact or `lifecycle.json`
+change. `docs/state.md` not touched — ADR-0012 not implicated.
+
 ## Candidate 8ba9d41001845bf2286ca2d85e72bedf3b4a5111 — 2026-08-11, range 1a0a1186..8ba9d410, L-AC-01 and A-AC-01 scoping steps run, shared root cause connected
 
 - ADR-0045: checked, no change needed.
