@@ -47,6 +47,24 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 680d971fbe34c904a85d321cabdfa4341c1fd295 — 2026-08-11, range 9ae13b10..680d971f, second stale-negative audit (A-AC-03/09, P-AC-09, EPIC-AC-02)
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+
+Covers `4c41a483` (the stale-4 audit's data edit plus its new dated
+`acceptance-evidence-map-20260811b.md` deliverable and the `CLOSURE`-map
+`build`→`po` fix for PX0-AC-05/13, dispatch `PHX-WP-DELTA-STALE4`),
+`0b180d16` (a trailing dispatch-record.json commit-hash fill-in, same
+task), and `680d971f` itself (`docs/state.md`, purely additive: records
+the 127/26/3/0/1 result). Same reading as the immediately preceding entry:
+no code in this range touches the canonical artifact topology ADR-0045
+governs beyond ordinary content evolution inside files it already lists —
+the new dated `.md` follows the existing naming convention, and the
+`CLOSURE` map edit is a data-value change inside a file ADR-0045 already
+covers, not a topology change. `docs/state.md` stays ADR-0012, purely
+additive as always.
+
 ## Candidate 9ae13b104d79ed76819b292b1a471b2582e5e2b0 — 2026-08-11, range e1265678..9ae13b10, targeted delta re-measurement of PX0-AC-03/05/06/13
 
 - ADR-0012: checked, no change needed.
