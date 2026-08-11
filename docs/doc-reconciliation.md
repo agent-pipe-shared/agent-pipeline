@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 09785aee2ae83c57e7179bdd216449f58325713e — 2026-08-12, range db3b6c3b..09785aee, PX0-AC-05 Critic FAIL recorded in evidence map
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`09785aee`), touching only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs` (a
+POINTERS note extension, verdict unchanged, totals regenerated and
+confirmed 130/157). File placement, naming and directory shape
+unaffected.
+
 ## Candidate 4a2a5e7b406b10fcf359dfb01f1b8f1df0eed2d6 — 2026-08-12, range 1d11c7f2..4a2a5e7b, GMW window status evidence artifact captured
 
 - ADR-0045: checked, no change needed.
