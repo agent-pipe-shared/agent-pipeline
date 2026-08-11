@@ -287,8 +287,46 @@ equally-strong alternate mechanism, document the equivalence" or "H-AC-12
 means the specific reference shape literally, wire it in regardless of the
 existing mechanism" is now a clean, fully-scoped PO/design call — no further
 code investigation narrows it further. Put to the PO the same night via
-`AskUserQuestion`; answer to be recorded here or in a follow-up note once
-given.
+`AskUserQuestion`; both answered "existing mechanism satisfies it," the
+recommended option in both cases.
+
+**Correction (2026-08-11, later still, advisor-flagged).** Recording that
+PO answer as "satisfied, no code change, done" in the evidence map was
+wrong — accepting an alternate mechanism in place of the literal
+`pipeline.human-decision-reference.v1` reference changes what H-AC-12's own
+SHALL text is read to require for these two subsystems. That is the same
+category of act P-AC-06 is blocked on: an `acceptance.md` amendment, not a
+code-evidence measurement. The PO's decision is not being re-litigated —
+it stands as the answer once the amendment route clears — but it does not
+land as a closed subsystem by itself, same as H-AC-11's O-4. **Both stay
+open** for verdict/measurement purposes until the amendment actually lands
+in `acceptance.md`, queued behind the same digest-coupling-gated signature
+route as P-AC-06 (see `design/p-ac-06-clause-disposition-proposal.md`).
+`evidence/acceptance-evidence-map.mjs`'s H-AC-12 entry corrected to match
+(`acceptance-evidence-map-20260811d.md`).
+
+**Git-guard override consumption — the third remaining named subsystem,
+read tonight, not yet dispositioned.** Unlike the two above, this one may
+not need a PO call at all: `guard-git.mjs`'s Phoenix override path
+(`consumePhoenixOverrideAuthority`, restored from `998a609`) already
+references a `decisionId` and validates it out-of-process against the
+canonical governance-authority resolver before consuming it — mandatory
+and unbypassable in a Phoenix-governed repository (this repo is one:
+`governance/events/registry.json` exists), conjoined with, not instead of,
+the base token check. There is no legacy "trust the token alone" path
+surviving for a Phoenix-governed project to migrate away from, which is
+what makes this different in kind from release-planning/deploy-consumption
+above: this reader was built with the canonical check mandatory from
+restoration, not layered on afterward as an alternate. Open question,
+un-verified: does H-AC-12's second SHALL clause ("dual-evaluate during
+migration... carry the shared compatibility owner and expiry") even apply
+to a reader with no migration in progress, or does satisfying the first
+SHALL clause (reference + validate the canonical decision ID) as written
+already close this one as a measurement — no PO amendment needed, unlike
+the other two? Next step if picked up: read `governance-authority.mjs`
+(the CLI `invokeGovernanceAuthority` spawns) to confirm what it actually
+validates against the human-governance ledger, then decide whether this is
+reportable as `implemented`-grade evidence for this one named subsystem.
 
 ## The unifying finding: one root cause behind at least four criteria
 
