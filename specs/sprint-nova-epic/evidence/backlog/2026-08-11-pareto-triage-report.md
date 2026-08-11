@@ -23,20 +23,27 @@ is still required before `reconcile-backlog-ledger.mjs --activate` runs.
 | 4 | 2026-08-07 | 23 (24 matched, 1 excluded false-positive) | 20 | 3 | 0 |
 | 5 | 2026-08-08 part A (items 1-24 alphabetical) | 24 | 17 | 7 | 0 |
 | 6 | 2026-08-08 part B (items 26-48 alphabetical) | 23 | 14 | 9 | 0 |
-| **Total** | | **121** | **88** | **32** | **1** |
+| **First-pass total** | | **121** | **88** | **32** | **1** |
+| Item 25 (coverage gap, confirmed by second pass) | 2026-08-08 | 1 | 0 | 1 | 0 |
+| **Final total (post second-pass)** | | **122** | **88** | **33** | **1** |
 
-**Known coverage gap:** item 25 of the 2026-08-08 alphabetical sort,
+**Coverage gap — resolved.** Item 25 of the 2026-08-08 alphabetical sort,
 `2026-08-08-po-language-is-set-without-asking-and-cannot-be-changed.md`, fell
 between batch 5's range (1-24) and batch 6's range (26-48) — covered by
-neither agent's assigned scope. Batch 6 did a bonus spot-check anyway:
-`project-onboarding-v3.mjs:290-317` now threads the PO's real `--language`
-kickoff answer into `pipeline.user.yaml`/`.claude/pipeline.yaml`/
-`project/pipeline.yaml` instead of silently defaulting to `"en"` — looks like
-**STALE-SHOULD-CLOSE**, though the fix is attributed in-code to a
-related-but-different backlog item (`language-selection-scope-is-unclear-and-arrives-too-late`).
-Flagged explicitly for independent confirmation, not adopted as final. Not
-counted in the totals table above (122 total files exist across the six
-date-partitions; 121 were classified by an in-scope agent).
+neither first-pass agent's assigned scope. The second-pass verification agent
+(see below) gave it a full independent classification: **STALE-SHOULD-CLOSE,
+confirmed**. `--language <de|en>` is now a required, validated CLI flag at
+kickoff (`project-onboarding-v3.mjs:114`), and the live `kickoff-apply`
+handler threads the PO's real answer through `correctSeededKickoffLanguage()`
+(landed via commit `1174512b`, 2026-08-10) — attributed in-code to a
+different, more specific item (`language-selection-scope-is-unclear-and-arrives-too-late`),
+but this item's own described defect is fully subsumed.
+
+**Selector false-positive risk — checked, not repeated in the re-verified set.**
+The second-pass agent ran `rg -n "^status:"` against the frontmatter block of
+all 19 items it covered: every one carries a genuine `status: open` inside
+the YAML header at line 6. No further false positives found (the one caught
+by batch 4 remains the only confirmed instance).
 
 **Selector caveat:** the underlying selector (`rg -l "status: open" backlog/items`)
 matches body prose as well as frontmatter. Batch 4 caught one instance
@@ -689,17 +696,113 @@ note in the aggregate section above.
 
 ---
 
-## Next step
+## Second-pass verification (2026-08-11)
 
-A second, targeted verification pass (not a full re-run of all 88
-STILL-OPEN-REAL items) against: the four items flagged "ambiguous, needs a
-closer look" (`po-gate-authority-receipt-readback`,
-`a-git-repository-appears-although-the-plan-said-it-would-not`,
-`an-agent-talks-itself-out-of-the-pipeline-and-starts-before-the-answer`,
-`what-the-claude-greenfield-run-adds-to-the-happy-path-findings`); items
-classified open only on the strength of their own recorded Triage note
-rather than a fresh code read (batch 4's 7-item group, and similar
-Triage-only confirmations in other batches); the "partially fixed" items
-where only half was confirmed; and the two coverage/selector gaps (item 25's
-own confirmation, and a frontmatter-only re-derivation of the true
-`status: open` set to rule out further body-prose false positives).
+Per the PO's explicit follow-up ("danach die offenen gegen den Code
+prüfen"), a targeted `general-purpose` agent re-checked the 19 items NOT
+already resolved by a direct fresh code citation in the first pass: the 4
+flagged "ambiguous, needs a closer look," 7 batch-4 items confirmed only by
+their own recorded Triage note, 7 "partially fixed" items where the unfixed
+half wasn't pinned down precisely, and the item-25 coverage gap. Investigation
+only, no file edits or status changes.
+
+### STALE-SHOULD-CLOSE (1)
+
+`2026-08-08-po-language-is-set-without-asking-and-cannot-be-changed.md` —
+defect fully resolved. `--language <de|en>` is now a required, validated CLI
+flag at kickoff (`project-onboarding-v3.mjs:114`). The live `kickoff-apply`
+handler (`applyProjectOnboardingKickoffV4`, `project-onboarding-v3.mjs:4403-4439`)
+calls `correctSeededKickoffLanguage()` (lines 320-337) and
+`initializeKickoffPoProfile()` (line 345). Landed via commit `1174512b`
+(2026-08-10), 4 days after this item's filing. Attributed in-code to a
+different, more specific item (`language-selection-scope-is-unclear-and-arrives-too-late`,
+GF-079) — but this item's own described defect is fully subsumed. Corrects
+the first pass's unconfirmed bonus spot-check to a confident close.
+
+### STILL-OPEN-REAL (18) — all reconfirmed, corrections noted where found
+
+1. `2026-07-25-po-gate-authority-receipt-readback.md` — `docs/state.md:5987-5988`
+   still literally reads "UNCONFIRMED," root cause "not isolated." Explicitly
+   NOT code-verifiable: a live Windows DACL/directory-durability timing race;
+   this session runs on Linux/WSL and cannot reproduce or refute it.
+2. `2026-08-08-a-git-repository-appears-although-the-plan-said-it-would-not.md`
+   — narrowed via exhaustive check: `project-onboarding-v3.mjs` is the
+   *only* production file anywhere that calls `git init`, both call sites
+   strictly gated behind `initializesGit`. Rules out an undisclosed
+   Pipeline-code initialization; a misleading field or out-of-band cause
+   remains unrefuted — a live-session claim not resolvable by static reading.
+3. `2026-08-08-an-agent-talks-itself-out-of-the-pipeline-and-starts-before-the-answer.md`
+   — confirmed: no "unadopted-session"/"not yet adopted" text anywhere in
+   `SKILL.md`, `roles/elephant.md`, or `docs/operating-model.md`. The
+   proposed fix target (an explicit unadopted-session contract) is a
+   documentation gap, confirmed absent.
+4. `2026-08-09-what-the-claude-greenfield-run-adds-to-the-happy-path-findings.md`
+   — compound item, resolved point-by-point: point 1 (late language-gate
+   firing) now fixed (same `1174512b` mechanism as the item above); point 3
+   (`--help`) already confirmed fixed by the first pass; points 4
+   (authority-staleness ordering) and 5 (missing git-identity onboarding)
+   remain unaddressed. Stays open (2 of 4 points unresolved), note point 1 fixed.
+5. `2026-08-07-agent-tool-isolation-worktree-snapshots-stale-upstream-ref.md`
+   — harness-level, not a repo-code defect; item's own "Update 2026-08-11"
+   section records independent reconfirmation today.
+6. `2026-08-07-adr-0047-numbering-collision.md` — both `docs/adr/0047-*.md`
+   files confirmed still present; PO decision 2026-08-11 defers to Phoenix sprint.
+7. `2026-08-07-greenfield-onboarding-writes-mixed-authority-tiers.md` —
+   independently confirmed: `planProjectOnboardingV3`'s write-target list
+   (`project-onboarding-v3.mjs:3694-3702`) includes only `project/pipeline.json`
+   for calibration, not `.claude/pipeline.json`.
+8. `2026-08-07-native-windows-verify-red-suite-class.md` — accept-deferred;
+   this session cannot execute native-Windows Verify (Linux/WSL).
+9. `2026-08-07-push-release-flow-unusable-for-third-party-adopters.md` —
+   `docs/push-release-flow.md` confirmed to exist (candidate #1 done);
+   candidates #2-#4 remain explicit PO-territory open calls.
+10. `2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md`
+    — sharper than first pass: `guard-gate-strength.mjs:246` explicitly
+    excludes GS-6 from `recordHumanGuardDenial` (code comment: "Never GS-6...
+    untouched"); its only lift route is an all-or-nothing Guard Maintenance
+    Window, not the narrower per-file route the item's Proposal #2 asks for.
+11. `2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md`
+    — confirmed no enforcement mechanism exists anywhere (zero hits for
+    dispatch-trailer verification in production code).
+12. `2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md` —
+    confirmed exactly: `gateConfig` (`manifest.mjs:793-799`) returns `null`
+    when `manifest.gates` is absent, line-for-line match with first pass.
+13. `2026-08-07-agent-definitions-pin-the-review-tier-model.md` — confirmed
+    `critic.md`/`goldfish-deep.md` both still `model: sonnet`; directly
+    confirmed against the live `Agent` tool schema — no `effort` parameter exists.
+14. `2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md` —
+    `goldfish-task.md` has zero occurrences of "reset" (candidate 4
+    unimplemented); the Worktree field still doesn't address shared-file
+    exposure (candidate 3 unimplemented).
+15. `2026-08-07-human-approval-ux-directory-clarity-and-single-command.md` —
+    narrower than first pass found: proposal #1 landed; **correction:**
+    proposal #3 (command-boundary docs) is actually done
+    (`docs/po-human-approval.md:56-64`, commit `71f330db`) — only proposal #2
+    (`sign-intent --request` flag) remains genuinely open, narrowing this
+    from "2 of 3 missing" to "1 of 3."
+16. `2026-08-07-maintenance-window-selectivity-is-untested-at-both-levels.md`
+    — `guard-testpath.test.mjs` grew to TP01-TP13 but still no selectivity
+    negative case (window scoped to one TP rule, edit matches a different one).
+17. `2026-08-08-the-grammar-refusal-does-not-say-which-part-of-the-command-failed.md`
+    — confirmed exactly: `guard-lifecycle-ready.mjs:1911` still passes
+    literal `[]` for `retryActions` on `GUARD-OPERATOR-UNAPPROVED`/
+    `GUARD-REDIRECT-UNAPPROVED`.
+18. `2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-calls-it.md`
+    — confirmed `retireOrphanScratchDescriptors` has zero production
+    callers; neither `pipeline.yaml` variant mentions "scratch" anywhere.
+
+### Selector sanity check
+
+`rg -n "^status:"` against the frontmatter block of all 19 files: every one
+carries a genuine `status: open` inside the YAML header. No false positives
+in this set.
+
+### Second-pass summary
+
+19 items re-verified: 18 STILL-OPEN-REAL (all reconfirmed; two evidence
+refinements — item 15 narrowed from 2-of-3 to 1-of-3 missing proposals, item
+4 noted one of its four points now fixed), 1 STALE-SHOULD-CLOSE (the item-25
+coverage gap, now confirmed). Two items (1 and 2 above) have a residual
+root-cause ambiguity that is explicitly a live-session/native-Windows claim
+outside what static code reading can settle — their open status itself is
+not in doubt (no fix has landed for either).
