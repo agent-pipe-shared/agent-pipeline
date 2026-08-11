@@ -144,3 +144,89 @@ export function normalizeSyntheticExecutionOutcome(expected, outcome) {
   return { ok: true, code: "OUTCOME:normalized", state: map[outcome.kind], result: outcome.kind === "verifierPassed" ? { ...outcome.result, status: "verified" } : outcome.result, reason: null, observation: { source: "synthetic-adapter", monotonicMs: expected.revision + 1, wallTime: null, rawSha256: outcome.evidenceSha256, adapterState: outcome.kind, rawStateSha256: outcome.evidenceSha256 } };
 }
 export function reduceExecutionState(current, outcome, history = undefined) { if (stateCode(current)) throw new Error("SHAPE:state-current"); if (!TRUSTED_STATES.has(current)) { const checked = validateExecutionState(current, history); if (!checked.ok) return { ok: false, code: checked.code, state: null }; } const n = normalizeSyntheticExecutionOutcome(current, outcome); if (!n.ok || n.state === null) return n; if (TERMINAL.has(current.state) || !TRANSITIONS[current.state]?.has(n.state)) return { ok: false, code: "CONFLICT:transition", state: null }; const next = { ...clone(current), state: n.state, revision: current.revision + 1, observation: n.observation, result: n.result ?? current.result, reason: n.reason, previousSha256: executionStateDigest(current) }; if (stateCode(next)) return { ok: false, code: "INTERNAL:state", state: null }; const sealed = freeze(next); TRUSTED_STATES.add(sealed); return { ok: true, code: "STATE:applied", state: sealed }; }
+
+/**
+ * ADR-0062 (Production executor, #12/#14) real-outcome counterpart to
+ * `normalizeSyntheticExecutionOutcome`, added ALONGSIDE it (never replacing
+ * it, never editing it). `reduceExecutionState` above is untouched; the new
+ * sibling `reduceRealExecutionState` below drives the same
+ * TRANSITIONS/TERMINAL machinery through this normalizer instead.
+ *
+ * Input is a real observed worker outcome shape informed by
+ * local-worker-supervisor.mjs's own validated record-worker shape
+ * (`validRecordWorker`) and its closed terminal worker-state set
+ * (`WORKER_STATES`/`TERMINAL`, local-worker-supervisor.mjs ~L71-73):
+ * exactly one of "completed" | "failed" | "cancelled" | "timed-out" |
+ * "recovery-required". Plane admission bookkeeping ("admitted"/"running")
+ * is still driven through the existing synthetic path deliberately: the
+ * supervisor's own per-worker record has no distinct real "admitted" signal
+ * separate from "running" (WORKER_STATES has no "admitted" entry) -- it is
+ * the worker's real *outcome* that ADR-0062 makes real, not plane admission.
+ */
+const REAL_WORKER_TERMINAL_STATES = new Set(["completed", "failed", "cancelled", "timed-out", "recovery-required"]);
+function realOutcomeCode(v) {
+  if (!exact(v, ["dispatchId", "attempt", "candidateCommit", "worker"])) return "SHAPE:real-outcome";
+  if (!ID.test(v.dispatchId) || !Number.isSafeInteger(v.attempt) || v.attempt < 0 || !OID.test(v.candidateCommit)) return "SHAPE:real-outcome";
+  const w = v.worker;
+  if (!w || typeof w !== "object" || !REAL_WORKER_TERMINAL_STATES.has(w.state)) return "SHAPE:real-worker-state";
+  if (!ID.test(w.taskId) || !SHA.test(w.subjectSha256)) return "SHAPE:real-worker-identity";
+  if (w.result !== null && (typeof w.result !== "object" || !SHA.test(w.result.resultSha256) || typeof w.result.status !== "string" || !Array.isArray(w.result.changed))) return "SHAPE:real-worker-result";
+  return null;
+}
+function realOutcomeEvidenceSha256(worker) {
+  // Reuse the supervisor's own already-computed, already-validated result
+  // digest whenever a result exists; only the identity-lost recovery-required
+  // case (worker.result === null, local-worker-supervisor.mjs waitForWorkers())
+  // has no such digest, so derive one from the real worker identity/timing
+  // fields actually present in the record instead of fabricating one.
+  return worker.result !== null
+    ? worker.result.resultSha256
+    : hash({ taskId: worker.taskId, subjectSha256: worker.subjectSha256, leaseId: worker.leaseId, state: worker.state, startedMonotonicMs: worker.startedMonotonicMs, completedMonotonicMs: worker.completedMonotonicMs });
+}
+function realOutcomeKind(worker) {
+  if (worker.state === "completed") return "success";
+  if (worker.state === "failed") return "failure";
+  if (worker.state === "timed-out") return "timeout";
+  if (worker.state === "cancelled") return "cancel";
+  // "recovery-required" covers several distinct real causes (see
+  // local-worker-supervisor.mjs waitForWorkers()/finishResult()). A null
+  // result means the process identity itself was lost -- never confirmed
+  // either way -- nearest synthetic counterpart "lostHeartbeat" -> "lost". A
+  // non-null result with status:"recovery-required" means the process
+  // exited and produced a result, but that result could not be trusted
+  // (source-status digest drift or invalid adapter output) -- nearest
+  // counterpart "completedUndelivered" -> "completed-undelivered", since
+  // work plausibly completed but delivery/integrity could not be confirmed.
+  // This is a disclosed judgment call (briefing NVA-A1214-EXEC-01 field 2),
+  // not a discovered fact, and the two sub-cases ARE distinguishable in the
+  // data available here, so each maps to its own closer counterpart rather
+  // than one blanket fallback.
+  return worker.result === null ? "lostHeartbeat" : "completedUndelivered";
+}
+export function normalizeRealExecutionOutcome(expected, realOutcome) {
+  const shapeCode = realOutcomeCode(realOutcome);
+  if (!expected || subjectCode(expected.subject) || shapeCode) return { ok: false, code: shapeCode ?? "SHAPE:real-outcome", state: null };
+  const s = expected.subject;
+  if (realOutcome.dispatchId !== s.dispatchId || realOutcome.attempt !== s.attempt || realOutcome.candidateCommit !== s.candidateCommit) return { ok: false, code: "STALE:outcome", state: null };
+  const worker = realOutcome.worker;
+  const kind = realOutcomeKind(worker);
+  const map = { success: "succeeded-unverified", failure: "failed", timeout: "timed-out", lostHeartbeat: "lost", completedUndelivered: "completed-undelivered" };
+  const evidenceSha256 = realOutcomeEvidenceSha256(worker);
+  // Real wall-clock/monotonic values, not the synthetic path's expected.revision+1
+  // trick: ordering/replay safety comes entirely from `revision` inside
+  // `reduceExecutionState`/`reduceRealExecutionState` (current.revision + 1), and
+  // observation.monotonicMs is never checked against any prior value anywhere in
+  // this file -- it is not load-bearing for ordering, so a genuine Date.now()
+  // capture at normalization time is honest and sufficient.
+  const observedAtMs = Date.now();
+  const observation = { source: "local-worker-supervisor", monotonicMs: observedAtMs, wallTime: new Date(observedAtMs).toISOString(), rawSha256: evidenceSha256, adapterState: worker.state, rawStateSha256: evidenceSha256 };
+  const reason = `worker:${worker.taskId} state:${worker.state}${worker.result ? ` exitCode:${worker.result.exitCode ?? "null"}` : ""}`.slice(0, 512);
+  if (kind === "cancel") return { ok: true, code: "OUTCOME:normalized", state: expected.state === "cancel-requested" ? "cancelled" : "cancel-requested", result: null, reason, observation };
+  if (kind === "success") {
+    if (worker.result === null) return { ok: false, code: "SHAPE:success-result", state: null };
+    const bytes = worker.result.changed.reduce((sum, entry) => sum + entry.bytes, 0);
+    return { ok: true, code: "OUTCOME:normalized", state: map.success, result: { resultSha256: worker.result.resultSha256, bytes, status: "delivered" }, reason, observation };
+  }
+  return { ok: true, code: "OUTCOME:normalized", state: map[kind], result: null, reason, observation };
+}
+export function reduceRealExecutionState(current, realOutcome, history = undefined) { if (stateCode(current)) throw new Error("SHAPE:state-current"); if (!TRUSTED_STATES.has(current)) { const checked = validateExecutionState(current, history); if (!checked.ok) return { ok: false, code: checked.code, state: null }; } const n = normalizeRealExecutionOutcome(current, realOutcome); if (!n.ok || n.state === null) return n; if (TERMINAL.has(current.state) || !TRANSITIONS[current.state]?.has(n.state)) return { ok: false, code: "CONFLICT:transition", state: null }; const next = { ...clone(current), state: n.state, revision: current.revision + 1, observation: n.observation, result: n.result ?? current.result, reason: n.reason, previousSha256: executionStateDigest(current) }; if (stateCode(next)) return { ok: false, code: "INTERNAL:state", state: null }; const sealed = freeze(next); TRUSTED_STATES.add(sealed); return { ok: true, code: "STATE:applied", state: sealed }; }
