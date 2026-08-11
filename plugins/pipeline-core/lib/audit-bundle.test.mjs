@@ -56,6 +56,11 @@ function illegallyMutableFixture() {
   writeFileSync(join(input.root, input.manifest), JSON.stringify(value));
   return input;
 }
+function orphanedFixture() {
+  const input = fixture();
+  writeFileSync(join(input.root, "specs", "bundle-fixture", "orphan.md"), "orphan");
+  return input;
+}
 // P-AC-06: a required artifact whose file is missing must reject the whole
 // bundle plan rather than silently building around a hole.
 test("P-AC-06 rejects a required artifact whose source file is missing", () => {
@@ -87,6 +92,13 @@ test("P-AC-06 fails the build when a planned artifact is truncated before the bu
   const input = fixture(); const plan = planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] });
   writeFileSync(join(input.root, "specs", "bundle-fixture", "result.md"), "re");
   await assert.rejects(() => buildAuditBundle({ repositoryRoot: input.root, outputPath: "bundle", plan }), (error) => error.code === "AB-SOURCE-DIGEST");
+});
+// P-AC-06: a file physically present under the package directory but not
+// referenced by any manifest artifact entry is orphaned and must reject the
+// plan, not be silently ignored.
+test("P-AC-06 rejects a package file not referenced by any artifact (orphaned)", () => {
+  const input = orphanedFixture();
+  assert.throws(() => planAuditBundle({ repositoryRoot: input.root, manifestPath: input.manifest, bundleId: "release-evidence", coreVersion: "0.4.7", packs: [pack()] }), (error) => error.code === "AB-PACKAGE");
 });
 // P-AC-10: a compliance claim must have no channel into a signed bundle,
 // including one smuggled through the external signing provider's response.
