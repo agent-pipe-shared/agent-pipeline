@@ -21,6 +21,6 @@
     "closure-mode--mode-closure-bare": "not verified due to budget exhaustion",
     "closure-mode--mode-closure-out": "not attempted due to budget exhaustion"
   },
-  "commit": "PENDING-AT-RECORD-WRITE-TIME",
+  "commit": "4c41a483",
   "report": "See final assistant message of session for the full completion report."
 }
