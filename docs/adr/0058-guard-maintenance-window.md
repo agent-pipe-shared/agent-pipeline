@@ -231,3 +231,28 @@ its own right (see Follow-up).
   and the exposure stays — the same two-way trigger shape §15.1.6 (v) of the caching design now uses
   for the analogous `guard-testpath.mjs` question, not a default of leaving the question open
   indefinitely.
+- `plugins/pipeline-core/hooks/guard-testpath.mjs`'s own membership in
+  `NEVER_LIFTABLE_KERNEL_PATHS` — the question the entry above uses only as an
+  analogy — is itself raised here, not yet decided.
+  `backlog/items/2026-08-10-guard-testpath-not-kernel-protected-like-its-
+  sibling.md` names the same recursive-hole shape Decision 3 already protects
+  `guard-gate-strength.mjs` against: `guard-testpath.mjs` is the enforcement
+  hook for the entire TP-* rule family, so a GS-6 window opened for any
+  legitimate, unrelated purpose would let its first edit weaken or remove a
+  TP-* refusal, and that edit would survive the window's own expiry — this
+  file's own `Governs:` line already lists `guard-testpath.mjs`, so the
+  question sits squarely inside this ADR's authority. `PIPE-WP-GTP-KERNEL`
+  (2026-08-11) attempted the array addition the backlog item proposes and
+  correctly stopped rather than ship it without this recorded decision —
+  the stop is what surfaced that the question had only ever been used as an
+  analogy above, never itself tracked.
+
+  Owner `pipeline`. **Trigger:** the same two-way shape as the entry above —
+  a dated correction that either adds the path to
+  `NEVER_LIFTABLE_KERNEL_PATHS` or records that the maintenance-cost
+  tradeoff is accepted and the exposure stays. The backlog item names the
+  cost precisely: once added, a genuine bug in TP-*'s own enforcement logic
+  would need a different, out-of-session route to fix (the PO editing it
+  directly, or a separate installed-plugin-copy workflow) — the same
+  limitation this repository already accepts for `guard-gate-strength.mjs`
+  today. That tradeoff is the PO's to weigh, not a default either way.
