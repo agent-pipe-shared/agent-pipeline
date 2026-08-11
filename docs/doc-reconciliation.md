@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 83a35689e1c7a6d685d8cee290e281c2a7bf7b3c — 2026-08-11, range 55e60f67..83a35689, P-AC-08 default-approval-fix note
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`83a35689`), touching only
+`evidence/acceptance-evidence-map.mjs`'s `P-AC-08` NOTES string (a prose
+append recording that PHX-WP-PAC08-RECONCILE-APPROVAL's default-closure fix
+landed and was independently re-verified; verdict unchanged at `partial`).
+Regenerated the report and diffed the summary table — `127/26/3/0/1`
+byte-identical before/after. No artifact topology, schema, or manifest
+tracking changed; the file stays under `specs/sprint-phoenix-epic/`, not
+`lifecycle.json`-tracked.
+
 ## Candidate 1d02fbe09775e8000d5549571e0d72f9baf35afe — 2026-08-11, range 98509db7..1d02fbe0, Git-guard override consumption measurement finding for H-AC-12
 
 - ADR-0045: checked, no change needed.
