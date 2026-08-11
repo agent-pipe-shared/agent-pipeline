@@ -906,6 +906,94 @@ unlike the other two? Not dispositioned either way tonight; recorded in
 step if picked up (read `governance-authority.mjs`, confirm what it
 validates against the ledger). 127/26/3/0/1 still unchanged.
 
+### P-AC-08's default-approval gap is fixed and independently re-verified; the GMW window is live, key rotation happened along the way
+
+**P-AC-08 (`deps.featurePackageReconcileApproval` has no default, Critic F3):**
+PO decision (verbatim): *"A) später bin am Handy / B) jetzt als
+Implementierung umsetzen auch gerne mit der selben Schlüssel Ed vs Chat
+Logik"* — authorized building the fix now, deferred the GMW window. Landed in
+three commits, each independently re-verified (not accepted from the
+dispatch's own report), per ADR-0056's 2026-08-11 Follow-up (`gates.
+reconcile_approval`, new key, mirrors `gates.push_approval`, same committed
+`trustAnchor`, scope limited to `feature-package-reconcile`):
+
+- `c6bd3a6b` — `critical-human-proof-policy.mjs` generalized
+  (`GATE_APPROVAL_MODE_KEYS`/`readGateApprovalMode`), `CRITICAL_ACTION_KINDS`
+  extended. 31/31 + 5/5 re-run green.
+- `4021299d` — `runner-profiles-v3.mjs` schema admits `gates.
+  reconcile_approval`. 21/21 + `check-routing-projections.mjs` re-run green.
+  Real `pipeline.user.yaml` NOT edited here — GS-1 (`guard-gate-strength`)
+  refuses any agent in-session edit to that file's `gates` block outright,
+  even under a GMW window (confirmed: GS-1 is not in the liftable set at
+  all, unlike GS-6). Absence still validates as the strongest default, so
+  nothing is weakened by the gap.
+- `55e60f67` — `pipeline-state.mjs`: `ALWAYS_REQUIRED_KINDS` bypass,
+  widened `FEATURE_PACKAGE_RECONCILE_FLAGS`, `defaultFeaturePackageReconcile
+  Approval` built and wired as `runFeaturePackageWriteCommand`'s fallback
+  (`Object.hasOwn`-gated, so an explicit-`undefined` test injection still
+  works). **Near-miss during this dispatch**, caught before it did damage:
+  the background agent's own regression pass got cut off mid-check by a
+  harness turn-boundary (same failure class as this work package's first
+  attempt) before it wrote its own report or dispatch-record entry — the
+  Elephant read the commit diff directly and independently re-ran 468/468
+  (`pipeline-state.test.mjs`, no regression), 31/31, 5/5, 0 implicated ADRs,
+  then wrote the missing dispatch-record log entry itself.
+- `83a35689`/`d11c4d5f` — evidence-map note + its doc-reconciliation entry.
+  **Verdict stays `partial`**: `spec.md:673` needs a named test in a
+  gate-registered suite, and the resolver's own proving tests are TP-5-
+  blocked, same gate as everything else below. 127/26/3/0/1 unchanged by
+  this leg (code-only, no criterion-closing test landed yet).
+
+**The PO came back to a PC and opened the GMW window live** (not deferred
+after all — "lass uns jetzt schnell das gmw wartungsfenster freigeben, ich
+bin gerade am PC"). Scope `TP-3,TP-5`, matching this file's own 2026-08-11
+punch list (§ above) plus the new P-AC-08 resolver tests as a fourth item.
+Sequence, for the next session that needs the pattern:
+
+1. `guard-maintenance-window.mjs prepare` (wrapped in
+   `scratch/gmw-prepare-and-write.mjs` since the CLI's `install` reads
+   `--request` from a FILE and stdout can't be redirected under the closed
+   shell grammar) — bound to HEAD.
+2. **The PO's registered signing key was lost.** `~/agent-pipeline-po/
+   po-private.pem` on disk resolved to a NEW, different public key
+   (`a3a43c4b…`) than the repo's committed `trustAnchor`
+   (`f28988b2…`, pinned since `3b98c138`) — confirmed by hashing the actual
+   on-disk PEM, not trusted from an adjacent `trust-policy.json` claim. The
+   PO rotated the anchor themselves, **directly on disk, never through the
+   agent** — `project/critical-human-proof.json` is a
+   `NEVER_LIFTABLE_KERNEL_PATHS` entry, refused even under an active GMW
+   window; there is no path by which the agent could have made this edit.
+   Landed as `2f56a6fb` (`chore(auth): rotate trust anchor to new PO key
+   (old key lost)`), a plain hash swap, PO-authored and PO-committed.
+3. `prepare` re-run against the post-rotation HEAD (the first request had
+   gone stale the moment `2f56a6fb` moved the tree — same freshness
+   discipline as the 2026-08-08/2026-08-10 precedents: never let a
+   signature be spent on a request that cannot verify).
+4. Signing helper `scratch/gmw-sign.mjs` (own script, pinned to the fresh
+   intent digest, never a repo `sign` mode — matches
+   `docs/po-approval-proof-contract.md`'s boundary). **First version had a
+   real bug**, found before the PO's first real run: three control-character
+   comparisons (backspace/Ctrl-C/Ctrl-D) had silently become empty-string
+   literals, which would have broken masked passphrase input. Fixed before
+   handoff. The PO's actual key turned out to be passphrase-protected
+   (`createPrivateKey` doesn't prompt on its own — this is why the script
+   prompts interactively, masked, never via argv/env, per the same contract).
+   Ran clean on the PO's second attempt.
+5. `install` — window active, `scopeRuleIds: ["TP-3","TP-5"]`, ~4h TTL.
+
+**Two dispatches launched the moment the window went active** (PO signed off
+with "ich muss los hau rein" and left — standing authorization to proceed,
+same shape as the 2026-08-09 AFK authorization): `PHX-GMW-TP5-TESTS`
+(goldfish-deep, xhigh — `AR06g`/`AR06h`/`AR06i` + the six P-AC-08 resolver
+regression cases, all in `pipeline-state.test.mjs`, bundled into one
+dispatch since they share the one protected file) and `PHX-GMW-TP3-REGISTER`
+(goldfish-mechanic, low — the 5 unregistered-suite `verify.mjs` entries from
+this file's own punch list, unchanged). Both in flight as of this entry;
+outcomes not yet known. **Not done in this window and not attempted:** the
+separate GS-1 `pipeline.user.yaml` edit — a different guard, a different
+signature ceremony (`request-sha256 f8bf4510…`), explicitly told to the PO
+as a second, independent decision they have not yet made.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
