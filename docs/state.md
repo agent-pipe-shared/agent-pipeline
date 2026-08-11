@@ -1069,6 +1069,98 @@ None of the above blocks `PHX-GMW-TP5-TESTS`, still running. 127/26/3/0/1
 unchanged — none of tonight's work has closed a criterion yet; the tests
 that would (TP-5) are the still-open piece.
 
+### `PHX-GMW-TP5-TESTS` landed (`433e73db`/`0d9f3690`/`3fdf8b9f`, 490/490) — independent Critic review of the whole P-AC-08 fix returned FAIL, three findings beyond the already-known OT09 regression
+
+The TP-5 window's own remaining scope landed across two goldfish-deep
+sub-dispatches, each resumed once after a harness turn-boundary cutoff
+truncated its first attempt (the first `PHX-GMW-TP5-TESTS` attempt reported
+"completed" with zero commits — caught, not trusted, before moving on):
+`AR06g` (the `casOutcome`-"stale" recovered-preimage regression, `433e73db`),
+`AR06h`/`AR06i` (a hand-rewritten genuine legacy `.v1` journal pair,
+`0d9f3690`), and `RGi`-`RGn` (the default reconcile-approval resolver's own
+wiring regressions — genuine `generateKeyPairSync`/`sign` Ed25519 proofs, not
+stubbed — `3fdf8b9f`). `node --test harness/scripts/pipeline-state.test.mjs`:
+**490/490**, independently re-run.
+
+With a real candidate to review, an independent Critic dispatch (fresh
+context, `pipeline-core:critic`, `claude-opus-5`, T2 standard stage) reviewed
+the complete 6-commit P-AC-08 range (`c6bd3a6b`..`3fdf8b9f`). **Verdict:
+FAIL.** F3 (the 2026-08-09 finding this whole range exists to close) is
+confirmed genuinely closed — `defaultFeaturePackageReconcileApproval` is
+reached by a real, non-injected code path and RGi/RGi-2 prove a genuine
+signed proof gates a genuine manifest rewrite. Full report:
+`specs/sprint-phoenix-epic/evidence/pac08-f3-critic-review-3fdf8b9f.md`.
+
+Four findings, one already known:
+
+- **F-A (major, already recorded above as the OT09 regression)** —
+  cross-confirmed independently by the Critic. Stays blocked on TP-7, out of
+  this window's scope, unchanged from the prior entry's disposition.
+- **F-B (major, genuinely new) — the verified approval is checked and then
+  discarded.** `defaultFeaturePackageReconcileApproval` calls
+  `verifyCriticalHumanProof` and on success returns only `{ok: true}` —
+  `verified.proof`, `verified.waived`, and `--by` are computed and thrown
+  away. No `criticalProofConsumption`-style replay ledger exists for this
+  kind (unlike `approve-push`'s, `pipeline-state.mjs:6554-6576`, which
+  `:5877-5879` explicitly claims to mirror), so the identical signed proof
+  can be presented repeatedly for its whole `expiresAt` window; no durable
+  record exists anywhere that a human approved a given reconcile; and in
+  chat mode `verifyCriticalHumanProof` returns before any candidate check, so
+  `--by <anything>` is accepted with nothing commit-bound. This is a real
+  security/audit gap against P-AC-08's own candidate/evidence-binding
+  language, not paperwork — **dispatched for remediation** the same night,
+  `PHX-WP-PAC08-APPROVAL-LEDGER` (goldfish-deep, background, still running at
+  the time of this entry): persist an `approvalRecord` +
+  `criticalProofConsumption` entry (`kind: "feature-package-reconcile"`) into
+  the governing session's own `pipeline-state.json`, mirroring `approve-push`
+  exactly, with new `RGo`-onward regression tests proving replay refusal —
+  scoped to stay inside `pipeline-state.mjs` (unprotected) plus
+  `pipeline-state.test.mjs` (TP-5, still active), explicitly forbidden from
+  touching the shared, MAC'd apply-journal schema that `AR06g`/`AR06h`/`AR06i`
+  already exercise.
+- **F-C (major, genuinely new, now fixed) — the bundled `casOutcome`
+  production hunk had no dispatch record actually claiming it.** `55e60f67`
+  carries the `staleReceipt`/`casOutcome` hunk designed and implemented by
+  `PHX-WP-PX0-CASOUTCOME`, but that hunk was left uncommitted per QG-04 (its
+  own TP-5 pairing was unreachable in that dispatch) and only shipped later
+  because the unrelated `PHX-WP-PAC08-RECONCILE-APPROVAL`/`-WIRING` dispatch
+  staged the whole of `pipeline-state.mjs` for its own reasons, sweeping the
+  sitting hunk along byte-identical. That record correctly disclaims
+  authorship ("not authored by this dispatch"), and `PHX-WP-PX0-CASOUTCOME`'s
+  own record never updated to claim the hunk it actually designed, once it
+  shipped somewhere else. **Fixed directly** (no dispatch needed — pure
+  attribution, not code): `evidence/PHX-WP-PX0-CASOUTCOME/dispatch-record.json`
+  now carries a `production-hunk-attribution` entry naming `55e60f67` as the
+  vehicle and confirming byte-identity against the known-good backup.
+- **F-D (minor, now fixed) — three commit trailers cited a dispatch record
+  that didn't exist.** `433e73db`/`0d9f3690`/`3fdf8b9f` all carry
+  `Dispatch: PHX-GMW-TP5-TESTS (goldfish)`, but no record with that `taskId`
+  existed anywhere in the evidence set. **Fixed directly**: wrote
+  `specs/sprint-phoenix-epic/evidence/PHX-GMW-TP5-TESTS.dispatch-record.json`
+  reconstructing the three sub-tasks from commit content and the sibling
+  records that already covered the design/implementation side of each.
+
+The Critic's report also self-disclosed four process violations in how this
+session built its own dispatch briefing (a directed hunt-list item, a
+re-run-yourself instruction contrary to CLAUDE.md, the prior verdict word
+leaked into what should have been a neutral findings registry, and a
+T1-lane/write-grant contradiction) — saved as a standing lesson for future
+Critic dispatches (memory: `feedback-critic-dispatch-contamination`), not
+re-litigated by re-dispatching: the Critic itself distinguished which
+findings the directed item could have steered ("I hunted my own surface;
+F-A, F-C, F-D lie outside the directed list") from the one it didn't (F-B),
+so contamination did not manufacture a false positive here.
+
+Also noted, not yet acted on: `evidence/verify-latest.json` binds
+`0d9f3690` (`"binding": "drift"`), not `3fdf8b9f` — no full-gate `verify.mjs`
+run is bound to the reviewed head, the same F5 shape as the 2026-08-09 round.
+A fresh full run after `PHX-WP-PAC08-APPROVAL-LEDGER` lands will be red on
+F-A and the two pre-existing backlog/product-capability failures above — that
+is the expected, honest result, not a blocker to record it.
+
+**P-AC-08 stays `partial`.** 127/26/3/0/1 unchanged. Critic-confirmed, not
+self-assessed.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
