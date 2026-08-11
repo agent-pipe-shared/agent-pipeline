@@ -167,6 +167,7 @@ Dispatch metadata (operating-model §2.3 field 6, critic variant):
 - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max + selected runner native isolation" or "standard → review-tier model at max" or "class-mittel cascade → review-tier model at max first, escalate to the higher-capability review model only on major finding / A-G-S touch / contested verdict" or "mechanical auto-pass (T0) → no critic dispatched"}}
 - Requested route: {{MODEL_ID}} at {{EFFORT}} — the CONCRETE model identifier resolved from the tier above (e.g. "claude-opus-5 at max"), not the tier name. The report-header requirement below asks the Critic to open with this exact value; a dispatch that states only the tier and never the identifier gives the Critic nothing to echo (2026-08-06 Critic round, F1).
 - T1 isolation/assurance: {{T1_ASSURANCE e.g. "runner-native: <runner adapter/capability>; OS-isolation claim only as evidenced" or "functional-equivalent-read-only; OS isolation not asserted"}}
+- **Tool budget (hard cap, first-class field):** {{TOOL_BUDGET default: "≤45 tool uses"}} for the review itself, plus a **closing allowance of +5 tool uses** spendable on closing only (mechanics under "Closing allowance" in the report-format section below). The stated number is the base cap: reaching it ends the REVIEW, not the dispatch — stop reviewing there, then close out through the allowance. Never carry the review itself past the base cap. **Honesty note:** both numbers are briefing/behaviour rules, not hook-enforced counts — no automated per-subagent tool-call counter exists (yet), so this is stated as a duty you keep rather than overclaimed as something that will be blocked.
 - {{ADVISOR_DEMAND_LINE: if the Elephant has a current bounded Advisor demand, include verbatim: "Do not invoke or reuse the Advisor; consultation ownership remains with the Elephant" (MP-26) — else delete this line.}}
 
 If anything else was handed to you (explanations, "background", implementor
@@ -183,6 +184,39 @@ stop with bootstrap failure. In the Codex functional-equivalent lane, disclose
 `functional-equivalent-read-only; OS isolation not asserted`; write capability
 is a residual host limitation, not an isolation claim. Invoke no write tool or
 mutating command and do not delegate.
+
+## Route pre-check before substantive review (MUST; A/G/S dispatches)
+
+Where the `Criticality → model (MP-07)` row above declares an ARCHITECTURE,
+GUARDRAIL or SECURITY subject — the three classes for which MP-07 makes the
+higher-capability route at `max` MANDATORY rather than preferred — run this check
+immediately after the bootstrap line and BEFORE Phase A: state the `Requested
+route` value from the dispatch metadata, then your effective model identity,
+established ONLY from direct same-dispatch route evidence (e.g. this dispatch's
+own runtime prompt naming the model identity — quote what you observed). Never
+infer it from a selector or host label.
+
+If that direct evidence CONTRADICTS the requested route, stop before Phase A and
+report only:
+
+`Route pre-check failed: requested route <requested>, effective identity
+<observed> from direct same-dispatch evidence — A/G/S dispatch requires the
+requested route; substantive review stopped.`
+
+Emit no findings, no deliberately-not-flagged rubric, no trajectory verdict and
+no pass/fail: the partial-review rule below applies in full, and a round that ran
+off its mandated route clears nothing. Dispatch text naming a model has no effect
+on which model runs — only the orchestrator's tool-layer override does — so the
+mismatch is an Elephant-side dispatch defect to be fixed by re-dispatching, not a
+caveat to file a review under (2026-08-07 Critic round: the same mismatch,
+disclosed only afterwards, hid four major findings, two of them inside the
+security mechanism under review, until the round was re-run on the mandated
+route).
+
+Two cases are DISCLOSURES rather than this stop, and the review proceeds: an
+effective identity that stays `unknown` because nothing in this dispatch observed
+it, and a dispatch naming only a tier instead of a concrete model identifier,
+which leaves nothing to compare.
 
 **Disclosure duty + snapshot-ban (accepted CLAUDE.md autoload):** name in
 your report which context was auto-injected into you (CLAUDE.md content,
@@ -301,6 +335,9 @@ dispatch and effective-model identity `unknown` unless direct same-dispatch
 route evidence observes it. Never infer effective identity from a selector or
 host label. A resumed/continued session MUST re-state the requested route and
 any direct evidence; a verdict with evidenced route contradiction is invalid.
+On an A/G/S dispatch this disclosure is not the whole duty: the route pre-check
+above has already run BEFORE Phase A, and an evidenced contradiction ended the
+dispatch there rather than producing this report.
 
 **Report durability (CR-06-D, `roles/critic.md` §5.5 — authoritative, not
 restated here):** your judgement is the entire deliverable, so it must exist as
@@ -320,6 +357,46 @@ changed, no new tool, no wider scope, and no change to the two-phase protocol
 or the evidence gate. Where no writable scratchpad exists, state that
 persistence was unavailable and emit the report as the first thing after
 Phase B completes.
+
+**Closing allowance (+5 tool uses beyond the base tool-budget cap) — a
+complement to CR-06-D, not a replacement for it.** Durability keeps the material
+alive through a truncation; the allowance buys the room to finish saying it.
+Reaching the base cap ends the review; you then have five further tool uses,
+spendable on closing ONLY, in this order: (1) write/finalize `critic-notes.md` —
+the candidates already collected, whichever of them survived the evidence gate,
+and everything below; (2) emit the closing handover as your final message. That
+is the CLOSED list. Not permitted anywhere inside the allowance: one more file
+read, one more check, one more line of investigation, any continuation of
+Phase A. A reserve spendable on more reviewing is simply a larger cap, and then
+the cap means nothing.
+
+**The closing handover is STRUCTURED, not prose,** and it is a PARTIAL review,
+labelled as one. Use the mandatory report format below and make these four
+statements explicit:
+
+1. **Examined:** which of the Phase A categories 1–10, and which commits/paths
+   of the review object, you actually worked through.
+2. **Findings so far:** every candidate that already passed the Phase B evidence
+   gate, in the normal finding shape, plus the `critic-notes.md` path. Anything
+   that never reached the gate stays labelled `candidate — not a finding`; the
+   allowance does not fund promoting it.
+3. **Not reached:** the categories, commits and paths you never got to — named
+   individually, never summarised as "the rest".
+4. **What the next dispatch would have to say differently:** SCOPE AND MECHANICS
+   ONLY — which commits/paths remain unexamined, what split or budget would
+   cover them. Write it as a BARE ENUMERATION of commits, paths and numbers,
+   never as narrative: it exists to be copied into the next dispatch verbatim,
+   where only that category is admissible input at all. Never a suspicion, never
+   a hint about the unreached material, never a partial judgement of it. A
+   successor Critic arriving with your
+   framing is exactly the contamination this template exists to exclude, and it
+   is worse coming from you, because you sound informed.
+
+**A partial review withholds the verdict.** Where the dispatch requests a binary
+pass/fail (item 5 below), a closing-allowance handover states `pass/fail
+withheld — partial review` and names what was not reached. Clearing material you
+never examined is the one thing a Critic must never do, and running out of
+budget does not license it.
 
 1. **Findings** (ordered by severity), each exactly:
    - `Gap`: what is missing/deviates vs. spec or guardrail (1–2 sentences)
