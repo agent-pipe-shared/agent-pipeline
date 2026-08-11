@@ -194,6 +194,21 @@ const cases = [
     assert.equal(checked.ok, false);
     assert.ok(has(checked, "$.gates.push_external_ledger", "contract"));
   }],
+  // PHX-WP-PAC08 (ADR-0056's 2026-08-11 Follow-up): the closed-`gates`-object optional-key
+  // list must admit `gates.reconcile_approval` with the same enum as `push_approval`.
+  ["gates.reconcile_approval accepts signature/chat, absence stays valid, other values are rejected", () => {
+    assert.equal(validatePipelineUserV3(completeIntent()).ok, true); // absent -> still valid
+    for (const valid of ["signature", "chat"]) {
+      const value = completeIntent(); value.gates.reconcile_approval = valid;
+      const checked = validatePipelineUserV3(value);
+      assert.equal(checked.ok, true, `reconcile_approval: ${valid} unexpectedly rejected`);
+      assert.ok(!has(checked, "$.gates.reconcile_approval", "additional_property"));
+    }
+    const value = completeIntent(); value.gates.reconcile_approval = "sometimes";
+    const checked = validatePipelineUserV3(value);
+    assert.equal(checked.ok, false);
+    assert.ok(has(checked, "$.gates.reconcile_approval", "contract"));
+  }],
 ];
 
 let passed = 0;
