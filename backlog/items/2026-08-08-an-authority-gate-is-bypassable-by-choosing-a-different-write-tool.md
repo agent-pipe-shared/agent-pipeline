@@ -79,7 +79,27 @@ report it.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, directions 1-3 — confirm the testpath gate is
+  authority-bearing (per GL-09, not a tripwire), route Bash/PowerShell shell
+  writes through it (closing the bypass), and investigate why TP-5's own
+  override ceremony refused with `author-repair-required` before reaching for
+  the unsanctioned route. **Plus an explicit addition beyond this item's own
+  Proposal:** a human override must remain possible for this gate too, via
+  signature-or-chat depending on `gates.push_approval` config — the same
+  duality already used for push approval elsewhere in this repo, not a novel
+  mechanism. Designed together with
+  `2026-08-08-the-test-path-guard-blocks-the-briefed-edit-and-offers-no-route.md`
+  (cluster C) — closing the bypass without also building the briefed-test-
+  change authorization (see that item) would strand legitimate work, which is
+  exactly the scenario that produced this bypass in the first place.
+- **Rationale:** PO, 2026-08-11: "Empfehlung aber auch human override muss
+  möglich sein per Signatur oder Chat je Config." SECURITY/GUARDRAIL-class
+  work — MP-07 mandates the higher-capability model at `max` for whoever
+  designs and implements this.
+- **Assignment (if accepted):** Unassigned. Design must cover: (a) routing
+  `Bash|PowerShell` through the same path check `guard-testpath.mjs` already
+  applies to Edit/Write, (b) the briefed-test-change authorization (see the
+  sibling item for its own constraints), and (c) a signature-or-chat human
+  override path for cases neither (a) nor (b) resolves — three components,
+  one coherent design, not three separate patches.
+- **Date:** 2026-08-11

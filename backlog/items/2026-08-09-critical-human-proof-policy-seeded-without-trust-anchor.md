@@ -44,7 +44,33 @@ Not yet worked out. Two directions worth exploring, not mutually exclusive:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Neither of this item's own two original directions (TOFU
+  pinning of a single global anchor, or loud disclosure of the current
+  no-anchor state) — the PO rejected both as insufficient. Accepted instead:
+  **trust-on-first-use PER KEY, gated by the same signature-or-chat ceremony
+  already used for other critical gates** (`gates.push_approval` config).
+  A new, unrecognized-but-well-formed key triggers an explicit human
+  confirmation (signature or chat, matching cluster C's same duality) before
+  being trusted; once confirmed it stays trusted. Supports multiple
+  legitimate keys (cross-repo team work) while an agent can never add or
+  invent a trusted key itself — the confirmation step is structurally
+  identical to every other critical-gate ceremony in this repo, not something
+  an agent can fake or skip.
+- **Rationale:** PO, 2026-08-11, verbatim objection to the original two
+  options: "widerspricht mE der design policy 'gegen den Agent und nicht
+  gegen Human'... es muss alleine wegen Cross-Repo-Teamarbeit die Möglichkeit
+  geben, dass verschiedene Schlüssel vom Human nutzbar sind, aber ein Agent
+  darf niemals selber einen erfinden." Re-designed with three new candidates
+  presented (external agent-unwritable key list; trust-on-first-use per key
+  via signature-or-chat; cryptographic trust-chain/delegation) — PO selected
+  the second, the Elephant's own recommendation, for reusing existing
+  ceremony machinery and cleanly satisfying both hard requirements (multiple
+  keys, agent can never originate trust).
+- **Assignment (if accepted):** Unassigned — real design + implementation
+  work on `pipeline-state.mjs`'s `trustAnchor` check (around line 2736) and
+  wherever `approve-push` currently accepts any well-formed key unconditioned.
+  Needs to define: what "new, unrecognized key" detection looks like
+  concretely, and how the signature-or-chat confirmation binds to that
+  specific key going forward (a per-key trust record, not a single global
+  anchor field).
+- **Date:** 2026-08-11

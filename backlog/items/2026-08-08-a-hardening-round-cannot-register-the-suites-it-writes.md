@@ -85,7 +85,19 @@ improved and the mechanism has not.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, both candidates 1 and 3 of the paired item
+  `2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md` — the
+  generalized unregistered-suite detector (this item's own direction 3) AND
+  actually registering the concrete outstanding suite. Same decision,
+  recorded once, cross-referenced here (cluster A).
+- **Rationale:** PO, 2026-08-11: "1 und 3" (against the sibling item's numbered
+  options, which this item's own direction 3 matches exactly). This item's
+  directions 1/2 (whether suite registration is the same risk class as
+  editing verify.mjs's logic, and if so making the ceremony batchable) remain
+  open design questions the detector doesn't resolve on its own — the
+  detector makes the gap loud; it doesn't itself close the TP-3 ceremony cost.
+- **Assignment (if accepted):** See the sibling item for the concrete
+  assignment split (detector first, registration ceremony second). This
+  item's directions 1/2 stay open, unassigned, for whoever picks up the
+  registration-ceremony half.
+- **Date:** 2026-08-11

@@ -90,7 +90,24 @@ Not designed here. Candidates, in the order they should be considered:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, both candidates 1 and 3 — build the generalized
+  unregistered-suite detector AND actually register
+  `codex-isolated-critic-protected-preimage.test.mjs` in `verify.mjs`. Paired
+  with `2026-08-08-a-hardening-round-cannot-register-the-suites-it-writes.md`
+  (same decision, same rationale, cluster A).
+- **Rationale:** PO, 2026-08-11: "1 und 3" — more than the Elephant's own
+  narrower recommendation (detector only, registration deferred). Urgency
+  confirmed by a live third recurrence this same session: `NVA-BL-42`'s
+  Critic review found this exact suite's pin (for `critic.md`, not
+  `review-protocol.md` this time) stale and unregistered again, independently
+  of this item.
+- **Assignment (if accepted):** Candidate 1 (detector: enumerate
+  `**/*.test.mjs`, fail on any file absent from `verify.mjs`'s registration
+  list with an explicit named opt-out) is a bounded, dispatchable task.
+  Candidate 3 (the actual registration) touches `harness/scripts/verify.mjs`
+  (TP-3) and needs a signature/maintenance-window ceremony — sequence the
+  detector first (it doesn't touch TP-3), then the registration once a window
+  is available. Candidate 2 (fix the stale pin, confirming the current bytes
+  are intended before re-pinning) is a prerequisite step inside candidate 3's
+  work, not a separate dispatch. Neither started this session.
+- **Date:** 2026-08-11

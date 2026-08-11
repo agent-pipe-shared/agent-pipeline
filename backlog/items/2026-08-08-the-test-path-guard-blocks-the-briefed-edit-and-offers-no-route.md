@@ -99,7 +99,22 @@ Constraints any design must hold:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — build the briefed-test-change authorization this
+  item's own Proposal describes (bound to exact target + exact briefing,
+  granted before the work not after a refusal, human decides, refusal states
+  which of the two situations it is in). **Plus an explicit addition:** a
+  human override must also remain possible via signature-or-chat depending on
+  `gates.push_approval` config — same duality as push approval elsewhere in
+  this repo. Designed together with
+  `2026-08-08-an-authority-gate-is-bypassable-by-choosing-a-different-write-tool.md`
+  (cluster C) — see that item for the full three-component design (bypass
+  closure + this authorization + the override path) and the shared rationale.
+- **Rationale:** PO, 2026-08-11, same decision as the sibling item (cluster
+  C): "Empfehlung aber auch human override muss möglich sein per Signatur
+  oder Chat je Config." SECURITY/GUARDRAIL-class, MP-07 max-tier model.
+- **Assignment (if accepted):** Unassigned — see the sibling item for the
+  combined assignment; this item's own four constraints (exact target/exact
+  briefing binding, granted before not after, human decides, refusal states
+  which situation) are the acceptance bar for this specific component of that
+  combined design.
+- **Date:** 2026-08-11

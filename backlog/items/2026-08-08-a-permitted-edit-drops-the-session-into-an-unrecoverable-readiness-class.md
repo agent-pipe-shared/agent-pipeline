@@ -78,7 +78,19 @@ Same protection intent, two mechanisms, and only one of them can tell the agent
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, directions 1 and 2 only — refuse the write on a
+  currently bound authority document at write-time (typed refusal, same
+  family as the protected-State refusal), and name the legitimate rebind
+  route in that refusal. Directions 3 (do not weaken the readiness class)
+  stands as a hard constraint on the fix, not separate work. Directions 4
+  (sweep for other admitted-write paths into this class) and 5 (consider a
+  first commit at onboarding) explicitly NOT taken up now.
+- **Rationale:** PO, 2026-08-11: "1 & 2 (in einem späteren Sprint kommt eh CR
+  Verfahren, daher reicht das)" — a future sprint brings a proper CR
+  (code-review) process that will cover broader concerns like directions 4/5;
+  investing further here now is not worth it.
+- **Assignment (if accepted):** Unassigned — a bounded guard fix: extend the
+  write-time refusal to cover currently-bound authority documents (the
+  promoted PRD, its Spec, its design input), refusal message names the
+  reviewed-planning-change-and-rebind route.
+- **Date:** 2026-08-11

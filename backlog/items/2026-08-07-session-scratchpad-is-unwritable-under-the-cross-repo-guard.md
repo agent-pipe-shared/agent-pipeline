@@ -147,7 +147,27 @@ passing. Candidates for a deliberate decision, explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, candidate 2 — keep the guard as-is, put the scratch
+  space inside the repository (`scratch/`, already gitignored, cleanup
+  machinery already built in `session-cleanup-recovery.mjs`). Candidates 1
+  (admit one externally-supplied path) and 3 (accept the restriction, make it
+  honest) not taken.
+- **Rationale:** PO, 2026-08-11: "2". Independently validated empirically
+  this same session: every Critic dispatch this session (which cannot write
+  to the assigned host-temp scratchpad, refused by
+  `GUARD-CROSS-REPO-MUTATION` exactly as this item describes) has already
+  been improvising by writing into this repository's own `scratch/`
+  directory instead — the direction candidate 2 proposes is already the de
+  facto behavior, not a hypothetical.
+- **Assignment (if accepted):** Unassigned. Two open sub-questions this
+  item's own Proposal names and the PO's decision does not itself resolve:
+  per-dispatch subdirectory naming that stays collision-free across parallel
+  dispatches sharing one checkout (same failure class as
+  `2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md`), and
+  rewriting `roles/critic.md`'s scratchpad-isolation clause plus ADR-0059 to
+  state honestly that this puts a reviewer's fixtures inside the tree it
+  reviews (gitignored, not invisible — the Critic reads the working tree).
+  Nothing creates the directory during setup/onboarding yet, nothing briefs
+  it as the working location, no cleanup descriptor binds it — all still to
+  build.
+- **Date:** 2026-08-11
