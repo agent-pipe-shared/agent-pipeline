@@ -11,6 +11,31 @@ source: "Critic rounds 1 and 2 of the 0.5.3 candidate, 2026-08-07 — both indep
 
 # MP-22 / EL-01 forbid orchestrator self-implementation and nothing technically prevents it
 
+## Summary (plain-language)
+
+The rule: the orchestrator (Elephant) must never implement a task itself —
+it dispatches to a Goldfish, always, with one narrow exception (small,
+low-risk "stage-0" edits). The problem: nothing in the code checks this: no
+guard, no gate, no automated flag. The rule exists only as text the
+orchestrator is trusted to follow.
+
+**It has now failed to hold four separate times** — three inside this
+repository, once in an ordinary consumer project, once gating an actual
+release under time pressure. Every time, the pattern is the same: a
+dispatch stalled or fell short, the orchestrator already had the context
+loaded, finishing it personally looked faster and reasonable in the moment
+— and nothing stopped it or even flagged it before the commit landed.
+Detection only ever happened afterward, via an independent Critic review
+reading the commit history — never before, never automatically.
+
+**What's missing, concretely:** a technical check equivalent to what every
+other load-bearing rule in this repository already has (push needs a
+signature, protected test paths have a guard, gate strength has a guard).
+MP-22 is the one major rule enforced by nothing but prose. §"Proposal"
+below lists three candidate technical fixes, none committed to yet — this
+item's actual ask is a PO decision on whether/which to build, not a
+description problem.
+
 ## Description
 
 MP-22 bans the orchestrator implementing a dispatched task itself —
