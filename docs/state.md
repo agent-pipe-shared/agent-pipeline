@@ -1394,17 +1394,31 @@ accurate reason.
 
 This is a materially cheaper path to more `implemented` criteria than any of
 the five categories: no PO design input, no TP-4/TP-5 window, just a Critic
-review of code that already exists and already passes. **Not dispatched
-this turn** — context was already flagged OVERDUE for compaction when this
-was found, and starting a fresh multi-round Critic-dispatch cycle (the same
-shape that took four rounds and three FAILs to get P-AC-08 right tonight) in
-an already-overloaded context risks exactly the kind of contamination
-mistake this session has spent all night catching and correcting. Recorded
-here as the explicit next action instead: dispatch an independent Critic
-review of the PX0 continuity-authority-revision package (likely one review
-covering all four criteria together, since they share one test family and
-one underlying mechanism, rather than four separate dispatches) as the very
-next piece of work, before sampling anything else from the five categories.
+review of code that already exists and already passes.
+
+**Correction, same session, minutes later:** the note above wrongly grouped
+`PX0-AC-13` in with the other three as "one package" — it is not.
+`PX0-AC-13` is the WSL host-transport gate
+(`pipeline-start-preflight-tests`/`ruleset-freshness-tests`, a completely
+different subsystem, different files, different mechanism). Only
+`PX0-AC-03`/`PX0-AC-05`/`PX0-AC-06` genuinely share one package
+(`continuity-authority-revision-plan`/`-apply`/`-recover` in
+`pipeline-state.mjs:3256-3760`, `AR03`/`AR05`/`AR06` in
+`pipeline-state.test.mjs:3680-4090`). Caught before dispatch, not after.
+
+**Dispatched** (the Stop hook is correct that recording a next step is not
+completing it): a first-pass Critic review of `PX0-AC-03`/`-05`/`-06` at
+current HEAD (`d827c1b3`), fresh evidence generated at that exact commit
+(`specs/sprint-phoenix-epic/evidence/px0-authority-revision-green.tap`,
+504/504). Framed correctly as a first-pass review, not a delta — no findings
+registry (none exists to report neutrally without leaking a prior verdict;
+prior-round history is exactly the "prior verdict" material the fail-closed
+boundary forbids), per-criterion pass/fail requested rather than one
+combined verdict, and the missing-dispatch-record gap (this capability was
+built across many separate work packages, no single authorship artifact
+exists) disclosed as a structural limitation rather than smuggled past the
+Critic as if it existed. `PX0-AC-13` still needs its own, separately-scoped
+review — not started, correctly NOT bundled in this one.
 
 ---
 
