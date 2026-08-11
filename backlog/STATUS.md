@@ -40,7 +40,7 @@
 | pipeline.closed-input-channel-review-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.codex-read-only-steps-escalate-individually-instead-of-once | open | idea | pipeline | 2026-08-09 | — |
+| pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | 2026-08-10 | — |
@@ -209,6 +209,6 @@
 
 ## Counts
 
-- open: 89
+- open: 88
 - in_progress: 22
-- closed: 90
+- closed: 91
