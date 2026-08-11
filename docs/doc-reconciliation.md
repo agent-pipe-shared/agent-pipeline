@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 5f53325731d21a8278d37bc5b1cc8fd268973e05 — 2026-08-11, range 75b75f9b..5f533257, P-AC-06 orphan-check attempt and revert
+
+- ADR-0012: checked, no change needed.
+
+Covers `6d92c613` (`docs/state.md`, additive: the tractability-pattern
+finding and the PAC06-ORPHAN dispatch record), `fad0aa95` (the orphan-check
+fix, touching `plugins/pipeline-core/lib/feature-package-topology.mjs` and
+`plugins/pipeline-core/lib/audit-bundle.test.mjs` — neither an
+ADR-`Governs:`-listed path), `cc43a182` (its clean revert, same two files,
+same non-governed paths), and `5f533257` itself (`docs/state.md`,
+additive: records the regression found and reverted). No other governed
+path touched; ADR-0045 not implicated (no `specs/<id>/` topology change —
+the touched files live under `plugins/pipeline-core/lib/`).
+
 ## Candidate 75b75f9b9e1ae0a990f671a68536c9d433a00d2b — 2026-08-11, range 18acfb52..75b75f9b, L-AC-01 scoping findings + session close
 
 - ADR-0012: checked, no change needed.
