@@ -1600,6 +1600,31 @@ why" is an explicitly valid, complete outcome, not a failure. This is now
 the live, PO-authorized next step; not resolvable by more of my own
 investigation given the severe context state this session has reached.
 
+### Investigation returned: no in-process mechanism can exist — PO answered a tight follow-up, final fix dispatched
+
+`PHX-WP-PX0AC13-HOSTDELEGATION` completed with exactly the honest,
+evidence-backed "nothing to build on here" outcome the briefing named as
+valid: `createWslHostAttestedSpawn`'s attestation was always fake (verifies
+an App-Server health check, then spawns git in the SAME sandbox with only a
+sterile env swap — never actually reaches a network-open host).
+`ruleset-freshness-host.mjs`'s own header comment and
+`docs/phoenix-governance-threat-model.md:53-57` state this as an explicit
+operating contract, not an inferred gap: genuine boundary-crossing is an
+agent/runner tool-tier decision, which is exactly what the F2 doc fix
+(`2a1a0903`) already correctly instructs. Every `executionBoundary`
+consumer across the codebase was traced; all of them treat it as a label
+for an external actor to act on, never something in-process code consumes
+to cross a sandbox.
+
+Asked ONE tight follow-up rather than guessing which way to take this
+finding: remove the fake attestation and trust the doc instruction, or
+leave it as-is. **PO answered: remove it.** Immediately dispatched
+`PHX-WP-PX0AC13-REMOVEATTESTATION` — a genuinely bounded, low-risk task this
+time (delete dead/misleading code, reuse the EXISTING, already-validated
+`selectHostTransport`/`host-transport-required` refusal path instead of
+inventing anything new), with the same reproduce-first discipline as every
+other fix tonight. This is the last piece of tonight's PX0-AC-13 work.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
