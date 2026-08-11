@@ -323,10 +323,51 @@ migration... carry the shared compatibility owner and expiry") even apply
 to a reader with no migration in progress, or does satisfying the first
 SHALL clause (reference + validate the canonical decision ID) as written
 already close this one as a measurement — no PO amendment needed, unlike
-the other two? Next step if picked up: read `governance-authority.mjs`
-(the CLI `invokeGovernanceAuthority` spawns) to confirm what it actually
-validates against the human-governance ledger, then decide whether this is
-reportable as `implemented`-grade evidence for this one named subsystem.
+the other two?
+
+**Follow-up (2026-08-11, still later the same night).** Read
+`governance-authority.mjs`, the CLI `invokeGovernanceAuthority` spawns. It
+is a thin wrapper over `queryHumanGovernanceDecisions` and
+`requireGovernanceAuthority` (`lib/human-governance-ledger.mjs` /
+`lib/governance-authority-resolver.mjs`) — the SAME checkpoint-verified,
+append-only human-governance ledger H-AC-01 through H-AC-15's whole
+apparatus is built on, accessed synchronously rather than in-process. This
+is a materially stronger finding than release-planning/deploy-consumption:
+those two use a genuinely *different* authority scheme (content hash;
+detached signature) that H-AC-12's text could reasonably be read as not
+contemplating. Guard-git's Phoenix override reads and writes the actual
+canonical ledger — the first SHALL clause ("reference and validate the
+canonical decision ID") is satisfied by the literal mechanism the criterion
+is about, not a substitute for it.
+
+The second SHALL clause is still genuinely unresolved, and it is an
+interpretive question, not a further code fact to go read: "dual-evaluate
+**during migration**" presupposes an old, non-ledger-backed check being
+phased out that a new ledger-backed check must be reconciled against
+(exactly guard-devplan.mjs/change-control.mjs's shape before WP-H-AC12).
+Guard-git's Phoenix override has never had that shape — restored from
+`998a609` with the ledger check mandatory and conjoined from the start, not
+layered on top of a prior bare-trust path for a Phoenix-governed repo. Two
+readings, both defensible, deliberately left both here rather than picked:
+
+1. **"During migration" gates applicability.** No migration is in progress
+   for this reader, so the second clause imposes nothing on it; the first
+   clause is satisfied by the actual canonical ledger; this subsystem is
+   done as-is.
+2. **The clause is a standing requirement, not migration-conditional** —
+   every direct reader carries the shared primitive's compat object
+   regardless of whether a legacy path currently exists to disagree with,
+   so a future legacy path (or a second, out-of-sync reader) is caught
+   automatically rather than by remembering to add the check later. Under
+   this reading guard-git's override does not yet close.
+
+**Deliberately not put to the PO tonight.** Resolving this either way does
+not flip H-AC-12's overall verdict — `guard-push.mjs`/`pipeline-state.mjs`
+stay TP-5/GMW-blocked regardless, so there is no verdict payoff available
+from a third mobile round tonight, only a partially-scoped subsystem
+either way. Left for a dedicated future pass (or Critic read) rather than
+spending another interruption on a question whose answer does not move the
+criterion's actual state.
 
 ## The unifying finding: one root cause behind at least four criteria
 

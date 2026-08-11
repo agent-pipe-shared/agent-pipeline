@@ -963,16 +963,22 @@ const DELTA = {
   //
   // guard-push.mjs and pipeline-state.mjs remain open, TP-5/GMW-blocked.
   // Git-guard override consumption (guard-git.mjs's Phoenix override path,
-  // `consumePhoenixOverrideAuthority`) is a live measurement candidate, not
-  // yet resolved either way: it does reference-and-validate a canonical
-  // decisionId via `invokeGovernanceAuthority`, mandatory and unbypassable
-  // in a Phoenix-governed repo (no legacy fallback exists to migrate away
-  // from), but does not call the shared primitive or carry its
-  // `{owner, expiresAtEpochMs}` compat object. Whether H-AC-12's second
-  // SHALL clause ("dual-evaluate during migration... carry the shared
-  // compatibility owner and expiry") even applies where there is no
-  // migration in progress is the open question -- read, not yet verified
-  // or dispositioned. Verdict stays partial.
+  // `consumePhoenixOverrideAuthority`) is a stronger case than the two
+  // above: `invokeGovernanceAuthority` is a thin CLI wrapper over the SAME
+  // checkpoint-verified, append-only human-governance ledger H-AC-01..15's
+  // apparatus runs on (confirmed by reading governance-authority.mjs in
+  // full) -- the canonical decisionId reference IS satisfied by the actual
+  // mechanism H-AC-12 is about, not a substitute for it. Mandatory and
+  // unbypassable in this Phoenix-governed repo; no legacy bare-trust path
+  // to migrate away from. Whether H-AC-12's second SHALL clause
+  // ("dual-evaluate during migration... carry the shared compatibility
+  // owner and expiry") is migration-conditional (this reader was never in
+  // a legacy state -> already done) or a standing requirement regardless
+  // (-> not yet closed) is a genuine interpretive question, not a further
+  // code fact -- deliberately left open, not put to the PO, since neither
+  // reading flips H-AC-12's overall verdict while guard-push.mjs/
+  // pipeline-state.mjs stay TP-5-blocked. Full detail in
+  // design/class-b-multi-dispatch-plan.md. Verdict stays partial.
   'H-AC-12': ['partial', 'WP-H-AC12'],
 
   // R-AC-04: an optional requiredCleanup field on validateCommandOfferEvent
