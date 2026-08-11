@@ -9,11 +9,17 @@ import { createHash } from "node:crypto";
 import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 
 export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action-approval-request.v1";
-// ADR-0063 adds the fourth member. The three original kinds keep their exact
+// ADR-0063 adds the fourth member. PHX-WP-PAC08-RECONCILE-APPROVAL (ADR-0056's
+// 2026-08-11 Follow-up) adds the fifth. The four original kinds keep their exact
 // behaviour: every use of this list in this file and in every consumer is an
 // `includes()` membership test, so a new member widens what is admissible and
-// changes nothing about how `push`/`deploy`/`publication` are treated.
-export const CRITICAL_ACTION_KINDS = Object.freeze(["push", "deploy", "publication", "governance-fork-disposition"]);
+// changes nothing about how `push`/`deploy`/`publication`/`governance-fork-disposition`
+// are treated. `feature-package-reconcile` is never routed through the shared
+// `prepare-critical`/`approve-critical`/`verify-critical` command family (that family
+// keys off its own, separate `CRITICAL_COMMAND_KINDS` in po-human-approval.mjs) --
+// membership here only makes it a valid `kind` for `criticalActionSubjectSha256`/
+// `actionValid`, which `scripts/pipeline-state.mjs`'s reconcile approval wrapper needs.
+export const CRITICAL_ACTION_KINDS = Object.freeze(["push", "deploy", "publication", "governance-fork-disposition", "feature-package-reconcile"]);
 
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40,64}$/u;

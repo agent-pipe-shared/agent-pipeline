@@ -26,6 +26,27 @@ import { parseYaml } from "./yaml-lite.mjs";
 
 export const USER_SOURCE_PATH = "pipeline.user.yaml";
 export const DEFAULT_PUSH_APPROVAL_MODE = "signature";
+// PHX-WP-PAC08-RECONCILE-APPROVAL (ADR-0056's 2026-08-11 Follow-up): a second
+// action kind gets the identical signature/chat mode shape, under its OWN
+// `gates.*` key (not an overload of `gates.push_approval` -- decision 5's "the
+// source wins, a contradiction fails closed" logic is written in terms of one
+// action kind owning one key). Mirrors DEFAULT_PUSH_APPROVAL_MODE exactly.
+export const DEFAULT_RECONCILE_APPROVAL_MODE = "signature";
+
+/**
+ * Kind -> `pipeline.user.yaml` `gates.*` key, for every action kind that has a
+ * source-of-truth approval mode (ADR-0056). Extending this table is how a future
+ * action kind gets the identical fail-closed mode logic without a second
+ * implementation -- see `readGateApprovalMode`/`criticalProofWaiverFor` below.
+ */
+const GATE_APPROVAL_MODE_KEYS = Object.freeze({
+  push: "push_approval",
+  "feature-package-reconcile": "reconcile_approval",
+});
+const GATE_APPROVAL_MODE_DEFAULTS = Object.freeze({
+  push: DEFAULT_PUSH_APPROVAL_MODE,
+  "feature-package-reconcile": DEFAULT_RECONCILE_APPROVAL_MODE,
+});
 
 /**
  * Does the working tree's copy of the setting match the one that is committed?
@@ -123,7 +144,9 @@ function committedBytes(root, spawn) {
  * mean the fail-closed default: a gate whose configuration cannot be read is at its
  * strongest setting, never its weakest.
  */
-export function readPushApprovalMode(dir, { spawn = spawnSync } = {}) {
+function readGateApprovalMode(dir, kind, { spawn = spawnSync } = {}) {
+  const key = GATE_APPROVAL_MODE_KEYS[kind];
+  const fallback = GATE_APPROVAL_MODE_DEFAULTS[kind];
   const path = join(resolve(dir), USER_SOURCE_PATH);
   if (!existsSync(path)) {
     // Absence is a claim too, and it needs the same evidence. If HEAD carries this file, an
@@ -131,26 +154,35 @@ export function readPushApprovalMode(dir, { spawn = spawnSync } = {}) {
     // (F2), which reached `default` and let a policy waiver govern without touching a byte
     // of content. Only a file Git does not have either means the source has no opinion.
     return committedBytes(resolve(dir), spawn) === null
-      ? { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "default" }
-      : { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "uncommitted" };
+      ? { mode: fallback, source: "default" }
+      : { mode: fallback, source: "uncommitted" };
   }
   try {
     const info = lstatSync(path);
-    if (!info.isFile() || info.isSymbolicLink()) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "unsafe" };
+    if (!info.isFile() || info.isSymbolicLink()) return { mode: fallback, source: "unsafe" };
     const raw = readFileSync(path, "utf8");
     const committed = committedBytes(resolve(dir), spawn);
     if (committed === null || Buffer.compare(committed, Buffer.from(raw, "utf8")) !== 0) {
-      return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "uncommitted" };
+      return { mode: fallback, source: "uncommitted" };
     }
     const value = parseYaml(raw);
-    const configured = value?.gates?.push_approval;
-    if (configured === undefined) return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "default" };
+    const configured = value?.gates?.[key];
+    if (configured === undefined) return { mode: fallback, source: "default" };
     return PUSH_APPROVAL_MODES.includes(configured)
       ? { mode: configured, source: USER_SOURCE_PATH }
-      : { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "invalid" };
+      : { mode: fallback, source: "invalid" };
   } catch {
-    return { mode: DEFAULT_PUSH_APPROVAL_MODE, source: "unreadable" };
+    return { mode: fallback, source: "unreadable" };
   }
+}
+
+export function readPushApprovalMode(dir, opts = {}) {
+  return readGateApprovalMode(dir, "push", opts);
+}
+
+/** Mirrors `readPushApprovalMode` exactly, for `gates.reconcile_approval` (ADR-0056 Follow-up). */
+export function readReconcileApprovalMode(dir, opts = {}) {
+  return readGateApprovalMode(dir, "feature-package-reconcile", opts);
 }
 
 export const CRITICAL_HUMAN_PROOF_POLICY_PATH = "project/critical-human-proof.json";
@@ -285,16 +317,22 @@ export function criticalProofWaiverFor(dir, kind) {
   const policy = readCriticalHumanProofPolicy(dir);
   if (!policy.ok) return { waived: false, code: policy.code };
   const reason = policy.waivers.get(kind);
-  // For `push`, pipeline.user.yaml is the operator-facing control and wins (ADR-0056).
-  // The two must not disagree: a policy-file waiver alongside `signature` in the source
-  // is an ambiguous configuration, and an ambiguous gate configuration fails closed.
-  if (kind === "push") {
-    const configured = readPushApprovalMode(dir);
+  // For every kind with a source-of-truth approval mode (GATE_APPROVAL_MODE_KEYS --
+  // today `push` and `feature-package-reconcile`), pipeline.user.yaml is the
+  // operator-facing control and wins (ADR-0056; extended by the 2026-08-11
+  // Follow-up). The two must not disagree: a policy-file waiver alongside
+  // `signature` in the source is an ambiguous configuration, and an ambiguous gate
+  // configuration fails closed. Every other kind (`deploy`, `publication`,
+  // `governance-fork-disposition`) has no source key and skips this branch entirely,
+  // exactly as before.
+  const approvalModeKey = GATE_APPROVAL_MODE_KEYS[kind];
+  if (approvalModeKey !== undefined) {
+    const configured = readGateApprovalMode(dir, kind);
     if (configured.mode === "chat") {
       return {
         waived: true,
         code: null,
-        waiver: { kind, reason: reason ?? `gates.push_approval: chat (${configured.source})`, mode: "chat", source: configured.source },
+        waiver: { kind, reason: reason ?? `gates.${approvalModeKey}: chat (${configured.source})`, mode: "chat", source: configured.source },
       };
     }
     // Fail closed unless the source genuinely has NO opinion. `default` is the only such
