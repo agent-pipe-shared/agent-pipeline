@@ -777,6 +777,62 @@ questions at the cost of a dispatch or a deep read each time — advisor's
 assessment, and it matches what actually happened twice tonight. Holding
 here.
 
+### PO answered all four open decisions directly (mobile, `AskUserQuestion`) — three landed, one blocked on a newly-found fifth gate
+
+After many identical Stop-hook cycles with nothing new to report, the PO
+asked directly for a mobile-answerable decision matrix. Four questions, four
+answers, in order:
+
+1. **GMW window: keep postponing.** No action; unchanged from all session.
+2. **P-AC-06: strike both clauses (the proposal's own recommendation).**
+   Drafted the exact amendment text (an "Amendment for legacy/orphaned (PO,
+   2026-08-11)" paragraph, matching this document's existing precedent
+   style for H-AC-01's GMW amendment), staged it — then found and hit a
+   **fifth, previously-undiscovered gate**: `acceptance.md` is a tracked
+   artifact in `specs/sprint-phoenix-epic/lifecycle.json` with a recorded
+   `sha256`; `validateFeaturePackage` checks that digest unconditionally
+   regardless of the artifact's `mutability` field, so editing the content
+   without re-syncing the manifest turned `check-artifact-topology.mjs` (a
+   registered, currently-green Verify suite) red — confirmed directly, not
+   assumed. The sanctioned fix (`feature-package-reconcile`) needs the same
+   signature class as the GMW window (on hold) and is, per this session's
+   own recorded P-AC-08 F3 finding, structurally uninvokable from any real
+   CLI as shipped. Hand-editing the digest is the exact bypass P-AC-08's
+   own case `RGf` tests and refuses — not attempted. **Reverted the
+   amendment before committing** (`git checkout --`, re-verified clean:
+   `findingCount: 0`), and recorded the decision, the drafted text (so it
+   never needs re-deriving), and this blocker in
+   [`design/p-ac-06-clause-disposition-proposal.md`](../specs/sprint-phoenix-epic/design/p-ac-06-clause-disposition-proposal.md)
+   (`b545be4d`). advisor() confirmed this was the right call before
+   reverting, not a second-guess.
+3. **The agent-decision-journal production-producer gap: plan as its own
+   initiative.** Filed as a proper owned backlog item,
+   [`2026-08-11-agent-decision-journal-has-no-production-producer.md`](../backlog/items/2026-08-11-agent-decision-journal-has-no-production-producer.md)
+   (`f188d5eb`), `type: requirement`, `status: open`, `decision: accepted`
+   — connects A-AC-01/A-AC-05/H-AC-08/R-AC-08's independently-found "no
+   production caller" findings into the one shared root cause this session
+   named, with the architecture question (integration point between live
+   agent sessions and this repo's governance stores) as the real next step.
+4. **`guard-testpath.mjs` kernel-membership: rejected, exposure stays.** PO
+   rationale, recorded verbatim in `docs/adr/0058-guard-maintenance-
+   window.md`'s Follow-up section (`bf46008e`): a GMW window is itself
+   human-authorized to open, and the guard system bounds what an AGENT can
+   do without a human step, not what the PO can do — who can already change
+   any file directly outside a session regardless of any guard. Backlog
+   item `pipeline.guard-testpath-not-kernel-protected` marked `status:
+   rejected` with the same rationale, cross-referencing the ADR as
+   canonical.
+
+**Three of four landed durably tonight** (1, 3, 4 — no code, no
+signature needed for any of them). **P-AC-06 (2) is the one genuine
+carry-forward**: decision made, text ready, blocked on a gate nobody had
+found until tonight. `EPIC-AC-05` still forbids any completion claim; the
+127/26/3/0/1 count is unchanged (no criterion's verdict moved — P-AC-06
+stays `partial`, same as before, since its acceptance text is unchanged on
+disk). Holding here per advisor's repeated assessment: further hunting
+would keep surfacing PO-gated questions at the cost of a dispatch each
+time, and tonight found two of exactly that shape already.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
