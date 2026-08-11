@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate bf46008eb4bc34e5e585e6d12e8006f644eeabec — 2026-08-11, range c5b13eae..bf46008e, PO resolves the guard-testpath.mjs kernel-membership question (rejected, exposure stays)
+
+- ADR-0058: amended in bf46008e.
+
+Covers exactly one commit (`bf46008e`), touching `docs/adr/0058-guard-
+maintenance-window.md` (resolves the Follow-up bullet the previous entry
+recorded, with the PO's own rationale) and `backlog/items/2026-08-10-guard-
+testpath-not-kernel-protected-like-its-sibling.md` (status: open →
+rejected, cross-referencing the ADR as canonical). The backlog item path
+carries no `Governs:` line — only the ADR body itself is reconciliation-
+relevant here.
+
 ## Candidate c5b13eae85086aa1a32ab8446c45bc1b116dfc97 — 2026-08-11, range 1a359938..c5b13eae, ADR-0058 Follow-up bullet (guard-testpath.mjs kernel membership, undecided) + state.md note
 
 - ADR-0012: checked, no change needed.
