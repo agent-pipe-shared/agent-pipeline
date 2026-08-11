@@ -47,6 +47,20 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 1324c266302674c6064c0082a0f1c98b9167a840 — 2026-08-11, range 5dabc566..1324c266, P-AC-06 clause disposition proposal (design doc, not an acceptance.md edit)
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`1324c266`), adding
+`specs/sprint-phoenix-epic/design/p-ac-06-clause-disposition-proposal.md`.
+ADR-0045 governs `specs/**`; the new file is a design artifact, not a
+tracked artifact-manifest entry for any package, and doesn't declare or
+imply a `lifecycle.json` change — no amendment needed. `acceptance.md`
+itself is untouched: the proposal is explicitly not authorized to amend
+the frozen acceptance text pending a PO decision, so ADR-0045's authority
+concern is satisfied by leaving that file alone, not by editing it.
+`docs/state.md` not touched in this range — ADR-0012 not implicated.
+
 ## Candidate 5dabc5669da64baa30cdca7d69db15f98b78c763 — 2026-08-11, range 5f533257..5dabc566, P-AC-06 both clauses resolved as spec problems
 
 - ADR-0012: checked, no change needed.
