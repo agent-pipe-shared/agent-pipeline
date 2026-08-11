@@ -1420,6 +1420,36 @@ exists) disclosed as a structural limitation rather than smuggled past the
 Critic as if it existed. `PX0-AC-13` still needs its own, separately-scoped
 review — not started, correctly NOT bundled in this one.
 
+### The PX0 Critic review returned — two PASS, one real security FAIL, both flips landed same session (130/23/3/0/1)
+
+Full report: `specs/sprint-phoenix-epic/evidence/px0-ac0305-06-critic-review-d827c1b3.md`.
+`PX0-AC-03`: PASS, no findings — every recheck axis genuinely re-derived
+under the lock. `PX0-AC-06`: PASS, two disclosed MINOR findings that don't
+defeat the mechanism (a replay short-circuit that masks a pending-journal
+state on one specific retry path; an undated but bounded legacy `.v1`
+journal sentinel that skips the expiry recheck). Both flipped to
+`implemented` (`80887ecd`).
+
+`PX0-AC-05`: **FAIL — a real, independently verified security gap.**
+`decision.id` (`authority-revision-proof.mjs:19`) is checked only as
+`typeof === "string"` — no pattern, no length bound — unlike its sibling
+`featureId`/`idempotencyKey` (both `ID`-regex-checked), and it flows verbatim
+into the durably-retained, git-tracked receipt. PX0-AC-05's own negative
+clause ("SHALL NOT persist raw commands, private paths, prompts, user/
+account data, or private machine identifiers") has no enforcing code path at
+all — the existing AR05b test only proves the implementation injects no path
+of its OWN, never that a hostile caller-supplied value is rejected. Verified
+independently before acting on it: read the validation function directly,
+confirmed the missing check by contrast with its own sibling fields, traced
+the receipt construction and durable-write call sites. Fix dispatched
+same night as `PHX-WP-PX0AC05-DECISIONID` (goldfish-deep, reproduce-first
+required), scoped to the validation function alone plus its own unit test
+plus one new end-to-end AR05 case — deliberately NOT touching
+`pipeline-state.mjs` itself, since rejecting the hostile value upstream at
+intent-construction needs no downstream change. Verdict stays `partial` for
+the accurate reason: an unenforced security clause, not merely an unreviewed
+candidate.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
