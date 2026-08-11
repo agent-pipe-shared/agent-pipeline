@@ -1470,6 +1470,44 @@ protected-file edit, review only). Fresh evidence generated at current HEAD
 matched against the file contents, not trusted from the note alone. Dispatched
 as a first-pass review, same corrected pattern as the last three rounds.
 
+### PX0-AC-13 came back FAIL, and it's a real one — six findings, three major
+
+Full report: `specs/sprint-phoenix-epic/evidence/px0-ac13-critic-review-d2743353.md`.
+Independently verified the central claim before accepting it (read
+`ruleset-freshness.mjs:848-917` directly, not trusted from the report alone):
+**`createWslHostAttestedSpawn` never actually delegates to a host-side
+process.** The "attested" branch still calls the same local `spawn`
+primitive, only swapping in a sterile environment — no boundary is crossed.
+The function's OWN comment admits its boundary check is "duplicated
+deliberately" from the real preflight decision, never actually consumed from
+it (F1). The design-mandated `harness/session-bootstrap.md:159` update was
+never made — the file contains no occurrence of "WSL" at all (F2). The
+CLI-side copy of the boundary check has zero discriminating test coverage;
+deleting its runner gate leaves all 52 supplied assertions green (F3). Three
+further minor findings (a collapsed generic failure reason where a distinct
+typed one already exists; a PATH-resolved attestation gate protecting a
+literal-path payload; a dropped git alternate-object-directories env var
+causing a latency regression, not a correctness one).
+
+**This is genuinely substantial remaining work — understanding and wiring
+the real host-delegation mechanism this codebase already has elsewhere
+(`ruleset-freshness-host.mjs`'s `selectHostTransport`/
+`observeThroughSelectedHost`), not a scoped validation fix like PX0-AC-05's.
+Correctly NOT dispatched tonight.** Recorded as the accurately-scoped next
+item rather than either rushed into an already-long session or left
+optimistically mis-described as "just needs review" — the prior belief this
+session held (echoed in the note this replaces) was itself wrong, and is now
+corrected on real evidence.
+
+**Tonight's four-criterion PX0 sweep is exhausted:** `PX0-AC-03`/`-06`
+closed clean, `PX0-AC-05` fixed with one documented TP-5-blocked follow-up,
+`PX0-AC-13` found to need real architectural work and left honestly
+unfinished. 130/23/3/0/1 stands. No further no-window, no-PO-input,
+low-risk opportunities are known to remain — the four categories from the
+2026-08-09 synthesis (PO-gated design, TP-5, TP-4/`hooks.json`, explicit
+Class-P) are the accurate description of what's left, re-confirmed rather
+than assumed stale this time.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
