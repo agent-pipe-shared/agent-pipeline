@@ -74,7 +74,7 @@ confirmed before it is changed.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the remaining group-3 call sites (`PO-GATE-PRD-SPEC-MISMATCH` and the UTF-8 decode half of `PO-GATE-PRD-LANGUAGE-MISMATCH`) were given their own remedy strings instead of sharing `PRD_REPAIR`, per the item's Direction 1 (`closure_commit` `5415923bb6336a7a816d2cbd8fe2cbe75554c424`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

@@ -94,7 +94,7 @@ removing the anchor.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the trust anchor became an optional set (absent/empty admits any well-formed key, the PO's stated default) with the signer's key always recorded on the approval, per the item's Direction 1/2/3 (`closure_commit` `4a61bf1d099da48e33f37b356021e1e78a0c6141`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

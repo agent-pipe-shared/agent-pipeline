@@ -72,7 +72,7 @@ Pipeline later treats as authority. This item is one instance; the pattern is
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** onboarding now seeds a verify command that fails until configured (naming what to replace it with) instead of the always-green `git diff --check` placeholder, per the item's Proposal candidate 1 (`closure_commit` `674b1c0c85986a7d4a0aed0f8b1a124c99003d68`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

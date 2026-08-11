@@ -98,7 +98,7 @@ this block.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the mandatory commit discipline now requires `git add -- <exact paths>` then `git commit -F <msgfile> -- <same paths>` as two consecutive calls, never a bare/wildcard commit, per the item's Direction 1 (`closure_commit` `7003b2fd221a48d583569505c817013cd551397c`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.

@@ -97,7 +97,7 @@ fields it does cover.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed (2026-08-11) — fixed.
+- **Rationale:** the shipped, generated `templates/prompts/agent-obligations.md` (produced by `harness/scripts/generate-agent-obligations.mjs`, pinned by byte-equality test) delivers the single obligations block the item's Direction 1/2 asked for, deriving the grammar and protected-path tables from the components that enforce them rather than a hand-copied second source (`closure_commit` `d71aa710abe437ac1c81bece5bacb12c0355529b`).
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.
