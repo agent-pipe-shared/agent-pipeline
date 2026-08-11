@@ -1450,6 +1450,26 @@ intent-construction needs no downstream change. Verdict stays `partial` for
 the accurate reason: an unenforced security clause, not merely an unreviewed
 candidate.
 
+### Hook caught a real bookkeeping error (Task #19 left open after P-AC-08 closed) — fixed; PX0-AC-13 dispatched (same cheap-win pattern, no window needed)
+
+Corrected: Task #19 (`PHX-WP-PAC08-RECONCILE-APPROVAL`) was never marked
+done despite P-AC-08 closing several checkpoints ago — stale tracking, not
+stale work; fixed. The hook's other two points (PX0-AC-05 partial,
+PX0-AC-06's two disclosed minors) were already accurate as reported.
+
+`PX0-AC-13` (WSL host-transport gate, `createWslHostAttestedSpawn` in
+`ruleset-freshness.mjs` + `executionBoundary` in
+`pipeline-start-preflight.mjs`) is the fourth and last member of the same
+"code-complete, tests green, only missing an independent Critic PASS"
+opportunity class found earlier tonight — genuinely independent of
+`PX0-AC-03/05/06`'s package (different files, different mechanism), which is
+why it was correctly left out of that dispatch. No GMW window needed (no
+protected-file edit, review only). Fresh evidence generated at current HEAD
+(`d2743353`) before dispatch: `px0-ac13-preflight-green.tap` (36/0),
+`px0-ac13-ruleset-freshness-green.tap` (16/0) — both counts independently
+matched against the file contents, not trusted from the note alone. Dispatched
+as a first-pass review, same corrected pattern as the last three rounds.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
