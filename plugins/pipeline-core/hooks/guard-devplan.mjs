@@ -216,6 +216,30 @@ if (isAbsolute(filePath)) {
 relPath = posix.normalize(relPath.replace(/\\/g, "/"));
 const normalizedPath = normalize(relPath);
 
+// ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
+// PO directive 2026-08-12: "scratch sollte immer zugelassen werden weil wie tmp pfad auch
+// wenn pipeline nicht ready ist muss scratch immer gehen" (backlog:
+// 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-calls-it.md). `scratch/`
+// must behave exactly like a host tmp path, so this is the same shape as the
+// outside-the-project-root allow above: exit 0 BEFORE the manifest and state are read at
+// all, not a late entry in a list.
+//
+// `scratch/` is also in DEFAULT_EXEMPT_PREFIXES below and stays there (that constant is the
+// single owner the shipped obligations reference is generated from). But the prefix list is
+// consulted at the very END of this hook -- after the manifest read, the state read, the
+// portable-State check and the plan/spec authority-immutability check, each of which can
+// decide first. A neutral State carrying a machine-local `sessionCleanup` binding, for one,
+// refuses EVERY write before the list is ever reached. Membership in that list therefore
+// made scratch/ *exempt*; it did not make it *unconditional*, and the difference is exactly
+// what a consumer hit when `Write(scratch/resume-card.json)` was refused in draft phase.
+//
+// Deliberately placed AFTER the traversal collapse above, never before it: `scratch/../src/
+// foo.ts` collapses to `src/foo.ts` first and is correctly NOT allowed here. The trailing
+// slash keeps the scope at "under `scratch/` at the project root" -- a file literally named
+// `scratch`, or a sibling `scratchpad/`, is unaffected. No other exemption is widened.
+// Tests: DP28/DP28b (unconditional) and DP29a-d (scope) in guard-devplan.test.mjs.
+if (normalizedPath.startsWith("scratch/")) process.exit(0);
+
 // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
 const manifestResult = loadManifest(projectDir);
 if (manifestResult.status === "absent") process.exit(0);

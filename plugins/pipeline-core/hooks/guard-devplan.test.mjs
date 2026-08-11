@@ -228,6 +228,59 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   check("DP27b block draft-phase write to a real source path is unchanged", "Write", "src/foo.ts", BLOCK, { projectDir: dir });
 }
 
+// ---- DP28 scratch/ is UNCONDITIONAL, not merely exempt -----------------------------------
+// PO directive 2026-08-12 ("scratch sollte immer zugelassen werden weil wie tmp pfad auch
+// wenn pipeline nicht ready ist muss scratch immer gehen" -- backlog item
+// 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-calls-it.md).
+// DP08/DP27 above only prove the PREFIX LIST contains `scratch/`, and that list is consulted
+// at the very END of this guard -- after the manifest read, the state read and the
+// portable-State check, each of which can decide first. A neutral State carrying a
+// machine-local `sessionCleanup` binding does exactly that: it refuses EVERY write, exempt
+// prefix or not, before the prefix list is ever reached. That case is what separates "exempt"
+// from "unconditional", it is the reason the early allow was hoisted above the manifest read,
+// and it is red without that hoist.
+{
+  const dir = freshDir("scratch-unconditional");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeAuthorityDocs(dir);
+  mkdirSync(join(dir, "project"), { recursive: true });
+  // The gate config has to be readable at whichever authority tier wins once a `project/`
+  // directory exists, otherwise the fixture fails open before reaching any of this and the
+  // case below would pass without proving anything (DP28b is the canary for exactly that).
+  writeFileSync(join(dir, "project", "pipeline.yaml"), MANIFEST_BLOCKING);
+  writeFileSync(
+    join(dir, "project", "pipeline-state.json"),
+    JSON.stringify({
+      ...DRAFT_AUTHORITY_STATE,
+      sessionCleanup: { sessionId: "prior-session", descriptorSha256: "0".repeat(64) },
+    }),
+  );
+  check("DP28 allow  scratch/ write while the neutral State is refused as unportable", "Write", "scratch/resume-card.json", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  // Canary: without this the case above could go green because the fixture never reached the
+  // gate at all (no manifest/state resolved) rather than because scratch/ is unconditional.
+  check("DP28b block  same fixture still refuses a non-scratch write", "Write", "src/foo.ts", BLOCK, { projectDir: dir });
+}
+
+// ---- DP29 the unconditional allow is scoped to scratch/ and nothing else ------------------
+// The exemption must not become a traversal bypass (the hoisted allow therefore sits AFTER
+// this guard's posix traversal collapse, not before it), and must not widen to a path that
+// merely starts with the letters "scratch".
+{
+  const dir = freshDir("scratch-scope");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, UNAPPROVED_STATE);
+  check("DP29 block  scratch/../src traversal is not exempt", "Write", "scratch/../src/foo.ts", BLOCK, { projectDir: dir });
+  check("DP29b block  a file literally named scratch is not exempt", "Write", "scratch", BLOCK, { projectDir: dir });
+  check("DP29c block  a sibling directory named scratchpad is not exempt", "Write", "scratchpad/foo.ts", BLOCK, { projectDir: dir });
+  check("DP29d allow  a nested path under scratch/ is exempt", "Write", "scratch/nested/deep/probe.json", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+}
+
 // ---- DP09 planPath itself -> allow -------------------------------------------------------
 {
   const dir = freshDir("planpath");
