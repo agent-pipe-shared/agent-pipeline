@@ -105,7 +105,31 @@ the listing above is itself a sample, of a 1MB output that was truncated.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accept-open, partial — Direction points 1 and 4 landed,
+  points 2 and 3 not pursued (point 3 correctly, by the item's own
+  instruction; point 2 deliberately, as unbounded scope).
+- **Rationale:** `NVA-BL-44` (commit `d0dde552dedff165b86e0797e10d9b06d4946632`)
+  built the two generalizing pieces: a repeatable prefix-grouped `/tmp`
+  enumeration script (`tmp-leak-enumerate.mjs`) and a standalone
+  before/after leak-detection guard (`tmp-leak-guard.mjs`), deliberately
+  NOT wired into `verify.mjs`. Running the enumeration once produced a
+  live measurement on this machine: **5,526 top-level `/tmp` entries across
+  ~90 prefix groups** at commit time, top offenders `codex-pretool` (458),
+  `guard-apply-patch` (374), `pr-contributor-gates`/`-trusted` (306 each),
+  `afk-ledger-test` (228), `actions-permissions` (221) — full breakdown in
+  `evidence/tmp-leak-enumeration-2026-08-11.json`. **This does NOT close
+  the underlying defect** — the leak itself is unfixed, only now visible
+  and measurable; the machine can still reach inode exhaustion again. Point
+  2 (per-suite cleanup ownership, "many prefixes") was deliberately not
+  attempted — the item's own text says the complete prefix list was
+  unknown before this dispatch, and now that it IS known (~90 groups),
+  fixing them individually is a genuinely large, separate sweep, not a
+  same-dispatch add-on. Point 3 (do not move into `scratch/`) was correctly
+  left untouched, per the PO's own prior rejection recorded in the item.
+- **Assignment (if accepted):** point 2's per-suite cleanup sweep is the
+  concrete next step, now scoped by real data instead of a sample — a
+  future `goldfish-implementor` (or several, split by prefix ownership) can
+  start directly from `evidence/tmp-leak-enumeration-2026-08-11.json`
+  rather than re-deriving the prefix list. Not dispatched this session —
+  genuinely large, better sized by the PO/next session than assumed here.
+- **Date:** 2026-08-11
