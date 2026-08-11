@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 06ec4e74911d8b7f3162fa582c2c9bc3aa8a60af — 2026-08-11, range f188d5eb..06ec4e74, four-question decision matrix summary
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`06ec4e74`), touching only `docs/state.md`
+(additive: consolidates the four PO answers and their outcomes into one
+summary section). No other governed path touched.
+
 ## Candidate f188d5ebe517022ea7c33afb1c1aaf75a78d8645 — 2026-08-11, range bf46008e..f188d5eb, PO decides P-AC-06 (strike, blocked on digest coupling) + Journal-Gap backlog filing
 
 - ADR-0045: checked, no change needed.
