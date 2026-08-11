@@ -61,6 +61,17 @@ before proposing a fix — the two may share a root cause or a fix.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+- **Decision:** Closed (2026-08-11) — fixed. Supersedes the 2026-08-07
+  "accept-open" note below, which was correct as of its own date.
+- **Rationale:** the unconditional `readRestartBarrier` call is now gated
+  behind `if (!requiresNativeRuntimeReadback(runner)) return afterRuntimeLifecycleResult(...)`
+  (`project-onboarding-v3.mjs:3544-3556`), landed in commit `864c7f1f`
+  (verified via `git log -S`), after this item's 2026-08-07 note below.
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.
+
+**2026-08-07 note (superseded, kept for history):**
+
 - **Decision:** accept-open.
 - **Rationale:** re-verified 2026-08-07:
   `project-onboarding-v3.mjs:3014-3017` still calls

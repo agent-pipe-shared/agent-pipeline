@@ -72,6 +72,23 @@ point.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
+- **Decision:** Closed (2026-08-11) — fixed. Supersedes the 2026-08-06 note
+  below, which was correct as of its own date but predates the PO's
+  2026-08-08 Option A reversal recorded further down in this file.
+- **Rationale:** `guard-lifecycle-ready.mjs` now implements exactly the
+  design the 2026-08-08 PO decision specifies —
+  `claudeSessionMemoryDirectory()`/`isClaudeSessionMemoryWritePath()`
+  (MEMPATH-1), deriving the memory directory from `transcript_path` per the
+  "derived path, never a prefix" boundary above, with a doc comment
+  explicitly citing this backlog item (`closure_commit`
+  `a32e1b99ba3abc71165014227064bba261064f14`). The 2026-07-29 citation gap
+  noted below is now moot — superseded by the later, explicit, in-session
+  PO decision.
+- **Assignment:** N/A — already closed.
+- **Date:** 2026-08-11.
+
+**2026-08-06 note (superseded, kept for history):**
+
 - **Decision:** stays open, PO-decision territory; not resolved and not
   resolvable by an agent. One citation in this item's own text could not be
   confirmed and should be re-checked.
