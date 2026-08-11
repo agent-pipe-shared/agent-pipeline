@@ -1,6 +1,6 @@
 # Pending Verify registrations
 
-> **Status 2026-08-09 (second revision).** **Two suites are pending** — see the
+> **Status 2026-08-12 (third revision).** **One suite is pending** — see the
 > next section. Everything below that is a worked record, in the past tense.
 >
 > The banner said "Nothing is pending" for most of 2026-08-09 while two suites
@@ -10,11 +10,48 @@
 > version left "pending" on resolved work, this one left "resolved" on pending
 > work. The rule stands and is now applied: the pending section goes first and
 > says so in its heading; a resolved section never keeps that word.
+>
+> It went wrong a third way between 2026-08-09 and 2026-08-12: the banner still
+> read "two suites are pending" while the heading directly under it read "NONE
+> PENDING", and both were checked against `verify.mjs` on 2026-08-12 — the two
+> suites the banner named (`repair-map-tests`, `obligations-contract-tests`) are
+> registered, so the heading was right and its own banner contradicted it. A
+> banner that is not re-derived from `TEST_SUITES` when it is edited is the
+> recurring defect here; this revision was written from a grep of that array.
 
-## NONE PENDING
+## PENDING — the dispatch-authorship suite (filed 2026-08-12, block NVA-BL-34)
 
-Every suite written in this block is registered in `harness/scripts/verify.mjs`
-and run by the gate. The resolved batches below are the record.
+One suite is written, green, and **not** in `harness/scripts/verify.mjs`, so it
+is not run by the gate:
+
+| Suite | Block | What it covers |
+|---|---|---|
+| `plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs` | NVA-BL-34 / NVA-BL-34-FIX | The correspondence rule behind commit authorship: that a `Dispatch: <TASK_ID> (goldfish)` trailer resolves to a dispatch record that is terminal, names the same task id, binds to the commit sha it vouches for, and declares paths covering the diff — plus the fail-closed edges (no trailer, malformed trailer, more than one `Dispatch:` trailer, a task id that is not a safe filename fragment, an Elephant-direct declaration outside the sanctioned `stage-0` form). Behavioural fixtures: every case writes a real `dispatch-record-<TASK_ID>.json` into a temporary evidence directory and resolves it through the script's own reader. |
+
+Why pending, not registered: the same TP-3 constraint described further down —
+`project/guard-config.json` protects `harness/scripts/verify.mjs`, and the
+override follows this repository's `signature` push-approval mode, which no
+agent session can satisfy. Registration is a PO/operator step
+(`harness/scripts/apply-pending-protected-edits.mjs`, whose `VERIFY_ANCHOR`
+needs re-pointing first — see the note in the 2026-08-09 batch below).
+
+Until then the suite is run individually and its result recorded with the block:
+
+```
+node --test plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+```
+
+"Not registered" here means "not run by the gate", never "not run". The script
+it covers, `plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs`, is a
+standalone diagnostic and is deliberately not wired into Verify either; the
+suite's registration is about the gate noticing when the diagnostic breaks, not
+about promoting the diagnostic to a gate.
+
+## Resolved 2026-08-09 — the batches below
+
+Every suite written in the blocks below is registered in
+`harness/scripts/verify.mjs` and run by the gate. Re-confirmed against
+`TEST_SUITES` on 2026-08-12.
 
 ## Resolved 2026-08-09 — the repair-map, obligations and Resume-Hint suites
 
@@ -153,13 +190,14 @@ the gate", never "not run".
 
 The two later additions to this table — `repair-map.test.mjs` (REPAIRMAP-1) and
 `generate-agent-obligations.test.mjs` (OBLIG-1) — were appended here after this
-section was already marked resolved, and are **still pending**. They are
-described in the PENDING section at the top of this file, which is where a
-reader should look for them.
+section was already marked resolved and were pending for a while. They are
+registered now (`repair-map-tests`, `obligations-contract-tests`), verified
+against `TEST_SUITES` on 2026-08-12.
 
 Note that `plugins/pipeline-core/scripts/po-human-approval.test.mjs` was found
 during SETUP-2b to be unregistered as well — a pre-existing gap, not created by
-this block. It covers the human authority chain. Worth adding in the same pass.
+this block. It covers the human authority chain. It is registered now
+(`po-human-approval-tests`), verified in the same 2026-08-12 sweep.
 
 ## A second human step, same shape, different guard
 
