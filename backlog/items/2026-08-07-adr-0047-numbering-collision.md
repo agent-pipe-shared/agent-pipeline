@@ -48,17 +48,11 @@ session-scoped plan file rather than the versioned work queue.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accept-open.
-- **Rationale:** confirmed still live — `docs/adr/0047-local-supervisor-state-authority.md`
-  and `docs/adr/0047-model-free-advisor-preflight-v2.md` both exist. Step 1
-  of the item's own Proposal (confirm with the PO whether this is
-  intentional) is unresolved and is a PO call, not something to infer —
-  proceeding straight to a renumber without that confirmation risks
-  guessing which of the two ADRs is the one that should move.
-- **Assignment (if accepted):** ask the PO which ADR keeps `0047` before any
-  rename; then a `goldfish-mechanic` dispatch (uniform rename + reference
-  sweep across `docs/adr/README.md`, `specs/sprint-nova-epic/plans/nova-b.md`,
-  and any other citing document) plus, per the item's step 3, a Verify check
-  for duplicate leading ADR numbers so this class of collision cannot recur
-  silently.
-- **Date:** 2026-08-07
+- **Decision:** deferred — owned by the Phoenix sprint.
+- **Rationale:** PO decision, 2026-08-11: "das wird vom phoenix sprint
+  nachhaltig gefixt - hier ignorieren" (this gets fixed sustainably by the
+  Phoenix sprint — ignore it here). Not a Nova A/B scope item; no Nova
+  session should renumber either ADR or sweep references, to avoid
+  colliding with whatever Phoenix's own resolution does.
+- **Assignment (if accepted):** n/a — tracked in the Phoenix sprint, not Nova.
+- **Date:** 2026-08-11
