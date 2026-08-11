@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate b1fc5ba51227f4f63e05a60a6f735efe2a30bbb7 — 2026-08-11, range 029587d2..b1fc5ba5, security-scan BLOCKING (semgrep timeout) recorded
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`b1fc5ba5`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 705c6114a1fc70c55848a0253e451ac1390e325c — 2026-08-11, range 57fc68b6..705c6114, F1/F3 design-question finding recorded
 
 - ADR-0012: checked, no change needed.
