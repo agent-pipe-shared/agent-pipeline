@@ -867,6 +867,14 @@ process.exit(0);
     },
   });
   assertEqual("license-check run: missing allowlist file -> SKIPPED", result.status, "SKIPPED");
+  // NVA-BL-32: an absent allowlist means "this project configures no license policy" -- a clean,
+  // completed skip. It must NOT surface as a scanner failure, and it must stay finding-free.
+  assertEqual(
+    "license-check run: missing allowlist file -> classification success (not configured, not a scanner error)",
+    { classification: result.classification, findingCount: result.findings.length },
+    { classification: "success", findingCount: 0 },
+  );
+  assertIncludes("license-check run: missing allowlist reason reads as not-configured", result.reason, "not configured");
 }
 {
   const rootDir = makeRootDir("license-malformed-root");
@@ -935,6 +943,19 @@ process.exit(0);
   );
   assertEqual("runner: manifest absent -> default thresholds", evidence.thresholds, { block_on: ["critical", "high"] });
   assertEqual("runner: manifest absent -> binary-backed SKIPPED entries classify binary_missing", evidence.scanners.slice(0, 3).map((s) => s.classification), ["binary_missing", "binary_missing", "binary_missing"]);
+  // NVA-BL-32 REGRESSION (the load-bearing one): this bare rootDir has NO `governance/` directory
+  // at all -- exactly the shape of a freshly seeded consumer project. The measured defect was the
+  // RENDERED runner entry `license-check: SKIPPED [scanner_error]`, produced by `scannerEntry`'s
+  // default for a SKIPPED result carrying no classification -- so asserting on the adapter's return
+  // value alone would not have caught it. Assert the entry the runner actually emits.
+  assertEqual(
+    "runner: manifest absent (no governance/ dir, fresh-consumer shape) -> license-check entry is a clean skip, not scanner_error",
+    (() => {
+      const entry = evidence.scanners.find((s) => s.tool === "license-check");
+      return { status: entry?.status, classification: entry?.classification, findingCount: entry?.findingCount };
+    })(),
+    { status: "SKIPPED", classification: "success", findingCount: 0 },
+  );
   assertEqual("runner: manifest absent -> child-process preflight succeeds", evidence.execution.childProcessPreflight, { status: "PASS", classification: "success" });
   const evidenceFile = join(rootDir, "evidence", "security-latest.json");
   assertTrue("runner: evidence file written (manifest-absent path)", existsSync(evidenceFile), evidenceFile);

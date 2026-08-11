@@ -26,7 +26,13 @@
  *     ... ] }`. `version` is optional (used only to make a finding's `path` more specific).
  *
  * BEHAVIOR: either file absent -> SKIPPED (with a reason naming which path is missing and
- * where). Either file present but not valid JSON -> ERROR (never silently treated as "no
+ * where). An absent `allowlistPath` additionally carries `classification: "success"` -- it means
+ * "this project configures no license policy", which is a project state, NOT a scanner failure;
+ * without that explicit classification the runner's `scannerEntry` default renders a SKIPPED
+ * result as `scanner_error`. NOTE the deliberate asymmetry: the absent-`declaredPath` branch
+ * below is still unclassified and therefore still reads as `scanner_error`. That is the same
+ * defect class, left untouched here because it is outside this change's scope, not because it
+ * is correct. Either file present but not valid JSON -> ERROR (never silently treated as "no
  * dependencies"). Otherwise: for every declared dependency whose `license` is NOT in
  * `allow` (or IS explicitly in `deny`), emit one finding, severity fixed "high" (briefing:
  * "license-check violations -> high"). No violations -> PASS.
@@ -73,7 +79,22 @@ export async function run({ config = {} } = {}) {
   const declaredPath = config.declaredPath;
 
   if (!allowlistPath || !existsSync(allowlistPath)) {
-    return { status: "SKIPPED", findings: [], raw: null, reason: `license allowlist not found: ${allowlistPath ?? "(no path configured)"}` };
+    // NOT CONFIGURED -- not a scanner failure. A consumer project that ships no license policy
+    // has nothing for this control to check, and that is a legitimate project state, not a
+    // broken scanner. `classification: "success"` is load-bearing: the runner's `scannerEntry`
+    // (plugins/pipeline-core/scripts/security-scan.mjs) defaults any SKIPPED result that carries
+    // NO classification to `scanner_error`, which rendered every unconfigured project as
+    // `license-check: SKIPPED [scanner_error]` and made "no license policy here" indistinguishable
+    // from "the scanner broke". Same clean-skip shape osv-scanner uses for "no package sources
+    // in project". Zero findings either way -- this changes how the skip READS, never whether
+    // anything blocks.
+    return {
+      status: "SKIPPED",
+      classification: "success",
+      findings: [],
+      raw: null,
+      reason: `license allowlist not configured: ${allowlistPath ?? "(no path configured)"}`,
+    };
   }
   if (!declaredPath || !existsSync(declaredPath)) {
     return {
