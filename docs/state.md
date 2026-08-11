@@ -871,6 +871,41 @@ postponed). 127/26/3/0/1 unchanged — this narrows H-AC-12's remaining gap
 from three named subsystems to two-and-one-unscoped, it does not close the
 criterion.
 
+**Correction (2026-08-11, later the same night, advisor-flagged).** The
+"Landed in `17af46cb`... document the equivalence" framing above overclaims.
+Recording the PO's "existing alternate mechanism satisfies it" answer as
+closed was wrong: accepting a structurally different mechanism in place of
+the literal `pipeline.human-decision-reference.v1` reference H-AC-12's SHALL
+text names is an `acceptance.md` **amendment**, the same category of act
+P-AC-06 is correctly blocked on — not a code-evidence measurement a comment
+update can land by itself. The PO's decision is not being re-litigated; it
+does not, by itself, close either subsystem. **Both revert to open**, same
+shape as H-AC-11's O-4, queued behind the identical digest-coupling-gated
+signature route as P-AC-06, corrected in `ff4558f2`. Also worth naming
+honestly: both `AskUserQuestion` calls marked the eventually-chosen option
+"(Empfehlung)," so "the PO chose the recommendation twice" is one data
+point about that framing, not a validated principle to lean on for a third,
+similar question.
+
+Separately — and this one may genuinely be a measurement, not an amendment
+— `guard-git.mjs`'s Phoenix override path (`consumePhoenixOverrideAuthority`,
+restored from `998a609`) was read in full for "Git-guard override
+consumption," the acceptance text's sixth named subsystem. It already
+references a `decisionId` and validates it out-of-process against the
+canonical governance-authority resolver before consuming it, mandatory and
+unbypassable in this Phoenix-governed repo (`governance/events/registry.json`
+exists), conjoined with the base token check rather than replacing it — no
+legacy "trust the token alone" path survives here to migrate away from,
+unlike guard-devplan.mjs/change-control.mjs's pre-primitive state. Open,
+unverified question: does H-AC-12's second SHALL clause ("dual-evaluate
+during migration... carry the shared compatibility owner and expiry") apply
+to a reader with no migration in progress, or does satisfying the first
+SHALL clause as written already close this one — no PO amendment needed,
+unlike the other two? Not dispositioned either way tonight; recorded in
+`class-b-multi-dispatch-plan.md`'s follow-up section as the next concrete
+step if picked up (read `governance-authority.mjs`, confirm what it
+validates against the ledger). 127/26/3/0/1 still unchanged.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
