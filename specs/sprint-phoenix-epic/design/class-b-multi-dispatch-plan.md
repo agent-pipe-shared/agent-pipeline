@@ -251,6 +251,45 @@ for each whether it already satisfies H-AC-12's intent through a different
 mechanism (as `critical-action-authorization.mjs` plausibly does) or is a
 genuine gap needing the dual-evaluation primitive wired in.
 
+**Follow-up scoping (2026-08-11, later the same night).** The two guesses
+above were not wrong — grepped the full `lib`/`scripts` tree for
+`release.plan|deploy.approv` variants and found no third candidate. Both
+false leads (`releasePlanSha256` in `session-cleanup-recovery.mjs`/
+`onboarding-continuity.mjs`) turned out to mean "release a session binding
+lock," unrelated to shipping a product release; ruled out on inspection.
+
+This also pins down the "deploy/override consumption" reader concretely:
+`state.deployApprovals` is written by `pipeline-state.mjs` (TP-5-blocked, as
+already known) and consumed by exactly one reader,
+`authorizeRecordedDeploy()` in `critical-action-authorization.mjs:296`. Read
+that function fully: it matches an approval entry by
+`{forArtifact, forEnvironment, usedAt}` and verifies a detached Ed25519
+proof (`verifySignedAction`) against a committed trust anchor. There is no
+`decisionId` field, no reference into `pipeline.human-decision-reference.v1`,
+and no dual-evaluation/migration semantics anywhere in the function —
+confirmed by reading the full 45-line body, not inferred from naming.
+
+Likewise for `release-version-plan.mjs`: its `decisionId` is
+`sha256("pipeline.release-version-decision.v1\0" + canonicalJson(payload))`
+— a self-binding content hash of the decision payload itself, checked
+structurally on every read (`RVD-ID` / `RVP-DIGEST` failures). It is not a
+reference to an externally-authored, owner/expiry-carrying human-decision
+record; it cannot disagree with a second reader the way the dual-evaluation
+primitive is built to catch, because nothing else produces or holds this ID
+independently to disagree with.
+
+Net: both candidate modules are confirmed correct (no third candidate
+exists) and both are confirmed, by full read rather than plausibility, to
+use an authority mechanism structurally different from
+`pipeline.human-decision-reference.v1` + `dualEvaluateDecisionReference`.
+Whether that difference means "already satisfies H-AC-12's intent by an
+equally-strong alternate mechanism, document the equivalence" or "H-AC-12
+means the specific reference shape literally, wire it in regardless of the
+existing mechanism" is now a clean, fully-scoped PO/design call — no further
+code investigation narrows it further. Put to the PO the same night via
+`AskUserQuestion`; answer to be recorded here or in a follow-up note once
+given.
+
 ## The unifying finding: one root cause behind at least four criteria
 
 Running every scoping step tonight converged on the same fact from four

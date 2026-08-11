@@ -936,11 +936,29 @@ const DELTA = {
   // named subsystems: guard-devplan.mjs's legacy/v2/v4 plan-approval path
   // (previously a bare skip -- zero second evaluation) and change-control.mjs's
   // pipelineAuthority gate (optional decisionReference, byte-for-byte
-  // unchanged when absent). guard-push.mjs, pipeline-state.mjs, release
-  // planning, deploy approval/consumption, and Git-guard override consumption
-  // remain open -- deliberately narrowed, not closed. 40/40 + 33/33 + 10/10 +
-  // 3/3 tests pass across all four consumer files, including the CLI-level
-  // change-control test.
+  // unchanged when absent). 40/40 + 33/33 + 10/10 + 3/3 tests pass across all
+  // four consumer files, including the CLI-level change-control test.
+  //
+  // Follow-up disposition (2026-08-11, PO decision, both recommended options
+  // taken -- full scoping in design/class-b-multi-dispatch-plan.md): the two
+  // remaining reachable-without-GMW named subsystems are dispositioned
+  // satisfied by an existing, structurally different but equally-binding
+  // authority mechanism, not by wiring in the shared primitive --
+  //   - release planning: release-version-plan.mjs's decisionId is a
+  //     self-binding content hash of the decision payload
+  //     (sha256("pipeline.release-version-decision.v1\0"+canonicalJson(...)))
+  //     checked structurally on every read (RVD-ID/RVP-DIGEST). Accepted as
+  //     satisfying intent; no code change.
+  //   - deploy approval/consumption: critical-action-authorization.mjs's
+  //     authorizeRecordedDeploy() verifies a detached Ed25519 proof against a
+  //     committed trust anchor for state.deployApprovals entries. Accepted as
+  //     satisfying intent; no code change.
+  // guard-push.mjs and pipeline-state.mjs remain open, TP-5/GMW-blocked same
+  // as the rest of the punch list. Git-guard override consumption remains
+  // open and unscoped -- signature-adjacent (guard-human-override.mjs),
+  // deliberately not touched while the GMW window is postponed. Verdict
+  // stays partial: three named subsystems (guard-push.mjs, pipeline-state.mjs,
+  // Git-guard override consumption) are still genuinely open.
   'H-AC-12': ['partial', 'WP-H-AC12'],
 
   // R-AC-04: an optional requiredCleanup field on validateCommandOfferEvent
@@ -1150,7 +1168,7 @@ const POINTERS = {
   'H-AC-09': 'NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target. RECLASSIFIED Class S -> Class P 2026-08-09 (PO-confirmed): the clause\'s own subject -- authorizing guarded work IN another repository -- is exactly the capability CLAUDE.md\'s Sprint-0 hard rule currently forbids outright ("Read-only toward the three project repos ... never a write ... until an explicitly approved Phase-4 migration"). There is no design to scope: building a cross-repository binding mechanism for a write capability this repo is not yet authorized to exercise would be building ahead of its own governing policy, not closing a gap. Closes only if/when a Phase-4 migration lifts the restriction, or the PO narrows the clause\'s scope by amendment (the same route H-AC-11 already used) -- either way, not a code task available now',
   'H-AC-10': 'five named assertions covering scope, reason, expiry, constraints, follow-up review, no standing bypass',
   'H-AC-11': 'portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4)',
-  'H-AC-12': 'guard-devplan/change-control-tests (WP-H-AC12): the shared dual-evaluation primitive (decision-reference-dual-evaluation.mjs) now closes the migration-boundary gap for two of five named subsystems -- guard-devplan.mjs (legacy/v2/v4 plans, previously a bare skip) and change-control.mjs (optional decisionReference). guard-push.mjs, pipeline-state.mjs, release planning, and deploy/override paths remain open, deliberately narrowed. 40/40 + 33/33 + 10/10 + 3/3 tests pass',
+  'H-AC-12': 'guard-devplan/change-control-tests (WP-H-AC12): the shared dual-evaluation primitive (decision-reference-dual-evaluation.mjs) closes guard-devplan.mjs and change-control.mjs. Release planning and deploy/override consumption dispositioned satisfied-by-alternate-mechanism 2026-08-11 (PO decision: release-version-plan.mjs content-hash decisionId; critical-action-authorization.mjs Ed25519 proof) -- no code change. guard-push.mjs, pipeline-state.mjs (TP-5/GMW-blocked) and Git-guard override consumption (unscoped, signature-adjacent) remain genuinely open. 40/40 + 33/33 + 10/10 + 3/3 tests pass',
   'H-AC-13': 'human-governance-ledger-tests + store admission: prohibited content rejected before any temporary file exists',
   'H-AC-14': 'docs/governance-events.md (PHX-WP-DOC-1 + PHX-WP-DOC-3): all eight named parts present -- migration/retention/recovery/operator-guidance and schema/taxonomy/authority-trust-model were already solid, and a dedicated "Human ledger: threat model" section now covers eight scenarios each tied to an HGL-* code and, where one exists, an H-AC-15 test',
   'H-AC-15': 'human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed)',
