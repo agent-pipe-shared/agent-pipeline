@@ -7,6 +7,6 @@
   ],
   "trustAnchor": {
     "keyReference": "local-po-key",
-    "publicKeySha256": "f28988b21c670c4b958a534e82fef485195ab1abc74df1a41772c9b58c73db14"
+    "publicKeySha256": "a3a43c4bfbd68c661e242f2f792977edde6a7de1fcb19ece12e2778819f156e1"
   }
 }
