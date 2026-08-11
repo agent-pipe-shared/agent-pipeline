@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-gate-authority-receipt-readback
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-07-25
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: 259b7f3b23447415982bdd3697d197fb03396739
+closure_evidence: backlog/evidence/2026-08-11-po-gate-authority-receipt-readback-po-confirmed-resolved.md
 source: "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; reproduced a second time 2026-07-25 (see docs/state.md, \"PO GATE ANSWERED\" entry) — repro confirmed, root cause still not isolated."
 ---
 
@@ -59,3 +63,14 @@ whether the write-then-read window has an ordering/flush gap around the
 Windows DACL-hardening step. No fix applied yet; this item only records the
 observation for the Windows/sandbox-assurance slice scope decision in
 `docs/state.md`.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Closed, 2026-08-11.
+- **Rationale:** PO direct statement in session ("windows dacl schließen :
+  ist erledigt"), based on first-hand Windows testing this session (Linux/WSL)
+  has no access to. No code fix exists in this repository to cite — the
+  underlying race was live-Windows-only and was never isolated or reproduced
+  from this checkout, matching this item's own "not chased further" scoping.
+- **Assignment:** N/A — resolved outside this repository's own code.
+- **Date:** 2026-08-11.
