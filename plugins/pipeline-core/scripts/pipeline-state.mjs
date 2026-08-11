@@ -2702,10 +2702,26 @@ function externalPublicJson(dir, value) {
   } catch { return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-FILE" }; }
 }
 
+/**
+ * Kinds whose gate is always active, regardless of what `project/critical-human-proof.json`'s
+ * `requiredKinds` list happens to say (PHX-WP-PAC08-RECONCILE-APPROVAL; ADR-0056's
+ * 2026-08-11 Follow-up). `feature-package-reconcile` is never routed through the shared
+ * `prepare-critical`/`approve-critical`/`verify-critical` command family that
+ * `requiredKinds` governs -- it has its own always-on dependency injection point
+ * (`deps.featurePackageReconcileApproval`) -- and the policy file is out of scope to edit
+ * for this kind, so without this bypass the kind would either brick permanently
+ * (`required: true` with the kind absent from `requiredKinds`) or verify nothing at all
+ * (`required: false`). Bypassing the `requiredKinds` membership test here, for this one
+ * kind only, is how the proof stays genuinely demanded either way. `push`/`deploy`/
+ * `publication`/`governance-fork-disposition` are deliberately NOT in this set, so their
+ * behaviour is byte-identical to before this addition.
+ */
+const ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile"]);
+
 function verifyCriticalHumanProof({ dir, state, kind, candidate, subject, flags, now, required = false }) {
   const policy = criticalHumanProofPolicy(dir);
   if (!policy.ok) return policy;
-  if (!policy.requiredKinds.has(kind)) {
+  if (!policy.requiredKinds.has(kind) && !ALWAYS_REQUIRED_KINDS.has(kind)) {
     return required ? { ok: false, code: "CRITICAL-PROOF-POLICY-KIND-REQUIRED" } : { ok: true, proof: null };
   }
   // The cryptographic proof may be stood down for this kind — by `gates.push_approval:
@@ -3675,7 +3691,22 @@ function runAuthorityRevisionRecoverCommand(dir, rest, deps) {
         console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL-RETIREMENT-UNRESOLVED); recovery journal retained.");
         return 2;
       }
-      console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-preimage", retained: false, mutated: false, receipt: journal.receipt }, null, 2));
+      // F4/courseDecisionReceipts convention (see buildAuthorityRevisionPlan above):
+      // `casOutcome` is the typed, closed enum {applied, stale, conflict, io-error} --
+      // "applied" means the CAS write landed (postRevision advanced from preRevision).
+      // On THIS branch it never did: State stays exactly at the preimage (no
+      // atomicWriteContinuityState call happens here), so echoing the frozen
+      // `journal.receipt` unmodified -- whose `casOutcome` was fixed to "applied" at
+      // apply-build time under the opposite assumption -- would contradict this same
+      // response's own `status: "recovered-preimage"` / `mutated: false`. The frozen
+      // journal object itself (and the durable receipt an eventual successful apply/
+      // recover would splice into State) is left untouched -- only this one echoed,
+      // non-durable CLI response gets a shallow-copied receipt with the outcome
+      // corrected to "stale": the decision's approval window aged out before the CAS
+      // could complete, which is exactly the courseDecisionReceipts sense of "stale"
+      // (an expired precondition, not a concurrent-state "conflict" or an "io-error").
+      const staleReceipt = { ...journal.receipt, casOutcome: "stale" };
+      console.log(JSON.stringify({ schema: AUTHORITY_REVISION_RECOVER_SCHEMA, status: "recovered-preimage", retained: false, mutated: false, receipt: staleReceipt }, null, 2));
       return 0;
     }
 
@@ -5426,7 +5457,13 @@ const FEATURE_PACKAGE_RECOVER_SCHEMA = "pipeline.feature-package-recover.v1";
 const FEATURE_PACKAGE_APPLY_JOURNAL_SCHEMA = "pipeline.feature-package-apply-journal.v1";
 const FEATURE_PACKAGE_APPLY_LOCK_TOKEN = "pipeline-feature-package-apply-v1";
 const FEATURE_PACKAGE_APPLY_FLAGS = new Set(["root", "manifest", "next-state", "proposal", "plan-sha256"]);
-const FEATURE_PACKAGE_RECONCILE_FLAGS = new Set(["root", "manifest", "plan-sha256"]);
+// PHX-WP-PAC08-RECONCILE-APPROVAL: widened to admit the PO-bound approval transport
+// (--by/--proof-request/--proof-authority/--proof) as OPTIONAL flags at this parse
+// stage. Whether a given flag is actually REQUIRED depends on the resolved approval
+// mode (chat vs. signature, ADR-0056's 2026-08-11 Follow-up) and is enforced inside
+// `defaultFeaturePackageReconcileApproval`, not here -- refusing an unknown flag here
+// would make the approval flags unreachable before the check that needs them ever runs.
+const FEATURE_PACKAGE_RECONCILE_FLAGS = new Set(["root", "manifest", "plan-sha256", "by", "proof-request", "proof-authority", "proof"]);
 
 function featurePackageApplyPrivatePaths(dir, deps = {}) {
   const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
@@ -5835,9 +5872,67 @@ function runFeaturePackageRecoverCommand(argv, deps) {
   return 2;
 }
 
+/**
+ * Default `deps.featurePackageReconcileApproval` for a real operator invocation -- no
+ * test-injected override present (PHX-WP-PAC08-RECONCILE-APPROVAL). Mirrors
+ * `approve-push`'s PO-bound proof-check shape (ADR-0056's 2026-08-11 Follow-up:
+ * `gates.reconcile_approval`, identical fail-closed rules), but reads from the
+ * GOVERNING SESSION's own local pipeline-state.json (`dir = deps.dir ?? projectDir()`)
+ * -- never from `--root`, which names the repository being reconciled, not the approving
+ * operator's own session (ADR-0056: "read from the governing session, not from the
+ * pushed repository").
+ *
+ * `argv` is re-parsed here (idempotent/pure, safe to call twice -- the reconcile command
+ * already parsed it once to reach this point) only to recover the `--by`/`--proof-*`
+ * flags; the fixed `{repoRoot, schema, manifest, planSha256, candidate}` call shape
+ * `runFeaturePackageReconcileCommand` already uses to invoke this closure is untouched,
+ * so an existing or future test injection of `deps.featurePackageReconcileApproval` keeps
+ * working unmodified.
+ */
+function defaultFeaturePackageReconcileApproval(argv, deps) {
+  return ({ manifest, planSha256, candidate }) => {
+    const dir = deps.dir ?? projectDir();
+    const kind = "feature-package-reconcile";
+    const parsedArgv = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_RECONCILE_FLAGS);
+    const flags = parsedArgv.ok ? parsedArgv.value : {};
+    const configured = criticalProofWaiverFor(dir, kind);
+    if (configured.code !== null && configured.code !== undefined) return { ok: false, code: configured.code };
+    const waived = configured.waived === true;
+    // Mode-appropriate flag presence, the same shape `approve-push` enforces via
+    // `parseExactFlags` there (chat needs only the attribution flag; signature needs the
+    // full detached-proof transport too). Enforced here instead of at the earlier parse
+    // stage because that parse is deliberately permissive across both modes (BLOCKER 1).
+    if (isBlank(flags.by)) return { ok: false, code: "CRITICAL-PROOF-FLAGS-BY-REQUIRED" };
+    if (!waived && (isBlank(flags["proof-request"]) || isBlank(flags["proof-authority"]) || isBlank(flags.proof))) {
+      return { ok: false, code: "CRITICAL-PROOF-FLAGS-PROOF-REQUIRED" };
+    }
+    const stateResult = readState(dir);
+    const state = stateResult.status === "ok" ? stateResult.state : { schema: SCHEMA_ID };
+    const now = (deps.now ?? (() => new Date().toISOString()))();
+    const verified = verifyCriticalHumanProof({
+      dir, state, kind, candidate,
+      subject: { manifest, planSha256, candidate },
+      flags, now, required: true,
+    });
+    return verified.ok ? { ok: true } : { ok: false, code: verified.code };
+  };
+}
+
 function runFeaturePackageWriteCommand(sub, argv, deps) {
   if (sub === "feature-package-apply") return runFeaturePackageApplyCommand(argv, deps);
-  if (sub === "feature-package-reconcile") return runFeaturePackageReconcileCommand(argv, deps);
+  if (sub === "feature-package-reconcile") {
+    // `Object.hasOwn` rather than `??`: a test that explicitly injects
+    // `featurePackageReconcileApproval: undefined` means "no approval function is
+    // available" (RGe's FTP-RECONCILE-APPROVAL-UNAVAILABLE case) and must NOT receive
+    // the default in its place. Only an absent key -- the real, no-injection operator
+    // invocation -- gets the default closure.
+    return runFeaturePackageReconcileCommand(argv, {
+      ...deps,
+      featurePackageReconcileApproval: Object.hasOwn(deps, "featurePackageReconcileApproval")
+        ? deps.featurePackageReconcileApproval
+        : defaultFeaturePackageReconcileApproval(argv, deps),
+    });
+  }
   return runFeaturePackageRecoverCommand(argv, deps);
 }
 
