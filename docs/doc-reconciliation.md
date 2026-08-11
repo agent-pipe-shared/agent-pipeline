@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 5b0278d76bb8ac914b80b003ca4073d4cfc03015 — 2026-08-11, range 89570dfc..5b0278d7, docs-only handover checkpoint
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`5b0278d7`, "docs(phoenix): checkpoint -- bootstrap
+repaired, Verify 6 red to 1 parked"), touching only `docs/state.md`. Purely
+additive: a new dated checkpoint section recording the continuity-damaged
+bootstrap repair (stash+pull to `eb735ae1` plus a session-cleanup bind-orphan
+recovery) and three Goldfish dispatches (`89570dfc`, `fd8fae52`, `ecbb9df2`)
+that closed five of six pre-existing Verify failures. No other governed path
+touched; ADR-0045 not implicated (no `specs/<id>/` topology change).
+
 ## Candidate 43d42a23eb5f99798eb1e40a2a464d957103969d — 2026-08-10, range 3387065..43d42a23, the substantive tip of an interim checkpoint push (not a release); supersedes the entries below
 
 - ADR-0012: checked, no change needed.
