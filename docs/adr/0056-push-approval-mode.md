@@ -226,6 +226,29 @@ this sprint has already paid for twice.
 
 - `deploy` and `publication` have no source-of-truth mode. If an operator ever asks
   for one, the shape is already proven here.
+- **Extended, 2026-08-11 (PO instruction, verbatim): "jetzt als Implementierung
+  umsetzen auch gerne mit der selben Schlüssel Ed vs Chat Logik"** — build P-AC-08's
+  missing `feature-package-reconcile` approval wiring now, reusing the same key
+  (the committed `trustAnchor` in `project/critical-human-proof.json`, unchanged
+  and un-widened — this repository already has one) and the same signature/chat
+  mode shape this ADR proves. This is exactly the case decision 7's Follow-up
+  bullet above anticipated for `deploy`/`publication`, now asked for a fifth
+  action kind. **Decided: a new `gates.reconcile_approval` key**, same shape as
+  `gates.push_approval` (`"signature"` default, `"chat"` alternative, same
+  fail-closed-on-unparseable/uncommitted/symlinked rules) — not an overload of
+  `gates.push_approval` itself, because reconcile and push are different actions
+  an operator may reasonably want different modes for, and decision 5's "the
+  source wins, a contradiction fails closed" logic is written in terms of one
+  action kind owning one key. `feature-package-reconcile`'s approval gate
+  (`deps.featurePackageReconcileApproval` in `scripts/pipeline-state.mjs`) is
+  its own always-on dependency injection point, not routed through
+  `criticalProofWaiverFor`/`CRITICAL_ACTION_KINDS` at all today — so this does
+  not require adding a kind to `project/critical-human-proof.json`'s
+  `requiredKinds` (a kernel-path edit, GMW-gated); it only reads that file's
+  already-public, already-committed `trustAnchor`, unchanged. Scoped to
+  `feature-package-reconcile` only. `continuity-authority-revision-apply`'s
+  identical `deps.authorityRevisionApproval` gap is a separate criterion's
+  problem, explicitly not touched by this amendment.
 - The `chat` mode makes a session-level attestation plausible (a signed session
   transcript reference, say). Not built, not needed for the ask.
 - **Open, from the T5 Critic (F4).** Decision 5 describes the conflict rule as "a
