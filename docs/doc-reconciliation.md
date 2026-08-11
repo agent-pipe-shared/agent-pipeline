@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate d328e307 — 2026-08-11, range 17af46cb..d328e307, H-AC-12 disposition recorded in state.md handover
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`d328e307`), touching only `docs/state.md`
+(additive handover entry summarizing the H-AC-12 disposition landed in
+`17af46cb`/`197d5072`). No other governed path touched.
+
 ## Candidate 17af46cb2127ea9befb352e7bf431205334ca0c3 — 2026-08-11, range 06ec4e74..17af46cb, PO dispositions H-AC-12's release-planning/deploy-consumption subsystems
 
 - ADR-0045: checked, no change needed.
