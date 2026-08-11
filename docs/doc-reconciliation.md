@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate f2fc3026a08fdd797b10d50580d0f55329fd9b3a — 2026-08-11, range 755a3959..f2fc3026, PX0-AC-13 formalized as a PO decision point
+
+- ADR-0045: checked, no change needed.
+
+Covers exactly one commit (`f2fc3026`), touching only
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`'s
+`PX0-AC-13` POINTERS note (F2 closure recorded, F1/F3 given the same formal
+"PO decision point" framing already used for K-AC-05/O-1/O-2/H-AC-09). No
+verdict/count change — stays `partial`.
+
 ## Candidate 755a395935b8ae3243f18597af77030c230f1783 — 2026-08-11, range 26ea6a34..755a3959, security-scan fix confirmed + re-verified checkpoint
 
 - ADR-0012: checked, no change needed.
