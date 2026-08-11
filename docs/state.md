@@ -1521,6 +1521,26 @@ not a resolved criterion. No doc-reconciliation entry needed (no ADR
 `Governs:`s this file, confirmed by the checker itself returning "0
 implicated").
 
+**Checked whether F1/F3 are actually a bounded wiring task before deciding
+to keep deferring them — they are not.** Read the REAL mechanism
+(`selectHostTransport`/`observeThroughSelectedHost`,
+`ruleset-freshness.mjs:504-557`) directly: it requires a caller-supplied
+`hostTransport.execute` function that returns a specific, cryptographically
+bound receipt (`FRESHNESS_HOST_RECEIPT_SCHEMA` — exact `hostControl`,
+`childStarted`, `executable`, `argv`, `exitCode`, `publicHeadOid` match).
+Nothing in this codebase currently SUPPLIES such an `execute` function that
+genuinely crosses the sandbox boundary — there is no reusable "run this on
+the real host" primitive to wire `createWslHostAttestedSpawn` into. The
+F2 doc sentence itself ("use the host-authorized boundary directly") reads
+as an instruction to the CALLING AGENT/RUNNER (choose a different execution
+tool tier), not a code path this Node process can enter on its own. That
+raises a real open design question `createWslHostAttestedSpawn`'s current
+shape (in-process attestation-then-local-spawn) may never have been able to
+answer by construction, however it's implemented — worth a PO/design pass
+before any further code, not a Goldfish wiring task. Standing firm on not
+dispatching this tonight is the correct call, now on stronger evidence than
+before, not weaker.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
