@@ -57,14 +57,17 @@ await check("OSV and Semgrep probes expose only their required source-scan capab
     finally { rmSync(f.root, { recursive: true, force: true }); }
   }
 });
-await check("prepared Semgrep run executes the exact prepared path with unchanged scan argv", async () => {
+await check("prepared Semgrep run executes the exact prepared path with the fixed per-rule timeout argv", async () => {
   const f = fixture("semgrep"); const probeCalls = [];
   try {
     const observed = probeSemgrep({ executablePath: f.path, rootDir: f.root, tempDir: f.root }, { spawnFn: spawnSequence([{ status: 0, stdout: "1.130.0\n", stderr: "" }, { status: 0, stdout: "--json --config", stderr: "" }], probeCalls), now: new Date("2026-07-18T12:00:00.000Z") });
     const runCalls = [];
     const result = await runPreparedScanner("semgrep", observed.handle, { rootDir: f.root, tempDir: f.root, config: { rulesDir: "rules" }, spawnFn: (command, args, options) => { runCalls.push({ command, args, options }); return { status: 0, stdout: JSON.stringify({ results: [], errors: [] }), stderr: "" }; } });
     assert.equal(result.status, "PASS"); assert.equal(runCalls[0].command, observed.handle.identity.realPath);
-    assert.deepEqual(runCalls[0].args, ["scan", "--json", "--config", "rules", f.root]); assert.equal(runCalls[0].options.shell, false);
+    // --timeout/--timeout-threshold added ba1a7d28 (2026-08-11): bounds semgrep's own
+    // per-rule-per-file budget so a large file can't trip a scanner_error; see
+    // harness/scripts/security-adapters/semgrep.mjs for the full rationale.
+    assert.deepEqual(runCalls[0].args, ["scan", "--json", "--timeout", "45", "--timeout-threshold", "0", "--config", "rules", f.root]); assert.equal(runCalls[0].options.shell, false);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 await check("prepared run fails closed before spawn after executable substitution", async () => {
