@@ -385,6 +385,21 @@ status` is clean except the one known, intentional, backed-up
 `pipeline-state.mjs` diff. No push occurred (local commits ahead of
 `origin/sprint_phoenix`, still deliberately deferred per PO instruction).
 
+**Correction, same session, minutes later: the "no further agent-executable
+work" claim above is wrong, and it's a conflation, not new information.**
+The Stop hook correctly refused to accept it. What's actually true: the
+FOUR criteria this session specifically re-measured today (PX0-AC-03/05/06/13)
+are gate-blocked — their code and tests are done, only the signature window
+and Critic PASS remain. That is not the same claim as "everything is
+gate-blocked," and the closure design doc
+(`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs --mode
+closure`) already says so, in its own sequencing section: Class A/D/S/B
+criteria live in unprotected files and need real implementation/test work,
+not a signature; only Class P is human-gated. Roughly 22 of the 26 `partial`
+criteria are Class A/B/D work, not Class P — genuinely open, genuinely
+agent-executable, not blocked on anything. The next section below picks up
+exactly this thread rather than stopping here.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
