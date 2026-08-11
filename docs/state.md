@@ -208,6 +208,60 @@ prior reports as `evidence:`) can actually reach PASS instead of re-failing
 on coverage. Until then, `EPIC-AC-05` still forbids any Phoenix completion
 claim — this is a known, named, single-signature gate, not an open-ended one.
 
+### Two things caught while assembling the above, recorded so they don't bite later
+
+**The two second-round Critic reports were never persisted — a real gap, now
+closed going forward.** Both FAIL verdicts (F1-F6 above) exist only as chat
+output that got compacted; `find` across `evidence/` and
+`specs/sprint-phoenix-epic/evidence/` for anything matching either candidate
+comes back empty. This violates this file's own persistence rule ("a session
+is a cache on the persisted artifact, not the record of truth"). The findings
+themselves are not lost — this checkpoint is now their record — but the next
+Critic re-review has no report file to cite as its `evidence:` prior-report
+path, so it cannot be framed as a delta re-review; it will have to be a fresh
+full review once a complete candidate exists. **Rule for every Critic dispatch
+from here on:** the report lands at
+`specs/sprint-phoenix-epic/evidence/<package>-critic-review-<candidate-sha>.md`
+*before* the Elephant acts on its verdict, same convention the first-round
+reviews already used (see the `wp2wp3-*`/`phx-r*-critic-review-*.md` files in
+that directory) — this round simply skipped it under redirect pressure.
+
+**Critic re-review parked, not dispatched this entry.** Considered
+dispatching a fresh (non-delta) review over `ee8a38f0..7dffa72e` to
+independently confirm F2/F3 now that both are fixed and unblocked. Decided
+against it: the FIX2 package (F1's source fix, uncommitted by design per
+QG-04/TP-5 — fix and test land together or not at all) has no reviewable
+candidate yet, and a partial review spends a full Critic budget confirming
+findings (F1/F4) that are already known and cannot be acted on before the
+GMW window regardless. One review over one complete candidate, once the
+window lands and both TP-5 tests are in, is both cheaper and the only form
+that can actually reach PASS. Direct verification already performed instead
+(design-doc exact-text match for F2, 36/36 + 16/16 green on the real call
+path for F3) is real evidence but does not substitute for the independent
+pass — it just makes clear there's nothing left to *fix*, only to confirm.
+
+**Both pending TP-5 tests independently landed on the name `AR06g`.**
+`PHX-WP-PX0-CASOUTCOME`'s prepared casOutcome-`"stale"` assertion and
+`PHX-WP-PX0-V1JOURNAL-TESTS`'s prepared `.v1`-journal-loads assertion
+(`specs/sprint-phoenix-epic/evidence/PHX-WP-PX0-V1JOURNAL-TESTS.dispatch-record.json`
+also names a sibling `AR06h` contrast case) each independently chose `AR06g`
+as the next free letter in `harness/scripts/pipeline-state.test.mjs`'s AR06
+sequence — a collision, since neither dispatch could see the other's guard-blocked
+attempt. Whoever lands the GMW window renames one on the way in (e.g.
+casOutcome keeps `AR06g`, the v1-journal pair becomes `AR06h`/`AR06i`) —
+noted here so it's a five-second rename instead of a rediscovered collision.
+
+**The uncommitted `pipeline-state.mjs` diff (F1's source fix) is backed up**
+at `scratch/casoutcome-fix-backup.diff`, gitignored but durable against a
+checkout accident, in addition to living in the working tree and in
+`evidence/PHX-WP-PX0-CASOUTCOME/dispatch-record.json`'s log notes.
+
+**`security-scan.mjs` cannot run this session.** It refuses a dirty working
+tree, and `pipeline-state.mjs` is staying dirty by design until the GMW
+window lands. The continuity queue's next action reads `security-scan` —
+that action is genuinely unreachable right now, not skipped; do not retry it
+in this state.
+
 ---
 
 ## RESTART CHECKPOINT — 2026-08-08, WSL reboot + plugin refresh (READ THIS FIRST)
