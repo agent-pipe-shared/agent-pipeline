@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate c5e2e6020663034042a201261ebab12a63f93f6a — 2026-08-11, range ddffcb63..c5e2e602, TP3 registration outcome + OT09 regression finding
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`c5e2e602`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 05ce87ecc71d4ea736e6a5f34eb7d9cebdf10edf — 2026-08-11, range 2f56a6fb..05ce87ec, P-AC-08/key-rotation/GMW-window checkpoint
 
 - ADR-0012: checked, no change needed.
