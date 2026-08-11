@@ -14,7 +14,7 @@
  */
 import { chmodSync, fsyncSync, linkSync, lstatSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync, symlinkSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { createHash, createHmac } from "node:crypto";
+import { createHash, createHmac, generateKeyPairSync, sign } from "node:crypto";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -59,6 +59,7 @@ import {
   validateFeaturePackage,
 } from "../../plugins/pipeline-core/lib/feature-package-topology.mjs";
 import { sha256CanonicalJson } from "../../plugins/pipeline-core/lib/plan-spec-state-v2.mjs";
+import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../../plugins/pipeline-core/lib/critical-action-approval-request.mjs";
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
@@ -4169,6 +4170,79 @@ function reconcileApplyCmd(dir, extraArgs, deps) {
   return captureBoth(() => run(["feature-package-reconcile", "--root", dir, ...extraArgs], deps));
 }
 
+// ---- PHX-WP-PAC08-RECONCILE-APPROVAL: defaultFeaturePackageReconcileApproval's real,
+// non-test-injected wiring (ADR-0056's 2026-08-11 Follow-up, gates.reconcile_approval). ----
+const PAC08_CANDIDATE = { commit: "a".repeat(40), tree: "b".repeat(40) };
+const PAC08_NOW = "2026-08-11T12:00:00.000Z";
+const PAC08_EXPIRES = "2026-08-11T13:00:00.000Z";
+const PAC08_PLAN_BYTES = Buffer.from("pac08-plan");
+const PAC08_SPEC_BYTES = Buffer.from("pac08-spec");
+const PAC08_PLAN_SHA256 = sha256Hex(PAC08_PLAN_BYTES);
+const PAC08_SPEC_SHA256 = sha256Hex(PAC08_SPEC_BYTES);
+const PAC08_FEATURE_ID = "pac08-reconcile";
+
+/** Writes AND commits `pipeline.user.yaml`. `readGateApprovalMode` ignores a working-tree
+ * copy that differs from HEAD (ADR-0056 decision 2 / critical-human-proof-policy.mjs), so an
+ * uncommitted fixture would silently exercise the fail-closed "signature" default instead of
+ * the configured mode -- mirrors critical-human-proof-policy.test.mjs's own userYaml() helper. */
+function pac08GatesYaml(base, mode) {
+  writeFileSync(join(base, "pipeline.user.yaml"), `schema: "pipeline.user.v3"\ngates:\n  reconcile_approval: "${mode}"\n`);
+  const git = (...args) => spawnSync("git", args, { cwd: base, encoding: "utf8" });
+  git("init", "-q");
+  git("config", "user.email", "goldfish@example.invalid");
+  git("config", "user.name", "Goldfish");
+  git("add", "-A");
+  git("commit", "-q", "-m", "fixture");
+}
+
+/** A GOVERNING session for `defaultFeaturePackageReconcileApproval` -- deliberately separate
+ * from `--root` (the repository being reconciled): the default approval reads
+ * `gates.reconcile_approval` and Continuity State from THIS directory, never from `--root`
+ * (ADR-0056: "read from the governing session, not from the pushed repository").
+ * `mode: null` leaves no `pipeline.user.yaml` at all, so `readGateApprovalMode` falls back
+ * to its strongest default ("signature", source "default"). */
+function seedPac08GoverningSession(prefix, { mode = null } = {}) {
+  const dir = freshDir(prefix);
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, "project", "pipeline-state.json"), `${JSON.stringify({
+    schema: SCHEMA_ID, planApproved: true,
+    activeFeature: { id: PAC08_FEATURE_ID, planPath: `specs/${PAC08_FEATURE_ID}/prd.md`, phase: "implementation" },
+    planApproval: { poGateAuthority: { planSha256: PAC08_PLAN_SHA256, specSha256: PAC08_SPEC_SHA256 } },
+  }, null, 2)}\n`);
+  if (mode !== null) pac08GatesYaml(dir, mode);
+  return dir;
+}
+
+/** A genuine Ed25519 keypair plus a well-formed request/authority/proof triple for
+ * `feature-package-reconcile`, written to an EXTERNAL directory (outside every `dir`/`root`
+ * this suite constructs -- `externalPublicJson` refuses a path inside `dir`). Mirrors the
+ * `generateKeyPairSync`/`sign` pattern already established in
+ * critical-action-approval-request.test.mjs and critical-human-proof-gate.test.mjs. */
+function pac08Proof({ manifest, planSha256, candidate = PAC08_CANDIDATE, expiresAt = PAC08_EXPIRES }) {
+  const subject = { manifest, planSha256, candidate };
+  const subjectSha256 = criticalActionSubjectSha256({ kind: "feature-package-reconcile", candidate, subject });
+  const action = { kind: "feature-package-reconcile", subjectSha256, expiresAt };
+  const request = createCriticalActionApprovalRequest({
+    candidate, featureId: PAC08_FEATURE_ID, planBytes: PAC08_PLAN_BYTES, specBytes: PAC08_SPEC_BYTES, action,
+  });
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+  const authority = { keyReference: "pac08-test-key", publicKeySha256: sha256Hex(publicKey) };
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256,
+    keyReference: "pac08-test-key", publicKey,
+    signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64"),
+  };
+  const external = freshDir("pac08-external");
+  const requestPath = join(external, "request.json");
+  const authorityPath = join(external, "authority.json");
+  const proofPath = join(external, "proof.json");
+  writeFileSync(requestPath, JSON.stringify(request));
+  writeFileSync(authorityPath, JSON.stringify(authority));
+  writeFileSync(proofPath, JSON.stringify(proof));
+  return { requestPath, authorityPath, proofPath };
+}
+
 function runFeaturePackageReconcileTests() {
 
 // ---- DoD 1: planFeaturePackageReconcile recomputes stale digests from disk and returns
@@ -4341,6 +4415,175 @@ function runFeaturePackageReconcileTests() {
   ok("RGh the unmodified feature-package-recover diagnoses the retained reconcile journal as not-yet-applied", recovered.value === 2
     && report.schema === "pipeline.feature-package-recover.v1" && report.status === "retained"
     && report.diagnosis === "not-yet-applied" && report.transaction.kind === "reconcile", recovered.out);
+}
+
+// ---- PHX-WP-PAC08-RECONCILE-APPROVAL: defaultFeaturePackageReconcileApproval's real
+// (non-test-injected) wiring, one level up from RGe's injected-function cases above. ----
+{
+  // RGi -- signature-mode success: a genuine Ed25519 proof over the real subject
+  // (manifest/planSha256/candidate) verifies and the reconcile actually applies. deps
+  // deliberately OMITS featurePackageReconcileApproval so runFeaturePackageWriteCommand
+  // wires in defaultFeaturePackageReconcileApproval itself, not a test double.
+  const fx = seedReconcilePackage("rgi-signature-success");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  const governingDir = seedPac08GoverningSession("rgi-governing", { mode: "signature" });
+  const proof = pac08Proof({ manifest: fx.manifestRel, planSha256: digest });
+  const deps = {
+    dir: governingDir, now: () => PAC08_NOW,
+    gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
+    gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }),
+  };
+  const applied = reconcileApplyCmd(fx.dir, [
+    "--manifest", fx.manifestRel, "--plan-sha256", digest,
+    "--by", "PO", "--proof-request", proof.requestPath, "--proof-authority", proof.authorityPath, "--proof", proof.proofPath,
+  ], deps);
+  const receipt = JSON.parse(applied.out || "{}");
+  ok("RGi signature-mode default approval: a genuine Ed25519 proof over the real subject verifies and the reconcile applies",
+    applied.value === 0 && receipt.status === "applied", applied.out || applied.err);
+  const persisted = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
+  ok("RGi-2 the manifest was actually rewritten -- the default approval genuinely gated a real write, not a no-op",
+    persisted.artifacts[0].sha256 === sha256Hex(newPrd), JSON.stringify(persisted));
+}
+{
+  // RGj -- chat-mode success: only --by is required, no proof flags, when the governing
+  // session's own committed gates.reconcile_approval is "chat".
+  const fx = seedReconcilePackage("rgj-chat-success");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  const governingDir = seedPac08GoverningSession("rgj-governing", { mode: "chat" });
+  const deps = {
+    dir: governingDir, now: () => PAC08_NOW,
+    gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
+    gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }),
+  };
+  const applied = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest, "--by", "PO"], deps);
+  const receipt = JSON.parse(applied.out || "{}");
+  ok("RGj chat-mode default approval: --by alone (no proof flags) succeeds when gates.reconcile_approval is chat",
+    applied.value === 0 && receipt.status === "applied", applied.out || applied.err);
+}
+{
+  // RGk -- missing/invalid proof refusal in signature mode: --by alone, with no
+  // --proof-* flags at all, is refused (the identical refusal a malformed proof file
+  // reaches too -- both fail the same verifyCriticalHumanProof pre-check and surface as
+  // the one generic FTP-RECONCILE-APPROVAL-REJECTED message), zero mutation.
+  const fx = seedReconcilePackage("rgk-missing-proof");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  const beforeManifest = readFileSync(join(fx.dir, fx.manifestRel));
+  const governingDir = seedPac08GoverningSession("rgk-governing", { mode: "signature" });
+  const deps = {
+    dir: governingDir, now: () => PAC08_NOW,
+    gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
+    gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }),
+  };
+  const refused = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest, "--by", "PO"], deps);
+  ok("RGk signature mode with --by but no --proof-* flags is refused (FTP-RECONCILE-APPROVAL-REJECTED), zero mutation",
+    refused.value === 2 && /FTP-RECONCILE-APPROVAL-REJECTED/.test(refused.err)
+    && readFileSync(join(fx.dir, fx.manifestRel)).equals(beforeManifest), refused.err);
+}
+{
+  // RGl -- wrong-candidate-bound proof refusal: the proof is genuinely signed and
+  // internally consistent, but bound to a DIFFERENT candidate than the one the reconcile
+  // actually observes via deps.gitCandidate -- refused, zero mutation.
+  const fx = seedReconcilePackage("rgl-wrong-candidate");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  const beforeManifest = readFileSync(join(fx.dir, fx.manifestRel));
+  const governingDir = seedPac08GoverningSession("rgl-governing", { mode: "signature" });
+  const wrongCandidate = { commit: "c".repeat(40), tree: "d".repeat(40) };
+  const proof = pac08Proof({ manifest: fx.manifestRel, planSha256: digest, candidate: wrongCandidate });
+  const deps = {
+    dir: governingDir, now: () => PAC08_NOW,
+    gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
+    gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }), // the REAL candidate the reconcile actually observes
+  };
+  const refused = reconcileApplyCmd(fx.dir, [
+    "--manifest", fx.manifestRel, "--plan-sha256", digest,
+    "--by", "PO", "--proof-request", proof.requestPath, "--proof-authority", proof.authorityPath, "--proof", proof.proofPath,
+  ], deps);
+  ok("RGl a proof bound to a DIFFERENT candidate than the one the reconcile actually observes is refused, zero mutation",
+    refused.value === 2 && /FTP-RECONCILE-APPROVAL-REJECTED/.test(refused.err)
+    && readFileSync(join(fx.dir, fx.manifestRel)).equals(beforeManifest), refused.err);
+}
+{
+  // RGm -- dir vs --root governing-session binding: `--root` (fx.dir, the repository being
+  // reconciled) carries its OWN committed pipeline.user.yaml claiming "chat"; the GOVERNING
+  // session (`dir`) has no yaml at all, so it falls back to the strongest "signature"
+  // default. Only --by is supplied (no proof). If the wiring ever read --root instead of
+  // `dir`, this would wrongly succeed; it must instead refuse, proving `dir` governs.
+  const fx = seedReconcilePackage("rgm-dir-vs-root");
+  const newPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), newPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  const beforeManifest = readFileSync(join(fx.dir, fx.manifestRel));
+  pac08GatesYaml(fx.dir, "chat"); // committed at --root; must be ignored by the approval
+  const governingDir = seedPac08GoverningSession("rgm-governing", { mode: null });
+  const deps = {
+    dir: governingDir, now: () => PAC08_NOW,
+    gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
+    gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }),
+  };
+  const refused = reconcileApplyCmd(fx.dir, ["--manifest", fx.manifestRel, "--plan-sha256", digest, "--by", "PO"], deps);
+  ok("RGm the approval reads gates.reconcile_approval and Continuity State from `dir`, never `--root` -- root's committed chat is ignored, dir's un-configured signature default still demands a proof",
+    refused.value === 2 && /FTP-RECONCILE-APPROVAL-REJECTED/.test(refused.err)
+    && readFileSync(join(fx.dir, fx.manifestRel)).equals(beforeManifest), refused.err);
+}
+{
+  // RGn -- push regression: proves the ALWAYS_REQUIRED_KINDS bypass (verifyCriticalHumanProof,
+  // scoped to "feature-package-reconcile" only) leaves push's own
+  // CRITICAL-PROOF-POLICY-KIND-REQUIRED refusal byte-identical to before the bypass was
+  // added -- reached via a REAL approve-push invocation whose policy file deliberately
+  // omits "push" from requiredKinds while verifyCriticalHumanProof's required:true still
+  // applies for push. Mirrors critical-human-proof-gate.test.mjs's own real-proof fixture
+  // shape (threat model file, remote/destination, genuine Ed25519 proof) so the refusal is
+  // reached at the SAME point a real operator invocation would reach it, not short-circuited
+  // by an earlier flag-parse failure.
+  const dir = freshDir("rgn-push-kind-required");
+  mkdirSync(join(dir, "project"), { recursive: true });
+  mkdirSync(join(dir, "specs", "sprint-nova-epic", "implementation"), { recursive: true });
+  const threatModelText = "fixture threat model\n";
+  writeFileSync(join(dir, "specs", "sprint-nova-epic", "implementation", "critical-action-authorization-threat-model.md"), threatModelText);
+  writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["deploy"] }));
+  // No project/pipeline-state.json is seeded: verifyCriticalHumanProof's requiredKinds
+  // check is the FIRST thing it does, before state is ever consulted, so this refusal is
+  // reached (and state stays genuinely absent, not merely untouched) with no state file
+  // at all -- exactly like PS10/PS11's existing approve-push fixtures.
+  const pushTarget = { remote: "origin", destination: "refs/heads/main" };
+  const threatModel = { path: "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md", sha256: sha256Hex(threatModelText) };
+  const candidate = PAC08_CANDIDATE;
+  const subjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit, ...pushTarget, threatModel } });
+  const request = createCriticalActionApprovalRequest({
+    candidate, featureId: PAC08_FEATURE_ID, planBytes: PAC08_PLAN_BYTES, specBytes: PAC08_SPEC_BYTES,
+    action: { kind: "push", subjectSha256, expiresAt: PAC08_EXPIRES },
+  });
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+  const authority = { keyReference: "pac08-test-key", publicKeySha256: sha256Hex(publicKey) };
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1", intentSha256: request.approvalIntent.sha256,
+    keyReference: "pac08-test-key", publicKey,
+    signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64"),
+  };
+  const external = freshDir("rgn-external");
+  const requestPath = join(external, "request.json");
+  const authorityPath = join(external, "authority.json");
+  const proofPath = join(external, "proof.json");
+  writeFileSync(requestPath, JSON.stringify(request));
+  writeFileSync(authorityPath, JSON.stringify(authority));
+  writeFileSync(proofPath, JSON.stringify(proof));
+  const deps = { dir, now: () => PAC08_NOW, gitHead: () => ({ ok: true, commit: candidate.commit }), gitCandidate: () => ({ ok: true, ...candidate }) };
+  const refused = captureBoth(() => run([
+    "approve-push", "--by", "PO", "--remote", pushTarget.remote, "--destination", pushTarget.destination,
+    "--proof-request", requestPath, "--proof-authority", authorityPath, "--proof", proofPath,
+  ], deps));
+  ok("RGn push's CRITICAL-PROOF-POLICY-KIND-REQUIRED refusal is byte-identical to before the ALWAYS_REQUIRED_KINDS bypass -- the bypass is scoped to feature-package-reconcile only",
+    refused.value === 2 && /CRITICAL-PROOF-POLICY-KIND-REQUIRED/.test(refused.err), refused.err);
+  ok("RGn-2 state is left absent -- zero mutation on the kind-required refusal", readState(dir).status === "absent", JSON.stringify(readState(dir)));
 }
 
 }
