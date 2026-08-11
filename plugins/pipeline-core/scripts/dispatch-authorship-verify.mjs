@@ -27,6 +27,15 @@
  *      `completed-by-elephant-finish` and `stopped-tool-budget`, and an allowlist would
  *      misclassify every new word someone reasonably invents.
  *   3. Path coverage (heuristic, and honestly the weakest). See LIMITS below.
+ *   4. Recorded model vs. agent definition (NVA-BL-78, `lib/agent-model-registry.mjs`). Silent
+ *      when the record predates the `agentType` convention (see LIMITS); where `agentType` IS
+ *      declared, the record's `model`/`effort` are checked against that agent's own definition
+ *      file rather than trusted as hand-typed text. A disagreement without a declared
+ *      `modelOverride` (with a non-empty `rationale`, the MP-05/07 requirement) downgrades a
+ *      would-be PASS to FAIL, classification `model-mismatch` — this is what makes the check
+ *      have teeth rather than being an informational aside. A well-formed override is HONOURED
+ *      (stays PASS) and reported as `model-override-declared`, distinguishable from both the
+ *      ordinary "agrees" case and an accidental mismatch.
  *
  * THE FOUR VERDICTS.
  *
@@ -90,6 +99,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { compareRecordedModel } from "../lib/agent-model-registry.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 export const DEFAULT_EVIDENCE_DIR = join(REPO_ROOT, "evidence");
@@ -356,7 +366,23 @@ export function verifyCommit(sha, deps) {
       uncovered,
     });
   }
-  return result(sha, VERDICT.pass, "bound", `bound to \`${taskId}\` (outcome \`${record.outcome}\`, ${changed.length} path(s) covered)`, { taskId });
+
+  // Dimension 4: the recorded model, checked against the dispatched agent's own definition
+  // (NVA-BL-78). Silent (no effect on verdict) when the record predates `agentType`.
+  const modelCheck = compareRecordedModel(record);
+  if (modelCheck.classification === "model-mismatch" || modelCheck.classification === "model-override-malformed") {
+    return result(
+      sha,
+      VERDICT.fail,
+      "model-mismatch",
+      `path coverage is fine, but the recorded model contradicts the dispatched agent's definition: ${modelCheck.reason}`,
+      { taskId, modelCheck },
+    );
+  }
+  return result(sha, VERDICT.pass, "bound", `bound to \`${taskId}\` (outcome \`${record.outcome}\`, ${changed.length} path(s) covered)`, {
+    taskId,
+    modelCheck,
+  });
 }
 
 export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = DEFAULT_EVIDENCE_DIR } = {}) {

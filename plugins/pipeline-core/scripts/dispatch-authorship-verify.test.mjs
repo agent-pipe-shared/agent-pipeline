@@ -170,6 +170,66 @@ test("(i) record whose own taskId denies the trailer -> FAIL (item failure shape
   assert.equal(verdict.classification, "record-taskid-mismatch");
 });
 
+test("(j) a record with a matching agentType/model/effort stays PASS/bound and carries modelCheck.model-matches", () => {
+  writeRecord("DOD-J", {
+    taskId: "DOD-J",
+    agentType: "goldfish-implementor",
+    model: "claude-sonnet-5",
+    effort: "medium",
+    outcome: "completed",
+    report: { changedFiles: ["src/thing.mjs - x"] },
+  });
+  const verdict = verifyCommit("j00j111", commit({ message: "feat(x): a thing\n\nDispatch: DOD-J (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.pass);
+  assert.equal(verdict.classification, "bound");
+  assert.equal(verdict.modelCheck.classification, "model-matches");
+});
+
+test("(k) recorded model contradicts the dispatched agent's definition (2026-08-08 incident shape) -> downgraded to FAIL model-mismatch", () => {
+  writeRecord("DOD-K", {
+    taskId: "DOD-K",
+    agentType: "goldfish-deep",
+    model: "claude-opus-5",
+    effort: "xhigh",
+    outcome: "completed",
+    report: { changedFiles: ["src/thing.mjs - x"] },
+  });
+  const verdict = verifyCommit("k00k222", commit({ message: "feat(x): a thing\n\nDispatch: DOD-K (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.fail);
+  assert.equal(verdict.classification, "model-mismatch");
+  assert.equal(verdict.modelCheck.classification, "model-mismatch");
+});
+
+test("(l) an explicit, rationale-carrying modelOverride is honoured -- stays PASS/bound, reported as an override", () => {
+  writeRecord("DOD-L", {
+    taskId: "DOD-L",
+    agentType: "goldfish-deep",
+    model: "claude-opus-5",
+    effort: "xhigh",
+    modelOverride: { model: "claude-opus-5", effort: "xhigh", rationale: "MP-05 criterion 1: guardrail rewrite" },
+    outcome: "completed",
+    report: { changedFiles: ["src/thing.mjs - x"] },
+  });
+  const verdict = verifyCommit("l00l333", commit({ message: "feat(x): a thing\n\nDispatch: DOD-L (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.pass);
+  assert.equal(verdict.classification, "bound");
+  assert.equal(verdict.modelCheck.classification, "model-override-declared");
+});
+
+test("(m) a record without agentType (pre-NVA-BL-78 corpus) is unaffected -- classification stays bound, no regression", () => {
+  writeRecord("DOD-M", {
+    taskId: "DOD-M",
+    model: "claude-sonnet-5",
+    effort: "medium",
+    outcome: "completed",
+    report: { changedFiles: ["src/thing.mjs - x"] },
+  });
+  const verdict = verifyCommit("m00m444", commit({ message: "feat(x): a thing\n\nDispatch: DOD-M (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }));
+  assert.equal(verdict.verdict, VERDICT.pass);
+  assert.equal(verdict.classification, "bound");
+  assert.equal(verdict.modelCheck.classification, "agent-type-absent");
+});
+
 test("a Dispatch: mentioned in the body prose is not authorship evidence", () => {
   const verdict = verifyCommit(
     "d44d000",
