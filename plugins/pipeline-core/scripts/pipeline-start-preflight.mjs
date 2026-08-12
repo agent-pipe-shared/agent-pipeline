@@ -3,7 +3,7 @@
 
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -323,12 +323,30 @@ export const SCRATCH_LIFECYCLE_SCHEMA = "pipeline.bootstrap-scratch-lifecycle.v1
  * invocation is deliberately NOT done — it would mint a fresh descriptor on every bootstrap
  * that no later sweep could ever match to a dead process, which is the unbounded growth this
  * whole mechanism exists to stop.
+ *
+ * NO PRE-EXISTING scratch/, NO SWEEP. Both `retireOrphanScratchDescriptors` and
+ * `bindScratchDescriptor` resolve their scratch root via `physicalScratchRoot`, which
+ * `mkdirSync`s `scratch/` unconditionally — including in a project where it never existed. A
+ * consumer project's `.gitignore` predating onboarding does not ignore `scratch/`, so that
+ * unconditional create dirties the tree on the very first bootstrap and can trip
+ * `security-scan.mjs`'s dirty-tree refusal. Nothing can be bound to sweep if `scratch/` never
+ * existed, so checking existence FIRST and skipping the whole lifecycle when it is absent loses
+ * nothing: it only reaches (2) whether `rootDir` itself resolves at all, which the existing
+ * fail-open path below still handles unchanged.
  */
 export function runBootstrapScratchLifecycle({
   rootDir = process.cwd(),
   env = process.env,
   deps = {},
 } = {}) {
+  if (existsSync(rootDir) && !existsSync(resolve(rootDir, "scratch"))) {
+    return {
+      schema: SCRATCH_LIFECYCLE_SCHEMA,
+      sweep: null,
+      binding: { status: "skipped-no-scratch-directory" },
+      faults: [],
+    };
+  }
   const faults = [];
   const faultCode = (error) => String(error?.code ?? "unknown");
   let sweep = null;

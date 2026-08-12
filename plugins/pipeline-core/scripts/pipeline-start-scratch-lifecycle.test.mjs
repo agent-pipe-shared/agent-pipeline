@@ -75,6 +75,9 @@ test("a live previous session is never swept out from under itself", () => {
 
 test("a bootstrap with no session identity sweeps and binds nothing, rather than minting an id", () => {
   const root = freshRepo();
+  // This case exercises the "no session identity" path specifically, not the "scratch/ does
+  // not exist yet" skip path pinned separately below -- so the fixture pre-creates scratch/.
+  mkdirSync(join(root, "scratch"), { recursive: true });
   const result = runBootstrapScratchLifecycle({
     rootDir: root,
     env: {},
@@ -83,6 +86,47 @@ test("a bootstrap with no session identity sweeps and binds nothing, rather than
   assert.equal(result.binding.status, "unbound-no-session-identity");
   assert.equal(result.sweep.retiredCount, 0);
   assert.deepEqual(result.faults, []);
+});
+
+test("a bootstrap skips the sweep entirely when scratch/ does not already exist, and creates nothing", () => {
+  const root = freshRepo();
+  const scratchPath = join(root, "scratch");
+  assert.equal(existsSync(scratchPath), false);
+
+  const result = runBootstrapScratchLifecycle({
+    rootDir: root,
+    env: { PIPELINE_SCRATCH_SESSION_ID: "current-session" },
+    deps: { ...ANONYMOUS_OWNER, isProcessAliveFn: () => false },
+  });
+
+  assert.equal(result.schema, SCRATCH_LIFECYCLE_SCHEMA);
+  assert.deepEqual(result.faults, []);
+  assert.equal(result.sweep, null);
+  assert.equal(result.binding.status, "skipped-no-scratch-directory");
+  assert.equal(existsSync(scratchPath), false, "the bootstrap must not create scratch/ when it did not already exist");
+  const status = spawnSync("git", ["status", "--porcelain"], { cwd: root, encoding: "utf8" });
+  assert.equal(status.status, 0);
+  assert.equal(status.stdout, "", "the bootstrap must not dirty the git tree when scratch/ did not already exist");
+});
+
+test("a bootstrap still sweeps and binds as before when scratch/ already exists", () => {
+  const root = freshRepo();
+  const previous = bindScratchDescriptor({ rootDir: root, sessionId: "previous-session", deps: ANONYMOUS_OWNER });
+  const previousDirectory = join(root, previous.scratchRelativePath);
+  assert.equal(existsSync(join(root, "scratch")), true);
+
+  const result = runBootstrapScratchLifecycle({
+    rootDir: root,
+    env: { PIPELINE_SCRATCH_SESSION_ID: "current-session" },
+    deps: { ...ANONYMOUS_OWNER, isProcessAliveFn: () => false },
+  });
+
+  assert.equal(result.schema, SCRATCH_LIFECYCLE_SCHEMA);
+  assert.deepEqual(result.faults, []);
+  assert.equal(result.sweep.retiredCount, 1);
+  assert.equal(existsSync(previousDirectory), false, "the previous session's claimed directory survives the sweep");
+  assert.equal(result.binding.status, "bound");
+  assert.equal(existsSync(join(root, result.binding.scratchRelativePath)), true);
 });
 
 test("the lifecycle is fail-open: an unusable root is a typed fault, never a throw", () => {
