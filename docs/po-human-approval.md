@@ -53,6 +53,35 @@ question "should this be authorized, with this consequence?" is answered while
 you can still read the terms, rather than being implied by having typed a
 passphrase. `setup` creates key material and signs nothing, so it does not ask.
 
+### The prompt speaks your language; the word you type does not
+
+The three framing lines of that prompt — the heading, the sentence naming the
+consequence, and the instruction to type the token — are printed in the
+human-facing language this repository is configured for
+(`continuity.runtime.humanFacingLanguage` in the project-state artifact;
+`de` and `en` are the values that contract admits). A repository configured for
+`de` therefore opens with `PO-FREIGABE BESTÄTIGEN` and closes with `Tippen Sie
+exakt "approve" ...`.
+
+English is the hard fallback, in every failure mode: an absent, unreadable or
+malformed state file, a missing continuity block, a language value that is not a
+recognised one, or a lookup that fails for any other reason all print the
+complete English prompt. There is no path on which a locale problem produces a
+shorter prompt, a partial prompt, or no prompt at all.
+
+The word you type is **always the English `approve`**, in every language. It is
+one stable, greppable constant shared by this document, the prompt and the code;
+a translated token would be a second accepted input on a signing gate, and could
+drift from the documentation. The localized prompt therefore quotes `approve`
+verbatim rather than translating it, and no localized synonym is accepted —
+typing `genehmigen` cancels exactly like any other non-matching answer.
+
+The summary lines between the framing lines are data, not prose: digests,
+candidate identifiers, expiry timestamps, and (for `sign-intent`) the recorded
+request's own reason and scope. They are identical in every language. So is the
+cancellation behaviour: any answer that is not exactly `approve` cancels before
+OpenSSL runs and before any artifact exists.
+
 ## Which commands are yours
 
 Every command in this document that reads the private key is yours and only

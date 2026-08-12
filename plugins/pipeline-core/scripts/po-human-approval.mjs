@@ -30,6 +30,7 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { boundedOpaqueCopyCommand, renderProjectOnboardingAction } from "../lib/project-onboarding-v3.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
@@ -360,7 +361,78 @@ function command(executable, args, dependencies) {
   if (result?.status !== 0) fail(`${executable} failed; the human terminal must complete the local prompt`);
 }
 
+/**
+ * NVA-BL-74 (backlog/items/2026-08-07-human-authorization-prompts-ignore-the-
+ * configured-language-profile.md): the token a human types is deliberately NOT
+ * translated. It stays this one stable English constant in every language --
+ * greppable, documentable (docs/po-human-approval.md), and impossible to drift
+ * between prompt and documentation. A localised token would be a SECOND accepted
+ * input on a signing gate for no security benefit; the localised prompt text
+ * below therefore quotes this exact word verbatim rather than translating it.
+ */
 const CONFIRMATION_TOKEN = "approve";
+
+/**
+ * The FRAME of the confirmation prompt -- header, consequence sentence and typed-
+ * token instruction -- per human-facing language. Only these three lines are
+ * translated: the summary lines between them are caller-supplied DATA (digests,
+ * candidate identifiers, and, for `sign-intent`, lines read verbatim out of a
+ * recorded request by describeGuardMaintenanceWindowRequest), never prose this
+ * function owns.
+ *
+ * This table's OWN keys are the recognised-language set. That is the point: a
+ * value that is absent, unreadable, or simply has no entry here resolves to
+ * `DEFAULT_HUMAN_FACING_LANGUAGE` through one branch, so a locale lookup can
+ * never fail open into "no prompt at all". `de`/`en` are exactly the values the
+ * continuity contract admits (lib/continuity-state.mjs HUMAN_FACING_LANGUAGES,
+ * scripts/continuity-state.schema.json's runtime.humanFacingLanguage enum);
+ * adding a language here is the only change a further translation needs.
+ */
+const DEFAULT_HUMAN_FACING_LANGUAGE = "en";
+const CONFIRMATION_PROMPT_FRAME = Object.freeze({
+  en: Object.freeze({
+    header: "PO APPROVAL CONFIRMATION -- read before you enter your passphrase:",
+    consequence: "This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.",
+    instruction: `Type exactly "${CONFIRMATION_TOKEN}" to continue; anything else cancels: `,
+  }),
+  de: Object.freeze({
+    header: "PO-FREIGABE BESTÄTIGEN -- bitte lesen, bevor Sie Ihre Passphrase eingeben:",
+    consequence: "Damit signiert OpenSSL den oben genannten Digest mit Ihrem privaten Schlüssel; einmal signiert, lässt sich das nicht mehr rückgängig machen.",
+    instruction: `Tippen Sie exakt "${CONFIRMATION_TOKEN}" (genau dieses englische Wort) zum Fortfahren; jede andere Eingabe bricht ab: `,
+  }),
+});
+
+/**
+ * Resolve the human-facing language for the prompt above from the same value the
+ * rest of the session uses: `continuity.runtime.humanFacingLanguage` in this
+ * repository's project-state artifact, located through the shared authority
+ * resolver (lib/project-authority.mjs) rather than a fourth hardcoded state path.
+ *
+ * Never throws and never returns a language the table above has no entry for: a
+ * missing checkout, an absent/malformed/unreadable state file, a state file with
+ * no continuity block, and an unrecognised value all yield English. The gate must
+ * degrade to a fully-formed English prompt, never to a missing one.
+ *
+ * `dependencies.resolveHumanFacingLanguageFn` is the injectable seam. It is
+ * deliberately its own named seam rather than a reuse of `dependencies.readFile`/
+ * `readFileSyncFn`: those are already overridden by existing tests to serve PEM
+ * and key-directory fixtures, and routing this read through them would silently
+ * feed the resolver the wrong payload -- which, because every failure here falls
+ * back to English, would look exactly like a passing test.
+ */
+function resolveHumanFacingLanguage(repository, dependencies = {}) {
+  const known = (value) => (typeof value === "string" && Object.hasOwn(CONFIRMATION_PROMPT_FRAME, value) ? value : DEFAULT_HUMAN_FACING_LANGUAGE);
+  if (typeof dependencies.resolveHumanFacingLanguageFn === "function") {
+    try { return known(dependencies.resolveHumanFacingLanguageFn(repository)); }
+    catch { return DEFAULT_HUMAN_FACING_LANGUAGE; }
+  }
+  try {
+    const artifact = resolveAuthorityArtifactPath("state", { rootDir: repository });
+    if (!artifact.exists) return DEFAULT_HUMAN_FACING_LANGUAGE;
+    const state = JSON.parse(readFileSync(artifact.path, "utf8"));
+    return known(state?.continuity?.runtime?.humanFacingLanguage);
+  } catch { return DEFAULT_HUMAN_FACING_LANGUAGE; }
+}
 
 /**
  * Reads one line of plain-text confirmation from the real controlling
@@ -387,13 +459,20 @@ function defaultReadConfirmation(prompt) {
  * prompt: a human must read what is being authorized and its consequence,
  * then type the exact confirmation token. Anything else cancels, and the
  * caller must never reach the OpenSSL sign step or write any artifact.
+ *
+ * NVA-BL-74: `language` selects the prompt FRAME only (see
+ * CONFIRMATION_PROMPT_FRAME). The acceptance test itself is untouched and stays
+ * language-independent -- one comparison against one English constant, so no
+ * language variant can widen, weaken or reorder what counts as consent. An
+ * unknown or omitted `language` renders the English frame.
  */
-function requireExplicitConfirmation(summaryLines, dependencies) {
+function requireExplicitConfirmation(summaryLines, dependencies, language = DEFAULT_HUMAN_FACING_LANGUAGE) {
+  const frame = CONFIRMATION_PROMPT_FRAME[language] ?? CONFIRMATION_PROMPT_FRAME[DEFAULT_HUMAN_FACING_LANGUAGE];
   const prompt = [
-    "PO APPROVAL CONFIRMATION -- read before you enter your passphrase:",
+    frame.header,
     ...summaryLines.map((line) => `  ${line}`),
-    "This authorizes OpenSSL to sign the digest above with your private key; it cannot be undone once signed.",
-    `Type exactly "${CONFIRMATION_TOKEN}" to continue; anything else cancels: `,
+    frame.consequence,
+    frame.instruction,
   ].join("\n");
   const read = dependencies.readConfirmation ?? defaultReadConfirmation;
   if (read(prompt) !== CONFIRMATION_TOKEN) fail("approval cancelled: explicit confirmation was not given");
@@ -557,6 +636,11 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     };
   }
   const repository = resolve(args.repoRoot);
+  // NVA-BL-74: resolved once, before any branch, and passed to every
+  // requireExplicitConfirmation() call below -- a read-only, never-throwing lookup
+  // (English on any failure), so it cannot change which error a command reports or
+  // in what order.
+  const humanFacingLanguage = resolveHumanFacingLanguage(repository, dependencies);
   // PO-KEYDIR-01: resolved once and reused by both fixes below -- fix (A)'s setup
   // auto-persist target and fix (B)'s filename fingerprint segment.
   const gitCommonDir = resolveGitCommonDir(repository, dependencies);
@@ -671,7 +755,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       `feature id: ${featureId}`,
       `approval intent sha256: ${intentSha256}`,
       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
-    ], dependencies);
+    ], dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
     return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer };
   }
@@ -706,7 +790,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
         "it signs a one-time, audited guard-lift/guard-override (HGO/GMW) authorization for whatever was recorded against this exact digest elsewhere.",
       ]),
       "this approval covers exactly this digest: a different scope, expiry, reason or candidate is a different digest and needs its own approval.",
-    ], dependencies);
+    ], dependencies, humanFacingLanguage);
     const manual = {
       intent: artifactPath(directory, "intent-manual.txt"),
       signature: artifactPath(directory, "signature-manual.bin"),
@@ -728,7 +812,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       summary.push(`action subject sha256: ${request?.action?.subjectSha256}`);
       summary.push(`action expires at: ${request?.action?.expiresAt}`);
     }
-    requireExplicitConfirmation(summary, dependencies);
+    requireExplicitConfirmation(summary, dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
     return { ok: true, code: "PO-HUMAN-PROOF-READY", intentSha256, signer: signed.signer };
   }

@@ -1564,3 +1564,149 @@ test("GF-105: the copyCommand rendering is bounded on every shell, and the posix
   assert.deepEqual(tokens, built.argv,
     "the posix copyCommand rendering does not reconstruct the exact intended argv");
 });
+
+/* ------------------------------------------------------------------ *
+ * NVA-BL-74: the confirmation PROMPT speaks the configured human-facing
+ * language; the confirmation TOKEN does not.
+ *
+ * Additive only. Every assertion above stays exactly as it was, and keeps
+ * passing for the same reason a real unconfigured checkout does: a fixture
+ * repository with no project-state artifact resolves to English.
+ * ------------------------------------------------------------------ */
+
+/** Writes the neutral project-state artifact (`project/pipeline-state.json`, the
+ * path lib/project-authority.mjs resolves) carrying exactly the continuity key
+ * chain the resolver reads: continuity.runtime.humanFacingLanguage. `raw` writes
+ * arbitrary bytes instead, for the malformed-file case. */
+function stateFixture(repoRoot, { language, raw } = {}) {
+  mkdirSync(join(repoRoot, "project"), { recursive: true });
+  const body = raw ?? `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    continuity: { schema: "pipeline.continuity.v0", runtime: { humanFacingLanguage: language, activeDuty: "Elephant", sessionCleanup: null } },
+  }, null, 2)}\n`;
+  writeFileSync(join(repoRoot, "project", "pipeline-state.json"), body);
+}
+
+const GERMAN_FRAME = /PO-FREIGABE BESTÄTIGEN/u;
+const ENGLISH_FRAME = /PO APPROVAL CONFIRMATION/u;
+
+test("NVA-BL-74: a repository configured for `de` gets the German prompt frame, while the typed token stays the English constant and the signature is produced exactly as before", () => {
+  const dirs = fixtureDirs();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    stateFixture(dirs.repoRoot, { language: "de" });
+    const intentSha256 = createHash("sha256").update("nva-bl-74-de-fixture").digest("hex");
+    const prompts = [];
+    const result = runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+    );
+    assert.equal(result.ok, true);
+    assert.equal(prompts.length, 1, "still exactly one human confirmation, in any language");
+    assert.match(prompts[0], GERMAN_FRAME, "the configured language must select the German prompt frame");
+    assert.doesNotMatch(prompts[0], ENGLISH_FRAME, "the English frame must not also be printed");
+    assert.match(prompts[0], /Passphrase/u, "the German frame must still warn before the passphrase prompt");
+    assert.match(prompts[0], /nicht mehr rückgängig/u, "the German frame must still state the irreversible consequence");
+    // The token itself is NOT translated: the German instruction quotes the exact
+    // English word the human types, and nothing else is offered as an alternative.
+    assert.match(prompts[0], /Tippen Sie exakt "approve"/u, "the German prompt must quote the stable English token verbatim");
+    // The summary lines are caller-supplied data and stay language-independent.
+    assert.match(prompts[0], new RegExp(intentSha256, "u"), "the digest must be named in every language");
+    assert.match(prompts[0], /guard-lift\/guard-override/u, "the data lines are untranslated by design");
+    // ... and the ceremony itself is unchanged: a real proof, verifiable as before.
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    assert.equal(verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof }).verified, true);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-BL-74: cancellation semantics are unchanged under the German prompt -- every non-token answer, including a plausible German translation of the token, cancels before OpenSSL and before any artifact exists", () => {
+  for (const answer of ["nope", "", "genehmigen", "Genehmigen", "bestätigen", "ja", "APPROVE", "approved", " approve"]) {
+    const dirs = fixtureDirs();
+    try {
+      keyFixture(dirs.directory);
+      stateFixture(dirs.repoRoot, { language: "de" });
+      const intentSha256 = createHash("sha256").update(`nva-bl-74-cancel-${answer}`).digest("hex");
+      let spawnCalled = false;
+      assert.throws(
+        () => runHumanApproval(
+          ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+          { readConfirmation: () => answer, spawn: () => { spawnCalled = true; return { status: 0 }; } },
+        ),
+        /approval cancelled: explicit confirmation was not given/u,
+        `${JSON.stringify(answer)} must cancel under the German prompt`,
+      );
+      assert.equal(spawnCalled, false, `${JSON.stringify(answer)}: OpenSSL must never be invoked once confirmation is cancelled`);
+      for (const artifact of ["proof-manual.json", "signature-manual.bin", "intent-manual.txt"]) {
+        assert.equal(existsSync(join(dirs.directory, artifact)), false, `${JSON.stringify(answer)}: no ${artifact} may exist after a cancelled confirmation`);
+      }
+    } finally {
+      cleanup(dirs);
+    }
+  }
+});
+
+test("NVA-BL-74: English is the hard fallback -- an absent, unrecognised, malformed or unreadable language value still produces a complete English prompt, never no prompt", () => {
+  const scenarios = [
+    { label: "no project-state artifact at all", prepare: () => {} },
+    { label: "an unrecognised language value", prepare: (repoRoot) => stateFixture(repoRoot, { language: "fr" }) },
+    { label: "a null language value", prepare: (repoRoot) => stateFixture(repoRoot, { language: null }) },
+    { label: "a non-string language value", prepare: (repoRoot) => stateFixture(repoRoot, { language: 42 }) },
+    { label: "a malformed state file", prepare: (repoRoot) => stateFixture(repoRoot, { raw: "{ not json" }) },
+    { label: "a state file with no continuity block", prepare: (repoRoot) => stateFixture(repoRoot, { raw: `${JSON.stringify({ schema: "pipeline.state.v0" })}\n` }) },
+    // The resolution itself failing (any reason at all) must land on English too,
+    // rather than propagating and skipping the gate.
+    { label: "a resolver that throws", prepare: () => {}, dependencies: { resolveHumanFacingLanguageFn: () => { throw new Error("locale lookup exploded"); } } },
+    { label: "a resolver returning a language with no translation", prepare: () => {}, dependencies: { resolveHumanFacingLanguageFn: () => "xx" } },
+  ];
+  for (const scenario of scenarios) {
+    const dirs = fixtureDirs();
+    try {
+      keyFixture(dirs.directory);
+      scenario.prepare(dirs.repoRoot);
+      const intentSha256 = createHash("sha256").update(`nva-bl-74-fallback-${scenario.label}`).digest("hex");
+      const prompts = [];
+      const result = runHumanApproval(
+        ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+        { ...(scenario.dependencies ?? {}), readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+      );
+      assert.equal(result.ok, true, scenario.label);
+      assert.equal(prompts.length, 1, `${scenario.label}: the gate must still ask exactly once`);
+      assert.match(prompts[0], ENGLISH_FRAME, `${scenario.label}: must fall back to the English frame`);
+      assert.match(prompts[0], /type exactly "approve"/iu, `${scenario.label}: the English frame must be complete, not truncated`);
+      assert.match(prompts[0], new RegExp(intentSha256, "u"), `${scenario.label}: the digest must still be named`);
+    } finally {
+      cleanup(dirs);
+    }
+  }
+});
+
+test("NVA-BL-74: the language selects only the frame -- the `de` and `en` prompts carry identical summary data lines and identical accepted-token semantics", () => {
+  const rendered = {};
+  for (const language of ["de", "en"]) {
+    const dirs = fixtureDirs();
+    try {
+      keyFixture(dirs.directory);
+      stateFixture(dirs.repoRoot, { language });
+      const prompts = [];
+      runHumanApproval(
+        ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", "c".repeat(64)],
+        { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+      );
+      rendered[language] = prompts[0];
+    } finally {
+      cleanup(dirs);
+    }
+  }
+  // Everything between the first line and the last two frame lines is data: identical
+  // in both languages, byte for byte.
+  const dataLines = (prompt) => prompt.split("\n").slice(1, -2);
+  assert.deepEqual(dataLines(rendered.de), dataLines(rendered.en),
+    "the translated frame must not alter, reorder or drop a single summary line");
+  assert.match(rendered.de, GERMAN_FRAME);
+  assert.match(rendered.en, ENGLISH_FRAME);
+  for (const prompt of Object.values(rendered)) {
+    assert.match(prompt, /"approve"/u, "every language must instruct the same English token");
+  }
+});
