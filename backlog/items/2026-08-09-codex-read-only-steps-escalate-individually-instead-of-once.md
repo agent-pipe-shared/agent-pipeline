@@ -9,7 +9,7 @@ source: "Live Codex+Pipeline 0.5.4 greenfield test session, 2026-08-09 (three ro
 due: 2026-08-23
 closed_at: 2026-08-12
 closure_repository: self
-closure_commit: 181b7730
+closure_commit: 181b7730c9d6a7ca87a5df108a5b4da3447aa0e6
 closure_evidence: backlog/items/2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md
 ---
 
