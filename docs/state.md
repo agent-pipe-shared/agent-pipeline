@@ -165,6 +165,105 @@ long-documented `933e1a8d` pre-existing ledger drift (38 events) plus the
 one newly-filed short-hash item above — both already characterized, not
 new regressions. `security-scan.mjs` — CLEAN, exit 0.
 
+**Addendum (2026-08-12, after the checkpoint above): push attempted, gate
+found genuinely blocking, partial fix landed, push completed via manual
+terminal — full cleanup left as next steps for the next session (PC shut
+down mid-work, written fast, not polished).**
+
+- Push ceremony run for real (PO present): signed via `authorize-critical`
+  (subject sha256 `44ccc0b8...`, candidate `1c7a5389`),
+  `pipeline-state.mjs approve-push` consumed it — but the actual `git push`
+  (via this agent's own Bash tool) was refused by `guard-push.mjs`'s
+  Push-Gate: `evidence/verify-latest.json` exitCode was `2`
+  (`backlog-state-check`), which the Push-Gate treats as hard-blocking, no
+  exemption for "known pre-existing drift." That approval is now stale
+  (HEAD moved since) — see `project/pipeline-state.json`, commit `009fc9f9`.
+- PO decision (AskUserQuestion): fix via **Option 1** — a narrow allowlist
+  of the known-unreachable legacy ledger evidence commits in
+  `check-backlog-state.mjs` — over Option 2 (ledger amendment event) or
+  deferring.
+- Dispatched `NVA-BLDRIFT-01` (goldfish-implementor). **Landed partially,
+  honestly disclosed, commit `ff665189`:** the backlog item's own diagnosis
+  was WRONG — it claimed all 38 baseline-migration events share ONE
+  unreachable commit (`933e1a8d...`); actually only sequences 1-12 do. The
+  goldfish correctly narrowed its fix to those 12 (verified via a direct
+  ledger read, not the item's paraphrase), added regression tests
+  (`check-backlog-state.test.mjs`, CBS01-03) proving the exception is
+  narrowly keyed (commit+actor+kind, not a blanket kind-based skip), and
+  correctly STOPPED rather than guessing at the rest (stop conditions 2+3,
+  advisor-confirmed) — see `evidence/dispatch-record-NVA-BLDRIFT-01.json`.
+- **Investigated directly right after (Elephant, read-only) — 6 MORE
+  distinct unreachable commits found among sequences 13-38, same
+  root-cause class (2026-08-01 rebase loss), NOT YET FIXED:**
+  - `8720bf3f6abfd79bbe6f42d8ff7b54211645c378` — actor
+    `sentinel-implementation`, kind `license-boundary-recovery` (events 13-14)
+  - `a798db6d45f2fc113f66d01400d7ea70fcef9427` — actor `po`, kind
+    `po-license-disposition` (event 15)
+  - `cb8219464937cfc4cb7ff50e2bf5579bfa78f6b5` — actor `close-retro`, kind
+    `close-retro` (event 16)
+  - `6df2e8a068cba1e6de5410ea5fe23d2c2ca72e59` — actor `sentinel-recovery`,
+    kind `sentinel-backlog-recovery` (events 17-31, 15 events)
+  - `a09b69b11d636f424fafb98aeae948f282bb7338` — actor
+    `sentinel-scope-extension`, kind `sentinel-scope-extension` (events 32-36)
+  - `e21933be86bea8735de7e407f94cff48cffd7bd8` — actor `pipeline`, kind
+    `sentinel-windows-containment`/`-closure` (events 37-38)
+- `backlog-state-check` also reports 2 more findings, unrelated to
+  reachability: (a) ledger event 403's short-hash `evidence.commit` —
+  already filed,
+  `backlog/items/2026-08-12-ledger-event-403-has-a-short-hash-evidence-commit.md`;
+  (b) `pipeline.codex-read-only-steps-escalate-individually-instead-of-once`'s
+  `closure_commit` mismatch against its own final ledger evidence — NOT yet
+  investigated, cause unknown.
+- Also unresolved, noticed but not chased: events 39/40's own
+  `reachability-amendment` mechanism (the precedent Option 2 would have
+  followed) — their superseding target commits (`726b8368...`/
+  `2ddf3592...`) are ALSO currently unreachable, meaning that earlier
+  amendment is itself drifted/broken or never landed correctly. Not
+  investigated.
+- **Push landed anyway**, bypassing the still-red Pipeline gate as
+  intended-by-design: the PO ran `git push origin feat/sprint-nova-codex-v046`
+  directly in their own terminal (outside Claude Code's tool-call boundary,
+  so the guard hooks — which only intercept this agent's own Bash calls —
+  never fired). `7132c5c7..ff665189` now on
+  `origin/feat/sprint-nova-codex-v046`. This is the documented, sanctioned
+  fallback path (`docs/push-release-flow.md`, harness-classifier-block
+  section) for exactly this class of situation, not a bypass violation.
+- **Separate, cross-repo finding relayed by the PO, filed:**
+  `backlog/items/2026-08-12-stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy.md`
+  (a sibling Phoenix checkout ran the pre-ADR-0061 two-step ceremony against
+  an already-upgraded external PO directory, got a misleading trust-policy
+  error). It then escalated further — Phoenix's own push is now fully
+  blocked, a NEW error `CRITICAL-PROOF-EXTERNAL-PATH` from
+  `pipeline-state.mjs approve-push` after an ad hoc hand-built reduced-shape
+  trust-policy copy. Full escalation detail is captured at
+  `scratch/phoenix-escalation-note.md` — **gitignored, NOT yet committed
+  anywhere durable, will be LOST if not folded into the backlog item next
+  session.**
+
+**Next steps for the next session, in priority order:**
+1. Fold `scratch/phoenix-escalation-note.md` into
+   `backlog/items/2026-08-12-stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy.md`
+   before it is lost (scratch/ is gitignored).
+2. Correct
+   `backlog/items/2026-08-11-backlog-ledger-baseline-migration-commit-unreachable.md`'s
+   Description/Proposal (claims "all 38 share one commit" — actually 12 do,
+   6 more distinct commits cover the other 26; the six tuples are listed
+   above) before any closure decision on it.
+3. Extend `check-backlog-state.mjs`'s narrow allowlist (same PO-approved
+   Option 1 pattern `ff665189` already established — commit+actor+kind
+   keying, same regression-test discipline) to the six additional tuples
+   above.
+4. Investigate the
+   `pipeline.codex-read-only-steps-escalate-individually-instead-of-once`
+   `closure_commit` mismatch (cause unknown, not yet looked at).
+5. Investigate why events 39/40's `reachability-amendment` targets are
+   themselves unreachable now.
+6. Once `backlog-state-check` is genuinely green: full
+   `node harness/scripts/verify.mjs` +
+   `node plugins/pipeline-core/scripts/security-scan.mjs`, close the
+   corrected item(s) with evidence, `reconcile-backlog-ledger.mjs --activate`,
+   commit.
+
 **A repeated agent-harness pattern worth naming, not yet filed as a
 backlog item:** across this session's ~20 background dispatches, roughly
 a third ended their turn on a mid-work checkpoint message rather than a
