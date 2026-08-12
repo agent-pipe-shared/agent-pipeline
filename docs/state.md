@@ -1369,7 +1369,8 @@ running unattended overnight.
 
 **Repaired and independently re-verified.** Every suite below was re-run by the
 Elephant rather than accepted from the implementing Goldfish's report — the
-standing rule after a report once described a state the suite did not confirm.
+standing rule after a report once described a state the suite did not confirm
+(now `roles/elephant.md` EL-30).
 
 | Commit | What it closes | Suites, re-run |
 |---|---|---|
@@ -2331,7 +2332,7 @@ external step.
   `VERIFY-CANDIDATE-DRIFT: Verify requires one clean, unchanged Git candidate
   from start through evidence write.` Not a defect; a process mistake.
   Corrected going forward: no further commits while a Verify run is in
-  flight.
+  flight (now `guardrails/quality-gates.md` QG-08).
 - **Run 2: genuinely clean candidate (`03c303f`), two real findings.**
   `binding: "exact"`, 253/255 suites `exitCode: 0`. Two real gaps, neither a
   defect in the ADR-0059/LCR-INTENT diffs themselves:
@@ -3698,7 +3699,7 @@ FAIL**, five findings.
   cases all collapse to one because nobody watched it fail. The correction is therefore not
   "be more careful" but "apply QG-07", plus the standing rule from the previous round: no
   "X cannot happen because Y" in code or register without a test or a measured probe behind
-  it; absent that, it is written as an open question.
+  it; absent that, it is written as an open question (now `guardrails/quality-gates.md` QG-09).
 
 The T2 Critic's stated coverage boundary: it read ~200 of 1699 Spec lines and did **not**
 map this delta onto a numbered acceptance criterion; it read only `quality-gates.md` in

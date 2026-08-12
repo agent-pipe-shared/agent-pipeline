@@ -88,3 +88,15 @@ Rule IDs: `QG-xx`.
 - The repro test **MUST** stay permanently in the suite after the fix goes green — it is the regression guard for exactly this bug, not a scratch artifact to delete once the fix lands.
 - **Why:** This was the largest substantive gap identified by an external review (Google, Whitepaper „Day 5") — no rule covered bugfix discipline at all. A fix without a preceding red repro cannot prove it fixed the reported failure rather than something adjacent; "fix + drive-by cleanup" in one commit is a scope-creep vector wearing a bugfix disguise, and QG-04's test-role separation only protects tests an implementor did not write in the first place.
 - **Verification:** Bugfix completion reports name the repro command/test and its pre-fix red result; the diff's test file shows the repro test present and green post-fix; a bugfix commit containing unrelated renames or cleanup is a QG-07 violation to flag in Critic review.
+
+## QG-08 — No commit while a Verify run is in flight
+
+- **MUST NOT** create a commit (handover, docs, code, anything) while a background/foreground `verify.mjs` run against the same working tree is still in progress. Verify requires one clean, unchanged Git candidate from start through evidence write (`VERIFY-CANDIDATE-DRIFT`); a mid-run commit invalidates that run and forces a re-run, even when the commit itself was unrelated to the diff under test.
+- **Why:** this exact self-inflicted pattern (a docs/state.md update, a benchmark file, a backlog item — landing while Verify was still running) cost a full re-run multiple times in the same Nova sprint block before being named as a standing rule; the guard already fails the run closed (`VERIFY-CANDIDATE-DRIFT`, `harness/scripts/verify.mjs`), but the cost is a wasted run, not a silent miss — writing the rule down front-loads that cost to "wait for the run to finish" instead of "re-run after the failure."
+- **Verification:** `VERIFY-CANDIDATE-DRIFT` in `harness/scripts/verify.mjs` is the mechanical backstop; this entry is the proactive form of the same rule for session/close discipline.
+
+## QG-09 — No unproven "cannot happen" claims
+
+- **MUST NOT** write "X cannot happen because Y" — in code, comments, or the handover/decision register — without a test or a measured probe behind it. Absent that evidence, state it as an open question instead of an assertion.
+- **Why:** named as a standing rule after a Critic round found three of five findings shared one root cause — the author reasoned about what the code should do instead of measuring what it does, then wrote the conclusion into a comment or the register. QG-07's reproduce-before-you-fix discipline would have caught the same class if followed; this rule closes the adjacent gap where no bug was being fixed yet, only a claim being written.
+- **Verification:** Critic review flags an unverified "cannot happen"/"X is impossible" assertion as a finding; the fix is either a test/probe demonstrating it, or a rewritten statement phrased as an open question.
