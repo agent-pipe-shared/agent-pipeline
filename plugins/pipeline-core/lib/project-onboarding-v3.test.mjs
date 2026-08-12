@@ -2817,6 +2817,70 @@ test("kickoff choosing a language different from the portable-seed default reach
   } finally { dispose(path); }
 });
 
+// Regression for backlog: what-the-claude-greenfield-run-adds-to-the-happy-
+// path-findings, finding 1 (NVA-BL-70). Unlike the kickoff-time case above,
+// here the PO's real answer arrives only at kickoff-design.md's SECOND,
+// document-specific language question -- asked, by design, after kickoff --
+// so the promoted PRD's own marker legitimately differs from what kickoff
+// itself was answered. Before this fix, promotion learned the answer only
+// into continuity.runtime.humanFacingLanguage (commit 29380a77); the config
+// files PO-GATE-PRD-LANGUAGE-MISMATCH actually reads stayed on the kickoff
+// value, so submit-plan still refused several steps after promotion had
+// already bound the PRD's bytes. This asserts promotion itself now reaches a
+// consistent, PASSING authority -- the mismatch never reaches submit-plan.
+test("promoting a PRD whose language differs from kickoff's own answer reaches a consistent authority at promotion, not several steps later at submit-plan", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+    const barrier = initializeRestartRequiredRoot(path, localDeps);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Ship the operator-English feature whose document turns out German", localDeps, "ready", "codex");
+    const seededSource = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
+    assert.equal(seededSource.language.human_facing, "en");
+
+    mkdirSync(join(path, "specs", "promo-lang"), { recursive: true });
+    const prdPath = "specs/promo-lang/prd_promo-lang.md";
+    const specPath = "specs/promo-lang/spec.md";
+    const designInputPath = "specs/promo-lang/design-input.md";
+    writeFileSync(join(path, specPath), "# Promo-lang technical specification\n");
+    const specSha256 = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, prdPath), [
+      "<!-- po-language: de -->",
+      `<!-- technical-spec-sha256: ${specSha256} -->`,
+      "",
+      "# Promo-lang product requirements",
+      "",
+    ].join("\n"));
+    writeFileSync(join(path, designInputPath), "# Promo-lang design input\n");
+    const promotion = {
+      rootDir: path, profile: "feature", featureId: "promo-lang-work", planPath: prdPath,
+      prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
+    };
+    const planned = planProjectOnboardingKickoffPromotionV4(promotion);
+    const promoted = applyProjectOnboardingKickoffPromotionV4({
+      runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true,
+    });
+    assert.equal(promoted.status, "ready");
+    assert.equal(promoted.continuity.status, "valid");
+
+    const correctedSource = parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"));
+    assert.equal(correctedSource.language.human_facing, "de");
+    assert.match(readFileSync(join(path, ".claude/pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+    assert.match(readFileSync(join(path, "project/pipeline.yaml"), "utf8"), /language:\n {2}human_facing: de\n/u);
+
+    const authority = validatePoGateAuthorityForRepository({ repoRoot: path });
+    assert.equal(authority.ok, true, JSON.stringify(authority));
+    const stderr = [];
+    const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
+      dir: path,
+      now: () => "2026-08-01T12:00:00.000Z",
+      writeError: (value) => stderr.push(value),
+    });
+    assert.equal(exit, 0, stderr.join(""));
+  } finally { dispose(path); }
+});
+
 // The gate the fresh seed switches on has to be PASSABLE, and that is
 // established by driving the whole path rather than by reading it. Both halves
 // are the contract: a promoted `feature` whose plan nobody approved is REFUSED

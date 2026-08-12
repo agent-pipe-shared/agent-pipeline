@@ -50,7 +50,7 @@ import {
   validatePoGateAuthorityForRepository,
   validatePoGateProfileForRepository,
 } from "./po-gate-authority.mjs";
-import { initializePoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
+import { initializePoGateProfileReceipt, publishPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
 import {
@@ -245,7 +245,7 @@ function deps(overrides = {}) {
     accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
     linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
     spawnSync, observeCodexOnboardingCapabilities, observeOnboardingAppServer,
-    initializePoGateProfileReceipt,
+    initializePoGateProfileReceipt, publishPoGateProfileReceipt,
     ...overrides,
   };
 }
@@ -314,6 +314,26 @@ function projectAuthorityPaths(root, fs) {
 // never "ready" this early). A no-op whenever the resolved kickoff language
 // already matches the seed default (the common English case), and fail
 // closed rather than rewrite anything unrecognized.
+//
+// A second caller exists below (`correctPromotedLanguage`, kickoff-promotion
+// apply): kickoff necessarily freezes its own answer before a portable
+// source exists, and a PO who is asked kickoff-design.md's second,
+// document-specific language question only after kickoff can have that
+// later answer land in the PROMOTED PRD's marker while this function's own
+// kickoff-time correction is already behind it (backlog:
+// what-the-claude-greenfield-run-adds-to-the-happy-path-findings, finding 1;
+// NVA-BL-70). The promotion transaction already updates
+// `continuity.runtime.humanFacingLanguage` to match that marker (commit
+// 29380a77) -- deliberately learning the PO's later answer rather than
+// refusing the promotion for it, per the PROMOLANG-1 regression this
+// function must not contradict. That state-only fix left the config files
+// this function actually corrects untouched, so `submit-plan`'s
+// PO-GATE-PRD-LANGUAGE-MISMATCH -- which reads `pipeline.user.yaml`/manifest,
+// never `continuity.runtime` -- still fired downstream, after promotion had
+// already bound the PRD's bytes. Reusing the exact same byte-identical-shape
+// correction here, at the transaction that learns the answer, keeps that the
+// common case closed at its source instead of a symptom patched three steps
+// later.
 function seededManifestLanguageBlock(language) {
   return `language:\n  human_facing: ${language}\n`;
 }
@@ -321,7 +341,7 @@ function correctSeededKickoffLanguage(root, resolvedLanguage, fs) {
   const sourcePath = safePath(root, SOURCE, fs);
   const intent = parseYaml(fs.readFileSync(sourcePath, "utf8"));
   const seededLanguage = intent?.language?.human_facing;
-  if (seededLanguage === resolvedLanguage) return;
+  if (seededLanguage === resolvedLanguage) return false;
   const correctedIntent = { ...intent, language: { ...intent.language, human_facing: resolvedLanguage } };
   if (!validatePipelineUserV3(correctedIntent).ok) throw new Error("kickoff language correction produced an invalid V3 source");
   fs.writeFileSync(sourcePath, renderYaml(correctedIntent), { encoding: "utf8", mode: 0o600 });
@@ -333,6 +353,34 @@ function correctSeededKickoffLanguage(root, resolvedLanguage, fs) {
     const start = bytes.indexOf(before);
     if (start === -1 || bytes.indexOf(before, start + 1) !== -1) throw new Error(`kickoff language correction: ${relative} is not the expected fresh-seed shape`);
     fs.writeFileSync(target, bytes.slice(0, start) + after + bytes.slice(start + before.length), { encoding: "utf8", mode: 0o600 });
+  }
+  return true;
+}
+// The promotion-time counterpart to `correctSeededKickoffLanguage` above --
+// see that function's comment for why a second call site exists. Only an
+// operator-facing `{de, en}` marker is corrected here: a third, non-{de,en}
+// promoted-document language is the OTHER legitimate axis kickoff-design.md
+// documents (a document-only language, tracked separately as
+// `continuity.runtime.documentLanguage`, per `onboarding-continuity.mjs`),
+// and is deliberately left alone by this function exactly as it already is
+// by the promotion transaction's own `continuity.runtime` update. The PO
+// profile receipt is republished (not re-initialized: kickoff already
+// published one) so a live re-read of the just-corrected manifest does not
+// itself turn into a PO-PROFILE-RECEIPT-STALE refusal.
+function correctPromotedLanguage(root, resolvedLanguage, fs) {
+  if (resolvedLanguage !== "de" && resolvedLanguage !== "en") return;
+  const changed = correctSeededKickoffLanguage(root, resolvedLanguage, fs);
+  if (!changed) return;
+  const projection = poGateProfileProjectionPaths(root);
+  const sourceBytes = readBoundPhysicalFile(safePath(root, projection.source, fs), fs);
+  const runtimeBytes = readBoundPhysicalFile(safePath(root, projection.manifest, fs), fs);
+  const republished = fs.publishPoGateProfileReceipt({
+    rootDir: root,
+    userYamlText: sourceBytes,
+    runtimeYamlText: runtimeBytes,
+  });
+  if (!republished?.ok) {
+    throw new Error(`promotion language correction failed to republish the PO profile receipt (${republished?.code ?? "unavailable"})`);
   }
 }
 
@@ -4515,5 +4563,8 @@ export function applyProjectOnboardingKickoffPromotionV4({
   applyOnboardingKickoffPromotion({
     plan, expectedPlanSha256: planSha256, activate, deps: { ...overrides, spawn: fs.spawnSync },
   });
+  if (observed.repository.mode === "local") {
+    correctPromotedLanguage(observed.root, plan.authority.poLanguage, fs);
+  }
   return v4Inspection(rootDir, fs, "onboarding", runner);
 }
