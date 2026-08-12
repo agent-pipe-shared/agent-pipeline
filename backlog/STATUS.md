@@ -101,6 +101,7 @@
 | pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | closed | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.ledger-event-403-has-a-short-hash-evidence-commit | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
@@ -211,6 +212,6 @@
 
 ## Counts
 
-- open: 88
+- open: 89
 - in_progress: 22
 - closed: 93
