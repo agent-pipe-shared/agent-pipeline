@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8ced40041e69fe57fddaf5c843bb0874311786d0cc6ab576a18f19472fcab3ed"
+    "transitionHead": "c3c603fa7eabff470ed2823e18bcd5c772b2d51d33175ad57b1a8acb643de889"
   },
   "counts": {
-    "open": 89,
+    "open": 90,
     "in_progress": 22,
     "closed": 93
   },
@@ -1803,6 +1803,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Sentinel recovery audit after Public close/transfer"
+    },
+    {
+      "id": "pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-12",
+      "source": "Cross-repo observation from a sibling Phoenix session, relayed by the PO into this Nova session for filing."
     },
     {
       "id": "pipeline.stateful-design-contract-template",

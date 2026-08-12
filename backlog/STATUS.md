@@ -187,6 +187,7 @@
 | pipeline.skill-arguments-and-bootstrap-length | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.spec-retention-on-close | open | defect | pipeline | 2026-07-20 | — |
+| pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.stateful-design-contract-template | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.t1-governance-path-preflight | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | open | workflow-improvement | pipeline | 2026-08-07 | — |
@@ -212,6 +213,6 @@
 
 ## Counts
 
-- open: 89
+- open: 90
 - in_progress: 22
 - closed: 93
