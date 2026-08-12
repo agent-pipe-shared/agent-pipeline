@@ -47,6 +47,47 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 0376a6652e9380b61b6ea72dede3d60c21a7ab58 — 2026-08-12, range eb735ae1..0376a665, the substantive tip of tonight's push candidate; supersedes the entries below (all their commit SHAs are orphaned by the PO-run rebase `git rebase --onto cd38619e ad5a537e sprint_phoenix`, which corrected the `979e579c`/`ad5a537e` commit-attribution defect and reassigned every SHA after `cd38619e`, though the analysis in each superseded entry remains valid and is incorporated here rather than redone)
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+
+**ADR-0012** (governs `docs/state.md`): every touch across this full range is
+an additive checkpoint append, consistent with every prior individual check
+in this file's superseded entries below (`04115341`, `2b9cfdad`, `76d9ba1d`,
+`5375ace6`, `a526e697`, `19badaa1`, `26c2d254`, and others) plus this range's
+one new commit not previously checked, `0376a665` itself (this file's own
+predecessor state.md commit, recording the PO-run rebase and the push
+ceremony in progress) — append-only, nothing rewritten.
+
+**ADR-0045** (governs the `specs/sprint-phoenix-epic/` canonical topology):
+every touched path — `acceptance.md`, the two design docs, the evidence-map
+generator and its dated snapshots, the GMW window-status evidence artifact —
+stays under the existing `specs/sprint-phoenix-epic/` tree with no new
+top-level artifact and no topology migration attempted, consistent with every
+prior individual check in the superseded entries below. The `acceptance.md`
+edit leaving `lifecycle.json`'s pinned digest stale (`FTP-ARTIFACT-2`,
+recorded in the superseded `04115341` entry's own state.md section) is a
+digest-binding question for `feature-package-reconcile`, not a topology
+question ADR-0045 governs — the mutable/authority artifact moved exactly as
+its own manifest kind permits; re-pinning the digest is the PO-signature-gated
+follow-up already on record, not an ADR-0045 finding.
+
+**ADR-0056** (governs `pipeline.user.yaml`, `project/critical-human-proof.json`,
+`project/pipeline-state.json`, `plugins/pipeline-core/hooks/guard-push.mjs`):
+newly implicated in this range by `project/critical-human-proof.json`'s
+`trustAnchor.publicKeySha256` change (commit `2f56a6fb`, "rotate trust anchor
+to new PO key (old key lost)") — not previously checked against this ADR
+because the file had no `Governs:` line for it at the time of the original
+`05ce87ec` entry (superseded below); ADR-0056 §"What a project must do to use
+it" and its "governing session" paragraph both describe rotating this exact
+field as the anticipated, GS-2-protected, out-of-session operator action —
+"performed outside an agent session — by design." The rotation is that
+action, done by the PO; nothing about it contradicts or requires amending
+the ADR's decisions. No other ADR-0056-governed path (`pipeline.user.yaml`,
+`project/pipeline-state.json`, `guard-push.mjs`) changed in this range.
+
 ## Candidate 04115341b6853f45564aaab04dbc157d253ebf2f — 2026-08-12, range 47f2e835..04115341, AFK run closed -- final Verify triage, honest gap report
 
 - ADR-0012: checked, no change needed.
