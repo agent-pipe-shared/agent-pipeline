@@ -115,3 +115,12 @@ not supersede it and does not claim to close it.
 - **Assignment (if accepted):** a lean ADR covering the 6 points at minimum
   necessary depth, queued for this session; expect Nightwing to revise.
 - **Date:** 2026-08-12
+- **Status update (2026-08-12, NVA-BL-79):** the ADR now exists —
+  `docs/adr/0063-repository-directory-contract.md`, indexed in
+  `docs/adr/README.md`. It resolves the 6 decision points at lean depth and
+  names three deferred follow-ups as required, tracked obligations rather
+  than silent gaps: the `.gitignore` anchoring audit beyond the
+  already-fixed `evidence/` line, wiring the kinds table into
+  `pipeline-start`/dispatch templates, and the Verify gate assertion. None
+  of the three is built yet; each needs its own dispatch. This item is not
+  closed by the ADR's existence alone.
