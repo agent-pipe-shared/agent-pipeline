@@ -109,3 +109,36 @@ does it.
 - **Assignment (if accepted):** SECURITY/GUARDRAIL-class (MP-07 max-tier
   model), queued for implementation this session.
 - **Date:** 2026-08-12
+
+### Verification result (NVA-BL-73, 2026-08-12) — already fixed for file writes; a narrower gap remains for commits
+
+Investigated before implementing: the Option-3 fix (idempotent `prepare`
+against its own signed intent digest) **already exists at HEAD**, landed by
+an earlier, unrelated hardening pass (commits `23d93b0a`, `64450b35`).
+`reusablePreparedRequest()` returns the stored request verbatim when a
+re-prepare's scope/expiry-basis/reason/feature are unchanged, so an
+UNRELATED FILE WRITE between prepare and install — the exact reproduction
+this item was filed from — no longer voids the signature. Verified with a
+new regression test (`GMW20b`, commit `d18257f3`) covering the one gap
+found in existing coverage (a changed plan/spec digest correctly still
+requires a fresh signature). No production code needed changing.
+
+**A narrower version of the same user-visible symptom remains, found during
+verification, not yet fixed:** `prepare` still rebuilds its `candidate`
+(commit + tree) from live `git rev-parse HEAD` on every call. A COMMIT
+(not just a file write) landing between prepare and install still produces
+a fresh digest and `install` refuses with `GMW-CANDIDATE-COMMIT-MISMATCH`
+— voiding the signature exactly as before, just for a narrower trigger
+(commits, not all writes). This is confirmed deliberate: the
+commit/tree-binding check was added by a LATER commit specifically after a
+Critic review, so loosening it is a real security judgment call, not a
+Goldfish-level fix — it directly trades off against the guarantee that
+binding exists to provide.
+
+**Status:** left `open`. The item's original, most-frequent trigger (file
+writes during AFK parallel-dispatch work) is fixed. The residual
+commit-landing case needs a PO decision: is `GMW-CANDIDATE-COMMIT-MISMATCH`
+also unnecessarily strict for the AFK scenario (extend the idempotency to
+tolerate a commit, provided the same safety properties hold), or is
+binding to the exact candidate commit intentional and should stay strict
+even at the cost of re-signing during active dispatch waves?
