@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { main, sessionStartDecision, sessionStartMessage } from "./codex-session-start-hint.mjs";
+import { buildResumeHint } from "../lib/resume-hint.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "codex-session-start-hint-"));
 const script = fileURLToPath(new URL("./codex-session-start-hint.mjs", import.meta.url));
@@ -67,7 +68,36 @@ try {
     rmSync(fresh, { recursive: true, force: true });
   }
 
-  console.log("codex-session-start-hint: 15 passed");
+  // NVA-BL-72: an `available` resume-hint card must be surfaced through this SessionStart
+  // hook's own `additionalContext` -- its full content (intent/scope/constraints/questions/
+  // progress), not merely a passive "a card exists" flag. This is the mandatory-read
+  // mechanism: text delivered unbidden into the next session's context, at the same
+  // `startup|resume|clear` trigger this hook already fires on.
+  assert.doesNotMatch(governed.context, /Resume-hint intent:/u, "no card was captured yet; nothing should be injected");
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const hint = buildResumeHint({
+    context: {
+      intent: "Resume the resume-hint mandatory-read work.",
+      scope: ["SessionStart hook only"],
+      constraints: ["No transcript reading"],
+      questions: ["Any remaining gap?"],
+      progress: ["hit a lifecycle-not-ready denial; resolved via typed inspection"],
+    },
+  });
+  writeFileSync(join(root, "project", "resume-hint.json"), `${JSON.stringify(hint, null, 2)}\n`);
+  const withHint = sessionStartDecision(root);
+  assert.match(withHint.context, /MUST be read now/u);
+  assert.match(withHint.context, /Resume-hint intent: Resume the resume-hint mandatory-read work\./u);
+  assert.match(withHint.context, /Resume-hint scope: SessionStart hook only/u);
+  assert.match(withHint.context, /Resume-hint constraints: No transcript reading/u);
+  assert.match(withHint.context, /Resume-hint questions: Any remaining gap\?/u);
+  assert.match(withHint.context, /Resume-hint progress: hit a lifecycle-not-ready denial; resolved via typed inspection/u);
+  // The rest of the governed message/context is unchanged, only extended.
+  assert.match(withHint.context, /A guard denial is not by itself a human gate/u);
+  assert.equal(withHint.message, governed.message);
+
+  console.log("codex-session-start-hint: 22 passed");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

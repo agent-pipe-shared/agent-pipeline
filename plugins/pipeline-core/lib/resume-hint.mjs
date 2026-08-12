@@ -13,6 +13,18 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const MAX_FIELD_BYTES = 480;
 const CONTEXT_KEYS = ["intent", "scope", "constraints", "questions"];
 /**
+ * NVA-BL-72: the write side was narrower than what a restart actually needs -- a working
+ * card still lost "already-hit guard errors, established workarounds, and the exact state
+ * of in-progress work" (the PO's own words after retesting GF-078). `progress` is additive
+ * and OPTIONAL, never required: every card captured before this change has exactly the four
+ * `CONTEXT_KEYS` and must keep validating unchanged (resume-hint.test.mjs's BASE/`corrected`
+ * fixtures), so this cannot become a fifth required key. Same discipline as the other list
+ * fields -- distilled statements only, never a transcript, a command line, or a guard denial's
+ * raw invocation; a guard CODE plus a distilled resolution is exactly the shape this exists
+ * to carry, and the shared FORBIDDEN_SHAPES/secret filters below apply to it unchanged.
+ */
+const CONTEXT_OPTIONAL_KEYS = ["progress"];
+/**
  * Forbidden SHAPES, never the characters those shapes happen to contain. A colon,
  * slash, at-sign, dollar, pipe, backslash or angle bracket inside ordinary prose
  * carries no information; a scheme-qualified URL, an absolute path, a command
@@ -112,9 +124,20 @@ function validText(value) {
     && !FORBIDDEN_SHAPES.some((shape) => shape.test(value)) && !secretAssignment(value) && !opaqueToken(value);
 }
 function validTextList(value, maximum) { return Array.isArray(value) && value.length <= maximum && value.every(validText); }
+/** Required keys must all be present; every present key must be required or optional -- never a bare `exact()`. */
+function contextKeyShape(value) {
+  if (!object(value)) return { missing: CONTEXT_KEYS, unexpected: [] };
+  const missing = CONTEXT_KEYS.filter((key) => !Object.hasOwn(value, key));
+  const unexpected = Object.keys(value).filter((key) => !CONTEXT_KEYS.includes(key) && !CONTEXT_OPTIONAL_KEYS.includes(key));
+  return { missing, unexpected };
+}
 function validContext(value) {
-  return exact(value, CONTEXT_KEYS) && validText(value.intent)
-    && validTextList(value.scope, 4) && validTextList(value.constraints, 4) && validTextList(value.questions, 3);
+  const { missing, unexpected } = contextKeyShape(value);
+  if (missing.length > 0 || unexpected.length > 0) return false;
+  if (!validText(value.intent) || !validTextList(value.scope, 4) || !validTextList(value.constraints, 4) || !validTextList(value.questions, 3)) {
+    return false;
+  }
+  return !Object.hasOwn(value, "progress") || validTextList(value.progress, 4);
 }
 
 /**
@@ -133,10 +156,9 @@ function validContext(value) {
  */
 export function resumeHintContextDetail(value) {
   if (!object(value)) return "context must be an object";
-  const missing = CONTEXT_KEYS.filter((key) => !Object.hasOwn(value, key));
-  const unexpected = Object.keys(value).filter((key) => !CONTEXT_KEYS.includes(key));
+  const { missing, unexpected } = contextKeyShape(value);
   if (missing.length > 0 || unexpected.length > 0) {
-    return `context keys must be exactly ${CONTEXT_KEYS.join(", ")}`
+    return `context keys must be exactly ${CONTEXT_KEYS.join(", ")} (optionally also ${CONTEXT_OPTIONAL_KEYS.join(", ")})`
       + `${missing.length > 0 ? `; missing: ${missing.join(", ")}` : ""}`
       + `${unexpected.length > 0 ? `; unexpected: ${unexpected.join(", ")}` : ""}`;
   }
@@ -148,6 +170,11 @@ export function resumeHintContextDetail(value) {
     return Array.isArray(value[key])
       ? `${key} must be at most ${maximum} non-empty single-line strings, free of secrets and opaque tokens`
       : `${key} must be an ARRAY of at most ${maximum} short strings, not a ${typeof value[key]}`;
+  }
+  if (Object.hasOwn(value, "progress") && !validTextList(value.progress, 4)) {
+    return Array.isArray(value.progress)
+      ? "progress must be at most 4 non-empty single-line strings, free of secrets and opaque tokens"
+      : `progress must be an ARRAY of at most 4 short strings, not a ${typeof value.progress}`;
   }
   return "context is not accepted in this shape";
 }

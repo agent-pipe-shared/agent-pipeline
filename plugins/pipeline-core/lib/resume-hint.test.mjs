@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
-import { RESUME_HINT_SCHEMA, buildResumeHint, validateResumeHint } from "./resume-hint.mjs";
+import { RESUME_HINT_SCHEMA, buildResumeHint, resumeHintContextDetail, validateResumeHint } from "./resume-hint.mjs";
 
 const BASE = {
   intent: "Resume the bounded rollout review where it stopped.",
@@ -230,4 +235,117 @@ test("keeps the digest, byte, control-character, trim and arity contracts unchan
   } }), /RH-SCHEMA/, "the 4 KiB context budget is unchanged");
   assert.throws(() => buildResumeHint({ context: BASE, basis: { ...basis, specSha256: "zz" } }), /RH-SCHEMA/);
   assert.throws(() => buildResumeHint({ context: BASE, createdAt: "not a timestamp" }), /RH-SCHEMA/);
+});
+
+/**
+ * NVA-BL-72. `progress` broadens the write side to carry what a restart actually needs --
+ * "already-hit guard errors, established workarounds, and the exact state of in-progress
+ * work" (the PO's own words, backlog/items/2026-08-09-codex-restart-cannot-recover-...).
+ * It is OPTIONAL and additive: every pre-existing four-key card (BASE, `corrected` above)
+ * must keep validating unchanged, so this field can never become a fifth required key.
+ */
+test("NVA-BL-72 progress is an optional, additive field with the same per-entry discipline", () => {
+  // Absent progress: unchanged behaviour for every card captured before this change.
+  assert.equal(validateResumeHint(buildResumeHint({ context: BASE })).ok, true);
+
+  // Present and bounded: distilled guard-denial-and-resolution entries are admitted.
+  const withProgress = {
+    ...BASE,
+    progress: [
+      "hit a shell-grammar denial on a piped read -- resolved by splitting into two single reads",
+      "diagnosing why the observation-governance check failed -- root cause not yet found",
+    ],
+  };
+  const hint = buildResumeHint({ context: withProgress });
+  assert.deepEqual(hint.context.progress, withProgress.progress);
+  assert.equal(validateResumeHint(hint).ok, true);
+
+  // Arity cap matches scope/constraints (4), not questions (3).
+  assert.throws(() => buildResumeHint({ context: { ...BASE, progress: ["a", "b", "c", "d", "e"] } }), /RH-SCHEMA/);
+
+  // Wrong shape (a bare string instead of an array) is named, not silently coerced.
+  assert.match(resumeHintContextDetail({ ...BASE, progress: "not an array" }), /progress must be an ARRAY/u);
+  assert.match(resumeHintContextDetail({ ...BASE, progress: ["a", "b", "c", "d", "e"] }), /progress must be at most 4/u);
+
+  // Unexpected keys still reject, and the optional key is named as tolerated, not required.
+  assert.throws(() => buildResumeHint({ context: { ...BASE, note: "extra" } }), /RH-SCHEMA: context keys must be exactly .*optionally also progress.*unexpected: note/u);
+});
+
+/**
+ * The non-obvious risk this new field invites: "record the guard denial and its resolution"
+ * tempts writing the denied command verbatim. Every FORBIDDEN shape (command lines, paths,
+ * secrets, transcript markers) applies to `progress` unchanged -- this proves it rather than
+ * asserting it, closing the loop the boundedness claim in the dispatch report depends on.
+ */
+test("NVA-BL-72 progress stays bounded: a raw command line or path is rejected, not carried through", () => {
+  for (const text of [
+    "node scripts/resume-hint.mjs inspect --root /tmp",
+    "git commit -m wip",
+    "cat /etc/passwd | grep root",
+    "resolved via /home/operator/private/notes.md",
+  ]) {
+    assert.throws(
+      () => buildResumeHint({ context: { ...BASE, progress: [text] } }),
+      /RH-SCHEMA/,
+      `progress admitted a forbidden shape: ${JSON.stringify(text)}`,
+    );
+  }
+  // A distilled, denial-plus-resolution statement (the shape this field exists for) is admitted.
+  assert.equal(
+    buildResumeHint({ context: { ...BASE, progress: ["hit a lifecycle-not-ready denial -- resolved by re-running the typed onboarding inspection"] } })
+      .context.progress[0],
+    "hit a lifecycle-not-ready denial -- resolved by re-running the typed onboarding inspection",
+  );
+});
+
+/**
+ * DISCOVERED INTERACTION, pinned deliberately (same idiom as ADMITTED_RESIDUAL above): the
+ * shared `opaqueToken()` filter -- built to catch API-key/token-shaped values -- also catches
+ * a bare, long, ALL-CAPS, hyphen-joined guard CODE (>=24 characters, e.g. this file's own
+ * `GUARD-LIFECYCLE-NOT-READY`) as an opaque token, because that shape (letters only, hyphens
+ * counted as `[_=-]`, length >= 24) is indistinguishable from the filter's own rule for a long
+ * opaque identifier. This means `progress` can carry a DISTILLED, worded description of a
+ * guard denial and its resolution (proven above and by the write-side tests), but not always
+ * the literal machine-readable code string verbatim when that code is long. Not fixed here:
+ * loosening `opaqueToken()` is a shared-filter change (also used by intent/scope/constraints/
+ * questions) with real over-admission risk, out of this dispatch's bounded scope -- reported
+ * as a limitation, not silently patched around.
+ */
+test("NVA-BL-72 progress can carry a distilled denial description, not always the literal long guard code", () => {
+  assert.throws(() => buildResumeHint({ context: { ...BASE, progress: ["GUARD-LIFECYCLE-NOT-READY"] } }), /RH-SCHEMA/);
+  assert.equal(
+    buildResumeHint({ context: { ...BASE, progress: ["hit a lifecycle-not-ready denial; resolved via typed inspection"] } })
+      .context.progress[0],
+    "hit a lifecycle-not-ready denial; resolved via typed inspection",
+  );
+});
+
+/**
+ * The write side is reachable only through the one argv shape isRestartResumeHintCapture()
+ * admits pre-restart: `resume-hint.mjs capture --root <root> --card-file
+ * <root>/project/.resume-hint-input.json --consume-card`. If the CLI's own card-shape gate
+ * (scripts/resume-hint.mjs's contextCard()) were not updated alongside the library, a
+ * `progress`-carrying card would be refused before ever reaching buildResumeHint's real
+ * validator -- unreachable in exactly the restart path this whole item is about.
+ */
+test("NVA-BL-72 the CLI accepts a five-key card carrying progress, unmodified four-key cards unaffected", () => {
+  const root = mkdtempSync(join(tmpdir(), "resume-hint-progress-cli-"));
+  try {
+    mkdirSync(join(root, "project"));
+    writeFileSync(join(root, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+    const helper = fileURLToPath(new URL("../scripts/resume-hint.mjs", import.meta.url));
+    const cardPath = join(root, "resume-card.json");
+
+    writeFileSync(cardPath, JSON.stringify({ ...BASE, progress: ["hit a lifecycle-not-ready denial; resolved via typed inspection"] }));
+    const captured = spawnSync(process.execPath, [helper, "capture", "--root", root, "--card-file", cardPath], { encoding: "utf8" });
+    assert.equal(captured.status, 0, captured.stderr);
+    assert.match(captured.stdout, /hit a lifecycle-not-ready denial; resolved via typed inspection/u);
+
+    // A pre-existing four-key card (no progress at all) still round-trips unmodified.
+    writeFileSync(cardPath, JSON.stringify(BASE));
+    const capturedFourKey = spawnSync(process.execPath, [helper, "capture", "--root", root, "--card-file", cardPath], { encoding: "utf8" });
+    assert.equal(capturedFourKey.status, 0, capturedFourKey.stderr);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });

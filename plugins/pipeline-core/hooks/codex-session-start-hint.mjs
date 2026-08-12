@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { inspectResumeHint } from "../lib/resume-hint.mjs";
 
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -16,10 +17,47 @@ const GOVERNANCE_MARKERS = [
   ".claude/pipeline.yaml",
 ];
 
+/**
+ * NVA-BL-72: the resume-hint READ side was documented (pipeline-start/SKILL.md #6) as a
+ * "MUST-DO consumption step" but enforced nowhere -- `project-onboarding-v3.mjs` never reads
+ * it, and the only other reference is a write-side write-tool admission in
+ * guard-lifecycle-ready.mjs. This SessionStart hook is the one place in this codebase that
+ * delivers text INTO a session's context unbidden (`additionalContext`), on every
+ * `startup|resume|clear` -- exactly the "first successful bootstrap after a restart" trigger,
+ * and more reliable than a "first ready" hook: readiness is re-derived fresh on every guarded
+ * tool call (guard-lifecycle-ready.mjs) rather than being a stored one-time event. Folding the
+ * card's content into THIS hook's output turns "run a separate command and remember to read
+ * it" into "it is already in the context before the first turn starts" -- the strongest
+ * available meaning of "mandatory" here, since no code can force an LLM to attend to a field
+ * it was merely permitted to fetch. `inspectResumeHint()` stays "Passive observation only" --
+ * this reads its result, never its absence or staleness, into a decision; a status other than
+ * `available` adds no lines, exactly mirroring "no hint state can alter lifecycle readiness."
+ */
+function resumeHintContextLines(root) {
+  let observed;
+  try {
+    observed = inspectResumeHint({ rootDir: root });
+  } catch {
+    return [];
+  }
+  if (observed?.status !== "available" || !observed.hint?.context) return [];
+  const { intent, scope, constraints, questions, progress } = observed.hint.context;
+  const lines = [
+    "A resume-hint card from a prior session is available and MUST be read now: incorporate it into this session's understanding before continuing -- noting its availability without reading its content does not satisfy this step.",
+    `Resume-hint intent: ${intent}`,
+  ];
+  if (Array.isArray(scope) && scope.length > 0) lines.push(`Resume-hint scope: ${scope.join("; ")}`);
+  if (Array.isArray(constraints) && constraints.length > 0) lines.push(`Resume-hint constraints: ${constraints.join("; ")}`);
+  if (Array.isArray(questions) && questions.length > 0) lines.push(`Resume-hint questions: ${questions.join("; ")}`);
+  if (Array.isArray(progress) && progress.length > 0) lines.push(`Resume-hint progress: ${progress.join("; ")}`);
+  return lines;
+}
+
 export function sessionStartDecision(projectDir = process.cwd(), exists = existsSync) {
   let governed = false;
+  let root = null;
   try {
-    const root = resolve(projectDir);
+    root = resolve(projectDir);
     governed = GOVERNANCE_MARKERS.some((marker) => exists(join(root, marker)));
   } catch {
     // A session-start hint must never prevent Codex from opening a workspace.
@@ -36,6 +74,7 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
         "After a ready bootstrap, the Operating Model and compiled manifest are the gate authority: continue ordinary implementation, focused tests, commits, Verify, Critic preparation and state readback autonomously.",
         "Do not invent a human checkpoint for routine work. Request the PO only for a configured decision gate, required final acceptance, an irreversible/external consequence, or a typed hard block with no safe returned recovery action.",
         "A guard denial is not by itself a human gate: first execute its exact typed read-only or lifecycle recovery action when one is supplied.",
+        ...resumeHintContextLines(root),
       ].join(" "),
     };
   }

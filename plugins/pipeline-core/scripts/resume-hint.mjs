@@ -9,12 +9,19 @@ function basis(args) {
   const featureId = value(args, "--feature-id"); const planSha256 = value(args, "--plan-sha256"); const specSha256 = value(args, "--spec-sha256");
   return [featureId, planSha256, specSha256].every((entry) => entry === null) ? null : { featureId, planSha256, specSha256 };
 }
+// NVA-BL-72: `progress` is an OPTIONAL fifth key (lib/resume-hint.mjs's CONTEXT_OPTIONAL_KEYS)
+// -- a card carrying it must reach the real validator (buildResumeHint/validContext), not be
+// turned away here on a stale exact-4-key gate. Missing it would make the new field
+// unreachable through the one argv shape isRestartResumeHintCapture() admits pre-restart.
+const REQUIRED_CARD_KEYS = ["constraints", "intent", "questions", "scope"];
+const OPTIONAL_CARD_KEYS = ["progress"];
 function contextCard(path) {
   const card = JSON.parse(readFileSync(resolve(path), "utf8"));
-  if (!card || typeof card !== "object" || Array.isArray(card)
-    || JSON.stringify(Object.keys(card).sort()) !== JSON.stringify(["constraints", "intent", "questions", "scope"])) {
-    throw new Error("RH-CARD-SCHEMA");
-  }
+  const keys = card && typeof card === "object" && !Array.isArray(card) ? Object.keys(card) : null;
+  const shaped = keys !== null
+    && REQUIRED_CARD_KEYS.every((key) => keys.includes(key))
+    && keys.every((key) => REQUIRED_CARD_KEYS.includes(key) || OPTIONAL_CARD_KEYS.includes(key));
+  if (!shaped) throw new Error("RH-CARD-SCHEMA");
   return card;
 }
 function main() {
