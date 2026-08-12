@@ -209,3 +209,55 @@ commitment to any of them:
   separately, since both are instances of "guard drawn at a whole-directory
   boundary rather than at what actually needs protecting."
 - **Date:** 2026-08-07
+
+## Occurrence — 2026-08-12, the "one authoritative document" is itself now stale
+
+The triage above closed the documentation half on the strength of
+`docs/push-release-flow.md` being "one authoritative, current document."
+Tonight it was not current: [ADR-0061](../../docs/adr/0061-uniform-human-approval-ceremony.md)
+(2026-08-07, same day as this item, PO instruction to collapse
+`prepare-critical`/`approve-critical` into a single `authorize-critical`
+command) exists on `origin/main` and is implemented in the installed plugin
+build (0.5.4) but was never merged into `sprint_phoenix` — this branch's own
+`plugins/pipeline-core/scripts/po-human-approval.mjs` has no
+`authorize-critical` at all (confirmed by grep), and `docs/push-release-flow.md`
+still describes only the two-step ceremony ADR-0061 calls superseded. An
+Elephant following this repo's own canonical, read-once-per-session doc
+therefore constructed and handed a PO two commands (`prepare-critical` then
+`approve-critical`) that were the *wrong* ceremony for the installed plugin,
+one of which the PO had to correct by name after recognizing the discrepancy
+from having watched a different session (Nova) run the real one. Full
+sequence and every SHA/error code involved:
+[`docs/state.md`](../../docs/state.md), section "Push ceremony ran to
+completion (Layers 1b–4) — blocked at Layer 5 on red Verify, not on the
+signature," 2026-08-12.
+
+Two narrower, concrete defects surfaced in the same run, worth carrying into
+whatever design round eventually touches this:
+
+- **Layer 4's `pipeline-state.mjs approve-push`** (unaffected by ADR-0061,
+  which only collapses the human-facing Layer 2+3) requires its
+  `--proof-authority` trust-policy file to be *exactly* `{keyReference,
+  publicKeySha256}` — no `humanName`, even though `setup --human-name` and
+  `authorize-critical` both now require and write that third field into the
+  PO's own `trust-policy.json`. The two ceremonies now disagree about the
+  shape of the same file, and closing that gap (widen Layer 4's `own()`
+  check to accept the 3-key shape, mirroring what `setup`'s own
+  `legacyShape`/`namedShape` dual-acceptance already does) is a small, well-
+  scoped fix distinct from the version-skew problem above.
+- **`--proof-authority` must resolve to an absolute path strictly outside
+  the repository root**, and an agent session cannot write there
+  (`GUARD-CROSS-REPO-MUTATION`) even to place a content-identical,
+  non-secret shape-compatibility file. Every external-directory write in
+  this ceremony family is therefore PO-only by construction, not just by
+  policy — worth stating explicitly if a future design round considers
+  narrowing candidate #3 above, since this is the same boundary, not a new
+  one.
+
+**Not re-triaged** — this is evidence for the existing open verdict
+("unusable for third parties as shipped... stands until at least one of
+#2-#4 is actually decided"), not a new finding requiring a new decision.
+Candidate #4 (a deliberate PO cost/benefit review) is the one this
+occurrence most directly speaks to: the ceremony took four rounds and three
+distinct wrong-path corrections to complete even with an attentive PO
+present at the keyboard throughout.
