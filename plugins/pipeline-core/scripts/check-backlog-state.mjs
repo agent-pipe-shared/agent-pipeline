@@ -260,6 +260,54 @@ function localCommitExists(root, oid) {
   return result.status === 0;
 }
 
+/**
+ * 12 ledger events (sequences 1-12, all dated 2026-07-20, all
+ * `actor: "backlog-migration"`, all `evidence.kind: "baseline-migration"`)
+ * cite this exact evidence commit; it does not exist locally, almost
+ * certainly lost in the sanctioned 2026-08-01 history rewrite. PO decision
+ * 2026-08-12 (Option 1 of
+ * backlog/items/2026-08-11-backlog-ledger-baseline-migration-commit-unreachable.md):
+ * accept and document this one specific historical value as a pinned,
+ * narrowly-keyed exception rather than re-flagging it every Verify run.
+ *
+ * NOTE: the source backlog item's own diagnosis claims this commit is shared
+ * by all 38 of the 2026-07-20 batch's events. Reading the ledger directly
+ * (this file's own contract, not this item's prose) shows only sequences
+ * 1-12 actually share it; sequences 13-38 of that same 2026-07-20 batch cite
+ * six other, also-unreachable, but DIFFERENT commit values under different
+ * actors/kinds. Those are NOT covered by this exception and are out of this
+ * change's authorized scope — see the dispatch report for
+ * NVA-BLDRIFT-01/2026-08-12.
+ *
+ * This is deliberately NOT a blanket waiver for `evidence.kind ===
+ * "baseline-migration"`: only an event whose commit/actor/kind ALL match this
+ * exact triple is excepted. A future baseline-migration event citing any
+ * other unreachable commit still fails exactly as before.
+ */
+const KNOWN_UNREACHABLE_BASELINE_MIGRATION_COMMIT = "933e1a8d17d6c7bed040d13f8fccca2511fff9dc";
+const KNOWN_UNREACHABLE_BASELINE_MIGRATION_ACTOR = "backlog-migration";
+const KNOWN_UNREACHABLE_BASELINE_MIGRATION_KIND = "baseline-migration";
+const UNREACHABLE_COMMIT_FINDING = /^ledger event (\d+): evidence\.commit is not a reachable local Git commit$/u;
+
+/**
+ * Drop exactly the "unreachable evidence.commit" findings produced for the
+ * known 2026-07-20 baseline-migration batch. Never keyed off the finding text
+ * alone — each candidate finding is re-checked against the actual event data
+ * (commit, actor, evidence.kind) before it is dropped, so an unrelated
+ * unreachable evidence commit (any other value) still fails.
+ */
+function filterKnownBaselineMigrationFindings(findings, events) {
+  return findings.filter((finding) => {
+    const match = UNREACHABLE_COMMIT_FINDING.exec(finding);
+    if (!match) return true;
+    const event = events[Number(match[1]) - 1];
+    const isKnownBaselineMigration = event?.actor === KNOWN_UNREACHABLE_BASELINE_MIGRATION_ACTOR
+      && event?.evidence?.kind === KNOWN_UNREACHABLE_BASELINE_MIGRATION_KIND
+      && event?.evidence?.commit === KNOWN_UNREACHABLE_BASELINE_MIGRATION_COMMIT;
+    return !isKnownBaselineMigration;
+  });
+}
+
 export function reachabilityAmendmentFindings(root, event) {
   const findings = [];
   const label = `ledger event ${event.sequence}`;
@@ -467,8 +515,9 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
     }
   }
 
-  const projection = findings.length === 0 ? projectBacklog(items, ledger.events) : null;
-  return { ok: findings.length === 0, findings, items, events: ledger.events, projection };
+  const filteredFindings = filterKnownBaselineMigrationFindings(findings, ledger.events);
+  const projection = filteredFindings.length === 0 ? projectBacklog(items, ledger.events) : null;
+  return { ok: filteredFindings.length === 0, findings: filteredFindings, items, events: ledger.events, projection };
 }
 
 /** Detect checked-in generated projection drift. */
