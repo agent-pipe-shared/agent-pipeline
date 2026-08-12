@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 988183e83501fa6c2c46975ce8d0af9a07383379 — 2026-08-12, range 945f9989..988183e8, push ceremony ADR-0061 skew + red-Verify block recorded
+
+- ADR-0012: checked, no change needed.
+
+Covers two commits: `4b24ea01` (docs/state.md, additive checkpoint recording
+the ADR-0061 version-skew finding and Layer 5's red-Verify block — append-only,
+nothing rewritten) and `988183e8` (backlog/items/..., which carries no
+`Governs:` line and is out of this check's scope). No other governed path
+touched.
+
 ## Candidate 0376a6652e9380b61b6ea72dede3d60c21a7ab58 — 2026-08-12, range eb735ae1..0376a665, the substantive tip of tonight's push candidate; supersedes the entries below (all their commit SHAs are orphaned by the PO-run rebase `git rebase --onto cd38619e ad5a537e sprint_phoenix`, which corrected the `979e579c`/`ad5a537e` commit-attribution defect and reassigned every SHA after `cd38619e`, though the analysis in each superseded entry remains valid and is incorporated here rather than redone)
 
 - ADR-0012: checked, no change needed.
