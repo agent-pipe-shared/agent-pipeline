@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 04115341b6853f45564aaab04dbc157d253ebf2f — 2026-08-12, range 47f2e835..04115341, AFK run closed -- final Verify triage, honest gap report
+
+- ADR-0012: checked, no change needed.
+
+Covers exactly one commit (`04115341`), touching only `docs/state.md`
+(additive checkpoint entry, append-only discipline preserved). No other
+governed path touched.
+
 ## Candidate 09785aee2ae83c57e7179bdd216449f58325713e — 2026-08-12, range db3b6c3b..09785aee, PX0-AC-05 Critic FAIL recorded in evidence map
 
 - ADR-0045: checked, no change needed.
