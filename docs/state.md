@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-11 (checkpoint: PO approved ledger --activate + the 27 High-priority backlog items; correction to the prior checkpoint — of 4 Critic reviews returned, 3 FAIL on a shared evidence-chain defect (`NVA-BL-20`, `NVA-BL-40`, `NVA-BL-42`), 1 PASS (`NVA-BL-32`); `NVA-BL-20-FIX` in flight, `NVA-BL-40`/`NVA-BL-42` fix-rounds queued behind it; a self-inflicted verify/edit race caught and killed before producing false evidence; Nova A/B gates unchanged/PO-only)
+**Last updated:** 2026-08-12 (checkpoint: PO decided all 23 Medium/Low decision-needed backlog items in one pass; every one implemented, verified, or closed this same AFK session; full Verify exact-bound, single pre-existing failure unchanged, Security clean)
 **Project status:** ACTIVE
 **Release version:** `0.5.4` released
 **Release state:** version `0.5.4` · tag `v0.5.4` · commit `dd1eb9eedeb7ac48860c8ec9745750c9a8367b32` · tree `b6857469bbc84de94c0f917ed64dc59b0eccc8de` · status `published`
@@ -88,7 +88,91 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-11 Three of four Critic reviews FAIL on the same evidence-chain defect; a self-inflicted verify/edit race caught and killed (current)
+## 2026-08-12 PO-directed autonomous AFK session: all 23 Medium/Low decision-needed backlog items decided and shipped (current)
+
+PO went AFK ("ich schlafe jetzt") after deciding all 23 items from the
+Medium/Low LOOSE backlog grouping in one message; standing instruction:
+implement everything in current scope before the next hard PO gate, AFK
+mode. Every item was implemented, verified-as-already-fixed, or closed
+this same session — none deferred without an explicit reason recorded in
+its own backlog item.
+
+**Shipped (commits, chronological):** git-identity ask-step now reachable
+through the live `apply-portable-seed --activate` CLI path (`476ca647`);
+manifest-seed divergence measured and found inert on the fresh-project
+path (`ff453862`, new lead filed for an unconfirmed apply-boundary
+invariant); Codex read-only-escalation investigated, closed as
+not-repo-side-actionable (`181b7730`); reclassification reasoning
+documented + override-reachability probe axis added, surfaced a **new
+finding**: a signature can currently arm a Bash redirect to a sensitive
+out-of-root path like `/etc/passwd` (`431776c3`, filed separately,
+not urgent — still requires the human's own key); `approve-plan`
+announces the required `set-phase` step (`c01dbf76`); dispatch model
+field now derived from the agent definition instead of hand-typed
+(`e7d72904`); outside-repo bounded diagnostics get their own
+override-reachable code instead of a false cross-repo refusal
+(`2f466462`); vendored canon build step + classification scheme built,
+found and re-synced 4 vendored files that had already silently drifted
+(`3f3f8852`+); `scratch/` made unconditionally writable, cleanup wired to
+bootstrap (`c6bcc307`, `49c7b760`, later hardened against a real
+dirty-tree-on-first-bootstrap regression in `84da1fd9`); lean
+directory-contract ADR-0063 written (`3194daa2`); `docs/state.md`
+extraction pass (3 rules lifted into `guardrails/`/`roles/`) plus a
+working block/feature-boundary rotation mechanism, deliberately not yet
+applied to this file's own live content (`c7d68f61`, `93f638e5`);
+maintenance-window signature-voiding verified ALREADY FIXED by an earlier
+unrelated commit for the file-write case — a narrower commit-landing
+version of the same symptom remains, deliberate post-Critic-review
+security control, left for a PO call (`d18257f3`); pre-signature
+confirmation prompt now speaks the configured `de`/`en` language, token
+stays a stable English constant (`598a8388`); PRD-language freeze fixed
+at its real root cause — promotion-time correction, not kickoff-time as
+originally guessed (`e7087fb0`); resume-hint card broadened with a
+bounded `progress` field, delivery made automatic via the SessionStart
+hook instead of relying on a session remembering to ask
+(`048e3ecf`).
+
+**Process defects found and fixed along the way, not part of the 23:**
+`evidence/verify-latest.json` is a shared single-slot resource that
+concurrent dispatches on one checkout clobber — observed independently by
+four separate dispatches, filed
+(`2026-08-12-shared-verify-evidence-slot-corrupted-by-concurrent-dispatches.md`).
+The Critic protected-preimage baseline had 4 non-matching pins, not the 1
+originally believed, 2 of which were never valid rather than merely
+drifted — filed separately, not blanket re-pinned. A newly created doc
+(`docs/bootstrap-step-accounting.md`) and the new ADR-0063 both landed
+without observation-governance classification — caught by the session's
+own first genuinely clean (`exact`-binding) full Verify run and fixed
+immediately. A backlog item's `closure_commit` used a short hash the
+append-only ledger had already baked in verbatim — cannot be edited in
+place; documented as needing the ledger's amendment mechanism rather than
+hand-fixed. One real `gitleaks` finding (a fake-secret-shaped test
+fixture string in `resume-hint.test.mjs`) allowlisted via the existing
+content-bound mechanism.
+
+**A Critic FAIL was found and fixed in-session:** `NVA-BL-34`'s
+dispatch-authorship-verify tooling reviewed FAIL (4 major, 3 minor) —
+record-shape mismatch between the template and generated governance text,
+a vendored copy that had silently stopped being byte-identical, no verify
+evidence bound to the candidate, a new suite neither registered nor filed
+as pending, plus three smaller integrity gaps. All 7 fixed and
+independently re-verified (`8d496c38`, `88dc62d6`, `52065bbc`).
+
+**Verify/Security, end of session (HEAD after `51b15d3b`):** full
+`harness/scripts/verify.mjs` — `candidate.binding: "exact"`, single
+failure `backlog-state-check`, confirmed unchanged from the
+long-documented `933e1a8d` pre-existing ledger drift (38 events) plus the
+one newly-filed short-hash item above — both already characterized, not
+new regressions. `security-scan.mjs` — CLEAN, exit 0.
+
+**A repeated agent-harness pattern worth naming, not yet filed as a
+backlog item:** across this session's ~20 background dispatches, roughly
+a third ended their turn on a mid-work checkpoint message rather than a
+completed structured final report, requiring an explicit resume message
+to actually finish. Every one finished cleanly once resumed; no work was
+lost. Left as an observation here rather than filed, since it reads as an
+agent-harness/turn-boundary behavior rather than anything this repo's own
+code controls.
 
 - **Material correction to the prior checkpoint's "8 of 27 landed clean":** of the four Critic reviews dispatched against that block's work, **three came back FAIL** (`NVA-BL-20`, `NVA-BL-40`, `NVA-BL-42`), one PASS (`NVA-BL-32`, 3 minor findings). All three FAILs name, independently, the same root defect: the dispatch's own closing evidence was a hand-run `node --test` on a single file or subset, not the calibration's actual gate (`node harness/scripts/verify.mjs`, which alone writes `evidence/verify-latest.json` per `guardrails/quality-gates.md` QG-02/QG-03). This is a dispatcher-side (Elephant) briefing defect, not three independent goldfish mistakes — every `Verify command` field this session was filled with a per-suite `node --test`, and it reproduced three times before being caught. **Do not repeat this pattern**: future briefings' DoD evidence requirement is the full `node harness/scripts/verify.mjs` run and its script-written artifact, not a file/subset run directly, even when that file is what the calibration ultimately delegates to.
 - **`NVA-BL-20` Critic review — FAIL, 5 major + 1 minor** (local-plugin-install attestation, `plugins/pipeline-core/lib/human-guard-override.mjs`, commit `492467bf`): F1 evidence-chain scope (above). F2 the new `EXTERNAL_SYMLINK_CAPABLE` probe blanket-catches instead of using the repo's own tested `symlink-capability.mjs` primitive (EPERM/EACCES-only discrimination). F3 no probe covers JUNCTION-type link capability specifically (only untyped `symlinkSync`), disabling link-shaped coverage on native Windows, ADR-0052's actual target. F4 one test uses a bare `if (EXTERNAL_SYMLINK_CAPABLE)` block instead of the proper `skip` option a sibling test uses — an unavailable capability silently passes instead of showing as skipped. F5 (independently verified via direct grep before briefing the fix) the new `options`/`spawn` seam is never threaded through at any of the 3 production call sites (`recordHumanGuardDenial:1723`, `planHumanGuardOverride:1835`, `consumeHumanGuardOverride:2327`) even though each already receives its own `spawn` parameter and threads it into the sibling branch one line below — the new mechanism is practically untestable-from-production as shipped. F6 minor, `externalMarketplace` state not exposed on the return object. Also flagged: my own dispatch briefing carried directed "SPECIFICALLY examine" hunt sub-questions, the exact freehand-briefing anti-pattern CLAUDE.md names — the Critic still found its majors outside that list, proving independent work occurred, but the discipline violation is real and is not to be repeated. **Fix-round dispatched** (`NVA-BL-20-FIX`, `goldfish-deep`, model explicitly overridden to `claude-opus-5`/`max` at the tool layer per MP-07, all 6 findings grounded in direct reads/greps before briefing rather than re-pasted from the Critic report, template hunt-list discipline N/A here since this is an implementation not a Critic dispatch). **Correction sent mid-flight** (`SendMessage`): the original briefing's F1 DoD check itself permitted the same defective evidence pattern (running the named file directly instead of the real gate) — retracted, budget raised ≤55→≤75, full `verify.mjs` run now required as closing evidence. Running at checkpoint time.
