@@ -612,6 +612,38 @@ try {
     }
   });
 
+  // GMW20 varies scope, expiry basis, reason and featureId, but never the plan/spec
+  // digests, so "a mismatched plan or spec is still refused" was the one property of
+  // the signed intent that the reuse path (`reusablePreparedRequest`) could have
+  // silently widened without any check turning red. Addition only: it pins that the
+  // idempotency introduced for CEREMONY-1 (B) is keyed on the WHOLE intent envelope,
+  // not merely on the fields the human is shown.
+  check("GMW20b a CHANGED plan or spec digest also mints a new digest, and the earlier proof still does not install it", () => {
+    const root = repoFixture("gmw-changed-plan-spec-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const base = {
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "baseline", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    };
+    const first = prepareGuardMaintenanceWindowRequest(base);
+    for (const [label, override] of [
+      ["plan", { planSha256: "1".repeat(64) }],
+      ["spec", { specSha256: "2".repeat(64) }],
+    ]) {
+      const changed = prepareGuardMaintenanceWindowRequest({ ...base, ...override });
+      assert.notEqual(changed.intent.sha256, first.intent.sha256, `a changed ${label} digest must mint a new intent digest`);
+      assert.equal(changed.reused, false, `a changed ${label} digest must not reuse the recorded request`);
+      let error;
+      try {
+        installGuardMaintenanceWindow({ rootDir: root, request: changed.request, trustPolicy, proof: proofFor(first.intent), livePluginRoot: plugin });
+      } catch (caught) { error = caught; }
+      assert.ok(error instanceof GuardMaintenanceWindowError, `a proof for the old digest must not install a changed ${label} digest`);
+      assert.equal(error.code, "GMW-PROOF-INVALID", `the refusal must be the signature check itself, not an incidental failure (${label})`);
+      assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", `a refused install must leave no window record behind (${label})`);
+    }
+  });
+
   check("GMW21 the four-hour TTL cap still clamps at prepare AND is still enforced at install", () => {
     const root = repoFixture("gmw-ttl-cap-");
     const plugin = pluginRootFixture();
