@@ -1,0 +1,336 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+/**
+ * Regression suite for `push-prepare.mjs` (NVA-PUSH-PREPARE).
+ *
+ * Fixtures live under temporary directories (`scratch/push-prepare-*`), never
+ * against the real repository state: every precondition check takes injected
+ * dependencies (`gitStatus`, `gitHead`, `readFile`, `exists`,
+ * `readCriticalHumanProofPolicy`, `parseHumanArgs`, `readState`, ...), so a
+ * fixture never has to be a real Git working tree with real evidence files.
+ *
+ * The one exception, by design, is the D3 hash-equality test at the bottom:
+ * it runs `preparePushSubject()` against THIS repository's real HEAD and
+ * separately spawns the real `pipeline-state.mjs prepare-push-subject` CLI as
+ * a subprocess, and asserts the two `subjectSha256` values are identical --
+ * proving the reuse this script's header comment promises, not merely
+ * asserting it by construction. It is read-only and does not pin an exact
+ * digest (HEAD is mutable), only equality between the two routes.
+ *
+ * Run: node --test plugins/pipeline-core/scripts/push-prepare.test.mjs
+ */
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { after, test } from "node:test";
+import { fileURLToPath } from "node:url";
+
+import {
+  checkCriticalHumanProofPolicy,
+  checkEvidenceFreshness,
+  checkPushThreatModel,
+  checkWorkingTreeClean,
+  criticalArtifactPaths,
+  parseArgs,
+  preparePushSubject,
+  pushPrepareReport,
+  renderF7Lines,
+  resolveFeatureContext,
+  segmentsForNodeCommand,
+} from "./push-prepare.mjs";
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+const SCRATCH = join(REPO_ROOT, "scratch");
+mkdirSync(SCRATCH, { recursive: true });
+const FIXTURE_DIR = mkdtempSync(join(SCRATCH, "push-prepare-"));
+after(() => rmSync(FIXTURE_DIR, { recursive: true, force: true }));
+
+const HEAD = "1a757618133eb27b62f1e427b2fb55895da42d85";
+
+// ---------------------------------------------------------------------------
+// parseArgs
+// ---------------------------------------------------------------------------
+
+test("parseArgs: accepts a well-formed --by/--remote/--destination", () => {
+  const parsed = parseArgs(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"]);
+  assert.deepEqual(parsed, { by: "tester", remote: "origin", destination: "refs/heads/main" });
+});
+
+test("parseArgs: refuses a missing --by", () => {
+  const parsed = parseArgs(["--remote", "origin", "--destination", "refs/heads/main"]);
+  assert.ok(parsed.error);
+});
+
+test("parseArgs: refuses an unsafe --remote", () => {
+  const parsed = parseArgs(["--by", "tester", "--remote", "o r i g i n", "--destination", "refs/heads/main"]);
+  assert.ok(parsed.error);
+});
+
+test("parseArgs: refuses a --destination that is not refs/heads/*", () => {
+  const parsed = parseArgs(["--by", "tester", "--remote", "origin", "--destination", "refs/tags/v1"]);
+  assert.ok(parsed.error);
+});
+
+// ---------------------------------------------------------------------------
+// D2 -- each precondition, met and unmet, each unmet result carrying a remedy
+// ---------------------------------------------------------------------------
+
+test("checkWorkingTreeClean: met -> ok, unmet -> ok:false with remedy", () => {
+  assert.equal(checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => "" }).ok, true);
+  const dirty = checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => " M some/file.mjs\n" });
+  assert.equal(dirty.ok, false);
+  assert.ok(dirty.remedy);
+});
+
+test("checkWorkingTreeClean: git failure -> ok:false with remedy", () => {
+  const result = checkWorkingTreeClean(FIXTURE_DIR, { gitStatus: () => null });
+  assert.equal(result.ok, false);
+  assert.ok(result.remedy);
+});
+
+test("checkEvidenceFreshness: missing file -> ok:false with remedy", () => {
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
+    readFile: () => { throw new Error("ENOENT"); },
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /missing or unreadable/);
+  assert.ok(result.remedy);
+});
+
+test("checkEvidenceFreshness: non-zero exitCode -> ok:false with remedy", () => {
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
+    readFile: () => JSON.stringify({ exitCode: 2, commit: HEAD }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /exitCode/);
+  assert.ok(result.remedy);
+});
+
+test("checkEvidenceFreshness: stale commit -> ok:false with remedy", () => {
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
+    readFile: () => JSON.stringify({ exitCode: 0, commit: "deadbeef" }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /stale/);
+  assert.ok(result.remedy);
+});
+
+test("checkEvidenceFreshness: exitCode 0 and matching commit -> ok:true", () => {
+  const result = checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", FIXTURE_DIR, HEAD, {
+    readFile: () => JSON.stringify({ exitCode: 0, commit: HEAD }),
+  });
+  assert.equal(result.ok, true);
+});
+
+test("checkPushThreatModel: absent -> ok:false with materialize remedy; present -> ok:true", () => {
+  const missing = checkPushThreatModel(FIXTURE_DIR, { exists: () => false });
+  assert.equal(missing.ok, false);
+  assert.match(missing.remedy, /materialize-push-threat-model/);
+  const present = checkPushThreatModel(FIXTURE_DIR, { exists: () => true });
+  assert.equal(present.ok, true);
+});
+
+test("checkCriticalHumanProofPolicy: unrestricted posture (no trust anchors) -> ok:true", () => {
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [] }),
+    parseHumanArgs: () => ({ directory: FIXTURE_DIR }),
+    exists: () => false,
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.message, /unrestricted/);
+});
+
+test("checkCriticalHumanProofPolicy: pinned set, local key IS a member -> ok:true", () => {
+  const anchor = { keyReference: "local-po-key", publicKeySha256: "a".repeat(64) };
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [anchor] }),
+    parseHumanArgs: () => ({ directory: FIXTURE_DIR }),
+    exists: () => true,
+    readFile: () => JSON.stringify({ ...anchor, humanName: "Test Human" }),
+  });
+  assert.equal(result.ok, true);
+  assert.match(result.message, /IS a member/);
+});
+
+test("checkCriticalHumanProofPolicy: pinned set, local key is NOT a member -> ok:false with remedy", () => {
+  const anchor = { keyReference: "local-po-key", publicKeySha256: "a".repeat(64) };
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [anchor] }),
+    parseHumanArgs: () => ({ directory: FIXTURE_DIR }),
+    exists: () => true,
+    readFile: () => JSON.stringify({ keyReference: "other-key", publicKeySha256: "b".repeat(64), humanName: "Someone Else" }),
+  });
+  assert.equal(result.ok, false);
+  assert.match(result.message, /NOT a member/);
+  assert.ok(result.remedy);
+});
+
+test("checkCriticalHumanProofPolicy: pinned set, directory unresolved -> ok:false with setup remedy", () => {
+  const anchor = { keyReference: "local-po-key", publicKeySha256: "a".repeat(64) };
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [anchor] }),
+    parseHumanArgs: () => ({ error: "approval directory is required" }),
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.remedy);
+});
+
+test("checkCriticalHumanProofPolicy: unreadable policy file -> ok:false", () => {
+  const result = checkCriticalHumanProofPolicy(FIXTURE_DIR, {
+    readCriticalHumanProofPolicy: () => ({ ok: false, code: "CRITICAL-PROOF-POLICY-UNREADABLE" }),
+  });
+  assert.equal(result.ok, false);
+  assert.ok(result.remedy);
+});
+
+// ---------------------------------------------------------------------------
+// resolveFeatureContext / criticalArtifactPaths
+// ---------------------------------------------------------------------------
+
+test("resolveFeatureContext: derives specPath as a sibling of planPath", () => {
+  const result = resolveFeatureContext(FIXTURE_DIR, {
+    readState: () => ({ status: "ok", state: { activeFeature: { id: "nova-x", planPath: "specs/sprint-nova-epic/plans/nova-x.md" } } }),
+  });
+  assert.equal(result.ok, true);
+  assert.equal(result.specPath, "specs/sprint-nova-epic/plans/spec.md");
+});
+
+test("resolveFeatureContext: no active feature -> ok:false", () => {
+  const result = resolveFeatureContext(FIXTURE_DIR, { readState: () => ({ status: "ok", state: {} }) });
+  assert.equal(result.ok, false);
+});
+
+test("criticalArtifactPaths: request/proof share a fingerprint suffix; authority is unsuffixed", () => {
+  const paths = criticalArtifactPaths(FIXTURE_DIR, "/external/po-dir", {
+    gitCommonDir: () => "/external/po-dir/.fake-common",
+    derivePoGateRepositoryFingerprint: () => "0123456789ab",
+  });
+  assert.equal(paths.request, "/external/po-dir/request-0123456789ab-critical-push.json");
+  assert.equal(paths.proof, "/external/po-dir/proof-0123456789ab-critical-push.json");
+  assert.equal(paths.authority, "/external/po-dir/trust-policy.json");
+});
+
+// ---------------------------------------------------------------------------
+// D4 -- F7 rendering: one segment per line, backslash continuation, <=100 cols
+// ---------------------------------------------------------------------------
+
+test("renderF7Lines: every line but the last ends with a backslash continuation", () => {
+  const lines = renderF7Lines(["node", "/short/script.mjs", "authorize-critical", "--kind push"]);
+  assert.equal(lines.length, 4);
+  for (let index = 0; index < lines.length - 1; index += 1) assert.match(lines[index], / \\$/);
+  assert.doesNotMatch(lines[lines.length - 1], / \\$/);
+});
+
+test("renderF7Lines: no emitted line exceeds 100 columns for realistic short fixture segments", () => {
+  const segments = segmentsForNodeCommand("node", [
+    "plugins/pipeline-core/scripts/po-human-approval.mjs", "authorize-critical",
+    "--repo-root", "/home/user/src/agent-pipeline",
+    "--directory", "/home/user/.po-approval",
+    "--feature-id", "nova-push-prepare",
+    "--plan", "specs/sprint-nova-epic/plans/nova-push-prepare.md",
+    "--spec", "specs/sprint-nova-epic/plans/spec.md",
+    "--kind", "push",
+    "--subject-sha256", "7fefc0ada3b7726f39460bf7e001ed4b71ad66c173f0132d00fcbd0648f5601a",
+    "--expires-at", "2026-08-16T20:00:00.000Z",
+  ]);
+  const lines = renderF7Lines(segments);
+  for (const line of lines) assert.ok(line.length <= 100, `line exceeds 100 columns: ${line}`);
+});
+
+test("segmentsForNodeCommand: groups flag/value pairs one per segment after exe/script/subcommand", () => {
+  const segments = segmentsForNodeCommand("node", ["script.mjs", "sub", "--a", "1", "--b", "2"]);
+  assert.deepEqual(segments, ["node", "script.mjs", "sub", "--a 1", "--b 2"]);
+});
+
+// ---------------------------------------------------------------------------
+// pushPrepareReport -- end to end, all preconditions met vs. unmet
+// ---------------------------------------------------------------------------
+
+function readyDeps(overrides = {}) {
+  return {
+    dir: FIXTURE_DIR,
+    gitHead: () => HEAD,
+    gitStatus: () => "",
+    exists: (path) => path.endsWith("push-threat-model.md") || path.endsWith("trust-policy.json"),
+    readFile: (path) => {
+      if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
+      if (path.endsWith("verify-latest.json") || path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      throw new Error(`unexpected read: ${path}`);
+    },
+    readCriticalHumanProofPolicy: () => ({ ok: true, trustAnchor: null, trustAnchors: [] }),
+    parseHumanArgs: () => ({ directory: "/external/po-dir" }),
+    readState: () => ({ status: "ok", state: { activeFeature: { id: "nova-push-prepare", planPath: "specs/sprint-nova-epic/plans/nova-push-prepare.md" } } }),
+    gitCommonDir: () => "/external/po-dir/.fake-common",
+    derivePoGateRepositoryFingerprint: () => "0123456789ab",
+    now: () => new Date("2026-08-16T20:00:00.000Z"),
+    pipelineStateRun: (argv) => {
+      console.log(JSON.stringify({
+        schema: "pipeline.push-subject-preview.v1",
+        subjectSha256: "7fefc0ada3b7726f39460bf7e001ed4b71ad66c173f0132d00fcbd0648f5601a",
+      }));
+      return 0;
+    },
+    authorizeCriticalPushCommand: ({ repoRoot, directory, featureId, plan, spec, subjectSha256, expiresAt }) => ({
+      executable: "node",
+      argv: [
+        "/plugin-root/scripts/po-human-approval.mjs", "authorize-critical",
+        "--repo-root", repoRoot, "--directory", directory, "--feature-id", featureId,
+        "--plan", plan, "--spec", spec, "--kind", "push",
+        "--subject-sha256", subjectSha256, "--expires-at", expiresAt,
+      ],
+    }),
+    ...overrides,
+  };
+}
+
+test("pushPrepareReport: all preconditions met -> ready:true, all three commands rendered", () => {
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], readyDeps());
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, true);
+  assert.equal(result.report.subjectSha256, "7fefc0ada3b7726f39460bf7e001ed4b71ad66c173f0132d00fcbd0648f5601a");
+  assert.ok(result.lines.authorize.length > 0);
+  assert.ok(result.lines.approvePush.length > 0);
+  assert.equal(result.lines.gitPush, "git push origin HEAD:refs/heads/main");
+});
+
+test("pushPrepareReport: one unmet precondition -> ready:false, no command lines, remedy present", () => {
+  const result = pushPrepareReport(
+    ["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"],
+    readyDeps({ gitStatus: () => " M dirty.mjs\n" }),
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.report.ready, false);
+  assert.equal(result.lines, null);
+  const failing = result.report.checks.find((check) => check.id === "working-tree-clean");
+  assert.equal(failing.ok, false);
+  assert.ok(failing.remedy);
+});
+
+test("pushPrepareReport: bad argv -> {ok:false, error}", () => {
+  const result = pushPrepareReport(["--remote", "origin"], readyDeps());
+  assert.equal(result.ok, false);
+  assert.ok(result.error);
+});
+
+// ---------------------------------------------------------------------------
+// D3 -- subjectSha256 equality against the real pipeline-state.mjs CLI
+// ---------------------------------------------------------------------------
+
+test("D3: preparePushSubject() matches the real `pipeline-state.mjs prepare-push-subject` CLI", () => {
+  const args = { dir: REPO_ROOT, by: "nva-push-prepare-d3-check", remote: "origin", destination: "refs/heads/main" };
+  const inProcess = preparePushSubject(args);
+  assert.equal(inProcess.ok, true, `preparePushSubject failed: ${inProcess.raw}`);
+
+  const spawned = spawnSync(
+    process.execPath,
+    ["plugins/pipeline-core/scripts/pipeline-state.mjs", "prepare-push-subject",
+      "--by", args.by, "--remote", args.remote, "--destination", args.destination],
+    { cwd: REPO_ROOT, encoding: "utf8" },
+  );
+  assert.equal(spawned.status, 0, `CLI subprocess failed: ${spawned.stderr}`);
+  const cliValue = JSON.parse(spawned.stdout);
+
+  assert.equal(inProcess.value.subjectSha256, cliValue.subjectSha256);
+  assert.match(inProcess.value.subjectSha256, /^[0-9a-f]{64,}$/);
+});

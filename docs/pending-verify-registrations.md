@@ -21,12 +21,13 @@
 
 ## PENDING — the dispatch-authorship suite (filed 2026-08-12, block NVA-BL-34)
 
-One suite is written, green, and **not** in `harness/scripts/verify.mjs`, so it
-is not run by the gate:
+Two suites are written, green, and **not** in `harness/scripts/verify.mjs`, so
+they are not run by the gate:
 
 | Suite | Block | What it covers |
 |---|---|---|
 | `plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs` | NVA-BL-34 / NVA-BL-34-FIX | The correspondence rule behind commit authorship: that a `Dispatch: <TASK_ID> (goldfish)` trailer resolves to a dispatch record that is terminal, names the same task id, binds to the commit sha it vouches for, and declares paths covering the diff — plus the fail-closed edges (no trailer, malformed trailer, more than one `Dispatch:` trailer, a task id that is not a safe filename fragment, an Elephant-direct declaration outside the sanctioned `stage-0` form). Behavioural fixtures: every case writes a real `dispatch-record-<TASK_ID>.json` into a temporary evidence directory and resolves it through the script's own reader. |
+| `plugins/pipeline-core/scripts/push-prepare.test.mjs` | NVA-PUSH-PREPARE | The read-only push-readiness report (`push-prepare.mjs`): each precondition (working tree clean, `evidence/verify-latest.json` and `evidence/security-latest.json` freshness matching `guard-push.mjs`'s own `checkEvidenceFreshness` contract, `project/push-threat-model.md` presence, the critical-human-proof posture and — when pinned — local-key membership) reported individually with its own remedy; the F7 rendering assertion (one segment per line, backslash continuation, ≤100 columns); and a D3 hash-equality check that runs the script's `preparePushSubject()` against this repository's real HEAD and separately spawns the real `pipeline-state.mjs prepare-push-subject` CLI, asserting the two `subjectSha256` values are identical. 26 tests. Fixtures are dependency-injected over a temporary directory, except that one D3 test, which is a deliberate read-only smoke test against the real repository. |
 
 Why pending, not registered: the same TP-3 constraint described further down —
 `project/guard-config.json` protects `harness/scripts/verify.mjs`, and the
