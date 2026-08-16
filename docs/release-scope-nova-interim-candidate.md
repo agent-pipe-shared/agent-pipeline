@@ -1,9 +1,16 @@
 # Release scope — Nova interim operational candidate
 
-This is the release scope record `specs/sprint-nova-epic/spec.md` §1.1
-requires for the interim candidate built from the exact `v0.5.0` base: "The
-candidate has its own commit/tree, release scope record and fresh focused
-tests, Full Verify, Security, release preflight and independent
+**This document does not claim §1.1 satisfaction.** The PO scoped this build
+on 2026-08-16 as a local test candidate for the install and push live test,
+not as a release (see "Release preflight is out of scope for this
+candidate" below). This record exists to describe the candidate's own
+scope — what it touches and why — not to assert that
+`specs/sprint-nova-epic/spec.md` §1.1's evidence list is complete for it.
+
+For context, here is what §1.1 requires of the interim candidate built from
+the exact `v0.5.0` base, which a release-bound candidate would actually owe:
+"The candidate has its own commit/tree, release scope record and fresh
+focused tests, Full Verify, Security, release preflight and independent
 delta-correct Critic evidence."
 
 ## Base and candidate commits

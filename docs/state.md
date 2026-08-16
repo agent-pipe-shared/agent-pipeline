@@ -88,6 +88,19 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
+**Clarifying note (2026-08-16, added by `NVA-CFIX-3`): the two entries above
+about `f28988b2...` vs. `a3a43c4b...` are not in conflict — they describe two
+different machines.** The entry near line 72 ("resolved, live with the PO")
+describes a session on the machine that generated and now holds the key
+beginning `a3a43c4b`, created there on 2026-08-11; that is the key the PO
+rotated `project/critical-human-proof.json`'s trust anchor to on that
+machine. The entry near lines 127–130 ("v3 any-key trust anchor") describes a
+session on a different machine — the one this repository is currently
+checked out on for this dispatch — which holds the key beginning `f28988b2`,
+the key that actually signed the 0.5.4 release and the key the current
+`project/critical-human-proof.json` in this checkout pins. Both entries are
+accurate for their own machine; neither is stale relative to the other.
+
 ## 2026-08-16 (later, same session) The push flow, taken apart and repaired (current)
 
 The PO opened a second topic mid-session: *"der push ist durch zu viele sachen
