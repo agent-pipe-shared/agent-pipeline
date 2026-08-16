@@ -34,6 +34,7 @@ import { dirname, join, resolve, sep } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { authorizeCriticalPushCommand, parseHumanArgs } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun } from "./pipeline-state.mjs";
 
@@ -99,10 +100,38 @@ function readJson(path, deps) {
  * is configured, so a green result here is necessary, not sufficient, for
  * that file -- the same freshness floor both evidence files share.
  */
+/**
+ * Resolves the remedy for a stale/missing evidence file to the PROJECT'S OWN
+ * calibrated `verify` command -- never a path hardcoded to this repository's
+ * own source-only tree layout (AC-11, the consumer-safe-path checker under
+ * this repository's own build tooling). Reuses the same calibration-tier
+ * resolver `security-scan.mjs` already routes
+ * through (`resolveAuthorityArtifactPath`, `../lib/project-authority.mjs`)
+ * rather than inventing a second calibration reader. An absent, unreadable, or
+ * malformed calibration -- or one with no `verify` key -- degrades honestly:
+ * it never invents a command and never falls back to a source-only path.
+ */
+export function resolveVerifyRemedy(dir, relPath, deps = {}) {
+  const resolveArtifact = deps.resolveAuthorityArtifactPath ?? resolveAuthorityArtifactPath;
+  try {
+    const artifact = resolveArtifact("calibration", { rootDir: dir });
+    if (artifact.exists) {
+      const raw = (deps.readFile ?? readFileSync)(artifact.path, "utf8");
+      const parsed = JSON.parse(raw);
+      if (typeof parsed?.verify === "string" && parsed.verify.trim() !== "") {
+        return `${parsed.verify}  # regenerates ${relPath}`;
+      }
+    }
+  } catch {
+    // absent/unreadable/malformed calibration -- fall through to the honest degradation below.
+  }
+  return `run this project's own calibrated verify command  # its calibration does not define one; regenerates ${relPath}`;
+}
+
 export function checkEvidenceFreshness(id, relPath, dir, headCommit, deps = {}) {
   const path = join(dir, relPath);
   const data = readJson(path, deps);
-  const remedy = `node harness/scripts/verify.mjs  # regenerates ${relPath}`;
+  const remedy = resolveVerifyRemedy(dir, relPath, deps);
   if (data === null) return { id, ok: false, message: `${relPath} is missing or unreadable.`, remedy };
   if (data.exitCode !== 0) return { id, ok: false, message: `${relPath}: exitCode=${JSON.stringify(data.exitCode)} (expected 0).`, remedy };
   if (data.commit !== headCommit) {
