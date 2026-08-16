@@ -62,3 +62,14 @@ Two consequences worth naming before anyone implements this:
 - **Rationale:** the item explicitly scopes itself as "Direction, not a design" — declaring per-gate input paths, verifying declarations rather than trusting them, and sharing the lever with the verify-growth item (`pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost`, itself only partly accepted this same block for exactly the reason that its own part 3, selective-vs-full tiering, "trades away a real guarantee" and needs a PO-visible decision) are real architecture questions, not a same-session patch. Rushing an implementation here risks exactly the "envelope is a lie" failure mode the item itself warns against (consequence 2). This also touches the push/release gate chain directly, which is Critic-mandatory/Design-tier surface per MP-07 — not proportionate for an unattended AFK block to design and accept unilaterally.
 - **Assignment (if accepted):** a future dedicated design session, paired with `pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost` (shared mechanism: per-suite/per-gate declared inputs). Not folded into the 0.5.5 candidate.
 - **Date:** 2026-08-16
+
+### Update, 2026-08-17 — the dedicated design round happened; `docs/adr/0065-...md`, proposed
+
+Found: the item's own proposed "envelope" shape doesn't actually work
+(the union of 269 suites' inputs is nearly the whole tree; the commit that
+motivated this item would still have voided the run). The real fix finishes
+the already-tested per-suite declared-input mechanism in
+`verify-resume.mjs`/`verify-journal.mjs` rather than inventing a new one —
+full reasoning, evidence citations and an open PO question (cross-candidate
+reuse for push/release-bound runs) in the ADR. `proposed`, not accepted —
+awaiting PO review like ADR-0064.
