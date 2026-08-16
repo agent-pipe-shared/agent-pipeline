@@ -210,14 +210,24 @@ exact command. This compounding is tracked as its own finding:
 
 **Resolved for `git push` on 2026-08-16 (PO decision):** `.claude/settings.json`
 now carries a single narrow `permissions.allow` entry, `Bash(git push *)`, so
-the Pipeline's own cryptographic push gate is the authority for a push rather
-than being overruled by a second gate that adds nothing to it. This is safe for
-a checked reason, not an optimistic one: `GG-01`/`GG-02` block every `--force`
-and `+refspec` push unconditionally, approval or not; `GG-03` admits a push only
-when `authorizeRecordedPush` verifies an approval bound to exactly this
-candidate commit, remote and destination ref; and a push that does not write out
-its destination ref is never matched at all. The entry deliberately covers
-`git push` alone — never `git *` — so no other command gains anything.
+the Pipeline's own hook chain is the authority for a push rather than being
+overruled by a second gate that adds nothing to it. This is safe for a checked
+reason, not an optimistic one, and the layer actually doing the checking for an
+ordinary branch push is **not** `GG-03`: `GG-01`/`GG-02` (`guard-git.mjs`)
+still block every `--force` and `+refspec` push unconditionally, approval or
+not, but `GG-03` matches only a `--delete`/`-d`/`:refspec` deletion or
+overwrite of `main`/`master` — it is never even evaluated for an ordinary
+push to a feature branch, so its signed-push admission route (reachable only
+when `GG-03` is the sole matching rule) is correspondingly unreachable there
+too, and `guard-git.mjs` simply lets such a push through. What actually
+enforces the recorded push approval for an ordinary push is a separate hook,
+`guard-push.mjs`, which runs after `guard-git.mjs`: its approval check
+requires, under `gates.push.approval: "required"`, that
+`state.pushApproval.lastApproved.forCommit` equal the pushed source commit
+and that `authorizeRecordedPush` independently verify the recorded approval
+for this exact candidate, remote and destination ref; a failure there is
+reported under `gates.push.mode`. The entry deliberately covers `git push`
+alone — never `git *` — so no other command gains anything.
 
 Two things about that change are worth keeping. First, `git restore` is **not**
 covered and can still be refused this way; the fallback below still applies to

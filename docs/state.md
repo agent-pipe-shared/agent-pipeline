@@ -193,11 +193,17 @@ for a decision the PO has already made. Only a human editing the file resolves
 it. The now-stale Layer 5 passage in `docs/push-release-flow.md` is
 deliberately left unchanged until the permission actually lands.
 
-Safety basis for that permission, verified in `guardrails/git.md` rather than
-assumed: GG-01/GG-02 block every `--force` and `+refspec` push unconditionally,
-approval or not; GG-03 admits a push only when `authorizeRecordedPush` verifies
-an approval bound to exactly this candidate commit, remote and destination ref;
-a push that does not write out its destination ref is never matched at all.
+Safety basis for that permission, verified by reading `guard-git.mjs` and
+`guard-push.mjs` rather than assumed: GG-01/GG-02 block every `--force` and
+`+refspec` push unconditionally, approval or not; GG-03 matches only a
+deletion or overwrite of `main`/`master` and does not match an ordinary
+branch push at all, so its signed-push admission route stays unreachable
+there. The layer that actually enforces the recorded push approval for an
+ordinary push is the separate `guard-push.mjs` hook, which runs after
+`guard-git.mjs` and requires (under `gates.push.approval: "required"`) that
+`state.pushApproval.lastApproved.forCommit` match the pushed source commit
+and that `authorizeRecordedPush` independently verify the approval for this
+exact candidate, remote and destination ref.
 
 ### Two named follow-up blocks, both PO-agreed, neither started
 
