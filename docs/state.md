@@ -7102,6 +7102,27 @@ run unusable (`"binding": "preflight-rejected"`, observed). The two mandatory
 steps were mutually exclusive. `2940443f` untracks the file; it stays on disk
 where the next session reads it.
 
+**Push executed, live test complete.** The restart's own handover commit
+(`2eb4466c`, docs-only) moved HEAD one commit past the Verify evidence bound
+to `2940443f`, so Verify was re-run before the signature could be requested —
+269/269 exit 0, Security exit 0, both bound to `2eb4466c` / tree `09fbf2b2`.
+The PO's `authorize-critical` ceremony needed one extra step first: the
+external key directory had never been persisted for this repo (no
+`--directory`, no machine-plane entry, no `$PIPELINE_PO_APPROVAL_DIRECTORY`),
+so the first attempt failed `run setup before authorize-critical`; a `setup`
+re-run against the existing key directory recovered and persisted it into the
+repo-scoped store (`agent-pipeline/` under the git common dir), and
+`authorize-critical` then succeeded, signing subject
+`c0e1175b…` for `2eb4466c`→`origin`/`feat/sprint-nova-codex-v046`. `approve-push`
+consumed the proof; `git push origin HEAD:refs/heads/feat/sprint-nova-codex-v046`
+went through as `1b467f98..2eb4466c` with **no harness-classifier block and no
+`OVERRIDE GG-03`** — the first live confirmation that `guard-push.mjs`'s
+0.5.4 auto-admission route (recorded approval + `guard-git.mjs` not even
+matching `GG-03` for an ordinary feature-branch push) works end to end, not
+just on paper. The consumed-approval record itself was committed after the
+push, per the documented ordering (`6cefbe8e`, local only, not yet pushed —
+folds into the next push cycle).
+
 ## Re-entry
 
 1. Maintainers start with [`CLAUDE.md`](../CLAUDE.md).
