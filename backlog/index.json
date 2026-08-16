@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6194cff0b18016352b0e6e351201ffb80f724b05604f35322663398cbda56362"
+    "transitionHead": "231c95527e6c96f2d80ba61d8c46907167723b4f765a700c5bd010c80e0fafd4"
   },
   "counts": {
-    "open": 92,
+    "open": 93,
     "in_progress": 26,
     "closed": 27
   },
@@ -99,6 +99,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Found on 2026-08-08 by the PHX-RED1 dispatch while diagnosing why plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs is red. The suite is not a broken test: it specifies a human-authority binding that was never built, and diagnosing that surfaced the live hole below. Verified independently at source by the Elephant before filing, not taken from the dispatch report."
+    },
+    {
+      "id": "pipeline.agent-decision-journal-code-pattern-array-coercion",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-16",
+      "source": "Found 2026-08-16 by PHX-WP-AAC01-REVALIDATION-TRIGGER while adding revalidationTrigger: RegExp.test() stringifies its argument, so CODE.test(value.reasonCode) alone admits an array like [\"SOME_CODE\"] where a string is required. Fixed for the new field with an added typeof guard; the pre-existing reasonCode instance was left untouched as out of scope."
     },
     {
       "id": "pipeline.agent-decision-journal-no-production-producer",

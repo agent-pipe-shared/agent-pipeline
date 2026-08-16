@@ -15,6 +15,7 @@
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-can-self-arm-the-git-override | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.agent-decision-journal-code-pattern-array-coercion | open | defect | pipeline | 2026-08-16 | — |
 | pipeline.agent-decision-journal-no-production-producer | open | requirement | pipeline | 2026-08-11 | — |
 | pipeline.agent-definitions-pin-the-review-tier-model | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | open | defect | pipeline | 2026-08-07 | — |
@@ -153,6 +154,6 @@
 
 ## Counts
 
-- open: 92
+- open: 93
 - in_progress: 26
 - closed: 27
