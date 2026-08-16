@@ -1,12 +1,10 @@
 {
-  "schema": "pipeline.critical-human-proof-policy.v1",
+  "schema": "pipeline.critical-human-proof-policy.v3",
   "requiredKinds": [
     "push",
     "deploy",
     "publication"
   ],
-  "trustAnchor": {
-    "keyReference": "local-po-key",
-    "publicKeySha256": "a3a43c4bfbd68c661e242f2f792977edde6a7de1fcb19ece12e2778819f156e1"
-  }
+  "waivedKinds": [],
+  "trustAnchors": []
 }
