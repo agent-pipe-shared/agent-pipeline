@@ -157,12 +157,76 @@ the recorded status.
   the durable allowlist fix is still required** — this machine merely masks
   the failure, and "the finding disappeared" must never be accepted as
   evidence that it was fixed.
-- **Next steps 2+3 dispatched as one work package** (`NVA-BLDRIFT-02`,
-  `goldfish-deep`) — correct the source backlog item's own diagnosis (it still
-  claims all 38 events share one commit) and extend `check-backlog-state.mjs`'s
-  narrowly-keyed allowlist to the six further commit/actor/kind tuples, with
-  regression tests mirroring the existing CBS01-03 discipline. Result recorded
-  below when it lands.
+- **Next steps 2+3 — LANDED as `NVA-BLDRIFT-02`** (`goldfish-deep`,
+  `claude-sonnet-5`/`xhigh`, no worktree, ruleset SHA `1b467f98…`), commit
+  `f3ac7cfd`. The real composition turned out to be **eight** (commit, actor,
+  `evidence.kind`) triples over **seven** distinct commit values across
+  sequences 1-38 — not the six tuples the 2026-08-12 addendum listed, because
+  sequences 37 and 38 cite the SAME commit under two different kinds
+  (`sentinel-windows-containment` and `…-closure`). That pair is incidentally
+  the cleanest available proof that the exception keys on the full triple and
+  never on the commit alone. Regression checks CBS04-CBS07 added alongside the
+  existing CBS01-03. QG-06 disclosure written for the whole set: owner is the
+  PO, and it is stated as permanent drift with the reason (the objects were
+  lost in the 2026-08-01 rewrite and the append-only ledger forbids ever
+  repointing sequences 1-38), while honestly noting the predecessor comment
+  carried the owner but no expiry-or-permanence statement.
+- **The dispatch truncated at 59 tool uses** — past its ≤50 base cap, inside
+  the closing allowance — while waiting on its OWN background verify task,
+  which died with it (`evidence/verify-latest.json` left at
+  `binding: "running"`). It committed its work first, so nothing was lost, but
+  it never emitted the structured closing handover. Per EL-13b the Elephant
+  read the record rather than re-dispatching, verified the committed diff
+  directly, and **re-ran the gate itself** rather than paying for a resume:
+  `node harness/scripts/verify.mjs` → `candidate.binding: "exact"` bound to
+  `f3ac7cfd`, exit 2, **sole** failing suite `backlog-state-check`, whose
+  findings are exactly the two known out-of-scope event-403 ones (confirmed by
+  running the checker directly). Record completed by the Elephant and labelled
+  as such, never presented as the goldfish's own report.
+- **PO decision (2026-08-16): the durable fix for the ledger-validation class
+  is direction B — separate integrity from drift — plus write-time
+  prevention.** Presented after the PO pushed back on pinning a second
+  exception ("wenn es jetzt schon 2x passiert ist, brauchen wir eine dauerhafte
+  lösung"). The shared root cause across both incidents: the ledger is
+  immutable, but the checker applies today's rules to yesterday's entries, so
+  every rule tightening and every environment change retroactively invalidates
+  entries nobody can ever fix — leaving only "pin an exception" or "weaken the
+  mechanism", again and again. **B:** `check-backlog-state.mjs` classifies each
+  of its rules into **integrity violations** (broken hash chain, forged or
+  duplicated entry, status change without evidence → blocking) versus
+  **historical evidence drift** (commit no longer resolvable, superseded
+  format → recorded, non-blocking). Both existing incidents then resolve
+  without any exception list, and the gate stops being something to route
+  around. **Prevention (decided separately, also approved):**
+  `reconcile-backlog-ledger.mjs` normalizes `closure_commit` to a full OID via
+  `git rev-parse`, and runs the checker's own event validator, BEFORE
+  appending — nothing malformed can enter the ledger again. Direction C
+  (per-event rule versioning) was offered and left as a possible later stage,
+  not decided. **Consequence for the work above:** B partly supersedes
+  `NVA-BLDRIFT-02`'s allowlist half, which was already in flight when the
+  decision came; it was deliberately allowed to finish, both because the
+  backlog-item correction is needed regardless and because the eight-triple
+  table it produced is precisely the input B's drift classification needs.
+  Not yet dispatched — the rule-by-rule classification defines what the gate
+  still stops and needs its own review.
+- **Event 403 itself is NOT closed by any of the above, and the backlog item's
+  proposed route is structurally impossible — measured, not assumed.** The item
+  suggests using the existing V2 evidence-amendment mechanism to upgrade the
+  short hash to a full OID. That cannot work: `lib/backlog-state.mjs:303`
+  requires the amendment's `targetCommit` to be a full 40-hex OID, while `:686`
+  requires it to be byte-equal to the target event's recorded `evidence.commit`
+  — which is the short hash. The two demands contradict each other for exactly
+  this class of target. On top of that the amendment WRITER is hard-restricted
+  to a single item id (`:898`) and amendments require a typed approval
+  authority. Under direction B the short-hash finding becomes drift and stops
+  blocking, so no amendment is needed; recorded here so the impossible route is
+  not attempted a third time.
+- **PO instruction (2026-08-16): the push flow itself is the next topic.** "Ein
+  push sollte nur einen verify brauchen und dann nach signature freigabe auch
+  durch laufen auf den origin" — analysis first, then options, no fix in
+  passing. Also standing: the PO creates signature approvals on request, so a
+  session should ask with the exact command and bound commit rather than
+  working around the gate.
 
 ## 2026-08-12 PO-directed autonomous AFK session: all 23 Medium/Low decision-needed backlog items decided and shipped
 
