@@ -1405,6 +1405,55 @@ test("plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actu
 });
 
 /**
+ * GUARDALLOW-1 (backlog: 2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md).
+ * `plan-partial-authority` is a real, read-only onboarding subcommand (scripts/
+ * project-onboarding-v3.mjs: absent from APPLY_SHAPED_COMMANDS) that a partial-authority
+ * inspection prescribes verbatim as its `nextAction` (lib/project-onboarding-v3.mjs:3388,
+ * 3669, via the same lifecycleArgv(argv, runner, intent) helper as its plan* siblings) --
+ * yet the allowlist refused it because it was absent from the plan* array, blocking every
+ * consumer project stuck in `partial` state from ever completing bootstrap. This mirrors
+ * the "plan-runtime family" test above, scoped to the one added subcommand, plus a negative
+ * case proving an unlisted, made-up plan-shaped subcommand is still refused (fail-closed
+ * default preserved).
+ */
+test("GUARDALLOW-1: plan-partial-authority is admitted with the same shape as its plan* siblings", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const intent of ["onboarding", "bootstrap", "session", "dispatch"]) {
+      for (const runner of ["claude", "codex"]) {
+        const withIntent = `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner ${runner} --intent ${intent}`;
+        assert.equal(isSanctionedLifecycleCommand(withIntent, path), true, withIntent);
+      }
+    }
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner codex`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}'`, path), true);
+    for (const command of [
+      // invalid intent value
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude --intent unknown`,
+      // invalid runner value
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner windows --intent session`,
+      // malformed / wrong-length argv
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude --intent session --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude --intent`,
+      // --profile/--source are valid CLI-level flags for this command (usage text), but the
+      // guard admits only the exact nextAction shape the inspection actually emits -- never
+      // the wider human-invoked shape -- so these still fall through to refusal.
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --runner claude --profile epic --source canonical-fresh-v3`,
+      // apply-partial-authority is a separate, mutating, apply-shaped command and is
+      // deliberately out of scope for this fix -- it must stay refused.
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --runner claude --plan-sha256 ${"a".repeat(64)} --activate`,
+      // an unlisted, made-up plan-shaped subcommand must stay refused (fail-closed default).
+      `node '${ONBOARDING_SCRIPT}' plan-partial-recovery --root '${path}'`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
  * GUARDFIX-1 (A). The apply half of the same defect the test above closed for the plan half.
  *
  * `plan-runtime --intent session` returns, verbatim, the argv built at

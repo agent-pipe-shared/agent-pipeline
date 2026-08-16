@@ -1348,7 +1348,13 @@ function sanctionedOnboardingArgs(rawArgs, root) {
         && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[4])))) return true;
   if (args[0] === "continuity" && args[1] === "inspect"
     && exactRoot(args, root, 2) && args.length === 4) return true;
-  if (["plan", "plan-runtime", "plan-reinstall", "plan-repair", "plan-readback", "plan-source-recovery", "plan-manifest-repair"].includes(args[0])
+  // GUARDALLOW-1 (backlog: 2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md).
+  // `plan-partial-authority` is a read-only planner -- absent from APPLY_SHAPED_COMMANDS
+  // (scripts/project-onboarding-v3.mjs:28-32) and passed through commandAction(..., false, ...)
+  // (lib/project-onboarding-v3.mjs:3388) -- built through the same lifecycleArgv(argv, runner,
+  // intent) helper as every sibling here, so it emits the identical `--root <root> [--runner
+  // <runner>] [--intent <value>]` shape and belongs in this exact branch, not a new one.
+  if (["plan", "plan-runtime", "plan-reinstall", "plan-repair", "plan-readback", "plan-source-recovery", "plan-manifest-repair", "plan-partial-authority"].includes(args[0])
     && exactRoot(args, root, 1)
     && (args.length === 3
       || (args.length === 5 && args[3] === "--intent"
