@@ -47,7 +47,43 @@ something to do here without review.
 
 ## Entries
 
-## Candidate a15fe3ee4e00c94b5155bf714b9b17d358a55c8a — 2026-08-16, range 8a92d377..a15fe3ee, four agent-eligible red Verify steps closed + the trust-anchor blocker recorded
+## Candidate 2390e02f — 2026-08-16, range a15fe3ee..2390e02f, the P-AC-11 criterion arc, its Critic FAIL and fix cycle, and the PO's v3 trust-anchor migration
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: amended in 2390e02f.
+
+ADR-0012 governs `docs/state.md`, changed twice in this range (`cf205a57`, and the
+earlier `a15fe3ee` already covered by the entry below). Both are append-only
+additions at the top of the file. Its decision — one canonical versioned handover
+file, memory mirror-only — is untouched: nothing moved out of `state.md`, and no
+secondary source was introduced.
+
+ADR-0045 governs `specs/**`, implicated by three paths: a new design document
+(`design/agent-decision-journal-production-producer.md`), a new Critic review record
+(`evidence/pac11-critic-review-8be6c308.md`), and an edit to
+`evidence/acceptance-evidence-map.mjs`. All three sit in `design/` and `evidence/`,
+established subdirectories of the package that already hold many files of exactly
+these kinds. Recorded honestly rather than left implicit: none of the three is
+enumerated in the package's own `lifecycle.json` manifest, which lists 13 artifacts.
+That is consistent with existing practice (`design/class-b-multi-dispatch-plan.md`
+and `design/p-ac-06-clause-disposition-proposal.md` are likewise unlisted and
+tracked) and with the deliberate revert of the orphaned-artifact check in
+`cc43a182`, after the PO ruled both P-AC-06 clauses spec problems rather than code
+gaps. No ADR change follows from it; the standing divergence is already filed as
+`pipeline.adr-0045-topology-divergence-from-package-and-skill`.
+
+ADR-0056 is the one that genuinely moved, and `checked, no change needed` would have
+been false. It states in three places (`:175`, `:232`, `:248`) that the committed
+`trustAnchor` is a single key and is "unchanged and un-widened". The PO's `0d3d9bcc`
+migrated `project/critical-human-proof.json` to schema v3 with an **empty**
+`trustAnchors` set — the any-key posture — so the ADR described a state the
+repository no longer had. `2390e02f` appends a dated correction recording what
+changed, why (the anchor had been rotated to a key present on only one of the two
+machines, and pinning per-machine keys would have required a signature to obtain the
+ability to sign), what is and is not weakened (the detached proof stays; identity
+pinning goes; agents still cannot write the proof outside the repository root), and
+two operational consequences measured directly rather than assumed.
 
 - ADR-0012: checked, no change needed.
 
