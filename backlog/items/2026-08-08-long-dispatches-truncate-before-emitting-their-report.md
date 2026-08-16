@@ -383,3 +383,60 @@ the material already exists.
   template-fix `goldfish-deep` dispatch planned, not yet sent — held pending
   the concurrently-running Critic review clearing `evidence/*.json`.
 - **Date:** 2026-08-11
+
+### Update, 2026-08-16 — the fix landed the same day it was planned; status was stale
+
+Re-checked while triaging the PO's explicit "#5: don't defer, start the
+investigation now" instruction from this session's decision matrix. The
+"template-fix `goldfish-deep` dispatch planned, not yet sent" line above was
+already stale five days before being read: it landed the SAME day.
+`templates/prompts/goldfish-task.md` carries the full closing-allowance
+mechanism (`git log`: `ba4f0e0e9b69292aa49f7a2058ff6ed788c8b6f8`, 2026-08-11,
+"feat(templates): fund a closing allowance when a goldfish hits its tool
+budget" — base cap + 5 spendable-on-closing-only tool uses, structured
+handover report shape, record-created-first with a mandatory readback).
+`templates/prompts/critic-review.md` got the companion fix the same day
+(`9b66e401`, "feat(templates): give the critic dispatch a tool budget and a
+closing allowance"). **This item's primary design question (1) is therefore
+implemented, not merely planned** — leaving it open with a "not yet sent"
+line was itself an instance of the pattern this whole session has been
+correcting (stale backlog/status text understating shipped work; see also
+the `docs/adr/0062-...` correction the same session made for A2/A4).
+
+**What is genuinely still open, distinct from the shipped mechanism:**
+
+- **Question 2's "second, mechanistically distinct failure mode"
+  (2026-08-11 forensic-analysis section) has no fix at all.** A dispatch
+  that ends a COMPLETE, grammatical sentence announcing a deliberate pause
+  ("I'll stop polling now... to preserve the ~7 calls remaining...") and
+  then simply never resumes is not caught by the closing-allowance
+  mechanism, which only fires when the base cap is reached mid-work — this
+  failure mode stops voluntarily, with budget left, and there is no
+  transcript fragment to recognize as wrong-shaped. Not designed here.
+- **No calibration data yet on whether the shipped fix actually reduced the
+  truncation rate** post-2026-08-11 (the item's own "Measured frequency"
+  table stops at that date). This will accumulate naturally as sessions
+  dispatch goldfish/critic work rather than needing a dedicated run.
+- **A fresh, possibly-related data point from THIS session (2026-08-16):**
+  a forked verify.mjs run (`Agent` tool, `subagent_type: "fork"`, task-id
+  `ac10576e92f6de34a`) started `node harness/scripts/verify.mjs` in the
+  background and then ended its own turn with a placeholder result
+  ("Waiting for the background verify run to finish before compiling the
+  report") instead of blocking on it — a task-notification fired reporting
+  the fork "completed" with no real report. This is NOT the same shape as
+  either of the two failure modes above (not a mid-sentence cutoff, not an
+  announced-then-abandoned pause) — it looks like a third, distinct pattern:
+  an agent that starts its OWN nested `run_in_background` job and then
+  exits its turn without the harness reliably resuming it when that job
+  finishes. Recorded here as a new observation, not yet investigated —
+  worth a look if this pattern recurs, but one instance is not enough to
+  act on alone.
+
+**Revised status:** keep `open` (the two items above are real, unaddressed
+gaps), but the "Assignment" line above is superseded — there is no
+outstanding template-fix dispatch to send; that work is done and shipped.
+Next concrete step, if picked up again, is designing a fix for the
+announced-then-abandoned-pause failure mode, which needs its own dedicated
+thought (not a mechanical follow-on to the closing-allowance fix).
+
+- **Date:** 2026-08-16
