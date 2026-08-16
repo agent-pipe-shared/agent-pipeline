@@ -209,6 +209,7 @@
           "docs/adr/0062-production-execution-and-selected-sandbox-launch.md",
           "docs/adr/0063-repository-directory-contract.md",
           "docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md",
+          "docs/adr/0065-a-voided-gate-is-re-earned-from-declared-inputs.md",
           "docs/adr/README.md"
         ]
       },
