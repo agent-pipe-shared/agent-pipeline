@@ -47,7 +47,7 @@ something to do here without review.
 
 ## Entries
 
-## Candidate 2390e02f — 2026-08-16, range a15fe3ee..2390e02f, the P-AC-11 criterion arc, its Critic FAIL and fix cycle, and the PO's v3 trust-anchor migration
+## Candidate 2390e02f5a106b5ad13b072f7baf5176f8c322f6 — 2026-08-16, range a15fe3ee..2390e02f, the P-AC-11 criterion arc, its Critic FAIL and fix cycle, and the PO's v3 trust-anchor migration
 
 - ADR-0012: checked, no change needed.
 - ADR-0045: checked, no change needed.
