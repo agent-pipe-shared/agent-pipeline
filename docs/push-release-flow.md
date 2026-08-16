@@ -142,6 +142,25 @@ committed `project/critical-human-proof.json` → `trustAnchor.publicKeySha256`
 mismatch fails closed with `CRITICAL-PROOF-TRUST-ANCHOR-MISMATCH`; treat that
 error as the check, not a surprise.
 
+### Ordering rule — the handover commit comes BEFORE the signature (interim workflow measure)
+
+A signature binds one exact commit and tree (`--subject-sha256` is computed
+over `{sourceCommit, remote, destination, threatModel}`, and `approve-push`
+fails closed the instant the observed candidate's commit differs from what
+the signature covers, `gitCandidate(dir).commit !== head.commit`). The
+practical consequence: the handover/documentation commit for a release
+**MUST** land before Layers 2-3 run, and **nothing MUST be committed between
+signing and pushing** — including a documentation-only commit. Every commit
+after signing, however small, voids the approval and costs another signing
+ceremony (private key, passphrase, human ceremony, all over again).
+
+This is a workflow rule, not a mechanism, and it is explicitly labelled as an
+**interim measure**: the durable fix — an approval that survives a bounded,
+declared change (e.g. a documented-in-advance handover-only commit) — is a
+separate, unstarted design. Until that exists, sequence is the only
+protection: finalize everything that will be committed, commit it, THEN
+start Layer 2/3.
+
 ### Layer 4 — consume the proof into pipeline state (agent work)
 
 ```
