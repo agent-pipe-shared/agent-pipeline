@@ -261,6 +261,36 @@ seam (design pass done, `442036b3`; closes R-AC-08's producer half), then the
 `agent-decision` scoping step, then `E-AC-08` (7 of 8 detections pinned; outbox
 truncation needs a cross-state comparison the module has no capability for).
 
+### Closing gate run: 10 red steps this morning → 6, and one of the 6 is new — 2026-08-16
+
+A real `node harness/scripts/verify.mjs` run at `b8c1f662`, binding `exact`, exit 2,
+373 steps — the script-written artifact this session should have produced before the
+first Critic dispatch and did not. **6 red steps**, against 10 at `8a92d377`:
+
+- **4 unchanged, all one cause and all PO-signature-gated:** `artifact-topology-check`,
+  `threat-model-tests`, `pipeline-state-tests`, `external-reference-adapter-tests` — all
+  `FTP-ARTIFACT-2` on `specs/sprint-phoenix-epic/acceptance.md`'s stale manifest digest.
+- **1 unchanged, TP-7-gated:** `guard-testpath-override-tests` (OT09).
+- **1 NEW, and it is a direct consequence of the v3 migration:**
+  `critical-human-proof-policy-tests`. The failing case is `CHP13 this repository ships
+  the gate ON`, which asserts that reading this repository's own
+  `project/critical-human-proof.json` yields an enabled gate. The repository-local library
+  does not know schema v3 and returns `CRITICAL-PROOF-POLICY-INVALID`, so the assertion is
+  false. **Not a weakening** — invalid reads as refuse, so the gate is if anything
+  stricter — but the self-assertion no longer holds. 30 of 31 cases in that suite still
+  pass; only CHP13 fails.
+
+The fix for the new red is the v3 library port, which the PO deferred to the next 0.5.5
+candidate ("Du bekommst aber gleich vorab die passende version dann lokal"). Deliberately
+not attempted here. Note for whoever does it: the source is the library
+(`plugins/pipeline-core/lib/critical-human-proof-policy.mjs`, not TP-protected), **not**
+the test — `critical-human-proof-policy.test.mjs` is TP-9-protected and CHP13's assertion
+is correct as written.
+
+Net for the session: four red steps closed by agent-eligible work, one opened by a
+PO-executed migration whose fix is already scheduled, five that only a human signature or
+a plugin version can clear.
+
 ---
 
 ## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
