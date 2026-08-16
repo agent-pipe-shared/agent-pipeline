@@ -47,6 +47,17 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 707129812a4f09a70ba727087544f28f34e80638 — 2026-08-16, range 2390e02f..70712981, the closing gate run recorded in the handover
+
+- ADR-0012: checked, no change needed.
+
+The only `Governs:`-listed path in this range is `docs/state.md`, appended once with
+the closing `verify.mjs` result. ADR-0012's decision — one canonical versioned
+handover file, memory mirror-only, the open-items block referenced rather than
+hand-maintained — is untouched. The other commit in the range
+(`fix(reconciliation): use the full commit SHA …`) edits this record file, which no
+ADR governs.
+
 ## Candidate 2390e02f5a106b5ad13b072f7baf5176f8c322f6 — 2026-08-16, range a15fe3ee..2390e02f, the P-AC-11 criterion arc, its Critic FAIL and fix cycle, and the PO's v3 trust-anchor migration
 
 - ADR-0012: checked, no change needed.
