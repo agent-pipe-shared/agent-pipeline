@@ -47,6 +47,29 @@ something to do here without review.
 
 ## Entries
 
+## Candidate a15fe3ee4e00c94b5155bf714b9b17d358a55c8a — 2026-08-16, range 8a92d377..a15fe3ee, four agent-eligible red Verify steps closed + the trust-anchor blocker recorded
+
+- ADR-0012: checked, no change needed.
+
+Covers five commits. Only two touch a `Governs:`-listed path, both `docs/state.md`
+under ADR-0012: `ae229923` (de-links a dead ADR-0061 Markdown link on one line;
+link mechanics only, no assertion in the file altered) and `a15fe3ee` (a new
+append-only checkpoint section at the top, plus the `Last updated` line). ADR-0012's
+decision — one canonical versioned handover file, memory mirror-only — is unaffected:
+`docs/state.md` remains the single handover, nothing was moved out of it, and no
+secondary source was introduced.
+
+The other three commits touch no governed path. `144db6ae` is `backlog/**` (items,
+evidence, and the three machine-written ledger projections), `7a2f6fce` is
+`docs/product-capability-inventory.json`, and `2724e234` is `docs/push-release-flow.md`
+plus one `backlog/items/` file. None of those paths appears in any ADR's `Governs:`
+line — checked directly against all five ADRs that carry one (0012, 0040, 0045, 0056,
+0058), not assumed from the checker's silence. ADR-0045 (`specs/**`) is specifically
+not implicated: no `specs/` path changed in this range, because the one dispatch
+record destined for `specs/sprint-phoenix-epic/evidence/` could not be committed —
+`evidence/` is gitignored, and the dispatch correctly declined to force-add against
+that stated repository policy rather than ship an out-of-scope exception.
+
 ## Candidate 988183e83501fa6c2c46975ce8d0af9a07383379 — 2026-08-12, range 945f9989..988183e8, push ceremony ADR-0061 skew + red-Verify block recorded
 
 - ADR-0012: checked, no change needed.
