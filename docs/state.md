@@ -7204,6 +7204,24 @@ Re-review of the fixed candidate dispatched: preflight (`15cf0e58..bf8803ed`) �
 5. **The two large architectural items** (`every-gate-binds-the-whole-tree`, `nothing-connects-an-acceptance-criterion`) — both filed fresh THIS session from live PO observations, not stale carried-forward claims (unlike the four corrected above), both explicitly self-scope as "Direction, not a design," both touch Design-tier/Critic-mandatory surface. Correctly deferred, not re-litigated.
 6. **No push.** 20 local commits since the last push (`2eb4466c`) — see the sequence above plus `a3197af3` (doc-governance fix), `965f9957` (R3 exercise), `c833deb4` (R4 correction). Stay local until the PO clears the next push explicitly.
 
+## 2026-08-16 (continued, part 3) — new local 0.5.5 candidate stamped: `79ddc997`
+
+**Candidate `79ddc997`, tree `fed653f7061b2a553422cccb59566acd02580e62`.** Verify 269/269 exit 0 and Security exit 0 (`gitleaks`/`semgrep`/`license-check` all `OK`, `osv-scanner` correctly `SKIPPED` — no package sources in this project), both `clean` and exactly bound to this candidate's commit and tree, run back to back against a clean tree at the very end of this AFK block specifically to stamp this candidate (not reused from an earlier run against a different commit).
+
+**Scope, same PO decision as the last candidate:** this remains a **local test candidate, not a release** — the same basis `2940443f`/`2eb4466c` recorded above still applies (no §1.1 claim, release preflight not run against a build-cachebuster-carrying local build).
+
+**Everything folded into this candidate since `2eb4466c` (the last pushed/stamped point), in order — this whole AFK block, 20 commits:** `6cefbe8e`, `3e27d99c`, `393aff93` (GMW bug filed), `c37f35e5` (three 2026-08-16 items triaged), `15cf0e58`→`d16c7345` (NVA-LEDGERCUTOFF-2, NVA-GUARDALLOW-1 first landing) — then this session's own continuation: `e2e612c7` (Phoenix GMW-reconcile item filed), `6ed531a8` (ADR-0062 correction for #1/#2), `a67c3100` (#5 status correction), `03a685e8` (two architectural items triaged-deferred), `c89e1469`+`f377b3f4`+`c7048ed4`+`b858a28e`+`79ddc997`... — see the full per-commit narrative in the sections above for what each one is; in short: two Critic-reviewed fixes (`NVA-GUARDALLOW-1`/`NVA-CRITICFIX-1`, PASS on re-review), one proposed ADR (`0064`, release-preflight consent), one governance-registry fix (doc-contract), one real exercise of `#98`'s R3 with sealed evidence, and four corrected stale-status claims (`#1`/`#2`, `#5`, `#98` R4) that turned out to already be done — each verified against real code/tests before being marked corrected, not assumed.
+
+**What this candidate does NOT close, named explicitly so this stamp isn't mistaken for "Nova A finished":**
+- Nova A's `#56`/`#98` rows stay `Partially implemented; not evidenced/closed` — real PO consent (blocked on ADR-0064 acceptance) and a zero-findings release-path Critic pass are still missing for actual publication authorization; this candidate narrows those gaps (R3/R4 corrected/exercised) without closing them.
+- ADR-0064 stays `proposed`.
+- The GMW v3-trust-anchor bug stays unfixed (kernel-protected file).
+- `#98` R6 (integrated fixture) is not built.
+- The two large architectural backlog items stay deferred to a dedicated design round.
+- `NVA-VERIFYDUR-1` (verify.mjs per-suite duration) stays blocked on the GMW bug.
+
+**Still open, deliberately, exactly as `2940443f` was:** the push. No approval has been prepared or recorded against `79ddc997`; per the standing AFK instruction, no push and no other PO-touching action happens until the PO clears it explicitly.
+
 ## Re-entry
 
 1. Maintainers start with [`CLAUDE.md`](../CLAUDE.md).
