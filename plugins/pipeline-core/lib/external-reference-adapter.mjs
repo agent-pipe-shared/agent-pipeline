@@ -3,7 +3,7 @@
 import { FEATURE_CLASSES, FEATURE_STATES } from "./feature-package-topology.mjs";
 import { canonicalSha256 } from "./governance-event.mjs";
 
-const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u; const SHA = /^[a-f0-9]{64}$/u;
+export const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u; const SHA = /^[a-f0-9]{64}$/u;
 const CLASSES = new Set(["issue-tracker", "knowledge-base", "document-store", "forge"]); const DOCUMENT_CLASSES = new Set(["architecture", "operations", "security", "privacy", "continuity", "recovery", "release", "change-management"]); const RELATIONS = new Set(["tracks", "specifies", "implements", "documents", "mirrors", "reviews", "evidences", "releases", "supersedes", "relates-to", "evidence-for", "published-from"]); const DIRECTIONS = new Set(["pipeline-to-external", "external-observation-only", "independent"]); const MODES = new Set(["reference-only", "projection", "controlled-publication"]); const OWNERSHIP = new Set(["pipeline-owned", "external-owned", "projection-only", "independently-maintained", "unsupported"]); const FRESHNESS = new Set(["fresh", "stale", "deleted", "moved", "merged", "duplicated", "inaccessible", "out-of-order"]); const OPERATIONS = new Set(["inspect", "preview", "apply", "readback", "reconcile"]);
 function fail(code, message = "External reference operation is invalid.") { const error = new Error(message); error.code = code; throw error; }
 function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
@@ -71,7 +71,16 @@ export async function planExternalReferenceWrite({ reference, capabilities, desi
     // this document class. A declared list (even empty) is a real restriction;
     // an undeclared field is neutral -- same declared-vs-undeclared precedent
     // mode/targetBinding already established above.
-    if (Object.hasOwn(entry, "ownedSections") && desired.changes.some((change) => !entry.ownedSections.includes(change.field))) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-owned-sections", plan: null });
+    // F4: this gate must hold the same posture as :64's documentClasses
+    // coercion -- a caller-supplied ownedSections whose runtime shape is not
+    // actually an array (a bare string, null, etc.) is never trusted as the
+    // real list; it is treated as the strictest declared value (empty),
+    // which rejects every change, instead of degrading `.includes()` into a
+    // substring test or throwing a raw TypeError out of a typed API.
+    if (Object.hasOwn(entry, "ownedSections")) {
+      const ownedSections = Array.isArray(entry.ownedSections) ? entry.ownedSections : [];
+      if (desired.changes.some((change) => !ownedSections.includes(change.field))) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-owned-sections", plan: null });
+    }
   }
   // X-AC-10: the canonical identity is resolved before any external contact, so
   // an unresolvable or ambiguous artifact never reaches the provider at all.

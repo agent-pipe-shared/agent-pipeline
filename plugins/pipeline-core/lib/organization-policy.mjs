@@ -17,13 +17,47 @@ const SIGNATURE_ALGORITHMS = new Set(["ed25519", "none"]);
 // target -- any other shape (missing sub-field, extra field, wrong type,
 // unknown targetClass) is rejected exactly like every other closed field.
 const TARGET_CLASSES = new Set(["artifact", "repository-path-pattern", "external-system"]); export const TARGET_REF = /^[a-z][a-z0-9-]{2,63}$/u;
+// F1 fix: ownedSections values name external-reference-adapter.mjs's own
+// changes[].field values (validated there by its own ID pattern), NOT
+// targetRef-shaped pack-level identifiers -- they are a different scoping
+// dimension with a different legal character set (field names commonly carry
+// uppercase letters, '.', '_', ':', and a leading digit, none of which
+// TARGET_REF's slug shape admits). This file deliberately does not import
+// from external-reference-adapter.mjs (wrong dependency direction: the
+// policy model is the lower layer), so this pattern is a duplicate of that
+// file's ID pattern, pinned equal by a test in organization-policy.test.mjs
+// that fails if either one narrows and silently reopens the gap. The
+// character set is purely structural (case/punctuation/length), so widening
+// it admits no provider, vendor, or product name.
+export const OWNED_SECTION_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u;
 // WP-PAC11: the five remaining P-AC-11 scoping dimensions (owned
 // fields/sections, lifecycle event, preview, retention, conflict policy),
 // each OPTIONAL and closed, following targetBinding's own precedent exactly.
 // lifecycleEvents reuses the epic's OWN canonical lifecycle-state vocabulary
 // verbatim (acceptance.md V-AC-08: "proposed, active, completed, superseded,
 // abandoned, or retained") rather than inventing a parallel one.
-const LIFECYCLE_EVENTS = new Set(["proposed", "active", "completed", "superseded", "abandoned", "retained"]);
+//
+// F2 fix: this vocabulary is NOT disjoint from feature-package-topology.mjs's
+// FEATURE_STATES -- four values are shared verbatim (completed, superseded,
+// abandoned, retained; pinned in organization-policy.test.mjs so neither
+// claim can drift silently again). The true reason external-reference-
+// adapter.mjs still does not enforce lifecycleEvents against an artifact's
+// binding.identity.lifecycleState is that the two vocabularies describe two
+// different lifecycle AUTHORITIES, not one shared authority with gaps:
+// LIFECYCLE_EVENTS is the epic's own V-AC-08 publication-event vocabulary
+// (WHEN, in the epic's governance process, a publication event happens),
+// while FEATURE_STATES is a feature package's OWN build/implementation
+// lifecycle (plan-spec-state-v2.mjs's draft through implementing, plus
+// verifying). Mapping every one of those build-phase states (draft,
+// awaiting-approval, approved, implementing, verifying -- none of which
+// lifecycleEvents can even represent) onto a publication-event decision is a
+// product policy call this file has no authority to invent; wiring it in
+// without that call would silently re-create F1's same unreachable-value
+// defect one level up. lifecycleEvents therefore stays declared-but-
+// unenforced here, the same posture this file already gives previewRequired
+// and conflictPolicy, until a dispatch with that authority defines the
+// mapping (tracked as a checklist gap, not resolved by this comment).
+export const LIFECYCLE_EVENTS = new Set(["proposed", "active", "completed", "superseded", "abandoned", "retained"]);
 // retention is deliberately a closed set of CATEGORICAL commitments, never a
 // concrete duration/period: a literal "N days/years" value would be
 // inventing a legal/product retention-schedule decision this dispatch has no
@@ -62,7 +96,7 @@ function sameTargetBinding(left, right) { if (left === undefined && right === un
 // LIFECYCLE_EVENTS values; both close the "no free-form prose" requirement
 // the same way targetBinding does for a single reference.
 function validIdArray(value, { isMember, maxLength }) { if (!Array.isArray(value) || value.length > maxLength) return false; const seen = new Set(); for (const item of value) { if (!isMember(item) || seen.has(item)) return false; seen.add(item); } return true; }
-function validOwnedSections(value) { return validIdArray(value, { isMember: (item) => typeof item === "string" && TARGET_REF.test(item), maxLength: 32 }); }
+function validOwnedSections(value) { return validIdArray(value, { isMember: (item) => typeof item === "string" && OWNED_SECTION_REF.test(item), maxLength: 32 }); }
 function validLifecycleEvents(value) { return validIdArray(value, { isMember: (item) => LIFECYCLE_EVENTS.has(item), maxLength: LIFECYCLE_EVENTS.size }); }
 // WP-PAC11: the closed key set grows by exactly the optional dimensions THIS
 // entry itself declares (Object.hasOwn) -- same technique packKeys already

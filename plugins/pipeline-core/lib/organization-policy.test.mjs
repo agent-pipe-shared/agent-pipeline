@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict"; import test from "node:test";
-import { OrganizationPolicyError, resolveEffectiveOrganizationPolicy, validateOrganizationPolicyPack } from "./organization-policy.mjs";
+import { ID } from "./external-reference-adapter.mjs";
+import { FEATURE_STATES } from "./feature-package-topology.mjs";
+import { LIFECYCLE_EVENTS, OrganizationPolicyError, OWNED_SECTION_REF, resolveEffectiveOrganizationPolicy, validateOrganizationPolicyPack } from "./organization-policy.mjs";
 // WP-P-AC11: targetBinding is an OPTIONAL closed field (see
 // organization-policy.mjs); this fixture default declares one so most tests
 // below exercise the scoped path, and dedicated tests cover omission,
@@ -211,6 +213,39 @@ test("P-AC-11 accepts a closed lifecycleEvents declaration and rejects a non-clo
     pack({ documentClasses: [{ ...pack().documentClasses[0], lifecycleEvents: "active" }] }),
   ];
   for (const value of malformed) assert.throws(() => validateOrganizationPolicyPack(value, { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
+});
+// F1: ownedSections must admit exactly the value domain
+// external-reference-adapter.mjs's own ID pattern already accepts for
+// changes[].field (uppercase letters, '.', '_', ':', a leading digit, and
+// lengths TARGET_REF's slug shape would have excluded) -- otherwise a
+// document class can never declare ownership of a legal field name and every
+// such write is permanently unrepresentable in policy.
+test("F1 admits ownedSections field names outside TARGET_REF's slug shape that external-reference-adapter.mjs's changes[].field domain already accepts", () => {
+  for (const fieldName of ["customfield_10001", "body.storage", "lifecycleState", "id", "a:b", "9x", "a".repeat(200)]) {
+    const accepted = validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], ownedSections: [fieldName] }] }), { coreVersion: "0.4.7" });
+    assert.deepEqual(accepted.documentClasses[0].ownedSections, [fieldName], fieldName);
+  }
+});
+// F1: pins ownedSections' value domain to exactly external-reference-
+// adapter.mjs's own ID pattern for changes[].field, so a future narrowing of
+// either one (this file must not import the other -- see organization-
+// policy.mjs's own comment) fails this test loudly instead of silently
+// re-creating the gap the two regexes previously left.
+test("F1 pins ownedSections' value domain equal to external-reference-adapter.mjs's changes[].field domain", () => {
+  assert.equal(OWNED_SECTION_REF.source, ID.source);
+  assert.equal(OWNED_SECTION_REF.flags, ID.flags);
+});
+// F2: pins the true relationship between lifecycleEvents and
+// feature-package-topology's FEATURE_STATES -- NOT disjoint (four terminal
+// values shared verbatim), but the non-shared states on each side (the
+// epic's own proposed/active, and the feature package's own pre-terminal
+// build-phase states) stay explicitly, provably non-shared. Fails loudly if
+// either vocabulary changes without this relationship being re-examined.
+test("F2 pins lifecycleEvents' overlap and non-overlap with feature-package-topology's FEATURE_STATES", () => {
+  const events = [...LIFECYCLE_EVENTS];
+  assert.deepEqual(events.filter((value) => FEATURE_STATES.includes(value)).sort(), ["abandoned", "completed", "retained", "superseded"]);
+  assert.deepEqual(events.filter((value) => !FEATURE_STATES.includes(value)).sort(), ["active", "proposed"]);
+  assert.deepEqual([...FEATURE_STATES].filter((value) => !events.includes(value)).sort(), ["approved", "awaiting-approval", "draft", "implementing", "verifying"]);
 });
 // WP-PAC11: lifecycleEvents shares ownedSections' genuine subset lattice, so
 // it merges the same safe-intersection way instead of mode/targetBinding's

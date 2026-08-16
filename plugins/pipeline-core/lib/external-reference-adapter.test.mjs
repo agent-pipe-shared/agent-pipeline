@@ -292,6 +292,22 @@ test("WP-PAC11 leaves an undeclared ownedSections neutral, unlike a declared-but
   assert.equal(blocked.status, "rejected"); assert.equal(blocked.reason, "policy-owned-sections");
 });
 
+// F4: planExternalReferenceWrite deliberately does not trust the
+// caller-supplied policy shape elsewhere (:64 coerces a non-array
+// documentClasses to []); the ownedSections gate must hold the same posture
+// instead of degrading a bare string into a substring test or throwing a raw
+// TypeError out of an API whose every other failure is a typed rejection.
+test("F4 does not degrade ownedSections into a substring test when a hand-built policy declares it as a bare string", async () => {
+  const stringOwned = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, ownedSections: "summary", packIds: ["security-baseline"] }]);
+  const desiredNarrow = { requestId: "publish-42", changes: [{ field: "sum", valueSha256: "b".repeat(64), ownership: "pipeline-owned" }] };
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired: desiredNarrow, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: stringOwned });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-owned-sections");
+});
+test("F4 does not throw a raw TypeError when a hand-built policy declares ownedSections as null", async () => {
+  const nullOwned = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, ownedSections: null, packIds: ["security-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: nullOwned });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-owned-sections");
+});
 test("X-AC-11 never consults organization policy for an ungoverned reference, even when one is supplied", async () => {
   const invalidPolicy = { not: "a valid effective policy" };
   const withPolicy = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: invalidPolicy });
