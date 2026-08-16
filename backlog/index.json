@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c180b13a419e0f9486866c8f2fa68f18bf667aacec27beb88ed5a65a6d08c730"
+    "transitionHead": "b74643798ff95182d144d36968332a5ce2f2eafa7c9d7d8c2608b96df7f09a3f"
   },
   "counts": {
-    "open": 96,
+    "open": 97,
     "in_progress": 22,
     "closed": 93
   },
@@ -690,6 +690,14 @@
       "owner": "pipeline",
       "created": "2026-08-16",
       "source": "Live GMW ceremony during the Nova A AFK-session bootstrap, this session (2026-08-16) -- guard-maintenance-window.mjs install wrote a well-formed, correctly-signed window record, but the immediate re-read (and every subsequent status/guard check) reported absent."
+    },
+    {
+      "id": "pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-16",
+      "source": "PO, 2026-08-16, observed live in agent-pipeline-share_phoenix: after po-human-approval.mjs sign-intent succeeded (PO-HUMAN-SIGN-INTENT-READY) and the GMW window was active, the session still asked the PO to manually run two `cp` commands to move scratch/reconcile-request-*.json and scratch/reconcile-proof-*.json into the external PO directory. PO: 'dass man nach der freigabe noch mal was von hand kopieren muss sollte auch nicht sein' (having to manually copy something again after the approval shouldn't be necessary either)."
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time",
