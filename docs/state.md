@@ -7039,6 +7039,69 @@ The intake implementation consists of a closed repository Issue Form, the
 preview/confirmation, GitHub creation and readback. Required labels still have
 to be created on GitHub before publication.
 
+## 2026-08-16 — the 0.5.5 local test candidate, two Critic rounds, push pending
+
+**Candidate `2940443f`, tree `fa526baa`.** Verify 269/269 exit 0 and Security
+exit 0, both `clean` at start and finish and bound to that exact commit and
+tree. Authorship across the whole range is PASS or the sanctioned
+`elephant-direct-declared` form; the only `UNVERIFIABLE` entries are five
+pre-trailer commits that cannot be corrected because history may not be
+rewritten, dispositioned in
+[`release-scope-nova-interim-candidate.md`](release-scope-nova-interim-candidate.md).
+
+**Scope, PO decision:** this build is a **local test candidate, not a
+release**. It therefore does not claim spec §1.1 satisfaction, and the release
+preflight §1.1 lists is deliberately not run — a preflight against a candidate
+records `blocked` by construction, because the two runner manifests carry a
+build cachebuster `VERSION` does not. The release-scope record says so in its
+own opening rather than quoting §1.1 as satisfied.
+
+**Round 1 (candidate `0e9f82fb`) returned FAIL with one blocker.**
+`project/critical-human-proof.json` had been migrated to the v3 multi-anchor
+schema with an EMPTY `trustAnchors` set, which the policy library defines as
+"any well-formed key may sign" — removing the property GIT-04 cites as the
+whole reason a signature may replace a typed human confirmation. Measured
+cause: the previously pinned anchor `a3a43c4b…` is the key created on the
+OTHER machine on 2026-08-11, while this machine holds `f28988b2…`; pinning the
+stale value would have refused every push the PO can actually sign, which is
+why an empty set had looked like the only option. Resolved by pinning the key
+this machine actually holds (`3475322b`, PO-applied — GS-2 refuses that path to
+every agent). A second machine's key is added as an ADDITIONAL anchor, never a
+replacement.
+
+**Round 2 was a delta review** over the nine commits since `0e9f82fb` and also
+returned FAIL — three major, one minor, all documentation accuracy, none
+touching the push mechanism. All four are closed: the `NVA-STAMP-2` record
+gained the machine-readable `changedFiles` its commit needed; the register's
+two key-digest entries carry an explicit machine-identity note (they were
+never contradictory, only ambiguous about which machine each was written
+from); the release-scope record stopped claiming §1.1; and `guardrails/git.md`
+GIT-04 now names `guard-push.mjs` rather than `GG-03` as the layer that
+actually enforces approval for an ordinary branch push. The two-round cap is
+reached — this rework was self-verified, not sent to a third Critic.
+
+**Still open, deliberately.** The push itself. The candidate is installed
+locally on both targets from the separate `agent-pipeline-local` marketplace
+root; the push is to run as a live test of the flow after a session restart,
+on WSL so the repository path does not change mid-ceremony. It needs an
+approval recorded against `2940443f` and the signature ceremony in
+[`push-release-flow.md`](push-release-flow.md).
+
+**Two measurements worth carrying, both now filed as backlog items.** Verify
+holds 269 registered suites and its evidence artifact records no per-suite
+duration, so its growth is unbounded AND invisible. And every gate binds the
+whole tree rather than its declared inputs, so any following commit voids it —
+which is what forces one-committer-at-a-time and what made this candidate cost
+over an hour of wall clock. The two share one lever: per-gate declared inputs.
+
+**One concrete instance of that cost, fixed here.** `project/resume-hint.json`
+was tracked while `.gitignore` listed it, so the ignore rule was inert. Because
+`verify.mjs` rejects a dirty tree at preflight, capturing the resume-hint card
+— which the bootstrap protocol REQUIRES before a restart — made the next verify
+run unusable (`"binding": "preflight-rejected"`, observed). The two mandatory
+steps were mutually exclusive. `2940443f` untracks the file; it stays on disk
+where the next session reads it.
+
 ## Re-entry
 
 1. Maintainers start with [`CLAUDE.md`](../CLAUDE.md).
