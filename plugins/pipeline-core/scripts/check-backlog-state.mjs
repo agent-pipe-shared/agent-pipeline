@@ -15,12 +15,14 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import {
+  BACKLOG_FINDING_SEVERITY,
   INDEX_SCHEMA,
   ITEM_SCHEMA,
   SENTINEL_RECOVERY_CATALOG_SCHEMA,
   TRANSITION_SCHEMA,
   TRANSITION_V2_SCHEMA,
   canonicalJson,
+  classifyBacklogFindings,
   parseBacklogItem,
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
@@ -266,11 +268,16 @@ function localCommitExists(root, oid) {
  * Sentinel-recovery, PO-license-disposition, close-retro, scope-extension,
  * and Windows-containment follow-on events) cite evidence commits that do
  * not exist as reachable objects in this repository — almost certainly lost
- * in the sanctioned 2026-08-01 history rewrite. PO decision 2026-08-12
- * (Option 1 of
- * backlog/items/2026-08-11-backlog-ledger-baseline-migration-commit-unreachable.md):
- * accept and document these as pinned, narrowly-keyed exceptions rather than
- * re-flagging them every Verify run.
+ * in the sanctioned 2026-08-01 history rewrite.
+ *
+ * NVA-LEDGER-B (2026-08-16) changed what this table DOES: `evidence.commit is
+ * not a reachable local Git commit` is now classified DRIFT (never blocking)
+ * for every ledger event, known or not — see BACKLOG_FINDING_SEVERITY and
+ * classifyBacklogFindings in ../lib/backlog-state.mjs, which decide pass/fail
+ * on their own. This table's only remaining job is to LABEL a drift finding
+ * as belonging to this previously-diagnosed historical batch (`knownHistoricalBatch:
+ * true` on the returned drift entry) versus a brand-new unreachable commit
+ * nobody has triaged yet (`false`). It no longer decides the exit code.
  *
  * NOTE: the source backlog item's own original diagnosis claimed a single
  * evidence.commit shared by all 38 events. Reading the ledger directly (this
@@ -285,27 +292,26 @@ function localCommitExists(root, oid) {
  *   - sequence 37:     e21933be... / pipeline                 / sentinel-windows-containment
  *   - sequence 38:     e21933be... / pipeline                 / sentinel-windows-containment-closure
  * (the last two share one commit under two different kinds — direct proof
- * the exception below keys on the full triple, never the commit alone).
+ * the label below keys on the full triple, never the commit alone).
  * NVA-BLDRIFT-01 (2026-08-12) pinned only the first triple and explicitly
  * scoped the remaining seven out as future work; NVA-BLDRIFT-02 (2026-08-16)
- * closes that scope and corrects the source item's own Description/Proposal
+ * closed that scope and corrected the source item's own Description/Proposal
  * to match this composition.
  *
- * This is deliberately NOT a blanket waiver for any `evidence.kind`, actor,
- * or commit value alone: only an event whose commit/actor/kind ALL match one
- * of these eight exact triples is excepted. A future event citing any other
- * unreachable commit still fails exactly as before.
+ * This is deliberately NOT a blanket label for any `evidence.kind`, actor, or
+ * commit value alone: only an event whose commit/actor/kind ALL match one of
+ * these eight exact triples is labelled known. A future event citing any
+ * other unreachable commit is still DRIFT (per the table above) but is
+ * labelled unknown, i.e. worth fresh triage.
  *
  * QG-06 disclosure (guardrails/quality-gates.md): owner is the PO (2026-08-12
- * decision on the source item, reaffirmed by the NVA-BLDRIFT-02 dispatch that
- * closed the remaining scope on 2026-08-16). This is permanent historical
- * drift with no expiry: the cited commit objects were lost in the 2026-08-01
- * history rewrite, and the ledger's append-only design forbids ever
- * repointing sequences 1-38 at a different evidence.commit — there is no
- * future event at which this exception could be promoted to blocking or
- * retired. (The pre-NVA-BLDRIFT-02 comment for the first triple alone carried
- * the owner attribution but no explicit expiry-or-permanence statement; this
- * paragraph closes that gap for the full set going forward.)
+ * decision on the source item, reaffirmed by NVA-BLDRIFT-02 on 2026-08-16 and
+ * by NVA-LEDGER-B on 2026-08-16, which is the change that stopped this table
+ * from deciding blocking/non-blocking). Permanent, no expiry: the cited
+ * commit objects were lost in the 2026-08-01 history rewrite, and the
+ * ledger's append-only design forbids ever repointing sequences 1-38 at a
+ * different evidence.commit — there is no future event at which this label
+ * could be retired.
  */
 const KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS = Object.freeze([
   { commit: "933e1a8d17d6c7bed040d13f8fccca2511fff9dc", actor: "backlog-migration", kind: "baseline-migration" },
@@ -320,23 +326,23 @@ const KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS = Object.freeze([
 const UNREACHABLE_COMMIT_FINDING = /^ledger event (\d+): evidence\.commit is not a reachable local Git commit$/u;
 
 /**
- * Drop exactly the "unreachable evidence.commit" findings produced for the
- * known 2026-07-19..2026-07-22 historical batch. Never keyed off the finding
- * text alone — each candidate finding is re-checked against the actual event
- * data (commit, actor, evidence.kind) before it is dropped, so an unrelated
- * unreachable evidence commit (any other value, or a known commit under a
- * different actor/kind) still fails.
+ * Label (never filter) exactly the "unreachable evidence.commit" DRIFT
+ * findings produced for the known 2026-07-19..2026-07-22 historical batch.
+ * Severity itself is already decided by classifyBacklogFindings; this only
+ * says whether a given drift finding is a member of the previously-diagnosed
+ * batch. Never keyed off the finding text alone — each candidate finding is
+ * re-checked against the actual event data (commit, actor, evidence.kind)
+ * before it is labelled known, so an unrelated unreachable evidence commit
+ * (any other value, or a known commit under a different actor/kind) is
+ * labelled unknown and still worth fresh triage.
  */
-function filterKnownUnreachableHistoricalLedgerFindings(findings, events) {
-  return findings.filter((finding) => {
-    const match = UNREACHABLE_COMMIT_FINDING.exec(finding);
-    if (!match) return true;
-    const event = events[Number(match[1]) - 1];
-    const isKnownHistoricalException = KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS.some((known) => event?.actor === known.actor
-      && event?.evidence?.kind === known.kind
-      && event?.evidence?.commit === known.commit);
-    return !isKnownHistoricalException;
-  });
+function isKnownHistoricalUnreachableFinding(finding, events) {
+  const match = UNREACHABLE_COMMIT_FINDING.exec(finding);
+  if (!match) return false;
+  const event = events[Number(match[1]) - 1];
+  return KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS.some((known) => event?.actor === known.actor
+    && event?.evidence?.kind === known.kind
+    && event?.evidence?.commit === known.commit);
 }
 
 export function reachabilityAmendmentFindings(root, event) {
@@ -546,9 +552,20 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
     }
   }
 
-  const filteredFindings = filterKnownUnreachableHistoricalLedgerFindings(findings, ledger.events);
-  const projection = filteredFindings.length === 0 ? projectBacklog(items, ledger.events) : null;
-  return { ok: filteredFindings.length === 0, findings: filteredFindings, items, events: ledger.events, projection };
+  // The gate rejects bad WRITES, not the past: a finding about an already-
+  // appended, unfixable-by-construction ledger event is DRIFT (reported,
+  // never blocking); only classifyBacklogFindings decides which finding that
+  // is. `findings`/`ok` below therefore reflect BLOCKING (integrity) findings
+  // only — drift is a separate, still-visible field, never silently dropped.
+  const classified = classifyBacklogFindings(findings, { events: ledger.events });
+  const blockingFindings = classified
+    .filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.INTEGRITY)
+    .map((entry) => entry.finding);
+  const driftFindings = classified
+    .filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.DRIFT)
+    .map((entry) => ({ finding: entry.finding, knownHistoricalBatch: isKnownHistoricalUnreachableFinding(entry.finding, ledger.events) }));
+  const projection = blockingFindings.length === 0 ? projectBacklog(items, ledger.events) : null;
+  return { ok: blockingFindings.length === 0, findings: blockingFindings, drift: driftFindings, items, events: ledger.events, projection };
 }
 
 /** Detect checked-in generated projection drift. */
@@ -938,6 +955,11 @@ function cli() {
     process.exit(2);
   }
   const result = write ? writeBacklogProjections() : checkBacklogState();
+  // Drift is reported unconditionally — whether the run is otherwise green or
+  // not — so it is never silently swallowed just because it does not block.
+  for (const entry of result.drift ?? []) {
+    console.error(`DRIFT backlog state: ${entry.finding}${entry.knownHistoricalBatch ? " (known 2026-07-19..2026-07-22 historical batch)" : ""}`);
+  }
   if (!result.ok) {
     for (const finding of result.findings) console.error(`FAIL backlog state: ${finding}`);
     process.exit(2);

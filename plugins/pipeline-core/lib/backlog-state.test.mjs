@@ -8,12 +8,14 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 import {
+  BACKLOG_FINDING_SEVERITY,
   EVIDENCE_AMENDMENT_SCHEMA,
   ITEM_SCHEMA,
   PROJECT_CLOSURE_READBACK_SCHEMA,
   TRANSITION_SCHEMA,
   TRANSITION_V2_SCHEMA,
   canonicalJson,
+  classifyBacklogFindings,
   parseBacklogItem,
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
@@ -1114,6 +1116,41 @@ function managedRepairInput(root, overrides = {}) {
       && !rejectedReplay.ok
       && rejectedReplay.errors.some((error) => error.includes("already appended")),
     [...planned.errors, ...rejectedReplay.errors].join("; "));
+}
+
+{
+  // D4: a finding this table does not recognise defaults to INTEGRITY
+  // (fail-closed), never DRIFT.
+  const unclassified = classifyBacklogFindings(["items: pipeline.example some entirely made-up finding text"]);
+  check("BS25 (D4) an unrecognised finding defaults to INTEGRITY, never DRIFT",
+    unclassified.length === 1
+      && unclassified[0].severity === BACKLOG_FINDING_SEVERITY.INTEGRITY,
+    JSON.stringify(unclassified));
+}
+{
+  // Direct unit coverage of the two DRIFT patterns and the "caused by" link
+  // between a ledger event's drifted evidence.commit and the item-level
+  // closure_commit cross-check finding it produces — the exact real-world
+  // shape of backlog/transitions.ndjson event 403.
+  const events = [
+    { id: "pipeline.example", sequence: 1, evidence: { commit: "181b7730" } },
+  ];
+  const shortHashFindings = [
+    "ledger event 1: evidence.commit must be a full lowercase Git commit OID",
+    "items: pipeline.example closure_commit must equal its final ledger evidence.commit",
+  ];
+  const classifiedShortHash = classifyBacklogFindings(shortHashFindings, { events });
+  const unrelatedMismatchFindings = [
+    // No matching "ledger event 1: evidence.commit ..." drift finding present —
+    // this cross-check is NOT caused by a drifted evidence.commit, so it must
+    // stay INTEGRITY: a plausible signature of real tampering.
+    "items: pipeline.example closure_commit must equal its final ledger evidence.commit",
+  ];
+  const classifiedUnrelated = classifyBacklogFindings(unrelatedMismatchFindings, { events });
+  check("BS26 evidence.commit format/reachability findings are DRIFT, and a closure_commit cross-check inherits DRIFT only when caused by that same event's drifted evidence.commit",
+    classifiedShortHash.every((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.DRIFT)
+      && classifiedUnrelated[0].severity === BACKLOG_FINDING_SEVERITY.INTEGRITY,
+    `${JSON.stringify(classifiedShortHash)} / ${JSON.stringify(classifiedUnrelated)}`);
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

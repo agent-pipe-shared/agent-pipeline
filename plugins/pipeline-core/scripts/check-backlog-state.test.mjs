@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -122,9 +122,17 @@ try {
     assert.equal(written.wrote, true);
     const after = checkBacklogState(base);
     assert.equal(after.ok, true, after.findings.join("; "));
+    assert.equal(after.drift.find((entry) => entry.finding.includes("ledger event 1"))?.knownHistoricalBatch, true);
   });
 
-  check("CBS02 an unrelated unreachable evidence commit still fails — never a blanket waiver", () => {
+  // CBS02/03/05/06/07 (NVA-LEDGER-B, 2026-08-16): "unreachable evidence.commit" is
+  // now classified DRIFT for every ledger event, known or not (the ledger is
+  // append-only, so this can never be edited into compliance regardless of how it
+  // got there) — the exit code no longer depends on the eight-triple table at all.
+  // What the table STILL decides, narrowly, is only the `knownHistoricalBatch`
+  // LABEL on an already-drift finding — proven below by asserting `false` for
+  // every one of these five never-a-blanket-waiver cases.
+  check("CBS02 an unrelated unreachable evidence commit is drift, not blocking, and is NOT labelled the known historical batch", () => {
     const { base } = fixture({
       items: [ITEM("beta", "open")],
       events: [{
@@ -132,12 +140,19 @@ try {
         commit: UNRELATED_UNREACHABLE_COMMIT, actor: "backlog-migration", kind: "baseline-migration",
       }],
     });
+    const written = writeBacklogProjections(base);
+    assert.equal(written.ok, true, written.findings.join("; "));
     const result = checkBacklogState(base);
-    assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(result.ok, true, result.findings.join("; "));
+    const drift = result.drift.find((entry) => entry.finding.includes("ledger event 1"));
+    assert.match(drift?.finding ?? "", /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(drift?.knownHistoricalBatch, false);
+    // D3: drift is reported, not swallowed — present in `drift`, absent from the
+    // blocking `findings` array that decides `ok` and the process exit code.
+    assert.ok(!result.findings.some((finding) => finding.includes("evidence.commit is not a reachable local Git commit")), "a drift finding must never also appear in the blocking findings array");
   });
 
-  check("CBS03 the exact known commit under a different actor/kind still fails — the triple must match exactly", () => {
+  check("CBS03 the exact known commit under a different actor/kind is drift, but not labelled known — the triple must match exactly", () => {
     const { base } = fixture({
       items: [ITEM("gamma", "open")],
       events: [{
@@ -145,9 +160,13 @@ try {
         commit: KNOWN_UNREACHABLE_BASELINE_MIGRATION_COMMIT, actor: "someone-else", kind: "baseline-migration",
       }],
     });
+    const written = writeBacklogProjections(base);
+    assert.equal(written.ok, true, written.findings.join("; "));
     const result = checkBacklogState(base);
-    assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(result.ok, true, result.findings.join("; "));
+    const drift = result.drift.find((entry) => entry.finding.includes("ledger event 1"));
+    assert.match(drift?.finding ?? "", /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(drift?.knownHistoricalBatch, false);
   });
 
   check("CBS04 each of the seven additional NVA-BLDRIFT-02 historical triples is an accepted exception", () => {
@@ -165,9 +184,11 @@ try {
     assert.equal(written.wrote, true);
     const after = checkBacklogState(base);
     assert.equal(after.ok, true, after.findings.join("; "));
+    assert.equal(after.drift.length, ids.length);
+    assert.ok(after.drift.every((entry) => entry.knownHistoricalBatch === true), after.drift.map((entry) => `${entry.finding} -> ${entry.knownHistoricalBatch}`).join("; "));
   });
 
-  check("CBS05 an unreachable commit outside the pinned set still fails under a newly pinned actor/kind — never a blanket waiver", () => {
+  check("CBS05 an unreachable commit outside the pinned set is drift, but not labelled known, under a newly pinned actor/kind — never a blanket waiver", () => {
     const { base } = fixture({
       items: [ITEM("lambda", "open")],
       events: [{
@@ -175,12 +196,16 @@ try {
         commit: UNRELATED_UNREACHABLE_COMMIT_2, actor: "sentinel-recovery", kind: "sentinel-backlog-recovery",
       }],
     });
+    const written = writeBacklogProjections(base);
+    assert.equal(written.ok, true, written.findings.join("; "));
     const result = checkBacklogState(base);
-    assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(result.ok, true, result.findings.join("; "));
+    const drift = result.drift.find((entry) => entry.finding.includes("ledger event 1"));
+    assert.match(drift?.finding ?? "", /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(drift?.knownHistoricalBatch, false);
   });
 
-  check("CBS06 a newly pinned commit value under a different actor still fails", () => {
+  check("CBS06 a newly pinned commit value under a different actor is drift, but not labelled known", () => {
     const { base } = fixture({
       items: [ITEM("mu", "open")],
       events: [{
@@ -188,12 +213,16 @@ try {
         commit: "6df2e8a068cba1e6de5410ea5fe23d2c2ca72e59", actor: "someone-else", kind: "sentinel-backlog-recovery",
       }],
     });
+    const written = writeBacklogProjections(base);
+    assert.equal(written.ok, true, written.findings.join("; "));
     const result = checkBacklogState(base);
-    assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(result.ok, true, result.findings.join("; "));
+    const drift = result.drift.find((entry) => entry.finding.includes("ledger event 1"));
+    assert.match(drift?.finding ?? "", /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(drift?.knownHistoricalBatch, false);
   });
 
-  check("CBS07 the pinned e21933be commit/actor pair under a third, non-pinned kind still fails — kind is part of the triple too", () => {
+  check("CBS07 the pinned e21933be commit/actor pair under a third, non-pinned kind is drift, but not labelled known — kind is part of the triple too", () => {
     const { base } = fixture({
       items: [ITEM("nu", "open")],
       events: [{
@@ -201,9 +230,32 @@ try {
         commit: "e21933be86bea8735de7e407f94cff48cffd7bd8", actor: "pipeline", kind: "sentinel-windows-unrelated-kind",
       }],
     });
+    const written = writeBacklogProjections(base);
+    assert.equal(written.ok, true, written.findings.join("; "));
     const result = checkBacklogState(base);
-    assert.equal(result.ok, false);
-    assert.match(result.findings.join("\n"), /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(result.ok, true, result.findings.join("; "));
+    const drift = result.drift.find((entry) => entry.finding.includes("ledger event 1"));
+    assert.match(drift?.finding ?? "", /ledger event 1: evidence\.commit is not a reachable local Git commit/u);
+    assert.equal(drift?.knownHistoricalBatch, false);
+  });
+
+  // D2 (no severity regression): unlike the commit-format/reachability findings
+  // above, a broken hash chain is evidence the LEDGER ITSELF was tampered with —
+  // never DRIFT, and classifyBacklogFindings must never reclassify it. Built over
+  // a synthetic fixture, never by mutating the real ledger.
+  check("CBS08 a tampered previousHash is INTEGRITY — it still blocks and never appears as drift", () => {
+    const { base } = fixture({
+      items: [ITEM("xi", "open")],
+      events: [{ id: "pipeline.xi", from: null, to: "open", reference: "2026-07-20-xi.md", commit: "a".repeat(40) }],
+    });
+    const ledgerPath = join(base, "backlog", "transitions.ndjson");
+    const tampered = JSON.parse(readFileSync(ledgerPath, "utf8").trim());
+    tampered.previousHash = "f".repeat(64);
+    writeFileSync(ledgerPath, `${JSON.stringify(tampered)}\n`);
+    const result = checkBacklogState(base);
+    assert.equal(result.ok, false, "a tampered previousHash must still block — no severity regression");
+    assert.match(result.findings.join("\n"), /previousHash does not bind the preceding ledger event/u);
+    assert.ok(!(result.drift ?? []).some((entry) => entry.finding.includes("previousHash")), "hash-chain tampering must never be classified drift");
   });
 } finally {
   console.log(`${passed} passed, ${failed} failed`);

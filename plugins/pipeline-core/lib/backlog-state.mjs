@@ -784,6 +784,83 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
   return errors;
 }
 
+/**
+ * QG-06 severity table (guardrails/quality-gates.md). Owner: Pipeline
+ * maintainers (Elephant role, docs/operating-model.md §2); no expiry — this
+ * is a permanent, structural consequence of the ledger's append-only design,
+ * never a temporary exception. Introduced by NVA-LEDGER-B (2026-08-16).
+ *
+ * `loadBacklogState` moves the gate from "reject the past" to "reject bad
+ * writes": a finding about an ALREADY-APPENDED ledger event is unfixable by
+ * construction — the entry can never be edited without breaking the hash
+ * chain — so re-flagging it as blocking on every Verify run only ever ends in
+ * a hand-pinned exception or a proposal to weaken a mechanism (both already
+ * happened once, `f3ac7cfd`). Only the two narrow patterns below are DRIFT
+ * (reported, never blocking); every other finding — including one this table
+ * does not recognise — is INTEGRITY (fail-closed default).
+ */
+export const BACKLOG_FINDING_SEVERITY = Object.freeze({ INTEGRITY: "integrity", DRIFT: "drift" });
+
+// A ledger event's evidence.commit can fail for two reasons that depend on
+// state OUTSIDE the ledger's own content, and that can drift independently
+// of it: local Git object availability (gc, shallow clone, an ancestor
+// pruned by a sanctioned history rewrite) and a format rule (full lowercase
+// OID) that tightened after older entries were already written. Neither is
+// evidence of tampering with the ledger itself, and the ledger can never be
+// edited to comply after the fact — so this stays reported, never blocking.
+const DRIFT_LEDGER_COMMIT_FINDING = /^ledger event \d+: evidence\.commit (?:is not a reachable local Git commit|must be a full lowercase Git commit OID)$/u;
+
+// An item's closure_commit cross-check against its own final ledger event can
+// fail for two findings that must NOT share one verdict: a forged or
+// hand-edited closure_commit (real tampering, INTEGRITY) versus a mismatch
+// that is the direct, structural side effect of that SAME final event's
+// evidence.commit already being DRIFT above — nothing new was tampered with,
+// the drifted value simply stopped matching. classifyBacklogFindings links
+// the two using the ledger's own event data (which final event closed which
+// item), never the finding text alone.
+const CLOSURE_COMMIT_CROSSCHECK_FINDING = /^items: (.+) closure_commit must equal its final ledger evidence\.commit$/u;
+
+function classifyBacklogFinding(finding) {
+  return DRIFT_LEDGER_COMMIT_FINDING.test(finding) ? BACKLOG_FINDING_SEVERITY.DRIFT : BACKLOG_FINDING_SEVERITY.INTEGRITY;
+}
+
+/**
+ * Classify every finding `loadBacklogState` can produce into INTEGRITY
+ * (blocking) or DRIFT (reported, never blocking). `events` supplies the
+ * ledger context needed to link a closure_commit cross-check finding to the
+ * drifted evidence.commit that caused it — see CLOSURE_COMMIT_CROSSCHECK_FINDING.
+ * A finding this function does not otherwise recognise defaults to INTEGRITY.
+ */
+export function classifyBacklogFindings(findings, { events = [] } = {}) {
+  const driftSequences = new Set();
+  const direct = findings.map((finding) => {
+    const severity = classifyBacklogFinding(finding);
+    if (severity === BACKLOG_FINDING_SEVERITY.DRIFT) {
+      const sequenceMatch = /^ledger event (\d+):/u.exec(finding);
+      if (sequenceMatch) driftSequences.add(Number(sequenceMatch[1]));
+    }
+    return { finding, severity };
+  });
+  // The sequence of the LAST (non reachability-amendment) event recorded for
+  // each item id — the same "final event" validateTransitionLedger itself
+  // binds closure_commit against above.
+  const finalEventSequenceById = new Map();
+  for (const event of events) {
+    if (isPlainObject(event) && typeof event.id === "string"
+      && event?.evidence?.kind !== "reachability-amendment" && Number.isSafeInteger(event.sequence)) {
+      finalEventSequenceById.set(event.id, event.sequence);
+    }
+  }
+  return direct.map(({ finding, severity }) => {
+    if (severity === BACKLOG_FINDING_SEVERITY.DRIFT) return { finding, severity };
+    const match = CLOSURE_COMMIT_CROSSCHECK_FINDING.exec(finding);
+    if (!match) return { finding, severity };
+    const finalSequence = finalEventSequenceById.get(match[1]);
+    const causedByDrift = finalSequence !== undefined && driftSequences.has(finalSequence);
+    return causedByDrift ? { finding, severity: BACKLOG_FINDING_SEVERITY.DRIFT } : { finding, severity };
+  });
+}
+
 function markdownCell(value) {
   return String(value ?? "—").replaceAll("|", "\\|").replaceAll("\n", " ");
 }
