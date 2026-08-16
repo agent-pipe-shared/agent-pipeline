@@ -346,6 +346,34 @@ No criterion status changed by either pass — both are scoping, explicitly. `ca
 (the seventh A-AC-05 dimension) and the route-receipt's own producer remain untraced,
 flagged rather than guessed at.
 
+**Thread 1 result — `PHX-WP-RAC08-OFFER-PRODUCER` landed (commit `8bb4c147`).** Independent
+DoD re-run, not accepted from the report: 114/114 across the four named suites, exit 0,
+artifact `scratch/rac08-offer-producer.tap` (not committed, per convention). Every
+`external-operator-required` route now journals a `command-offer` event in state `offered`
+BEFORE the route is returned (R-AC-08); an append failure suppresses `nextAction` and
+returns `journalRefusal: "HGO-JOURNAL-UNAVAILABLE"` instead of throwing inside a
+PreToolUse hook (R-AC-10). New module `plugins/pipeline-core/lib/guard-handoff-offer.mjs` +
+test; `human-guard-override.mjs` wiring-only (new `storage().commandOffers` journal file,
+separate from the HMAC-chained `audit.jsonl`, same `writeAtomic` discipline). Collateral
+suites re-checked for breakage, none found (codex-pretool-guard 22/22, guard-human-override
+CLI 6/6, guard-gate-strength 30/30, guard-testpath+guard-lifecycle-ready 44/44).
+
+**One item explicitly not landed, sixth in the PO-signature-gated set:** the briefed
+one-line `verify.mjs` registration (`guard-handoff-offer-tests`) is TP-3-blocked — confirmed
+independently by the Elephant re-attempting the identical edit, not just accepted from the
+goldfish report. TP-3 refuses **any** ad-hoc edit to `verify.mjs`, Elephant or Goldfish
+alike; the sanctioned route is the same signed human-guard-override ceremony as the other
+five. Per the PO's 2026-08-16 decision (wait, no signatures for now), left open rather than
+pursued. The suite runs and passes today via the direct `node --test` invocation above; it
+is simply not yet wired into the 373-step gate, so Verify's red count is unaffected by this
+work either way (`guard-handoff-offer-tests` isn't a step yet, so it can't turn red or
+green there) — the substance (R-AC-08/R-AC-10) is real and independently verified
+regardless of the registration gap.
+
+Live acceptance-evidence-map counts as of this checkpoint (unchanged by this pass, both
+threads are `partial`/scoping-only or pending the registration): **130 implemented / 23
+partial / 3 not-started / 1 constraint**, 157 total.
+
 ---
 
 ## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
