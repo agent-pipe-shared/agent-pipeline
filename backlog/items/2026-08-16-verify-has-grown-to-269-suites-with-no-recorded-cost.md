@@ -53,3 +53,20 @@ two share a lever and should be picked up together or in that order.
 - **Rationale:** part 1 is explicitly the precondition for everything else and carries no weakening of its own — pure additive instrumentation.
 - **Assignment (if accepted):** Nova A AFK-session closeout, folded into the next local 0.5.5 candidate.
 - **Date:** 2026-08-16
+
+### Update, 2026-08-17 — part 1 half-landed; the remaining half is a small, PO-gated refresh, not more design
+
+`plugins/pipeline-core/scripts/verify-journal.mjs`'s `runVerifyJournal` now
+computes and returns `durationMs` per step (commit `ce9bf7e1`, 9/9 tests,
+independently re-verified). `harness/scripts/verify.mjs` itself still
+discards it (TP-3 protected; the one-line propagation fix is written down in
+that commit's own message, ready to dispatch). The block was a real,
+correctly-signed PO Guard Maintenance Window covering TP-3 that a separate
+bug (fixed same session, `e31f0233`) had made unreadable — but fixing that
+bug in this checkout doesn't reach the physically separate marketplace copy
+this session's Claude guards actually enforce from
+(`docs/claude-local-plugin-development.md`, "copy not a link," refreshed only
+by an operator running `cp -a` + `claude plugin update` outside any agent
+session — full diagnosis in `docs/state.md`'s 2026-08-17 entry). Next PO
+action, whenever they're back: run that two-command refresh; the remaining
+`verify.mjs` line is then a same-day dispatch.
