@@ -267,6 +267,31 @@ test("X-AC-11 permits a governed reference to proceed when the effective policy'
   assert.equal(planned.plan.reference.pipelineArtifact.documentClass, "security");
 });
 
+// WP-PAC11: ownedSections (P-AC-11 "owned fields/sections") is the one of the
+// five newly-representable P-AC-11 dimensions (commit 9352331d) that has a
+// genuine consumer: desired.changes[].field is already the write-plan's sole
+// per-write field identifier, so a declared ownedSections list scopes exactly
+// which fields the policy permits the pipeline to write for that class.
+test("WP-PAC11 rejects a governed write whose desired change targets a field the effective policy does not own", async () => {
+  const scoped = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, ownedSections: ["summary"], packIds: ["security-baseline"] }]);
+  const outOfScope = { requestId: "publish-42", changes: [{ field: "title", valueSha256: "b".repeat(64), ownership: "pipeline-owned" }] };
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired: outOfScope, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: scoped });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-owned-sections"); assert.equal(rejected.plan, null);
+});
+test("WP-PAC11 admits a governed write whose desired changes stay within the effective policy's declared ownedSections", async () => {
+  const scoped = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, ownedSections: ["summary", "status"], packIds: ["security-baseline"] }]);
+  const planned = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: scoped });
+  assert.equal(planned.status, "preview"); assert.equal(planned.reason, null); assert.ok(planned.plan);
+});
+test("WP-PAC11 leaves an undeclared ownedSections neutral, unlike a declared-but-empty one which blocks every change", async () => {
+  const undeclared = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, packIds: ["security-baseline"] }]);
+  const unaffected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: undeclared });
+  assert.equal(unaffected.status, "preview");
+  const emptied = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, ownedSections: [], packIds: ["security-baseline"] }]);
+  const blocked = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: emptied });
+  assert.equal(blocked.status, "rejected"); assert.equal(blocked.reason, "policy-owned-sections");
+});
+
 test("X-AC-11 never consults organization policy for an ungoverned reference, even when one is supplied", async () => {
   const invalidPolicy = { not: "a valid effective policy" };
   const withPolicy = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: invalidPolicy });

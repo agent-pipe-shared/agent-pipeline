@@ -66,6 +66,12 @@ export async function planExternalReferenceWrite({ reference, capabilities, desi
     if (!entry) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-uncovered-class", plan: null });
     if (entry.mode !== ref.mode) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-mode-mismatch", plan: null });
     if (entry.approvalRequired === true) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-approval-required", plan: null });
+    // WP-PAC11: ownedSections (P-AC-11 "owned fields/sections") scopes which
+    // desired.changes[].field values the policy permits the pipeline to own for
+    // this document class. A declared list (even empty) is a real restriction;
+    // an undeclared field is neutral -- same declared-vs-undeclared precedent
+    // mode/targetBinding already established above.
+    if (Object.hasOwn(entry, "ownedSections") && desired.changes.some((change) => !entry.ownedSections.includes(change.field))) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-owned-sections", plan: null });
   }
   // X-AC-10: the canonical identity is resolved before any external contact, so
   // an unresolvable or ambiguous artifact never reaches the provider at all.
