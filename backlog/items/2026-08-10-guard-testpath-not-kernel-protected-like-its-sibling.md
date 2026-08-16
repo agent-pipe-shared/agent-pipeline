@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-testpath-not-kernel-protected
 type: defect
 owner: pipeline
-status: rejected
+status: closed
 created: 2026-08-10
 source: "Found on 2026-08-10 by the WP-O1O2-CACHING-REWORK1 dispatch while fixing a related, narrower gap (the module hosting O-2's new ledger-narrowing check was not a NEVER_LIFTABLE_KERNEL_PATHS member). While proposing that fix, the dispatch checked the two real GS-6/TP-* call sites named in the O-1/O-2 design doc and found the same class of exposure already existed, independent of anything this sprint added. Verified independently by the Elephant against source before filing."
 due: 2026-09-09
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: bf46008eb4bc34e5e585e6d12e8006f644eeabec
+closure_evidence: backlog/evidence/2026-08-16-verify-red-suite-backlog-closures.md
 ---
 
 # `guard-testpath.mjs` is not a never-liftable kernel path; its sibling `guard-gate-strength.mjs` already is

@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-11
 source: "Elephant session, 2026-08-11: node harness/scripts/security-scan.mjs turned BLOCKING (exit 2) for the first time this session after harness/scripts/pipeline-state.test.mjs grew to 4788 lines across many same-session dispatches."
+closed_at: 2026-08-11
+closure_repository: self
+closure_commit: ba1a7d282913357208d31f2fc4eea6857a64639d
+closure_evidence: backlog/evidence/2026-08-16-verify-red-suite-backlog-closures.md
 ---
 
 # `security-scan.mjs` blocks on a semgrep per-rule TIMEOUT against the now-4700+-line `pipeline-state.test.mjs`, not a real finding

@@ -15,6 +15,7 @@
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-can-self-arm-the-git-override | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.agent-decision-journal-no-production-producer | open | requirement | pipeline | 2026-08-11 | — |
 | pipeline.agent-definitions-pin-the-review-tier-model | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.anchor-check-passes-on-wrong-language-content | open | defect | pipeline | 2026-08-07 | — |
@@ -63,7 +64,7 @@
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | open | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | open | defect | pipeline | 2026-08-07 | — |
-| pipeline.guard-testpath-not-kernel-protected | open | defect | pipeline | 2026-08-10 | — |
+| pipeline.guard-testpath-not-kernel-protected | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
@@ -107,6 +108,7 @@
 | pipeline.push-release-flow-unusable-for-third-party-adopters | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.readonly-command-guard-classification | open | workflow-improvement | pipeline | 2026-07-26 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
+| pipeline.reconcile-lock-reuse-lexical-path-comparison | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.recovery-preview-callback-attestation | in_progress | defect | pipeline | 2026-07-20 | — |
 | pipeline.regulated-document-hooks | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -120,6 +122,7 @@
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.self-application-integrity-check-absent | in_progress | defect | pipeline | 2026-08-07 | — |
+| pipeline.semgrep-timeout-oversized-pipeline-state-test | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | open | defect | pipeline | 2026-08-07 | — |
@@ -146,6 +149,6 @@
 
 ## Counts
 
-- open: 87
+- open: 88
 - in_progress: 26
-- closed: 25
+- closed: 27
