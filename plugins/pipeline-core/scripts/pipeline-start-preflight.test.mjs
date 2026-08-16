@@ -239,7 +239,12 @@ test("an exact registered local marketplace is a visible development source", ()
   });
 });
 
-test("simultaneous local-development and official installations fail closed", () => {
+// NVA-PLUGIN-PRECEDENCE / D5: an attested local-development entry (exact local
+// marketplace source + exact local install path) is an explicit, machine-local
+// act of intent and wins over a coexisting eligible official entry for the same
+// repository -- this used to fail closed as ambiguous; that was exactly the
+// friction this task fixes (`codexAttestedLocalWinsOverOfficial`).
+test("an attested local-development entry wins over a coexisting official entry (Codex, D5)", () => {
   const official = JSON.parse(pluginList("0.4.4", "git")()).installed[0];
   const local = JSON.parse(pluginList(
     "0.4.5+test",
@@ -247,14 +252,15 @@ test("simultaneous local-development and official installations fail closed", ()
     "agent-pipeline-local",
   )()).installed[0];
   const both = () => JSON.stringify({ installed: [official, local], available: [] });
+  assert.deepEqual(installedPipelineIdentity(both), { version: "0.4.5+test", source: "local-development" });
   const result = observePipelineStartPreflight({
     env: {},
     pluginList: both,
     read: () => manifest,
   });
-  assert.equal(result.status, "plugin-refresh-required");
-  assert.equal(result.installedVersion, null);
-  assert.equal(result.installedSource, "unknown");
+  assert.equal(result.status, "ready");
+  assert.equal(result.installedVersion, "0.4.5+test");
+  assert.equal(result.installedSource, "local-development");
 });
 
 test("the isolated development id is accepted only from its exact local marketplace root", () => {
@@ -373,14 +379,20 @@ test("a Claude bare-array registry resolves an attested local-development instal
   );
 });
 
-test("a Claude registry with two eligible entries fails closed as ambiguous", () => {
+// NVA-PLUGIN-PRECEDENCE / D1: an attested local-development entry (registered as
+// a `directory`-source marketplace in the host's own `known_marketplaces.json`,
+// as `claudeKnownMarketplaces()`'s default fixture is) is an explicit,
+// machine-local act of intent and wins over a coexisting eligible official
+// entry -- this used to fail closed as ambiguous; that was exactly the bug
+// this task fixes (`claudeAttestedLocalWinsOverOfficial`).
+test("an attested local-development entry wins over a coexisting official entry (D1)", () => {
   const both = () => JSON.stringify([
-    { id: "pipeline-core@agent-pipeline-local", version: "0.5.2+claude.a", scope: "local", enabled: true },
+    { id: "pipeline-core@agent-pipeline-local", version: "0.5.2+claude.test", scope: "local", enabled: true },
     { id: "pipeline-core@agent-pipeline", version: "0.5.1+claude.b", scope: "local", enabled: true },
   ]);
   assert.deepEqual(
     installedPipelineIdentity(both, "claude", claudeKnownMarketplaces()),
-    { version: null, source: "unknown", ambiguous: true },
+    { version: "0.5.2+claude.test", source: "local-development" },
   );
   const result = observePipelineStartPreflight({
     env: { CLAUDECODE: "1" },
@@ -388,9 +400,37 @@ test("a Claude registry with two eligible entries fails closed as ambiguous", ()
     knownMarketplaces: claudeKnownMarketplaces(),
     read: () => claudeManifest,
   });
-  assert.equal(result.status, "plugin-refresh-required");
-  assert.equal(result.installedVersion, null);
-  assert.equal(result.installedSource, "unknown");
+  assert.equal(result.status, "ready");
+  assert.equal(result.installedVersion, "0.5.2+claude.test");
+  assert.equal(result.installedSource, "local-development");
+});
+
+// D2: an UNATTESTED local id carries no proven intent, so it must not silently
+// win over a coexisting official entry either -- the pair stays exactly the
+// pre-existing ambiguous/fail-closed outcome, unchanged by D1.
+test("an unattested local-development entry does not win over a coexisting official entry", () => {
+  const both = () => JSON.stringify([
+    { id: "pipeline-core@agent-pipeline-local", version: "0.5.2+claude.a", scope: "local", enabled: true },
+    { id: "pipeline-core@agent-pipeline", version: "0.5.1+claude.b", scope: "local", enabled: true },
+  ]);
+  const unattested = () => JSON.stringify({});
+  assert.deepEqual(
+    installedPipelineIdentity(both, "claude", unattested),
+    { version: null, source: "unknown", ambiguous: true },
+  );
+});
+
+// D4: two eligible LOCAL entries are a genuine registry duplicate, not an
+// expression of intent -- they must still fail closed as ambiguous.
+test("two eligible Claude local-development entries still collide as ambiguous", () => {
+  const twoLocal = () => JSON.stringify([
+    { id: "pipeline-core@agent-pipeline-local", version: "0.5.2+claude.a", scope: "local", enabled: true },
+    { id: "pipeline-core@agent-pipeline-local", version: "0.5.3+claude.b", scope: "user", enabled: true },
+  ]);
+  assert.deepEqual(
+    installedPipelineIdentity(twoLocal, "claude", claudeKnownMarketplaces()),
+    { version: null, source: "unknown", ambiguous: true },
+  );
 });
 
 // GF-111: a `scope: "project"` entry belonging to a DIFFERENT project on the same

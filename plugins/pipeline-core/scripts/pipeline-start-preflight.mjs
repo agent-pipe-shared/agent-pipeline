@@ -67,6 +67,45 @@ function readClaudeKnownMarketplaces() {
   return readFileSync(resolve(homedir(), ".claude", "plugins", "known_marketplaces.json"), "utf8");
 }
 
+/**
+ * Codex's `plugin list --json` entry carries its own `source`/`marketplaceSource`
+ * fields (unlike Claude's, which has no such fields and needs the host's separate
+ * `known_marketplaces.json` registry instead -- see `claudeLocalDevelopmentAttested`),
+ * so attestation here is a pure function of the candidate entry itself: both its
+ * `marketplaceSource` and `source` report "local", and the entry's own installed
+ * path resolves under that exact local marketplace root. Extracted so the
+ * precedence check below can attest a LOCAL candidate before a match is chosen.
+ */
+function codexExactLocalSource(entry) {
+  return entry?.marketplaceSource?.sourceType === "local"
+    && typeof entry.marketplaceSource.source === "string"
+    && isAbsolute(entry.marketplaceSource.source)
+    && resolve(entry.marketplaceSource.source) === entry.marketplaceSource.source
+    && entry?.source?.source === "local"
+    && typeof entry.source.path === "string"
+    && isAbsolute(entry.source.path)
+    && resolve(entry.source.path) === entry.source.path
+    && resolve(entry.marketplaceSource.source, "plugins", "pipeline-core") === entry.source.path;
+}
+
+/**
+ * NVA-PLUGIN-PRECEDENCE: the Codex mirror of the Claude precedence rule
+ * (`claudeAttestedLocalWinsOverOfficial`'s comment carries the full reasoning --
+ * an attested local-development install is an explicit, machine-local act of
+ * intent that outranks a released install of the SAME repository). Same shape,
+ * same restriction -- exactly one eligible local entry, exactly one eligible
+ * official entry, and the local entry itself attested -- only the attestation
+ * SOURCE differs (the entry's own fields here, the host registry there), because
+ * that is the only place the two runners' `plugin list --json` payloads diverge.
+ * It does NOT collapse two entries of the SAME class: those stay ambiguous via
+ * the check that follows, unchanged.
+ */
+function codexAttestedLocalWinsOverOfficial(localMatches, officialMatches) {
+  return localMatches.length === 1
+    && officialMatches.length === 1
+    && codexExactLocalSource(localMatches[0]);
+}
+
 function installedPipelineIdentityCodex(payload) {
   if (!Array.isArray(payload?.installed)) return null;
   const eligible = (entry) =>
@@ -81,21 +120,16 @@ function installedPipelineIdentityCodex(payload) {
     eligible(entry) && entry.pluginId === LOCAL_PLUGIN_ID);
   const officialMatches = payload.installed.filter((entry) =>
     eligible(entry) && entry.pluginId === PLUGIN_ID);
+  if (codexAttestedLocalWinsOverOfficial(localMatches, officialMatches)) {
+    return { version: localMatches[0].version, source: "local-development" };
+  }
   if (localMatches.length + officialMatches.length > 1) {
     return { version: null, source: "unknown", ambiguous: true };
   }
   if (localMatches.length + officialMatches.length !== 1) return null;
   const matches = localMatches.length === 1 ? localMatches : officialMatches;
   const entry = matches[0];
-  const exactLocalSource = entry?.marketplaceSource?.sourceType === "local"
-    && typeof entry.marketplaceSource.source === "string"
-    && isAbsolute(entry.marketplaceSource.source)
-    && resolve(entry.marketplaceSource.source) === entry.marketplaceSource.source
-    && entry?.source?.source === "local"
-    && typeof entry.source.path === "string"
-    && isAbsolute(entry.source.path)
-    && resolve(entry.source.path) === entry.source.path
-    && resolve(entry.marketplaceSource.source, "plugins", "pipeline-core") === entry.source.path;
+  const exactLocalSource = codexExactLocalSource(entry);
   if (entry.pluginId === LOCAL_PLUGIN_ID && !exactLocalSource) return null;
   let source = "unknown";
   if (entry?.marketplaceSource?.sourceType === "git") {
@@ -157,6 +191,25 @@ function shadowProjectScope(entries) {
   return projectEntries.length > 0 ? projectEntries : entries;
 }
 
+/**
+ * NVA-PLUGIN-PRECEDENCE (2026-08-16): the repository declares THAT it is governed;
+ * the machine decides WHICH build provides it. An attested local-development
+ * install (`claudeLocalDevelopmentAttested`) is an explicit, machine-local act of
+ * intent -- someone built and registered this exact plugin tree on THIS machine --
+ * and that act of intent outranks a released install of the SAME repository, so
+ * the pair resolves rather than failing closed. This deliberately does NOT
+ * extend to: an UNATTESTED local id (no proven intent, so the unconditional
+ * ambiguity/fallthrough below still applies to it exactly as before this change),
+ * or two entries of the SAME class (two eligible local entries, or two eligible
+ * official entries, are a genuine registry duplicate, not an expression of
+ * intent, and still fail closed as ambiguous via the check that follows).
+ */
+function claudeAttestedLocalWinsOverOfficial(localMatches, officialMatches, knownMarketplaces) {
+  return localMatches.length === 1
+    && officialMatches.length === 1
+    && claudeLocalDevelopmentAttested(localMatches[0], knownMarketplaces);
+}
+
 function installedPipelineIdentityClaude(payload, knownMarketplaces, cwd) {
   if (!Array.isArray(payload)) return null;
   const eligible = (entry) =>
@@ -172,6 +225,9 @@ function installedPipelineIdentityClaude(payload, knownMarketplaces, cwd) {
       || (typeof entry?.projectPath === "string" && resolve(entry.projectPath) === resolve(cwd)));
   const localMatches = shadowProjectScope(payload.filter((entry) => eligible(entry) && entry.id === LOCAL_PLUGIN_ID));
   const officialMatches = shadowProjectScope(payload.filter((entry) => eligible(entry) && entry.id === PLUGIN_ID));
+  if (claudeAttestedLocalWinsOverOfficial(localMatches, officialMatches, knownMarketplaces)) {
+    return { version: localMatches[0].version, source: "local-development" };
+  }
   if (localMatches.length + officialMatches.length > 1) {
     return { version: null, source: "unknown", ambiguous: true };
   }
