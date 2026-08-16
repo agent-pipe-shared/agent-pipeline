@@ -261,50 +261,81 @@ function localCommitExists(root, oid) {
 }
 
 /**
- * 12 ledger events (sequences 1-12, all dated 2026-07-20, all
- * `actor: "backlog-migration"`, all `evidence.kind: "baseline-migration"`)
- * cite this exact evidence commit; it does not exist locally, almost
- * certainly lost in the sanctioned 2026-08-01 history rewrite. PO decision
- * 2026-08-12 (Option 1 of
+ * 38 ledger events (sequences 1-38, dated 2026-07-19 through 2026-07-22: the
+ * original 2026-07-20 canonical-ledger migration plus its immediate
+ * Sentinel-recovery, PO-license-disposition, close-retro, scope-extension,
+ * and Windows-containment follow-on events) cite evidence commits that do
+ * not exist as reachable objects in this repository — almost certainly lost
+ * in the sanctioned 2026-08-01 history rewrite. PO decision 2026-08-12
+ * (Option 1 of
  * backlog/items/2026-08-11-backlog-ledger-baseline-migration-commit-unreachable.md):
- * accept and document this one specific historical value as a pinned,
- * narrowly-keyed exception rather than re-flagging it every Verify run.
+ * accept and document these as pinned, narrowly-keyed exceptions rather than
+ * re-flagging them every Verify run.
  *
- * NOTE: the source backlog item's own diagnosis claims this commit is shared
- * by all 38 of the 2026-07-20 batch's events. Reading the ledger directly
- * (this file's own contract, not this item's prose) shows only sequences
- * 1-12 actually share it; sequences 13-38 of that same 2026-07-20 batch cite
- * six other, also-unreachable, but DIFFERENT commit values under different
- * actors/kinds. Those are NOT covered by this exception and are out of this
- * change's authorized scope — see the dispatch report for
- * NVA-BLDRIFT-01/2026-08-12.
+ * NOTE: the source backlog item's own original diagnosis claimed a single
+ * evidence.commit shared by all 38 events. Reading the ledger directly (this
+ * file's own contract, not that item's prose) shows the real composition is
+ * eight distinct (commit, actor, evidence.kind) triples:
+ *   - sequences 1-12:  933e1a8d... / backlog-migration        / baseline-migration
+ *   - sequences 13-14: 8720bf3f... / sentinel-implementation  / license-boundary-recovery
+ *   - sequence 15:     a798db6d... / po                       / po-license-disposition
+ *   - sequence 16:     cb821946... / close-retro              / close-retro
+ *   - sequences 17-31: 6df2e8a0... / sentinel-recovery        / sentinel-backlog-recovery
+ *   - sequences 32-36: a09b69b1... / sentinel-scope-extension / sentinel-scope-extension
+ *   - sequence 37:     e21933be... / pipeline                 / sentinel-windows-containment
+ *   - sequence 38:     e21933be... / pipeline                 / sentinel-windows-containment-closure
+ * (the last two share one commit under two different kinds — direct proof
+ * the exception below keys on the full triple, never the commit alone).
+ * NVA-BLDRIFT-01 (2026-08-12) pinned only the first triple and explicitly
+ * scoped the remaining seven out as future work; NVA-BLDRIFT-02 (2026-08-16)
+ * closes that scope and corrects the source item's own Description/Proposal
+ * to match this composition.
  *
- * This is deliberately NOT a blanket waiver for `evidence.kind ===
- * "baseline-migration"`: only an event whose commit/actor/kind ALL match this
- * exact triple is excepted. A future baseline-migration event citing any
- * other unreachable commit still fails exactly as before.
+ * This is deliberately NOT a blanket waiver for any `evidence.kind`, actor,
+ * or commit value alone: only an event whose commit/actor/kind ALL match one
+ * of these eight exact triples is excepted. A future event citing any other
+ * unreachable commit still fails exactly as before.
+ *
+ * QG-06 disclosure (guardrails/quality-gates.md): owner is the PO (2026-08-12
+ * decision on the source item, reaffirmed by the NVA-BLDRIFT-02 dispatch that
+ * closed the remaining scope on 2026-08-16). This is permanent historical
+ * drift with no expiry: the cited commit objects were lost in the 2026-08-01
+ * history rewrite, and the ledger's append-only design forbids ever
+ * repointing sequences 1-38 at a different evidence.commit — there is no
+ * future event at which this exception could be promoted to blocking or
+ * retired. (The pre-NVA-BLDRIFT-02 comment for the first triple alone carried
+ * the owner attribution but no explicit expiry-or-permanence statement; this
+ * paragraph closes that gap for the full set going forward.)
  */
-const KNOWN_UNREACHABLE_BASELINE_MIGRATION_COMMIT = "933e1a8d17d6c7bed040d13f8fccca2511fff9dc";
-const KNOWN_UNREACHABLE_BASELINE_MIGRATION_ACTOR = "backlog-migration";
-const KNOWN_UNREACHABLE_BASELINE_MIGRATION_KIND = "baseline-migration";
+const KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS = Object.freeze([
+  { commit: "933e1a8d17d6c7bed040d13f8fccca2511fff9dc", actor: "backlog-migration", kind: "baseline-migration" },
+  { commit: "8720bf3f6abfd79bbe6f42d8ff7b54211645c378", actor: "sentinel-implementation", kind: "license-boundary-recovery" },
+  { commit: "a798db6d45f2fc113f66d01400d7ea70fcef9427", actor: "po", kind: "po-license-disposition" },
+  { commit: "cb8219464937cfc4cb7ff50e2bf5579bfa78f6b5", actor: "close-retro", kind: "close-retro" },
+  { commit: "6df2e8a068cba1e6de5410ea5fe23d2c2ca72e59", actor: "sentinel-recovery", kind: "sentinel-backlog-recovery" },
+  { commit: "a09b69b11d636f424fafb98aeae948f282bb7338", actor: "sentinel-scope-extension", kind: "sentinel-scope-extension" },
+  { commit: "e21933be86bea8735de7e407f94cff48cffd7bd8", actor: "pipeline", kind: "sentinel-windows-containment" },
+  { commit: "e21933be86bea8735de7e407f94cff48cffd7bd8", actor: "pipeline", kind: "sentinel-windows-containment-closure" },
+]);
 const UNREACHABLE_COMMIT_FINDING = /^ledger event (\d+): evidence\.commit is not a reachable local Git commit$/u;
 
 /**
  * Drop exactly the "unreachable evidence.commit" findings produced for the
- * known 2026-07-20 baseline-migration batch. Never keyed off the finding text
- * alone — each candidate finding is re-checked against the actual event data
- * (commit, actor, evidence.kind) before it is dropped, so an unrelated
- * unreachable evidence commit (any other value) still fails.
+ * known 2026-07-19..2026-07-22 historical batch. Never keyed off the finding
+ * text alone — each candidate finding is re-checked against the actual event
+ * data (commit, actor, evidence.kind) before it is dropped, so an unrelated
+ * unreachable evidence commit (any other value, or a known commit under a
+ * different actor/kind) still fails.
  */
-function filterKnownBaselineMigrationFindings(findings, events) {
+function filterKnownUnreachableHistoricalLedgerFindings(findings, events) {
   return findings.filter((finding) => {
     const match = UNREACHABLE_COMMIT_FINDING.exec(finding);
     if (!match) return true;
     const event = events[Number(match[1]) - 1];
-    const isKnownBaselineMigration = event?.actor === KNOWN_UNREACHABLE_BASELINE_MIGRATION_ACTOR
-      && event?.evidence?.kind === KNOWN_UNREACHABLE_BASELINE_MIGRATION_KIND
-      && event?.evidence?.commit === KNOWN_UNREACHABLE_BASELINE_MIGRATION_COMMIT;
-    return !isKnownBaselineMigration;
+    const isKnownHistoricalException = KNOWN_UNREACHABLE_HISTORICAL_LEDGER_EVENTS.some((known) => event?.actor === known.actor
+      && event?.evidence?.kind === known.kind
+      && event?.evidence?.commit === known.commit);
+    return !isKnownHistoricalException;
   });
 }
 
@@ -515,7 +546,7 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
     }
   }
 
-  const filteredFindings = filterKnownBaselineMigrationFindings(findings, ledger.events);
+  const filteredFindings = filterKnownUnreachableHistoricalLedgerFindings(findings, ledger.events);
   const projection = filteredFindings.length === 0 ? projectBacklog(items, ledger.events) : null;
   return { ok: filteredFindings.length === 0, findings: filteredFindings, items, events: ledger.events, projection };
 }
