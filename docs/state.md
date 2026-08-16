@@ -88,7 +88,168 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-16 Second-machine re-sync; the 2026-08-12 handover's six next steps worked (current)
+## 2026-08-16 (later, same session) The push flow, taken apart and repaired (current)
+
+The PO opened a second topic mid-session: *"der push ist durch zu viele sachen
+viel zu schwierig und umständlich geworden. Man kann nicht zeitnah einfach mal
+pushen selbst nach freigabe nicht… ein push sollte nur einen verify brauchen
+und dann nach signature freigabe auch durch laufen auf den origin."* Analysis
+first, then options, then build — in that order, at the PO's explicit
+instruction. The session goal was then set to producing a new **local
+candidate** carrying the push and any-key fixes, to be installed by the PO and
+push-tested after a restart.
+
+### What the analysis found
+
+A push passes **six independent layers**, three of which can still refuse
+AFTER the human has signed: (1) `gates.push_approval`, (2+3) the human's
+`authorize-critical`, (4) `approve-push` consuming the proof, (5a) the
+**Push-Gate's evidence checks**, (5b) `guard-git` GG-03, (5c) the **Claude
+Code harness classifier**, and (6) the GitHub repository ruleset. The
+2026-08-12 failure was **not** an approval failure: the signature was valid and
+consumed, and layer 5a refused because `evidence/verify-latest.json` carried
+`exitCode: 2`. The 0.5.3 release failed at 5c and 6. Three pushes, three
+different layers, every one of them after the actual authorization.
+
+**Option A (teach the push gate to read classified findings) was analysed and
+then DROPPED, with the PO's agreement.** It would have required editing
+`harness/scripts/verify.mjs` to emit a severity field — a TP-3 protected path
+needing its own signed maintenance-window ceremony — and it is redundant by
+construction: the 2026-08-12 push gate behaved correctly. Verify was red, so it
+blocked. The defect was one level down, in a check that reported unfixable
+historical facts as blocking. **The rule that replaced A is now QG-10**
+(`57821c91`): severity belongs to the check that produces the finding, not to
+the gate that consumes it, so a check exits non-zero only for findings that
+genuinely block, and the push gate keeps demanding `exitCode === 0` unchanged.
+
+### The candidate, commit by commit
+
+- **`d4d8843d` — v3 any-key trust anchor.** Found while checking the PO's key
+  directory: the repository pinned `a3a43c4b…`, the key created on the *other*
+  machine on 2026-08-11, while this machine holds `f28988b2…`, the key that
+  actually signed the 0.5.4 release. Any signature prepared here would have
+  failed `PO-APPROVAL-TRUST-MISMATCH`. **The PO's hypothesis that the multi-key
+  fix was missing from the installed build was tested and disproved:**
+  `4a61bf1d` is an ancestor of `dd1eb9ee`, and the installed 0.5.4's own
+  `lib/critical-human-proof-policy.mjs` carries the full v3 `trustAnchors` set
+  logic — read directly, not inferred. The capability was present; only this
+  repository's own policy document was never migrated. Migrated to v3 with an
+  empty anchor set: the gate keeps proving a human signed and stops asserting
+  which human, exactly the posture the PO described on 2026-08-08. Written by
+  the PO in their own terminal — the file is GS-2-protected, and its
+  human-override route is itself a signature ceremony that the very mismatch
+  being fixed would have blocked.
+- **`ef0ec784` + `1a757618` — the ledger gate stops rejecting the past**
+  (`NVA-LEDGER-B`, PO decision "Richtung B"). Prevention first:
+  `reconcile-backlog-ledger.mjs` now resolves a self-closure `closure_commit`
+  to a full OID via `git rev-parse` and validates the candidate event with the
+  checker's own validator before appending, refusing with a named reason.
+  Only *because* that exists is the read side safe to relax:
+  `classifyBacklogFindings` splits every finding into **integrity** (blocking,
+  and the fail-closed default for anything unrecognised) or **drift**
+  (reported, never blocking). Drift is exactly two narrow patterns — a ledger
+  event's `evidence.commit` being unreachable, or not a full lowercase OID —
+  plus an item `closure_commit` cross-check, and that one inherits drift ONLY
+  when the ledger's own event data shows it is caused by that same final
+  event's drifted commit, never by matching finding text. `CBS08` pins that a
+  tampered `previousHash` still blocks. **Result: `node harness/scripts/verify.mjs`
+  exits 0 for the first time since the drift appeared** — `binding: "exact"`,
+  zero red suites. That is the actual repair of the 2026-08-12 blocker.
+- **`2a4968cc` — `push-prepare`**, a read-only report that checks all six
+  layers up front and emits the fully-formed `authorize-critical` command,
+  F7-rendered one argv token per line. It reuses `prepare-push-subject`'s own
+  hashing rather than reimplementing it, proven by running both and comparing
+  the digests. It also pulls the trust-anchor check FORWARD: under a v3 policy
+  the singular-anchor check in `pipeline-state.mjs:2754` is skipped entirely,
+  so a key mismatch would otherwise surface only at push time, after signing —
+  found by the parallel Phoenix session and confirmed here by direct read.
+- **`89a07b2c` — an attested local build outranks a released one**
+  (`NVA-PLUGIN-PRECEDENCE`). The resolver counted a local and a released entry
+  together, so one of each yielded `ambiguous`, forcing a developer to
+  uninstall the released build — which the repository's own committed
+  `.claude/settings.json` then reinstalled. Now: **the repository declares THAT
+  it is governed, the machine decides WHICH build provides it.** An attested
+  local-development install expresses machine-local intent and wins; an
+  UNattested one wins nothing; two of the same class stay ambiguous. This
+  answers the PO's own constraint directly — one PC on a local build, a laptop
+  on `stable`, same repository, no repository edit either way. Disclosed
+  deviation worth the Critic's attention: two pre-existing tests pinned the old
+  ambiguous outcome and were updated rather than duplicated.
+- **`57821c91` — QG-10 and the ordering rule.** QG-10 as above. The ordering
+  rule in `docs/push-release-flow.md`: the handover commit lands BEFORE the
+  signing ceremony and nothing commits between signing and pushing, because the
+  signature binds one exact commit and tree. Labelled explicitly as an interim
+  workflow measure.
+
+### Part C did not land, and the reason is itself the finding
+
+Adding a narrow `Bash(git push *)` permission to the committed
+`.claude/settings.json` — PO-decided, to stop the harness classifier overruling
+an already-cryptographically-authorized push — **was refused by the harness
+classifier itself**: *"Permission for this action was denied by the Claude Code
+auto mode classifier."* The dispatch stopped rather than overriding. The layer
+is not merely redundant, it is **self-sealing**: an agent cannot open it even
+for a decision the PO has already made. Only a human editing the file resolves
+it. The now-stale Layer 5 passage in `docs/push-release-flow.md` is
+deliberately left unchanged until the permission actually lands.
+
+Safety basis for that permission, verified in `guardrails/git.md` rather than
+assumed: GG-01/GG-02 block every `--force` and `+refspec` push unconditionally,
+approval or not; GG-03 admits a push only when `authorizeRecordedPush` verifies
+an approval bound to exactly this candidate commit, remote and destination ref;
+a push that does not write out its destination ref is never matched at all.
+
+### Two named follow-up blocks, both PO-agreed, neither started
+
+- **Block F — the candidate-binding trap.** The PO named it as the one that
+  must go: *"genau der punkt 2 ist die falle in die wir da jedes mal tippen…
+  das passiert ja auch viel bei verifys etc, dann wird parallel irgendwas
+  gemacht und alles ist ungültig."* A signature, a verify artifact and a
+  security artifact all bind one exact commit, so any subsequent or concurrent
+  commit voids them — which is why this whole session had to serialise itself
+  to one committer at a time. **The obvious fix is measurably wrong and must
+  not be built:** "changes under `docs/` are inert" is false here, because at
+  least four registered gates read the handover file directly
+  (`check-artifact-lifecycle.mjs`'s `CANONICAL_HUMAN_STATE_PATH`,
+  `check-release-state-consistency.mjs`'s `statePath`, `check-doc-contracts`'
+  link/anchor validation, `check-state-budgets`' size budget). The envelope
+  must be DERIVED from each gate's declared inputs and machine-checked, never
+  assumed. Needs its own ADR: it changes what a signature covers. Note the PO
+  already decided the principle on 2026-08-11 (decision 5, "human intent
+  captured exactly once, applies across all gates for that approved unit of
+  work") and it was never built.
+- **Reachability cutoff.** `NVA-LEDGER-B` makes reachability drift for *every*
+  event, so a well-chained forged event citing a nonexistent commit would no
+  longer block. Agreed remedy: a pinned cutoff sequence — drift at or before
+  it, integrity after, which is exactly the boundary past which the new
+  write-side validation already prevents such an event. PO agreed to build it
+  as a follow-up once the candidate stands.
+
+### Measured process finding: the briefed tool budget is inoperative
+
+Five consecutive dispatches were cut off by the harness at roughly 40-50
+cumulative tool uses regardless of the briefed cap (55, 70, 70, 40, 30). The
+closing-allowance mechanism from `NOVA-CLOSING-ALLOWANCE-01` cannot help,
+because the agents are not detecting a boundary — the harness ends the turn.
+Three of the five needed a purely procedural resume; two were finished by the
+Elephant verifying the committed work directly and committing it under the
+dispatch's own trailer, which is cheaper than a resume when the suites have to
+be re-run anyway. **Practical consequence, applied from `NVA-PLUGIN-PRECEDENCE`
+onward: size packages to finish inside ~40 tool calls rather than raising a cap
+that is never reached.** A recurring pattern also worth recording: several
+dispatches ended while WAITING on their own background verify run, which then
+died with them — a dispatch should not spend its last turn waiting.
+
+### Tooling caveat observed twice, independently
+
+`rg` output in this session repeatedly rendered file paths and string literals
+truncated or mangled (`docs/state.md` printed as `ln`;
+`"pipeline.critical-human-proof-policy.v3"` printed as `"pipeline.ln"`). The
+parallel Phoenix session hit the same thing and warned about false negatives.
+Every load-bearing conclusion in this block was therefore taken from a direct
+file read, not from grep output.
+
+## 2026-08-16 Second-machine re-sync; the 2026-08-12 handover's six next steps worked
 
 Session opened on the *other* machine (the one whose `scratch/` still dates
 from 2026-08-10), with the PO's instruction to pull `origin` and continue per
