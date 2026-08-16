@@ -86,7 +86,7 @@ try {
       schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "gst-e2e", publicKey,
       signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), pair.privateKey).toString("base64"),
     };
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy: { keyReference: "gst-e2e", publicKeySha256 }, proof, livePluginRoot });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [{ keyReference: "gst-e2e", publicKeySha256 }], proof, livePluginRoot });
 
     const ordinary = ask(root, join(PLUGIN_ROOT, "hooks", "guard-git.mjs"));
     assert.equal(ordinary.blocked, false, "ordinary plugin file should be lifted under the active window");
