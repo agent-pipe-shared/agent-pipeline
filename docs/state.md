@@ -720,13 +720,90 @@ items the live window exists for, in one bundle: OT09's stale assertion (exact f
 pre-diagnosed above), the TP-2 (`guard-testpath.test.mjs`) and TP-6
 (`guard-gate-strength.test.mjs`) `trustPolicy`→`anchors` fixes (same mechanical
 transform as the 15 sites already fixed this session), and registering the two
-orphaned suites into `verify.mjs` (TP-3). Result not yet known. Once it lands: close
-the window, run full `verify.mjs` + `security-scan.mjs` from the worktree, then
-continue with Phoenix criterion content work (P-AC-11 remaining dimensions,
-R-AC-08/A-AC-05 continuation per the "Next criterion targets" earlier in this
-checkpoint) toward content-complete — no push, per the PO's explicit "kein
-Zwischenpush" — stopping only at the final push-approval request, prepared but left
-unsigned for the PO's return.
+orphaned suites into `verify.mjs` (TP-3).
+
+### CRITICAL FINDING: the GMW window (and the classic HGO ceremony) cannot actually clear anything in THIS repository, at the installed-plugin level, tonight — corrects the "window active" claims above
+
+**The dispatch's four edits were ALL refused by the live guard hooks** — no
+`[pipeline-guard-maintenance-window] … lifted` line in any refusal, meaning
+`windowCoversRule` returned `covered: false` (or threw, silently swallowed) for
+every single one, despite the window genuinely being installed. The Elephant then
+reproduced the SAME refusal directly, in-session, attempting the identical OT09
+edit by hand — ruling out "subagent-only" as the cause.
+
+**Root-caused, not guessed.** `node
+plugins/pipeline-core/scripts/guard-maintenance-window.mjs status --repo-root
+/home/skar667/src/agent-pipeline-share_phoenix` reports `"status": "active"`,
+correct scope, correct remaining TTL — because that CLI script imports its
+`currentGuardMaintenanceWindow`/`windowCoversRule` from THIS REPOSITORY's own
+`lib/guard-maintenance-window.mjs`, already ported to v3 tonight (`6a548cf9`).
+**But the actual enforcing PreToolUse hook (`guard-testpath.mjs`, `guard-gate-strength.mjs`,
+etc.) runs from the INSTALLED plugin distribution
+(`~/agent-pipeline-local-marketplace/plugins/pipeline-core/`), which imports its OWN,
+UNPATCHED copy of `lib/guard-maintenance-window.mjs`.** Confirmed by direct read:
+
+```
+~/agent-pipeline-local-marketplace/.../lib/guard-maintenance-window.mjs:638
+  if (!policy.ok || policy.trustAnchor === null) return { status: "absent" };
+```
+
+Still the pre-v3 singular-`trustAnchor` check — exactly the gap this checkpoint
+already named as unfixed-even-upstream when scoping `PHX-WP-CHP-V3-PORT` (see
+"guard-maintenance-window.mjs ... no upstream equivalent yet" above), just not
+fully appreciated as **load-bearing for tonight's whole ceremony** until now.
+Against this repository's v3-empty `critical-human-proof.json`, `policy.trustAnchor`
+is always `null`, so `currentGuardMaintenanceWindow` always returns `"absent"` when
+called from the hook's code path — **regardless of whether a real, validly-signed
+window file exists on disk.** The window was genuinely installed and is genuinely
+real; it is simply invisible to the code that would need to honor it.
+
+**The classic HGO capability-arming ceremony (`authorize-by-signature`, what the
+refusal message's "signed override is admitted instead" text points at) has the
+IDENTICAL gap**, confirmed the same way:
+`~/agent-pipeline-local-marketplace/.../lib/human-guard-override.mjs:2210-2213`
+still gates on the singular `trustAnchor`. So there is currently **no working
+signature-based route at all** to clear a `TP-*`/`GS-*` protection in this
+repository — not the window, not the older override — until the installed plugin
+gets the same v3 port this session already applied to the repo-local copies.
+
+**Why the RECONCILE ceremony worked anyway, and the window ceremony didn't, is the
+whole explanation in one sentence: `pipeline-state.mjs feature-package-reconcile`
+is a SCRIPT, invoked directly (`node plugins/pipeline-core/scripts/pipeline-state.mjs
+...`), which resolves its own imports to THIS REPOSITORY's `lib/` — already patched.
+The GMW window's CONSUMPTION happens inside a PreToolUse HOOK, which is wired to the
+INSTALLED plugin root, not this repository — unpatched.** Scripts run repo-local
+code; hooks run installed code. Every fix landed tonight helped the script side
+(reconcile, and any future script-driven ceremony) and did nothing for the hook side,
+because no dispatch touched — and per `docs/push-release-flow.md`'s and
+`GUARD-CROSS-REPO-MUTATION`'s own rules, no agent session CAN touch — the installed
+plugin distribution.
+
+**Consequence, stated plainly:** OT09/TP-2/TP-6/TP-3 (and, generalized, any future
+protected-test-path or `GS-6` edit) are **not achievable by any agent-only means
+tonight**, not because of a missing signature but because the currently-installed
+plugin cannot recognize ANY signature against this repository's v3-any-key policy
+for hook-enforced clearances. Not worked around by: preparing a new window
+(same code path, same result), trying the classic HGO route (same gap, confirmed
+above), or asking for a fourth PO signature (nothing to sign that the installed
+code would honor). **The only real fixes are either of:** (a) update the installed
+plugin distribution to the version carrying tonight's v3 port for
+`guard-maintenance-window.mjs`/`human-guard-override.mjs` (an out-of-repo action,
+its own session, PO authorization — exactly what the PO's earlier "Du bekommst aber
+gleich vorab die passende version dann lokal" already anticipated needing, just not
+yet landed for these two specific files), or (b) port the same v3 fix into a NEW
+local-development plugin build and have the PO re-point their installation at it.
+**Filed as its own backlog item** (see below) rather than left only in this prose,
+and named as the top open item for the next session/PO check-in.
+
+**Parked, cleanly, per the AFK protocol (work what is not blocked, park what needs
+the PO — never force a blocked path):** OT09, TP-2, TP-6, TP-3-registration all stay
+exactly as pre-diagnosed above (exact line numbers, exact replacement text) — zero
+investigation needed when this unblocks, whether by plugin update or otherwise. The
+GMW window itself is left installed (harmless, expires on its own ~3h from now); no
+further attempt to use it tonight.
+
+**Live acceptance-evidence-map / criterion work resumes below, on threads that do
+NOT depend on this blocked mechanism.**
 
 **Exact next steps once both proofs exist (mechanical, no more design decisions):**
 1. Capture the window proof (copy `~/agent-pipeline-po-nova/proof-manual.json` content into
