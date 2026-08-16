@@ -7234,6 +7234,8 @@ Re-review of the fixed candidate dispatched: preflight (`15cf0e58..bf8803ed`) â†
 
 **Next step, PO-gated, small:** once the PO runs that two-command refresh (whenever they're back, not now), the TP-3 lift will actually work for the remainder of the active window's ~2h, and the one remaining line in `harness/scripts/verify.mjs` (`steps.push(...verifyRun.steps.map(({ name, exitCode, durationMs }) => ({ name, exitCode, durationMs })));`, per `NVA-VERIFYDUR-2`'s own report) can be dispatched immediately â€” small, well-understood, ready to go the moment the block above stops applying.
 
+**New local 0.5.5 candidate re-stamped: `13bcec25`, tree `1c12273003189269fa25ef3a4df10b36338377c3`.** Verify 269/269 exit 0 and Security exit 0, both clean and exactly bound, run back to back against a clean tree at the end of this sub-block. Same PO scope as every candidate this AFK block: local test candidate, not a release. Adds to `79ddc997`: the GMW v3-trust-anchor fix (`e31f0233`, 33/33 tests), the partial verify-duration landing (`ce9bf7e1`, 9/9 tests) plus its full root-cause diagnosis, and the two backlog-item corrections recording both. Does NOT close: ADR-0064 (still `proposed`), `#98` R6/R4-real-exercise, the two deferred architectural items, or `NVA-VERIFYDUR-1`'s remaining one-line `verify.mjs` change (genuinely PO-gated now, on the marketplace-copy refresh, not on anything this session can still move). Push stays open, no approval prepared or recorded against `13bcec25`.
+
 ## Re-entry
 
 1. Maintainers start with [`CLAUDE.md`](../CLAUDE.md).
