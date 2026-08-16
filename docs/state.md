@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-12 (checkpoint: PO decided all 23 Medium/Low decision-needed backlog items in one pass; every one implemented, verified, or closed this same AFK session; full Verify exact-bound, single pre-existing failure unchanged, Security clean)
+**Last updated:** 2026-08-16 (this machine re-synced to `origin/feat/sprint-nova-codex-v046`; the 2026-08-12 handover's six recorded next steps worked — see the 2026-08-16 section, which is now the current block)
 **Project status:** ACTIVE
 **Release version:** `0.5.4` released
 **Release state:** version `0.5.4` · tag `v0.5.4` · commit `dd1eb9eedeb7ac48860c8ec9745750c9a8367b32` · tree `b6857469bbc84de94c0f917ed64dc59b0eccc8de` · status `published`
@@ -88,7 +88,83 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical candidate-qualification sections below are retained as
 session history and no longer describes the current publication disposition.
 
-## 2026-08-12 PO-directed autonomous AFK session: all 23 Medium/Low decision-needed backlog items decided and shipped (current)
+## 2026-08-16 Second-machine re-sync; the 2026-08-12 handover's six next steps worked (current)
+
+Session opened on the *other* machine (the one whose `scratch/` still dates
+from 2026-08-10), with the PO's instruction to pull `origin` and continue per
+the recorded status.
+
+- **`origin` sync.** Local branch was at `7132c5c7` (the published 0.5.4
+  point), 129 commits behind `origin/feat/sprint-nova-codex-v046`. Working
+  tree clean, zero local-only commits, `git merge-base --is-ancestor HEAD
+  origin/...` → exit 0, so this was a plain **fast-forward** to `1b467f98`, not
+  the destructive reset the PO's phrasing would also have permitted. (A
+  `git reset --hard` was tried first and correctly refused by guard-git
+  `GG-07`; the refusal was right and the fast-forward made it moot — no
+  override was sought.)
+- **Bootstrap ran against the checkout, not the installed plugin — disclosed,
+  not silently chosen.** The installed plugin (`~/.claude/plugins/cache/.../0.5.4`,
+  built at `dd1eb9ee`) returns `plugin-refresh-required`: its
+  `installedPipelineIdentityClaude` ambiguity check predates GF-111/GF-115 and
+  still counts the sibling `agent-pipeline-share_phoenix` project-scope
+  registration plus a redundant `local`-scope one. The checkout's own current
+  `pipeline-start-preflight.mjs` returns `ready` on the *identical* host
+  registry state — confirmed by running both. Bootstrapped from the checkout's
+  own `nextAction` per the canon-references rule (repo-root wins in a source
+  checkout); onboarding V4 `ready`, continuity `valid`, observation governance
+  `passed`, `CLAUDE_CODE_SUBAGENT_MODEL` unset. **The guard hooks actually
+  enforcing this session still come from the stale cache copy** — same
+  version-skew class as
+  `backlog/items/2026-08-11-critic-route-pre-check-not-in-force-in-installed-plugin.md`.
+- **Next step 1 (fold `scratch/phoenix-escalation-note.md` into the
+  stale-checkout backlog item) — NOT EXECUTABLE HERE.** `scratch/` on this
+  machine dates from 2026-08-10; a `find /home/<user>/src -maxdepth 3 -name
+  phoenix-escalation-note.md` returns nothing. The note was written on the
+  other machine and, being gitignored, did not travel with the push. It is
+  either still on that machine or already lost — this session cannot fold it
+  in, and does not invent its contents. Carried forward as the one next-step
+  this session could not do.
+- **Next step 4 (`closure_commit` mismatch, "cause unknown") — RESOLVED,
+  read-only.** It is not an independent defect: ledger event 403's
+  `evidence.commit` is the 8-character short hash `181b7730`, while the item
+  `2026-08-09-codex-read-only-steps-escalate-individually-instead-of-once.md`
+  carries the full OID `181b7730c9d6a7ca87a5df108a5b4da3447aa0e6`. The two
+  `backlog-state-check` findings ("must be a full lowercase Git commit OID"
+  and "closure_commit must equal its final ledger evidence.commit") are one
+  defect reported twice — exactly what
+  `backlog/items/2026-08-12-ledger-event-403-has-a-short-hash-evidence-commit.md`
+  already documents. Nothing new to investigate; what remains is a decision,
+  see below.
+- **Next step 5 (events 39/40's `reachability-amendment` targets "are
+  themselves unreachable") — DOES NOT REPRODUCE; the 2026-08-12 claim was
+  wrong.** The amendment events are sequences **42 and 43** (not 39/40
+  rewritten), both citing `evidence.commit`
+  `83640cec22d494d227eebc82929370277ce926b9`, which `git branch -a --contains`
+  places on `feat/sprint-nova-codex-v046`, `stable`, `origin/main` and
+  `upstream/main` — genuinely reachable. The short values `726b8368`/
+  `2ddf3592` named in the 2026-08-12 handover appear in neither amendment
+  event's `evidence.commit` nor its `referenceBlobOid`; that line was a
+  misreading and is corrected here rather than left to be re-chased.
+- **A finding the 2026-08-12 session could not have seen: `backlog-state-check`'s
+  reachability verdict is CLONE-DEPENDENT.** On this machine `node
+  plugins/pipeline-core/scripts/check-backlog-state.mjs` reports **zero**
+  unreachable-commit findings — all seven historical commits (`933e1a8d…`
+  plus the six named in the 2026-08-12 addendum) return exit 0 from `git
+  cat-file -e`. But `git branch -a --contains` returns **nothing** for them:
+  they survive here only as dangling objects in an older clone that has not
+  been gc'd, reachable from no ref at all. A fresh clone (and, evidently, the
+  other machine) has none of them and fails exactly as recorded. **Consequence:
+  the durable allowlist fix is still required** — this machine merely masks
+  the failure, and "the finding disappeared" must never be accepted as
+  evidence that it was fixed.
+- **Next steps 2+3 dispatched as one work package** (`NVA-BLDRIFT-02`,
+  `goldfish-deep`) — correct the source backlog item's own diagnosis (it still
+  claims all 38 events share one commit) and extend `check-backlog-state.mjs`'s
+  narrowly-keyed allowlist to the six further commit/actor/kind tuples, with
+  regression tests mirroring the existing CBS01-03 discipline. Result recorded
+  below when it lands.
+
+## 2026-08-12 PO-directed autonomous AFK session: all 23 Medium/Low decision-needed backlog items decided and shipped
 
 PO went AFK ("ich schlafe jetzt") after deciding all 23 items from the
 Medium/Low LOOSE backlog grouping in one message; standing instruction:
