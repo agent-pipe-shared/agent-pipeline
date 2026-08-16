@@ -194,6 +194,73 @@ and the item template still document `rejected`/`deferred`. A PO-rejected item c
 therefore only be recorded as `closed`, which understates the outcome. Not fixed here
 (would mean editing the validator); worth its own item if the PO wants a fourth status.
 
+### Criterion work resumed: P-AC-11, the top unworked blocker — worked, reviewed, FAILed, fixed — 2026-08-16
+
+With the push chain parked on key material, the session moved to the substantive
+criterion work. `P-AC-11` was the top unworked lever in the ranked blocking set (4 live
+bullets; `P-AC-06` and `H-AC-12` above it already carry PO dispositions).
+
+Full arc, in five commits: **`9352331d`** gave all five previously-fieldless dimensions a
+representation; **`8be6c308`** ran investigation-first against the real decision path and
+found only ONE of the five has a genuine enforcement point; **`c7eb2297`** plus two
+Elephant commits closed the Critic's findings. The per-dimension detail lives in the
+evidence map entry (`cfffef1b`) and the review record
+(`specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md`, `325aca9f`) rather
+than being repeated here.
+
+**The verdict stays `partial`, deliberately, and this is the sentence that matters for
+whoever picks it up:** "scope permission by" is satisfied for `mode`, `approvalRequired`,
+`targetBinding` and `ownedSections` by an actual rejection on an actual decision path.
+That is the bar. The remaining four validate and merge but change no behaviour, so the
+criterion moved from "no field exists" to "field exists, nothing enforces it" — real
+progress, not a close. Criterion totals unchanged at 130/23/3/1.
+
+**The Critic returned FAIL, and it was worth every minute.** F1 and F2 were real defects
+both dispatch reports missed. F1: `ownedSections` items were validated against one
+pattern while the value they are compared against uses another, so every field name with
+an uppercase letter, dot, underscore, colon or leading digit was unrepresentable in
+policy and permanently rejected — exactly the field conventions of the systems the
+adapter supports. F2: the recorded justification for leaving `lifecycleEvents` unenforced
+was factually false and contradicted by the same diff's own source comment. The fix
+dispatch re-verified both at source, and for F2 chose to leave the dimension unenforced
+rather than invent semantics — replacing the false claim with a true one **in the source
+comment**, because a commit message is not durable enough.
+
+**Three process errors of mine, recorded because they are the reusable lesson:**
+
+1. **The first Critic dispatch was defective at parse** — I used keyword-style arguments
+   (`T2 range … spec …`) against a strictly positional grammar. The Critic refused before
+   reviewing anything, which is correct. `CLAUDE.md` already says dispatch from the
+   template; I did not.
+2. **I supplied a model-authored evidence artifact** with a custom schema listing four
+   ad-hoc `node --test` runs, and never ran the project's single declared gate at the
+   candidate. QG-03 is explicit that the verify script must write the artifact and that a
+   submission without one is unverified regardless of what the report claims. The
+   trajectory check correctly resolved *inconsistent*.
+3. **I put implementor rationale inside that artifact** (`openQuestionsForTheReviewer`,
+   pre-empting a conclusion). The Skill invocation was clean, so the dispatch was not
+   contaminated — but the artifact is the wrong carrier for a justification.
+
+**A structural block worth stating once:** a delta Critic re-review of the fix range
+cannot be issued yet. QG-01 forbids handing a diff to the Critic while deterministic
+gates are red, and the full Verify gate cannot go green until the PO-signed
+`feature-package-reconcile` lands. Not worked around.
+
+**Also found and filed, not fixed:** `.gitignore:25`'s `evidence/` rule has no leading
+slash, so it matches every directory of that name at any depth — including
+`specs/<package>/evidence/`, which holds the durable per-package audit artifacts ADR-0045
+expects tracked. Two dispatches today correctly refused to force-add their records past
+it. The fix is to anchor the pattern, which is what its own comment already claims it
+means, but measured before filing: anchoring surfaces ~75 untracked files at once,
+leaving the tree dirty so that the Verify candidate preflight and `security-scan` both
+refuse. It needs a curation pass with an absolute-path check per file, not a one-line
+edit — `backlog/items/2026-08-16-gitignore-evidence-rule-swallows-durable-spec-artifacts.md`.
+
+**Next criterion targets, in order:** the `command-offer` producer at the guard hand-off
+seam (design pass done, `442036b3`; closes R-AC-08's producer half), then the
+`agent-decision` scoping step, then `E-AC-08` (7 of 8 detections pinned; outbox
+truncation needs a cross-state comparison the module has no capability for).
+
 ---
 
 ## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
