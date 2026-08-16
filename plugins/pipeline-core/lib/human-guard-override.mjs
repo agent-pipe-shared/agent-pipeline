@@ -23,6 +23,13 @@ import {
   readCriticalHumanProofPolicy,
   readPushApprovalMode,
 } from "./critical-human-proof-policy.mjs";
+import {
+  buildGuardHandoffOfferEvent,
+  GUARD_HANDOFF_JOURNAL_REFUSAL,
+  GUARD_HANDOFF_OFFER_OMISSIONS,
+  GUARD_HANDOFF_REDACTION_POLICY,
+  recordGuardHandoffOffer,
+} from "./guard-handoff-offer.mjs";
 import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 import {
   LEGACY_STATE,
@@ -315,6 +322,9 @@ function storage(common) {
     audit: join(base, "audit.jsonl"),
     auditHead: join(base, "audit.head.json"),
     auditLock: join(base, "audit.lock"),
+    // R-AC-08: the command-offer journal is a SEPARATE file in the same private
+    // directory, never a member of the HMAC-chained override ledger above.
+    commandOffers: join(base, "command-offers.jsonl"),
   };
 }
 
@@ -1100,6 +1110,112 @@ function appendAudit(paths, event) {
   }
 }
 
+// ---------------------------------------------------------------------------------
+// R-AC-08 / R-AC-10: the command-offer journal for the external-operator hand-off.
+//
+// A second consumer of this module's existing fsync'd write discipline, never a
+// second write discipline: `writeAtomic` above, the same owner-private directory
+// `storage()` already returns, one JSON object per line.
+//
+// Deliberately NOT the HMAC-chained override ledger. That ledger records the
+// override authority trail (denied/authorized/consumed) under a key whose custody
+// is the thing being protected; this file records observational journal events for
+// routes that never produce an override request at all. Chaining an observational
+// record into an authority ledger would let a journal write failure corrupt the
+// authority chain -- and would make the journal's own key custody a new problem.
+//
+// No lock file: unlike `appendAudit`, an entry here neither reads nor re-macs the
+// prior entries, one guard hand-off is written per synchronous tool-call decision,
+// and `writeAtomic`'s rename is atomic. The readback below then verifies OUR OWN
+// line, so a concurrent writer can never be mistaken for a successful append.
+// ---------------------------------------------------------------------------------
+function appendCommandOfferJournal(event, { paths } = {}) {
+  const path = paths.commandOffers;
+  let prior = Buffer.alloc(0);
+  if (existsSync(path)) {
+    safePrivateFile(path);
+    prior = readFileSync(path);
+  }
+  const line = Buffer.from(`${JSON.stringify(event)}\n`, "utf8");
+  writeAtomic(path, Buffer.concat([prior, line]));
+  const lines = readFileSync(path, "utf8").split("\n").filter(Boolean);
+  let readback;
+  try { readback = JSON.parse(lines.at(-1) ?? ""); }
+  catch { fail("HGO-COMMAND-OFFER-JOURNAL", "command offer journal readback is malformed"); }
+  if (canonical(readback) !== canonical(event)) {
+    fail("HGO-COMMAND-OFFER-JOURNAL", "command offer journal readback does not match the appended event");
+  }
+  return { eventId: readback.eventId, candidateDigest: readback.candidateDigest, integrity: "verified" };
+}
+
+/**
+ * The five SHA-256 context digests `buildGuardHandoffOfferEvent` requires, every
+ * one derived with this module's own `sha()` over values the denial already holds
+ * -- never over raw command text, argv, or tool input.
+ */
+function commandOfferDigests({ repo, repository, policy, toolName, eligiblePaths }) {
+  return {
+    candidateDigest: sha({
+      kind: "pipeline.guard-handoff-offer-candidate.v1",
+      fingerprint: repository?.fingerprintSha256 ?? null,
+      head: repository?.head ?? null,
+      tree: repository?.tree ?? null,
+      statusSha256: repository?.statusSha256 ?? null,
+    }),
+    repositoryFingerprint: SHA256.test(String(repository?.fingerprintSha256))
+      ? repository.fingerprintSha256
+      : sha({ physicalRoot: repo.root, physicalCommon: repo.common }),
+    scopeDigest: sha({
+      kind: "pipeline.guard-handoff-offer-scope.v1",
+      root: repo.root,
+      toolName: String(toolName ?? ""),
+      eligiblePaths: [...(eligiblePaths ?? [])].map(String).sort(),
+    }),
+    policyDigest: sha(policy),
+    redactionPolicyDigest: sha({
+      policy: GUARD_HANDOFF_REDACTION_POLICY,
+      omissions: GUARD_HANDOFF_OFFER_OMISSIONS,
+    }),
+  };
+}
+
+/**
+ * R-AC-08/R-AC-10 seam: no external-operator route leaves this module until its
+ * hand-off has been journaled as a validated `command-offer` in state `offered`.
+ *
+ * Fail-closed shape on ANY journaling failure: the same `status`/`code` -- the
+ * denial itself must still reach the caller -- with `nextAction` ABSENT and a
+ * typed `journalRefusal`. Deliberately not a throw: this runs inside a PreToolUse
+ * hook, where a throw would replace a typed refusal with an unroutable crash
+ * (the exact defect ADR-0059 Decision 4 already had to close once).
+ */
+function journaledExternalOperatorRoute(route, {
+  repo, repository, pluginRoot, toolName, denials, eligiblePaths, nowMs, appendCommandOffer,
+}) {
+  try {
+    const paths = storage(repo.common);
+    const offer = buildGuardHandoffOfferEvent({
+      route,
+      toolName,
+      ...commandOfferDigests({
+        repo,
+        repository,
+        policy: policyIdentity(repo.root, pluginRoot, denials),
+        toolName,
+        eligiblePaths,
+      }),
+      occurredAtEpochMs: nowMs,
+    });
+    recordGuardHandoffOffer({ offer, append: (value) => appendCommandOffer(value, { paths }) });
+    return route;
+  } catch {
+    const refused = Object.fromEntries(
+      Object.entries(route).filter(([name]) => name !== "nextAction"),
+    );
+    return { ...refused, journalRefusal: GUARD_HANDOFF_JOURNAL_REFUSAL };
+  }
+}
+
 const CAPABILITY_KEYS = [
   "schema",
   "status",
@@ -1265,6 +1381,9 @@ export function recordHumanGuardDenial({
   nowMs = Date.now(),
   ttlMs = DEFAULT_TTL_MS,
   spawn = spawnSync,
+  // R-AC-08: injectable only so a test can substitute the append; production
+  // always journals through this module's own fsync'd writer.
+  appendCommandOffer = appendCommandOfferJournal,
 } = {}) {
   if (!Array.isArray(denials) || denials.length === 0) fail("HGO-DENIAL", "denial set is empty");
   const physicalRootDir = physicalRoot(rootDir);
@@ -1295,11 +1414,25 @@ export function recordHumanGuardDenial({
     };
   }
   if (!eligible.eligible && !eligible.authorCandidate) {
-    return recoveryRoute(eligible.code, toolName, toolInput, eligible.paths, {
+    const route = recoveryRoute(eligible.code, toolName, toolInput, eligible.paths, {
       root: repo.root,
       pluginRoot,
       repository,
     });
+    // Only the external-operator routes hand a human a copy-only command, so only
+    // they need a journaled offer first; every other route is returned unchanged.
+    return route.status === "external-operator-required"
+      ? journaledExternalOperatorRoute(route, {
+        repo,
+        repository,
+        pluginRoot,
+        toolName,
+        denials,
+        eligiblePaths: eligible.paths,
+        nowMs,
+        appendCommandOffer,
+      })
+      : route;
   }
   const paths = storage(repo.common);
   const policy = policyIdentity(repo.root, pluginRoot, denials);
