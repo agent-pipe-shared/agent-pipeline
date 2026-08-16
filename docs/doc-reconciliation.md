@@ -50,13 +50,32 @@ something to do here without review.
 ## Candidate 707129812a4f09a70ba727087544f28f34e80638 — 2026-08-16, range 2390e02f..70712981, the closing gate run recorded in the handover
 
 - ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: amended in 2390e02f5a106b5ad13b072f7baf5176f8c322f6.
 
-The only `Governs:`-listed path in this range is `docs/state.md`, appended once with
-the closing `verify.mjs` result. ADR-0012's decision — one canonical versioned
-handover file, memory mirror-only, the open-items block referenced rather than
-hand-maintained — is untouched. The other commit in the range
-(`fix(reconciliation): use the full commit SHA …`) edits this record file, which no
-ADR governs.
+The only `Governs:`-listed path changed in this entry's own narrow range is
+`docs/state.md`, appended once with the closing `verify.mjs` result. ADR-0012's
+decision — one canonical versioned handover file, memory mirror-only, the open-items
+block referenced rather than hand-maintained — is untouched. The other commit in that
+narrow range (`fix(reconciliation): use the full commit SHA …`) edits this record
+file, which no ADR governs.
+
+**ADR-0045 and ADR-0056 are restated here deliberately, and this is worth reading
+before extending this file.** The checker does not compose sub-range entries: a
+Layer 1b run over a wider span (`--base <last pushed> --candidate <tip>`, which is
+the shape a push actually uses) requires ONE entry naming the final candidate and
+covering every ADR implicated anywhere in that span. A chain of correct incremental
+entries does not satisfy it — verified directly here, where
+`--base 8a92d377 --candidate 70712981` reported ADR-0045 and ADR-0056 unreconciled
+even though both were fully checked one entry below. That is the same
+narrow-ancestor-span limitation this file's own header already names as the obvious
+v2. Restating them is therefore not duplication for its own sake; it is what keeps a
+session's whole range pushable.
+
+Both restatements are the same findings, unchanged and not re-derived: ADR-0045 was
+implicated by three `specs/` paths and needed no change (see the entry below for the
+manifest-enumeration note), and ADR-0056 was genuinely amended, by a commit that is an
+ancestor of this candidate.
 
 ## Candidate 2390e02f5a106b5ad13b072f7baf5176f8c322f6 — 2026-08-16, range a15fe3ee..2390e02f, the P-AC-11 criterion arc, its Critic FAIL and fix cycle, and the PO's v3 trust-anchor migration
 
