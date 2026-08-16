@@ -170,7 +170,7 @@ try {
       featureId: "f", planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
     const installed = installGuardMaintenanceWindow({
-      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+      rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin,
     });
     assert.equal(installed.status, "active");
     assert.deepEqual([...installed.scopeRuleIds].sort(), ["GS-6", "TP-1"]);
@@ -194,7 +194,7 @@ try {
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 60, reason: "expiry", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
 
     const repo = guardMaintenanceWindowInternals.topology(root);
@@ -220,7 +220,7 @@ try {
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 30, reason: "short-lived", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
     const repo = guardMaintenanceWindowInternals.topology(root);
     const paths = guardMaintenanceWindowInternals.storagePaths(repo.common);
     const record = JSON.parse(readFileSync(paths.window, "utf8"));
@@ -243,14 +243,14 @@ try {
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
     const proof = proofFor(intent);
-    const first = installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof, livePluginRoot: plugin });
+    const first = installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof, livePluginRoot: plugin });
     assert.equal(first.status, "active");
     const firstExpiresAtMs = first.expiresAtMs;
 
     // Re-run install with the SAME request/proof after real wall-clock time has passed.
     // A vulnerable implementation would recompute a fresh expiry from "now" here.
     const later = installGuardMaintenanceWindow({
-      rootDir: root, request, trustPolicy, proof, livePluginRoot: plugin, nowMs: Date.now() + 60_000,
+      rootDir: root, request, anchors: [trustPolicy], proof, livePluginRoot: plugin, nowMs: Date.now() + 60_000,
     });
     assert.equal(later.status, "active");
     assert.equal(later.expiresAtMs, firstExpiresAtMs, "a repeated install must reinstall the identical signed bound, never extend it");
@@ -263,7 +263,7 @@ try {
       root, plugin, scopeRuleIds: ["GS-6"], expiresAtMs: Date.now() - 60_000,
     });
     assert.throws(
-      () => installGuardMaintenanceWindow({ rootDir: root, request: builtRequest, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin }),
+      () => installGuardMaintenanceWindow({ rootDir: root, request: builtRequest, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin }),
       GuardMaintenanceWindowError,
     );
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
@@ -288,7 +288,7 @@ try {
       root, plugin, scopeRuleIds: ["GS-6"], expiresAtMs: before + MAX_WINDOW_TTL_MS * 100, reason: "excessive claim",
     });
     assert.throws(
-      () => installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin }),
+      () => installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin }),
       GuardMaintenanceWindowError,
       "the first install attempt of a grossly oversized signed expiresAtMs must itself refuse, not silently clamp",
     );
@@ -309,7 +309,7 @@ try {
     const proof = proofFor(intent);
     for (const nowMs of [before, before + 60_000, before + 2 * 60 * 60 * 1000]) {
       assert.throws(
-        () => installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof, livePluginRoot: plugin, nowMs }),
+        () => installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof, livePluginRoot: plugin, nowMs }),
         GuardMaintenanceWindowError,
         `install must still refuse at nowMs=${nowMs}`,
       );
@@ -328,7 +328,7 @@ try {
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
     assert.throws(
-      () => installGuardMaintenanceWindow({ rootDir: rootB, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin }),
+      () => installGuardMaintenanceWindow({ rootDir: rootB, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin }),
       GuardMaintenanceWindowError,
     );
     assert.equal(currentGuardMaintenanceWindow({ rootDir: rootB }).status, "absent");
@@ -343,7 +343,7 @@ try {
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "tamper", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
 
     const repo = guardMaintenanceWindowInternals.topology(root);
@@ -361,7 +361,7 @@ try {
     for (const scope of [["GS-2"], ["GS-1"], ["unknown-id"]]) {
       const { request, intent } = handBuiltRequest({ root, plugin, scopeRuleIds: scope, expiresAtMs: Date.now() + 60_000 });
       assert.throws(
-        () => installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin }),
+        () => installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin }),
         GuardMaintenanceWindowError,
         `scope ${JSON.stringify(scope)} must be rejected at install`,
       );
@@ -381,7 +381,7 @@ try {
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "scope-read-check", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
-    installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    installGuardMaintenanceWindow({ rootDir: root, request, anchors: [trustPolicy], proof: proofFor(intent), livePluginRoot: plugin });
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
     assert.equal(windowCoversRule({ rootDir: root, ruleId: "GS-2" }).covered, false);
   });

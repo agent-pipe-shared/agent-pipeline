@@ -381,6 +381,15 @@ export function prepareGuardMaintenanceWindowRequest({
 
 /** Agent-safe: verify-and-place only. Cannot succeed without a genuine proof. */
 export function installGuardMaintenanceWindow({ rootDir, request, anchors, proof, livePluginRoot, nowMs = Date.now(), spawn = spawnSync } = {}) {
+  // Fail closed on a missing/malformed anchor set. verifyAgainstTrustAnchors() coerces any
+  // non-array `anchors` to [] -- which is its MOST permissive posture (an empty set derives the
+  // anchor from the proof itself, so any well-formed Ed25519 key verifies). A caller that simply
+  // forgets `anchors`, or passes the wrong shape, must therefore not silently inherit that
+  // posture: caller error is refused loudly here, while an explicit empty array (the deliberate
+  // "any well-formed key may sign" choice) still reaches verification unchanged.
+  if (!Array.isArray(anchors)) {
+    fail("GMW-ANCHORS-INVALID", "anchors must be an array (possibly empty); a missing or malformed value is refused rather than treated as an empty set");
+  }
   if (!validRequest(request)) fail("GMW-REQUEST-INVALID", "window request is malformed");
   // F3 defense in depth: install() re-validates the closed scope set independently of
   // prepare() -- a hand-built request naming a non-liftable id must never install.
