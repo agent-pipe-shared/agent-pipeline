@@ -467,7 +467,80 @@ both correctly still `partial` (neither closes its full criterion alone: R-AC-08
 producer half only per the design doc, A-AC-05 covers 5 of 7 dimensions and the success path
 only).
 
----
+### v3 trust-anchor library port landed; PO goal set for an overnight run to the final push gate — 2026-08-16
+
+PO corroborated (with a Nova session) that the `project/critical-human-proof.json` v3
+any-key migration from the checkpoint above is real and usable now that the 0.5.5 candidate
+is installed locally (`pipeline-start-preflight` now reports `installedVersion` matching
+this session's plugin root). Directive: pack as much as possible into ONE Guard Maintenance
+Window signing session so the PO can go AFK immediately after clearing it, while the Elephant
+finishes Phoenix content work overnight up to the final push gate — **no intermediate push**,
+one signature sitting now, one final push-approval signature when the PO returns.
+
+**`PHX-WP-CHP-V3-PORT` landed, commit `6a548cf9`** (goldfish-deep/opus/xhigh; first attempt
+correctly self-stopped at its own route pre-check — the dispatching tool call had named
+`claude-opus-5` in the briefing text but never set the actual tool-layer model override, so
+the subagent ran as `claude-sonnet-5`; a real dispatcher-side defect, not a Goldfish error —
+re-dispatched with the override actually set). Ports schema-v3 `trustAnchors`-SET parsing and
+verification into `critical-human-proof-policy.mjs` (merged, not copy-over: preserves the
+repo-local-only `GATE_APPROVAL_MODE_KEYS`/`readReconcileApprovalMode` P-AC-08 generalization
+the installed plugin does not have), `critical-action-authorization.mjs` (matches the
+installed 0.5.5 pattern), and `guard-maintenance-window.mjs`/`human-guard-override.mjs`'s
+READ/verify paths (`currentGuardMaintenanceWindow`, the `authorize-by-signature` fallback) —
+**these last two have no upstream equivalent yet**; the installed 0.5.5 plugin has the same
+v1-only gap in both. Independently re-verified by the Elephant, not accepted from the
+(truncated — see below) report: all four suites re-run directly, 31+31+14+26 = 102/102 pass,
+CHP13 now green. Full `verify.mjs` re-run at `6a548cf9` from the relocated `.git/phx-verify`
+worktree: **6 red** (down from 7), zero regressions —
+`critical-human-proof-policy-tests` is the one that closed;
+`critical-action-authorization-tests`/`guard-maintenance-window-tests`/
+`human-guard-override-tests` stay green as before. Remaining 6, unchanged in kind:
+`artifact-topology-check` (2), `threat-model-tests` (1), `pipeline-state-tests` (1),
+`external-reference-adapter-tests` (1) — all `FTP-ARTIFACT-2`, reconcile-signature-gated;
+`guard-testpath-override-tests`/OT09 (1) — TP-7-gated; `verify-suite-registration-check`
+(2) — TP-3-gated (the two still-unregistered suites from tonight's earlier R-AC-08/A-AC-05
+work, `advisory-decision-event.test.mjs` and `guard-handoff-offer.test.mjs`).
+
+**The dispatch's own final report was truncated** (`outcome: "in-progress"`, `report: null`
+in `scratch/dispatch-record-PHX-WP-CHP-V3-PORT-retry.json`) — it committed and ran the
+isolated suites green, then was mid-investigation of the verify-candidate preflight (tripped
+by this repo's permanently-dirty state files, the known `.claude/settings.json`/
+`project/pipeline-state.json`/`project/resume-hint.json` trio) when it ran out of turns. Its
+report-early log survived (per the template's truncated-final mitigation) and was enough to
+reconstruct and independently confirm the outcome without guessing.
+
+**Gap the report-early log flagged and the Elephant confirmed independently: two more
+call sites never got the v3 treatment, both load-bearing for tonight's actual ceremony.**
+The original briefing said "this file's own single call site" for
+`guard-maintenance-window.mjs`, which was wrong — there are two. `currentGuardMaintenanceWindow`
+(the read path) is fixed; `installGuardMaintenanceWindow` (the WRITE path — i.e. actually
+installing a signed window) still takes a scalar `trustPolicy` and still throws on a v3
+empty set, and so does its one caller, `scripts/guard-maintenance-window.mjs`'s `install`
+command (`GMW-TRUST-ANCHOR-MISSING`). Neither shows up as a red Verify step, because no
+suite exercises `install` against the real committed policy — only a live ceremony run
+would hit it, tonight. Dispatched as `PHX-WP-GMW-INSTALL-V3` (goldfish-deep/opus/xhigh,
+scope: exactly these two files, mirroring the already-committed, already-tested pattern
+from the same file's sibling function) — result not yet known. A third, related but
+lower-priority sibling gap was also found and left alone for now: `scripts/human-authority-grant.mjs`
+has the identical v1-only pattern (`HAG-TRUST-ANCHOR-MISSING`) but backs a different
+ceremony (A-AC-04 authority grants), not tonight's window/reconcile/push path.
+
+**OT09's exact fix, pre-diagnosed and ready to apply the moment the window is open**
+(not applied yet — `guard-testpath-override.test.mjs` is TP-7-protected): its assertion
+`assert.match(source, /gates\?\.push_approval/u)` greps `critical-human-proof-policy.mjs`
+for a literal that the P-AC-08 `GATE_APPROVAL_MODE_KEYS` generalization (`c6bd3a6b`,
+2026-08-11) replaced with `value?.gates?.[key]`. Confirmed by direct search: the literal
+no longer occurs in the source at all. The code is right, the assertion is stale — needs
+updating to match the generalized lookup, not reverted.
+
+**Next, once `PHX-WP-GMW-INSTALL-V3` lands:** move the `.git/phx-verify` worktree to the
+new final candidate, re-verify, then build the actual GMW window-prepare request (scope
+bundling at least TP-3 and TP-7, everything tonight's remaining work needs, so the PO signs
+once) and the `feature-package-reconcile` prepare request (`pipeline-state.mjs
+feature-package-reconcile`, the `ALWAYS_REQUIRED_KINDS` consumption path — confirmed its
+`policy.trustAnchor !== null` pre-check is the ADR-0056-accepted, already-documented v1-only
+residue, not a new blocker, since it degrades to "skip the extra cross-check", not to a
+refusal), and hand the PO the exact commands for one signing sitting.
 
 ## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
 
