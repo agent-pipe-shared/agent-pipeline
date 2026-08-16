@@ -146,6 +146,18 @@ work — no human action needed here beyond having already produced the proof.
 
 ### Layer 5 — execute the push (dual-gated: Pipeline + Claude Code harness)
 
+**The push command's refspec must be the full `<source>:refs/heads/<branch>`
+form**, matching what `approve-push` already recorded via its own
+`--destination refs/heads/<branch>`. A bare branch name (`git push origin
+<branch>`, no colon) leaves the push guard's own refspec parser unable to
+populate a destination, and `authorizeRecordedPush` then fails its
+input-validation guard and returns `PUSH-PROOF-INPUT-INVALID` — a code that
+reads like "the recorded approval is malformed" but actually means "the push
+command left its destination implicit." The identical push written as
+`git push origin <branch>:refs/heads/<branch>` succeeds against the exact
+same recorded approval
+(`backlog/items/2026-08-09-bare-branch-name-in-git-push-fails-approval-with-a-misleading-code.md`).
+
 Once `approve-push` succeeds, the actual `git push` still passes through
 `guard-git.mjs`'s `GG-03` (refuses any direct write to `main`/protected
 branches without the documented double-confirmation override —

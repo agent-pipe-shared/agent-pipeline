@@ -128,7 +128,20 @@ of implicit behavior this guard family has elsewhere refused to guess at.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Proposal option (1) ("Narrower — document it") accepted and
+  implemented in this same change: `docs/push-release-flow.md` Layer 5 now
+  states the full `<source>:refs/heads/<branch>` refspec requirement and
+  names `PUSH-PROOF-INPUT-INVALID` as the symptom of a bare branch name.
+  Proposal option (2) ("Wider — expand it", having `guard-push.mjs` resolve
+  an implicit destination itself) stays open and unaddressed; this item's
+  `status` remains `open` accordingly.
+- **Rationale:** Option (1) costs nothing and closes the documentation gap
+  that directly caused a failed push attempt under time pressure. Option (2)
+  requires the guard to reproduce git's own refspec-resolution semantics,
+  which is exactly the class of implicit behavior this guard family has
+  elsewhere refused to guess at — a call for a future design dispatch, not
+  a Goldfish-scoped documentation fix.
+- **Assignment (if accepted):** Option (2), if the PO wants it, is a future
+  design-tier dispatch against `guard-push.mjs`'s `parsePushBinding`; no
+  assignment made here.
+- **Date:** 2026-08-16
