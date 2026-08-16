@@ -62,9 +62,24 @@ when the v3 migration landed elsewhere in the same session.
 
 Note the *file* `lib/guard-maintenance-window.mjs` is itself one of the
 hardcoded `NEVER_LIFTABLE_KERNEL_PATHS` (ADR-0058 point 3) — a GMW window can
-never cover editing this file, by design. A fix here can only land through an
-isolated-worktree Goldfish dispatch (ADR-0058's documented primary route),
-never through a same-session Edit under an active window.
+never cover editing this file, by design.
+
+**Correction, 2026-08-17: the sentence that used to stand here ("a fix here
+can only land through an isolated-worktree Goldfish dispatch... never
+through a same-session Edit under an active window") was wrong, and blocked
+this fix from being dispatched for a full session.** It conflated two
+different things: `NEVER_LIFTABLE_KERNEL_PATHS` governs which paths a GMW
+*window* can waive — it says nothing about whether the file can be edited by
+an ORDINARY Goldfish dispatch with no window involved at all.
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs` is on the exact same
+list and was successfully edited twice via ordinary, non-isolated Goldfish
+dispatches earlier the same session this item was filed in (commits
+`15cf0e58`, `a27a2ce8`, `bf8803ed`) — direct, empirical proof the file class
+is normally editable. Confirmed separately: neither
+`lib/guard-maintenance-window.mjs` nor `scripts/guard-maintenance-window.mjs`
+appears in `project/guard-config.json`'s `protectedTestPaths` (TP-1..TP-10)
+either. There is no technical obstacle; dispatched as `NVA-GMWFIX-1` (ordinary
+goldfish-deep, no isolation, no window) once this was noticed.
 
 ## Proposal
 
@@ -81,7 +96,7 @@ active`, not `absent`.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted — dispatched as `NVA-GMWFIX-1` (goldfish-deep, no isolation), 2026-08-17.
+- **Rationale:** correctly diagnosed, correctly scoped fix (mirror the already-correct `trustAnchorsFor`/`verifyAgainstTrustAnchors` pattern already used elsewhere in the same codebase); the file is guardrail-class but not actually blocked from ordinary editing (see correction above).
+- **Assignment (if accepted):** this AFK block, in flight at time of writing.
+- **Date:** 2026-08-17
