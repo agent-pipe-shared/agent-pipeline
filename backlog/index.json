@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "cabc2c70a84158a4bb5f9753f9f226e76c59b90558cfa57f8d61f8a43bdf9b5f"
+    "transitionHead": "1328c0188917bc86ebea124e290e0e3801d42677b329a1449fcc78f7f51bd6aa"
   },
   "counts": {
-    "open": 94,
+    "open": 95,
     "in_progress": 22,
     "closed": 93
   },
@@ -970,6 +970,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding it deliberately left alone rather than fixing outside its briefed scope."
+    },
+    {
+      "id": "pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-16",
+      "source": "Reported by the PO on 2026-08-16 from a consumer project running the 0.5.5 local candidate installed from the Windows local marketplace root. That session followed the bootstrap ritual, was told by the tooling to run the repair, and had it refused by the guard."
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
