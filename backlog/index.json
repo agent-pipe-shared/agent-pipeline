@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "91e0a1a1d9b33e457318461a98af4969e599c32be1710cd7e84259c9d5d38e16"
+    "transitionHead": "6194cff0b18016352b0e6e351201ffb80f724b05604f35322663398cbda56362"
   },
   "counts": {
-    "open": 90,
+    "open": 92,
     "in_progress": 26,
     "closed": 27
   },
@@ -305,6 +305,14 @@
       "source": "Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context"
     },
     {
+      "id": "pipeline.critical-command-kinds-excludes-feature-package-reconcile",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-16",
+      "source": "Found 2026-08-16 while building the PO's feature-package-reconcile signing request for the Phoenix P-AC-11/FTP-ARTIFACT-2 ceremony -- the PO had to manually cp a request file the Elephant built out to the external signing directory, and asked why."
+    },
+    {
       "id": "pipeline.critical-human-proof-not-wired-to-push-and-prd-gates",
       "status": "open",
       "type": "defect",
@@ -578,6 +586,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Critic finding F5, Phoenix gate-integrity full review round 1, 2026-08-08: lifecycle.json rebound the sha256 of an entry declared mutability immutable, and the schema has no field that could have carried the reason."
+    },
+    {
+      "id": "pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-16",
+      "source": "Found 2026-08-16 overnight: a real, correctly-signed, correctly-scoped GMW window (TP-1..TP-12, ~3.7h TTL) was installed, but every single edit it should have covered was refused by the live guard hooks. Traced to source, not guessed."
     },
     {
       "id": "pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base",

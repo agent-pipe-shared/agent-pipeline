@@ -39,6 +39,7 @@
 | pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.critical-command-kinds-excludes-feature-package-reconcile | open | defect | pipeline | 2026-08-16 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-provenance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -72,6 +73,7 @@
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-legible-approval-record | open | requirement | pipeline | 2026-08-06 | — |
 | pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | open | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
@@ -151,6 +153,6 @@
 
 ## Counts
 
-- open: 90
+- open: 92
 - in_progress: 26
 - closed: 27
