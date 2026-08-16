@@ -435,5 +435,145 @@ check("a genuinely failing example test blocks the real prepare step -- the real
   assert.match(transactionId, /^tx-/u);
 });
 
+/**
+ * NVA-A98R6-4: the R0 ("exact baseline adoption") piece the roadmap in this file's own
+ * top-of-file comment and NVA-A98R6-1/2/3's dispatch reports named as the last remaining
+ * non-PO-gated wiring increment. Per spec SS R0, a real baseline-adoption record binds
+ * previous head/tree, released-base commit/tree, resulting rebased head/tree, the ordered
+ * replayed commits, per-conflict semantic disposition and changed-path impact closure.
+ *
+ * The scoping decision this dispatch was given explicitly: do NOT hand-assert a "receipt"
+ * that just claims these fields are true -- that would be decorative (nothing would verify
+ * the resulting head genuinely descends from replaying the declared commits onto the
+ * declared base). Instead `baselineAdoptionFixture` performs a REAL `git rebase` inside a
+ * fresh disposable local repository (no remote involved -- R0 is explicitly a no-push
+ * step), `buildBaselineAdoptionReceipt` derives every receipt field from what git actually
+ * produced (`git rev-parse`, `git rev-list --reverse`, `git diff --name-status` -- never
+ * invented), and `validateBaselineAdoptionReceipt` independently RE-DERIVES the
+ * base/resultingHead relationship from git plumbing rather than trusting the numbers the
+ * builder already collected: it recomputes each claimed tree from its claimed commit,
+ * confirms `git merge-base(base, resultingHead) === base` (proving resultingHead
+ * genuinely descends from base), and recomputes `git rev-list --reverse base..resultingHead`
+ * to confirm it matches the claimed ordered replayed-commit list exactly.
+ *
+ * This fixture's rebase is conflict-free by construction (the "previous Nova head" branch
+ * and the "released base" branch touch disjoint files), so the receipt's `conflicts` field
+ * is honestly `[]` here -- real per-conflict semantic-disposition capture over an actually
+ * conflicting rebase is a further increment, not simulated by this dispatch. Scope note
+ * repeated in the dispatch report: this proves a REAL rebase-receipt validator works
+ * against REAL git history in disposable fixture resources; it does not reproduce, and
+ * does not claim to reproduce, this repository's actual historical v0.4.7 rebase.
+ */
+function baselineAdoptionFixture() {
+  const parent = mkdtempSync(join(tmpdir(), "baseline-adoption-"));
+  roots.push(parent);
+  const root = join(parent, "work");
+  mkdirSync(root);
+  assert.equal(git(root, "init", "--quiet", "-b", "main").status, 0);
+  git(root, "config", "user.email", "publication@example.invalid");
+  git(root, "config", "user.name", "Publication Fixture");
+
+  writeFileSync(join(root, "shared.txt"), "shared\n");
+  git(root, "add", "shared.txt");
+  git(root, "commit", "--quiet", "-m", "common ancestor");
+  const common = oid(root, "HEAD");
+
+  assert.equal(git(root, "checkout", "--quiet", "-b", "released-base").status, 0);
+  writeFileSync(join(root, "base-only.txt"), "base change\n");
+  git(root, "add", "base-only.txt");
+  git(root, "commit", "--quiet", "-m", "released base commit");
+  const base = { commit: oid(root, "HEAD"), tree: oid(root, "HEAD^{tree}") };
+
+  assert.equal(git(root, "checkout", "--quiet", "-b", "nova-previous", common).status, 0);
+  writeFileSync(join(root, "nova-1.txt"), "nova change one\n");
+  git(root, "add", "nova-1.txt");
+  git(root, "commit", "--quiet", "-m", "nova commit one");
+  writeFileSync(join(root, "nova-2.txt"), "nova change two\n");
+  git(root, "add", "nova-2.txt");
+  git(root, "commit", "--quiet", "-m", "nova commit two");
+  const previousHead = { commit: oid(root, "HEAD"), tree: oid(root, "HEAD^{tree}") };
+
+  return { parent, root: realpathSync(root), common, base, previousHead };
+}
+
+/** Derives every receipt field from what the real rebase actually produced -- never
+ * invented. `replayedCommits` is the real, ordered (oldest-first) set of commits reachable
+ * from `resultingHead` but not from `base`; `changedPathImpact` is the real changed-path
+ * closure between `base` and `resultingHead`. */
+function buildBaselineAdoptionReceipt(root, { previousHead, base, resultingHead }) {
+  const replayedCommits = git(root, "rev-list", "--reverse", `${base.commit}..${resultingHead.commit}`)
+    .stdout.trim().split("\n").filter(Boolean);
+  const changedPathImpact = git(root, "diff", "--name-status", base.commit, resultingHead.commit)
+    .stdout.trim().split("\n").filter(Boolean)
+    .map((line) => {
+      const [status, path] = line.split(/\s+/u);
+      return { status, path };
+    });
+  return {
+    schema: "pipeline.baseline-adoption-receipt.v1",
+    previousHead, base, resultingHead,
+    replayedCommits,
+    conflicts: [],
+    changedPathImpact,
+  };
+}
+
+/** Real validator: independently RE-DERIVES the claimed base/resultingHead relationship
+ * from git plumbing rather than trusting the receipt's own numbers. Returns
+ * `{ status: "verified" | "rejected", reasons: string[] }`; never throws on a bad receipt
+ * so both the positive and negative case can assert on the same shape. */
+function validateBaselineAdoptionReceipt(root, receipt) {
+  const reasons = [];
+  const baseTreeCheck = git(root, "rev-parse", `${receipt.base.commit}^{tree}`);
+  if (baseTreeCheck.status !== 0 || baseTreeCheck.stdout.trim() !== receipt.base.tree) reasons.push("base-tree-mismatch");
+
+  const headExists = git(root, "cat-file", "-e", receipt.resultingHead.commit);
+  if (headExists.status !== 0) {
+    reasons.push("resulting-head-unknown");
+    return { status: "rejected", reasons };
+  }
+  const headTreeCheck = git(root, "rev-parse", `${receipt.resultingHead.commit}^{tree}`);
+  if (headTreeCheck.status !== 0 || headTreeCheck.stdout.trim() !== receipt.resultingHead.tree) reasons.push("resulting-head-tree-mismatch");
+
+  const mergeBase = git(root, "merge-base", receipt.base.commit, receipt.resultingHead.commit);
+  if (mergeBase.status !== 0 || mergeBase.stdout.trim() !== receipt.base.commit) reasons.push("resulting-head-does-not-descend-from-base");
+
+  const realReplay = git(root, "rev-list", "--reverse", `${receipt.base.commit}..${receipt.resultingHead.commit}`);
+  const realReplayed = realReplay.status === 0 ? realReplay.stdout.trim().split("\n").filter(Boolean) : [];
+  if (JSON.stringify(realReplayed) !== JSON.stringify(receipt.replayedCommits)) reasons.push("replayed-commits-mismatch");
+
+  return { status: reasons.length === 0 ? "verified" : "rejected", reasons };
+}
+
+check("R0 baseline adoption: a real rebase's receipt is built from and re-verified against the disposable repo's actual post-rebase state", () => {
+  const value = baselineAdoptionFixture();
+
+  // The real rebase: replay nova-previous's two commits onto released-base. No conflicts by
+  // construction (disjoint files), so this is a genuine, clean git rebase -- not simulated.
+  assert.equal(git(value.root, "rebase", "--quiet", value.base.commit).status, 0);
+  const resultingHead = { commit: oid(value.root, "HEAD"), tree: oid(value.root, "HEAD^{tree}") };
+  assert.notEqual(resultingHead.commit, value.previousHead.commit, "a real rebase mints new commit OIDs (new parents), never reuses the pre-rebase ones");
+
+  const receipt = buildBaselineAdoptionReceipt(value.root, { previousHead: value.previousHead, base: value.base, resultingHead });
+  assert.equal(receipt.replayedCommits.length, 2, "both nova-previous commits were genuinely replayed");
+  assert.ok(receipt.changedPathImpact.some((entry) => entry.path === "nova-1.txt"), "the real changed-path closure includes the first replayed commit's file");
+  assert.ok(receipt.changedPathImpact.some((entry) => entry.path === "nova-2.txt"), "the real changed-path closure includes the second replayed commit's file");
+  assert.ok(receipt.changedPathImpact.every((entry) => entry.path !== "base-only.txt"), "the base's own pre-existing file is not part of the closure between base and resultingHead");
+
+  const honest = validateBaselineAdoptionReceipt(value.root, receipt);
+  assert.deepEqual(honest.reasons, [], `an honest receipt built from the real rebase must be accepted: ${JSON.stringify(honest.reasons)}`);
+  assert.equal(honest.status, "verified");
+
+  // Negative: hand-edit the receipt to claim a resultingHead that does NOT actually
+  // correspond to the real rebase outcome. `value.previousHead` is a real commit in this
+  // same disposable repo (the genuine pre-rebase Nova head) -- an unrelated-but-real OID,
+  // never a fabricated one -- so this exercises exactly the tampering the DoD names.
+  const tampered = { ...receipt, resultingHead: { ...value.previousHead } };
+  const rejected = validateBaselineAdoptionReceipt(value.root, tampered);
+  assert.equal(rejected.status, "rejected");
+  assert.ok(rejected.reasons.includes("resulting-head-does-not-descend-from-base"), `expected descent-check failure, got ${JSON.stringify(rejected.reasons)}`);
+  assert.ok(rejected.reasons.includes("replayed-commits-mismatch"), `expected replayed-list mismatch, got ${JSON.stringify(rejected.reasons)}`);
+});
+
 for (const root of roots) rmSync(root, { recursive: true, force: true });
 console.log(`publication-executor-productive-flow: ${tests} tests passed`);
