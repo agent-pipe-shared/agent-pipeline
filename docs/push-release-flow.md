@@ -205,10 +205,31 @@ release.
 "auto mode classifier" may refuse the actual `git push`/`git restore`
 invocation regardless of Pipeline-side clearance — this is outside the
 Pipeline's control or visibility, undiscoverable except by attempting the
-exact command. When it fires, the only resolution today is the PO running
-the identical, already-Pipeline-authorized command in their own terminal.
-This compounding is tracked as its own finding:
+exact command. This compounding is tracked as its own finding:
 `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`.
+
+**Resolved for `git push` on 2026-08-16 (PO decision):** `.claude/settings.json`
+now carries a single narrow `permissions.allow` entry, `Bash(git push *)`, so
+the Pipeline's own cryptographic push gate is the authority for a push rather
+than being overruled by a second gate that adds nothing to it. This is safe for
+a checked reason, not an optimistic one: `GG-01`/`GG-02` block every `--force`
+and `+refspec` push unconditionally, approval or not; `GG-03` admits a push only
+when `authorizeRecordedPush` verifies an approval bound to exactly this
+candidate commit, remote and destination ref; and a push that does not write out
+its destination ref is never matched at all. The entry deliberately covers
+`git push` alone — never `git *` — so no other command gains anything.
+
+Two things about that change are worth keeping. First, `git restore` is **not**
+covered and can still be refused this way; the fallback below still applies to
+it. Second, and more instructive: **an agent cannot make this change itself.**
+The dispatch that was briefed to add the entry had its edit to
+`.claude/settings.json` refused by the classifier it was about to relax
+("Permission for this action was denied by the Claude Code auto mode
+classifier"), and correctly stopped rather than seeking an override. The layer
+is self-sealing — a human must edit the file. When any classifier refusal fires
+for something not covered by an allow entry, the resolution remains the PO
+running the identical, already-Pipeline-authorized command in their own
+terminal.
 
 ### Layer 6 — the GitHub repository ruleset (outside this repo, discovered by rejection)
 

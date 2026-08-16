@@ -3,6 +3,11 @@
     "type": "command",
     "command": "node plugins/pipeline-core/scripts/statusline-context.mjs"
   },
+  "permissions": {
+    "allow": [
+      "Bash(git push *)"
+    ]
+  },
   "enabledPlugins": {
     "pipeline-core@agent-pipeline": true
   },
