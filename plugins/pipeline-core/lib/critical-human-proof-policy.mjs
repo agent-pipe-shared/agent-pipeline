@@ -16,11 +16,13 @@
  * stays in `requiredKinds`: the action remains gated, only the private-key proof is
  * no longer demanded.
  */
+import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
 import { CRITICAL_ACTION_KINDS } from "./critical-action-approval-request.mjs";
+import { verifyPoApprovalProof } from "./po-approval-proof.mjs";
 import { PUSH_APPROVAL_MODES } from "./runner-profiles-v3.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 
@@ -188,6 +190,15 @@ export function readReconcileApprovalMode(dir, opts = {}) {
 export const CRITICAL_HUMAN_PROOF_POLICY_PATH = "project/critical-human-proof.json";
 export const CRITICAL_HUMAN_PROOF_POLICY_V1 = "pipeline.critical-human-proof-policy.v1";
 export const CRITICAL_HUMAN_PROOF_POLICY_V2 = "pipeline.critical-human-proof-policy.v2";
+/**
+ * v3 (SETUP-1, `nova-setup-bootstrap.md` §5a): the one change v1/v2 could not make
+ * in place without silently reinterpreting an existing document -- `trustAnchor`
+ * (singular) becomes `trustAnchors` (a SET). Absent or empty is the default posture,
+ * "any well-formed key may sign"; populated enforces membership. v1 and v2 keep their
+ * old single-anchor field and its old meaning untouched; a v3 document uses the plural
+ * field only, so the two spellings never coexist on one schema version.
+ */
+export const CRITICAL_HUMAN_PROOF_POLICY_V3 = "pipeline.critical-human-proof-policy.v3";
 const MAX_POLICY_BYTES = 32_768;
 const MIN_REASON_CHARS = 8;
 const MAX_REASON_CHARS = 500;
@@ -232,19 +243,45 @@ const KEY_REFERENCE = /^[A-Za-z0-9._:@/-]{1,200}$/u;
  * Optional on purpose. A project that never authorizes a raw push does not need one, and
  * its absence is not an error — it simply means that route is unavailable.
  */
+function anchorShapeOk(anchor) {
+  return exactKeys(anchor, ["keyReference", "publicKeySha256"])
+    && typeof anchor.keyReference === "string" && KEY_REFERENCE.test(anchor.keyReference)
+    && typeof anchor.publicKeySha256 === "string" && SHA256.test(anchor.publicKeySha256);
+}
+
 function readTrustAnchor(value) {
   if (!Object.hasOwn(value, "trustAnchor")) return { ok: true, trustAnchor: null };
   const anchor = value.trustAnchor;
-  if (!exactKeys(anchor, ["keyReference", "publicKeySha256"])
-    || typeof anchor.keyReference !== "string" || !KEY_REFERENCE.test(anchor.keyReference)
-    || typeof anchor.publicKeySha256 !== "string" || !SHA256.test(anchor.publicKeySha256)) {
-    return { ok: false, code: "CRITICAL-PROOF-POLICY-TRUST-ANCHOR-INVALID" };
-  }
+  if (!anchorShapeOk(anchor)) return { ok: false, code: "CRITICAL-PROOF-POLICY-TRUST-ANCHOR-INVALID" };
   return { ok: true, trustAnchor: Object.freeze({ ...anchor }) };
 }
 
 /**
- * @returns {{ok: true, requiredKinds: Set<string>, waivers: Map<string, string>, trustAnchor: object|null}
+ * v3's anchor SET. Absent or empty `trustAnchors` means "any well-formed key may sign" --
+ * the PO's stated intent ("a human audited, deliberately not which one") and the default
+ * posture. A populated array enforces membership, for a project that wants the narrower
+ * claim. Each entry has the exact shape a v1/v2 `trustAnchor` always had -- only the
+ * cardinality is new. Two entries naming the same key are refused: a policy that says the
+ * same thing twice is not obviously wrong to a reader, so it is caught here rather than
+ * left for a downstream consumer to trip over.
+ */
+function readTrustAnchorSet(value) {
+  if (!Object.hasOwn(value, "trustAnchors")) return { ok: true, trustAnchors: [] };
+  const anchors = value.trustAnchors;
+  if (!Array.isArray(anchors) || anchors.some((anchor) => !anchorShapeOk(anchor))) {
+    return { ok: false, code: "CRITICAL-PROOF-POLICY-TRUST-ANCHORS-INVALID" };
+  }
+  const seen = new Set();
+  for (const anchor of anchors) {
+    if (seen.has(anchor.publicKeySha256)) return { ok: false, code: "CRITICAL-PROOF-POLICY-TRUST-ANCHORS-INVALID" };
+    seen.add(anchor.publicKeySha256);
+  }
+  return { ok: true, trustAnchors: Object.freeze(anchors.map((anchor) => Object.freeze({ ...anchor }))) };
+}
+
+/**
+ * @returns {{ok: true, requiredKinds: Set<string>, waivers: Map<string, string>,
+ *            trustAnchor: object|null, trustAnchors: object[]|null}
  *          | {ok: false, code: string}}
  */
 export function readCriticalHumanProofPolicy(dir) {
@@ -256,14 +293,18 @@ export function readCriticalHumanProofPolicy(dir) {
     }
     const value = JSON.parse(readFileSync(path, "utf8"));
     const v2 = value?.schema === CRITICAL_HUMAN_PROOF_POLICY_V2;
-    // `trustAnchor` is admitted as an optional key on BOTH schema versions rather than
-    // minting a `.v3` for it: it adds no rule and changes no existing field's meaning, so
-    // a version bump would force every consumer project to migrate a policy file for a
-    // capability it may never use. The shape stays exact — the key is either absent or
-    // present, never partially specified.
-    const shapeOk = v2
+    const v3 = value?.schema === CRITICAL_HUMAN_PROOF_POLICY_V3;
+    // `trustAnchor` (singular) is admitted as an optional key on v1 AND v2 rather than
+    // minting a version for it: it adds no rule and changes no existing field's meaning,
+    // so a version bump would force every consumer project to migrate a policy file for a
+    // capability it may never use. v3 is different on purpose — an anchor SET changes what
+    // absence means (§5a: absence now means "any well-formed key", not "no anchor
+    // configured"), which is exactly the kind of change v1/v2 must NOT absorb silently. So
+    // v3 carries `trustAnchors` (plural) only; a document that wants v3 with the old
+    // single-key restriction writes a one-entry set, never the singular field.
+    const shapeOk = (v2 || v3)
       ? exactKeys(value, ["schema", "requiredKinds", "waivedKinds"])
-        || exactKeys(value, ["schema", "requiredKinds", "waivedKinds", "trustAnchor"])
+        || exactKeys(value, ["schema", "requiredKinds", "waivedKinds", v3 ? "trustAnchors" : "trustAnchor"])
       : (exactKeys(value, ["schema", "requiredKinds"])
         || exactKeys(value, ["schema", "requiredKinds", "trustAnchor"]))
         && value?.schema === CRITICAL_HUMAN_PROOF_POLICY_V1;
@@ -275,7 +316,7 @@ export function readCriticalHumanProofPolicy(dir) {
       return { ok: false, code: "CRITICAL-PROOF-POLICY-INVALID" };
     }
     const waivers = new Map();
-    if (v2) {
+    if (v2 || v3) {
       if (!Array.isArray(value.waivedKinds)) return { ok: false, code: "CRITICAL-PROOF-POLICY-INVALID" };
       for (const entry of value.waivedKinds) {
         if (!exactKeys(entry, ["kind", "reason"])
@@ -289,15 +330,32 @@ export function readCriticalHumanProofPolicy(dir) {
         waivers.set(entry.kind, entry.reason.trim());
       }
     }
+    // `trustAnchor` (v1/v2, one key or none) and `trustAnchors` (v3, a set) are kept as
+    // TWO fields on the returned policy rather than folded into one, so a caller can tell
+    // "this document has no set concept at all" (v1/v2, `trustAnchors: null`) apart from
+    // "this document explicitly has an empty set" (v3, `trustAnchors: []`, meaning any
+    // well-formed key) — the two must not collapse into the same value, because they
+    // authorize differently downstream.
+    if (v3) {
+      const anchors = readTrustAnchorSet(value);
+      if (!anchors.ok) return { ok: false, code: anchors.code };
+      return {
+        ok: true, requiredKinds: new Set(value.requiredKinds), waivers,
+        trustAnchor: null, trustAnchors: anchors.trustAnchors,
+      };
+    }
     const anchor = readTrustAnchor(value);
     if (!anchor.ok) return { ok: false, code: anchor.code };
-    return { ok: true, requiredKinds: new Set(value.requiredKinds), waivers, trustAnchor: anchor.trustAnchor };
+    return {
+      ok: true, requiredKinds: new Set(value.requiredKinds), waivers,
+      trustAnchor: anchor.trustAnchor, trustAnchors: null,
+    };
   } catch (error) {
     // No policy file at all is the ordinary consumer case: nothing is required, and
     // nothing is waived either. Anything else is a policy we cannot read, which must
     // never read as "not required".
     return error?.code === "ENOENT"
-      ? { ok: true, requiredKinds: new Set(), waivers: new Map(), trustAnchor: null }
+      ? { ok: true, requiredKinds: new Set(), waivers: new Map(), trustAnchor: null, trustAnchors: null }
       : { ok: false, code: "CRITICAL-PROOF-POLICY-UNREADABLE" };
   }
 }
@@ -353,4 +411,60 @@ export function criticalProofWaiverFor(dir, kind) {
   return reason === undefined
     ? { waived: false, code: null }
     : { waived: true, code: null, waiver: { kind, reason } };
+}
+
+/**
+ * Is `publicKeyPem` a WELL-FORMED key for a PO-approval proof? (SETUP-1.) "Well-formed"
+ * is not "anything that parses" — it is specifically a structurally valid Ed25519 public
+ * key: unparseable PEM, an RSA/EC/Ed448 key, or an empty value are all refused here. This
+ * is the floor every signer must clear in BOTH postures below; in the absent-set posture
+ * it is the ONLY floor, since there is no committed anchor to fall back on.
+ */
+export function isWellFormedEd25519PublicKey(publicKeyPem) {
+  if (typeof publicKeyPem !== "string" || publicKeyPem.trim() === "") return false;
+  try { return createPublicKey(publicKeyPem).asymmetricKeyType === "ed25519"; }
+  catch { return false; }
+}
+
+/**
+ * Verifies a recorded PO-approval proof against a trust-anchor SET — one parameterised
+ * path for both postures (SETUP-1), rather than an "any key" branch and a "restricted"
+ * branch that could drift apart:
+ *
+ *   - `anchors` empty (v3 with an absent/empty `trustAnchors`, the default posture) — "any
+ *     well-formed key may sign". There is no committed identity to check the proof
+ *     against, so the identity is read FROM the proof itself (which already carries the
+ *     full public key and its own claimed `keyReference`) and the claim is verified
+ *     cryptographically. Nothing here is unchecked: `isWellFormedEd25519PublicKey` gates
+ *     the key, and the detached signature must still verify over `intent`.
+ *   - `anchors` non-empty (v3 populated, or a v1/v2 single anchor wrapped as a set of one)
+ *     — membership is enforced: the proof must match one of them, by BOTH `keyReference`
+ *     and `publicKeySha256`, the same pair a lone anchor always compared. A key that is
+ *     individually well-formed but not in the set is still refused.
+ *
+ * Returns the same shape `verifyPoApprovalProof` does, plus `signer` on success — the
+ * `keyReference`/`publicKeySha256` pair SETUP-1 requires present in every accepting case,
+ * independent of which posture accepted it. The human-supplied name travels separately
+ * (`po-human-approval.mjs`'s signer record); this function only ever sees the key.
+ */
+export function verifyAgainstTrustAnchors({ intent, anchors, proof }) {
+  if (!isWellFormedEd25519PublicKey(proof?.publicKey)) return { verified: false, code: "PO-APPROVAL-PROOF-INVALID" };
+  const set = Array.isArray(anchors) ? anchors : [];
+  if (set.length === 0) {
+    const derived = {
+      keyReference: proof.keyReference,
+      publicKeySha256: createHash("sha256").update(proof.publicKey).digest("hex"),
+    };
+    const result = verifyPoApprovalProof({ intent, trustPolicy: derived, proof });
+    return result.verified ? { ...result, signer: derived } : result;
+  }
+  let lastCode = "PO-APPROVAL-TRUST-MISMATCH";
+  for (const anchor of set) {
+    const result = verifyPoApprovalProof({ intent, trustPolicy: anchor, proof });
+    if (result.verified) {
+      return { ...result, signer: { keyReference: anchor.keyReference, publicKeySha256: anchor.publicKeySha256 } };
+    }
+    lastCode = result.code;
+  }
+  return { verified: false, code: lastCode };
 }

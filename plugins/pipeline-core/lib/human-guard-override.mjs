@@ -22,6 +22,7 @@ import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import {
   readCriticalHumanProofPolicy,
   readPushApprovalMode,
+  verifyAgainstTrustAnchors,
 } from "./critical-human-proof-policy.mjs";
 import {
   buildGuardHandoffOfferEvent,
@@ -1871,14 +1872,26 @@ export function authorizeHumanGuardOverrideBySignature({
       decision: HGO_SIGNATURE_INTENT_DECISION,
     });
   } catch { fail("HGO-SIGNATURE-INTENT-INVALID", "signed authorization intent could not be built from the current repository observation"); }
-  const resolvedTrustPolicy = trustPolicy ?? (() => {
+  // An explicitly supplied `trustPolicy` (a `--proof-authority` file, say) keeps its old
+  // single-policy shape and is simply wrapped as a set of one. Only the committed-policy
+  // FALLBACK learned v3 (ADR-0056's 2026-08-16 correction): a v3 `trustAnchors` is used as
+  // written, EMPTY INCLUDED -- an explicit empty set is the "any well-formed key may sign"
+  // posture, not a missing anchor, so refusing it here would break the ceremony on a
+  // deliberately configured repository. A v1/v2 single `trustAnchor` behaves exactly as
+  // before; only a policy with no anchor concept at all is still HGO-TRUST-ANCHOR-MISSING.
+  const resolvedAnchors = trustPolicy !== null && trustPolicy !== undefined ? [trustPolicy] : (() => {
     const policy = readCriticalHumanProofPolicy(rootDir);
-    if (!policy.ok || policy.trustAnchor === null) {
-      fail("HGO-TRUST-ANCHOR-MISSING", "project/critical-human-proof.json carries no trustAnchor");
+    const anchors = policy.ok
+      ? (policy.trustAnchors !== null
+        ? policy.trustAnchors
+        : (policy.trustAnchor === null ? null : [policy.trustAnchor]))
+      : null;
+    if (anchors === null) {
+      fail("HGO-TRUST-ANCHOR-MISSING", "project/critical-human-proof.json carries no trust anchor");
     }
-    return policy.trustAnchor;
+    return anchors;
   })();
-  const verified = verifyPoApprovalProof({ intent, trustPolicy: resolvedTrustPolicy, proof });
+  const verified = verifyAgainstTrustAnchors({ intent, anchors: resolvedAnchors, proof });
   if (!verified.verified) fail("HGO-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
 
   // global-plugin-install is already excluded above, so this is always the ordinary

@@ -63,7 +63,7 @@ import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
-import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+import { readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 export class GuardMaintenanceWindowError extends Error {
@@ -503,11 +503,20 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   if (record.repoFingerprintSha256 !== repoFingerprintSha256 || record.root !== repo.root) return { status: "absent" };
   if (record.subject.repoFingerprintSha256 !== repoFingerprintSha256) return { status: "absent" };
 
-  let trustAnchor;
+  // The committed identity is a SET (ADR-0056's 2026-08-16 correction). A v3 document's
+  // `trustAnchors` is used as written, EMPTY INCLUDED -- an explicit empty v3 set is not
+  // "no anchor", it is the "any well-formed key may sign" posture, and refusing it here
+  // would silently turn a deliberately-configured window into an absent one. A v1/v2
+  // document's single `trustAnchor` is wrapped as a set of one (identical behaviour to
+  // before), and only a document with no anchor concept at all still reads as absent.
+  let anchors;
   try {
     const policy = readCriticalHumanProofPolicy(repo.root);
-    if (!policy.ok || policy.trustAnchor === null) return { status: "absent" };
-    trustAnchor = policy.trustAnchor;
+    if (!policy.ok) return { status: "absent" };
+    anchors = policy.trustAnchors !== null
+      ? policy.trustAnchors
+      : (policy.trustAnchor === null ? null : [policy.trustAnchor]);
+    if (anchors === null) return { status: "absent" };
   } catch { return { status: "absent" }; }
 
   const subjectSha256 = sha(record.subject);
@@ -526,7 +535,7 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
     });
   } catch { return { status: "absent" }; }
   if (rebuiltIntent.sha256 !== record.intent.sha256) return { status: "absent" }; // tamper
-  const verified = verifyPoApprovalProof({ intent: rebuiltIntent, trustPolicy: trustAnchor, proof: record.proof });
+  const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof: record.proof });
   if (!verified.verified) return { status: "absent" }; // tamper / revoked anchor
 
   // Validity is derived PURELY from the signed, digest-verified `expiresAtMs` above
