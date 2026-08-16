@@ -625,8 +625,108 @@ terminal.** `sign-intent` is generic/kind-agnostic (only checks the SHA format, 
 `CRITICAL_COMMAND_KINDS` gate) and writes to a FIXED path, `<directory>/proof-manual.json`
 — the second signing overwrites the first, so the Elephant must read and persist the first
 proof into `scratch/` (Read tool can read outside the repo root; only writes are
-cross-repo-blocked) before the PO runs the second command. **As of this checkpoint: NOT YET
-SIGNED.** The PO has not run either command; nothing below this point has executed.
+cross-repo-blocked) before the PO runs the second command.
+
+**First real-world friction, found and repaired live (not by this checkpoint's earlier
+theory — by what actually happened):** both first attempts failed
+`PO-HUMAN-APPROVAL-FAILED: external trust policy does not match the local public key` —
+`~/agent-pipeline-po-nova/trust-policy.json` (the recorded `publicKeySha256`) had drifted
+from the directory's actual `po-public.pem`, left over from the 2026-08-11 key rotation.
+`setup`'s own three-branch logic (`po-human-approval.mjs:241-257`) refuses to repair this
+automatically when all three files are present but inconsistent (branch 2, `fail("existing
+trust policy does not match the local public key")`) — it only self-heals from branch 1
+(key present, authority ABSENT). Fix: PO moved the stale file aside
+(`trust-policy.json.stale-backup`) and re-ran `setup`, which then hit branch 1 and rebuilt
+`trust-policy.json` from the current key: `{"keyReference":"local-po-key",
+"publicKeySha256":"f28988b21c670c4b958a534e82fef485195ab1abc74df1a41772c9b58c73db14"}` —
+matches this checkpoint's own earlier-recorded pre-rotation value for this exact directory
+exactly, confirming the diagnosis. **As of this checkpoint: setup repaired, but NEITHER
+`sign-intent` has been re-run successfully yet.** The PO is about to retry the window
+intent first; nothing below this point has executed.
+
+**Both signatures then obtained, in three real attempts, all friction genuinely
+mechanical — recorded because the failure modes are reusable lessons, not because
+anything was wrong with the design:**
+
+1. `sign-intent` writes to ONE fixed path, `<directory>/proof-manual.json`, per call —
+   the PO ran both commands back-to-back without a pause, so the second (reconcile)
+   overwrote the first (window) before it could be captured. Recovered: PO re-ran the
+   window `sign-intent` alone a second time; the Elephant read+persisted it into
+   `scratch/gmw-window-proof-11783228.json` (and the earlier-captured reconcile proof)
+   the instant each was available.
+2. **GMW window installed successfully** —
+   `guard-maintenance-window.mjs install --repo-root <main checkout> --request
+   scratch/gmw-window-request-11783228.json --proof
+   /home/skar667/agent-pipeline-po-nova/proof-manual.json` (the proof MUST be read from
+   its live external path or a freshly-external copy — `externalJson`'s own check refuses
+   any path inside the repo root, including `scratch/`). Result: `status: "active"`, all
+   twelve `TP-1`..`TP-12` scope rules lifted, ~3.7h remaining as of install.
+3. **`feature-package-reconcile` refused twice, both diagnosed to source before any
+   third guess:**
+   - First refusal: `--proof-request`/`--proof-authority`/`--proof` for THIS specific
+     command (unlike GMW's `--request`) must ALL be external-only paths too
+     (`externalPublicJson` in `pipeline-state.mjs`, same restriction as `--proof`) — the
+     `scratch/reconcile-request-…json` built earlier lives inside the repo. Fixed: PO
+     `cp`'d both the request and the (already-captured) proof out to
+     `~/agent-pipeline-po-nova/`.
+   - Second refusal (`FTP-RECONCILE-APPROVAL-REJECTED`, a code the CLI collapses into
+     one generic message covering many distinct causes — do not assume which one
+     without checking): traced by reproducing `verifyCriticalActionApprovalRequest`
+     directly in a throwaway script FIRST (it verified `true` — so the cryptographic
+     proof itself was never the problem), which meant the mismatch had to be the
+     CANDIDATE. Confirmed: `git rev-parse HEAD HEAD^{tree}` on the main checkout showed
+     `c88b2125`/`24c09105…` — ONE commit past `11783228`, because
+     `PHX-WP-GMW-E2E-ANCHORS` (the fourth dispatch, §"A second, then a third small
+     dispatch" above) landed WHILE the PO was mid-troubleshooting the key issue. Exactly
+     the "prepare it before further commits land wastes the PO's signature" risk this
+     checkpoint warned about at the very top, materializing on the reconcile half
+     specifically (GMW install is NOT candidate-bound the same way — its `install`
+     re-check is `repoFingerprintSha256`/`openingTreeSha256` (live plugin tree), not
+     commit/tree, so it stayed valid through the drift). **Lesson for next time: lock
+     the candidate — confirm no dispatch is still in flight — BEFORE building ANY
+     candidate-bound request, not just before the window's.**
+
+**Rebuilt against the new final candidate — `c88b2125a06b3c41c6097dedbf76707ce21ca606` /
+tree `24c09105f6dd926a843c8a275e0f9bd96df8c90c`.** `feature-package-status` re-confirmed:
+same single `FTP-ARTIFACT-2` finding, `planSha256` unchanged
+(`3e957dade960797f826176721255ca001d092a71666b875610513888cf894a73` — lifecycle.json/
+acceptance.md untouched by the intervening commit, only test files changed). New
+`subjectSha256` `a40b0b9229d344557c512144055263521ba257acafe86380a74fea75ec7edd51`; new
+request written to `scratch/reconcile-request-c88b2125.json`. **Third signature requested,
+intent sha256 `da54df78dfd9e0fcace70d4351e836438c18ef5801aeae0d631db25574ce3220` — NOT YET
+signed as of this checkpoint.** The window signature/install from steps 1-2 above remain
+valid and do not need repeating. No further dispatch is in flight; HEAD should not move
+again before this signs.
+
+**Signed, and applied.** `pipeline-state.mjs feature-package-reconcile` (proof-request/
+proof-authority/proof all pointed at the external directory — this specific command
+requires ALL THREE external, unlike GMW's `install` which only requires `--proof`
+external) returned `status: "applied"`: `specs/sprint-phoenix-epic/acceptance.md`'s
+manifest-pinned digest moved `2768f169…` → `300acd10…`, consumption ledger updated.
+This is the last PO action of the night — **PO confirmed done and went AFK.** One
+process gap the PO flagged and the Elephant owns: `prepare-critical` should have
+written the reconcile request directly into the external directory the way it does
+for `push`/`deploy`/`publication`, avoiding the manual `cp` step entirely — refused
+because `CRITICAL_COMMAND_KINDS` (`po-human-approval.mjs:105`) is frozen to those
+three and does not include `feature-package-reconcile` despite it being a first-class
+`CRITICAL_ACTION_KINDS`/`ALWAYS_REQUIRED_KINDS` member. Filed:
+[`backlog/items/2026-08-16-critical-command-kinds-excludes-feature-package-reconcile.md`](../backlog/items/2026-08-16-critical-command-kinds-excludes-feature-package-reconcile.md)
+(commit `5b6c982c`).
+
+### Autonomous phase begins — window still active, closing out its own scope before broader content work
+
+Dispatched `PHX-WP-TP-WINDOW-CLOSEOUT` (goldfish-deep/opus/xhigh) to close the four
+items the live window exists for, in one bundle: OT09's stale assertion (exact fix
+pre-diagnosed above), the TP-2 (`guard-testpath.test.mjs`) and TP-6
+(`guard-gate-strength.test.mjs`) `trustPolicy`→`anchors` fixes (same mechanical
+transform as the 15 sites already fixed this session), and registering the two
+orphaned suites into `verify.mjs` (TP-3). Result not yet known. Once it lands: close
+the window, run full `verify.mjs` + `security-scan.mjs` from the worktree, then
+continue with Phoenix criterion content work (P-AC-11 remaining dimensions,
+R-AC-08/A-AC-05 continuation per the "Next criterion targets" earlier in this
+checkpoint) toward content-complete — no push, per the PO's explicit "kein
+Zwischenpush" — stopping only at the final push-approval request, prepared but left
+unsigned for the PO's return.
 
 **Exact next steps once both proofs exist (mechanical, no more design decisions):**
 1. Capture the window proof (copy `~/agent-pipeline-po-nova/proof-manual.json` content into
