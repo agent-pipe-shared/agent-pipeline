@@ -62,8 +62,8 @@ import {
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
-import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
-import { readCriticalHumanProofPolicy } from "./critical-human-proof-policy.mjs";
+import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+import { readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 export class GuardMaintenanceWindowError extends Error {
@@ -528,7 +528,16 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   } catch { fail("GMW-REQUEST-INVALID", "request intent is malformed"); }
   if (rebuiltIntent.sha256 !== request.intent.sha256) fail("GMW-REQUEST-INVALID", "request intent digest does not match its rebuilt preimage");
 
-  const verified = verifyPoApprovalProof({ intent: rebuiltIntent, trustPolicy, proof });
+  // NVA-GMWFIX-1: `trustPolicy` is either a single anchor object -- the shape every
+  // pre-existing caller and the CLI's `--authority` branch supply -- or a v3 anchor SET
+  // (an array, empty included for the "any well-formed key" posture) -- the shape the
+  // CLI's default-authority branch now supplies (mirrors trustAnchorsFor,
+  // lib/critical-action-authorization.mjs). Normalizing a lone object into a one-element
+  // set before calling verifyAgainstTrustAnchors keeps every existing single-anchor
+  // caller's behavior byte-for-byte identical (verifyAgainstTrustAnchors on a
+  // one-element, non-empty set is exactly verifyPoApprovalProof against that one anchor).
+  const anchors = Array.isArray(trustPolicy) ? trustPolicy : [trustPolicy];
+  const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof });
   if (!verified.verified) fail("GMW-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
 
   // The signed `expiresAtMs` is written through VERBATIM -- install() never recomputes
@@ -632,11 +641,21 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   if (record.repoFingerprintSha256 !== repoFingerprintSha256 || record.root !== repo.root) return { status: "absent" };
   if (record.subject.repoFingerprintSha256 !== repoFingerprintSha256) return { status: "absent" };
 
-  let trustAnchor;
+  // NVA-GMWFIX-1: this used to read the legacy SINGULAR `policy.trustAnchor` field only,
+  // which is permanently `null` once `critical-human-proof.json` carries the v3
+  // `trustAnchors` SET -- every window read back `absent`, including the one install()
+  // itself performs to build its own return value. Mirrors trustAnchorsFor
+  // (lib/critical-action-authorization.mjs) exactly: the v3 set wins whenever the
+  // document carries one at all, used AS-IS (empty array included -- the "any
+  // well-formed key" posture, never treated as "missing"); the legacy singular field is
+  // the fallback ONLY for a document that predates v3 (`trustAnchors === null`).
+  let anchors;
   try {
     const policy = readCriticalHumanProofPolicy(repo.root);
-    if (!policy.ok || policy.trustAnchor === null) return { status: "absent" };
-    trustAnchor = policy.trustAnchor;
+    if (!policy.ok) return { status: "absent" };
+    if (policy.trustAnchors !== null) anchors = policy.trustAnchors;
+    else if (policy.trustAnchor !== null) anchors = [policy.trustAnchor];
+    else return { status: "absent" };
   } catch { return { status: "absent" }; }
 
   const subjectSha256 = sha(record.subject);
@@ -646,7 +665,7 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
     rebuiltIntent = rebuildGuardLiftIntent(record.intent.value, subjectSha256);
   } catch { return { status: "absent" }; }
   if (rebuiltIntent.sha256 !== record.intent.sha256) return { status: "absent" }; // tamper
-  const verified = verifyPoApprovalProof({ intent: rebuiltIntent, trustPolicy: trustAnchor, proof: record.proof });
+  const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof: record.proof });
   if (!verified.verified) return { status: "absent" }; // tamper / revoked anchor
 
   // Validity is derived PURELY from the signed, digest-verified `expiresAtMs` above

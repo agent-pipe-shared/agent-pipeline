@@ -129,9 +129,18 @@ export function run(argv = process.argv.slice(2)) {
         return { keyReference: authority?.keyReference, publicKeySha256: authority?.publicKeySha256 };
       })()
       : (() => {
+        // NVA-GMWFIX-1: mirrors trustAnchorsFor (lib/critical-action-authorization.mjs)
+        // exactly. The v3 `trustAnchors` SET wins whenever the document carries one at
+        // all, used AS-IS (empty array included -- the "any well-formed key" posture,
+        // never treated as "missing"); the legacy singular `trustAnchor` is the fallback
+        // ONLY for a document that predates v3 (`trustAnchors === null`).
+        // installGuardMaintenanceWindow's proof verification accepts either shape: a
+        // single anchor object (legacy) or an anchor array (v3 set).
         const policy = readCriticalHumanProofPolicy(rootDir);
-        if (!policy.ok || policy.trustAnchor === null) throw new Error("GMW-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");
-        return policy.trustAnchor;
+        if (!policy.ok) throw new Error("GMW-TRUST-ANCHOR-MISSING: project/critical-human-proof.json is unreadable or invalid");
+        if (policy.trustAnchors !== null) return policy.trustAnchors;
+        if (policy.trustAnchor !== null) return policy.trustAnchor;
+        throw new Error("GMW-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");
       })();
     const livePluginRoot = currentLivePluginRoot();
     if (livePluginRoot === null) throw new Error("GMW-PLUGIN-SOURCE: no currently-enforcing live plugin root could be identified");

@@ -76,8 +76,16 @@ function proofFor(intent) {
   };
 }
 
-/** A real, freshly initialized git repository carrying this key as its trust anchor. */
-function repoFixture(prefix = "gmw-") {
+/**
+ * A real, freshly initialized git repository carrying this key as its trust anchor.
+ *
+ * NVA-GMWFIX-1: `policy`, when supplied, replaces the DEFAULT v1-shaped
+ * `critical-human-proof.json` (a legacy singular `trustAnchor`) with a caller-chosen
+ * document -- the v3 regression fixtures below use this to write a `trustAnchors`
+ * (plural, array) document instead, mirroring the v3 fixture convention already used in
+ * critical-action-authorization.test.mjs's own `fixture()` helper.
+ */
+function repoFixture(prefix = "gmw-", { policy } = {}) {
   const root = mkdtempSync(join(tmpdir(), prefix));
   roots.push(root);
   execFileSync("git", ["init", "-q"], { cwd: root });
@@ -89,7 +97,7 @@ function repoFixture(prefix = "gmw-") {
   writeFileSync(join(root, "spec.md"), "spec\n");
   writeFileSync(
     join(root, "project", "critical-human-proof.json"),
-    JSON.stringify({
+    JSON.stringify(policy ?? {
       schema: "pipeline.critical-human-proof-policy.v1",
       requiredKinds: ["push"],
       trustAnchor: { keyReference: "gmw-test-key", publicKeySha256 },
@@ -98,6 +106,11 @@ function repoFixture(prefix = "gmw-") {
   execFileSync("git", ["add", "-A"], { cwd: root });
   execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: root });
   return root;
+}
+
+/** v3-shaped `critical-human-proof.json` carrying ONLY `trustAnchors` (plural, array) -- no legacy singular `trustAnchor` field at all. */
+function v3PolicyWithAnchors(anchors) {
+  return { schema: "pipeline.critical-human-proof-policy.v3", requiredKinds: ["push"], waivedKinds: [], trustAnchors: anchors };
 }
 
 // A synthetic "live plugin root" fixture -- small and self-contained, so tree
@@ -825,6 +838,132 @@ try {
     ]);
     assert.equal(installed.ok, true);
     assert.equal(installed.value.status, "active");
+    assert.equal(closeGuardMaintenanceWindow({ rootDir: root }).status, "closed");
+  });
+
+  // ---- NVA-GMWFIX-1: v3 multi-anchor trust anchor read (both bug sites) -------------
+  // Live ceremony bug (backlog: 2026-08-16-gmw-install-never-recognizes-its-own-window-
+  // under-v3-multi-anchor-schema.md): `currentGuardMaintenanceWindow` and the CLI's
+  // default-authority branch used to read ONLY the legacy singular `policy.trustAnchor`
+  // field, which is permanently `null` once `critical-human-proof.json` carries the v3
+  // `trustAnchors` array -- a correctly signed, correctly installed window read back
+  // `absent` on every single check, including the one `install` itself performs to
+  // build its own return value. These checks pin the fix at both bug sites.
+
+  check("GMW27 a v3-only critical-human-proof.json (trustAnchors array, no legacy trustAnchor field) reads an installed window back as active, not absent", () => {
+    const root = repoFixture("gmw-v3-populated-", { policy: v3PolicyWithAnchors([{ keyReference: "gmw-test-key", publicKeySha256 }]) });
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "no window installed yet");
+
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "v3 populated set", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+    });
+    // install()'s OWN return value is built by calling currentGuardMaintenanceWindow
+    // internally -- this is the exact line the live ceremony broke on.
+    assert.equal(installed.status, "active", "install's own re-read must not report absent under a v3-only policy");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active", "every subsequent read must also see active");
+    assert.equal(windowCoversRule({ rootDir: root, ruleId: "GS-6" }).covered, true);
+  });
+
+  check("GMW28 an explicit EMPTY v3 trustAnchors: [] (the \"any well-formed key\" posture) is accepted at install and at read, never treated as missing", () => {
+    const root = repoFixture("gmw-v3-empty-", { policy: v3PolicyWithAnchors([]) });
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "v3 empty set, any key", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    // `trustPolicy: []` mirrors what the CLI's default-authority branch now hands
+    // install() when the committed policy carries an empty v3 set (see GMW31 below for
+    // the same posture exercised through the real CLI default-authority branch).
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request, trustPolicy: [], proof: proofFor(intent), livePluginRoot: plugin,
+    });
+    assert.equal(installed.status, "active", "an empty trustAnchors set must admit a well-formed key's signature, not refuse it as missing");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
+  });
+
+  check("GMW29 a legacy-only policy (singular trustAnchor, no trustAnchors array at all) still reads an installed window back as active -- the fix is additive, not breaking", () => {
+    // The suite's DEFAULT repoFixture() already writes exactly this shape (v1 schema,
+    // singular trustAnchor, no `trustAnchors` key present at all) -- pinned here as its
+    // own named regression case per NVA-GMWFIX-1's DoD, not merely incidentally covered
+    // by every other v1-fixture check in this file.
+    const root = repoFixture("gmw-legacy-singular-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "legacy singular anchor", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+    });
+    assert.equal(installed.status, "active");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
+  });
+
+  check("GMW30 a populated v3 trustAnchors set refuses a signature from a key that matches neither the legacy singular anchor nor any set entry -- the fix must not widen acceptance", () => {
+    const outsider = generateKeyPairSync("ed25519");
+    const outsiderPublicKey = outsider.publicKey.export({ type: "spki", format: "pem" });
+    const outsiderPublicKeySha256 = createHash("sha256").update(outsiderPublicKey).digest("hex");
+    const outsiderProofFor = (intent) => ({
+      schema: PO_APPROVAL_PROOF_SCHEMA,
+      intentSha256: intent.sha256,
+      keyReference: "outsider-key",
+      publicKey: outsiderPublicKey,
+      signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), outsider.privateKey).toString("base64"),
+    });
+    // The committed v3 set trusts ONLY "gmw-test-key" -- never "outsider-key".
+    const root = repoFixture("gmw-v3-negative-", { policy: v3PolicyWithAnchors([{ keyReference: "gmw-test-key", publicKeySha256 }]) });
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "negative case, outsider key", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    // install() verifies against the trustPolicy it is explicitly given (self-consistent
+    // with the outsider proof here), so install itself does not throw -- but its own
+    // re-read (and every later read) consults the COMMITTED v3 set, which does not
+    // include this key.
+    const outsiderTrustPolicy = { keyReference: "outsider-key", publicKeySha256: outsiderPublicKeySha256 };
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request, trustPolicy: outsiderTrustPolicy, proof: outsiderProofFor(intent), livePluginRoot: plugin,
+    });
+    assert.equal(installed.status, "absent", "a signature outside the committed v3 anchor set must not read back as active");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
+  });
+
+  check("GMW31 CLI install WITHOUT --authority reads the v3 trustAnchors array from the committed policy and installs successfully -- the exact live ceremony this bug broke", () => {
+    const root = repoFixture("gmw-cli-v3-default-", { policy: v3PolicyWithAnchors([{ keyReference: "gmw-test-key", publicKeySha256 }]) });
+    const prepared = runGuardMaintenanceWindowCli([
+      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "300",
+      "--reason", "v3 default-authority ceremony", "--plan", "plan.md", "--spec", "spec.md",
+    ]);
+    assert.equal(prepared.ok, true);
+    const { request, intent } = prepared.value;
+
+    const external = mkdtempSync(join(tmpdir(), "gmw-cli-v3-external-"));
+    roots.push(external);
+    const requestPath = join(root, "gmw-request.json");
+    writeFileSync(requestPath, JSON.stringify(request));
+    const proofPath = join(external, "proof.json");
+    writeFileSync(proofPath, JSON.stringify(proofFor(intent)));
+
+    // NO --authority: exercises the CLI's default-authority branch reading the
+    // v3-shaped project/critical-human-proof.json this repository fixture committed.
+    const installed = runGuardMaintenanceWindowCli([
+      "install", "--repo-root", root, "--request", requestPath, "--proof", proofPath,
+    ]);
+    assert.equal(installed.ok, true);
+    assert.equal(installed.value.status, "active", "install's own return value must read back active, not absent, under a v3-only committed policy");
+
+    const status = runGuardMaintenanceWindowCli(["status", "--repo-root", root]);
+    assert.equal(status.value.status, "active");
     assert.equal(closeGuardMaintenanceWindow({ rootDir: root }).status, "closed");
   });
 
