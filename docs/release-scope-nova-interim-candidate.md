@@ -16,9 +16,11 @@ delta-correct Critic evidence."
   1a757618, 2a4968cc, 89a07b2c, 57821c91, 0aaeb881, e9bd4a23, 0e9f82fb,
   3475322b, 41967fd3, 5abaa442, 75f96504, a50e259e, 1f0abff3`.
 
-The candidate's tip is this document's own commit — the one that carries
-this refresh, `docs(release-scope): refresh candidate enumeration and
-authorship after the version stamp`. The candidate's **binding** commit and
+The commit enumeration above is a snapshot taken when this document was last
+updated, and commits may follow it. The live state is reproduced by running
+`node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs --range
+1b467f98..HEAD`; the candidate's true tip is whatever that command reports
+first. The candidate's **binding** commit and
 tree — the exact object identities a release preflight artifact fixes and a
 signature is later computed over —
 are carried by the release preflight artifact itself
@@ -97,12 +99,17 @@ history is forbidden by this repo's hard rules — so they stay
 `UNVERIFIABLE`, permanently, by design; the trailer is used going forward
 for every new stage-0 Elephant commit.
 
-## Owed evidence
+## Release preflight is out of scope for this candidate
 
-`evidence/gate-release-preflight.json` currently binds candidate
-`ad2452df` (`preflightId: "nova-0-5-2"`) from an earlier release, **not**
-this candidate. §1.1's release-preflight evidence requirement is therefore
-outstanding for this interim candidate and must be regenerated against the
-final tip via `plugins/pipeline-core/scripts/release-preflight-cli.mjs`.
-This is stated as owed, not run here: the tip is not final while this
-dispatch runs.
+`evidence/gate-release-preflight.json` binds candidate `ad2452df`
+(`preflightId: "nova-0-5-2"`) from an earlier release, not this candidate. It
+is deliberately not regenerated here: the PO scoped this build on 2026-08-16
+as a local test candidate for the install and push live test, not as a
+release.
+
+A release preflight run against a candidate would in any case record
+`status: blocked` rather than a pass. It compares the three version surfaces
+for exact string equality, and a candidate's two runner manifests deliberately
+carry a build cachebuster that `VERSION` does not. That disagreement is the
+normal candidate state, stripped only when a release is actually cut — the
+same pattern commit `dcf32a33` records for the 0.5.4 release.
