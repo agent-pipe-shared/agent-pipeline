@@ -72,6 +72,39 @@ every pack that declares it, and `approvalRequired` combines as a logical OR
 so an additional pack can only add review, never remove it
 (`organization-policy.mjs:18-23,34`).
 
+That closed shape has since grown optional keys at both levels, and this section
+was stale on both counts before 2026-08-16. A pack may additionally carry
+`provenance`, `dependencies` and `signaturePolicy`; a `documentClasses` entry may
+additionally carry `targetBinding`, `ownedSections`, `lifecycleEvents`,
+`previewRequired`, `retention` and `conflictPolicy`. Every one of them is optional
+in the strict sense: an entry declaring none of them validates and resolves exactly
+as it did before they existed, and the closed-key check simply grows by the keys the
+entry itself declares.
+
+Each optional entry key carries its own merge rule, and two of them can fail
+resolution outright — which matters operationally, because an operator combining two
+packs meets the failure at activation, where a wrong diagnosis is expensive:
+
+| key | merge rule across packs declaring the same class |
+|---|---|
+| `targetBinding` | never merged — a mismatch, **including declared against undeclared**, fails `OPP-RESOLVE-CONFLICT` |
+| `retention` | exact match only — a mismatch, **including declared against undeclared**, fails `OPP-RESOLVE-CONFLICT` |
+| `ownedSections` | set intersection; an undeclared side is neutral and yields the declared list |
+| `lifecycleEvents` | set intersection; an undeclared side is neutral |
+| `previewRequired` | logical OR — a later pack can add a required preview, never remove one |
+| `conflictPolicy` | ranked maximum toward the stricter `reject` |
+
+Intersection never widens permission and OR never downgrades it, so no combination of
+packs can resolve to something more permissive than its strictest contributor.
+
+**Four of these six are declared but not yet consumed by any decision path.** Only
+`mode`, `approvalRequired`, `targetBinding` and `ownedSections` currently scope a real
+permission decision; `lifecycleEvents`, `previewRequired`, `retention` and
+`conflictPolicy` validate and merge but change no behaviour anywhere. That gap is
+tracked, with its per-dimension reasons, in
+`backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md` — declaring
+one of the four today is not an error, but it is also not enforcement.
+
 Activation is a separate, transactional step from resolution
 (`organization-policy-activation.mjs`). `planOrganizationPolicyActivation`
 is a pure, non-mutating function: it resolves the effective policy, reads the
