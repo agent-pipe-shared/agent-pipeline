@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v2",
   "sourceBaseline": {
-    "commit": "e32f34c5aa03f2498844a7fa5d35be5b612c051b",
-    "tree": "d8f434afea67c2c852061e84b5bd665e1a9607fd"
+    "commit": "144db6aeb9a906a0978a46b3bfebe48e395dc708",
+    "tree": "06a49ac3a6e61c527b64db5610196ad89d0368ab"
   },
   "criticReview": {
     "status": "required-before-publication",
@@ -1151,6 +1151,12 @@
       "member": "critical-human-proof-policy-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:decision-reference-dual-evaluation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "decision-reference-dual-evaluation-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1161,6 +1167,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "dispatch-policy-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:dispatch-provenance-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "dispatch-provenance-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
@@ -1439,6 +1451,12 @@
       "member": "guard-gate-strength-origin-attestation-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-authority-grant-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-git-phoenix-authority-grant-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1509,6 +1527,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "host-advisor-workspace-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-authority-grant-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "human-authority-grant-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
@@ -1935,6 +1959,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "plan-spec-state-v2-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-approval-gate-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "po-approval-gate-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-approval-proof-tests",
@@ -2963,8 +2993,10 @@
         "verify-phase:harness/scripts/verify.mjs:critical-action-authorization-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:critical-human-proof-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:decision-reference-dual-evaluation-tests",
         "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
         "verify-phase:harness/scripts/verify.mjs:dispatch-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:dispatch-provenance-tests",
         "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
         "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:document-hooks-manifest-tests",
@@ -3011,6 +3043,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-gmw-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-origin-attestation-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-authority-grant-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
@@ -3023,6 +3056,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-authority-grant-tests",
         "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:human-guard-override-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
@@ -3092,6 +3126,7 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-approval-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:po-approval-proof-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
