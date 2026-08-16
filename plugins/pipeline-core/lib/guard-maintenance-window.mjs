@@ -380,7 +380,7 @@ export function prepareGuardMaintenanceWindowRequest({
 }
 
 /** Agent-safe: verify-and-place only. Cannot succeed without a genuine proof. */
-export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, proof, livePluginRoot, nowMs = Date.now(), spawn = spawnSync } = {}) {
+export function installGuardMaintenanceWindow({ rootDir, request, anchors, proof, livePluginRoot, nowMs = Date.now(), spawn = spawnSync } = {}) {
   if (!validRequest(request)) fail("GMW-REQUEST-INVALID", "window request is malformed");
   // F3 defense in depth: install() re-validates the closed scope set independently of
   // prepare() -- a hand-built request naming a non-liftable id must never install.
@@ -415,7 +415,7 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   } catch { fail("GMW-REQUEST-INVALID", "request intent is malformed"); }
   if (rebuiltIntent.sha256 !== request.intent.sha256) fail("GMW-REQUEST-INVALID", "request intent digest does not match its rebuilt preimage");
 
-  const verified = verifyPoApprovalProof({ intent: rebuiltIntent, trustPolicy, proof });
+  const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof });
   if (!verified.verified) fail("GMW-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
 
   // The signed `expiresAtMs` is written through VERBATIM -- install() never recomputes

@@ -116,16 +116,28 @@ export function run(argv = process.argv.slice(2)) {
     if (!args.request || !args.proof) throw new Error(usage);
     const request = JSON.parse(readFileSync(resolve(args.request), "utf8"));
     const proof = externalJson(rootDir, args.proof);
-    const trustPolicy = args.authority
-      ? externalJson(rootDir, args.authority)
+    // The committed identity is a SET (ADR-0056's 2026-08-16 correction), so `install`
+    // resolves anchors exactly the way currentGuardMaintenanceWindow already does: a v3
+    // `trustAnchors` is used as written, EMPTY INCLUDED -- an explicit empty v3 set is not
+    // "no anchor", it is the "any well-formed key may sign" posture, and refusing it here
+    // would block a deliberately-configured repository from ever installing a window. A
+    // v1/v2 document's single `trustAnchor` is wrapped as a set of one (identical
+    // behaviour to before), and only a document with no anchor concept at all still
+    // refuses. `--authority` keeps its precedence and its single-anchor external file
+    // shape; it is merely wrapped as a one-element set for the array-based lib signature.
+    const anchors = args.authority
+      ? [externalJson(rootDir, args.authority)]
       : (() => {
         const policy = readCriticalHumanProofPolicy(rootDir);
-        if (!policy.ok || policy.trustAnchor === null) throw new Error("GMW-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");
-        return policy.trustAnchor;
+        const resolved = !policy.ok
+          ? null
+          : (policy.trustAnchors !== null ? policy.trustAnchors : (policy.trustAnchor === null ? null : [policy.trustAnchor]));
+        if (resolved === null) throw new Error("GMW-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");
+        return resolved;
       })();
     const livePluginRoot = currentLivePluginRoot();
     if (livePluginRoot === null) throw new Error("GMW-PLUGIN-SOURCE: no currently-enforcing live plugin root could be identified");
-    const window = installGuardMaintenanceWindow({ rootDir, request, trustPolicy, proof, livePluginRoot });
+    const window = installGuardMaintenanceWindow({ rootDir, request, anchors, proof, livePluginRoot });
     return { ok: true, value: window };
   }
 
