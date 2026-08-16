@@ -542,6 +542,126 @@ feature-package-reconcile`, the `ALWAYS_REQUIRED_KINDS` consumption path — con
 residue, not a new blocker, since it degrades to "skip the extra cross-check", not to a
 refusal), and hand the PO the exact commands for one signing sitting.
 
+### PO directive: bundle everything into one GMW sitting, then work autonomously to the final push gate — 2026-08-16, in progress, PO about to go AFK
+
+**PO directive (verbatim intent):** pack as much as possible into one Guard Maintenance
+Window signing session so the PO can go AFK right after clearing it; the Elephant then
+finishes Phoenix content work overnight, up to the final push gate — **no intermediate
+push**, one signing sitting now, one final push-approval signature when the PO returns.
+
+**A second, then a third small dispatch landed closing the follow-up gaps, both
+independently re-verified:**
+- `PHX-WP-GMW-INSTALL-V3` (commit `3f466662`) — ported v3 to `installGuardMaintenanceWindow`
+  (lib write path) and `scripts/guard-maintenance-window.mjs`'s `install` command, the two
+  call sites `PHX-WP-CHP-V3-PORT`'s briefing wrongly scoped out ("single call site" — there
+  were two). Its own report flagged that the fix accidentally made `anchors: undefined`
+  degrade to the "any key" posture (fail-open), because `lib/guard-maintenance-window.test.mjs`'s
+  13 call sites still passed the old `trustPolicy` scalar.
+- `PHX-WP-GMW-ANCHORS-FAILCLOSED` (commit `11783228`) — added a `GMW-ANCHORS-INVALID`
+  fail-closed guard in `installGuardMaintenanceWindow` for non-array `anchors`, and fixed
+  those 13 call sites in `lib/guard-maintenance-window.test.mjs` (confirmed NOT
+  testpath-protected — `.claude/guard-config.json`'s `protectedTestPaths` does not name it)
+  to pass `anchors: [trustPolicy]`. All four core suites re-verified green by the Elephant
+  directly (not from the report): `guard-maintenance-window` 14/14,
+  `critical-human-proof-policy` 31/31, `critical-action-authorization` 31/31,
+  `human-guard-override` 26/26.
+
+**Full `verify.mjs` re-run at the new final candidate `11783228` (moved worktree,
+confirmed clean) surfaced FOUR MORE regressions the isolated suites above never exercised:**
+`guard-testpath-tests` (crashes uncaught, not just fails — `hooks/guard-testpath.test.mjs`
+line ~209, TP09), `gate-strength-guard-tests` (`hooks/guard-gate-strength.test.mjs` line
+~347, GST20), `guard-testpath-gmw-tests` (`hooks/guard-testpath-gmw.test.mjs` line ~97,
+crashes uncaught), `guard-gate-strength-gmw-tests` (`hooks/guard-gate-strength-gmw.test.mjs`
+line ~89) — all four still pass the old `trustPolicy` shorthand into
+`installGuardMaintenanceWindow`. Confirmed via a repo-wide grep this is now the COMPLETE
+list — no more surprises. **Two of the four are gate-strength-protected and cannot be
+edited without the window itself:** `guard-testpath.test.mjs` = **TP-2**,
+`guard-gate-strength.test.mjs` = **TP-6** (`.claude/guard-config.json`). The other two,
+`guard-testpath-gmw.test.mjs` and `guard-gate-strength-gmw.test.mjs`, are NOT protected —
+**still open, not yet fixed, no dispatch in flight for them as of this checkpoint.** Same
+one-line-per-callsite fix as the already-fixed 13: replace the bare `trustPolicy` shorthand
+with `anchors: [trustPolicy]` (or the equivalent inline object) at each site.
+
+**Final candidate locked at `11783228e8719118a44b10db739e0d932af41d0e` / tree
+`7b6225ece153003cd7a95bba7cfcf7d0551fad9e`.** Two signing artifacts prepared and written to
+`scratch/` (gitignored, not committed) against this exact candidate:
+
+- **GMW window request** — `scratch/gmw-window-request-11783228.json`. Scope: ALL twelve
+  currently-defined `TP-1`..`TP-12` (deliberately broad, per the PO directive, so anything
+  else found overnight needs no second signature) — this also happens to cover the TP-2/TP-6
+  fix above. TTL requested 14400s (the `MAX_WINDOW_TTL_MS` ceiling, 4h — a window this long is
+  not needed for the mechanical fixes themselves, just generous headroom). `featureId
+  sprint-phoenix-epic`, plan/spec SHAs match `pipeline-state.json`'s `planApproval`. Built via
+  `guard-maintenance-window.mjs prepare` run from the **main checkout** (not the worktree —
+  unlike `prepare-critical`, this command has no clean-including-untracked requirement, and
+  the resulting `repoFingerprintSha256` must match wherever `install`/enforcement actually
+  runs later, i.e. the main checkout, not the worktree). **Intent sha256 to sign:
+  `a58cf9f6bd52c905ec9f027eac21b38f8f4520eae267cc715bc4c6571d1a4fd3`.**
+- **Reconcile request** — `scratch/reconcile-request-11783228.json`. **Correction to this
+  checkpoint's own earlier "corrected, no version-skew wall" claim above: that correction was
+  itself wrong.** Measured directly this time: `po-human-approval.mjs`'s `parseHumanArgs`
+  line 133 (`if (command.endsWith("-critical") && !CRITICAL_COMMAND_KINDS.includes(values.kind))`)
+  DOES reject `--kind feature-package-reconcile` — `CRITICAL_COMMAND_KINDS` (line 105) is
+  frozen to exactly `["push", "deploy", "publication"]`. Confirmed by actually running
+  `prepare-critical --kind feature-package-reconcile`, which refused with the USAGE string.
+  So `prepare-critical` genuinely cannot build this request; built it directly instead by
+  importing `createCriticalActionApprovalRequest` (`lib/critical-action-approval-request.mjs`)
+  in a throwaway `scratch/` script, per `docs/push-release-flow.md`'s own sanctioned pattern.
+  `manifest specs/sprint-phoenix-epic/lifecycle.json`, `planSha256`
+  `3e957dade960797f826176721255ca001d092a71666b875610513888cf894a73` (recomputed fresh via
+  `planFeaturePackageReconcile` + `sha256CanonicalJson` from `lib/plan-spec-state-v2.mjs`,
+  matches the 2026-08-12 value exactly — unchanged since, confirming `feature-package-status`'s
+  single `FTP-ARTIFACT-2` finding is still the same one, acceptance.md digest `2768f169…` →
+  `300acd10…`), `subjectSha256` `dd08bd0ea6022139a7f401fcdfbadbc4a1849aa703411eb889e45f740458a97d`
+  (via `criticalActionSubjectSha256({kind: "feature-package-reconcile", candidate, subject:
+  {manifest, planSha256, candidate}})`, matching `defaultFeaturePackageReconcileApproval`'s
+  exact subject shape), `expiresAt 2026-08-17T12:00:00.000Z`. **Intent sha256 to sign:
+  `5813a9e0d72fce488138b8b812f4b40814936584035c4a035264707fbe1f18c6`.**
+
+**Handed the PO exactly two `po-human-approval.mjs sign-intent --repo-root
+/home/skar667/src/agent-pipeline-share_phoenix --directory ~/agent-pipeline-po-nova
+--intent-sha256 <one of the two digests above>` commands, to run back to back in their own
+terminal.** `sign-intent` is generic/kind-agnostic (only checks the SHA format, no
+`CRITICAL_COMMAND_KINDS` gate) and writes to a FIXED path, `<directory>/proof-manual.json`
+— the second signing overwrites the first, so the Elephant must read and persist the first
+proof into `scratch/` (Read tool can read outside the repo root; only writes are
+cross-repo-blocked) before the PO runs the second command. **As of this checkpoint: NOT YET
+SIGNED.** The PO has not run either command; nothing below this point has executed.
+
+**Exact next steps once both proofs exist (mechanical, no more design decisions):**
+1. Capture the window proof (copy `~/agent-pipeline-po-nova/proof-manual.json` content into
+   `scratch/gmw-window-proof-11783228.json`) before the second `sign-intent` call overwrites it.
+2. `guard-maintenance-window.mjs install --repo-root <main checkout> --request
+   scratch/gmw-window-request-11783228.json --proof scratch/gmw-window-proof-11783228.json`
+   (no `--authority` — defaults to the committed v3-empty policy, any well-formed key).
+3. Capture the reconcile proof the same way, into `scratch/reconcile-proof-11783228.json`.
+4. `pipeline-state.mjs feature-package-reconcile --root <main checkout> --manifest
+   specs/sprint-phoenix-epic/lifecycle.json --plan-sha256
+   3e957dade960797f826176721255ca001d092a71666b875610513888cf894a73 --by <PO name>
+   --proof-request scratch/reconcile-request-11783228.json --proof-authority
+   ~/agent-pipeline-po-nova/trust-policy-verify-shape.json --proof
+   scratch/reconcile-proof-11783228.json` — closes `artifact-topology-check`,
+   `threat-model-tests`, `pipeline-state-tests`, `external-reference-adapter-tests` (all
+   `FTP-ARTIFACT-2`).
+5. Under the now-live window: fix OT09 (TP-7, exact diagnosis already recorded above), fix
+   `guard-testpath.test.mjs`/TP-2 and `guard-gate-strength.test.mjs`/TP-6 (same
+   `trustPolicy`→`anchors: [...]` mechanical fix as the already-landed 13, see above),
+   register the two orphaned suites in `verify.mjs` (TP-3, closes
+   `verify-suite-registration-check`) — `advisory-decision-event.test.mjs` and
+   `guard-handoff-offer.test.mjs`.
+6. Also fix (no window needed) the two NOT-YET-FIXED unprotected files —
+   `guard-testpath-gmw.test.mjs`, `guard-gate-strength-gmw.test.mjs` — same mechanical fix;
+   can happen before or after the window, independently.
+7. Close the GMW window, full `verify.mjs`, `security-scan.mjs` (the Stop-hook's queued next
+   gate, deferred all session for exactly this reason — races with in-flight guard-file
+   edits).
+8. Continue Phoenix criterion work (P-AC-11 remaining, R-AC-08/A-AC-05 continuation per the
+   "Next criterion targets" list earlier in this checkpoint) as far as budget/time allow,
+   content-complete, **no push**.
+9. At the true end: prepare the push-approval request bound to the final commit and stop —
+   that signature is the named final PO gate, deliberately left for the PO's return, per
+   "kein Zwischenpush."
+
 ## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
 
 **Trigger.** PO asked to continue Phoenix work, then went AFK with standing
