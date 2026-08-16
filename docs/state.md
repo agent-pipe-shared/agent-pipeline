@@ -805,6 +805,28 @@ further attempt to use it tonight.
 **Live acceptance-evidence-map / criterion work resumes below, on threads that do
 NOT depend on this blocked mechanism.**
 
+**In flight as of this checkpoint (both unaffected by the window finding — neither
+touches a TP-*/GS-6 path):**
+- A full `verify.mjs` re-run at the current candidate (`5324acac`, worktree moved
+  and confirmed clean), background, result not yet known — expected to show the
+  reconcile's effect (the four `FTP-ARTIFACT-2` reds should clear) alongside the
+  still-open `guard-testpath-tests`/`gate-strength-guard-tests`/
+  `guard-testpath-override-tests`/`verify-suite-registration-check` reds the window
+  finding above explains and parks.
+- `PHX-WP-AAC01-REVALIDATION-TRIGGER` (goldfish-deep/opus/xhigh): closes A-AC-01's
+  field gap named in `agent-decision-identity-scoping.md` §6/§7 step 4 — the
+  Elephant decided it is a missing field (not a caller's concern or an amendment),
+  added the same optional-key way `assumptionState` already was: a `CODE`-pattern
+  (stable identifier, not free text) `revalidationTrigger`, unscoped across all
+  five `KINDS` (deliberately NOT restricted the way `identity` is restricted to
+  `IDENTITY_KINDS` — A-AC-01's own text does not narrow it). Three artifacts in
+  lockstep: `lib/agent-decision-journal.mjs`, the published
+  `governance/schemas/agent-decision-event.schema.json`, and its test file.
+  Result not yet known. This is preparatory for design-doc step 3 (extending
+  `main-session-route.mjs` at the caller boundary for A-AC-01's ordering clause,
+  itself gated on settling §5.1's host-adapter precondition first) — not that step
+  itself.
+
 **Exact next steps once both proofs exist (mechanical, no more design decisions):**
 1. Capture the window proof (copy `~/agent-pipeline-po-nova/proof-manual.json` content into
    `scratch/gmw-window-proof-11783228.json`) before the second `sign-intent` call overwrites it.
