@@ -374,6 +374,56 @@ Live acceptance-evidence-map counts as of this checkpoint (unchanged by this pas
 threads are `partial`/scoping-only or pending the registration): **130 implemented / 23
 partial / 3 not-started / 1 constraint**, 157 total.
 
+### Continuation, same evening — A-AC-05 translator landed; E-AC-08 truncation dispatched
+
+PO: "ja bitte mache inhaltlich weiter, den rest fassen wir dann gleich für alles zusammen."
+Two more disjoint-file dispatches, following the revised sequencing from the identity-scoping
+document (§7) and the closing-gate handover's queued next target.
+
+**A-AC-05 producer, landed (commit `63dac0b4`).** `PHX-WP-AAC05-ADVISORY-TRANSLATOR`,
+goldfish-deep/opus/xhigh. New `plugins/pipeline-core/lib/advisory-decision-event.mjs` +
+test — a pure, synchronous translator from an answered `pipeline.advisory-receipt.v1` to a
+validated `agent-decision-journal.mjs` event, all 5 reachable identity dimensions
+(`runner`/`model`/`effort`/`adapter`/`profile`), each with an explicit provenance/assurance
+pair decided per-dimension in the briefing rather than left to the goldfish: `runner` and
+`adapter` `verified` (this module re-derives runner from the observed provider and refuses
+on mismatch; which adapter answered is this dispatch's own control-flow fact), `model` and
+`effort` `reported` (the coordinator's alias matching is enforced upstream, not reimplemented
+here), `profile` `reported`/`requested-route` (caller input nothing observes back).
+Deliberately scoped to the success-only case (`kind: "selection"`/`"fallback"` from
+`receipt.fallback.reason`) — a receipt whose route was exhausted without an answer is refused
+by name (`ADE-RECEIPT-UNANSWERED`), because deciding the right `kind`/`state` for "we tried
+and got no identity at all" is its own design question, not one to improvise mid-package.
+No wiring into `advisory-coordinator.mjs`/`advisory-host-bridge.mjs`/the governance event
+store — threading a real `repositoryRoot`/fingerprint/capture-policy binding through a
+currently synchronous, git-unaware call path stays a separate decision. Independently
+re-verified by the Elephant, not accepted from the report: re-ran the exact DoD command
+myself, 59/59 pass, 0 fail; also read the full module diff and confirmed every D2 mapping
+value against the briefing line by line before trusting the report's claim. One genuine
+cross-module gap surfaced and deliberately left visible rather than papered over:
+`advisory-receipt.mjs`'s `MODEL_ID` pattern admits `/`, `agent-decision-journal.mjs`'s `ID`
+pattern does not — a receipt with such a `modelId` is refused by the journal itself
+(`ADJ-SHAPE`), covered by a test, not silently normalized by the translator.
+
+**E-AC-08 outbox truncation, dispatched, in flight.** `PHX-WP-EAC08-TRUNCATION`,
+goldfish-deep/opus/xhigh, disjoint files from both threads above
+(`governance-export-outbox-store.mjs` + its test). Closes the 8th and last of E-AC-08's
+named failure classes — 7 (destination-mismatch/forged-ack/event-gap/schema-downgrade/
+cursor-bound/source-fork/invalid-hash) were already pinned; "outbox truncation" was not.
+Found by reading the CAS persistence adapter directly: `persistGovernanceExportOutbox`
+already holds both the prior on-disk state and the new one in scope right before it writes
+— the exact seam, no new plumbing needed. Design fixed in the briefing: the invariant is
+append-only + per-sequence-immutable `projection` (verified by reading
+`enqueueGovernanceExport`/`applyGovernanceExportDelivery` before relying on it — neither
+ever shrinks the array or rewrites an existing entry's `projection`, confirmed from source,
+not assumed), checked strictly after the existing CAS `expectedSha256` conflict check so a
+stale preimage is still reported as `"conflict"`, never as truncation. Deliberately narrow:
+does NOT check cursor regression or status reversion (related, but not what "outbox
+truncation" names) — flagged as an open observation for the PO if noticed, not built.
+**No `verify.mjs` edit needed this time** — `governance-export-outbox-store-tests` is
+already registered (`harness/scripts/verify.mjs:468`), so this package (unlike the two
+above) should land without a TP-3-blocked tail if the premise holds. Result not yet known.
+
 ---
 
 ## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
