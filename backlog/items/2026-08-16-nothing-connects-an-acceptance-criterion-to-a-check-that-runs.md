@@ -54,7 +54,7 @@ seeded placeholder and nothing else.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted — deferred to a dedicated design round, not this AFK block.
+- **Rationale:** self-scoped as "Direction, not a design"; the proposed shape (acceptance criteria carry check identifiers, verify registration derived from them, unregistered-but-named checks hard-fail) changes the plan gate and the Spec/PRD authoring contract — Design-phase work per MP-22 (interview/spec/readiness), not an execution-phase patch. The item itself says the consumer-project half matters more than the Pipeline's own, which argues for Spec-level design (how a hosted project's PRD/Spec template carries check identifiers) before any code changes, exactly as the compaction-point survey already flagged ("needs Spec/ADR work first").
+- **Assignment (if accepted):** a future dedicated design session (Spec/ADR authorship on the check-identifier chain), likely paired with `docs/pending-verify-registrations.md`'s existing parking-lot mechanism and `2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md`. Not folded into the 0.5.5 candidate.
+- **Date:** 2026-08-16
