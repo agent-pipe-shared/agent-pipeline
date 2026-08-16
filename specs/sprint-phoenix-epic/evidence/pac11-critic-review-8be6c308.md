@@ -15,11 +15,18 @@ resolves *inconsistent*.
 
 ### F1 — `ownedSections` and `changes[].field` are validated against different value domains (major)
 
-`validOwnedSections` requires `TARGET_REF = /^[a-z][a-z0-9-]{2,63}$/u`
+`validOwnedSections` requires every item to match `TARGET_REF`
 (`organization-policy.mjs:65`, pattern at `:19`), but the compared value
-`desired.changes[].field` is validated by `ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u`
-(`external-reference-adapter.mjs:20`, pattern at `:6`). The gate at
-`external-reference-adapter.mjs:74` is a raw `includes` with no normalization.
+`desired.changes` field is validated by `ID`
+(`external-reference-adapter.mjs:20`, pattern at `:6`):
+
+```
+TARGET_REF   ^[a-z][a-z0-9-]{2,63}$
+ID           ^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$
+```
+
+The gate at `external-reference-adapter.mjs:74` is a raw `includes` with no
+normalization.
 
 Consequence: once a document class declares `ownedSections`, any legal field name
 containing an uppercase letter, `.`, `_`, `:`, a leading digit, or fewer than 3 /
