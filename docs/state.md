@@ -442,8 +442,30 @@ projections match (real, related, not "truncation"); the projection comparison i
 "the detached verify worktree ... that is what it exists for" but no session this checkpoint
 covers had located and used it directly) — was parked at stale `dd452881`. Moved it to the
 current candidate (`git checkout 897e28cd` inside the worktree, confirmed clean including
-untracked), ran `node harness/scripts/verify.mjs` from there in the background. Result
-pending at time of writing this entry; recorded separately once it returns.
+untracked), ran `node harness/scripts/verify.mjs` from there in the background.
+
+**Result: exit 2, 373 steps, 7 red — one more than the 6 at the last full run, and the new
+one is a foreseen mechanical consequence, not a new independent blocker.** The 6 unchanged:
+`artifact-topology-check`, `threat-model-tests`, `pipeline-state-tests`,
+`external-reference-adapter-tests` (all 4 `FTP-ARTIFACT-2`, PO-signature-gated),
+`guard-testpath-override-tests`/OT09 (TP-7-gated), `critical-human-proof-policy-tests`/CHP13
+(waiting on the 0.5.5 v3-lib candidate). **New: `verify-suite-registration-check`.** Ran its
+underlying script directly for the exact cause rather than asserting one: `UNREGISTERED
+plugins/pipeline-core/lib/advisory-decision-event.test.mjs` and `UNREGISTERED
+plugins/pipeline-core/lib/guard-handoff-offer.test.mjs` — precisely the two new test files
+both dispatches already flagged as pending a `verify.mjs` registration, now caught by a
+dedicated orphan-suite check neither dispatch's own narrower DoD command would have run.
+Confirmed `governance-export-outbox-store-tests` (E-AC-08's suite) is green at full-gate
+scale, `exitCode: 0` — no regression from that package. **Net: this joins the SAME
+PO-signature-gated bucket as the other 5** (clearing `verify.mjs`'s TP-3 protection for one
+edit clears it for three), not a new category of blocker — the substance of both R-AC-08 and
+A-AC-05 remains real and independently verified regardless.
+
+Live acceptance-evidence-map counts, restated at this checkpoint's close: **130 implemented /
+23 partial / 3 not-started / 1 constraint**, 157 total — unchanged by tonight's two packages,
+both correctly still `partial` (neither closes its full criterion alone: R-AC-08 is the
+producer half only per the design doc, A-AC-05 covers 5 of 7 dimensions and the success path
+only).
 
 ---
 
