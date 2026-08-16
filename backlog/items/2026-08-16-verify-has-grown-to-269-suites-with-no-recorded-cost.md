@@ -49,7 +49,7 @@ two share a lever and should be picked up together or in that order.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted — part 1 only (measure and record per-suite duration in the evidence artifact). Parts 2-4 stay open; part 3 in particular (selective-vs-full tiering) trades away a real guarantee and is exactly the kind of scope-widening decision that belongs with the PO, not assumed here.
+- **Rationale:** part 1 is explicitly the precondition for everything else and carries no weakening of its own — pure additive instrumentation.
+- **Assignment (if accepted):** Nova A AFK-session closeout, folded into the next local 0.5.5 candidate.
+- **Date:** 2026-08-16

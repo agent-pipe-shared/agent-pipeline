@@ -55,7 +55,7 @@ to the data but drifts if the ledger is ever rebuilt.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted — cutoff lives in the checking script (`plugins/pipeline-core/scripts/check-backlog-state.mjs` or the shared lib it calls), not in the ledger file. The item itself left this open; the checking script is the safer default because it is immutable relative to the data (a future writer/rebuild cannot silently move the cutoff forward to re-admit a new integrity violation as DRIFT).
+- **Rationale:** not architecture/ADR-scale, a bounded implementation choice with tradeoffs already stated in the item body — resolved here rather than escalated, per this session's PO-set autonomy for exactly this class of decision.
+- **Assignment (if accepted):** Nova A AFK-session closeout, folded into the next local 0.5.5 candidate.
+- **Date:** 2026-08-16

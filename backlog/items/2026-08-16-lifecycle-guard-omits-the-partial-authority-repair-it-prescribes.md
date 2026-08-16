@@ -59,7 +59,7 @@ Two candidates, not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted — direction 1 only (add the missing allowlist entry). Direction 2 (derive the admitted set from the CLI's own subcommand table) is a larger design change with a stated correctness hazard (must key on a declared read-only property, not name/prefix) and is left open for a dedicated design-phase pass, not bundled into this fix.
+- **Rationale:** smallest possible change, third recurrence of the identical repair pattern (2026-08-08, 2026-08-09), guardrail-class code so it goes through goldfish-deep + worktree isolation + mandatory Design-tier Critic escalation (MP-07) rather than a same-session edit.
+- **Assignment (if accepted):** Nova A AFK-session closeout, folded into the next local 0.5.5 candidate.
+- **Date:** 2026-08-16
