@@ -76,6 +76,7 @@
 | pipeline.git-appears-despite-initializes-git-false | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation | closed | defect | pipeline | 2026-08-10 | — |
+| pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | open | defect | pipeline | 2026-08-16 | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
@@ -218,6 +219,6 @@
 
 ## Counts
 
-- open: 95
+- open: 96
 - in_progress: 22
 - closed: 93
