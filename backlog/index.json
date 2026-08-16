@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "95a3961affbe592aad75d539a1e680d4294d9c3a5b195be612497d2a74f0f176"
+    "transitionHead": "91e0a1a1d9b33e457318461a98af4969e599c32be1710cd7e84259c9d5d38e16"
   },
   "counts": {
-    "open": 88,
+    "open": 90,
     "in_progress": 26,
     "closed": 27
   },
@@ -472,6 +472,14 @@
       "source": "Adjacent finding by the Elephant while verifying the GMW lift question for the WP2-WP3 Part A residuals (2026-08-07). Verified against the code, not assumed. Recorded rather than fixed because the affected file is a NEVER_LIFTABLE_KERNEL_PATH and cannot be edited in-session."
     },
     {
+      "id": "pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-16",
+      "source": "Found 2026-08-16 when two dispatches in one session correctly refused to force-add their dispatch records, and the Critic separately flagged that the evidence artifact it was given sat under scratch/ rather than the calibration's canonical evidence/ location. Verified with git check-ignore before filing."
+    },
+    {
       "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",
       "status": "open",
       "type": "requirement",
@@ -743,6 +751,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07."
+    },
+    {
+      "id": "pipeline.p-ac-11-four-dimensions-declared-but-inert",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-16",
+      "source": "Independent Critic review of 0d3d9bcc..8be6c308, finding F3 (blocker), 2026-08-16. Full report: specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md."
     },
     {
       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",

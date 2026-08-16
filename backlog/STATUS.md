@@ -59,6 +59,7 @@
 | pipeline.first-verify-run-is-red-with-four-failures | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-override-route-advertised-not-offered | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | open | defect | pipeline | 2026-08-16 | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | open | requirement | pipeline | 2026-08-07 | — |
 | pipeline.governance-product-verify-suites-deregistered | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
@@ -91,6 +92,7 @@
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.p-ac-11-four-dimensions-declared-but-inert | open | defect | pipeline | 2026-08-16 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
@@ -149,6 +151,6 @@
 
 ## Counts
 
-- open: 88
+- open: 90
 - in_progress: 26
 - closed: 27
