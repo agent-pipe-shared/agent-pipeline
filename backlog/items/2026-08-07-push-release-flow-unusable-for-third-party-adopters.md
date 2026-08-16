@@ -214,7 +214,8 @@ commitment to any of them:
 
 The triage above closed the documentation half on the strength of
 `docs/push-release-flow.md` being "one authoritative, current document."
-Tonight it was not current: [ADR-0061](../../docs/adr/0061-uniform-human-approval-ceremony.md)
+Tonight it was not current: ADR-0061 (`docs/adr/0061-uniform-human-approval-ceremony.md`
+on `origin/main`; not present on this branch)
 (2026-08-07, same day as this item, PO instruction to collapse
 `prepare-critical`/`approve-critical` into a single `authorize-critical`
 command) exists on `origin/main` and is implemented in the installed plugin
