@@ -49,6 +49,8 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createReleasePreflight } from "./release-preflight.mjs";
+import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
+import { runVerifyJournal, sealVerifyCleanupRegistration } from "./verify-journal.mjs";
 import {
   applyPublicationAuthorization,
   executePublication,
@@ -69,6 +71,60 @@ function gateEvidence(gate, candidateOid, candidateTree) {
   return {
     schema: "pipeline.publication-gate-evidence.v1", gate,
     candidate: { commit: candidateOid, tree: candidateTree }, status: "passed", exitCode: 0,
+  };
+}
+
+/**
+ * NVA-A98R6-2: the "verify" gate's evidence, unlike the identity/security/critic
+ * placeholders above (out of scope here), is a REAL receipt: it runs a small,
+ * fixture-local, throwaway example test list through this repository's own
+ * general-purpose `runVerifyJournal`, then derives `pipeline.publication-gate-
+ * evidence.v1` from that real result via `publication-gate-evidence.mjs`'s own
+ * deriver -- never a hand-asserted "passed". `registerRun` follows the exact
+ * convention `verify-journal.test.mjs` already established for testing
+ * `runVerifyJournal` in isolation.
+ */
+const registerFixtureVerifyRun = (request) => sealVerifyCleanupRegistration({
+  status: "registered", runId: request.runId, runPath: request.runPath,
+  sessionId: "a98r6-fixture-session", descriptorSha256: "d".repeat(64),
+  resourceId: `verify-${request.runId}`, registeredAt: "2026-08-01T00:00:00.000Z",
+});
+
+function writeCheckScript(root, name, body) {
+  const dir = join(root, "checks");
+  mkdirSync(dir, { recursive: true });
+  const file = join(dir, `${name}.mjs`);
+  writeFileSync(file, body);
+  return file;
+}
+
+/** Runs ONE real, trivial example test (never this repository's own several-hundred-item
+ * list) through the real `runVerifyJournal` plumbing, genuinely passing or genuinely
+ * failing depending on `exitOk`. */
+function realVerifyRun(value, { exitOk }) {
+  const body = exitOk
+    ? "process.stdout.write('a98r6 example check ok\\n');\n"
+    : "process.stderr.write('a98r6 example check failing on purpose\\n');\nprocess.exitCode = 1;\n";
+  const file = writeCheckScript(value.root, "example-check", body);
+  return runVerifyJournal({
+    gitCommonDir: join(value.root, ".git"),
+    repoRoot: value.root,
+    candidate: { commit: value.candidate, tree: value.tree },
+    suites: [{ name: "example-check", file }],
+    policyInputs: { fixture: "a98r6-productive-flow" },
+    registerRun: registerFixtureVerifyRun,
+    runId: `a98r6-verify-${value.candidate.slice(0, 8)}`,
+  });
+}
+
+/** The `pipeline.verify-evidence.v0` shape `deriveGateEvidence` reads, built from the
+ * REAL runVerifyJournal result's own steps/exit codes -- never hand-asserted. */
+function verifyEvidenceFromRealRun(value, result) {
+  return {
+    schema: "pipeline.verify-evidence.v0",
+    candidate: { commit: value.candidate, tree: value.tree },
+    steps: result.steps.map((step) => ({ name: step.name, exitCode: step.exitCode })),
+    exitCode: result.steps.some((step) => step.exitCode !== 0) ? 1 : 0,
   };
 }
 
@@ -140,8 +196,14 @@ function writeEvidence(root, relPath, record) {
   return relPath;
 }
 
-/** Steps 1-3: preflight, gate/release-preflight evidence, prepare. Real R1 + the R2 prepare leg. */
-function prepareTransaction(value) {
+/**
+ * Steps 1-3: preflight, gate/release-preflight evidence, prepare. Real R1 + the R2 prepare
+ * leg. `verifyOk = false` runs a genuinely FAILING example test through the same real
+ * `runVerifyJournal` plumbing, confirms `deriveGateEvidence` refuses to launder that real
+ * failure into passing evidence, then confirms the honestly-recorded failure is itself
+ * consulted -- and rejected -- by the real `preparePublicationTransaction` prepare step.
+ */
+function prepareTransaction(value, { verifyOk = true } = {}) {
   const preflight = preflightPublication({
     rootDir: value.root, preflightId: "a98r6-fixture", candidateOid: value.candidate,
     remoteName: "origin", destinationRef: "refs/heads/main",
@@ -149,7 +211,27 @@ function prepareTransaction(value) {
   assert.equal(preflight.status, "ready");
   const preflightPath = writeEvidence(value.root, "evidence/capability-preflight.json", preflight);
   const identityPath = writeEvidence(value.root, "evidence/identity.json", gateEvidence("identity", value.candidate, value.tree));
-  const verifyPath = writeEvidence(value.root, "evidence/verify.json", gateEvidence("verify", value.candidate, value.tree));
+
+  const verifyRun = realVerifyRun(value, { exitOk: verifyOk });
+  assert.equal(verifyRun.terminal.status, verifyOk ? "passed" : "failed");
+  const verifySourcePath = writeEvidence(value.root, "evidence/verify-run-source.json", verifyEvidenceFromRealRun(value, verifyRun));
+  let verifyPath;
+  if (verifyOk) {
+    const derivedVerify = deriveGateEvidence({ rootDir: value.root, gate: "verify", sourcePath: verifySourcePath });
+    verifyPath = writeEvidence(value.root, "evidence/verify.json", derivedVerify.evidence);
+  } else {
+    assert.equal(verifyRun.steps[0].exitCode, 1, "the real spawned example check genuinely exited non-zero");
+    assert.throws(
+      () => deriveGateEvidence({ rootDir: value.root, gate: "verify", sourcePath: verifySourcePath }),
+      /verify did not pass/u,
+      "a real failing verify run must never be laundered into passing gate evidence",
+    );
+    // No passing evidence can honestly be derived from a real failure; record that failure
+    // directly (never a fabricated pass) so the real prepare step below has something to
+    // consult and reject.
+    verifyPath = writeEvidence(value.root, "evidence/verify.json", { schema: "pipeline.publication-gate-evidence.v1", gate: "verify", candidate: { commit: value.candidate, tree: value.tree }, status: "failed", exitCode: 1 });
+  }
+
   const securityPath = writeEvidence(value.root, "evidence/security.json", gateEvidence("security", value.candidate, value.tree));
   const criticPath = writeEvidence(value.root, "evidence/critic.json", gateEvidence("critic", value.candidate, value.tree));
   const releasePreflightRecord = releasePreflightFixture({
@@ -159,6 +241,18 @@ function prepareTransaction(value) {
   assert.equal(releasePreflightRecord.status, "ready");
   const releasePreflightPath = writeEvidence(value.root, "evidence/release-preflight.json", releasePreflightRecord);
   const transactionId = `tx-${value.candidate.slice(0, 8)}`;
+  if (!verifyOk) {
+    assert.throws(
+      () => preparePublicationTransaction({
+        rootDir: value.root, transactionId, channel: "private",
+        preflightPath, identityPath, verifyPath, securityPath, criticPath, releasePreflightPath,
+      }),
+      /verify evidence did not pass/u,
+      "prepare must consult the real (failing) verify result, not merely carry it unused",
+    );
+    assert.equal(oid(value.remote, "refs/heads/main"), value.base, "a rejected prepare must never reach the remote");
+    return { preflight, transactionId };
+  }
   const prepared = preparePublicationTransaction({
     rootDir: value.root, transactionId, channel: "private",
     preflightPath, identityPath, verifyPath, securityPath, criticPath, releasePreflightPath,
@@ -277,6 +371,12 @@ check("authorize-apply rejects a genuinely-planned apply replayed after its own 
     planSha256: plan.planSha256, activate: true,
   }, { now: () => expiresAt + 1 }), /not active at apply time/u);
   assert.equal(oid(value.remote, "refs/heads/main"), value.base, "an expired apply must never reach the remote");
+});
+
+check("a genuinely failing example test blocks the real prepare step -- the real result is consulted downstream, not merely present", () => {
+  const value = fixture("failing-verify");
+  const { transactionId } = prepareTransaction(value, { verifyOk: false });
+  assert.match(transactionId, /^tx-/u);
 });
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });
