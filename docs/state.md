@@ -805,27 +805,53 @@ further attempt to use it tonight.
 **Live acceptance-evidence-map / criterion work resumes below, on threads that do
 NOT depend on this blocked mechanism.**
 
-**In flight as of this checkpoint (both unaffected by the window finding — neither
-touches a TP-*/GS-6 path):**
-- A full `verify.mjs` re-run at the current candidate (`5324acac`, worktree moved
-  and confirmed clean), background, result not yet known — expected to show the
-  reconcile's effect (the four `FTP-ARTIFACT-2` reds should clear) alongside the
-  still-open `guard-testpath-tests`/`gate-strength-guard-tests`/
-  `guard-testpath-override-tests`/`verify-suite-registration-check` reds the window
-  finding above explains and parks.
-- `PHX-WP-AAC01-REVALIDATION-TRIGGER` (goldfish-deep/opus/xhigh): closes A-AC-01's
-  field gap named in `agent-decision-identity-scoping.md` §6/§7 step 4 — the
-  Elephant decided it is a missing field (not a caller's concern or an amendment),
-  added the same optional-key way `assumptionState` already was: a `CODE`-pattern
-  (stable identifier, not free text) `revalidationTrigger`, unscoped across all
-  five `KINDS` (deliberately NOT restricted the way `identity` is restricted to
-  `IDENTITY_KINDS` — A-AC-01's own text does not narrow it). Three artifacts in
-  lockstep: `lib/agent-decision-journal.mjs`, the published
-  `governance/schemas/agent-decision-event.schema.json`, and its test file.
-  Result not yet known. This is preparatory for design-doc step 3 (extending
-  `main-session-route.mjs` at the caller boundary for A-AC-01's ordering clause,
-  itself gated on settling §5.1's host-adapter precondition first) — not that step
-  itself.
+**`PHX-WP-AAC01-REVALIDATION-TRIGGER` landed, commit `170c44ef`.** Closes A-AC-01's
+field gap named in `agent-decision-identity-scoping.md` §6/§7 step 4 — the Elephant
+decided it is a missing field (not a caller's concern or an amendment), added the
+same optional-key way `assumptionState` already was: a `CODE`-pattern (stable
+identifier, not free text) `revalidationTrigger`, unscoped across all five `KINDS`
+(deliberately NOT restricted the way `identity` is restricted to `IDENTITY_KINDS` —
+A-AC-01's own text does not narrow it). Three artifacts in lockstep:
+`lib/agent-decision-journal.mjs`, the published
+`governance/schemas/agent-decision-event.schema.json`, its test file (44→47
+passing). **The dispatch caught and closed a real latent bug the briefing's own
+literal spec would have left open:** `RegExp.test` stringifies its argument, so
+`CODE.test(value.revalidationTrigger)` alone would have admitted a single-element
+array (`["ON_NEXT_VERIFY_RUN"]` stringifies to the matching text) where the
+published schema says `"type": "string"` — added an explicit `typeof` guard ahead
+of the regex test. **The identical pre-existing hole on `reasonCode` (and possibly
+other bare `CODE.test`/similar checks in this file) was correctly left untouched**
+(out of that dispatch's scope) and filed as its own backlog item:
+[`backlog/items/2026-08-16-agent-decision-journal-code-pattern-array-coercion.md`](../backlog/items/2026-08-16-agent-decision-journal-code-pattern-array-coercion.md).
+This is preparatory for design-doc step 3 (extending `main-session-route.mjs` at
+the caller boundary for A-AC-01's ordering clause) — not that step itself; see
+below for why that step is not attempted tonight.
+
+**Two Elephant-caught process gaps, fixed directly, both explaining stale-looking
+red suites that were NOT actually still blocked:**
+- `pipeline-state.mjs feature-package-reconcile` (from earlier tonight) had written
+  `specs/sprint-phoenix-epic/lifecycle.json`'s corrected digest binding to the
+  working tree but the commit step was missed — the four `FTP-ARTIFACT-2` suites
+  stayed red in every verify run since, looking exactly like an unresolved blocker
+  when the actual PO-signed reconcile had already succeeded. Committed (`7178e126`).
+- Filing three backlog items directly (bypassing the sanctioned
+  `reconcile-backlog-ledger.mjs` writer) left `backlog-state-check`/
+  `backlog-ledger-reconciliation-tests` red — the exact same class of self-inflicted
+  gap this checkpoint's own earlier `PHX-VF-BACKLOG2` fix already named once
+  tonight. Ran `reconcile-backlog-ledger.mjs --activate` twice (once for the first
+  two items, once more after filing the third); committed (`11eb6087`, `2d78ef7c`).
+
+**Full `verify.mjs` re-run at the new candidate (worktree moved, confirmed clean) —
+down to exactly four red steps, ALL already identified and parked above, nothing
+new:** `guard-testpath-tests` (TP09/TP-2), `gate-strength-guard-tests` (GST20/TP-6),
+`guard-testpath-override-tests` (OT09/TP-7), `verify-suite-registration-check` (2 —
+the still-unregistered TP-3 pair). **Every other step, including all four
+`FTP-ARTIFACT-2` suites, `agent-decision-journal-tests`, both backlog checks, is
+green.** (`exit 1` this run vs. earlier `exit 2` runs is not a severity signal —
+`verify.mjs`'s own exit code is simply whichever failing step's own exit code
+sorts first in step-array order, per its source at `harness/scripts/verify.mjs:656`
+— an incidental artifact of which check happens to fail first, not a new class of
+problem.)
 
 **Exact next steps once both proofs exist (mechanical, no more design decisions):**
 1. Capture the window proof (copy `~/agent-pipeline-po-nova/proof-manual.json` content into
