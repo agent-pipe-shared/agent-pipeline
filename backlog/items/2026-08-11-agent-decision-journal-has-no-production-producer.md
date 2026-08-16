@@ -48,3 +48,39 @@ Either way this is real, multi-session design-then-build work — not a single d
 - **Rationale:** PO decision, 2026-08-11 (direct question, "Journal-Gap"): plan as its own initiative. Sizing and sequencing not yet done — that is the next session's Elephant work, starting from the candidate starting points above and `class-b-multi-dispatch-plan.md`'s existing scoping.
 - **Assignment (if accepted):** unassigned — needs a scoping/design pass before it can be sequenced into a phase.
 - **Date:** 2026-08-11
+
+## Scoping pass done — 2026-08-16
+
+The design pass this Triage asked for is written:
+`specs/sprint-phoenix-epic/design/agent-decision-journal-production-producer.md`.
+It is a decision document, not a build; no code changed.
+
+Two results change how this item should be sequenced, and both correct
+statements made in the Description above rather than merely adding to them:
+
+1. **The architectural question is narrower than it looked.** The premise "that
+   activity happens at the chat-harness level, outside the repository entirely"
+   holds for *orchestration* — which agent is dispatched, with which briefing —
+   and that finding for L-AC-01 stands unchanged. It does **not** hold for the
+   journal: guard and gate decisions (refusing a command, handing a human a
+   copy-only command, admitting an override, consuming an approval) run inside
+   this repository's own code during real agent operation. So the integration
+   point does not have to be created, only tapped, and this item does not
+   require deciding whether to grow an in-repo orchestration layer.
+2. **One producer does not close four criteria.** This item groups A-AC-01,
+   A-AC-05, H-AC-08 and R-AC-08 under one root cause, which is right as a
+   diagnosis and misleading as a plan: the module validates three *independent*
+   event kinds. `command-offer` serves R-AC-08; `agent-decision` serves A-AC-01
+   and A-AC-05; `legacy-import-observation` serves H-AC-08. A producer for one
+   produces none of the others.
+
+Sequencing that follows, per the design doc: build the `command-offer` producer
+at the guard hand-off seam first (best-evidenced, smallest, and the transition
+state machine in `external-command-offer.mjs` is already complete and tested);
+then run the `agent-decision` scoping step against the continuity
+course-decision machinery; and put **H-AC-08 to the PO as a probable acceptance
+amendment rather than a build** — the product performs no legacy import at all,
+and building a caller to satisfy a criterion is the anti-pattern `cc43a182`
+already reverted once in this epic.
+
+This item stays `open`: the first producer is scoped but not built.
