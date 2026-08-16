@@ -169,3 +169,97 @@ test("P-AC-01 validates a pack's signature policy and rejects an unknown algorit
   ];
   for (const value of malformed) assert.throws(() => validateOrganizationPolicyPack(value, { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-SIGNATURE");
 });
+// WP-PAC11: ownedSections is a bounded, deduplicated array of opaque
+// TARGET_REF-shaped ids (same shape as targetRef, not a hardcoded enum --
+// governed-document sections vary per organization, so only the SHAPE is
+// closed, exactly like targetRef itself). A well-formed declaration is
+// admitted; a free-prose, duplicate, or malformed-id value is refused under
+// the same OPP-DOCUMENT code every other document-class shape violation uses.
+test("P-AC-11 accepts a closed ownedSections declaration and rejects a non-closed one", () => {
+  const accepted = validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], ownedSections: ["threat-model", "risk-register"] }] }), { coreVersion: "0.4.7" });
+  assert.deepEqual(accepted.documentClasses[0].ownedSections, ["threat-model", "risk-register"]);
+  const malformed = [
+    pack({ documentClasses: [{ ...pack().documentClasses[0], ownedSections: "threat-model" }] }),
+    pack({ documentClasses: [{ ...pack().documentClasses[0], ownedSections: ["Not An Id"] }] }),
+    pack({ documentClasses: [{ ...pack().documentClasses[0], ownedSections: ["threat-model", "threat-model"] }] }),
+  ];
+  for (const value of malformed) assert.throws(() => validateOrganizationPolicyPack(value, { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
+});
+// WP-PAC11: ownedSections is a permission-narrowing SET with a genuine subset
+// lattice (unlike mode/targetBinding's incomparable categorical values), so
+// the safe merge is intersection: the effective set can never exceed what
+// EVERY contributing pack individually sanctioned.
+test("P-AC-11 merges ownedSections by safe intersection across disagreeing packs", () => {
+  const first = pack({ documentClasses: [{ ...pack().documentClasses[0], ownedSections: ["threat-model", "risk-register"] }] });
+  const second = pack({ packId: "security-narrow", revision: "7".repeat(64), documentClasses: [{ ...pack().documentClasses[0], ownedSections: ["risk-register", "appendix"] }] });
+  const resolved = resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [first, second] });
+  assert.deepEqual(resolved.documentClasses.find((entry) => entry.class === "security").ownedSections, ["risk-register"]);
+  const undeclared = pack({ packId: "security-silent", revision: "8".repeat(64), documentClasses: [{ class: "security", mode: "controlled-publication", approvalRequired: true, targetBinding: pack().documentClasses[0].targetBinding }] });
+  const withNeutral = resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [first, undeclared] });
+  assert.deepEqual(withNeutral.documentClasses.find((entry) => entry.class === "security").ownedSections, ["risk-register", "threat-model"]);
+});
+// WP-PAC11: lifecycleEvents reuses V-AC-08's own canonical lifecycle-state
+// vocabulary verbatim (proposed/active/completed/superseded/abandoned/
+// retained) -- a well-formed subset is admitted, an unrecognized event is
+// refused under OPP-DOCUMENT exactly like an unrecognized mode already is.
+test("P-AC-11 accepts a closed lifecycleEvents declaration and rejects a non-closed one", () => {
+  const accepted = validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], lifecycleEvents: ["active", "superseded"] }] }), { coreVersion: "0.4.7" });
+  assert.deepEqual(accepted.documentClasses[0].lifecycleEvents, ["active", "superseded"]);
+  const malformed = [
+    pack({ documentClasses: [{ ...pack().documentClasses[0], lifecycleEvents: ["launched"] }] }),
+    pack({ documentClasses: [{ ...pack().documentClasses[0], lifecycleEvents: ["active", "active"] }] }),
+    pack({ documentClasses: [{ ...pack().documentClasses[0], lifecycleEvents: "active" }] }),
+  ];
+  for (const value of malformed) assert.throws(() => validateOrganizationPolicyPack(value, { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
+});
+// WP-PAC11: lifecycleEvents shares ownedSections' genuine subset lattice, so
+// it merges the same safe-intersection way instead of mode/targetBinding's
+// exact-match-only rule.
+test("P-AC-11 merges lifecycleEvents by safe intersection across disagreeing packs", () => {
+  const first = pack({ documentClasses: [{ ...pack().documentClasses[0], lifecycleEvents: ["active", "completed"] }] });
+  const second = pack({ packId: "security-events", revision: "9".repeat(64), documentClasses: [{ ...pack().documentClasses[0], lifecycleEvents: ["completed", "retained"] }] });
+  const resolved = resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [first, second] });
+  assert.deepEqual(resolved.documentClasses.find((entry) => entry.class === "security").lifecycleEvents, ["completed"]);
+});
+// WP-PAC11: previewRequired is a boolean gate, same shape and same
+// never-downgrade merge rule as approvalRequired's own existing precedent.
+test("P-AC-11 accepts previewRequired, rejects a non-boolean, and unions it so a later pack cannot downgrade an earlier pack's required preview", () => {
+  const accepted = validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], previewRequired: true }] }), { coreVersion: "0.4.7" });
+  assert.equal(accepted.documentClasses[0].previewRequired, true);
+  assert.throws(() => validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], previewRequired: "true" }] }), { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
+  const strict = pack({ documentClasses: [{ ...pack().documentClasses[0], previewRequired: true }] });
+  const lax = pack({ packId: "security-lax-preview", revision: "10".repeat(32), documentClasses: [{ ...pack().documentClasses[0], previewRequired: false }] });
+  const resolved = resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [strict, lax] });
+  assert.equal(resolved.documentClasses.find((entry) => entry.class === "security").previewRequired, true);
+});
+// WP-PAC11: retention is a closed set of categorical commitments with no
+// safe partial order (see organization-policy.mjs's own header comment for
+// why it deliberately excludes a concrete duration) -- it merges exactly
+// like mode/targetBinding: exact match only, a mismatch (including declared
+// vs undeclared) fails closed under OPP-RESOLVE-CONFLICT.
+test("P-AC-11 accepts a closed retention declaration and rejects a non-closed one", () => {
+  const accepted = validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], retention: "retain-indefinitely" }] }), { coreVersion: "0.4.7" });
+  assert.equal(accepted.documentClasses[0].retention, "retain-indefinitely");
+  assert.throws(() => validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], retention: "seven-years" }] }), { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
+});
+test("P-AC-11 refuses to merge a mismatched retention for the same document class instead of choosing one", () => {
+  const indefinite = pack({ documentClasses: [{ ...pack().documentClasses[0], retention: "retain-indefinitely" }] });
+  const untilSuperseded = pack({ packId: "security-retention", revision: "11".repeat(32), documentClasses: [{ ...pack().documentClasses[0], retention: "retain-until-superseded" }] });
+  assert.throws(() => resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [indefinite, untilSuperseded] }), (error) => error.code === "OPP-RESOLVE-CONFLICT");
+  const undeclared = pack({ packId: "security-retention-silent", revision: "12".repeat(32), documentClasses: [pack().documentClasses[0]] });
+  assert.throws(() => resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [indefinite, undeclared] }), (error) => error.code === "OPP-RESOLVE-CONFLICT");
+});
+// WP-PAC11: conflictPolicy reuses external-reference-adapter.mjs's own
+// existing "rejected"/"reconciliation-required" status vocabulary; it is a
+// two-value ranked categorical, not a boolean or a free lattice, so it
+// merges via a ranked max toward "reject" (the strictly safer disposition),
+// generalizing approvalRequired's OR the same way previewRequired does.
+test("P-AC-11 accepts a closed conflictPolicy declaration, rejects a non-closed one, and merges it toward the stricter disposition", () => {
+  const accepted = validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], conflictPolicy: "require-reconciliation" }] }), { coreVersion: "0.4.7" });
+  assert.equal(accepted.documentClasses[0].conflictPolicy, "require-reconciliation");
+  assert.throws(() => validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], conflictPolicy: "prefer-latest" }] }), { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
+  const lenient = pack({ documentClasses: [{ ...pack().documentClasses[0], conflictPolicy: "require-reconciliation" }] });
+  const strict = pack({ packId: "security-conflict-strict", revision: "13".repeat(32), documentClasses: [{ ...pack().documentClasses[0], conflictPolicy: "reject" }] });
+  const resolved = resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [lenient, strict] });
+  assert.equal(resolved.documentClasses.find((entry) => entry.class === "security").conflictPolicy, "reject");
+});

@@ -17,6 +17,28 @@ const SIGNATURE_ALGORITHMS = new Set(["ed25519", "none"]);
 // target -- any other shape (missing sub-field, extra field, wrong type,
 // unknown targetClass) is rejected exactly like every other closed field.
 const TARGET_CLASSES = new Set(["artifact", "repository-path-pattern", "external-system"]); export const TARGET_REF = /^[a-z][a-z0-9-]{2,63}$/u;
+// WP-PAC11: the five remaining P-AC-11 scoping dimensions (owned
+// fields/sections, lifecycle event, preview, retention, conflict policy),
+// each OPTIONAL and closed, following targetBinding's own precedent exactly.
+// lifecycleEvents reuses the epic's OWN canonical lifecycle-state vocabulary
+// verbatim (acceptance.md V-AC-08: "proposed, active, completed, superseded,
+// abandoned, or retained") rather than inventing a parallel one.
+const LIFECYCLE_EVENTS = new Set(["proposed", "active", "completed", "superseded", "abandoned", "retained"]);
+// retention is deliberately a closed set of CATEGORICAL commitments, never a
+// concrete duration/period: a literal "N days/years" value would be
+// inventing a legal/product retention-schedule decision this dispatch has no
+// authority to make, and could easily be read as an implicit P-AC-10
+// compliance claim ("this satisfies retention regulation X") which this
+// schema is expressly forbidden from carrying. The concrete schedule behind
+// "retain-per-external-schedule" lives outside this portable policy schema,
+// exactly like a provider-specific target lives outside targetRef.
+const RETENTION = new Set(["retain-indefinitely", "retain-until-superseded", "retain-per-external-schedule"]);
+// conflictPolicy reuses this exact vocabulary root from
+// external-reference-adapter.mjs's own existing write-plan statuses
+// ("rejected", "reconciliation-required") rather than inventing parallel
+// terms; it is a declared disposition only -- this dispatch does not wire it
+// into adapter behavior (out of this file's scope).
+const CONFLICT_POLICIES = new Set(["reject", "require-reconciliation"]);
 // WP-P-AC01: provenance, dependencies, and signaturePolicy are OPTIONAL
 // pack-level fields, following the exact precedent targetBinding set above:
 // keeping them optional (rather than mandatory) is what lets every
@@ -35,7 +57,36 @@ function record(v) { return v !== null && typeof v === "object" && !Array.isArra
 function hasTargetBinding(entry) { return record(entry) && Object.hasOwn(entry, "targetBinding"); }
 function validTargetBinding(v) { return exact(v, ["targetClass", "targetRef"]) && TARGET_CLASSES.has(v.targetClass) && TARGET_REF.test(v.targetRef); }
 function sameTargetBinding(left, right) { if (left === undefined && right === undefined) return true; if (left === undefined || right === undefined) return false; return left.targetClass === right.targetClass && left.targetRef === right.targetRef; }
-function freezeDocumentEntry(entry) { return hasTargetBinding(entry) ? Object.freeze({ ...entry, targetBinding: Object.freeze({ ...entry.targetBinding }) }) : Object.freeze({ ...entry }); }
+// WP-PAC11: a bounded, deduplicated array of opaque TARGET_REF-shaped ids
+// (reusing the same shape targetRef already established) or of closed
+// LIFECYCLE_EVENTS values; both close the "no free-form prose" requirement
+// the same way targetBinding does for a single reference.
+function validIdArray(value, { isMember, maxLength }) { if (!Array.isArray(value) || value.length > maxLength) return false; const seen = new Set(); for (const item of value) { if (!isMember(item) || seen.has(item)) return false; seen.add(item); } return true; }
+function validOwnedSections(value) { return validIdArray(value, { isMember: (item) => typeof item === "string" && TARGET_REF.test(item), maxLength: 32 }); }
+function validLifecycleEvents(value) { return validIdArray(value, { isMember: (item) => LIFECYCLE_EVENTS.has(item), maxLength: LIFECYCLE_EVENTS.size }); }
+// WP-PAC11: the closed key set grows by exactly the optional dimensions THIS
+// entry itself declares (Object.hasOwn) -- same technique packKeys already
+// generalizes for the pack-level optional fields below, applied here to the
+// five new entry-level optional fields in addition to targetBinding. A
+// pre-existing three-key or four-key entry validates unchanged.
+function entryKeys(entry) {
+  const keys = ["class", "mode", "approvalRequired"];
+  if (hasTargetBinding(entry)) keys.push("targetBinding");
+  if (record(entry) && Object.hasOwn(entry, "ownedSections")) keys.push("ownedSections");
+  if (record(entry) && Object.hasOwn(entry, "lifecycleEvents")) keys.push("lifecycleEvents");
+  if (record(entry) && Object.hasOwn(entry, "previewRequired")) keys.push("previewRequired");
+  if (record(entry) && Object.hasOwn(entry, "retention")) keys.push("retention");
+  if (record(entry) && Object.hasOwn(entry, "conflictPolicy")) keys.push("conflictPolicy");
+  return keys;
+}
+function freezeDocumentEntry(entry) {
+  return Object.freeze({
+    ...entry,
+    ...(hasTargetBinding(entry) ? { targetBinding: Object.freeze({ ...entry.targetBinding }) } : {}),
+    ...(Object.hasOwn(entry, "ownedSections") ? { ownedSections: Object.freeze([...entry.ownedSections]) } : {}),
+    ...(Object.hasOwn(entry, "lifecycleEvents") ? { lifecycleEvents: Object.freeze([...entry.lifecycleEvents]) } : {}),
+  });
+}
 export class OrganizationPolicyError extends Error { constructor(code) { super("Organization policy pack is invalid."); this.code = code; } }
 function fail(code) { throw new OrganizationPolicyError(code); }
 function compare(left, right) { const rightParts = right.split(".").map(Number); return left.split(".").map(Number).reduce((result, part, index) => result || part - rightParts[index], 0); }
@@ -52,7 +103,20 @@ export function validateOrganizationPolicyPack(pack, { coreVersion } = {}) {
   if (!exact(pack.compatibility, ["minimumCoreVersion", "maximumCoreVersion"]) || !VERSION.test(pack.compatibility.minimumCoreVersion) || !VERSION.test(pack.compatibility.maximumCoreVersion) || compare(pack.compatibility.minimumCoreVersion, pack.compatibility.maximumCoreVersion) > 0) fail("OPP-COMPATIBILITY");
   if (coreVersion !== undefined && (!VERSION.test(coreVersion) || compare(coreVersion, pack.compatibility.minimumCoreVersion) < 0 || compare(coreVersion, pack.compatibility.maximumCoreVersion) > 0)) fail("OPP-CORE-VERSION");
   if (!exact(pack.governanceFloors, ["requireHumanDecisionLedger", "allowExternalAuthority"]) || pack.governanceFloors.requireHumanDecisionLedger !== true || pack.governanceFloors.allowExternalAuthority !== false || !Array.isArray(pack.documentClasses) || pack.documentClasses.length > 32) fail("OPP-FLOOR");
-  const seen = new Set(); for (const entry of pack.documentClasses) { const scoped = hasTargetBinding(entry); if (!exact(entry, scoped ? ["class", "mode", "approvalRequired", "targetBinding"] : ["class", "mode", "approvalRequired"]) || !CLASSES.has(entry.class) || !MODES.has(entry.mode) || typeof entry.approvalRequired !== "boolean" || (scoped && !validTargetBinding(entry.targetBinding)) || seen.has(entry.class)) fail("OPP-DOCUMENT"); seen.add(entry.class); }
+  const seen = new Set(); for (const entry of pack.documentClasses) {
+    const scoped = hasTargetBinding(entry);
+    if (
+      !exact(entry, entryKeys(entry)) || !CLASSES.has(entry.class) || !MODES.has(entry.mode) || typeof entry.approvalRequired !== "boolean" ||
+      (scoped && !validTargetBinding(entry.targetBinding)) ||
+      (Object.hasOwn(entry, "ownedSections") && !validOwnedSections(entry.ownedSections)) ||
+      (Object.hasOwn(entry, "lifecycleEvents") && !validLifecycleEvents(entry.lifecycleEvents)) ||
+      (Object.hasOwn(entry, "previewRequired") && typeof entry.previewRequired !== "boolean") ||
+      (Object.hasOwn(entry, "retention") && !RETENTION.has(entry.retention)) ||
+      (Object.hasOwn(entry, "conflictPolicy") && !CONFLICT_POLICIES.has(entry.conflictPolicy)) ||
+      seen.has(entry.class)
+    ) fail("OPP-DOCUMENT");
+    seen.add(entry.class);
+  }
   // WP-P-AC01: each check only runs when the pack actually declares the
   // optional field (Object.hasOwn) -- an absent field was already excluded
   // from the closed key set above, so there is nothing further to validate.
@@ -94,7 +158,32 @@ export function validateOrganizationPolicyPack(pack, { coreVersion } = {}) {
  * gates a decision here (unlike mode/targetBinding/approval it carries no
  * conflict semantics of its own), so it is always safely appended, one entry
  * per contributing pack, then sorted deterministically for output.
+ *
+ * WP-PAC11 (the five remaining P-AC-11 dimensions) split into the same two
+ * families mode/targetBinding and approvalRequired already established:
+ *  - retention has no safe partial order between its categorical commitments
+ *    (see RETENTION's own comment above) -- it follows mode/targetBinding
+ *    exactly: EXACT match only (undeclared vs declared is itself a
+ *    mismatch), fails OPP-RESOLVE-CONFLICT otherwise.
+ *  - ownedSections and lifecycleEvents are permission-narrowing SETS with a
+ *    genuine subset lattice (unlike a single categorical value), so the safe
+ *    combination is INTERSECTION: the effective set can never exceed what
+ *    EVERY contributing pack individually sanctioned. An undeclared side is
+ *    neutral (no additional restriction stated by that pack) and never
+ *    narrows the other side.
+ *  - previewRequired generalizes approvalRequired's own boolean OR exactly
+ *    (never downgrades once any pack requires a preview).
+ *  - conflictPolicy is a two-value ranked categorical, not a free lattice:
+ *    "reject" is strictly the safer disposition (it never proceeds without a
+ *    brand-new cycle), so it generalizes the OR rule to a ranked max instead.
+ * For all four safely-combined fields, a side that never declared the field
+ * at all is neutral and never blocks or weakens the other side's declaration.
  */
+function sameOptional(left, right) { if (left === undefined && right === undefined) return true; if (left === undefined || right === undefined) return false; return left === right; }
+function intersectOptional(left, right) { if (left === undefined && right === undefined) return undefined; if (left === undefined) return [...right].sort(); if (right === undefined) return [...left].sort(); const keep = new Set(right); return [...left].filter((value) => keep.has(value)).sort(); }
+function orOptional(left, right) { if (left === undefined) return right; if (right === undefined) return left; return left || right; }
+const CONFLICT_POLICY_RANK = new Map([["require-reconciliation", 0], ["reject", 1]]);
+function strictestOptional(left, right) { if (left === undefined) return right; if (right === undefined) return left; return CONFLICT_POLICY_RANK.get(left) >= CONFLICT_POLICY_RANK.get(right) ? left : right; }
 export function resolveEffectiveOrganizationPolicy({ coreVersion, packs } = {}) {
   if (!VERSION.test(coreVersion ?? "") || !Array.isArray(packs) || packs.length === 0 || packs.length > 32) fail("OPP-RESOLVE-INPUT");
   const packIds = new Set(); const seenRevisions = new Set(); const classes = new Map(); const bindings = [];
@@ -104,10 +193,10 @@ export function resolveEffectiveOrganizationPolicy({ coreVersion, packs } = {}) 
     packIds.add(pack.packId); seenRevisions.add(pack.revision); bindings.push(frozenBinding(pack));
     for (const entry of pack.documentClasses) {
       const existing = classes.get(entry.class);
-      if (existing && (existing.mode !== entry.mode || !sameTargetBinding(existing.targetBinding, entry.targetBinding))) fail("OPP-RESOLVE-CONFLICT");
+      if (existing && (existing.mode !== entry.mode || !sameTargetBinding(existing.targetBinding, entry.targetBinding) || !sameOptional(existing.retention, entry.retention))) fail("OPP-RESOLVE-CONFLICT");
       classes.set(entry.class, existing
-        ? { class: entry.class, mode: entry.mode, approvalRequired: existing.approvalRequired || entry.approvalRequired, targetBinding: entry.targetBinding, packIds: [...existing.packIds, pack.packId], revisions: [...existing.revisions, { packId: pack.packId, revision: pack.revision }] }
-        : { class: entry.class, mode: entry.mode, approvalRequired: entry.approvalRequired, targetBinding: entry.targetBinding, packIds: [pack.packId], revisions: [{ packId: pack.packId, revision: pack.revision }] });
+        ? { class: entry.class, mode: entry.mode, approvalRequired: existing.approvalRequired || entry.approvalRequired, targetBinding: entry.targetBinding, ownedSections: intersectOptional(existing.ownedSections, entry.ownedSections), lifecycleEvents: intersectOptional(existing.lifecycleEvents, entry.lifecycleEvents), previewRequired: orOptional(existing.previewRequired, entry.previewRequired), retention: entry.retention, conflictPolicy: strictestOptional(existing.conflictPolicy, entry.conflictPolicy), packIds: [...existing.packIds, pack.packId], revisions: [...existing.revisions, { packId: pack.packId, revision: pack.revision }] }
+        : { class: entry.class, mode: entry.mode, approvalRequired: entry.approvalRequired, targetBinding: entry.targetBinding, ownedSections: entry.ownedSections, lifecycleEvents: entry.lifecycleEvents, previewRequired: entry.previewRequired, retention: entry.retention, conflictPolicy: entry.conflictPolicy, packIds: [pack.packId], revisions: [{ packId: pack.packId, revision: pack.revision }] });
     }
   }
   return Object.freeze({
@@ -116,10 +205,15 @@ export function resolveEffectiveOrganizationPolicy({ coreVersion, packs } = {}) 
     governanceFloors: Object.freeze({ requireHumanDecisionLedger: true, allowExternalAuthority: false }),
     packs: Object.freeze(bindings.sort((left, right) => left.packId.localeCompare(right.packId))),
     documentClasses: Object.freeze([...classes.values()].sort((left, right) => left.class.localeCompare(right.class)).map((entry) => {
-      const { targetBinding, packIds: entryPackIds, revisions: entryRevisions, ...rest } = entry;
+      const { targetBinding, ownedSections, lifecycleEvents, previewRequired, retention, conflictPolicy, packIds: entryPackIds, revisions: entryRevisions, ...rest } = entry;
       return Object.freeze({
         ...rest,
         ...(targetBinding !== undefined ? { targetBinding: Object.freeze({ ...targetBinding }) } : {}),
+        ...(ownedSections !== undefined ? { ownedSections: Object.freeze([...ownedSections]) } : {}),
+        ...(lifecycleEvents !== undefined ? { lifecycleEvents: Object.freeze([...lifecycleEvents]) } : {}),
+        ...(previewRequired !== undefined ? { previewRequired } : {}),
+        ...(retention !== undefined ? { retention } : {}),
+        ...(conflictPolicy !== undefined ? { conflictPolicy } : {}),
         packIds: Object.freeze([...entryPackIds].sort()),
         revisions: Object.freeze([...entryRevisions].sort((left, right) => left.packId.localeCompare(right.packId) || left.revision.localeCompare(right.revision)).map((revisionEntry) => Object.freeze({ ...revisionEntry }))),
       });
