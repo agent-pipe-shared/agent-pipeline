@@ -50,6 +50,7 @@ import {
   parseTransitionLedger,
   projectBacklog,
   transitionHash,
+  validateTransitionShape,
 } from "../lib/backlog-state.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 // One owner for "is this citation readable in every checkout, or only in mine" —
@@ -91,12 +92,33 @@ function readItems(root) {
   return { items, findings };
 }
 
-function commitExists(root, commit) {
+/**
+ * Resolve the item's OWN closure_commit to the exact form the checker
+ * requires before it may ever reach the ledger: a full 40-character lowercase
+ * Git commit OID. The ledger is append-only and hash-chained, so a value
+ * written wrong here can never be corrected afterward without breaking the
+ * chain (see backlog/items/2026-08-12-ledger-event-403-has-a-short-hash-
+ * evidence-commit.md — event 403's short `181b7730` is exactly this failure,
+ * already committed and permanent). This is the one place that class of
+ * mistake is prevented rather than merely diagnosed later.
+ *
+ * Only a self-closure is resolved through THIS repository's own object
+ * store: `git rev-parse` both normalizes an abbreviation to its full form and
+ * proves the commit is actually reachable here, which is exactly what a
+ * self-closure claims. A project closure's commit lives in a repository this
+ * checkout cannot query, so it is passed through unresolved; if it is
+ * malformed it is still caught below by the same shape validator the checker
+ * itself runs on every event, before the event is ever appended.
+ */
+function resolveClosureCommit(root, item) {
+  const m = item.metadata;
+  if (m.closure_repository !== "self") return { ok: true, commit: m.closure_commit };
   try {
-    execFileSync("git", ["cat-file", "-e", `${commit}^{commit}`], { cwd: root, stdio: "ignore" });
-    return true;
+    const resolved = execFileSync("git", ["rev-parse", "--verify", "--quiet", `${m.closure_commit}^{commit}`], { cwd: root, encoding: "utf8" }).trim();
+    if (!/^[a-f0-9]{40}$/u.test(resolved)) throw new Error("git rev-parse did not resolve to a full lowercase OID");
+    return { ok: true, commit: resolved };
   } catch {
-    return false;
+    return { ok: false, finding: `${item.path}: closure_commit ${m.closure_commit} does not exist in this repository` };
   }
 }
 
@@ -108,9 +130,8 @@ function closureFindings(root, item) {
     if (typeof m[key] !== "string" || m[key].trim() === "") out.push(`${item.path}: closed item is missing ${key}`);
   }
   if (out.length > 0) return out;
-  if (m.closure_repository === "self" && !commitExists(root, m.closure_commit)) {
-    out.push(`${item.path}: closure_commit ${m.closure_commit} does not exist in this repository`);
-  }
+  const resolvedCommit = resolveClosureCommit(root, item);
+  if (!resolvedCommit.ok) out.push(resolvedCommit.finding);
   // Presence is not the property the closure contract needs. A file that exists only
   // in this working tree makes the local run green and leaves every other checkout
   // with a closure bound to evidence nobody can read.
@@ -189,17 +210,28 @@ export function planBacklogReconciliation(root = DEFAULT_ROOT, { at = null, comm
         actor: ACTOR,
         reason: ORDER[step] === "closed" ? CLOSED_REASON : REASON,
         // A closing entry's evidence commit is the item's OWN recorded closure
-        // commit — the checker binds the two, and a reconciliation must not
-        // substitute the reconciling HEAD for the commit that did the work.
+        // commit, normalized to a full OID by resolveClosureCommit() above —
+        // the checker binds the two, and a reconciliation must not substitute
+        // the reconciling HEAD for the commit that did the work.
         evidence: {
           kind: "item-file-reconciliation",
-          commit: ORDER[step] === "closed" ? item.metadata.closure_commit : baseline,
+          commit: ORDER[step] === "closed" ? resolveClosureCommit(root, item).commit : baseline,
           reference: item.path,
         },
         previousHash: chain.length === 0 ? null : chain.at(-1).entryHash,
         entryHash: "",
       };
       event.entryHash = transitionHash(event);
+      // Validate the CANDIDATE event with the exact same per-event validator
+      // the checker (`loadBacklogState` -> `validateTransitionLedger`) applies
+      // once it is appended. The ledger is append-only: an entry that would
+      // fail this check can never be corrected afterward, so refusing here,
+      // before a single byte is written, is the only point this can be caught.
+      const shapeFindings = validateTransitionShape(event, `ledger event ${event.sequence}`, {});
+      if (shapeFindings.length > 0) {
+        blocked.push(...shapeFindings.map((finding) => `${item.path}: refusing to append an event that would fail the state checker's own event validator — ${finding}`));
+        break;
+      }
       chain.push(event);
       planned.push(event);
     }

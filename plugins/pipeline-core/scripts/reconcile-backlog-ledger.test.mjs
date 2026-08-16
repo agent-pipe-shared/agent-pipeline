@@ -315,6 +315,47 @@ try {
     assert.equal(existsSync(join(base, "backlog", ".reconcile-transaction.json")), false);
   });
 
+  check("RBL16 (D5) a closing entry's evidence.commit is normalized to the full 40-character OID, never the item's abbreviated form", () => {
+    // Directly the historical failure this closes: backlog/items/2026-08-12-ledger-
+    // event-403-has-a-short-hash-evidence-commit.md — a short closure_commit reached
+    // the ledger verbatim and, being append-only, could never be corrected afterward.
+    const { base, head } = fixture({
+      items: [ITEM("sigma", "closed", {
+        closed_at: "2026-07-02", closure_repository: "self",
+        closure_commit: "PLACEHOLDER", closure_evidence: "backlog/evidence/sigma.md",
+      })],
+      evidenceFiles: ["sigma.md"],
+    });
+    const path = join(base, "backlog", "items", "2026-07-01-sigma.md");
+    // The item's OWN closure_commit is deliberately the SHORT, abbreviated form —
+    // exactly the shape that produced event 403's permanent drift.
+    writeFileSync(path, readFileSync(path, "utf8").replace("PLACEHOLDER", head.slice(0, 8)));
+    const plan = planBacklogReconciliation(base, { at: "2026-08-09" });
+    assert.equal(plan.ok, true, plan.findings.join("; "));
+    const closing = plan.planned.at(-1);
+    assert.equal(closing.to, "closed");
+    assert.equal(closing.evidence.commit, head, "the appended event must carry the full OID, not the item's abbreviated form");
+    assert.equal(closing.evidence.commit.length, 40);
+    assert.match(closing.evidence.commit, /^[a-f0-9]{40}$/u);
+  });
+
+  check("RBL17 (D6) the writer refuses to append an event that would fail the checker's own event validator", () => {
+    // readItems() intentionally trusts the item file's own id without re-running
+    // validateBacklogItem (that would re-diagnose every historical drift on every
+    // read). A malformed id therefore only surfaces here, at the same per-event
+    // shape gate the checker itself applies before the event is ever written.
+    const { base } = fixture({ items: [ITEM("Tau.Invalid-ID", "open")] });
+    const before = readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8");
+    const plan = planBacklogReconciliation(base, { at: "2026-08-09" });
+    assert.equal(plan.ok, false);
+    assert.match(plan.findings.join("\n"), /refusing to append an event that would fail the state checker's own event validator/u);
+    assert.match(plan.findings.join("\n"), /id must be a lowercase stable identifier/u);
+    const applied = applyBacklogReconciliation(base, { at: "2026-08-09" });
+    assert.equal(applied.ok, false);
+    assert.equal(applied.wrote, false);
+    assert.equal(readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8"), before, "nothing is written when the candidate event is refused");
+  });
+
   console.log(`\n${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });

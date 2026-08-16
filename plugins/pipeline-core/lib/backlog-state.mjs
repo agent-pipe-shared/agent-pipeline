@@ -470,7 +470,14 @@ function validateV2OrdinaryEvidence(evidence, label) {
   return errors;
 }
 
-function validateTransitionShape(event, label, { readDispositionBytes = null, authorizeAmendment = null, authorizeOrdinaryEvidence = null } = {}) {
+/**
+ * Validate one ledger event's own shape and evidence fields (never chain
+ * continuity — that is `validateTransitionLedger`'s job). Exported so a
+ * writer can validate a CANDIDATE event against the exact same rule the
+ * checker will apply once it is appended, and refuse before writing rather
+ * than discovering the failure after the (unfixable, append-only) fact.
+ */
+export function validateTransitionShape(event, label, { readDispositionBytes = null, authorizeAmendment = null, authorizeOrdinaryEvidence = null } = {}) {
   const errors = [];
   const allowed = new Set(["schema", "sequence", "id", "from", "to", "at", "actor", "reason", "evidence", "previousHash", "entryHash"]);
   if (!isPlainObject(event)) return [`${label}: event must be an object`];
