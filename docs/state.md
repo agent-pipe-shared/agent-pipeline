@@ -887,6 +887,133 @@ problem.)
    that signature is the named final PO gate, deliberately left for the PO's return, per
    "kein Zwischenpush."
 
+### Session close — the final PO gate is prepared, nothing pushed, nothing signed by the agent — 2026-08-16 (READ THIS SECOND, right after the top of this file)
+
+**Final candidate: `18cc56d50b1d4daf5ced46d485fe47dcb0d6bf92`, tree
+`af5d006d5a36f42ad4c0e76da00a3af0ec16f8e7`, branch `sprint_phoenix`.** No further
+commit is planned tonight. Local is ahead of `origin/sprint_phoenix` by every
+commit this checkpoint's sections above name; nothing has been pushed.
+
+**The final push-approval request is prepared, Layers 1b and 2 of
+`docs/push-release-flow.md` done, Layer 3 deliberately NOT attempted (human-only,
+by design — no override exists or should exist):**
+
+- Layer 1b (`check-doc-reconciliation.mjs --base 8a92d377 --candidate 1cb00e72`,
+  the last commit before this reconciliation entry itself): passed, recorded in
+  `docs/doc-reconciliation.md` (commit `18cc56d5`) — 4 ADRs implicated across the
+  whole session, all reconciled (ADR-0012/0045/0058 checked-no-change,
+  ADR-0056 restated as already amended).
+- Layer 2: `po-approval-gate.mjs prepare-critical --repo-root <detached worktree,
+  moved to 18cc56d5, confirmed clean> --directory ~/agent-pipeline-po-nova
+  --feature-id sprint-phoenix-epic --plan specs/sprint-phoenix-epic/prd_phoenix-epic.md
+  --spec specs/sprint-phoenix-epic/spec.md --kind push --subject-sha256
+  b22a52ef05d1c44e941b6999548819e1515f400dea35c121c8b6872256191818 --expires-at
+  2026-08-17T18:00:00.000Z` — ran cleanly, **wrote the request directly into the
+  external directory, no manual `cp` needed this time** (`push`, unlike
+  `feature-package-reconcile`, IS in `CRITICAL_COMMAND_KINDS`). Cross-checked: a
+  parallel manual computation via `createCriticalActionApprovalRequest` in a
+  throwaway script produced the byte-identical `intentSha256`
+  (`868995db160c492efa7de099a07d64ba83af370e51cff2e88e230bef53a740c1`) before the
+  sanctioned tool was used, confirming correctness rather than trusting one path
+  alone. Threat model digest (`6a13ff03dfd15f93f15fe845c86edca35445a49a8979275ad35e42a93252a1ae`,
+  the fixed `specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md`
+  binding) matches the value already on record from the 2026-08-06 push approval —
+  the threat model itself has not changed.
+
+**What the PO does when awake, in their own terminal, at `~/agent-pipeline-po-nova`:**
+
+```
+node plugins/pipeline-core/scripts/po-human-approval.mjs approve-critical \
+  --repo-root /home/skar667/src/agent-pipeline-share_phoenix \
+  --directory ~/agent-pipeline-po-nova --kind push
+```
+
+That is Layer 3 — signs the already-prepared request, writes
+`proof-critical-push.json`. Then Layer 4 (agent-eligible, the Elephant of whichever
+session picks this up next should run it, not the PO):
+
+```
+node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push \
+  --by <PO name> --remote origin --destination refs/heads/sprint_phoenix \
+  --proof-request ~/agent-pipeline-po-nova/request-critical-push.json \
+  --proof-authority <the matching trust-policy file — verify-shape, 2-key,
+    e.g. trust-policy-verify-shape.json> \
+  --proof ~/agent-pipeline-po-nova/proof-critical-push.json
+```
+
+Then Layer 5, the full-refspec form this session's own earlier discovery of a bare-branch-name bug requires:
+
+```
+git push origin sprint_phoenix:refs/heads/sprint_phoenix
+```
+
+**Everything else that could be closed without a human action tonight was closed.**
+Restated once, compactly, for a reader who does not want to walk the whole
+checkpoint above:
+
+- v3 trust-anchor migration ported end-to-end on the SCRIPT side (four repo-local
+  library files, three follow-up hardening rounds, one genuine fail-open bug
+  self-caught and closed). `feature-package-reconcile` ceremony completed with a
+  real PO signature; its digest correction is committed.
+- **A structural, load-bearing gap found and NOT working-around-able tonight:**
+  the INSTALLED plugin distribution's `guard-maintenance-window.mjs`/
+  `human-guard-override.mjs` are still pre-v3, so no HOOK-enforced clearance
+  (GMW window or classic HGO override) can succeed against this repository's
+  v3-any-key policy — confirmed by a real signed window that a real hook refused
+  to honor. Filed, thoroughly:
+  [`backlog/items/2026-08-16-installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits.md`](../backlog/items/2026-08-16-installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits.md).
+  **This is the top item for the next session or the PO's own attention** — it
+  blocks the four remaining Verify reds below and any future `TP-*`/`GS-6` fix,
+  not just tonight's.
+- **Verify: down to exactly four red steps, all four caused by that one gap, all
+  four pre-diagnosed with exact replacement text, ready to apply the instant it
+  unblocks** (`docs/state.md`, "OT09's exact fix" and "guard-testpath-tests"/
+  "gate-strength-guard-tests" sections above): `guard-testpath-tests` (TP09),
+  `gate-strength-guard-tests` (GST20), `guard-testpath-override-tests` (OT09),
+  `verify-suite-registration-check` (2 — the `advisory-decision-event`/
+  `guard-handoff-offer` suites still need `verify.mjs` registration, TP-3).
+- A-AC-01's schema field gap closed (`revalidationTrigger`); a real coercion bug
+  self-caught in the same dispatch and closed; the identical pre-existing hole on
+  `reasonCode` correctly left alone and filed separately.
+- Four more backlog items filed tonight beyond the two named above, ALL ledger-reconciled
+  (not left to rot the way this session found others had):
+  [`2026-08-16-critical-command-kinds-excludes-feature-package-reconcile.md`](../backlog/items/2026-08-16-critical-command-kinds-excludes-feature-package-reconcile.md),
+  [`2026-08-16-agent-decision-journal-code-pattern-array-coercion.md`](../backlog/items/2026-08-16-agent-decision-journal-code-pattern-array-coercion.md).
+
+**Deliberately NOT attempted tonight, and why, so it is not silently re-discovered:**
+
+- **`main-session-route.mjs`'s A-AC-01/A-AC-05 caller-boundary extension** (design
+  doc step 3): confirmed by direct repo-wide search that NO Claude host adapter
+  anywhere in this codebase currently supplies `pipelineMainSessionRoute` — the
+  design doc's own §5.1 precondition for deferring this step is met, not merely
+  suspected. Building it now would record `unknown` for every dimension.
+- **Wiring `advisory-decision-event.mjs`'s translator into the real
+  `advisory-coordinator.mjs` flow** (the other half of making A-AC-05's producer
+  actually fire, not just exist as an importable pure function): scoped, not
+  attempted — `advisory-coordinator.mjs`'s receipt-emitting function is currently
+  synchronous and not git-aware, and threading a real `repositoryRoot`/
+  fingerprint/capture-policy binding through it is real architecture work the
+  design doc itself already flagged as "a separate decision," not a late-night
+  mechanical dispatch. Left for a session with PO input available.
+- **P-AC-11's four remaining inert dimensions and P-AC-06/H-AC-12**: already
+  PO-gated per the resume-hint's own open questions (whether to build, declare
+  satisfied by construction, or drop each by amendment) — not re-litigated
+  unilaterally.
+- **The criterion count** (130 implemented / 23 partial / 3 not-started / 1
+  constraint, 157 total) **was not re-measured against tonight's changes.**
+  `specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs` is a data
+  table, not a live computation — moving it honestly needs the same
+  per-criterion evidence rigor the C/J/A/B tagged passes already used, which
+  tonight's time did not include. Stating it unchanged is the honest number, not
+  a claim that nothing of substance happened — it is Verify-gate repair and one
+  schema field, exactly the same distinction this checkpoint already drew for
+  earlier gate-only sessions.
+
+**Nothing was pushed. No signature was produced by the agent — every proof in this
+checkpoint was signed by the PO, in their own terminal, with their own key,
+outside this repository.** The only unresolved action is Layer 3 above, and it is
+unresolved because it is designed to be unresolvable by anything but the PO.
+
 ## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
 
 **Trigger.** PO asked to continue Phoenix work, then went AFK with standing
