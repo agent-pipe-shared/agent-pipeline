@@ -7242,6 +7242,8 @@ Re-review of the fixed candidate dispatched: preflight (`15cf0e58..bf8803ed`) â†
 
 **One more small item added to the marketplace-refresh follow-on list:** this new fixture is runnable directly (`node --test ...`) but not registered in `harness/scripts/verify.mjs`'s suite list â€” same TP-3 block as `NVA-VERIFYDUR-1`'s remaining line, same fix window once the PO's two-command refresh happens.
 
+**New local 0.5.5 candidate re-stamped: `958b65ce`, tree `8f0d64a40fcd3f23bee11d59e2e3f8a057b4ef26`.** Verify 269/269 exit 0 and Security exit 0, both clean and exactly bound, run back to back against a clean tree. Same PO scope as every candidate this AFK block: local test candidate, not a release. Adds `#98` R6's first increment (`c9bb0647`) and its matrix update (`958b65ce` itself) on top of `13bcec25`. Push stays open, no approval prepared or recorded.
+
 ## Re-entry
 
 1. Maintainers start with [`CLAUDE.md`](../CLAUDE.md).
