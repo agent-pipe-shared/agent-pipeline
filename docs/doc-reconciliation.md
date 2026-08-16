@@ -47,6 +47,54 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 1cb00e72117c09f8c23293043da92e9bc6724701 — 2026-08-16, range 8a92d377..1cb00e72, the whole overnight session: v3 trust-anchor port, the GMW/reconcile signing ceremony, A-AC-01's field, and the resulting Verify repair
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: amended in 2390e02f5a106b5ad13b072f7baf5176f8c322f6.
+- ADR-0058: checked, no change needed.
+
+**Restated per the known limitation this file's header names** (a record naming an
+ancestor candidate is invisible to a wider-range check; `fd917320` already
+demonstrated this for the prior narrower session-range entry): ADR-0012 and
+ADR-0045 were already checked at narrower candidates within this range and found
+unchanged there; nothing in the wider range changes that finding. ADR-0056's
+amendment (`2390e02f`, the v3 any-key correction) is likewise an ancestor of this
+candidate, restated rather than re-derived.
+
+**ADR-0012** — `docs/state.md` was appended to repeatedly across the whole session
+(every checkpoint this range covers). The canonical-handover decision itself (one
+versioned file, memory mirror-only, open-items referenced not hand-maintained) is
+untouched; every change is additive checkpoint prose in the one file the ADR names.
+
+**ADR-0045** — implicated by `specs/sprint-phoenix-epic/lifecycle.json` (the
+PO-signed `feature-package-reconcile` digest correction, `2768f169…` → `300acd10…`,
+through the sanctioned reconcile mechanism ADR-0045's own topology expects — not a
+hand edit) and by several `specs/sprint-phoenix-epic/design/` and `evidence/`
+artifacts (the P-AC-11 critic-review record, the agent-decision producer scoping
+docs, the evidence-map generator). All are exactly the artifact classes ADR-0045's
+canonical topology already names as legitimate package contents; none change the
+topology's own rules.
+
+**ADR-0056** — `project/critical-human-proof.json`'s v3 migration (`0d3d9bcc`) is
+the same PO-executed edit `2390e02f` already recorded and amended the ADR for. No
+further change to the file or the ADR happened later in this range — the
+signature ceremony this range's later commits perform (GMW window install,
+`feature-package-reconcile` consumption) reads that same v3-empty policy, it does
+not alter it again.
+
+**ADR-0058** — implicated by `plugins/pipeline-core/lib/human-guard-override.mjs`,
+ported tonight (`6a548cf9`) from a scalar `trustPolicy` to the v3 `trustAnchors`-SET
+shape via `verifyAgainstTrustAnchors`, mirroring the identical, already-shipped
+pattern in `lib/critical-action-authorization.mjs`. Read the ADR's own text for a
+claim this could contradict: it names `project/critical-human-proof.json` generically
+as "the file carrying the trust anchor" (§3) and separately states that a window
+cannot be used to rewrite "`push_approval` or the trust anchor mid-window" (§7) —
+neither claim is about the field's internal singular-vs-set shape, so neither is
+made stale by this port. This is a compatibility fix (the mechanism now
+understands a schema the committed policy already uses) not a design change to the
+window mechanism ADR-0058 describes.
+
 ## Candidate 707129812a4f09a70ba727087544f28f34e80638 — 2026-08-16, range 2390e02f..70712981, the closing gate run recorded in the handover
 
 - ADR-0012: checked, no change needed.
