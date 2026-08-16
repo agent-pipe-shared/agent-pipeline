@@ -5,9 +5,18 @@
 scoping step … Elephant-context investigation, not a dispatch"). No code is
 written or dispatched by this document.
 
-**Result in one line:** the producer candidate that §4 named at medium
-confidence is wrong, and the right one already implements A-AC-05's substance
-in a different vocabulary.
+**Revision note.** This document was written in three passes on the same day and
+the conclusion moved twice (commits `5d2b8240`, `6c3f66ca`, and this one). The
+text below is the third pass; the git history carries the earlier two. Both
+revisions came from checking a claim rather than from new information, which is
+recorded here because the pattern is the point: the first pass named a candidate
+without tracing its fields, and the second asserted a cause without reading the
+registry.
+
+**Result in one line:** the producer candidate §4 named at medium confidence is
+wrong, and A-AC-05's substance is not missing — it is collected in at least
+three production paths that each separate a requested route from an observed
+one, none of which speaks the journal's vocabulary.
 
 ---
 
@@ -28,79 +37,101 @@ none of the seven identity dimensions A-AC-05 names. Marking that row "medium
 confidence" was right, and the confidence was misplaced rather than merely
 uncertain.
 
-**The right candidate is `plugins/pipeline-core/lib/main-session-route.mjs`.**
-Its `reconcileMainSessionRoute` (`:80`) records four of the seven dimensions on
-every call, and it already separates the two axes A-AC-05 requires — it just
-names them `desired`/`observed` and `code`/`reasonCode` instead of
-`provenance`/`assurance`.
+**The answer is bigger than a replacement candidate.** A-AC-05 says: *WHEN
+runner, model, effort, profile, role, adapter, or capability identity is
+recorded, THE SYSTEM SHALL include its provenance and assurance.* Three separate
+production paths already record several of those dimensions, and all three
+already draw the provenance distinction the criterion demands — under their own
+names, and in their own comments. **The gap is translation into the journal's
+vocabulary, not collection.**
 
-## 2. Why that module, read from source
+## 2. The three collection sites
 
 `IDENTITY_DIMENSIONS` (`agent-decision-journal.mjs:8`) is
 `runner, model, effort, profile, role, adapter, capability`.
-`reconcileMainSessionRoute`'s inputs and outputs cover four of them directly:
 
-| A-AC-05 dimension | where it appears in `main-session-route.mjs` |
-|---|---|
-| `runner` | `desired.runner` (`:30`), `observed.runner` (`:46`); constrained to `["claude","codex"]` at `:41` |
-| `model` | `observed.modelId` (`:47`), carried as `selector: { kind: "model-id", value }` (`:97`) |
-| `effort` | `desired.effort` (`:32`), `observed.effort` (`:48`) |
-| `profile` | the `profile` argument that selects the registry cell (`:26`) |
+| site | dimensions recorded | requested vs. observed | bound to |
+|---|---|---|---|
+| `lib/advisory-receipt.mjs` + `lib/advisory-coordinator.mjs` | `adapter`, `runner`, `model`, `effort`, `profile` — **five of seven** | `configuredRoute` vs. `observed.identity` | a dispatch (`dispatchId`, `candidateCommit`, `candidateTree`) |
+| `lib/route-receipt.mjs`, consumed at `lib/runner-usage-v1.mjs:498` | `runner`, `model`, `effort` (as `effectiveModelId`/`effectiveEffort`) | `projectedRoute` vs. effective model | `dispatchBinding` + `trustedEvidence` |
+| `lib/main-session-route.mjs` | `runner`, `model`, `effort`, `profile` | `desired` vs. `observed` | a host-introspection observation |
 
-`role` is recorded elsewhere and thinly: `continuity-state.mjs`'s
-`RUNTIME_KEYS` (`:21`) admits `activeDuty`, validated only as a safe id
-(`:163`). It carries no provenance and no assurance at all. `adapter` and
-`capability` were not mapped in this pass — see §6.
+`role` is recorded elsewhere and thinly: `continuity-state.mjs`'s `RUNTIME_KEYS`
+(`:21`) admits `activeDuty`, validated only as a safe id (`:163`). It carries no
+provenance and no assurance at all. `capability` remains unmapped (§6).
 
-## 3. The vocabulary already matches, term for term
+### 2.1 The advisory receipt is the strongest of the three
 
-This is the substance of the finding. `IDENTITY_PROVENANCE` is
+It is worth separating out, because it is the only one of the three that is
+both **produced in this repository** and **persisted as its own evidence
+artifact** with a committed schema (`scripts/advisory-receipt.schema.json`).
+
+- `makeReceipt` (`advisory-coordinator.mjs:115`) constructs it; `adapter` comes
+  from `step.kind` (`:123`). This is a real producer, not a validator waiting
+  for a caller — the distinction that makes the `agent-decision` journal itself
+  empty (§6).
+- `ADVISORY_ADAPTERS` is `["native", "consult"]` (`advisory-receipt.mjs:25`),
+  enforced at `:89`. That is A-AC-05's `adapter` dimension, closed and
+  validated, in production.
+- Its header states the provenance rule in the criterion's own terms (`:57`):
+  *"Validate a receipt without treating an agent's self-report as route
+  attestation. Callers that need route attestation must bind this receipt to
+  their own dispatch/route evidence separately."*
+- `fallback` is a first-class field (`:109`), with a `reason` and a
+  `redactedErrorClass` cross-checked against it (`semanticFailure`, `:48`).
+  A-AC-05's `IDENTITY_KINDS` are exactly `selection`, `escalation`, `fallback`.
+- `observed-runner-drift` (`:97`) rejects a receipt whose observed provider
+  contradicts the configured runner. That is an assurance check, not a
+  recording — the system already refuses to record an identity it can
+  contradict.
+
+## 3. The vocabulary maps term for term
+
+`IDENTITY_PROVENANCE` is
 `same-dispatch-observed, requested-route, inherited-session, unknown`;
-`IDENTITY_ASSURANCE` is `verified, reported, inferred, unknown`. The module
-draws exactly those distinctions, and its own comments say so:
+`IDENTITY_ASSURANCE` is `verified, reported, inferred, unknown`.
 
-- **`requested-route` is stated verbatim in the header** (`:6`): *"A requested
-  profile route is policy, not identity evidence."* `desiredRoute` (`:25`)
-  reads the runner-profiles registry — that is the requested route, and the
-  module already refuses to treat it as evidence.
-- **The evidence bar is a provenance bar.** `observedMainSession` (`:36`)
-  admits a value only when `subject === "main-session"` **and**
-  `source === "host-introspection"`. The header adds (`:8`): *"a
-  child/dispatch receipt can never satisfy this boundary"* — which is the
-  module refusing to let `same-dispatch-observed` stand in for a main-session
-  observation.
-- **The five outcome codes are an assurance ladder.** `MSR-ALIGNED` (`:101`)
-  and `MSR-PO-EXCEPTION` (`:104`) both require a host-attested observation →
-  `verified`. `MSR-UNVERIFIED` with `MSR-HOST-OBSERVATION-UNAVAILABLE` (`:93`)
-  is `unknown` by name. `MSR-DRIFT-RETURN-REQUESTED` (`:113`) carries a
-  verified observation that contradicts the requested route — the
-  `contradicted` state, on a `selection` kind.
+- **`requested-route`** is the `configuredRoute` / `projectedRoute` / `desired`
+  half of all three sites. `main-session-route.mjs`'s header states it verbatim
+  (`:6`): *"A requested profile route is policy, not identity evidence."*
+- **`same-dispatch-observed`** is the advisory receipt's `observed.identity`
+  and the route receipt's effective model — both bound to a dispatch id.
+- **`unknown`** is `observed.identity === null` (advisory) and
+  `MSR-HOST-OBSERVATION-UNAVAILABLE` (main session).
+- **Assurance** is the outcome ladder: advisory's `observed.status`
+  (`answered, unavailable, failed, timed-out, permission-denied`) and
+  main-session's five `MSR-*` codes. `MSR-ALIGNED` and `MSR-PO-EXCEPTION`
+  require a host-attested observation → `verified`; a receipt accepted only
+  after `observed-runner-drift` passes is likewise `verified` rather than
+  `reported`.
 
-So a producer here is a **translation**, not a new judgment. Every value the
-event needs is already computed and already justified in this module; nothing
-has to be inferred, and no new policy decision is smuggled in. That is the
-opposite of the P-AC-11 failure mode, where representation landed ahead of any
-decision point that could use it.
+So a producer here is a **translation** of values already computed and already
+justified. Nothing has to be inferred and no new policy decision is smuggled in.
+That is deliberately the opposite of the P-AC-11 failure mode, where
+representation landed ahead of any decision point that could use it.
 
-## 4. A-AC-01's ordering requirement is satisfiable here
+## 4. A-AC-01's ordering requirement, and which site satisfies it
 
-A-AC-01 requires recording *before* the dependent action. Two properties make
-this seam unusually favourable, both read from source rather than assumed:
+A-AC-01 requires recording *before* the dependent action. The three sites differ
+here, and this is what keeps `main-session-route.mjs` in the picture despite §2.1:
 
-1. `reconcileMainSessionRoute` is **pure** — the header states it "cannot
-   change a model, persist an acknowledgement, or infer identity from a child
-   route receipt" (`:76`). A pure reconciliation followed by a caller-side
-   action is already the "decide, record, then act" shape.
-2. The drift path returns `action: { kind: "request-main-session-route-change",
-   automatic: false }` (`:118`) and the header instructs callers to *"persist
-   `observed.eventId` only after displaying a drift request"* (`:78`). The
-   dependent action is therefore explicitly deferred to the caller, with an
-   explicitly-stated ordering constraint — the journal append slots in ahead of
-   it without restructuring anything.
+- **The receipts record after the fact.** An advisory receipt is emitted once
+  the adapter has answered or failed; a route receipt describes a dispatch that
+  has run. Both are excellent A-AC-05 evidence and neither is an A-AC-01
+  "before".
+- **`main-session-route.mjs` records before.** `reconcileMainSessionRoute` is
+  pure by contract — its header states it "cannot change a model, persist an
+  acknowledgement, or infer identity from a child route receipt" (`:76`) — and
+  the drift path returns `action: { kind: "request-main-session-route-change",
+  automatic: false }` (`:118`) with the instruction to *"persist
+  `observed.eventId` only after displaying a drift request"* (`:78`). The
+  dependent action is explicitly deferred to the caller, with an explicitly
+  stated ordering constraint. A journal append slots in ahead of it without
+  restructuring anything.
 
 ## 5. The seam is live, not hypothetical
 
-`post-compact-reground.mjs` calls it on every re-grounding
+`post-compact-reground.mjs` calls the reconciliation on every re-grounding
 (`mainSessionRouteProjection`, `:83`; wired at `:138`). The 2026-08-16 session's
 own re-grounding payload carried, verbatim:
 
@@ -110,96 +141,85 @@ own re-grounding payload carried, verbatim:
 ```
 
 An identity reconciliation ran, produced a typed unverified result, and was
-recorded nowhere machine-readable. That is one observation of the gap this
-package would close, from this repository's own operation.
+recorded nowhere machine-readable. `activeDuty: "Elephant"` rode in the same
+payload with no provenance or assurance beside it — §2's `role` gap in the same
+artifact.
 
-### 5.1 Why that result was `MSR-DESIRED-ROUTE-UNAVAILABLE` — and why it matters
+### 5.1 Why that result was `MSR-DESIRED-ROUTE-UNAVAILABLE`
 
-The obvious reading is that the runner-profiles-v3 registry has no cell for
-this profile/phase/runner combination. **That reading is wrong, and checking it
-changes the conclusion.**
+The obvious reading is that the runner-profiles-v3 registry has no cell for this
+profile/phase/runner combination. **That reading is wrong, and checking it
+changes the recommendation.**
 
 `config/runner-profiles-v3.json` carries `execution_phase` → `claude` for every
 registered profile (`:12`, `:22`, `:32`, and the duty entries at `:39`–`:63`),
 and `phaseRouteId` (`post-compact-reground.mjs:72`) maps everything that is not
-`design` to `execution_phase`. The phase was `implementation`. So a cell exists,
-and a lookup with real arguments would have found one.
+`design` to `execution_phase`. The phase was `implementation`. A cell exists.
 
-The lookup did not have real arguments. `mainSessionRouteProjection` (`:83`)
-reads `profile` and `runner` out of `input.pipelineMainSessionRoute`, and falls
-back to `{}` when that key is absent — which the hook's own comment says is the
+The lookup had no arguments. `mainSessionRouteProjection` (`:83`) reads
+`profile` and `runner` out of `input.pipelineMainSessionRoute` and falls back to
+`{}` when that key is absent — which the hook's own comment describes as the
 normal case: *"SessionStart input is not a model attestation by itself. A host
 adapter may provide one separately under `pipelineMainSessionRoute`"* (`:77`).
-No such adapter supplied one here, so `desiredRoute` was called with
-`profile === undefined` and returned `null` before any registry cell was
+No adapter supplied one, so `desiredRoute` returned `null` before any cell was
 consulted.
 
-**Consequence for the producer, and it is a real constraint:** in a session
-where the host supplies no route context, every reconciliation yields
-`MSR-UNVERIFIED` with all four dimensions absent. A producer wired here without
-that context would emit nothing but `unknown` identities — recording that an
-identity decision happened while recording no identity. Whether the Claude host
-adapter can supply `pipelineMainSessionRoute` at all is therefore a
-**precondition** of this producer being worth building, not a detail to settle
-afterwards. It is not answered here.
-
-`activeDuty: "Elephant"` was carried in the same payload with no provenance or
-assurance beside it — §2's `role` gap showing up in the same artifact.
+**Consequence:** in a session where the host supplies no route context, every
+main-session reconciliation yields `MSR-UNVERIFIED` with all four dimensions
+absent. A producer wired *only* there would record that an identity decision
+happened while recording no identity. This is the single strongest argument for
+starting at the advisory receipt instead, where the values are present by
+construction.
 
 ## 6. What this scoping does NOT resolve
 
-- **`adapter` is registered but was not traced to a recording site.**
-  `runner-profiles-v3.json` carries `adapter` as a first-class field on the
-  advisory duty's fallback chain (`"adapter": "native-opus"` and
-  `"adapter": "consult"`, `:76`–`:77`), alongside an `assuranceClass` (`:101`)
-  and an `"evidence": "dispatch-receipt"` marker on every profile cell. That is
-  strong evidence A-AC-05's `adapter` dimension has a home in this repository —
-  but registry *content* is not a *recording site*, and this pass did not
-  follow those fields to whichever code reads them. Do that before assuming the
-  four dimensions of §2 are the whole surface.
-- **`capability` is unmapped.** A keyword sweep of
-  `plugins/pipeline-core/lib` returns ~44 files, almost all matching unrelated
-  senses of the word (security capability plans, forge capabilities, runner
-  capability reports). Deciding whether any of them *records an identity* in
-  A-AC-05's sense needs its own pass; this document claims nothing about them.
+- **No `agent-decision` producer exists, confirmed by reading both import
+  sites.** `validateAgentDecisionEvent` is imported in exactly two places: its
+  own test, and `governance-event-store.mjs` (`:29`), which uses it only as a
+  *validator* on the append path (`:320`, `:351`) and additionally requires
+  `event.eventType === "agent.${journal.kind}"` and a candidate-digest binding
+  (`:353`). The store side is finished; the caller is what is missing. Contrast
+  `makeReceipt` (§2.1), which is what a real producer looks like in this
+  codebase.
+- **`capability` is unmapped.** A keyword sweep of `plugins/pipeline-core/lib`
+  returns ~44 files, almost all matching unrelated senses of the word (security
+  capability plans, forge capabilities, runner capability reports). Whether any
+  of them *records an identity* in A-AC-05's sense needs its own pass.
+- **The route receipt's producer was not traced.** `runner-usage-v1.mjs:498`
+  *validates* one; who constructs it — a host adapter, a runner, or in-repo
+  code — was not established here, and neither was whether that call site is
+  reached in ordinary operation or only under test. Establish both before
+  choosing it as the producer seam.
 - **A-AC-01 has a field gap.** It names "domain, status, selected option,
   stable reason codes, evidence basis/gaps, and revalidation trigger".
   `validateAgentDecisionEvent` (`agent-decision-journal.mjs:40`) covers the
   first five — `kind`, `state`, `candidateDigest`/`identity`, `reasonCode`,
   `assumptionState` (whose `unavailable`/`unknown` members are exactly the
   "gaps" half). **No field carries a revalidation trigger.** Whether that is a
-  missing field, a caller's concern, or an amendment is undecided here, and it
-  is the one thing that could keep A-AC-01 from reaching `implemented` even
-  with a working producer.
-- **No producer exists yet, confirmed.** `validateAgentDecisionEvent` is
-  imported in exactly two places: its own test, and
-  `governance-event-store.mjs` (`:29`), which uses it only as a *validator* on
-  the append path (`:320`, `:351`) and additionally requires
-  `event.eventType === "agent.${journal.kind}"` and a candidate-digest binding
-  (`:353`). The store side of the integration is finished; the caller is what
-  is missing. This matches the backlog item's premise rather than restating it
-  on faith.
+  missing field, a caller's concern, or an amendment is undecided, and it is the
+  one thing that could keep A-AC-01 from reaching `implemented` even with a
+  working producer.
 - **Nothing here changes a criterion's status.** No code changed. A-AC-01 and
   A-AC-05 stay where they were.
 
 ## 7. Recommended sequencing, revised
 
-1. Finish the `command-offer` producer first (`PHX-WP-RAC08-OFFER-PRODUCER`,
-   in flight). It proves the append/readback integration shape end-to-end
-   against a state machine that is already complete and tested; the
-   `agent-decision` producer reuses that shape rather than inventing a second.
-2. **Settle §5.1's precondition before building anything here.** Determine
-   whether a Claude host adapter can supply `pipelineMainSessionRoute`. If it
-   cannot, a producer at this seam records `unknown` for every dimension and is
-   not worth building yet — and that answer redirects the package rather than
-   merely delaying it.
-3. Then build the `agent-decision` producer at `main-session-route.mjs`'s
-   caller boundary — **not inside the pure function**, which must stay pure
-   (§4.1). One `selection` event per reconciliation, `identity` carrying the
-   four dimensions of §2, provenance/assurance mapped per §3.
-4. Resolve A-AC-01's revalidation-trigger gap (§6) as a decision before, not
-   during, that build. It is the only part of A-AC-01 that a producer alone
-   cannot close.
-5. Trace the registry's `adapter` field (§6) to whatever code reads it. Unlike
-   `capability`, it is already a first-class registry concept, so the odds of a
-   real recording site are good and the cost of looking is one pass.
+1. **Finish the `command-offer` producer first**
+   (`PHX-WP-RAC08-OFFER-PRODUCER`, in flight). It proves the append/readback
+   integration shape end-to-end against a state machine that is already complete
+   and tested; the `agent-decision` producer reuses that shape rather than
+   inventing a second one.
+2. **Build the A-AC-05 producer at the advisory receipt** (§2.1) — five of seven
+   dimensions, both axes, a closed `adapter` enum, a first-class `fallback`, an
+   existing drift check, and a real in-repo constructor to hang it off. It has
+   no missing-host-context precondition, which is what disqualifies the main
+   session seam as a starting point (§5.1).
+3. **Then extend to `main-session-route.mjs` for A-AC-01's ordering clause**
+   (§4) — at the *caller* boundary, never inside the pure function. Settle
+   §5.1's precondition first: if no Claude host adapter can supply
+   `pipelineMainSessionRoute`, this step records `unknown` for every dimension
+   and should be deferred rather than built.
+4. **Resolve A-AC-01's revalidation-trigger gap** (§6) as a decision before, not
+   during, that build. A producer alone cannot close it.
+5. **Trace the route receipt's producer and the `capability` dimension** (§6)
+   only if steps 2–3 leave A-AC-05 short of `implemented`.
