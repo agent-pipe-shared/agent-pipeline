@@ -50,6 +50,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createReleasePreflight } from "./release-preflight.mjs";
 import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
+import { checkReleaseStateConsistency } from "./check-release-state-consistency.mjs";
+import { createPublicReleaseState } from "../lib/public-release-state.mjs";
 import { runVerifyJournal, sealVerifyCleanupRegistration } from "./verify-journal.mjs";
 import {
   applyPublicationAuthorization,
@@ -329,6 +331,60 @@ check("disposable-remote publication loop: preflight -> prepare -> authorize-pla
   assert.equal(read.readback.oid, value.candidate);
   assert.equal(read.readback.tree, value.tree);
   assert.equal(read.publicationReceiptDigest, executed.publicationReceiptDigest, "readback converges on the exact same receipt execute produced");
+
+  /*
+   * NVA-A98R6-3: one more real-world property beyond "the loop converges" -- does a
+   * machine-readable "what got published" projection agree with what the disposable
+   * remote ACTUALLY now holds? A real lightweight tag is created and pushed to the
+   * disposable remote (never faked), then an INDEPENDENT fresh clone of that remote
+   * (not the working copy that did the push) is used as the checker's rootDir, so
+   * `checkReleaseStateConsistency`'s own `nativeObserve` resolves the tag purely from
+   * what the remote actually contains. The projection is built from Step 7's own
+   * observed commit/tree (`read.readback`), through the real `createPublicReleaseState`
+   * constructor -- never a hand-asserted record -- and checked with the real,
+   * unmodified `checkReleaseStateConsistency` (default `docs/` paths, no
+   * `observeTag` dependency override, matching check-release-state-consistency.test.mjs's
+   * own positive-case convention).
+   */
+  const releaseVersion = "0.5.6"; // matches releasePreflightFixture's targetVersion/candidateVersion above
+  const releaseTag = `v${releaseVersion}`;
+  assert.equal(git(value.root, "tag", releaseTag, value.candidate).status, 0);
+  assert.equal(git(value.root, "push", "--quiet", "origin", releaseTag).status, 0);
+
+  const releaseStateRoot = join(value.parent, "release-state-clone");
+  assert.equal(git(value.parent, "clone", "--quiet", value.remote, releaseStateRoot).status, 0);
+  mkdirSync(join(releaseStateRoot, "docs"));
+  const writeReleaseState = (record, statedStatus = record.publicationStatus) => {
+    writeFileSync(join(releaseStateRoot, "docs/release-state.json"), `${JSON.stringify(record, null, 2)}\n`);
+    writeFileSync(
+      join(releaseStateRoot, "docs/state.md"),
+      `**Release state:** version \`${record.version}\` · tag \`${record.tag}\` · commit \`${record.commit}\` · tree \`${record.tree}\` · status \`${statedStatus}\`\n`,
+    );
+  };
+
+  const honestProjection = createPublicReleaseState({
+    version: releaseVersion, tag: releaseTag, commit: read.readback.oid, tree: read.readback.tree,
+    publicationStatus: "published", releaseUrlClass: "public-release", observedAt: "2026-08-01T00:00:00.000Z",
+  });
+  writeReleaseState(honestProjection);
+  const honestCheck = checkReleaseStateConsistency({ rootDir: releaseStateRoot });
+  assert.deepEqual(honestCheck.reasons, [], `an honestly-consistent projection must be accepted: ${JSON.stringify(honestCheck.reasons)}`);
+  assert.equal(honestCheck.status, "consistent");
+
+  // Negative: a projection claiming a commit the disposable remote's real tag never
+  // pointed at (the fixture's own tracked base, not the candidate it actually converged
+  // to) must be rejected by the REAL checker -- proving the check is real, not decorative.
+  const tamperedProjection = createPublicReleaseState({
+    version: releaseVersion, tag: releaseTag, commit: value.base, tree: value.baseTree,
+    publicationStatus: "published", releaseUrlClass: "public-release", observedAt: "2026-08-01T00:00:00.000Z",
+  });
+  writeReleaseState(tamperedProjection);
+  const tamperedCheck = checkReleaseStateConsistency({ rootDir: releaseStateRoot });
+  assert.equal(tamperedCheck.status, "blocked");
+  assert.ok(
+    tamperedCheck.reasons.includes("published-identity-mismatch"),
+    `expected published-identity-mismatch, got ${JSON.stringify(tamperedCheck.reasons)}`,
+  );
 });
 
 check("authorize-apply rejects a tampered plan digest before any effect, even after a genuine authorize-plan preview", () => {
