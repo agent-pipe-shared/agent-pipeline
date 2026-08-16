@@ -1,0 +1,48 @@
+{
+  "schema": "pipeline.verify-resume-exercise.v1",
+  "purpose": "Real end-to-end exercise of Nova A98's R3 acceptance criterion (resumable Full Verify) -- prior evidence was code-plus-unit-tests only (nova-verify-journal-tests, nova-verify-resume-tests, both green in every Verify run), never a live cross-invocation exercise.",
+  "candidate": {
+    "commit": "2f34c1ccbcd454ba1fd2095c9a45625632333387",
+    "tree": "7ad38a16f8421697f19afc0581161e24a405717f"
+  },
+  "mechanism": "harness/scripts/verify.mjs -> plugins/pipeline-core/scripts/verify-journal.mjs (runVerifyJournal) -> plugins/pipeline-core/lib/verify-resume.mjs (planVerifyResume/firstDrift). No code was modified to produce this evidence -- two real, unmodified `node harness/scripts/verify.mjs` invocations against the same clean, unchanged candidate, back to back.",
+  "runA": {
+    "role": "fresh baseline",
+    "runId": "verify-1786917278371-0af8839da36f083b",
+    "startedAt": "2026-08-16T21:54:38.567Z",
+    "finishedAt": "2026-08-16T21:57:57.320Z",
+    "durationMs": 198753,
+    "suitesTotal": 269,
+    "suitesStarted": 269,
+    "suitesReused": 0,
+    "status": "passed"
+  },
+  "runB": {
+    "role": "same-candidate resume, immediately after runA with no intervening commit",
+    "runId": "verify-1786917485709-f57faf92ab87c181",
+    "startedAt": "2026-08-16T21:58:05.704Z",
+    "finishedAt": "2026-08-16T21:58:07.542Z",
+    "durationMs": 1838,
+    "suitesTotal": 269,
+    "suitesStarted": 0,
+    "suitesReused": 269,
+    "status": "passed"
+  },
+  "observation": "Every one of runB's 269 progress-journal entries carries state:\"reused\" (verified by grep -c against the raw progress stream, count 269/269), each with a startedAt/completedAt delta of ~1ms, versus runA's real per-suite execution times. runB's total wall time (1.84s) is ~108x faster than runA's (198.75s) for an identical 269-suite candidate. This is the harness's own explicit self-report (the state field), not an inference from receipt content.",
+  "negativeControlAlreadyOnRecord": {
+    "description": "The same session separately ran Verify twice against two DIFFERENT candidates one commit apart (f377b3f4 then a3197af3) and observed ZERO reuse (269/269 fresh in the second run) -- firstDrift's candidate-drift check (verify-resume.mjs:66) correctly invalidates every receipt the instant commit/tree differs, before any per-suite content check runs. This is the expected, conservative counterpart to the positive result above: reuse triggers only for a genuinely unchanged candidate, never merely a 'similar' one.",
+    "runsCompared": ["verify-1786916516926-6a1e5e7ad8174044", "verify-1786916847459-c6988a4be97d87a1"]
+  },
+  "verification": {
+    "howChecked": "grep -c '\"state\":\"reused\"' against runB's persisted raw progress-stream output (269 matches); git rev-parse HEAD confirmed unchanged (2f34c1ccbcd454ba1fd2095c9a45625632333387) across both runs; evidence/verify-latest.json's own verifyRun block cross-checked (registeredSuiteCount: 269, terminalReceiptCount: 269, status: passed) for runB.",
+    "producedBy": {
+      "commands": [
+        "node harness/scripts/verify.mjs (runA)",
+        "node harness/scripts/verify.mjs (runB, immediately after, no commit in between)"
+      ],
+      "exitCode": 0,
+      "real": true
+    }
+  },
+  "scopeNote": "This closes Nova A98's R3 acceptance criterion (resumable Full Verify, genuinely exercised with real evidence) but does not close #98 as a whole -- R4 (Critic delta lineage for the release path) and R6 (integrated fixtures) remain the real, undesigned gaps, per docs/adr/0064's own Context section."
+}
