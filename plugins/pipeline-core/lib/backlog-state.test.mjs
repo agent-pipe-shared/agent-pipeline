@@ -16,6 +16,7 @@ import {
   TRANSITION_V2_SCHEMA,
   canonicalJson,
   classifyBacklogFindings,
+  LEDGER_DRIFT_CUTOFF_SEQUENCE,
   parseBacklogItem,
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
@@ -1151,6 +1152,53 @@ function managedRepairInput(root, overrides = {}) {
     classifiedShortHash.every((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.DRIFT)
       && classifiedUnrelated[0].severity === BACKLOG_FINDING_SEVERITY.INTEGRITY,
     `${JSON.stringify(classifiedShortHash)} / ${JSON.stringify(classifiedUnrelated)}`);
+}
+
+{
+  // NVA-LEDGERCUTOFF-2: a DRIFT-shaped finding at or below
+  // LEDGER_DRIFT_CUTOFF_SEQUENCE keeps its DRIFT verdict unchanged.
+  const events = [
+    { id: "pipeline.example", sequence: LEDGER_DRIFT_CUTOFF_SEQUENCE, evidence: { commit: "181b7730" } },
+  ];
+  const findings = [
+    "ledger event 1: evidence.commit must be a full lowercase Git commit OID",
+  ];
+  const classified = classifyBacklogFindings(findings, { events });
+  check("BS27 a DRIFT-shaped finding at the cutoff sequence still classifies DRIFT",
+    classified[0].severity === BACKLOG_FINDING_SEVERITY.DRIFT,
+    JSON.stringify(classified));
+}
+
+{
+  // NVA-LEDGERCUTOFF-2: the identical finding shape on a sequence strictly
+  // above the cutoff classifies INTEGRITY instead of DRIFT.
+  const events = [
+    { id: "pipeline.example", sequence: LEDGER_DRIFT_CUTOFF_SEQUENCE + 1, evidence: { commit: "181b7730" } },
+  ];
+  const findings = [
+    "ledger event 1: evidence.commit must be a full lowercase Git commit OID",
+  ];
+  const classified = classifyBacklogFindings(findings, { events });
+  check("BS28 (NVA-LEDGERCUTOFF-2) the identical DRIFT-shaped finding above the cutoff sequence classifies INTEGRITY",
+    classified[0].severity === BACKLOG_FINDING_SEVERITY.INTEGRITY,
+    JSON.stringify(classified));
+}
+
+{
+  // NVA-LEDGERCUTOFF-2: the closure_commit crosscheck linkage must also flip
+  // to INTEGRITY when the finding it would otherwise inherit DRIFT from is a
+  // post-cutoff event — driftSequences must exclude post-cutoff sequences.
+  const events = [
+    { id: "pipeline.example", sequence: LEDGER_DRIFT_CUTOFF_SEQUENCE + 1, evidence: { commit: "181b7730" } },
+  ];
+  const findings = [
+    "ledger event 1: evidence.commit must be a full lowercase Git commit OID",
+    "items: pipeline.example closure_commit must equal its final ledger evidence.commit",
+  ];
+  const classified = classifyBacklogFindings(findings, { events });
+  check("BS29 (NVA-LEDGERCUTOFF-2) a post-cutoff drift-shaped finding's closure_commit crosscheck also classifies INTEGRITY",
+    classified.every((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.INTEGRITY),
+    JSON.stringify(classified));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

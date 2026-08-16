@@ -820,6 +820,21 @@ const DRIFT_LEDGER_COMMIT_FINDING = /^ledger event \d+: evidence\.commit (?:is n
 // item), never the finding text alone.
 const CLOSURE_COMMIT_CROSSCHECK_FINDING = /^items: (.+) closure_commit must equal its final ledger evidence\.commit$/u;
 
+// Fixed once, at the highest sequence number present in
+// backlog/transitions.ndjson when NVA-LEDGERCUTOFF-2 landed (2026-08-16), and
+// never moved afterward. A DRIFT_LEDGER_COMMIT_FINDING on a ledger event at or
+// below this sequence keeps its DRIFT verdict — the historical admission this
+// table exists for. The identical finding shape on any event ABOVE the cutoff
+// classifies INTEGRITY instead: "reject the past" already moved to "reject bad
+// writes" for events appended going forward, not only for the ones the
+// candidate-event validator in reconcile-backlog-ledger.mjs happens to see. It
+// lives here (the checking code), not in the ledger data, precisely so a
+// future writer or rebuild cannot silently move it forward to re-admit a new
+// integrity violation as DRIFT. See
+// backlog/items/2026-08-16-ledger-drift-classification-has-no-reachability-cutoff.md
+// (Triage: cutoff lives in the checking script).
+export const LEDGER_DRIFT_CUTOFF_SEQUENCE = 417;
+
 function classifyBacklogFinding(finding) {
   return DRIFT_LEDGER_COMMIT_FINDING.test(finding) ? BACKLOG_FINDING_SEVERITY.DRIFT : BACKLOG_FINDING_SEVERITY.INTEGRITY;
 }
@@ -827,17 +842,26 @@ function classifyBacklogFinding(finding) {
 /**
  * Classify every finding `loadBacklogState` can produce into INTEGRITY
  * (blocking) or DRIFT (reported, never blocking). `events` supplies the
- * ledger context needed to link a closure_commit cross-check finding to the
- * drifted evidence.commit that caused it — see CLOSURE_COMMIT_CROSSCHECK_FINDING.
- * A finding this function does not otherwise recognise defaults to INTEGRITY.
+ * ledger context needed to (a) resolve a DRIFT-shaped finding's actual ledger
+ * sequence against LEDGER_DRIFT_CUTOFF_SEQUENCE, and (b) link a closure_commit
+ * cross-check finding to the drifted evidence.commit that caused it — see
+ * CLOSURE_COMMIT_CROSSCHECK_FINDING. A finding this function does not
+ * otherwise recognise defaults to INTEGRITY.
  */
 export function classifyBacklogFindings(findings, { events = [] } = {}) {
   const driftSequences = new Set();
   const direct = findings.map((finding) => {
-    const severity = classifyBacklogFinding(finding);
+    let severity = classifyBacklogFinding(finding);
     if (severity === BACKLOG_FINDING_SEVERITY.DRIFT) {
       const sequenceMatch = /^ledger event (\d+):/u.exec(finding);
-      if (sequenceMatch) driftSequences.add(Number(sequenceMatch[1]));
+      const physicalIndex = sequenceMatch ? Number(sequenceMatch[1]) - 1 : -1;
+      const eventSequence = events[physicalIndex]?.sequence;
+      const sequence = Number.isSafeInteger(eventSequence) ? eventSequence : Number(sequenceMatch?.[1]);
+      if (Number.isSafeInteger(sequence) && sequence > LEDGER_DRIFT_CUTOFF_SEQUENCE) {
+        severity = BACKLOG_FINDING_SEVERITY.INTEGRITY;
+      } else if (Number.isSafeInteger(sequence)) {
+        driftSequences.add(sequence);
+      }
     }
     return { finding, severity };
   });
