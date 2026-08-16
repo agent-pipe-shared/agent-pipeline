@@ -23,6 +23,11 @@ const spawnPass = () => ({ status: 0, stdout: Buffer.from("complete private log\
 const registerRun = (request) => sealVerifyCleanupRegistration({ status: "registered", runId: request.runId, runPath: request.runPath, sessionId: "test-session", descriptorSha256: "d".repeat(64), resourceId: `verify-${request.runId}`, registeredAt: "2026-08-01T00:00:00.000Z" });
 const artifact = verifySuiteArtifactName("fixture-suite");
 
+function makeClock(startMs = 1_700_000_000_000, stepMs = 25) {
+  let ticks = 0;
+  return () => startMs + (ticks++) * stepMs;
+}
+
 function currentProcessStartId() {
   if (process.platform !== "linux") return `pid-${process.pid}`;
   return readFileSync(`/proc/${process.pid}/stat`, "utf8").trim().split(" ")[21];
@@ -51,12 +56,32 @@ test("a terminal matching receipt is reused and still produces complete current 
   let calls = 0;
   const spawn = () => { calls += 1; return spawnPass(); };
   try {
-    runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-one", spawn, registerRun });
-    const resumed = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-two", spawn, registerRun });
+    const clock = makeClock();
+    runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-one", spawn, registerRun, clock });
+    const resumed = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-two", spawn, registerRun, clock });
     assert.equal(calls, 1);
     assert.deepEqual(resumed.plan.reusable, ["fixture-suite"]);
     assert.equal(resumed.steps.length, 1);
     assert.equal(resumed.steps[0].reused, true);
+    // The reused step's durationMs reflects the reuse operation's own receipt timing (near-zero,
+    // bounded by the fixture clock's step), never a value borrowed from the original run.
+    assert.equal(Number.isInteger(resumed.steps[0].durationMs), true);
+    assert.ok(resumed.steps[0].durationMs >= 0);
+    const reusedReceipt = JSON.parse(readFileSync(join(resumed.runDir, "receipts", `${artifact}.json`), "utf8"));
+    assert.equal(resumed.steps[0].durationMs, Date.parse(reusedReceipt.completedAt) - Date.parse(reusedReceipt.startedAt));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("a freshly executed suite carries a durationMs derived from its own receipt timing", () => {
+  const f = fixture();
+  try {
+    const clock = makeClock();
+    const result = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-duration", spawn: spawnPass, registerRun, clock });
+    assert.equal(result.steps[0].reused, false);
+    assert.equal(Number.isInteger(result.steps[0].durationMs), true);
+    assert.ok(result.steps[0].durationMs >= 0);
+    const receipt = JSON.parse(readFileSync(join(result.runDir, "receipts", `${artifact}.json`), "utf8"));
+    assert.equal(result.steps[0].durationMs, Date.parse(receipt.completedAt) - Date.parse(receipt.startedAt));
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

@@ -413,7 +413,13 @@ export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, po
       if (plan.reusable.includes(suite.name)) receipt = reuseSuite({ suite, registration, sourceReceipt: prior.receipts[suite.name], sourceLog: prior.logs[suite.name], run, candidate, policySha256, index: offset + 1, total: suites.length, clock });
       else receipt = executeSuite({ suite: { ...suite, cwd: repoRoot }, registration, run, candidate, policySha256, index: offset + 1, total: suites.length, clock, spawn });
       receiptBySuite[suite.name] = receipt;
-      steps.push({ name: suite.name, exitCode: receipt.exitCode, receiptSha256: receipt.receiptSha256, reused: plan.reusable.includes(suite.name) });
+      // durationMs is derived from this receipt's OWN startedAt/completedAt, never borrowed from a
+      // prior run's receipt. For a freshly executed suite that is its real wall-clock cost. For a
+      // reused suite it is deliberately the (near-zero) cost of the reuse operation itself -- reading
+      // and re-sealing the prior log -- because this artifact records what THIS run actually spent,
+      // and a stale duration copied from a different run/environment would misrepresent both this
+      // run's own timing and how much the reuse mechanism is saving.
+      steps.push({ name: suite.name, exitCode: receipt.exitCode, receiptSha256: receipt.receiptSha256, reused: plan.reusable.includes(suite.name), durationMs: Date.parse(receipt.completedAt) - Date.parse(receipt.startedAt) });
     }
     const completedAt = now(clock);
     const terminal = { schema: RUN_TERMINAL_SCHEMA, runId, candidate, policySha256, planSha256: plan.planSha256, receipts: Object.values(receiptBySuite).map((receipt) => receipt.receiptSha256).sort(), status: steps.every((step) => step.exitCode === 0) ? "passed" : "failed", durability: run.manifest.durability, completedAt, journalSha256: sha(readFileSync(run.journalPath)), terminalSha256: null };
