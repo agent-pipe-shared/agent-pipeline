@@ -137,6 +137,7 @@ test("R-AC-05 refuses every enumerated private field and every untyped digest at
 import { readFileSync } from "node:fs";
 const ASSUMPTION_STATES=["assumed","inferred","observed","verified","contradicted","unavailable","unknown"];
 const LIFECYCLE_STATES=["declared","verified","contradicted","expired","invalidated","superseded"];
+const CODE_PATTERN="^[A-Z][A-Z0-9._:-]{0,127}$";
 test("A-AC-11 preserves each enumerated assumption state as a distinct typed value",()=>{
   const seen=new Set();
   for(const assumptionState of ASSUMPTION_STATES){
@@ -169,7 +170,53 @@ test("A-AC-11 keeps the published schema closed and in step with the validator",
   assert.deepEqual(branch.properties.assumptionState.enum,ASSUMPTION_STATES);
   assert.deepEqual(branch.properties.state.enum,LIFECYCLE_STATES);
   assert.equal(branch.required.includes("assumptionState"),false);
+  assert.equal(branch.properties.revalidationTrigger.type,"string","A-AC-01: the published schema must carry the revalidation trigger the validator now admits");
+  assert.equal(branch.properties.revalidationTrigger.pattern,CODE_PATTERN,"A-AC-01: the published revalidation-trigger pattern must be the validator's own bounded CODE pattern, not a looser string");
+  assert.equal(branch.required.includes("revalidationTrigger"),false,"revalidationTrigger must stay optional, matching assumptionState");
   for(const entry of schema.oneOf)assert.equal(entry.additionalProperties,false,"a journal event shape stopped being closed");
+});
+
+// A-AC-01 adds the one clause of that criterion with no field anywhere on this
+// shape: the revalidation trigger. `state` records what became of a claim and
+// `assumptionState` the epistemic ground it was held on; `revalidationTrigger`
+// records what would make it due for re-checking. It is a bounded stable
+// identifier (the same CODE pattern `reasonCode` uses -- this module admits
+// free text nowhere), optional at the key level exactly like `assumptionState`
+// so every pre-existing fixture keeps validating unchanged, and deliberately
+// NOT kind-scoped the way `identity` is: A-AC-01's own text narrows it to no
+// subset of KINDS, so there is no ADJ-IDENTITY-SCOPE analogue to assert -- a
+// shape-valid trigger is accepted on every kind, which the test below pins
+// positively rather than leaving as an untested absence.
+const AGENT_KINDS=["assumption","selection","verification-scope","fallback","escalation"];
+test("A-AC-01 preserves a well-formed revalidation trigger as a bounded stable identifier",()=>{
+  for(const revalidationTrigger of ["ON_NEXT_VERIFY_RUN","CANDIDATE.CHANGED","SPEC:REVISION-CHANGED","E",`A${"B".repeat(127)}`]){
+    const accepted=validateAgentDecisionEvent(value({revalidationTrigger}));
+    assert.equal(accepted.revalidationTrigger,revalidationTrigger,`revalidation trigger ${revalidationTrigger} was not preserved`);
+    assert.equal(Object.isFrozen(accepted),true);
+  }
+});
+test("A-AC-01 rejects free text and every non-string revalidation trigger with ADJ-SHAPE",()=>{
+  for(const revalidationTrigger of ["revalidate this later","on_next_verify_run","ON NEXT VERIFY RUN","","1_TRIGGER",`A${"B".repeat(128)}`,null,undefined,0,1,true,false,[],["ON_NEXT_VERIFY_RUN"],{},{trigger:"ON_NEXT_VERIFY_RUN"}])
+    assert.throws(()=>validateAgentDecisionEvent(value({revalidationTrigger})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-SHAPE",`revalidation trigger ${JSON.stringify(revalidationTrigger)??String(revalidationTrigger)} was admitted`);
+  for(const field of ["revalidationtrigger","revalidation_trigger","RevalidationTrigger","revalidateOn"])
+    assert.throws(()=>validateAgentDecisionEvent({...value(),[field]:"ON_NEXT_VERIFY_RUN"}),(error)=>error instanceof AgentDecisionJournalError,`the shape admitted the unknown property ${field}`);
+  assert.throws(()=>validateCommandOfferEvent(offer({revalidationTrigger:"ON_NEXT_VERIFY_RUN"})),(error)=>error.code==="ADJ-COMMAND-OFFER","the command-offer shape must stay closed against the new key");
+});
+test("A-AC-01 leaves the revalidation trigger optional, unscoped by kind, and independent of the claim lifecycle",()=>{
+  assert.equal(Object.hasOwn(validateAgentDecisionEvent(value()),"revalidationTrigger"),false,"absence must stay absence, not a synthesised value");
+  for(const kind of AGENT_KINDS){
+    const accepted=validateAgentDecisionEvent(value({kind,revalidationTrigger:"ON_NEXT_VERIFY_RUN"}));
+    assert.equal(accepted.revalidationTrigger,"ON_NEXT_VERIFY_RUN",`kind ${kind} rejected or altered a shape-valid revalidation trigger; this field is deliberately unscoped, unlike identity`);
+    assert.equal(Object.hasOwn(validateAgentDecisionEvent(value({kind})),"revalidationTrigger"),false,`kind ${kind} synthesised a revalidationTrigger key from its absence`);
+  }
+  for(const state of LIFECYCLE_STATES){
+    const accepted=validateAgentDecisionEvent(value({state,revalidationTrigger:"CANDIDATE.CHANGED",supersedesEventId:state==="superseded"?"agent-0":null}));
+    assert.equal(accepted.state,state,`lifecycle ${state} was constrained by the revalidation trigger`);
+    assert.equal(accepted.revalidationTrigger,"CANDIDATE.CHANGED",`the revalidation trigger was constrained by lifecycle ${state}`);
+  }
+  const composed=validateAgentDecisionEvent(value({kind:"selection",assumptionState:"inferred",identity:[{dimension:"model",value:"claude-opus-5",provenance:"same-dispatch-observed",assurance:"verified"}],revalidationTrigger:"ROUTE.CHANGED"}));
+  assert.equal(composed.revalidationTrigger,"ROUTE.CHANGED","the three optional axes must compose; none excludes another");
+  assert.equal(composed.assumptionState,"inferred");
 });
 
 // A-AC-05 adds a third, distinct axis: identity provenance/assurance. It is

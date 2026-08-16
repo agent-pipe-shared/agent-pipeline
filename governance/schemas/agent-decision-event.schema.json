@@ -28,6 +28,7 @@
             }
           }
         },
+        "revalidationTrigger": { "type": "string", "pattern": "^[A-Z][A-Z0-9._:-]{0,127}$" },
         "reasonCode": { "type": "string" },
         "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "relatedHumanDecisionId": { "type": ["string", "null"] },

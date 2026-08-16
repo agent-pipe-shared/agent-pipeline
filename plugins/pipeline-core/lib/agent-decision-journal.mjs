@@ -36,6 +36,14 @@ const validIdentity=(identity)=>Array.isArray(identity)&&identity.length>=1&&ide
  * IDENTITY_ASSURANCE, and its presence is itself scoped to IDENTITY_KINDS
  * (ADJ-IDENTITY-SCOPE) because only `selection`/`escalation`/`fallback` ever have
  * a material identity choice to record.
+ * `revalidationTrigger` is optional the same way, for A-AC-01: WHEN the
+ * criterion's "revalidation trigger" clause is recorded it is a bounded stable
+ * identifier -- the same `CODE` pattern `reasonCode` already validates against,
+ * never free text, which this module admits nowhere -- naming what would make
+ * the recorded decision due for re-checking; unlike `identity` it is
+ * deliberately admissible on every `kind` (no scope rule), because A-AC-01's
+ * own text says "assumption or selection" broadly and narrows the trigger to no
+ * subset of KINDS the way A-AC-05's identity dimension narrows itself.
  */
 export function validateAgentDecisionEvent(value) {
   const keys=["eventId","kind","state","reasonCode","candidateDigest","relatedHumanDecisionId","supersedesEventId"];
@@ -43,8 +51,9 @@ export function validateAgentDecisionEvent(value) {
   if(value?.kind==="legacy-import-observation") return validateLegacyImportObservationEvent(value);
   const epistemic=rec(value)&&Object.hasOwn(value,"assumptionState");
   const identified=rec(value)&&Object.hasOwn(value,"identity");
-  const extended=[...keys,...(epistemic?["assumptionState"]:[]),...(identified?["identity"]:[])];
-  if(!exact(value,extended)||!ID.test(value.eventId)||!KINDS.has(value.kind)||!STATES.has(value.state)||(epistemic&&!ASSUMPTION_STATES.has(value.assumptionState))||(identified&&!validIdentity(value.identity))||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&(!ID.test(value.relatedHumanDecisionId)))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId)))fail("ADJ-SHAPE");
+  const revalidated=rec(value)&&Object.hasOwn(value,"revalidationTrigger");
+  const extended=[...keys,...(epistemic?["assumptionState"]:[]),...(identified?["identity"]:[]),...(revalidated?["revalidationTrigger"]:[])];
+  if(!exact(value,extended)||!ID.test(value.eventId)||!KINDS.has(value.kind)||!STATES.has(value.state)||(epistemic&&!ASSUMPTION_STATES.has(value.assumptionState))||(identified&&!validIdentity(value.identity))||(revalidated&&(typeof value.revalidationTrigger!=="string"||!CODE.test(value.revalidationTrigger)))||!CODE.test(value.reasonCode)||!SHA.test(value.candidateDigest)||(value.relatedHumanDecisionId!==null&&(!ID.test(value.relatedHumanDecisionId)))||(value.supersedesEventId!==null&&!ID.test(value.supersedesEventId)))fail("ADJ-SHAPE");
   if(value.state==="superseded"&&value.supersedesEventId===null)fail("ADJ-SUPERSESSION");
   if(identified&&!IDENTITY_KINDS.has(value.kind))fail("ADJ-IDENTITY-SCOPE");
   return Object.freeze({...value,...(identified?{identity:Object.freeze(value.identity.map((entry)=>Object.freeze({...entry})))}:{})});
