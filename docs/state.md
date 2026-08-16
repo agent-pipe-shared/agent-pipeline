@@ -291,6 +291,61 @@ Net for the session: four red steps closed by agent-eligible work, one opened by
 PO-executed migration whose fix is already scheduled, five that only a human signature or
 a plugin version can clear.
 
+### Continuation, same day — command-offer producer dispatched; agent-decision scoped (revised twice)
+
+Following "Next criterion targets" above. Two threads, no conflict (disjoint files).
+
+**Thread 1 — `command-offer` producer at the guard hand-off seam (R-AC-08/R-AC-10),
+dispatched, in flight.** Briefing `PHX-WP-RAC08-OFFER-PRODUCER` built strictly from
+`templates/prompts/goldfish-task.md` (a freehand attempt via a file pointer was rejected
+by `guard-dispatch.mjs` — the template must be filled inline in the prompt, not
+referenced), dispatched to `goldfish-deep`/opus/xhigh against ruleset `fd917320`. Scope:
+new `plugins/pipeline-core/lib/guard-handoff-offer.mjs` + test, wiring-only change to
+`human-guard-override.mjs`, one `verify.mjs` step. Design fixed in the briefing (D1–D6):
+`sideEffectClass: "guard-bypass"` (not `non-authoritative` — that value unlocks the
+no-journal exception, and a guard-refused command is never that harmless);
+`authorityRequirement: "not-required"` with null decision id (the external-operator
+routes write no override request, so there is nothing to correlate to); fail-closed shape
+adds a `journalRefusal` key and drops `nextAction` rather than throwing inside a
+PreToolUse hook. Result not yet known — report arrives via task notification, not
+predicted here.
+
+**Thread 2 — `agent-decision` scoping (A-AC-01/A-AC-05), Elephant-context, no dispatch.**
+Document: `specs/sprint-phoenix-epic/design/agent-decision-identity-scoping.md`
+(commits `5d2b8240` → `6c3f66ca` → `d9f748bb`, three passes, kept as one file with a
+revision note rather than silently overwritten — the moves are the record).
+
+- Pass 1: the design doc's named candidate (`continuity-select-course`/
+  `continuity-apply-decision`) does NOT carry A-AC-05's identity dimensions — it records
+  which course a package took, not runner/model/effort/etc. Named `main-session-route.mjs`
+  as the replacement (4 of 7 dimensions, requested-vs-observed split already in its own
+  header language).
+- Pass 2 (self-correction): pass 1 asserted the live session's
+  `MSR-DESIRED-ROUTE-UNAVAILABLE` came from a missing registry cell — asserted without
+  checking, which is exactly what GL-08 forbids. Checked: the registry has a cell for
+  every profile at `execution_phase`/`claude`; the actual cause is that no host adapter
+  supplied `pipelineMainSessionRoute` in `SessionStart` input, so the lookup ran with an
+  undefined profile. Added as a stated precondition: a producer wired only at this seam
+  records `unknown` for every dimension in a session lacking that host context.
+- Pass 3 (upgrade, not correction): tracing the `adapter` field this session's own
+  re-grounding payload doesn't carry led to `advisory-receipt.mjs`/
+  `advisory-coordinator.mjs` — a real in-repo constructor (`makeReceipt`) already
+  recording 5 of 7 identity dimensions including a closed `adapter` enum
+  (`["native","consult"]`), a first-class `fallback` field, and a drift check
+  (`observed-runner-drift`) that refuses a self-contradicting identity. Unlike
+  `validateAgentDecisionEvent` (imported only by its own test and by
+  `governance-event-store.mjs` as a pure validator — confirmed by reading both call
+  sites, no producer exists anywhere), this site is already a producer. **Revised
+  sequencing:** build the A-AC-05 producer at the advisory receipt first (no missing-context
+  precondition); extend to `main-session-route.mjs` second, for A-AC-01's
+  before-the-action ordering clause specifically, once §5.1's host-adapter precondition is
+  settled; resolve A-AC-01's missing revalidation-trigger field as its own decision before
+  that build, not during it.
+
+No criterion status changed by either pass — both are scoping, explicitly. `capability`
+(the seventh A-AC-05 dimension) and the route-receipt's own producer remain untraced,
+flagged rather than guessed at.
+
 ---
 
 ## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
