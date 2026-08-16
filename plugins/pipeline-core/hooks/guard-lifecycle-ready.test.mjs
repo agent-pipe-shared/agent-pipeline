@@ -1408,8 +1408,8 @@ test("plan-runtime family accepts the runner-plus-intent argv lifecycleArgv actu
  * GUARDALLOW-1 (backlog: 2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md).
  * `plan-partial-authority` is a real, read-only onboarding subcommand (scripts/
  * project-onboarding-v3.mjs: absent from APPLY_SHAPED_COMMANDS) that a partial-authority
- * inspection prescribes verbatim as its `nextAction` (lib/project-onboarding-v3.mjs:3388,
- * 3669, via the same lifecycleArgv(argv, runner, intent) helper as its plan* siblings) --
+ * inspection prescribes verbatim as its `nextAction` (lib/project-onboarding-v3.mjs:3436,
+ * 3717, via the same lifecycleArgv(argv, runner, intent) helper as its plan* siblings) --
  * yet the allowlist refused it because it was absent from the plan* array, blocking every
  * consumer project stuck in `partial` state from ever completing bootstrap. This mirrors
  * the "plan-runtime family" test above, scoped to the one added subcommand, plus a negative
