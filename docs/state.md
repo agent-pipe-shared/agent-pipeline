@@ -424,6 +424,27 @@ truncation" names) — flagged as an open observation for the PO if noticed, not
 already registered (`harness/scripts/verify.mjs:468`), so this package (unlike the two
 above) should land without a TP-3-blocked tail if the premise holds. Result not yet known.
 
+**E-AC-08 result — landed clean, commit `8956d770`, premise confirmed.** No TP-3 tail: the
+diff is 4 lines in `governance-export-outbox-store.mjs` (one `truncates()` helper, one guard
+clause) + 6 lines of new tests; the two pre-existing tests are byte-unchanged. Independently
+re-verified by the Elephant: read the actual diff line by line against D1–D3 before trusting
+the report (placement exactly after the CAS conflict check and after validation, skipped when
+`current.digest === null`, `GEOS-TRUNCATION` naming matches this file's own convention), then
+independently re-ran the exact DoD command — 39/39 pass, matching the report. Two open
+observations the goldfish surfaced and correctly left unbuilt (D4's own boundary): the store
+still accepts a `next` with a lower `cursor` or a backward `status` move as long as entries/
+projections match (real, related, not "truncation"); the projection comparison is
+`JSON.stringify`-based and therefore key-order sensitive — no current caller hits this,
+`canonicalizeJson` is already imported in the file if order-insensitivity is ever wanted.
+
+**Post-landing: found the standing detached verify worktree and ran the full gate.**
+`.git/phx-verify` already existed (`docs/push-release-flow.md` references it as
+"the detached verify worktree ... that is what it exists for" but no session this checkpoint
+covers had located and used it directly) — was parked at stale `dd452881`. Moved it to the
+current candidate (`git checkout 897e28cd` inside the worktree, confirmed clean including
+untracked), ran `node harness/scripts/verify.mjs` from there in the background. Result
+pending at time of writing this entry; recorded separately once it returns.
+
 ---
 
 ## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
