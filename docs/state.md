@@ -3,11 +3,200 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-12
+**Last updated:** 2026-08-16
 
 ---
 
-## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked (READ THIS FIRST)
+## CHECKPOINT — 2026-08-16, four agent-eligible red suites closed; the push chain is blocked on PO key material, not on process (READ THIS FIRST)
+
+**Trigger.** PO asked to pull `origin/sprint_phoenix` (explicitly authorising a full
+local replacement — "da ist nichts sinnvolles on top drin") and continue, then asked
+for a working push again, having had to push manually last time. Signature approvals
+were offered "as soon as needed".
+
+**Sync.** Local was strictly behind; `git reset --hard` is refused by GG-07, so the
+sanctioned route was `git stash push -u` (three locally-modified config/state files,
+stash `phoenix-local-state-pre-origin-sync-2026-08-16`, superseded — safe to drop) then
+`git merge --ff-only origin/sprint_phoenix` to `8a92d377`. Bootstrap `ready`/continuity
+`valid` (rev 5); `pipeline-start-preflight` reports `plugin-refresh-required`, which is
+the already-recorded cosmetic distribution-identity readback (`installedVersion: null`),
+not a stale ruleset — `ruleset-freshness` says `current`, non-blocking.
+
+**Baseline Verify at `8a92d377`, binding `exact`, exit 2 — 10 red steps, one more than
+the 2026-08-12 triage recorded.** The extra pair (`doc-contract-tests`/`doc-contract-check`)
+was introduced by `988183e8`/`4b24ea01` themselves: both added a Markdown link to
+`docs/adr/0061-uniform-human-approval-ceremony.md`, which exists only on `origin/main`.
+No Verify ran after those commits, so nobody saw it.
+
+**Four of the ten are now green, in four commits, three template-briefed dispatches run
+strictly sequentially** (the parallel-dispatch commit-attribution race has three
+occurrences on record in this repo; not repeated). Each DoD was re-run independently by
+the Elephant, not accepted from the dispatch report:
+
+- **PHX-VF-BACKLOG2** (`144db6ae`) — `backlog-state-check` + `backlog-ledger-reconciliation-tests`.
+  `pipeline.guard-testpath-not-kernel-protected` carried `status: rejected`, which is not
+  a canonical status, and that single invalid value cascaded into the bogus
+  "ledger event 248: id does not name a current backlog item" finding (the checker builds
+  its item index only from validly-statused items). `pipeline.semgrep-timeout-oversized-pipeline-state-test`
+  was `closed` with a complete Triage but none of its four closure fields. Both repaired,
+  ledger entries written only by `reconcile-backlog-ledger.mjs --activate`.
+- **PHX-VF-INVENTORY** (`7a2f6fce`) — `product-capability-inventory-tests`. The five
+  `verify-phase` surfaces registered into `verify.mjs` in an earlier session were never
+  carried into `docs/product-capability-inventory.json`; added, assigned to
+  `deterministic-verification` (which already holds all 362 other verify-phase surfaces
+  1:1 — placement, not a catch-all), `sourceBaseline` refreshed.
+- **PHX-VF-DOCLINK** (`ae229923`, `2724e234`) — `doc-contract-tests` + `doc-contract-check`.
+  Both dead ADR-0061 links de-linked to plain text that still names the ADR and states it
+  lives on `origin/main`. The ADR was deliberately NOT copied onto this branch: this
+  branch's `po-human-approval.mjs` does not implement the `authorize-critical` ceremony
+  ADR-0061 mandates, so importing the decision without its implementation would create
+  fresh doc/code drift. Second commit closes the documentation half of
+  `backlog/items/2026-08-09-bare-branch-name-in-git-push-fails-approval-with-a-misleading-code.md`
+  (Proposal option 1): `docs/push-release-flow.md` Layer 5 now states that the push refspec
+  must be the full `<source>:refs/heads/<branch>` form and names `PUSH-PROOF-INPUT-INVALID`
+  as the symptom a bare branch name produces. That item's Triage is filled; `status` stays
+  `open` because option (2) (guard-side expansion) is untouched.
+
+**The remaining six red steps are all human-signature-gated, verified at source rather
+than assumed:**
+
+- Four (`artifact-topology-check`, `threat-model-tests`, `pipeline-state-tests`,
+  `external-reference-adapter-tests`) share one cause, `FTP-ARTIFACT-2` on
+  `specs/sprint-phoenix-epic/acceptance.md`. `feature-package-status` confirms exactly one
+  finding. The reconcile plan is exactly one change (digest `2768f169…` → `300acd10…`,
+  `planSha256 3e957dade960797f826176721255ca001d092a71666b875610513888cf894a73`), and
+  `ALWAYS_REQUIRED_KINDS = new Set(["feature-package-reconcile"])` makes the PO proof
+  mandatory regardless of gate mode.
+- Two (`guard-testpath-override-tests`, OT09) need a TP-7 lift: the test greps
+  `critical-human-proof-policy.mjs` for the literal `gates?.push_approval`, which the
+  `kind -> gates.*` lookup-table refactor removed. The code is right, the assertion is
+  stale, and `guard-testpath-override.test.mjs` is TP-7-protected.
+
+### The blocker that actually stops the push, and it is not process
+
+`pipeline-state.mjs` cross-checks the `--proof-authority` file against the committed
+`project/critical-human-proof.json` `trustAnchor` and refuses on mismatch, so an external
+trust policy cannot be chosen freely. That anchor was rotated on 2026-08-11 (`2f56a6fb`,
+"old key lost") from `f28988b2…` to `a3a43c4b…`.
+
+**No key on this machine produces `a3a43c4b…`.** Measured directly —
+`verifyPoApprovalProof` digests the PEM text (`createHash("sha256").update(proof.publicKey)`),
+confirmed by the fact that `~/agent-pipeline-po-nova/po-public.pem` hashes to exactly the
+pre-rotation anchor value:
+
+| key material on this machine | sha256 of its public PEM |
+|---|---|
+| `~/old-key-AP/` | `f1e6c705…` |
+| `~/agent-pipeline-po-nova/` | `f28988b2…` (the anchor *before* the rotation) |
+| `~/.agent-pipeline/po-keys/` | `1274d606…` |
+| committed anchor requires | **`a3a43c4b…`** |
+
+A repository-wide search for that digest finds it only in the two checkouts' own
+`critical-human-proof.json`; no trust policy or key file on this machine carries it. Every
+signature step — GMW window, `feature-package-reconcile`, push approval — would fail
+`PO-APPROVAL-TRUST-MISMATCH` here. This is the most likely reason the 2026-08-12 push had
+to be completed by hand.
+
+**PO decision, 2026-08-16 (AskUserQuestion):** wait — no push and no signatures for now.
+Until then: work everything that does not need a signature, use `scratch/` where needed,
+and document.
+
+**CORRECTION, same session, minutes later — no new candidate is needed; it is one data
+file.** The PO (corroborated by a Nova session) pointed out that the multi-key support is
+already installed, and that is right: the **installed 0.5.4 lib**
+`critical-human-proof-policy.mjs` carries `CRITICAL_HUMAN_PROOF_POLICY_V3` and the full
+`trustAnchors` SET logic, in which `trustAnchor` (singular) becomes a set. Its
+`verifyAgainstTrustAnchors` has exactly two postures: an empty/absent set means "any
+well-formed Ed25519 key may sign", and a non-empty set enforces membership by BOTH
+`keyReference` and `publicKeySha256` — a v1/v2 lone anchor being wrapped as a set of one.
+So depositing a second, per-machine key is a change to `project/critical-human-proof.json`
+alone (v1 → v3, `trustAnchor` → `trustAnchors: [...]`), with the plugin that is already
+installed.
+
+**Two caveats measured directly, which the "just migrate the file" summary does not
+cover.** Both were found by counting occurrences in the actual files rather than by
+grep output (`rg` abbreviates this identifier in its own rendering, which produces false
+negatives — measure with `node`, not `rg`, when checking this specific token):
+
+| file | `trustAnchors` | `trustAnchor` | knows v3 |
+|---|---|---|---|
+| installed 0.5.4 `lib/critical-human-proof-policy.mjs` | 17 | 15 | yes |
+| installed 0.5.4 `scripts/pipeline-state.mjs` | **0** | 3 | no |
+| repo-local `lib/critical-human-proof-policy.mjs` | **0** | 11 | no |
+| repo-local `scripts/pipeline-state.mjs` | **0** | 3 | no |
+
+1. `pipeline-state.mjs` — in the installed build too — gates only on
+   `policy.trustAnchor !== null` (read literally at 0.5.4 `pipeline-state.mjs:2754-2758`,
+   `CRITICAL-PROOF-TRUST-ANCHOR-MISMATCH`). Under a v3 document that field is `null`, so
+   this branch is skipped entirely and the approval-time check silently stops applying.
+   Not a security hole — the guard's own verify path still enforces the set, which is what
+   that code's own comment says it is an early convenience duplicate of — but the failure
+   moves from approval time to push time, which is precisely the late-discovery problem
+   the comment says it exists to prevent. Worth its own backlog item.
+2. The **repo-local** lib does not know v3 at all, so a migrated file must be driven
+   through the installed copies, the same plugin-cache-over-repo-local rule this file
+   already records for `po-human-approval.mjs` in the 2026-08-12 push ceremony.
+
+Also corrected from earlier in this same checkpoint: `po-human-approval.mjs` does **not**
+validate `--kind` against a closed set in either copy — `args.kind` flows straight into the
+action (0.5.4 `po-human-approval.mjs:310`). The `push|deploy|publication` triple is stale
+text in the USAGE string only, so `--kind feature-package-reconcile` is usable. The earlier
+claim in this checkpoint that this was a second version-skew wall was wrong, and was based
+on reading the usage string rather than the validation.
+
+Nothing was executed against any of this: the PO's "wait, no signatures" decision stands,
+and editing `project/critical-human-proof.json` is itself gate-strength-protected (the
+shell lane refuses even to name the file; the Edit/Write lane offers the audited
+human-guard-override ceremony). Recorded as the ready, verified next move.
+
+**Also established while preparing the ceremony, so the next session does not rediscover it:**
+
+- The GMW window request is **commit-bound** — its intent carries `candidate.{commit,tree}`.
+  Preparing it before further commits land wastes the PO's signature. Prepare it against
+  the final candidate.
+- `verifyCriticalHumanProof` requires the **2-key** trust-policy shape
+  (`keyReference` + `publicKeySha256` exactly); `authorize-critical` requires the 3-key
+  shape with `humanName`. Both files already exist in `~/agent-pipeline-po-nova/`
+  (`trust-policy-verify-shape.json` and `trust-policy.json`) — no new artifact needed once
+  the key question is resolved.
+- `authorize-critical --kind` accepts only `push|deploy|publication` in **both** the
+  repo-local and the installed 0.5.4 `po-human-approval.mjs`. There is no
+  `--kind feature-package-reconcile`, so the reconcile proof has to go through the generic
+  `sign-intent` route. This is a second instance of the ADR-0061 version-skew class already
+  tracked in `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`.
+- The anonymous-public push identity checks in `guard-push.mjs` are **inert** here:
+  `readPublicPushIdentity` reads `publicPushIdentity` from the project calibration, and
+  neither `.claude/pipeline.json` nor `project/pipeline.json` defines it, so
+  `checkAnonymousPublicPush` returns no findings. Not a blocker; recorded so it is not
+  re-investigated.
+
+**Once the key question is resolved, the ceremony is two PO sittings, not three.** At the
+final candidate, prepare BOTH the GMW request and the reconcile request; then consume in
+this order while HEAD is unchanged: window `install` → reconcile → commit → OT09 fix under
+the live window → commit → window `close` → full Verify → `security-scan` → and only then
+the third signature, the push approval bound to that exact commit, followed by
+`git push origin sprint_phoenix:refs/heads/sprint_phoenix` (full refspec, per the Layer 5
+addition above).
+
+**Criterion count, re-measured this session, unchanged from 2026-08-12 by design:**
+130 implemented / 23 partial / 3 not-started / 1 constraint = 157
+(`scratch/acc-map-20260816.md`, regenerated from
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`). Nothing this session
+was ever going to move that number — it was Verify-gate repair, not criterion work.
+Ranked blocking set unchanged: `P-AC-11` (4 live bullets), `P-AC-06` (3), `H-AC-12` (2),
+then ten criteria blocking one bullet each. `P-AC-06` and `H-AC-12` already carry PO
+dispositions, so `P-AC-11` is the top unworked lever and the next piece of substantive
+work.
+
+**One honest gap carried forward, reported by the dispatch rather than hidden:**
+`BACKLOG_STATUSES` admits only `open`/`in_progress`/`closed`, while `backlog/README.md`
+and the item template still document `rejected`/`deferred`. A PO-rejected item can
+therefore only be recorded as `closed`, which understates the outcome. Not fixed here
+(would mean editing the validator); worth its own item if the PO wants a fourth status.
+
+---
+
+## CHECKPOINT — 2026-08-11, bootstrap repair + Verify from 6 red to 1 known-parked
 
 **Trigger.** PO asked to continue Phoenix work, then went AFK with standing
 authorization to work autonomously, deferring anything that needs a PO act.
