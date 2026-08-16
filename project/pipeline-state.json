@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-12T05:31:27.968Z",
+  "updatedAt": "2026-08-16T20:41:30.753Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -156,22 +156,22 @@
   "pushApproval": {
     "lastApproved": {
       "approvedBy": "Andre",
-      "approvedAt": "2026-08-12T05:31:27.968Z",
-      "forCommit": "1c7a538980595d243cfa7cdbb1bd9126d4ebc0f5",
+      "approvedAt": "2026-08-16T20:41:30.753Z",
+      "forCommit": "2eb4466c9a0b6a28425c9a414d747e635309858a",
       "criticalProof": {
-        "proofSha256": "154f9fd847921efa4bd5a9cb4f46d0530365f29d5060beb18d273105c02a015c",
-        "intentSha256": "b8e46ab1ef70df00cb563a6b8b1ed56ef7ed5b1c885d5b9d1d241a44eabbec11",
+        "proofSha256": "3245a556572ed76dfd568d16c5adb08383fbd1bf54f40fc46e049d832a99e061",
+        "intentSha256": "ca59405db148d501fd71c8c1d38a437c88b2b1f0c77707eecd92dfbde4fdc41d",
         "action": {
           "kind": "push",
-          "subjectSha256": "44ccc0b80bdd8c2141561402e3c84c4739426761fd5d0a86038aafa2fef778fa",
-          "expiresAt": "2026-08-12T07:15:49.303Z"
+          "subjectSha256": "c0e1175b54bf32f3903b1179e18c59404c1c5ccda130f488a946652cd615e5e8",
+          "expiresAt": "2026-08-16T21:06:04.000Z"
         },
         "proof": {
           "schema": "pipeline.po-approval-proof.v1",
-          "intentSha256": "b8e46ab1ef70df00cb563a6b8b1ed56ef7ed5b1c885d5b9d1d241a44eabbec11",
+          "intentSha256": "ca59405db148d501fd71c8c1d38a437c88b2b1f0c77707eecd92dfbde4fdc41d",
           "keyReference": "local-po-key",
-          "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEA4ZKjO+WKvDidbUzVVR3PS3MTa8LXeWsku8U/ohsjkaY=\n-----END PUBLIC KEY-----\n",
-          "signatureBase64": "eJ6UMCigmKWjFHRyEB23Av7g2lwqZvjMU6pKchhg2ZT29W9+uzwsTSxSsUmcL08ChF/DXOgCM9paOIWY/b/oBQ=="
+          "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAb2hgIMasQe7m80aB5C9zD7YTW6mEa0wjUGHRZ9yGv5c=\n-----END PUBLIC KEY-----\n",
+          "signatureBase64": "hdJppq/yvKjCZz+EYDEulG7o6tp8PpNCzcELZhWJzGKcltFy/SB7vu3joQqUI21bBVb4o6TN1XR7CSPxzTLCAQ=="
         }
       },
       "remote": "origin",
@@ -217,6 +217,11 @@
       "proofSha256": "154f9fd847921efa4bd5a9cb4f46d0530365f29d5060beb18d273105c02a015c",
       "kind": "push",
       "consumedAt": "2026-08-12T05:31:27.968Z"
+    },
+    {
+      "proofSha256": "3245a556572ed76dfd568d16c5adb08383fbd1bf54f40fc46e049d832a99e061",
+      "kind": "push",
+      "consumedAt": "2026-08-16T20:41:30.753Z"
     }
   ]
 }
