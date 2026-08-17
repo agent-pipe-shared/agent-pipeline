@@ -84,6 +84,7 @@
 | pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs | open | workflow-improvement | pipeline | 2026-08-16 | — |
+| pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | open | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
@@ -242,6 +243,6 @@
 
 ## Counts
 
-- open: 110
+- open: 111
 - in_progress: 22
 - closed: 102

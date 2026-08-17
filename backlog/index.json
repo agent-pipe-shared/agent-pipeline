@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ddafd1b69b80d2439bef11f5a7e07800d5385bdac044e17cc48223fd8d7a4c5c"
+    "transitionHead": "bc7455c03f8768d52e1744eb7d5afa0e7be11dabb942c8db4cdacd45877e43ef"
   },
   "counts": {
-    "open": 110,
+    "open": 111,
     "in_progress": 22,
     "closed": 102
   },
@@ -750,6 +750,14 @@
       "owner": "pipeline",
       "created": "2026-08-16",
       "source": "PO, 2026-08-16, observed live in agent-pipeline-share_phoenix: after po-human-approval.mjs sign-intent succeeded (PO-HUMAN-SIGN-INTENT-READY) and the GMW window was active, the session still asked the PO to manually run two `cp` commands to move scratch/reconcile-request-*.json and scratch/reconcile-proof-*.json into the external PO directory. PO: 'dass man nach der freigabe noch mal was von hand kopieren muss sollte auch nicht sein' (having to manually copy something again after the approval shouldn't be necessary either)."
+    },
+    {
+      "id": "pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "PO observation, 2026-08-17, live during a session dispatching several goldfish-deep and Critic subagents back-to-back for Nova A Windows bugfix work."
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time",
