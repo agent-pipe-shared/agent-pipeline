@@ -76,14 +76,12 @@ action's safety shape, not a second PO chat gate.
 A local Git init result carrying a `collect-input` action for the repository's
 commit author (`project-onboarding-v3.mjs`'s `applyProjectOnboardingV3`,
 neither `user.name` nor `user.email` resolves locally or globally) is a
-blocking question, the same as the kickoff goal/profile/language questions
-already are — never a diagnostic to notice and act on later, and never a
-default or invented value. Ask the PO once now for both the author name and
-email, then hold the answered values — do not set them yet. Apply them via
-`git config user.name "<name>"` and `git config user.email "<email>"` in THIS
-repository's local config only, immediately before authoring this
-repository's first commit, never sooner — never `--global`, and never a value
-the PO did not type.
+blocking question, same tier as the kickoff goal/profile/language questions —
+never a diagnostic to notice and act on later, never a default or invented
+value. Ask the PO once now for both, hold the answered values, and apply them
+via `git config user.name "<name>"` / `git config user.email "<email>"` in
+THIS repository's local config only, immediately before the first commit,
+never sooner — never `--global`, never an untyped value.
 
 After a required restart, an already seeded repository shows this consent
 was exercised; resume ordinary bootstrap without re-asking. Stop for new
@@ -112,17 +110,14 @@ recommendation.
 3. **Boundary:** one simple shell command per tool call; never compose
    `&&`, `;`, redirects or pipelines except bounded, expansions-free
    `rg … | rg …` or `rg … | head -n 1..500` diagnostics, and never a heredoc
-   or a multi-line command. The full closed grammar and its costliest
-   workarounds are in `templates/prompts/agent-obligations.md` §1 — read it
-   before hitting the same refusal live. This applies whether a
-   Goldfish/Critic dispatch reads that file directly or an Elephant session
-   acts undispatched: every agent-authored commit message carries the
-   trailers defined in `templates/prompts/agent-obligations.md` §6
-   (`AI-Assisted: true`, plus `Dispatch: <TASK_ID> (goldfish)` for a
-   dispatched Goldfish) and nothing else that identifies a provider, model,
-   session, run, trace, or account (GIT-03, `guardrails/git.md` — same rule;
-   no override exists); this binds every session, not only a dispatched one.
-   Treat
+   or a multi-line command. The full closed grammar, its costliest
+   workarounds, and the commit-trailer rule (`AI-Assisted: true`, plus
+   `Dispatch: <TASK_ID> (goldfish)` for a dispatched Goldfish, nothing else
+   identifying provider/model/session/run/trace/account — GIT-03,
+   `guardrails/git.md`, no override) are in
+   `templates/prompts/agent-obligations.md` §1/§6 — read it before hitting
+   the same refusal live. This binds a Goldfish/Critic dispatch and an
+   undispatched Elephant session alike. Treat
    `executionBoundary: "host-authorized-wsl"` as mandatory: submit the exact
    returned action directly at that boundary, including every Git
    observation, keeping that routing authoritative. For Codex, never retry
