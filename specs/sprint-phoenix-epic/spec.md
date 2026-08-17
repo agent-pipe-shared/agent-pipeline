@@ -365,6 +365,10 @@ files are excepted only when their path is already declared here.
 | `plugins/pipeline-core/scripts/project-authority-migration.mjs` | expose the closed `reconcile-state` operator operation with pre-write preview | Keep the correction behind the sanctioned project-authority boundary. |
 | `plugins/pipeline-core/scripts/project-authority-migration.test.mjs` | cover the operator command and readback | Prove the human-facing write route is explicit and bounded. |
 | `specs/sprint-phoenix-epic/lifecycle.json` | reconcile only the existing draft manifest's stale PRD, Spec, acceptance, architecture, and proven append-only Result digest bindings through the PHX-0A feature-package writer | Keep the reviewed artifact set and `draft` state intact while replacing no authority bytes except the five writer-planned current digest values; admit Result only when its manifest-bound historical prefix, canonical reconciliation fence, and Continuity-State binding all read back exactly; forbid manual editing, direct hash replacement, history rewrite, or a state transition. |
+| `plugins/pipeline-core/lib/parallel-sprint-integration.mjs` | extend the accepted integration-gate policy with a pure `checkUnpublishedSiblingSprintConsumption` decision function (EPIC-AC-02) | Fail Phoenix verification when a package's bound candidate consumes an unpublished Nova/Cyborg/Nightwing commit, without the module ever invoking Git itself. |
+| `plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs` | cover the new decision function's fail-closed and permitted paths | Prove the gate refuses on any unresolved Git observation. |
+| `plugins/pipeline-core/scripts/check-epic-ac02-publication.mjs` | create the observation-gathering verify-gate script that calls `checkUnpublishedSiblingSprintConsumption` against every real `specs/*/lifecycle.json` manifest | Give the pure decision function a live caller in the blocking Verify gate, matching the `harness/scripts/verify.mjs` row above. |
+| `plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs` | cover manifest discovery, sibling-ancestry gathering, and the standalone CLI's exit codes | Prove the gate's Git-observation half is closed and fail-closed. |
 
 ### 7.2 Ruleset-source trust root
 
@@ -425,6 +429,12 @@ files are excepted only when their path is already declared here.
 | `plugins/pipeline-core/scripts/phoenix-authority-approval.mjs` | create the human-terminal prepare/approve/verify helper for a signed authority revision | Keep private keys and signing outside the repository and outside agent reach. |
 | `plugins/pipeline-core/scripts/phoenix-authority-revision.mjs` | create the proof-gated wrapper around the continuity authority revision writer | Admit the sanctioned writer only after an exact verified proof binding. |
 | `plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs` | cover ledger-bound Git override authority, target-repository binding, and replay | Keep the override path provable against the ledger rather than against mutable state. |
+| `plugins/pipeline-core/scripts/human-authority-grant.mjs` | create the missing grant-creation half (prepare/external-sign/install ceremony) for a granted human-governance decision (A-AC-04) | `governance-authority.mjs`'s CLI only ever consumed an existing grant; nothing could create one until this closed the correlate-and-cannot-replay clause's other half. |
+| `plugins/pipeline-core/scripts/human-authority-grant.test.mjs` | cover prepare, external-sign, install, and replay-refusal | Prove the create half is as fail-closed as the consume half. |
+| `plugins/pipeline-core/scripts/po-human-approval.mjs` | extend the sanctioned fork-disposition approval CLI so a PO can actually clear it (K-AC-05) | Give the approval a reachable operator route instead of a theoretical one. |
+| `plugins/pipeline-core/scripts/po-human-approval.test.mjs` | cover the extended prepare/approve/verify path | Preserve the existing sibling-epic contract while adding Phoenix's reachability. |
+| `plugins/pipeline-core/scripts/po-approval-gate.mjs` | extend the sanctioned fork-disposition gate to admit the PO-cleared approval (K-AC-05) | Same reachability closure, gate side. |
+| `plugins/pipeline-core/scripts/po-approval-gate.test.mjs` | cover the extended admission path | Preserve the existing sibling-epic contract while adding Phoenix's reachability. |
 
 ### 7.5 Agent journal and lifecycle replay
 
@@ -451,6 +461,12 @@ files are excepted only when their path is already declared here.
 | `plugins/pipeline-core/lib/governance-replay-view.test.mjs` | cover provenance, invalid-source, uncertainty, and privacy states | Prove the local replay view remains honest. |
 | `plugins/pipeline-core/scripts/governance-replay-viewer.mjs` | create explicit local replay-view build CLI | Provide a human-operable, offline read surface. |
 | `plugins/pipeline-core/scripts/governance-replay-viewer.test.mjs` | cover CLI output and source-invalid behavior | Preserve the operator boundary. |
+| `plugins/pipeline-core/lib/control-execution-lifecycle-event.mjs` | create the shared dispatch/status lifecycle-event projection body both `buildLifecycleDispatchEvent` and `buildLifecycleStatusEvent` share (L-AC-01) | Give continuity-cas/continuity-integrate-final one non-duplicated projection instead of two independent copies. |
+| `plugins/pipeline-core/lib/control-execution-lifecycle-event.test.mjs` | cover the shared projection's dispatch and status branches | Prove the shared body preserves both callers' distinct schema-valid shapes. |
+| `plugins/pipeline-core/lib/advisory-decision-event.mjs` | create `buildAdvisoryDecisionEvent`, translating an advisory receipt into a validated `agent-decision` journal event (A-AC-05) | Give the empty `agent-decision` journal its first real producer at the advisory receipt, the strongest of the three identity-collection sites. |
+| `plugins/pipeline-core/lib/advisory-decision-event.test.mjs` | cover the translation's provenance/assurance mapping and candidate-digest binding | Prove the producer matches `governance-event-store.mjs`'s append-time binding check exactly. |
+| `plugins/pipeline-core/scripts/advisory-host-bridge.mjs` | wire `buildAdvisoryDecisionEvent` into the live `coordinateAdvisory` call path whenever a receipt resolves answered (A-AC-05) | Give the producer a real caller instead of a tested-but-unreachable function. |
+| `plugins/pipeline-core/scripts/advisory-host-bridge.test.mjs` | cover the success append path and the fail-open path when capture policy is unavailable | Prove the wiring never blocks an advisory answer on journal unavailability. |
 
 ### 7.6 Organization policy and audit bundle
 
@@ -472,6 +488,7 @@ files are excepted only when their path is already declared here.
 | `docs/organization-policy-packs.md` | create precedence/activation/migration guide | Maintained user contract. |
 | `docs/audit-bundles.md` | create assurance/signing/retention guide | Prevent signature overclaim. |
 | `docs/adr/0049-policy-and-audit-bundles.md` | create policy/bundle decision | Durable architecture. |
+| `plugins/pipeline-core/lib/organization-policy-backfill-export.mjs` | create the consented-backfill export trigger, reusing the existing `queryPortableGovernanceStream → projectGovernanceEvent → enqueueGovernanceExport → deliverGovernanceExportBatch` pipeline (P-AC-09) | Let a distinct backfill-consent grant actually deliver the historical events it was consented to, without a parallel export mechanism. |
 
 ### 7.7 Evidence Viewer
 
