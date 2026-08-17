@@ -150,3 +150,55 @@ const TEST_SUITES = [
   assert.throws(() => parseRegisteredSuiteFiles(source), /PARSE-TEST-SUITES-UNRECOGNIZED-SHAPE/);
   assert.throws(() => parseRegisteredSuiteFiles(source), /someUnknownDir/);
 });
+
+test("parseRegisteredSuiteFiles: fails closed on a file: value that is not a join(...) call at all -- a bare identifier is not silently skipped", () => {
+  const source = `
+const TEST_SUITES = [
+  { name: "setup-tests", file: join(repoRoot, "setup.test.mjs") },
+  { name: "bogus", file: someHelperVariable },
+];
+`;
+  assert.throws(() => parseRegisteredSuiteFiles(source), /PARSE-TEST-SUITES-UNRECOGNIZED-SHAPE/);
+  assert.throws(() => parseRegisteredSuiteFiles(source), /file: value is not a recognized join\(\.\.\.\) call/);
+  assert.throws(() => parseRegisteredSuiteFiles(source), /someHelperVariable/);
+});
+
+test("parseRegisteredSuiteFiles: fails closed on a file: value that calls a DIFFERENT function than join(...) -- not silently skipped", () => {
+  const source = `
+const TEST_SUITES = [
+  { name: "bogus", file: resolvePath(repoRoot, "x.test.mjs") },
+];
+`;
+  assert.throws(() => parseRegisteredSuiteFiles(source), /PARSE-TEST-SUITES-UNRECOGNIZED-SHAPE/);
+  assert.throws(() => parseRegisteredSuiteFiles(source), /file: value is not a recognized join\(\.\.\.\) call/);
+});
+
+test("parseRegisteredSuiteFiles: fails closed on a join(...) call mixing a quoted segment with an unquoted/variable argument -- not silently truncated", () => {
+  const source = `
+const TEST_SUITES = [
+  { name: "bogus", file: join(pluginScriptsDir, someVariableSegment, "x.test.mjs") },
+];
+`;
+  assert.throws(() => parseRegisteredSuiteFiles(source), /PARSE-TEST-SUITES-UNRECOGNIZED-SHAPE/);
+  assert.throws(() => parseRegisteredSuiteFiles(source), /join\(\.\.\.\) argument is not a fully-quoted string/);
+  assert.throws(() => parseRegisteredSuiteFiles(source), /someVariableSegment/);
+});
+
+test("parseRegisteredSuiteFiles: fails closed on a join(...) call with an unquoted first extra segment followed by a quoted one (segments.length !== 0 trap)", () => {
+  // Regression for the exact F1.2 sub-case: the old QUOTED_SEGMENT_RE scan found 1 quoted
+  // segment (not 0), so `segments.length === 0` never tripped and the call silently
+  // reconstructed a truncated path from only the quoted segment.
+  const source = `
+const TEST_SUITES = [
+  { name: "bogus", file: join(libDir, computedSegment, "trailing.test.mjs") },
+];
+`;
+  let thrown;
+  try {
+    parseRegisteredSuiteFiles(source);
+  } catch (error) {
+    thrown = error;
+  }
+  assert.ok(thrown, "must throw rather than returning a truncated path");
+  assert.match(thrown.message, /computedSegment/);
+});

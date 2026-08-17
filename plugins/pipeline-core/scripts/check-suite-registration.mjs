@@ -19,16 +19,20 @@
  * be run at close, in CI, or by a Critic against a review set without touching any gate's
  * strength.
  *
- * PARSING STRATEGY: a plain regex over `join(<base>, "<segment>", ...)` calls inside the
- * `TEST_SUITES` array's source text -- no AST dependency, matching this codebase's existing
- * comfort with pure string/regex logic over its own source (see `git-cmd.mjs`'s header and
- * `guard-maintenance-window-kernel-closure.test.mjs`'s scanner, which this mirrors). `<base>`
- * must be one of the five directory constants `verify.mjs` itself defines (`repoRoot`,
- * `scriptDir`, `hooksDir`, `libDir`, `pluginScriptsDir`); every other shape -- including a
- * base identifier this parser does not recognize -- FAILS CLOSED with a named diagnostic
- * rather than being silently skipped or guessed at by a general-purpose JS-expression
- * evaluator. A parser that silently under-reads its own registration list would defeat the
- * entire point of this check.
+ * PARSING STRATEGY: a depth-aware character scan (comments and string contents skipped)
+ * locates EVERY `file:` key inside the `TEST_SUITES` array's source text and captures its
+ * value verbatim, whatever shape it is written in -- no AST dependency, matching this
+ * codebase's existing comfort with pure string/character-scan logic over its own source
+ * (see `git-cmd.mjs`'s header and `guard-maintenance-window-kernel-closure.test.mjs`'s
+ * scanner, which this mirrors). Only a value that is, in its entirety, a
+ * `join(<base>, "<segment>", ...)` call is resolved to a path; `<base>` must be one of the
+ * five directory constants `verify.mjs` itself defines (`repoRoot`, `scriptDir`, `hooksDir`,
+ * `libDir`, `pluginScriptsDir`), and every remaining argument must be a fully-quoted string.
+ * Every other shape -- a `file:` value that is not a `join(...)` call at all, an unrecognized
+ * base identifier, or a `join(...)` call mixing a quoted segment with an unquoted/variable
+ * argument -- FAILS CLOSED with a named diagnostic rather than being silently skipped,
+ * truncated, or guessed at by a general-purpose JS-expression evaluator. A parser that
+ * silently under-reads its own registration list would defeat the entire point of this check.
  *
  * LIMITS -- what this script does NOT establish, stated plainly:
  *
@@ -150,42 +154,212 @@ export function parseTestSuitesBlock(sourceText) {
   return sourceText.slice(bodyStart, terminatorIndex + 2); // include the closing "]"
 }
 
-const JOIN_CALL_RE = /file:\s*join\(([^)]*)\)/g;
-const BASE_IDENTIFIER_RE = /^\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*,?/;
-const QUOTED_SEGMENT_RE = /"([^"]*)"/g;
+/**
+ * Scan `text` character-by-character (skipping `//` line comments and the contents of string
+ * literals) tracking bracket/paren/brace nesting depth, and return every `file:` key found
+ * together with the raw source text of its value -- i.e. everything between the key and the
+ * next comma or closing delimiter AT THE SAME DEPTH the key itself was found at. This
+ * deliberately does NOT assume the value is a `join(...)` call: whatever is written there (a
+ * bare identifier, a differently-named function call, a template literal, anything else) is
+ * captured verbatim, so the caller can classify -- and, if unrecognized, fail closed on --
+ * every shape, not only the one shape this parser already knows how to resolve. A `file:`
+ * key is matched only as a whole identifier (`profile:`/`filename:` do not match).
+ */
+export function extractFileKeyValues(text) {
+  const values = [];
+  const isIdentChar = (c) => c !== undefined && /[A-Za-z0-9_$]/.test(c);
+  const n = text.length;
+  let i = 0;
+  let depth = 0;
+  while (i < n) {
+    const ch = text[i];
+    if (ch === "/" && text[i + 1] === "/") {
+      while (i < n && text[i] !== "\n") i++;
+      continue;
+    }
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const quote = ch;
+      i++;
+      while (i < n && text[i] !== quote) {
+        if (text[i] === "\\") i++;
+        i++;
+      }
+      i++; // consume the closing quote (or run off the end of a malformed source)
+      continue;
+    }
+    if (ch === "{" || ch === "(" || ch === "[") {
+      depth++;
+      i++;
+      continue;
+    }
+    if (ch === "}" || ch === ")" || ch === "]") {
+      depth--;
+      i++;
+      continue;
+    }
+    if (text.startsWith("file", i) && !isIdentChar(text[i - 1]) && !isIdentChar(text[i + 4])) {
+      let j = i + 4;
+      while (j < n && /\s/.test(text[j])) j++;
+      if (text[j] === ":") {
+        j++;
+        while (j < n && /\s/.test(text[j])) j++;
+        const valueStart = j;
+        const valueDepth = depth;
+        while (j < n) {
+          const vc = text[j];
+          if (vc === "/" && text[j + 1] === "/") {
+            while (j < n && text[j] !== "\n") j++;
+            continue;
+          }
+          if (vc === '"' || vc === "'" || vc === "`") {
+            const quote = vc;
+            j++;
+            while (j < n && text[j] !== quote) {
+              if (text[j] === "\\") j++;
+              j++;
+            }
+            j++;
+            continue;
+          }
+          if (vc === "{" || vc === "(" || vc === "[") {
+            depth++;
+            j++;
+            continue;
+          }
+          if (vc === "}" || vc === ")" || vc === "]") {
+            if (depth === valueDepth) break; // closing delimiter of the enclosing structure
+            depth--;
+            j++;
+            continue;
+          }
+          if (vc === "," && depth === valueDepth) break; // top-level separator
+          j++;
+        }
+        values.push({ index: i, value: text.slice(valueStart, j).trim() });
+        i = j;
+        continue;
+      }
+    }
+    i++;
+  }
+  return values;
+}
 
 /**
- * Parse every `file: join(<base>, "<segment>", ...)` call inside the `TEST_SUITES` array's
- * source text into a repo-relative path. FAILS CLOSED (throws, naming every problem found in
- * one message) on any join-call shape this parser does not recognize -- see the module header.
+ * Split a `join(...)` call's argument-list text on top-level commas (respecting quotes and
+ * any nested brackets), trimming each piece. A single trailing empty piece caused by a
+ * trailing comma (`"a, b,"`) is dropped, matching normal JS trailing-comma semantics; an
+ * empty piece anywhere else is kept, so the caller rejects it as neither a base identifier
+ * nor a quoted string rather than silently ignoring it.
+ */
+export function splitTopLevelArgs(argsText) {
+  const parts = [];
+  let current = "";
+  let depth = 0;
+  const n = argsText.length;
+  let i = 0;
+  while (i < n) {
+    const ch = argsText[i];
+    if (ch === '"' || ch === "'" || ch === "`") {
+      const quote = ch;
+      current += ch;
+      i++;
+      while (i < n && argsText[i] !== quote) {
+        if (argsText[i] === "\\" && i + 1 < n) {
+          current += argsText[i];
+          i++;
+        }
+        current += argsText[i];
+        i++;
+      }
+      if (i < n) {
+        current += argsText[i]; // closing quote
+        i++;
+      }
+      continue;
+    }
+    if (ch === "(" || ch === "[" || ch === "{") {
+      depth++;
+      current += ch;
+      i++;
+      continue;
+    }
+    if (ch === ")" || ch === "]" || ch === "}") {
+      depth--;
+      current += ch;
+      i++;
+      continue;
+    }
+    if (ch === "," && depth === 0) {
+      parts.push(current.trim());
+      current = "";
+      i++;
+      continue;
+    }
+    current += ch;
+    i++;
+  }
+  parts.push(current.trim());
+  if (parts.length > 0 && parts[parts.length - 1] === "") parts.pop();
+  return parts;
+}
+
+const BASE_IDENTIFIER_ONLY_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const QUOTED_ARG_RE = /^"([^"]*)"$/;
+
+/**
+ * Parse every `file:` key's value inside the `TEST_SUITES` array's source text into a
+ * repo-relative path. FAILS CLOSED (throws, naming every problem found in one message) on:
+ *   - a `file:` value that is not, in its entirety, a `join(...)` call (any other shape -- a
+ *     bare identifier, a differently-named function call, a template literal -- is named and
+ *     rejected rather than silently producing no entry for that suite);
+ *   - a `join(...)` call whose first argument is not a recognized base-directory identifier;
+ *   - a `join(...)` call with no path segments at all;
+ *   - a `join(...)` call mixing a quoted string segment with an unquoted/variable argument --
+ *     every argument after the base MUST be a fully-quoted string, or the call is rejected
+ *     rather than silently reconstructed from fewer segments than arguments.
+ * See the module header for why: a parser that silently under-reads its own registration
+ * list would defeat the entire point of this check.
  */
 export function parseRegisteredSuiteFiles(sourceText) {
   const block = parseTestSuitesBlock(sourceText);
   const files = [];
   const problems = [];
-  let match;
-  JOIN_CALL_RE.lastIndex = 0;
-  while ((match = JOIN_CALL_RE.exec(block)) !== null) {
-    const argsText = match[1];
-    const baseMatch = BASE_IDENTIFIER_RE.exec(argsText);
-    if (!baseMatch) {
+  for (const { value } of extractFileKeyValues(block)) {
+    const joinMatch = /^join\(([\s\S]*)\)$/.exec(value);
+    if (!joinMatch) {
+      problems.push(`file: value is not a recognized join(...) call: \`${value}\``);
+      continue;
+    }
+    const argsText = joinMatch[1];
+    const args = splitTopLevelArgs(argsText);
+    const base = args[0] ?? "";
+    if (!BASE_IDENTIFIER_ONLY_RE.test(base)) {
       problems.push(`no base identifier extractable from \`join(${argsText})\``);
       continue;
     }
-    const base = baseMatch[1];
     const baseSegments = DIRECTORY_CONSTANTS[base];
     if (baseSegments === undefined) {
       problems.push(`unknown base identifier \`${base}\` in \`join(${argsText})\` -- not one of ${Object.keys(DIRECTORY_CONSTANTS).join(", ")}`);
       continue;
     }
-    const segments = [];
-    QUOTED_SEGMENT_RE.lastIndex = 0;
-    let segMatch;
-    while ((segMatch = QUOTED_SEGMENT_RE.exec(argsText)) !== null) segments.push(segMatch[1]);
-    if (segments.length === 0) {
+    const remaining = args.slice(1);
+    if (remaining.length === 0) {
       problems.push(`no quoted path segment in \`join(${argsText})\``);
       continue;
     }
+    const segments = [];
+    let sawNonString = false;
+    for (const arg of remaining) {
+      const quotedMatch = QUOTED_ARG_RE.exec(arg);
+      if (!quotedMatch) {
+        problems.push(`join(...) argument is not a fully-quoted string: \`${arg}\` in \`join(${argsText})\``);
+        sawNonString = true;
+        continue;
+      }
+      segments.push(quotedMatch[1]);
+    }
+    if (sawNonString) continue;
     files.push(normalizeRepoRelativePath([...baseSegments, ...segments].join("/")));
   }
   if (problems.length > 0) {
