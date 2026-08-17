@@ -78,7 +78,12 @@ briefed. Whoever picks this up should:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Alfred.
+- **Rationale:** matches Alfred's confirmed scope — "control integrity" —
+  directly; this item's own text is explicit that arming the capability
+  still requires a human's own key or the chat ceremony (ADR-0061's
+  "protects against the agent, not the human" policy), so it is real but
+  not urgent.
+- **Assignment (if accepted):** next available Alfred slot — needs the
+  target-vs-tool decision (question 1) before implementation.
+- **Date:** 2026-08-17

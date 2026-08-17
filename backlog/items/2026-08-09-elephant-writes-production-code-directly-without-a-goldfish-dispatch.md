@@ -67,5 +67,8 @@ first real implementation step. Two angles worth investigating together:
 - **Assignment (if accepted):** Unassigned, folds into the same design pass
   as the mp22 item. Direction 1 (documentation/guidance wording) remains a
   candidate cheap fix but is not yet approved — flag separately if picked
-  up.
+  up. Sprint: Alfred — matches its confirmed scope ("mechanical governance,
+  measurable rigor, and control integrity",
+  `docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17 amendment)
+  precisely.
 - **Date:** 2026-08-11

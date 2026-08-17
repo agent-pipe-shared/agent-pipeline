@@ -59,7 +59,11 @@ actually landed, or what to call instead of a wrong guess.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Rationale:** matches Nightwing's confirmed scope — "product experience
+  ... and low-friction adoption" (`docs/adr/0043-post-go-live-sprint-model.md`,
+  2026-08-17 amendment) — this is exactly a CLI-ergonomics/feedback gap
+  (path confirmation on write, closest-match subcommand suggestion), not a
+  correctness defect and not blocking current work.
+- **Assignment (if accepted):** next available Nightwing slot.
+- **Date:** 2026-08-17

@@ -125,3 +125,17 @@ call, not something to resolve by just porting the push mechanism over.
   Sprint Nova session, 2026-08-06. Step 3 unassigned — needs the PO design
   call above before dispatch.
 - **Date:** 2026-08-06
+
+### Sprint assignment, 2026-08-17 — remaining step 3 deferred to Alfred
+
+- **Decision:** the remaining step 3 (Ed25519 proof binding for PRD/
+  `approve-plan`) is deferred to Sprint Alfred.
+- **Rationale:** matches Alfred's confirmed scope — "agent-first
+  architecture, mechanical governance, measurable rigor, and control
+  integrity" (`docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17
+  amendment) — precisely; it is architecture/guardrail-class work with an
+  open PO design question (whether PRD approval needs the same Ed25519
+  treatment as push/deploy), not urgent or blocking current work.
+- **Assignment (if accepted):** next available Alfred slot, PO design call
+  first.
+- **Date:** 2026-08-17

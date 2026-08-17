@@ -74,3 +74,13 @@ Not yet worked out. Two directions worth exploring, not mutually exclusive:
   specific key going forward (a per-key trust record, not a single global
   anchor field).
 - **Date:** 2026-08-11
+
+### Sprint assignment, 2026-08-17
+
+- **Decision:** deferred to Sprint Alfred.
+- **Rationale:** matches Alfred's confirmed scope — "control integrity" —
+  directly; real design + implementation work, not urgent (the current
+  no-anchor boundary is a deliberate, already-accepted tradeoff, not an
+  active gap).
+- **Assignment (if accepted):** next available Alfred slot.
+- **Date:** 2026-08-17

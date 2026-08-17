@@ -76,3 +76,14 @@ dispatch. Two things would close it:
   gate) — both filed for direct fix, unlike this release-process item.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted, deferred to Sprint Alfred.
+- **Rationale:** matches Alfred's confirmed scope — "mechanical governance,
+  measurable rigor, and control integrity" (`docs/adr/0043-post-go-live-
+  sprint-model.md`, 2026-08-17 amendment). Both proposed directions
+  (a disclosure convention for release-pending agent-definition duties, and
+  using the existing local-development refresh path to actually exercise a
+  just-landed change same-session) are release-process/governance fixes, not
+  urgent — not blocking current Nova/Phoenix work.
+- **Assignment (if accepted):** next available Alfred slot.
+- **Date:** 2026-08-17

@@ -121,5 +121,8 @@ session."
   open only for its genuinely unimplemented remainder.
 - **Assignment (if accepted):** Directions 2/3 unassigned, no urgency signal
   beyond this item's own text — pick up in a dedicated design pass, not
-  this AFK block.
+  this AFK block. Sprint: Alfred — matches its confirmed scope ("mechanical
+  governance, measurable rigor, and control integrity",
+  `docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17 amendment)
+  precisely.
 - **Date:** 2026-08-17
