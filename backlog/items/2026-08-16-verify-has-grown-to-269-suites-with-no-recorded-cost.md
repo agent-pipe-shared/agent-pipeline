@@ -84,3 +84,23 @@ candidate (c) (narrow further suites, ordered by the `durationMs` part 1
 above now records) is not started. Part 3 (selective-vs-full tiering) stays
 explicitly out of scope of ADR-0065 and still needs its own PO-visible
 decision, per this item's own original Triage above. Part 4 not assessed.
+
+### Update, 2026-08-17 (continued) — candidate (b) landed a real bug, fixed and Critic-passed; a second blocked field found at the same line
+
+Candidate (b) landed (`1f414443`+`5886ef5a`), but its own mandatory Critic
+review found a real, independently-confirmed defect: the `candidate-drift`
+check stayed unconditional after Tier-B suites existed, so cross-candidate
+reuse — Decision 8's own PO-reserved question — was silently activated with
+no `--no-reuse` safety valve. Fixed (`423f38e6`+`09a9035c`) by gating
+Tier-B reuse behind a new `allowCrossCandidateReuse` parameter defaulting to
+`false` everywhere, with zero edits to the TP-3-protected
+`harness/scripts/verify.mjs` — its unmodified call gets the safe default
+automatically. Critic-passed round 2 (all findings RESOLVED). **A second,
+related gap surfaced during that same review (N-1, minor, not yet fixed):**
+`harness/scripts/verify.mjs:528` — the exact same line `NVA-VERIFYDUR-1`
+(above) is blocked on for `durationMs` — also drops each step's `reused`
+flag from the public evidence artifact, so a sealed `verify-latest.json`
+cannot be audited for whether any receipt was reused. Same TP-3/no-active-GMW
+blocker as `NVA-VERIFYDUR-1`; when the marketplace refresh eventually
+unblocks that file, propagate `reused` in the same edit as `durationMs`,
+not a separate PO-gated round.
