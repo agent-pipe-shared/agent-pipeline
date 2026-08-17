@@ -61,9 +61,14 @@ Class P: **11**.
   landed commit). No conclusion changed, but: future parallel independent-verification forks should
   probably go in separate messages, or the prompt should explicitly forbid attempting the sibling's
   task.
-- Nova branch-divergence topic (GMW-ANCHORS-INVALID / `scratch/gmw-anchors-fixture-fix.patch`) is
-  unchanged from the entry below — still `TP-2`/`author-repair-required`-blocked, still
-  Phoenix-branch-specific, still waiting on a human with author-repair rights.
+- **GMW-ANCHORS-INVALID resolved** (commit `8271a94e`, applied by the PO directly in their own
+  terminal, outside this session, since the fix touches `TP-2`/`author-repair-required`-protected
+  Pipeline source this session cannot edit under any route). Both stale test fixtures
+  (`guard-testpath.test.mjs:210`, `guard-gate-strength.test.mjs:347`) migrated from the retired
+  `trustPolicy` shorthand to the current `anchors: [x]` array, mirroring commit `11783228`'s own
+  fix pattern. Independently re-verified by syncing `.git/phx-verify` to `8271a94e` and re-running
+  both suites: `guard-testpath.test.mjs` 13/13 (including TP09), `guard-gate-strength.test.mjs`
+  30/30 (including GST20). Phoenix-branch-specific as intended, no merge-risk introduced.
 - **Next:** continue Class B (9 remain: A-AC-01, A-AC-03, R-AC-08, R-AC-09, V-AC-02, EPIC-AC-02,
   L-AC-01's remaining triggers; A-AC-05 stays explicitly PO-deferred per the session's earlier
   decision). No dispatches currently in flight.
