@@ -36,7 +36,7 @@ import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
-import { authorizeCriticalPushCommand, parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
+import { authorizeCriticalPushCommand, outside, parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
@@ -1816,5 +1816,40 @@ test("NVA-BL-74: the language selects only the frame -- the `de` and `en` prompt
   assert.match(rendered.en, ENGLISH_FRAME);
   for (const prompt of Object.values(rendered)) {
     assert.match(prompt, /"approve"/u, "every language must instruct the same English token");
+  }
+});
+
+/**
+ * NVA-WINPATH-1 (backlog/items/2026-08-17-po-human-approval-outside-check-uses-a-posix-only-
+ * separator-on-windows.md): outside()'s previous POSIX-only `rel.startsWith("../")` check
+ * relied on the default (host-platform) node:path export, whose relative() returns
+ * backslash-separated paths on win32 -- so a genuinely external, same-drive-letter path was
+ * silently misclassified as "inside" there. `platform` is injected exactly as the sibling
+ * guard-human-override.mjs `externalJson()` fix's own test does, so the win32 answer is
+ * provable from either host.
+ */
+test("NVA-WINPATH-1: outside() classifies a same-drive external win32 path as outside, not as inside", () => {
+  // A genuinely external, same-drive-letter path: this is the case the POSIX-only check
+  // (`rel.startsWith("../")` against a backslash-separated relative()) silently misclassified
+  // as "inside" -- before the fix this assertion fails (`false` instead of `true`).
+  assert.equal(outside("C:\\Repo", "C:\\OtherDir", "win32"), true);
+  // A genuine subdirectory of the root must still classify as NOT outside.
+  assert.equal(outside("C:\\Repo", "C:\\Repo\\po-directory", "win32"), false);
+  // A case-folded drive/root spelling of the very same directory is not outside either --
+  // win32 path resolution folds case, exactly like guard-human-override.mjs's own fix.
+  assert.equal(outside("C:\\Repo", "c:\\repo", "win32"), false);
+  // An absolute cross-drive path is outside.
+  assert.equal(outside("C:\\Repo", "D:\\po\\directory", "win32"), true);
+});
+
+test("NVA-WINPATH-1: outside() behavior on POSIX hosts is unchanged by the platform-selection fix", () => {
+  const dirs = fixtureDirs();
+  try {
+    assert.equal(outside(dirs.repoRoot, dirs.directory, "linux"), true);
+    assert.equal(outside(dirs.repoRoot, join(dirs.repoRoot, "sub"), "linux"), false);
+    assert.equal(outside(dirs.repoRoot, dirs.repoRoot, "linux"), false);
+    assert.equal(outside(dirs.repoRoot, "/some/other/absolute/dir", "linux"), true);
+  } finally {
+    cleanup(dirs);
   }
 });

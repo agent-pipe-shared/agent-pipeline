@@ -19,7 +19,7 @@
 import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readSync, realpathSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, posix as posixPath, resolve, win32 as win32Path } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
@@ -210,9 +210,18 @@ const own = (value, keys) => value !== null && typeof value === "object" && !Arr
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
 
-function outside(repoRoot, path) {
-  const root = resolve(repoRoot); const target = resolve(path); const rel = relative(root, target);
-  return rel === "" ? false : rel === ".." || rel.startsWith("../") || isAbsolute(rel);
+// NVA-WINPATH-1 (backlog/items/2026-08-17-po-human-approval-outside-check-uses-a-posix-only-
+// separator-on-windows.md): mirrors guard-human-override.mjs's own externalJson() fix for the
+// exact same defect class. node:path's default (host-platform) export makes relative() return
+// backslash-separated paths on win32, so a POSIX-only `rel.startsWith("../")` check never
+// matches a genuinely external same-drive path there, silently misclassifying it as "inside".
+// `platform` is injected (default process.platform) so the win32 answer is provable from
+// either host, exactly like the sibling fix's own test seam.
+export function outside(repoRoot, path, platform = process.platform) {
+  const api = platform === "win32" ? win32Path : posixPath;
+  const root = api.resolve(repoRoot); const target = api.resolve(path);
+  const rel = api.relative(root, target).split("\\").join("/");
+  return rel === "" ? false : rel === ".." || rel.startsWith("../") || api.isAbsolute(rel);
 }
 function fail(message) { throw new Error(message); }
 function json(path) { return JSON.parse(readFileSync(path, "utf8")); }
