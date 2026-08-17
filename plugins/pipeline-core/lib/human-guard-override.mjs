@@ -690,10 +690,22 @@ function repositoryObservation(root, spawn = spawnSync) {
   };
 }
 
+// NVA-HGOFIX-1 (sibling fix ba562481 for po-human-approval.mjs's outside()): rewriting
+// backslashes to forward slashes is a WIN32-ONLY concern -- there, node:path returns
+// backslash-separated output. On POSIX a backslash is an ORDINARY filename character,
+// never a path separator, so applying the rewrite unconditionally turned a legal
+// single-component name like `..\keys` into `../keys` and made an in-root path read as an
+// escape from root -- in both directions that matter: safePath() then REFUSED a legitimate
+// in-root path (fail-closed), and crossBoundaryTarget(), whose escape test is the only gate
+// into the cross-repository-target class, ACCEPTED the same in-root path as an out-of-root
+// target (fail-open), skipping the in-root symlink-safety walk and the relative-path
+// hardBoundaryPath() refusal that class deliberately never runs.
+const separatorNormalized = (value) => (process.platform === "win32" ? value.split("\\").join("/") : value);
+
 function safePath(root, candidate) {
   if (typeof candidate !== "string" || candidate.trim() === "" || candidate.includes("\0")) return null;
   const absolute = resolve(root, candidate);
-  const rel = relative(root, absolute).split("\\").join("/");
+  const rel = separatorNormalized(relative(root, absolute));
   if (rel === "" || rel === "." || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return null;
   let cursor = root;
   const components = rel.split("/");
@@ -774,10 +786,10 @@ function pipelineSourcePath(path) {
 function crossBoundaryTarget(root, candidate) {
   if (typeof candidate !== "string" || candidate.trim() === "" || candidate.includes("\0")) return null;
   const absolute = resolve(root, candidate);
-  const rel = relative(root, absolute).split("\\").join("/");
+  const rel = separatorNormalized(relative(root, absolute));
   const escapes = rel === ".." || rel.startsWith("../") || isAbsolute(rel);
   if (!escapes) return null;
-  if (hardBoundaryPath(absolute.split("\\").join("/"))) return null;
+  if (hardBoundaryPath(separatorNormalized(absolute))) return null;
   return absolute;
 }
 

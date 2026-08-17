@@ -2098,6 +2098,63 @@ test("NOVA-HGOELIG-4: an in-root symlink or hardlink attack is never reclassifie
   }
 });
 
+// ---------------------------------------------------------------------------------
+// NVA-HGOFIX-1 (backlog/items/2026-08-17-human-guard-override-shares-the-po-human-
+// approval-posix-normalization-bug.md; sibling fix ba562481 for po-human-approval.mjs's
+// outside()): safePath() and crossBoundaryTarget() normalized backslashes to forward
+// slashes UNCONDITIONALLY. On POSIX a backslash is an ordinary filename character, never
+// a path separator, so a single path component literally named `..\x` was rewritten to
+// `../x` and then read as an escape from root. The two tests below pin the two directions
+// that misread produced -- one per affected function -- and both are POSIX-only by
+// construction: on win32 a backslash IS a separator, so such a component cannot exist.
+const POSIX_BACKSLASH_SKIP = process.platform === "win32"
+  ? "a backslash is a path separator on win32; a single component containing one cannot exist there"
+  : false;
+
+// Direction 1 (safePath(), fail-CLOSED): a genuine in-root file under a directory whose
+// name merely CONTAINS a backslash was denied its own in-root class.
+test("NVA-HGOFIX-1: safePath() reads an in-root component literally named `..\\x` as in-root, not as an escape", { skip: POSIX_BACKSLASH_SKIP }, () => {
+  const root = fixture();
+  try {
+    const directory = "..\\hgofix"; // ONE component containing a backslash, not a traversal
+    mkdirSync(join(root, directory));
+    writeFileSync(join(root, directory, "note.txt"), "in-root\n");
+    const filePath = `${directory}/note.txt`;
+    const result = humanGuardOverrideInternals.eligibility(root, "Write", { file_path: filePath, content: "x" });
+    assert.equal(result.eligible, true, "a legitimate in-root path was refused");
+    assert.equal(result.commandClass, "exact-in-root-write",
+      "an in-root path whose first component merely contains a backslash was classified as leaving the repository");
+    assert.deepEqual(result.paths, [filePath], "the in-root relative path must survive classification unrewritten");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// Direction 2 (crossBoundaryTarget(), fail-OPEN -- the security-relevant one): its escape
+// test is the ONLY gate into the cross-repository-target eligible class, and that class
+// deliberately runs neither safePath()'s in-root symlink-safety walk nor eligibility()'s
+// relative-path hardBoundaryPath() refusal (hardBoundaryPath()'s `.git`/`.codex`/
+// `.agent-pipeline` arms anchor on the ENTIRE string and are inert for the absolute path
+// crossBoundaryTarget() checks). Before the fix, an in-root symlink named `..\x` pointing
+// at this repository's own `.git` was therefore rescued INTO that class: an in-repository
+// hard-boundary target authorized as if it were an out-of-root one. This extends the
+// NOVA-HGOELIG-4 pin above ("an in-root symlink attack is never reclassified") to the
+// backslash-bearing name it did not exercise.
+test("NVA-HGOFIX-1: crossBoundaryTarget() never rescues an in-root `..\\x` symlink attack into the cross-repository-target class", { skip: POSIX_BACKSLASH_SKIP }, () => {
+  const root = fixture();
+  try {
+    symlinkSync(join(root, ".git"), join(root, "..\\hgofix-link"), "dir");
+    const filePath = "..\\hgofix-link/hooks/pre-commit";
+    const result = humanGuardOverrideInternals.eligibility(root, "Write", { file_path: filePath, content: "x" });
+    assert.notEqual(result.commandClass, "cross-repository-target",
+      "an in-root symlink into .git was classified as a cross-repository target");
+    assert.equal(result.eligible, false, "an in-root symlink attack must stay refused");
+    assert.equal(result.code, "HGO-NONOVERRIDABLE-CROSS-BOUNDARY");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("repository identity failures name the sanitized Git operation", () => {
   const root = fixture();
   try {
