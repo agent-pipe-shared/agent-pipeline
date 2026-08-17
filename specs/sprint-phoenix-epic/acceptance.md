@@ -373,6 +373,43 @@ architecture prose or an implementation briefing.
   amendment addresses this criterion's first sentence for these two readers
   only: the second sentence's migration dual-evaluation, shared
   compatibility owner, and expiry are untouched.
+
+  **Amendment for Git-guard override consumption (PO, 2026-08-17).** Satisfied
+  by construction, not by a dual-evaluation call. `plugins/pipeline-core/hooks/
+  guard-git.mjs`'s Phoenix authority block (`consumePhoenixOverrideAuthority`,
+  line 697) already calls `invokeGovernanceAuthority` →
+  `scripts/governance-authority.mjs --request-json`/`--consume-request-json`,
+  which delegates to `lib/human-governance-ledger.mjs`'s
+  `queryHumanGovernanceDecisions`/`appendConsumedHumanGovernanceDecision` — a
+  genuine, canonical-ledger-backed reference-and-validate of the decision ID
+  before the override transition becomes effective, satisfying this
+  criterion's first sentence independently of the shared
+  `decision-reference-dual-evaluation.mjs` primitive. The second sentence does
+  not apply to this reader: in a Phoenix-governed repository
+  (`governance/events/registry.json` present — true for this repository), the
+  override consumption's `if (phoenixGovernedProject())` branch
+  (`guard-git.mjs:894-901`) unconditionally requires the ledger-backed
+  authority check and hard-exits via `emit()`/`process.exit` on either outcome
+  before the plain one-time-token path (`findConsumption`/`appendLedger`,
+  `guard-git.mjs:902-916`) is ever reached — independently confirmed by
+  reading `emit()` itself (`:767-770`, unconditional `process.exit`). That path
+  is structurally unreachable here, not a coexisting legacy verification of the
+  same authority claim, and it validates only `rule|token` reuse (no
+  decisionId, no ledger, no shape resembling
+  `pipeline.human-decision-reference.v1`), so there is no old-path verdict to
+  disagree with. The reference this reader validates
+  (`PHOENIX_OVERRIDE_REFERENCE_SCHEMA = "pipeline.git-override-authority-
+  reference.v1"`, fields `authorityRequest`/`consumption`) is a genuinely
+  different shape than `pipeline.human-decision-reference.v1`; the shared
+  primitive's own `isDecisionReference` gate
+  (`decision-reference-dual-evaluation.mjs:130`) rejects it, so a literal dual-
+  evaluation call here would compare a syntax-only precondition (always true
+  once reached) against a check that already unconditionally gates the
+  transition on its own — never able to disagree, adding no protection.
+  Git-guard override consumption is the sixth and final reader; all six are
+  now dispositioned (two by this amendment's own PO decision above, two by
+  dual-evaluation wiring, one — `pipeline-state`'s deploy/push half — folded
+  into `guard-push`, and this one by construction).
 - **H-AC-13:** IF a proposed portable ledger entry contains a secret, raw
   prompt, complete transcript, unrestricted command/output, private path, or
   private coordinate, natural-person identifier, joinable pseudonym,
