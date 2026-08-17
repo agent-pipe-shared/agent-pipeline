@@ -38,7 +38,14 @@ valid solely for an explicitly unsupported layout.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, still open — deferred to Sprint Alfred. This is a
+  standing review-lens rule for future host-layout additions, not a live
+  defect against any layout supported today; "mechanical governance,
+  measurable rigor" (Alfred's scope) fits a rule like this better than
+  urgent current-scope work.
+- **Rationale:** no current host-layout gap is claimed by the item itself;
+  it is a process rule for the next one.
+- **Assignment (if accepted):** next available Alfred slot — likely lands as
+  a `guardrails/quality-gates.md` entry or an onboarding-acceptance-checklist
+  addition rather than code.
+- **Date:** 2026-08-17

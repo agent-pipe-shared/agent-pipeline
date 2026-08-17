@@ -206,3 +206,14 @@ date.
   orchestrator does instead of finishing personally). Not yet a dispatchable
   spec.
 - **Date:** 2026-08-11
+
+## Sprint update, 2026-08-17
+
+Deferred to Sprint Alfred — "mechanical governance, measurable rigor, and
+control integrity" is this item's charter almost verbatim, and the
+2026-08-11 decision already turned it into a design pass, not an urgent
+fix. Flagging explicitly rather than silently filing: this gap is
+cross-cutting (it governs how the orchestrator behaves in every sprint, not
+only Alfred's own scope), so deferring it delays a real, still-active
+governance hole rather than parking unrelated feature work — worth a
+conscious PO call, not just this triage pass's default.

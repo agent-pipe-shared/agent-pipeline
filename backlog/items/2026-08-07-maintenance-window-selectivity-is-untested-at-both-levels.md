@@ -91,7 +91,15 @@ level — the point is the invariant, not the case count.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, still open — deferred to Sprint Alfred. Re-verified
+  the item's own framing: this is explicitly "not a live defect but an
+  untested invariant" (selectivity was empirically confirmed intact against
+  a real signed window). Adding the missing negative-case coverage
+  (`guard-maintenance-window.test.mjs`, `guard-testpath.test.mjs`) is
+  measurable-rigor test-coverage work with no urgency — squarely Alfred's
+  "mechanical governance, measurable rigor, and control integrity" scope.
+- **Rationale:** no code changed since 2026-08-07 that would affect this
+  assessment (spot-checked `windowCoversRule` is still the same simple
+  membership test the item describes).
+- **Assignment (if accepted):** next available Alfred slot.
+- **Date:** 2026-08-17

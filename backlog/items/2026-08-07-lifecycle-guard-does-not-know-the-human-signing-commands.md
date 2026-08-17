@@ -68,7 +68,19 @@ Not designed here. Two candidates, and the second is the one that matters:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, still open — deferred to Sprint Alfred. Verified
+  live: `isHumanPoSigningCommand()`
+  (`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:1221-1224`) still
+  checks only `["setup", "approve", "approve-all"]` — `approve-critical`,
+  `sign-intent` and `authorize-critical` remain unrecognised, exactly as
+  reported. Not urgent (the item's own analysis holds: the trust boundary
+  does not depend on this list, only the guard's classification does) and
+  Direction #2 (derive the list from the CLI's actual command set instead of
+  hand-restating it, so it cannot drift again) is exactly "mechanical
+  governance, measurable rigor" — Alfred's scope description verbatim.
+- **Rationale:** verified the stale list directly; deferred rather than
+  fixed now because the trivial 3-name patch (Direction #1) would just
+  re-create the drift risk Direction #2 exists to close, and Direction #2 is
+  design-shaped Alfred-track work, not an urgent gap.
+- **Assignment (if accepted):** next available Alfred slot.
+- **Date:** 2026-08-17
