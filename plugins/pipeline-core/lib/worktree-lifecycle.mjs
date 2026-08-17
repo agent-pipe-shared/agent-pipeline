@@ -57,6 +57,22 @@ const TEMP_TYPES = new Set(["scratch-file", "scratch-directory", "disposable-wor
 const TEMP_CLASSES = new Set(["scratch", "disposable-control", "generated-output", "verify-recovery"]);
 const CLEANUP_POLICIES = new Set(["unlink-file", "remove-directory", "remove-worktree"]);
 const PROTECTED_CONTENT_CLASSES = new Set(["spec", "prd", "state", "implementation", "unknown"]);
+// checkSessionHygiene's `current-worktree-dirty` reason exists for genuinely
+// foreign dirty state, not for the scaffolding the Pipeline's own onboarding
+// flow (project-onboarding-v3.mjs) generates on a project's normal, expected
+// first run. This allowlist is deliberately narrow and sourced from that
+// module's own known write targets -- `.claude/**` (freshBaselines(): settings
+// .json, pipeline.json, pipeline.yaml), `project/**` (NEUTRAL_CALIBRATION,
+// NEUTRAL_MANIFEST, CRITICAL_HUMAN_PROOF_POLICY_PATH, RESUME_HINT_PATH, all
+// from project-authority.mjs/critical-human-proof-policy.mjs), `specs/**`
+// (onboarding kickoff's own feature spec directories), and the portable
+// source file `pipeline.user.yaml` itself. `.codex/**` is deliberately
+// excluded: in a host-managed Codex project that tree is host-owned, not
+// onboarding-owned, so admitting it here would mask genuinely foreign dirty
+// state in exactly the scenario this defect was first observed in. When in
+// doubt a path stays OUT of this list -- still-flagging is the safe default.
+const ONBOARDING_GENERATED_EXACT_PATHS = new Set(["pipeline.user.yaml"]);
+const ONBOARDING_GENERATED_PREFIXES = [".claude/", "project/", "specs/"];
 const FIXED_GIT_CONFIG = [
   "-c", "core.hooksPath=/dev/null",
   "-c", "commit.gpgSign=false",
@@ -1429,11 +1445,41 @@ export function classifyCanonicalWorktree(repo, record) {
   };
 }
 
+// Parses `git status --porcelain=v1 -z` output into the list of paths it
+// names. Each ordinary record is `XY PATH\0`; a rename/copy record (status
+// letter R or C in either column) additionally carries `ORIG_PATH\0` right
+// after it -- both paths are returned so a rename touching a foreign path is
+// never hidden behind an onboarding-generated new name (or vice versa).
+export function parseStatusPorcelainPaths(raw) {
+  const tokens = String(raw ?? "").split("\0");
+  const paths = [];
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
+    if (token === "") continue;
+    const statusCode = token.slice(0, 2);
+    paths.push(token.slice(3));
+    if ((statusCode[0] === "R" || statusCode[0] === "C") && tokens[index + 1] !== "" && tokens[index + 1] !== undefined) {
+      index += 1;
+      paths.push(tokens[index]);
+    }
+  }
+  return paths;
+}
+
+// True only for a path the Pipeline's own onboarding flow is known to
+// generate -- see ONBOARDING_GENERATED_EXACT_PATHS/_PREFIXES above for the
+// sourced allowlist and why it stops where it does.
+function isOnboardingGeneratedPath(path) {
+  if (ONBOARDING_GENERATED_EXACT_PATHS.has(path)) return true;
+  return ONBOARDING_GENERATED_PREFIXES.some((prefix) => path.startsWith(prefix));
+}
+
 export function checkSessionHygiene(startPath, fields, options = {}) {
   const repo = discoverRepository(startPath, options);
   const reasons = [];
   const status = runGit(repo.start, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]).stdout;
-  if (String(status).length > 0) reasons.push("current-worktree-dirty");
+  const dirtyPaths = parseStatusPorcelainPaths(status);
+  if (dirtyPaths.some((path) => !isOnboardingGeneratedPath(path))) reasons.push("current-worktree-dirty");
   if (existsSync(cleanupManifestPath(repo, fields.sessionId))) reasons.push("session-manifest-not-drained");
   const records = readWorktreeRecords(repo);
   if (records.some(({ record }) => record.sessionId === fields.sessionId && record.status === "ready" && record.lifecycle === "detached-operational")) {

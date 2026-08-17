@@ -502,6 +502,42 @@ check("D0-07 hygiene reports only redacted classifications and rejects noncanoni
   assert.equal(JSON.stringify(receipt).includes(fixture), false);
 });
 
+// NVA-HYGFIX-1 repro: a worktree whose ONLY unversioned/modified paths are the
+// pipeline's own onboarding-flow output (project-onboarding-v3.mjs's own
+// `freshBaselines()`/`planProjectOnboardingV3()` targets) must not be reported
+// as `current-worktree-dirty` -- that reason exists for genuinely foreign
+// dirty state, not for the scaffolding onboarding just generated on the
+// project's own first run. Before the fix this reproduces RED (the raw
+// `git status --porcelain` length check flags any change at all).
+check("D0-07 hygiene ignores dirty state made only of onboarding-generated paths", () => {
+  const { primary } = repoFixture();
+  mkdirSync(join(primary, ".claude"), { mode: 0o700 });
+  writeFileSync(join(primary, ".claude", "settings.json"), "{}\n");
+  writeFileSync(join(primary, ".claude", "pipeline.json"), "{}\n");
+  writeFileSync(join(primary, ".claude", "pipeline.yaml"), "language:\n  human_facing: en\n");
+  mkdirSync(join(primary, "project"), { mode: 0o700 });
+  writeFileSync(join(primary, "project", "pipeline.json"), "{}\n");
+  writeFileSync(join(primary, "project", "resume-hint.json"), "{}\n");
+  mkdirSync(join(primary, "specs", "kickoff-example"), { mode: 0o700, recursive: true });
+  writeFileSync(join(primary, "specs", "kickoff-example", "spec.md"), "# example\n");
+  writeFileSync(join(primary, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const receipt = checkSessionHygiene(primary, { sessionId: "session-hygiene-onboarding" });
+  assert.equal(receipt.reasons.includes("current-worktree-dirty"), false);
+});
+
+// Regression coverage for the positive case the fix must not weaken: onboarding
+// scaffolding sitting alongside one genuinely foreign/unexpected dirty file
+// must still raise `current-worktree-dirty`.
+check("D0-07 hygiene still flags current-worktree-dirty when a genuinely foreign path is dirty", () => {
+  const { primary } = repoFixture();
+  mkdirSync(join(primary, ".claude"), { mode: 0o700 });
+  writeFileSync(join(primary, ".claude", "settings.json"), "{}\n");
+  writeFileSync(join(primary, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  writeFileSync(join(primary, "unexpected-foreign-file.txt"), "not onboarding output\n");
+  const receipt = checkSessionHygiene(primary, { sessionId: "session-hygiene-foreign" });
+  assert(receipt.reasons.includes("current-worktree-dirty"));
+});
+
 check("D0-08 clean migration creates/verifies canonical copy before removing old registration", () => {
   const { fixture, primary, head } = repoFixture();
   branch(primary, "feat/move");
