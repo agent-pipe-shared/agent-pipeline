@@ -118,6 +118,12 @@ const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-o
 const PO_HUMAN_APPROVAL_SCRIPT = fileURLToPath(new URL("../scripts/po-human-approval.mjs", import.meta.url));
 const PO_APPROVAL_GATE_SCRIPT = fileURLToPath(new URL("../scripts/po-approval-gate.mjs", import.meta.url));
 const RESTART_RESUME_HINT_INPUT_PATH = "project/.resume-hint-input.json";
+// NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
+// tmp-fallback.md): the ONE write-side diagnosis lane a `partial` lifecycle admits -- see
+// isPartialLifecycleScratchDirCreate() / isPartialLifecycleIncidentReportWrite() below.
+// Deliberately a single fixed relative path, never a directory prefix or a glob.
+const PARTIAL_LIFECYCLE_SCRATCH_DIR = "scratch";
+const PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH = join(PARTIAL_LIFECYCLE_SCRATCH_DIR, "incident-report.md");
 const HEX = /^[a-f0-9]{64}$/u;
 const VALID_RUNNERS = new Set(["claude", "codex"]);
 // Every write-capable tool this gate admits. NotebookEdit was absent from both this list
@@ -1898,6 +1904,43 @@ export function isSanctionedGhReadOnlyDiagnostic(command, root, options = {}) {
 }
 
 /**
+ * NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
+ * tmp-fallback.md): the write-side twin of isReadOnlyDiagnosticCommand() above, scoped to
+ * the ONE directory a session stuck at `partial` needs in order to leave a trace of its own
+ * incident -- `mkdir scratch` or `mkdir -p scratch`, nothing else. Exact by construction,
+ * like every sibling admission in this file: the target argument must resolve to exactly
+ * `<root>/scratch`, so `mkdir scratch/nested`, `mkdir somethingelse` and any extra or
+ * reordered flag all still fall through to the ordinary GUARD-LIFECYCLE-NOT-READY refusal.
+ * This function only recognizes the shape; the caller (evaluateAfterGrammarAdmission()
+ * below) is the one that gates it on `lifecycleStatus === "partial"`.
+ */
+function isPartialLifecycleScratchDirCreate(command, root) {
+  const words = simpleWords(command, root);
+  if (!words || words.length === 0) return false;
+  if (basename(words[0]).toLowerCase() !== "mkdir") return false;
+  const args = words.slice(1);
+  const target = args.length === 1 ? args[0]
+    : args.length === 2 && args[0] === "-p" ? args[1]
+      : null;
+  return target !== null && resolve(root, target) === join(root, PARTIAL_LIFECYCLE_SCRATCH_DIR);
+}
+
+/**
+ * NVA-LCREADONLY-1: the Write/Edit-side twin -- the ONE fixed incident-report file a session
+ * stuck at `partial` may create to persist a report of its own stuck state. Deliberately
+ * scoped to Edit/Write only (never NotebookEdit, which this fixed `.md` path can never
+ * legitimately name) and to this one exact resolved path -- no other filename, no directory
+ * write, no glob. Shaped like isRestartResumeHintInputWrite() above; the caller is again the
+ * one that gates this on `lifecycleStatus === "partial"`.
+ */
+function isPartialLifecycleIncidentReportWrite(input, root) {
+  const toolName = String(input?.tool_name ?? "");
+  if (toolName !== "Edit" && toolName !== "Write") return false;
+  const filePath = writeTargetPath(input?.tool_input, toolName);
+  return filePath !== "" && resolve(root, filePath) === join(root, PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH);
+}
+
+/**
  * ADR-0059 Decision 5 / NOVA-LCR-HGO-2: everything below -- the LAUNCH_SCRIPT
  * external-restart refusal and the onboarding-readiness gate (denial code
  * GUARD-LIFECYCLE-NOT-READY) -- stays outside HGO's authority no matter how the
@@ -1961,6 +2004,26 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && toolName === "Bash"
       && isExactPoAuthorityRebindPlannerRecovery(input.tool_input.command, root, dependencies);
     if (exactPoAuthorityRebindRecovery) return verdict(0);
+    // NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-
+    // and-tmp-fallback.md): a session stuck at `partial` has no route at all today to
+    // persist a report of its own stuck state -- the in-root write is refused by this very
+    // gate as GUARD-LIFECYCLE-NOT-READY, and a `/tmp` fallback is refused separately as
+    // GUARD-CROSS-REPO-MUTATION (a governed session may write only inside its own physical
+    // project root). Additive to isReadOnlyDiagnosticCommand()'s existing read-only lane,
+    // never a widening of it: this is the write side, narrowed to the one scratch-directory
+    // creation and the one fixed incident-report file
+    // (isPartialLifecycleScratchDirCreate() / isPartialLifecycleIncidentReportWrite()
+    // above). Scoped to `lifecycleStatus === "partial"` only -- every other PORG-NOT-READY
+    // status (restart-required among them) is unaffected and keeps refusing both operations
+    // exactly as before, and this is strictly additive: it never touches GUARDALLOW-1's
+    // `plan-partial-authority` branch or any other existing allowlist entry.
+    const partialLifecycleDiagnosisWrite = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "partial"
+      && ((toolName === "Bash" && isPartialLifecycleScratchDirCreate(input.tool_input.command, root))
+        || isPartialLifecycleIncidentReportWrite(input, root));
+    if (partialLifecycleDiagnosisWrite) return verdict(0);
     return toolName === "Bash"
       && (isSanctionedLifecycleCommand(input.tool_input.command, root)
         || isSanctionedGhReadOnlyDiagnostic(input.tool_input.command, root))

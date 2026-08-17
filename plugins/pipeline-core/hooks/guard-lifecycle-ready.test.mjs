@@ -2012,6 +2012,88 @@ test("restart-required admits only the consumed bounded resume-hint input and ca
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
+// tmp-fallback.md): the write-side twin of isReadOnlyDiagnosticCommand()'s narrow read-only
+// lane -- a session stuck at `partial` today has no route at all to persist a report of its
+// own stuck state, not inside the project root (GUARD-LIFECYCLE-NOT-READY) and not outside
+// it (GUARD-CROSS-REPO-MUTATION). This proves the admission is exact by construction (no
+// other mkdir target, no other filename, no directory write) and scoped to
+// `lifecycleStatus === "partial"` only -- every other PORG-NOT-READY status, restart-required
+// among them (already fixtured immediately above), keeps refusing both operations unchanged.
+test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the fixed incident-report write, nothing wider", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const partialDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("partial"); } };
+
+    // AC-1/AC-2: both admitted mkdir shapes.
+    for (const command of ["mkdir scratch", "mkdir -p scratch"]) {
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), partialDeps).exitCode, 0, command);
+    }
+
+    // AC-3: exact, not substring/prefix-based -- a different target or any extra/reordered
+    // flag still refuses.
+    for (const command of [
+      "mkdir somethingelse",
+      "mkdir -p scratch/nested",
+      "mkdir scratch extra",
+      "mkdir -p -v scratch",
+      "mkdir scratch -p",
+      "mkdir -pv scratch",
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), partialDeps);
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, command);
+    }
+
+    // AC-4: the one fixed incident-report write, admitted for both Write and Edit.
+    for (const input of [write("scratch/incident-report.md"), edit("scratch/incident-report.md")]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, partialDeps).exitCode, 0, input.tool_name);
+    }
+
+    // AC-5: exact, not a directory or a glob -- any other filename or path still refuses.
+    for (const input of [
+      write("scratch/other-file.md"),
+      write("incident-report.md"),
+      edit("incident-report.md"),
+      write("scratch/nested/incident-report.md"),
+      write("scratch"),
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, partialDeps);
+      assert.equal(result.exitCode, 2, `${input.tool_name}:${input.tool_input.file_path}`);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_input.file_path);
+    }
+
+    // AC-6: the lane is `partial`-only, not a general readiness bypass -- the identical
+    // admitted shapes stay refused under a different PORG-NOT-READY status this file already
+    // fixtures (restart-required, proven immediately above).
+    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+    for (const input of [
+      bash("mkdir scratch"),
+      bash("mkdir -p scratch"),
+      write("scratch/incident-report.md"),
+      edit("scratch/incident-report.md"),
+    ]) {
+      const result = evaluateLifecycleReadyGuard(input, restartDeps);
+      assert.equal(result.exitCode, 2, `restart-required/${input.tool_name}`);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, `restart-required/${input.tool_name}`);
+    }
+
+    // AC-7: an exactly-ready session's behaviour for both operations is unchanged -- the new
+    // branch lives inside evaluateAfterGrammarAdmission()'s catch block, unreachable unless
+    // requireProjectOnboardingReadyFn() throws, so a ready session never enters it.
+    const readyDeps = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    };
+    for (const input of [bash("mkdir scratch"), write("scratch/incident-report.md")]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, readyDeps).exitCode, 0, input.tool_name ?? "Bash");
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // GF-078 bug 1: Codex's own write-capable tool is `apply_patch`, whose tool_input carries
 // the whole patch envelope under `command`, never a Claude-shaped `file_path`. Before the
 // fix, isRestartResumeHintInputWrite() gated on WRITE_TOOLS (Edit/Write/NotebookEdit only)
