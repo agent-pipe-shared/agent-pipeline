@@ -2522,8 +2522,10 @@ function sourceEnablesCodex(root, fs) {
 /**
  * General, runner-aware form of `sourceEnablesCodex`. Used only where the
  * caller's own invoking runner (not always "codex") controls admission; the
- * two Codex-specific helpers above stay untouched for their existing call
- * sites.
+ * Codex-specific helper above stays untouched for its own existing call
+ * sites. (`selectedRunnerIsCodex`, the second Codex-specific helper this
+ * comment used to name, was deleted by NVA-MANIFESTRUNNER-1 -- its two call
+ * sites now use this function instead.)
  */
 function sourceEnablesRunner(root, fs, runner) {
   try {
@@ -2669,10 +2671,10 @@ export function planProjectOnboardingSourceRecoveryV4({
       category: "unsupported-source-transition",
       sourceSha256: inspected.sourceSha256,
       diagnostics: [lifecycleDiagnostic(
-        "$.source.runners.default",
+        "$.source.runners.enabled",
         "source_runner_transition_unsupported",
-        "the current V4 lifecycle supports only a Codex-selected authority",
-        "change the selected runner through the source-owning workflow; this recovery planner will not rewrite it",
+        "this V3 source does not enable the invoking session's own runner",
+        "enable this runner in the source's authority, or switch to a runner it already enables; this recovery planner will not rewrite it",
       )],
     });
   }
@@ -2775,7 +2777,7 @@ export function planProjectOnboardingManifestRepairV4({
       diagnostics: [lifecycleDiagnostic(
         "$.source",
         "manifest_repair_source_not_current",
-        "manifest repair requires one current Codex-selected V3 source",
+        "manifest repair requires one current V3 source that enables the invoking session's own runner",
         "complete the source-owning recovery workflow first",
       )],
     });
