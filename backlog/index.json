@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3ab78a74b0d27a58b4360534b5a53bfaf0cd11668bee9abd9fef88d32d2d0eaf"
+    "transitionHead": "985ca2b90ac42f7278ae486a1127f45878a8e269044997ba7e6d9941809a7f37"
   },
   "counts": {
-    "open": 109,
+    "open": 108,
     "in_progress": 22,
-    "closed": 100
+    "closed": 101
   },
   "items": [
     {
@@ -1165,11 +1165,15 @@
     },
     {
       "id": "pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; the original report's line numbers were corrupted by transcription and were not trusted -- independently re-located and confirmed against this repository's own current source before filing."
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; the original report's line numbers were corrupted by transcription and were not trusted -- independently re-located and confirmed against this repository's own current source before filing.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "4af6bb0b289f6afc3ab95c560e3cd142d795bddc",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-manifest-repair-runner-gate-closure.md"
     },
     {
       "id": "pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have",

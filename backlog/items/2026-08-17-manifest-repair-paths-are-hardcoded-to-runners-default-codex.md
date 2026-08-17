@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 4af6bb0b289f6afc3ab95c560e3cd142d795bddc
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-manifest-repair-runner-gate-closure.md
 source: "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; the original report's line numbers were corrupted by transcription and were not trusted -- independently re-located and confirmed against this repository's own current source before filing."
 ---
 
@@ -57,8 +61,20 @@ the gate.
 - **Rationale:** a legitimate, elsewhere-fully-supported runner
   configuration (`runners.default: "claude"`) makes two automated repair
   paths permanently dead-ended; real functional gap, not a misreading.
-- **Assignment:** queued behind the current Windows-hotfix candidate
-  (WINPATH/SUITEREG/LCGUARD); not this candidate's scope. Needs design
-  input (why Codex-only) before a goldfish-deep dispatch, not a
-  same-session edit.
-- **Date:** 2026-08-17
+- **Assignment (superseded):** originally queued behind the Windows-hotfix
+  candidate, pending design input on why the gate was Codex-only. That
+  design question was answered by the dispatch's own source investigation
+  (the Codex-specific helper's exact call sites, and that an already-used
+  runner-neutral replacement already existed) before implementation began —
+  the investigation itself is what justified acting same-session rather
+  than deferring further, even though this line originally said otherwise.
+  Dispatched as `NVA-MANIFESTRUNNER-1` (goldfish-deep) the same session.
+- **Outcome:** Critic review (`claude-sonnet-5` at `max`) returned **FAIL**
+  (1 blocker — verify evidence bound to the wrong commit; 3 minor — stale
+  Codex-worded diagnostics/comment, and this Triage note left unreconciled).
+  All four resolved directly, no second Critic round (this session's
+  one-round practice). Full account:
+  `specs/sprint-nova-epic/evidence/backlog/2026-08-17-manifest-repair-runner-gate-closure.md`.
+  Closed `4af6bb0b` (the commit resolving every Critic finding; the original
+  fix landed at `a9a170a7`).
+- **Date:** 2026-08-17 (filed and fixed); 2026-08-17 (closed, same AFK block)
