@@ -73,13 +73,28 @@ export function sealVerifySuiteReceipt(fields) {
 // because its declared inputs are a specific, narrow set of files/non-files that do not depend on
 // overall candidate identity -- see `isTierBRegistration` in verify-journal.mjs, whose exact test
 // this mirrors without importing it, to avoid a circular dependency) the candidate-drift check
-// below is skipped entirely: its own declared files/non-files are already the full statement of
-// what it depends on, and declared-input-drift (above) already invalidates it the instant any of
-// THOSE change. Gating a Tier-B suite on candidate identity too would defeat candidate (b)'s
-// entire purpose -- reuse across an unrelated commit -- while adding no real protection, since a
-// Tier-B suite is barred from reading anything outside its own declaration (enforced at runtime by
-// the Node --permission grant, ADR-0065 Decision clarification 2, and it may never carry
-// --allow-child-process).
+// below is skipped only when the caller has explicitly opted into cross-candidate reuse (see
+// `allowCrossCandidateReuse` below): its own declared files/non-files are already the full
+// statement of what it depends on, and declared-input-drift (above) already invalidates it the
+// instant any of THOSE change. Gating a Tier-B suite on candidate identity too would defeat
+// candidate (b)'s entire purpose -- reuse across an unrelated commit -- while declared-input-drift
+// already catches every change the Node `--permission` grant mediates. That containment is real
+// but bounded, not absolute: ADR-0065's own Risk paragraph names paths the permission model does
+// NOT mediate -- a spawned child, a native addon, an environment variable carrying content, a
+// network fetch -- as exactly why Tier B is "the new trust boundary," which is also why Tier B
+// forbids `--allow-child-process` rather than merely discouraging it, rather than a claim that a
+// Tier-B suite cannot reach anything outside its declaration.
+//
+// ADR-0065's Decision 8 leaves open, for the PO to answer, whether cross-candidate receipt reuse
+// should be permitted for the evidence that backs a candidate freeze or a push, with the accepted
+// conservative default that push/release-bound Verify runs force full re-execution (`--no-reuse`).
+// `allowCrossCandidateReuse` (threaded through `context` from `planVerifyResume`'s caller) is that
+// switch: it defaults to false/absent, so a Tier-B suite is gated by candidate-drift exactly like
+// Tier A unless a caller explicitly opts in. `harness/scripts/verify.mjs` -- the one production
+// entry point -- is TP-3-protected with no active Guard Maintenance Window, so it cannot currently
+// be edited to pass `true`; its unmodified call therefore gets the safe default automatically,
+// which makes the conservative behaviour the real production behaviour today, not a placeholder
+// pending a later change.
 function isTierARegistration(suite) {
   return suite.inputs.nonFiles.some((entry) => entry.kind.startsWith("declared-tree:"));
 }
@@ -92,7 +107,7 @@ function firstDrift(suite, receipt, context) {
   if (receipt.implementationSha256 !== suite.implementationSha256) return "suite-implementation-drift";
   if (digestJson(receipt.inputs) !== digestJson(suite.inputs)) return "declared-input-drift";
   if (receipt.environmentContractSha256 !== suite.environmentContractSha256) return "environment-contract-drift";
-  if (isTierARegistration(suite) && (receipt.candidate.commit !== context.candidate.commit || receipt.candidate.tree !== context.candidate.tree)) return "candidate-drift";
+  if ((isTierARegistration(suite) || !context.allowCrossCandidateReuse) && (receipt.candidate.commit !== context.candidate.commit || receipt.candidate.tree !== context.candidate.tree)) return "candidate-drift";
   if (receipt.policySha256 !== context.policySha256) return "verify-policy-drift";
   const log = context.logs?.[suite.id];
   if (!logRef(log)) return "missing-log";
@@ -134,7 +149,7 @@ export function createPublicVerifyRunEvidence({ runId, policySha256, resumePlanS
   });
 }
 
-export function planVerifyResume({ runId, candidate: currentCandidate, suites, receipts = {}, logs = {}, policySha256 }) {
+export function planVerifyResume({ runId, candidate: currentCandidate, suites, receipts = {}, logs = {}, policySha256, allowCrossCandidateReuse = false }) {
   if (!ID.test(runId) || !candidate(currentCandidate) || !Array.isArray(suites) || suites.length === 0 || !SHA256.test(policySha256)) throw new TypeError("Verify registration is invalid");
   const ids = new Set();
   for (const suite of suites) { if (!validSuite(suite) || ids.has(suite.id)) throw new TypeError("Verify suite registration is invalid"); ids.add(suite.id); }
@@ -142,7 +157,7 @@ export function planVerifyResume({ runId, candidate: currentCandidate, suites, r
   assertAcyclic(suites);
 
   const reasons = new Map();
-  for (const suite of suites) reasons.set(suite.id, receipts[suite.id] === undefined ? { code: "missing-receipt", dependency: null } : { code: firstDrift(suite, receipts[suite.id], { candidate: currentCandidate, logs, policySha256 }), dependency: null });
+  for (const suite of suites) reasons.set(suite.id, receipts[suite.id] === undefined ? { code: "missing-receipt", dependency: null } : { code: firstDrift(suite, receipts[suite.id], { candidate: currentCandidate, logs, policySha256, allowCrossCandidateReuse }), dependency: null });
   let changed = true;
   while (changed) {
     changed = false;

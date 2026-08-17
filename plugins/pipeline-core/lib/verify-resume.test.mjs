@@ -93,22 +93,52 @@ test("ADR-0065: candidate-drift no longer gates the content checks, but stays ex
   assert.deepEqual(commitOnly.rerun, ["alpha", "beta"]);
 });
 
-test("ADR-0065 candidate (b) fix (Critic F1): a Tier-B suite (no declared-tree:* input) skips candidate-drift and is reused across an unrelated candidate change", () => {
+test("ADR-0065 candidate (b) fix (Critic F1): a Tier-B suite (no declared-tree:* input) skips candidate-drift and is reused across an unrelated candidate change WHEN the caller explicitly opts in via allowCrossCandidateReuse", () => {
   const tierB = suite("tierb", { inputs: tierBInput() });
   const sealed = sealVerifySuiteReceipt({ runId: "verify-source", candidate, suite: tierB.id, implementationSha256: tierB.implementationSha256, inputs: tierB.inputs, environmentContractSha256: tierB.environmentContractSha256, policySha256: C, status: "completed", exitCode: 0, log: log("tierb"), startedAt: "2026-08-01T00:00:00.000Z", completedAt: "2026-08-01T00:00:01.000Z" });
   const unrelatedCandidate = { commit: "3".repeat(40), tree: "4".repeat(40) };
   // Both commit AND tree differ from the receipt's -- exactly the case that unconditionally fired
-  // candidate-drift before this fix, even though this suite's own declared files never moved.
-  const reused = planVerifyResume({ runId: "verify-next", candidate: unrelatedCandidate, suites: [tierB], receipts: { tierb: sealed }, logs: { tierb: log("tierb") }, policySha256: C });
+  // candidate-drift before the ADR-0065 candidate (b) fix, even though this suite's own declared
+  // files never moved. This proves the underlying mechanism still works when a caller explicitly
+  // opts in (NVA-ADR65TIERFIX-2, Critic finding F1's follow-up: the mechanism must stay gated
+  // behind a caller-supplied flag, never on by default).
+  const reused = planVerifyResume({ runId: "verify-next", candidate: unrelatedCandidate, suites: [tierB], receipts: { tierb: sealed }, logs: { tierb: log("tierb") }, policySha256: C, allowCrossCandidateReuse: true });
   assert.deepEqual(reused.reusable, ["tierb"]);
   assert.deepEqual(reused.rerun, []);
   assert.deepEqual(reused.reasons, []);
   // Skipping candidate-drift never means skipping content checks: the suite's OWN declared file
-  // changing must still invalidate it, via declared-input-drift.
+  // changing must still invalidate it, via declared-input-drift, even with the flag set.
   const changedTierB = suite("tierb", { inputs: tierBInput("tierb.test.mjs", B) });
-  const invalidated = planVerifyResume({ runId: "verify-next", candidate: unrelatedCandidate, suites: [changedTierB], receipts: { tierb: sealed }, logs: { tierb: log("tierb") }, policySha256: C });
+  const invalidated = planVerifyResume({ runId: "verify-next", candidate: unrelatedCandidate, suites: [changedTierB], receipts: { tierb: sealed }, logs: { tierb: log("tierb") }, policySha256: C, allowCrossCandidateReuse: true });
   assert.equal(invalidated.reasons[0].code, "declared-input-drift");
   assert.deepEqual(invalidated.rerun, ["tierb"]);
+});
+
+test("NVA-ADR65TIERFIX-2: WITHOUT allowCrossCandidateReuse (the default, matching harness/scripts/verify.mjs's real unmodified call shape), a Tier-B suite whose own files are unchanged is NOT reused across a candidate change -- candidate-drift still fires", () => {
+  const tierB = suite("tierb", { inputs: tierBInput() });
+  const sealed = sealVerifySuiteReceipt({ runId: "verify-source", candidate, suite: tierB.id, implementationSha256: tierB.implementationSha256, inputs: tierB.inputs, environmentContractSha256: tierB.environmentContractSha256, policySha256: C, status: "completed", exitCode: 0, log: log("tierb"), startedAt: "2026-08-01T00:00:00.000Z", completedAt: "2026-08-01T00:00:01.000Z" });
+  const unrelatedCandidate = { commit: "3".repeat(40), tree: "4".repeat(40) };
+  // Deliberately omit allowCrossCandidateReuse entirely -- this is the actual safety property that
+  // matters: the production call site (harness/scripts/verify.mjs) cannot pass the flag (TP-3
+  // protected, no active Guard Maintenance Window), so its call shape is exactly this one.
+  const notReused = planVerifyResume({ runId: "verify-next", candidate: unrelatedCandidate, suites: [tierB], receipts: { tierb: sealed }, logs: { tierb: log("tierb") }, policySha256: C });
+  assert.deepEqual(notReused.reusable, []);
+  assert.deepEqual(notReused.rerun, ["tierb"]);
+  assert.equal(notReused.reasons[0].code, "candidate-drift");
+  // Explicitly passing allowCrossCandidateReuse: false must be identical to omitting it.
+  const explicitFalse = planVerifyResume({ runId: "verify-next", candidate: unrelatedCandidate, suites: [tierB], receipts: { tierb: sealed }, logs: { tierb: log("tierb") }, policySha256: C, allowCrossCandidateReuse: false });
+  assert.deepEqual(explicitFalse.rerun, ["tierb"]);
+  assert.equal(explicitFalse.reasons[0].code, "candidate-drift");
+});
+
+test("NVA-ADR65TIERFIX-2: allowCrossCandidateReuse never affects Tier A -- candidate-drift stays unconditional regardless of the flag", () => {
+  const alpha = receipt(suites[0]);
+  const artifacts = { alpha };
+  const logs = { alpha: log("alpha") };
+  const driftedCandidate = { commit: "3".repeat(40), tree: candidate.tree };
+  const withFlagTrue = plan(artifacts, logs, { candidate: driftedCandidate, allowCrossCandidateReuse: true });
+  assert.equal(withFlagTrue.reasons[0].code, "candidate-drift");
+  assert.deepEqual(withFlagTrue.rerun, ["alpha", "beta"]);
 });
 
 test("targeted invalidation propagates only through declared deterministic dependents", () => {

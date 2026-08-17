@@ -457,7 +457,7 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
   return receipt;
 }
 
-export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnSync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS }) {
+export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnSync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false }) {
   const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree, tierBDeclarations });
   // ADR-0065 coupling (3): this digest no longer covers `suites: registrations`, so one suite's
   // registration changing no longer invalidates every OTHER suite's receipt via
@@ -476,7 +476,7 @@ export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, po
   let terminalWritten = false;
   try {
     const prior = loadVerifyResumeArtifacts({ runsRoot: run.runsRoot, currentRunId: runId, suites: registrations });
-    const plan = planVerifyResume({ runId, candidate, suites: registrations, receipts: prior.receipts, logs: prior.logs, policySha256 });
+    const plan = planVerifyResume({ runId, candidate, suites: registrations, receipts: prior.receipts, logs: prior.logs, policySha256, allowCrossCandidateReuse });
     atomicJson(join(run.runDir, "resume-plan.json"), plan);
     const receiptBySuite = {};
     const steps = [];
