@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 9ab96e01fab4a013ea9a8e8cb88fda546be2fe7f
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-vendored-package-sync-closure.md
 source: "Relayed by the PO 2026-08-17 from a live D:\\Dev\\Web\\Toolbox (Windows Claude) session's handover, live-blocking. Independently verified line-for-line against this repository's current source before filing."
 ---
 
@@ -117,7 +121,30 @@ OTHER case it protects must not regress.
   or redesigning that gate needs explicit design input, not a same-session
   patch, matching this session's own standing treatment of the sibling
   `human-guard-override.mjs` marketplace-provenance gap.
-- **Assignment:** queued for a future design/PO-decision session; not
-  agent-dispatchable as-is. Toolbox session left paused, `project/` in a
-  recoverable `invalid` state, nothing written or bypassed.
-- **Date:** 2026-08-17
+- **Superseding PO decision (2026-08-17, same AFK block):** the PO directed a
+  sustainable fix explicitly, in these terms (translated): "fix this
+  sustainably now — the files the Pipeline needs for this must also be
+  available inside the Pipeline for user projects too; the Pipeline is not
+  primarily meant for itself, it's meant for other repos. This needs to be
+  properly solved now" — and separately confirmed the chosen direction
+  (an explicit, operator-visible vendored-copy sync, never a silent write or
+  a weakened gate) before implementation. This overrides the "not
+  agent-dispatchable as-is" assignment below; the design input the original
+  triage asked for was supplied by the PO directly rather than deferred to a
+  future session.
+- **Outcome:** dispatched as `NVA-VENDORSYNC-1` (goldfish-deep, opus/max per
+  MP-07 architecture/trust-boundary criteria). The gate itself
+  (`loadedPackageEvidence`, `packageInventory`, `TARGETS`, the migration
+  journal) is unchanged; a new explicit plan/apply pair
+  (`planVendoredPackageSync`/`applyVendoredPackageSync`) plus a `vendor-sync`
+  CLI command provisions exactly the copy the gate already checks, failing
+  closed on a tracked destination, an uncovered `.gitignore` rule, a
+  symlinked/unreadable destination, drift since planning, and a failed
+  readback; it never writes or edits a `.gitignore` itself. Critic review
+  (`claude-opus-5` at `max`) returned **FAIL** on first round (4 major, 1
+  minor); per this session's standing "one Critic round, then self-verify"
+  practice (PO-confirmed for this specific thread), no second round was
+  dispatched — findings were triaged and resolved directly. Full account:
+  `specs/sprint-nova-epic/evidence/backlog/2026-08-17-vendored-package-sync-closure.md`.
+  Closed `9ab96e01`.
+- **Date:** 2026-08-17 (filed); 2026-08-17 (closed, same AFK block)

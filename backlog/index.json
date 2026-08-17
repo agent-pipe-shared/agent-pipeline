@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a64ae64cad5cb31eabb03639d2a1fe015146c42f765f4a2f845290f810554a19"
+    "transitionHead": "3ab78a74b0d27a58b4360534b5a53bfaf0cd11668bee9abd9fef88d32d2d0eaf"
   },
   "counts": {
     "open": 109,
     "in_progress": 22,
-    "closed": 99
+    "closed": 100
   },
   "items": [
     {
@@ -1173,11 +1173,15 @@
     },
     {
       "id": "pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\Web\\Toolbox (Windows Claude) session's handover, live-blocking. Independently verified line-for-line against this repository's current source before filing."
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\Web\\Toolbox (Windows Claude) session's handover, live-blocking. Independently verified line-for-line against this repository's current source before filing.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "9ab96e01fab4a013ea9a8e8cb88fda546be2fe7f",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-vendored-package-sync-closure.md"
     },
     {
       "id": "pipeline.mp22-orchestrator-self-implementation-has-no-enforcement",
@@ -1560,6 +1564,14 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
+    },
+    {
+      "id": "pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Critic review of NVA-VENDORSYNC-1 (9ab96e01, claude-opus-5 at max), finding F2 — the dispatch's own claims record overclaimed a green plugin-wide sweep when project-authority.test.mjs actually failed there. Independently re-verified: the suite passes 29/29 standalone (node --test plugins/pipeline-core/lib/project-authority.test.mjs) and cleanly under the serialized harness/scripts/verify.mjs gate (evidence/verify-latest.json, exact-bound to 9ab96e01); it only fails inside a whole-plugin-directory `node --test` sweep that runs many test files concurrently."
     },
     {
       "id": "pipeline.project-reset-does-not-classify-the-proof-policy-artifact",

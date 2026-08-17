@@ -128,7 +128,7 @@
 | pipeline.maintenance-window-signature-voided-by-unrelated-write | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | open | defect | pipeline | 2026-08-17 | — |
-| pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.mp22-orchestrator-self-implementation-has-no-enforcement | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.native-windows-verify-red-suite-class | closed | defect | pipeline | 2026-08-07 | — |
@@ -166,6 +166,7 @@
 | pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-settings-enabled-two-pipeline-core-plugin-instances-at-once | open | defect | pipeline | 2026-08-17 | — |
@@ -240,4 +241,4 @@
 
 - open: 109
 - in_progress: 22
-- closed: 99
+- closed: 100

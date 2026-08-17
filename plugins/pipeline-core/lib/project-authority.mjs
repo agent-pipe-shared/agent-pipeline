@@ -68,6 +68,16 @@ const VENDORED_PACKAGE_PATH = "plugins/pipeline-core";
  * repair.  Every other failure (malformed manifest, symlinked destination) is
  * reported as `PA-VENDOR-COPY-UNKNOWN` and must NOT be offered the sync as its
  * remedy: those are not a missing copy, they are a broken one.
+ *
+ * STALE is included alongside MISSING deliberately, not by omission: a sync
+ * only ever overwrites a LOCAL, gitignored, untracked copy with the package
+ * that is already loaded and executing in this very session (source is
+ * re-read at apply time, never taken from the plan -- see
+ * `applyVendoredPackageSync`).  It cannot turn an untrusted package into a
+ * trusted one; it only re-proves that the local copy matches what is already
+ * running.  A destination holding TRACKED project bytes is refused
+ * unconditionally regardless of this list (`vendoredPackageWriteEvidence`),
+ * so a deliberately pinned, committed vendored copy is never a sync target.
  */
 export const SELF_HEALABLE_VENDOR_PROVENANCE_CODES = Object.freeze(["PA-VENDOR-COPY-MISSING", "PA-VENDOR-COPY-STALE"]);
 const VENDOR_PROVENANCE_CODES = new Map([
