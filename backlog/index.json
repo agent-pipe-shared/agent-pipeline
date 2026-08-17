@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "06d168d115936eaf613256372b8fff7368ab885530968f06171fd780de05316c"
+    "transitionHead": "286199acb7888bf50b885153633a436fc2ae4573267b5e4df74e5458d597eab0"
   },
   "counts": {
-    "open": 99,
+    "open": 98,
     "in_progress": 22,
-    "closed": 124
+    "closed": 125
   },
   "items": [
     {
@@ -1945,11 +1945,15 @@
     },
     {
       "id": "pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed."
+      "source": "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "a7c3e581bf0b18a036d412012143fe3820c9b7c8",
+      "closureEvidence": "backlog/items/2026-08-17-repair-map-crashes-on-a-fresh-repository-with-no-head.md"
     },
     {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",

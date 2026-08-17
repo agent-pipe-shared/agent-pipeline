@@ -197,7 +197,7 @@
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
 | pipeline.reopen-design-invites-the-edit-that-ends-the-session | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.runner-neutrality-before-third-runner | open | workflow-improvement | pipeline | 2026-08-08 | — |
@@ -253,6 +253,6 @@
 
 ## Counts
 
-- open: 99
+- open: 98
 - in_progress: 22
-- closed: 124
+- closed: 125

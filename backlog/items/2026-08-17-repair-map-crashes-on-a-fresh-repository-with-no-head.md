@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: a7c3e581bf0b18a036d412012143fe3820c9b7c8
+closure_evidence: backlog/items/2026-08-17-repair-map-crashes-on-a-fresh-repository-with-no-head.md
 created: 2026-08-17
 source: "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed."
 ---
@@ -53,3 +57,33 @@ uncaught crash.
 - **Assignment (if accepted):** goldfish-deep, guardrail-tier (MP-07), plus
   Critic review before considered done.
 - **Date:** 2026-08-17
+
+## Closure (2026-08-17)
+
+Fixed via goldfish-deep dispatch NVA-HGOHEAD-1. `repositoryObservation()`
+now detects the unborn-branch shape specifically (`git symbolic-ref -q HEAD`
+succeeding while `git rev-parse --verify -q HEAD` fails — exit-code-only,
+locale-independent) and returns a defined `head: null` sentinel with git's
+well-known empty-tree object id as `tree`, instead of propagating the
+uncaught `HGO-GIT` crash; a detached/corrupt HEAD still hits the original,
+unweakened `fail("HGO-GIT", ...)` path. Chosen over the alternative typed-
+status design (option b in the Proposal) because `head`/`tree` are used
+purely as opaque `canonical()` comparison values at all three call sites
+(record/plan/consume drift checks), with no shape validation there — this
+needed zero changes outside `human-guard-override.mjs`.
+
+Independently re-verified: reviewed the diff directly, confirmed the fix's
+4 new tests pass, and confirmed — by temporarily restoring the pre-fix
+version of both changed files and rerunning the suite — that the 5
+remaining failures (`HGO-EXTERNAL-MARKETPLACE`, "external local marketplace
+plugin entry content does not match this checkout") are pre-existing and
+unrelated to this fix, present identically before and after with zero code
+changes; this is a machine-local marketplace-checkout condition, not a
+regression. `node --test plugins/pipeline-core/lib/human-guard-override.test.mjs`:
+34 pass / 5 pre-existing unrelated fail, both before and after. Commit
+`a7c3e581bf0b18a036d412012143fe3820c9b7c8`.
+
+Still needs the Critic review noted in Assignment above before being
+considered fully done — not yet scheduled. The pre-existing
+`HGO-EXTERNAL-MARKETPLACE` failures are out of this item's scope; worth a
+separate backlog item if not already tracked.
