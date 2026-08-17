@@ -1,0 +1,15 @@
+{
+  "taskId": "PHX-WP-EAC08",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "goldfish",
+  "outcome": "in-progress",
+  "log": [
+    { "phase": "opening", "toolUseCount": 2, "note": "dispatch record created, about to read context files" },
+    { "phase": "implementation", "toolUseCount": 6, "note": "added rollsBackCursor() + GEOS-CURSOR-ROLLBACK check in governance-export-outbox-store.mjs, additive alongside GEOS-TRUNCATION" },
+    { "phase": "tests", "toolUseCount": 12, "note": "added 5 new tests to governance-export-outbox-store.test.mjs; 11/11 pass (node --test)" },
+    { "phase": "regression", "toolUseCount": 15, "note": "governance-export-outbox.test.mjs (untouched sibling module) still 12/12 pass" },
+    { "phase": "evidence-map", "toolUseCount": 22, "note": "DELTA E-AC-08 flipped partial->implemented, POINTERS narrative appended (not replaced), CLOSURE row for E-AC-08 removed; node --check passes; snapshot regenerated, totals sum to 157 (implemented 148, partial 8, constraint 1)" }
+  ],
+  "report": null
+}

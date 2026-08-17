@@ -549,7 +549,20 @@ const DELTA = {
   // argument capability this module does not have) remains, deliberately
   // out of scope. 7/7 governance-export-outbox-tests pass (independently
   // re-run).
-  'E-AC-08': ['partial', 'WP-EAC08-TRUNCATION'],
+  // WP-EAC08-CURSOR-ROLLBACK 2026-08-17 (goldfish, dispatch PHX-WP-EAC08):
+  // the eighth and final named defect class, cursor rollback, now has its
+  // own typed code (GEOS-CURSOR-ROLLBACK) in the cross-state write path
+  // (governance-export-outbox-store.mjs's persistGovernanceExportOutbox,
+  // alongside the existing GEOS-TRUNCATION check, same calling/throwing
+  // shape). Fires only on a genuine decrease (next.cursor < current.cursor)
+  // between two writes; cursor staying the same or advancing by any amount
+  // remains fully legal, unchanged. 11/11 governance-export-outbox-store-
+  // tests pass (independently re-run, 5 new cases: rollback rejected,
+  // same-cursor legal, advancing-cursor legal, existing GEOS-TRUNCATION
+  // unaffected); 12/12 governance-export-outbox-tests pass unchanged
+  // (that module untouched, out of scope by design). All 8 named E-AC-08
+  // defect classes are now genuinely detected with their own typed codes.
+  'E-AC-08': ['implemented', 'WP-EAC08-TRUNCATION'],
   'E-AC-09': ['partial', 'WP-E'],
   // WP-E-AC11 CLOSED 2026-08-09 (goldfish-implementor, commit 5bb4269):
   // createGovernanceDeliveryReceipt now requires projectionDigest alongside
@@ -1507,7 +1520,7 @@ const POINTERS = {
   'E-AC-05': 'governance-export-outbox-tests: independent destination queues, idempotent enqueue, retryable and quarantined entries preserved',
   'E-AC-06': 'governance-export-delivery-tests (PHX-WP-E + PHX-WP-A2): stable idempotency and at-least-once redelivery are pinned; the receipt\'s closed enums carry no exactly-once wording and structurally cannot ever admit one -- the SHALL-NOT-claim-exactly-once negative is now pinned directly',
   'E-AC-07': 'governance-export-delivery-tests: only the safely acknowledged prefix advances after partial delivery',
-  'E-AC-08': 'governance-export-outbox-tests (PHX-WP-E-AC08): 7 of 8 detections pinned (destination-mismatch/forged-ack/event-gap/schema-downgrade pre-existing, cursor-bound/source-fork/invalid-hash new, each with its own typed code); outbox truncation (a cross-state comparison this module has no capability for) remains absent. CORRECTED 2026-08-17 (EPIC-AC-04 Critic audit workflow, independently re-verified by the Elephant): this narrative is now stale in the OPPOSITE direction -- outbox truncation IS detected, added later in a sibling module (governance-export-outbox-store.mjs\'s `truncates()`/GEOS-TRUNCATION, confirmed by direct read), not the module this pointer describes. But that same function\'s own comment states plainly: "attempts/status/cursor legitimately advance and are deliberately not compared" -- cursor is explicitly excluded from the cross-state check. `GEO-CURSOR-BOUND` (governance-export-outbox.mjs:10,14) only bounds-checks a single state\'s own cursor against its own entries.length; it cannot and does not compare against a PRIOR state, so it cannot detect a cursor that moved backward (a rollback) between two writes. Re-tallying the 8 named classes honestly: destination-mismatch/forged-ack/event-gap/schema-downgrade/cursor-bound/source-fork/invalid-hash/outbox-truncation = 8, but "cursor rollback" specifically (a named, distinct item in E-AC-08\'s own text, separate from "outbox truncation") has no detector anywhere. Verdict reverts to partial: 7 of 8 named IF-conditions genuinely typed and fail-closed; cursor rollback is the one real remaining gap',
+  'E-AC-08': 'governance-export-outbox-tests (PHX-WP-E-AC08): 7 of 8 detections pinned (destination-mismatch/forged-ack/event-gap/schema-downgrade pre-existing, cursor-bound/source-fork/invalid-hash new, each with its own typed code); outbox truncation (a cross-state comparison this module has no capability for) remains absent. CORRECTED 2026-08-17 (EPIC-AC-04 Critic audit workflow, independently re-verified by the Elephant): this narrative is now stale in the OPPOSITE direction -- outbox truncation IS detected, added later in a sibling module (governance-export-outbox-store.mjs\'s `truncates()`/GEOS-TRUNCATION, confirmed by direct read), not the module this pointer describes. But that same function\'s own comment states plainly: "attempts/status/cursor legitimately advance and are deliberately not compared" -- cursor is explicitly excluded from the cross-state check. `GEO-CURSOR-BOUND` (governance-export-outbox.mjs:10,14) only bounds-checks a single state\'s own cursor against its own entries.length; it cannot and does not compare against a PRIOR state, so it cannot detect a cursor that moved backward (a rollback) between two writes. Re-tallying the 8 named classes honestly: destination-mismatch/forged-ack/event-gap/schema-downgrade/cursor-bound/source-fork/invalid-hash/outbox-truncation = 8, but "cursor rollback" specifically (a named, distinct item in E-AC-08\'s own text, separate from "outbox truncation") has no detector anywhere. Verdict reverts to partial: 7 of 8 named IF-conditions genuinely typed and fail-closed; cursor rollback is the one real remaining gap. UPDATED 2026-08-17 (goldfish, dispatch PHX-WP-EAC08, independently re-verified): cursor rollback now has its own typed code, GEOS-CURSOR-ROLLBACK, in governance-export-outbox-store.mjs\'s persistGovernanceExportOutbox, additive alongside GEOS-TRUNCATION (fires on next.cursor < current.cursor between two writes; same-or-advancing cursor stays legal, confirmed by dedicated tests for both directions). GEO-CURSOR-BOUND (governance-export-outbox.mjs) is untouched and remains what it always was, a single-state bounds check, not a cross-state one -- the new check is a distinct, additive capability in the sibling module, not a change to that one. 11/11 governance-export-outbox-store-tests and 12/12 governance-export-outbox-tests pass (both independently re-run). Verdict moves to implemented: all 8 named E-AC-08 defect classes -- cursor rollback, outbox truncation, event gap, source fork, invalid hash, schema downgrade, forged acknowledgement, destination mismatch -- are now genuinely detected, each with its own typed code',
   'E-AC-09': 'governance-export-delivery-tests (PHX-WP-E, break-proofed): lag exposed on a failed acknowledgement is pinned; CONFIRMED ABSENT: the "advisory destination" concept itself -- no such distinction exists anywhere in scope, so "canonical governance continues under an unavailable advisory destination" is not representable',
   'E-AC-10': 'NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range',
   'E-AC-11': 'governance-export-delivery-tests (PHX-WP-E-AC11): the closed 10-field receipt schema is pinned, rejecting any retention/immutability/analyst-review/compliance-implying extension, AND now carries a projectionDigest alongside policyRevision -- deterministic over batch content, proven to change when batch content changes',
@@ -1651,7 +1664,6 @@ const CLOSURE = {
   'E-AC-02': ['build', 'WP-E'],
   'E-AC-04': ['build', 'WP-E'],
   'E-AC-06': ['assert', 'WP-E'],
-  'E-AC-08': ['build', 'WP-E'],
   'E-AC-09': ['build', 'WP-E'],
   'E-AC-10': ['build', 'WP-E'],
   'E-AC-11': ['build', 'WP-E'],
