@@ -3,11 +3,95 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-16
+**Last updated:** 2026-08-17
 
 ---
 
-## CHECKPOINT — 2026-08-16, four agent-eligible red suites closed; the push chain is blocked on PO key material, not on process (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, closure-plan.md corrected (48→26 open), L-AC-01 producer dispatched, push still blocked on the same installed-plugin gap (READ THIS FIRST)
+
+**Trigger.** PO returned, granted "Architektur Themen" approval, asked what was needed to
+finalize the push, then set the standing goal `/goal "Phoenix offene Punkte weiter final
+umsetzen nach Prioritäten A, D, S, B"` — still active, drives autonomous continuation.
+
+**Push attempt this morning: Layer 4 refused cleanly (`CRITICAL-PROOF-SUBJECT`), no proof
+consumed.** Root cause: the prior session's own "Session close" doc commit (`2afd2c2e`)
+landed AFTER the push request was built, moving HEAD past the signed candidate
+(`18cc56d5`). Investigated whether to push the exact old SHA via `git -C <worktree> push`
+(guard-push.mjs's `resolveEvidenceProject` DOES honor an explicit-SHA source bound to the
+invocation directory, confirmed by reading `parsePushBinding`/`resolveEvidenceProject`
+directly) — abandoned: the verify evidence bound to that old candidate is itself red (4
+known suites, see below), and `checkEvidenceFreshness` requires `exitCode === 0` with no
+exception for "known parked" reds. **The real blocker is unchanged from 2026-08-16: the
+installed plugin distribution's `guard-maintenance-window.mjs`/`human-guard-override.mjs`
+are still pre-v3**, so no signature-based ceremony can clear the four protected-path
+fixes Verify needs. PO says Nova (the local-candidate supplier) has the transcript and
+will ship the fix in the next candidate — **not agent-actionable, do not re-attempt.**
+The PO's Layer-3 signature from this morning (`proof-critical-push.json`, expires
+`2026-08-17T18:00:00Z`) is almost certainly going to expire unused, since more commits
+have landed since (see below) — expected, not a problem to chase.
+
+**Major finding: `specs/sprint-phoenix-epic/design/closure-plan.md` was a week stale.**
+Spot-checking two "open" criteria (PX0-AC-03, E-AC-20) found both already fully closed
+(2026-08-11, 2026-08-10) and never reflected back into the doc. Ran the
+`acceptance-evidence-map.mjs` generator fresh — its own live `VERDICTS` table was ALREADY
+correct for almost everything (130 implemented / 27 open at that point) — then dispatched
+5 parallel forks to independently re-verify every one of the original 48 "open" rows
+directly against current code/tests (not against the doc's prose). Net: **22 of 48 rows
+had already closed** and one more (E-AC-08's outbox-truncation half, my own commit
+`8956d770` from the night before) had been missed by the generator too — fixed and
+independently re-verified (7/7 `governance-export-outbox-store` tests). **Corrected,
+current, doubly-verified total: 131/157 implemented, 26 open (14 Class B, 12 Class P;
+Classes A/D/S now empty).** `closure-plan.md` and a new dated snapshot
+(`evidence/acceptance-evidence-map-20260817.md`) both corrected and committed
+(`6bf4480e`). PO independently confirmed from memory ("ich war am laptop schon bei ca 130
+erledigten Artefakten") — matches exactly.
+
+**Side finding while committing the new snapshot: `.gitignore`'s unanchored `evidence/`
+rule was ALSO silently untracking `specs/sprint-phoenix-epic/evidence/`** (a durable
+package-artifact directory per the generator's own header comment, not the same
+regenerated run-output the rule intended). Fixed (`13811594`, anchored to `/evidence/`).
+Fixing it surfaced ~75 previously-untracked files in that directory going back an unknown
+number of sessions — NOT triaged or bulk-added (too much unknown content to `git add -A`
+responsibly); filed as
+[`backlog/items/2026-08-17-evidence-gitignore-left-dozens-of-durable-artifacts-untracked.md`](../backlog/items/2026-08-17-evidence-gitignore-left-dozens-of-durable-artifacts-untracked.md),
+ledger-reconciled (`d812087e`).
+
+**PO-decision artifact published:** the 12 Class P criteria, split into 7 genuine
+decisions (options/implications/recommendation each) and 5 pure-execution items, as an
+HTML artifact (`https://claude.ai/code/artifact/621b4c7c-7a86-4493-94e0-90079f62b669`,
+source `scratch/phoenix-weichenstellungen.html`, not committed — scratch/ is gitignored
+by design). Recommendations given but NOT yet PO-accepted for any of the 7 — next
+session should check whether the PO responded before treating any of them as settled.
+
+**Class B work started: PHX-WP-LAC01 dispatched** (Goldfish-deep, opus/xhigh,
+`templates/prompts/goldfish-task.md`-built briefing in `scratch/dispatch-briefing-lac01.md`),
+targeting L-AC-01 — the lead item per the closure-plan's own sequencing rationale ("no
+Pipeline path emits a lifecycle event at all", the structural gap several other rows
+describe as their own missing half). Scoped to ONE of the nine named kinds, investigation-
+first: verify whether `pipeline-state.mjs`'s `queueHead.dispatch` continuity tracking is
+the right wiring point (starting hypothesis, not mandated), likely routing through a new
+translator from `control-execution-exchange.mjs` (also has zero production callers today,
+confirmed) into `lifecycle-governance-events.mjs`'s closed schema, persisted via
+`governance-event-store.mjs`'s `appendPortableGovernanceEvent`. **Status at this
+checkpoint: dispatched, result not yet known — check for a completion notification /
+commits under `Dispatch: PHX-WP-LAC01` before starting anything that assumes it landed.**
+
+**Final candidate at this checkpoint: `d812087e3c3cb1ced015d73428f5dfdeb007507d`** (plus
+whatever PHX-WP-LAC01 adds on top). Security-scan re-run clean at this exact commit from
+the synced `.git/phx-verify` worktree (gitleaks/semgrep/license-check OK, osv-scanner
+skipped — no package sources — exit 0). Full Verify NOT re-run this checkpoint (still
+carries the same 4 known, plugin-gap-blocked reds; no point re-running until either the
+plugin lands or PHX-WP-LAC01's own suites need checking).
+
+**Next steps, in order:** (1) check PHX-WP-LAC01's outcome; (2) continue Class B in
+closure-plan.md's "Class B" table order (13 items remain after L-AC-01); (3) surface the
+PO-decision artifact's answers once given and execute the settled ones (mostly cheap
+amendments/removals per the recommendations); (4) do NOT re-attempt the push until the
+installed-plugin gap is confirmed fixed.
+
+---
+
+## CHECKPOINT — 2026-08-16, four agent-eligible red suites closed; the push chain is blocked on PO key material, not on process
 
 **Trigger.** PO asked to pull `origin/sprint_phoenix` (explicitly authorising a full
 local replacement — "da ist nichts sinnvolles on top drin") and continue, then asked
