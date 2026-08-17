@@ -1067,6 +1067,12 @@
       "member": "control-execution-exchange-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-execution-lifecycle-event-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-execution-lifecycle-event-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1415,6 +1421,12 @@
       "member": "governance-export-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:governance-export-view-status-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "governance-export-view-status-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:governance-replay-cli-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1443,6 +1455,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "guard-apply-patch-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-authority-ledger-intake-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
@@ -1481,6 +1499,12 @@
       "member": "guard-git-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-handoff-offer-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-handoff-offer-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1497,6 +1521,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "guard-maintenance-window-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-decision-reference-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-push-decision-reference-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-external-ledger-tests",
@@ -1937,10 +1967,22 @@
       "member": "pipeline-start-v3-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-decision-reference-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-state-decision-reference-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-external-push-ledger-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "pipeline-state-external-push-ledger-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-lifecycle-event-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-state-lifecycle-event-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-runner-tests",
@@ -2997,6 +3039,7 @@
         "verify-phase:harness/scripts/verify.mjs:control-catalog-schema-tests",
         "verify-phase:harness/scripts/verify.mjs:control-evaluation-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-execution-lifecycle-event-tests",
         "verify-phase:harness/scripts/verify.mjs:control-waiver-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:credential-lease-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
@@ -3053,20 +3096,24 @@
         "verify-phase:harness/scripts/verify.mjs:governance-export-outbox-store-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-export-outbox-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-export-tests",
+        "verify-phase:harness/scripts/verify.mjs:governance-export-view-status-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-core-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-view-tests",
         "verify-phase:harness/scripts/verify.mjs:governance-replay-viewer-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-gmw-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-origin-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-authority-grant-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-handoff-offer-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-decision-reference-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-external-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-v2-tests",
@@ -3139,7 +3186,9 @@
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-decision-reference-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-external-push-ledger-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-lifecycle-event-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-runner-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-reopen-design-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
