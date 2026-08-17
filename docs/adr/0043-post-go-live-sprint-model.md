@@ -82,6 +82,44 @@ change after go-live, or the Sprint taxonomy changes. Any further issue,
 branch, label, merge, release, or promotion action uses its own authority and
 gates.
 
+## Amendment (2026-08-17) — three further planning windows: Alfred, Nightwing, Batman
+
+The PO confirmed (2026-08-17) three further canonical planning windows,
+already carrying live GitHub Issues and sprint labels in this repository:
+**Sprint Alfred** (`alfred`, `sprint:alfred`), **Sprint Nightwing**
+(`nightwing`, `sprint:nightwing` — same codename this ADR already reserved
+above; its scope is confirmed, not new), and **Sprint Batman** (`batman`,
+`sprint:batman`). The label descriptions are the authoritative scope
+statement, not a table hand-copied into this ADR (issue membership under a
+label changes over time; query `gh issue list --label sprint:<name>` for the
+live set rather than trusting a snapshot here):
+
+| Sprint | Label description (authoritative scope) |
+| --- | --- |
+| Alfred | Agent-first architecture, mechanical governance, measurable rigor, and control integrity. |
+| Nightwing | Product experience: onboarding, configuration, documentation and low-friction adoption. |
+| Batman | Optional capabilities: governed adapters, built-in tools, recommendations, and safe pilots. |
+
+**Batman name reuse:** this is a second, distinct use of the codename
+"Batman" — [ADR-0037](0037-batman-bounded-assurance.md) is an unrelated,
+already-completed v0.3 sprint (AFK bounded-assurance architecture). The two
+share a name and nothing else; ADR-0037 is not reopened or superseded by
+this amendment.
+
+**Order and current status (PO, 2026-08-17):** Cyborg is complete. Phoenix is
+at approximately 90% completion and is now closed to new scope — no further
+backlog item is assigned into Phoenix while it finishes. Alfred, Nightwing,
+and Batman follow, in that order, once Phoenix and Nova are live; Alfred
+before Nightwing, Batman last. A backlog item may be assigned into one of
+these three windows ahead of its own start — the same non-scope-changing
+"Sprint assignment" recording this ADR already establishes in
+[the 2026-07-24 portfolio assignment evidence](../../backlog/evidence/2026-07-24-sprint-portfolio-assignment.md)
+— when its content matches the window's scope and it is not needed
+near-term. This creates no branch, no re-sequencing of Phoenix/Nova, and no
+new lifecycle profile; the rules already stated in this ADR's Decision
+section (independent branch/PRD/spec/gates per Sprint, no unpublished
+sibling dependency) apply unchanged to all three.
+
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation. -->
 
 # ADR-0043: Post-Go-live-Sprint-Modell und Common-Base-Branch-Regel
