@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e47c66fad8df8c06aa1d03fef4e26d78a3a2118eb6b8b7dbe6d5394a7a17254e"
+    "transitionHead": "f2b4f5e8579a07cddb19cbbd3058ffd0086b2d387c82de545844cb8f32ca74b2"
   },
   "counts": {
-    "open": 95,
+    "open": 96,
     "in_progress": 26,
     "closed": 27
   },
@@ -791,6 +791,14 @@
       "owner": "pipeline",
       "created": "2026-08-16",
       "source": "Independent Critic review of 0d3d9bcc..8be6c308, finding F3 (blocker), 2026-08-16. Full report: specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md."
+    },
+    {
+      "id": "pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Delta Critic re-review of the P-AC-11 fix range (289287e7, c7eb2297), finding F-A (blocker), 2026-08-17."
     },
     {
       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
