@@ -199,7 +199,7 @@ const VERDICTS = {
 
   'EPIC-AC-01': ['partial', 'C'],
   'EPIC-AC-02': ['not-started', 'J'],
-  'EPIC-AC-03': ['partial', 'C'],
+  'EPIC-AC-03': ['implemented', 'C'],
   'EPIC-AC-04': ['partial', 'C'],
   'EPIC-AC-05': ['constraint', 'C'],
   'EPIC-AC-06': ['implemented', 'C'],
@@ -1538,7 +1538,7 @@ const POINTERS = {
 
   'EPIC-AC-01': 'the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues',
   'EPIC-AC-02': 'NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file',
-  'EPIC-AC-03': 'an outstanding deviation is recorded (the bound Spec section 7 inventory omits six implemented modules) and is not yet repaired through the sanctioned route',
+  'EPIC-AC-03': 'an outstanding deviation is recorded (the bound Spec section 7 inventory omits six implemented modules) and is not yet repaired through the sanctioned route. CLOSED 2026-08-17 (PHX-WP-EPICAC03, no dispatch -- Elephant-context, module list independently re-derived by PHX-WP-EPICAC03-MODULELIST): the deviation is repaired through the sanctioned continuity-authority-revision route. spec.md sec.7 gained 9 producer + 8 companion test files across sec.7.1 (EPIC-AC-02), sec.7.4 (A-AC-04, K-AC-05), sec.7.5 (L-AC-01, A-AC-05), sec.7.6 (P-AC-09) -- commit 47af86b5. The PRD\'s embedded technical-spec-sha256 marker was rebound to the revised spec.md (commit e39f3903). A PO-authority-decision cycle (po-authority-decision-plan/select/apply) reopened design phase after the spec.md drift was detected by the live readiness gate; the sanctioned continuity-authority-revision-plan/apply ceremony then formally renewed the approval binding -- proposal generated fresh from continuity.authority (not the stale generator script, which assumes no intermediate edit between reopening design and generating the request; hand-verified against buildAuthorityRevisionPlan\'s own checks instead), PRD marker rebound to the new spec digest, PO-signed via phoenix-authority-approval.mjs prepare/approve/verify (Ed25519, existing WSL key), applied via phoenix-authority-revision.mjs -- continuity revision 6->7, continuity.authority.{prd,spec} now point at the current bytes. Both halves of the clause -- "update the Spec" and "renew the affected approval" -- are done; "before merge" is not yet due since nothing has been pushed',
   'EPIC-AC-04': 'Full Verify and blocking Security pass only on the last PUSHED candidate (`3387065`), not the integrated one measured here (see the gates table below). An independent high-risk Critic on the integrated candidate is no longer absent -- it ran 2026-08-09 and returned FAIL (5 major, 2 minor); privacy review and explicit PO acceptance remain absent',
   'EPIC-AC-05': 'a prohibition, and it currently bites -- see the summary count above for the exact figure; deliberately not hardcoded here after an independent Critic FAIL found this line stale against the generated total more than once (F4, 2026-08-09)',
   'EPIC-AC-06': 'the PRD header records the PO approval binding the first implementation dispatch',
@@ -1679,7 +1679,8 @@ const CLOSURE = {
   // EPIC-AC-02 CLOSED 2026-08-17 (PHX-WP-EPICAC02-VERIFYCHECK, commit ebc75a77
   // + 7135aa41): the observation-gathering script and its verify.mjs
   // registration both landed -- see POINTERS for the full narrative.
-  'EPIC-AC-03': ['po', 'WP-PO'],
+  // EPIC-AC-03 CLOSED 2026-08-17 (PHX-WP-EPICAC03, continuity revision 6->7,
+  // PO-signed authority revision): see POINTERS for the full narrative.
   'EPIC-AC-04': ['po', 'WP-PO'],
   'EPIC-AC-05': ['po', 'WP-PO'],
 };
