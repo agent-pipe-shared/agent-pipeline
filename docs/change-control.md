@@ -7,7 +7,8 @@ and schedule window. An ITSM approval never substitutes for Pipeline authority,
 and a Pipeline approval never authenticates an external change system.
 
 Mandatory profiles block promotion for a missing, draft, rejected, expired,
-conflicting, unknown, unauthenticated, mismatched, or out-of-window external
+conflicting, unknown, unavailable, unauthenticated, mismatched, or
+out-of-window external
 receipt — unless the profile's `reviewPolicy` is `advisory`, in which case an
 unreachable external system is `allowed` with a distinct, operator-visible
 `reconciliation-required` reason instead of a hard block (C-AC-12; see
@@ -26,8 +27,10 @@ Evaluate one promotion tuple explicitly:
 
 ```bash
 node plugins/pipeline-core/scripts/change-control.mjs gate \
+  --repo <checkout> \
   --profile-file <profile.json> \
   --pipeline-authority-file <local-authority.json> \
+  --authority-request-file <authority-request.json> \
   --external-receipt-file <receipt.json|none> \
   --now-ms <epoch-ms>
 ```
@@ -57,11 +60,14 @@ distinct attack surface:
   pipelineAuthority.decisionReference.resolved` — the caller's own
   already-resolved, ledger-backed second-reader verdict for that reference;
   this module performs no I/O and never resolves the reference itself
-  (`change-control.mjs:61-68`). Any disagreement between the legacy
-  `granted` verdict and the ledger-backed verdict, in either direction,
-  blocks with the distinct reason `"decision-reference-disagreement"`
-  rather than being silently folded into `"pipeline-authority"`
-  (`change-control.mjs:67`). A malformed `decisionReference` shape
+  (`change-control.mjs:61-68`). Because this block is only reached after
+  `matchesLocal` already required `pipelineAuthority.granted` to be `true`,
+  `legacyOk` is always `true` here — so the only reachable disagreement is
+  the legacy authority granting while the ledger-backed verdict disagrees;
+  that case blocks with the distinct reason
+  `"decision-reference-disagreement"` rather than being silently folded
+  into `"pipeline-authority"` (`change-control.mjs:67`). A malformed
+  `decisionReference` shape
   (not the closed `{ reference, resolved }` object, or a `reference` not
   shaped like `pipeline.human-decision-reference.v1`) is rejected earlier,
   at the input boundary, with `CC-GATE` (`validPipelineAuthority`,
@@ -78,8 +84,8 @@ distinct attack surface:
   requires an exact match of `profileId`, candidate, artifact, environment,
   `scopeSha256`, and `window`, plus `authenticated === true` and `state ===
   "approved"` (`change-control.mjs:81-82`); draft, rejected, expired,
-  conflicting, unknown, and unauthenticated receipts are all rejected
-  through this one check (reason `"external-authority"`).
+  conflicting, unknown, unavailable, and unauthenticated receipts are all
+  rejected through this one check (reason `"external-authority"`).
 - **Deploy-window bypass:** even a matching, authenticated, approved receipt
   is blocked outside `profile.window` (`change-control.mjs:83`, reason
   `"outside-window"`).
@@ -229,8 +235,7 @@ neither `change-control.mjs` (lib) nor `scripts/change-control.mjs` version
 the profile/receipt/journal schemas beyond the single
 `pipeline.change-control-profile.v1` / `pipeline.change-control-receipt.v1`
 / `pipeline.change-control-journal.v1` shapes (`change-control.mjs:43,47,
-178`). `specs/sprint-phoenix-epic/design/closure-plan.md:197` records this
-gap directly. An existing deployment that wants to adopt change control
+178`). An existing deployment that wants to adopt change control
 today has to hand-author a profile matching the schema above and start
 appending journal entries from `began`; there is no automated onboarding or
 conversion path, and this document does not invent one.
