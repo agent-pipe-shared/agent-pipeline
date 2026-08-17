@@ -1579,6 +1579,80 @@ test("NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and n
 });
 
 /**
+ * NVA-LCGUARD-3 (backlog: 2026-08-17-lifecycle-guard-omits-the-operator-authority-repair-
+ * shape.md). collectOperatorContinuityAuthorityAction() (lib/project-onboarding-v3.mjs)
+ * tells a session that gets `operator-authority-required` back from plan-repair to rerun
+ * plan-repair/apply-repair with --id --plan-path --prd-path --spec-path --language set to
+ * the PO's answers -- the exact five-field, all-or-none operator-confirmed continuity claim
+ * the CLI's own usage string documents. The allowlist had no branch admitting either shape,
+ * so a session that collected the operator's answers had no route forward at all.
+ */
+test("NVA-LCGUARD-3: plan-repair and apply-repair admit exactly the operator-authority shape", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    const operatorTail = "--id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en";
+    const planCommand = `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' ${operatorTail}`;
+    assert.equal(isSanctionedLifecycleCommand(planCommand, path), true, planCommand);
+    const applyCommand = `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(applyCommand, path), true, applyCommand);
+    for (const intent of ["onboarding", "bootstrap", "session", "dispatch"]) {
+      const withIntentPlan = `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' ${operatorTail} --intent ${intent}`;
+      assert.equal(isSanctionedLifecycleCommand(withIntentPlan, path), true, withIntentPlan);
+      const withIntentApply = `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --plan-sha256 ${sha} --activate --intent ${intent}`;
+      assert.equal(isSanctionedLifecycleCommand(withIntentApply, path), true, withIntentApply);
+    }
+    // No-regression pins: the pre-existing bare-form plan-repair and digest-form
+    // apply-repair, with and without --intent, keep working exactly as before.
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}'`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --intent session`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' --plan-sha256 ${sha} --activate --intent session`, path), true);
+    for (const command of [
+      // each of the five operator fields missing entirely (positions shift, so no branch matches)
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md`,
+      // reordered: --plan-path before --id
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --plan-path specs/plan.md --id feat-1 --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      // reordered: --language before --spec-path
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --language en --spec-path specs/spec.md`,
+      // flag-shaped values (e.g. --id --plan-path with no value)
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path --spec-path specs/spec.md --language en`,
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --spec-path --language en`,
+      // empty operator field values
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id '' --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language en`,
+      // invalid --language enum value
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' --id feat-1 --plan-path specs/plan.md --prd-path specs/plan.md --spec-path specs/spec.md --language fr`,
+      // apply-repair is a separate, mutating command and does not admit the plan-repair
+      // operator shape without --plan-sha256/--activate
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail}`,
+      // incomplete apply-repair: operator fields present but --plan-sha256 missing
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --activate`,
+      // incomplete apply-repair: operator fields and digest present but --activate missing
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --plan-sha256 ${sha}`,
+      // incomplete apply-repair: malformed digest
+      `node '${ONBOARDING_SCRIPT}' apply-repair --root '${path}' ${operatorTail} --plan-sha256 ${"a".repeat(63)} --activate`,
+      // plan-repair does not admit the apply-repair operator tail (--plan-sha256/--activate smuggled in)
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' ${operatorTail} --plan-sha256 ${sha} --activate`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root /tmp/other ${operatorTail}`,
+      // extra trailing argument
+      `node '${ONBOARDING_SCRIPT}' plan-repair --root '${path}' ${operatorTail} --extra flag`,
+      // no other plan-repair sibling admits the operator-authority shape
+      `node '${ONBOARDING_SCRIPT}' plan --root '${path}' ${operatorTail}`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
  * GUARDFIX-1 (A). The apply half of the same defect the test above closed for the plan half.
  *
  * `plan-runtime --intent session` returns, verbatim, the argv built at

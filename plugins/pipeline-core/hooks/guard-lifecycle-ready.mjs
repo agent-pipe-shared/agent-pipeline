@@ -1332,6 +1332,29 @@ function withoutRunnerFlag(args) {
 
 function sanctionedOnboardingArgs(rawArgs, root) {
   const args = withoutRunnerFlag(rawArgs);
+  // NVA-LCGUARD-3 (backlog: 2026-08-17-lifecycle-guard-omits-the-operator-authority-repair-shape.md).
+  // collectOperatorContinuityAuthorityAction() (lib/project-onboarding-v3.mjs) is the
+  // guidance a session actually reads once plan-repair reports operator-authority-required:
+  // "rerun plan-repair/apply-repair with --id --plan-path --prd-path --spec-path --language
+  // set to those exact values" -- the same five-field, all-or-none operator-confirmed
+  // continuity claim the CLI's own usage string documents (scripts/project-onboarding-v3.mjs,
+  // "<plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path>
+  // --prd-path <path> --spec-path <path> --language <de|en>] ..."). Exact position, like every
+  // sibling here: parse() is flag-name-based and order-tolerant, but the guard is the only
+  // place order actually matters. --id/--plan-path/--prd-path/--spec-path are a feature id and
+  // repository-relative paths, checked only as non-empty, non-flag-shaped strings -- the same
+  // defensive idiom the adopt-remote branch already applies to its own free-form --remote
+  // value below -- never re-deriving the path-safety/existence validation that stays the
+  // library's job. --language is the CLI's own closed two-value enum, exactly as the kickoff
+  // branches below already check it.
+  const operatorContinuityAuthorityAt = (index) => {
+    const nonEmptyPathArg = (value) => typeof value === "string" && value !== "" && !value.startsWith("--");
+    return args[index] === "--id" && nonEmptyPathArg(args[index + 1])
+      && args[index + 2] === "--plan-path" && nonEmptyPathArg(args[index + 3])
+      && args[index + 4] === "--prd-path" && nonEmptyPathArg(args[index + 5])
+      && args[index + 6] === "--spec-path" && nonEmptyPathArg(args[index + 7])
+      && args[index + 8] === "--language" && ["de", "en"].includes(args[index + 9]);
+  };
   // GF-093: same reasoning as START_PREFLIGHT_SCRIPT's and REPAIR_MAP_SCRIPT's own bare
   // no-arg admissions above -- a stuck agent needs the CLI's own usage text precisely in the
   // state this function exists to gate. `main()` returns immediately on `options.help`
@@ -1359,6 +1382,14 @@ function sanctionedOnboardingArgs(rawArgs, root) {
     && (args.length === 3
       || (args.length === 5 && args[3] === "--intent"
         && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[4])))) return true;
+  // NVA-LCGUARD-3: the operator-authority form -- only plan-repair ever accepts these five
+  // fields (isRepairCommand in the CLI's own parse()); no other sibling in the bare-form
+  // branch above does, so this is a plan-repair-only addition, not a widening of that
+  // shared branch.
+  if (args[0] === "plan-repair" && exactRoot(args, root, 1) && operatorContinuityAuthorityAt(3)
+    && (args.length === 13
+      || (args.length === 15 && args[13] === "--intent"
+        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[14])))) return true;
   if (["plan-source-recovery", "plan-manifest-repair"].includes(args[0])
     && exactRoot(args, root, 1) && args.length === 3) return true;
   if (args[0] === "apply-manifest-repair"
@@ -1415,6 +1446,18 @@ function sanctionedOnboardingArgs(rawArgs, root) {
     && (args.length === 6
       || (args.length === 8 && args[6] === "--intent"
         && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[7])))) return true;
+  // NVA-LCGUARD-3: apply-repair's own operator-authority form. applyLifecycle()
+  // (lib/project-onboarding-v3.mjs) re-threads operatorAuthority into the apply-side
+  // recomputation of the repair plan, so the digest only matches when these five fields are
+  // supplied again alongside --plan-sha256/--activate -- only apply-repair ever accepts them
+  // (isRepairCommand), so this is an apply-repair-only addition, not a widening of the
+  // shared digest+activate branch above.
+  if (args[0] === "apply-repair" && exactRoot(args, root, 1) && operatorContinuityAuthorityAt(3)
+    && args[13] === "--plan-sha256" && HEX.test(args[14] ?? "")
+    && args[15] === "--activate"
+    && (args.length === 16
+      || (args.length === 18 && args[16] === "--intent"
+        && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[17])))) return true;
   // --language <de|en> is mandatory for kickoff plan/apply since the CLI's
   // GF-066 addition (scripts/project-onboarding-v3.mjs:56,92,114); it sits
   // between --goal <text> and --plan-sha256 <sha256> in the CLI's own
