@@ -90,11 +90,11 @@ export function sealVerifySuiteReceipt(fields) {
 // conservative default that push/release-bound Verify runs force full re-execution (`--no-reuse`).
 // `allowCrossCandidateReuse` (threaded through `context` from `planVerifyResume`'s caller) is that
 // switch: it defaults to false/absent, so a Tier-B suite is gated by candidate-drift exactly like
-// Tier A unless a caller explicitly opts in. `harness/scripts/verify.mjs` -- the one production
-// entry point -- is TP-3-protected with no active Guard Maintenance Window, so it cannot currently
-// be edited to pass `true`; its unmodified call therefore gets the safe default automatically,
-// which makes the conservative behaviour the real production behaviour today, not a placeholder
-// pending a later change.
+// Tier A unless a caller explicitly opts in. The top-level Verify entry point -- the one
+// production caller -- is TP-3-protected with no active Guard Maintenance Window, so it cannot
+// currently be edited to pass `true`; its unmodified call therefore gets the safe default
+// automatically, which makes the conservative behaviour the real production behaviour today, not
+// a placeholder pending a later change.
 function isTierARegistration(suite) {
   return suite.inputs.nonFiles.some((entry) => entry.kind.startsWith("declared-tree:"));
 }
