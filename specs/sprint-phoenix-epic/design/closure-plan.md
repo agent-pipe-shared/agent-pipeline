@@ -2,16 +2,31 @@
 
 Status: design
 
-Date: 2026-08-09
+Date: 2026-08-09 (class table and per-criterion rows CORRECTED 2026-08-17 — see note below)
 
-Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260809.md](../evidence/acceptance-evidence-map-20260809.md)
+Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260817.md](../evidence/acceptance-evidence-map-20260817.md)
+
+**CORRECTION, 2026-08-17.** This document's original "48 of 157" claim (below) had gone stale:
+between 2026-08-09 and 2026-08-16, real work landed on 22 of those 48 rows — 20 flipped to
+`implemented` and never got reflected back here, and 2 more (K-AC-05, and one further criterion
+found while re-verifying) were also already closed. Verified two ways before correcting: (1) the
+acceptance-evidence-map.mjs generator's own live `VERDICTS` table already had the correct,
+current value for most of them — running the generator fresh (`node
+specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`) was sufficient; (2) five parallel
+re-verification passes independently re-checked every one of the original 48 rows directly
+against current code/tests (not against this document's prose), confirming the generator's live
+state and additionally catching one the generator itself had missed (E-AC-08, closed by commit
+`8956d770` the same night, verified independently by re-running its test file: 7/7 pass). The
+class table and per-criterion tables below are corrected to match. **Current authoritative
+snapshot:** [`../evidence/acceptance-evidence-map-20260817.md`](../evidence/acceptance-evidence-map-20260817.md).
 
 ## What this design is for
 
-The measurement established that 48 of 157 acceptance criteria are not
+The measurement established that **26 of 157** acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
-cannot drift apart.
+cannot drift apart — provided it is regenerated when the verdict data moves, which is the exact
+step that was skipped for a week and is corrected here.
 
 The central design claim is that the remainder is **not one backlog**. It is five populations
 with different costs, different owners, and different blocking properties, and treating them as
@@ -19,12 +34,12 @@ one list is what has made the epic look larger and more uniform than it is.
 
 | class | criteria | what closing one actually costs |
 |---|---|---|
-| A — assertion missing | 2 | one named test case in an already-registered, unprotected suite |
-| D — documentation missing | 1 | one document section set; no code, no gate |
-| S — seam missing | 1 | a connector between two packages that already work |
-| B — capability missing | 38 | real implementation plus its tests |
-| P — not code | 6 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **48** | |
+| A — assertion missing | 0 | (both prior members, A-AC-14/PX0-AC-03, closed — see below) |
+| D — documentation missing | 0 | (prior member L-AC-08 reclassified to P — see below) |
+| S — seam missing | 0 | (prior member E-AC-20 closed 2026-08-10) |
+| B — capability missing | 14 | real implementation plus its tests |
+| P — not code | 12 | a human gate, a sanctioned authority revision, or a proved impossibility |
+| **total** | **26** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -172,76 +187,56 @@ H-AC-11's GMW half is a proved impossibility that closes by amendment or not at 
 
 ## Per criterion
 
-### Class A — the behaviour exists, the assertion does not (2)
+Classes A, D and S are empty as of the 2026-08-17 correction — every prior member closed:
+A-AC-14/PX0-AC-03 (Class A) landed 2026-08-09/2026-08-11; L-AC-08 (Class D) is reclassified to P
+below (its remaining gap is a naming/design ambiguity, not a missing document section — more
+prose cannot close it); E-AC-20 (Class S) landed 2026-08-10. Full per-row evidence for every
+`implemented` criterion, including these, is in
+[`../evidence/acceptance-evidence-map-20260817.md`](../evidence/acceptance-evidence-map-20260817.md)
+— not repeated here, since this document's job is the OPEN set.
 
-| ID | verdict | package | what closes it |
-|---|---|---|---|
-| A-AC-14 | partial | WP-A | 12 of 13 named conformance scenarios now have dedicated coverage (PHX-WP-A + PHX-WP-A2 + PHX-WP-A-AC14): "tampering" now proven via GES-EVENT-INVALID on a digest-stale agent-kind fixture; "decomposition" is confirmed not representable in the current `kind` enum |
-| PX0-AC-03 | partial | WP-PX0 | pipeline-state-tests AR03a-g (PHX-WP-PX0): apply rechecks both the next-authority artifact (AR03c) and its own fresh State preimage against a concurrent unrelated mutation (AR03e-g, new). One named axis remains unpinned: active-feature phase != design -> AR-DECISION-SCOPE, reachable in production but needing a full plan-approval fixture the dispatch's budget did not cover |
-
-### Class D — the gap is a documentation section the criterion enumerates (1)
-
-| ID | verdict | package | what closes it |
-|---|---|---|---|
-| L-AC-08 | partial | WP-DOC | docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed |
-
-### Class S — two implemented packages, mutually unaware (1)
-
-| ID | verdict | package | what closes it |
-|---|---|---|---|
-| E-AC-20 | not-started | WP-E | NO CARRIER: audit-bundle carries nothing from the export package, and the export modules never reference the bundle |
-
-### Class B — an absent capability (38)
+### Class B — an absent capability (14)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | A-AC-01 | partial | WP-A | record shape pinned; nothing enforces recording BEFORE dependent action where policy requires |
 | A-AC-03 | not-started | WP-A | NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption |
-| A-AC-05 | partial | WP-AAC05 | agent-decision-journal-tests (PHX-WP-AAC05): the observational shape now carries an optional identity array (dimension/value/provenance/assurance, closed enums, 1-7 entries, no duplicate dimension) on selection/escalation/fallback only, rejected elsewhere via ADJ-IDENTITY-SCOPE, schema/validator drift-tested. Still no production caller: CONFIRMED ABSENT (repo-wide search) that any code path emits a selection/escalation/fallback event at all |
-| A-AC-07 | not-started | WP-A | CONFIRMED ABSENT (PHX-WP-A, repo-wide search): no per-event-class "mandatory" capture concept exists anywhere in the journal, the shared store, or capture-policy.json -- five of the seven named event classes are not even representable as a journal `kind` |
-| A-AC-08 | not-started | WP-A | NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only |
-| A-AC-09 | designed-only | WP-A | materiality is documented as design intent only; no code enforces or measures it |
+| A-AC-05 | partial | WP-AAC05 | the observational shape (identity array, dimension/value/provenance/assurance) is pinned on selection/escalation/fallback. Still no production caller: CONFIRMED ABSENT that any code path emits a selection/escalation/fallback event at all — wiring `advisory-decision-event.mjs`'s translator into the real `advisory-coordinator.mjs` flow is real architecture work, deliberately deferred to a session with PO input available (design/agent-decision-identity-scoping.md) |
+| A-AC-09 | partial | WP-A | `assertMandatoryCaptureNotSkipped` (governance-event-store.mjs) lets a caller avoid persisting a non-mandatory event, tested; nothing computes "routine/low-impact" itself — the caller still decides |
 | A-AC-10 | partial | WP-A | the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists |
-| C-AC-02 | partial | WP-C | change-control-tests (PHX-WP-C-AC02): "standard" is pinned as a distinct changeClass paired with mandatory authority, alongside emergency and not-required, AND now carries its own required standardTemplate {templateId, revision} field (null for every other class), closing the standard-vs-normal field-level distinction per issue #24 §5. Any anti-class-shopping check remains absent -- no concept anywhere in the module supports detecting a class picked solely to avoid approval |
-| C-AC-07 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): explicit emergency authority and bounded-scope rejection of a scope mismatch are pinned; retrospective evidence proving the emergency was real or reviewed is not -- the journal binding does not even carry changeClass, so nothing is gated on it |
-| C-AC-09 | not-started | WP-C | CONFIRMED ABSENT (PHX-WP-C, repo-wide search): no resolver over multiple candidate change-control profiles exists anywhere in this module or its CLI -- there is no data shape representing "release configuration for an environment" as a set of candidates, so nothing exists to test |
-| C-AC-12 | partial | WP-C | change-control-tests (PHX-WP-C, break-proofed): unavailable external state blocks via C-AC-04, and the distinct "external-unavailable" gate reason is now pinned by name; the explicit advisory-vs-mandatory policy distinction remains absent -- mandatory:false is only representable together with changeClass:"not-required", which short-circuits before ITSM availability is ever inspected |
-| E-AC-04 | partial | WP-E | governance-export-adapter-tests (PHX-WP-E, break-proofed): default omission of rationale/summary is pinned; CONFIRMED ABSENT: the "policy allows and redacts" path -- EXPORT_FIELDS is a closed, non-configurable constant (adapter.mjs:15), no policy can ever admit the field |
-| E-AC-08 | partial | WP-E | governance-export-outbox-tests (PHX-WP-E-AC08): 7 of 8 detections pinned (destination-mismatch/forged-ack/event-gap/schema-downgrade pre-existing, cursor-bound/source-fork/invalid-hash new, each with its own typed code); outbox truncation (a cross-state comparison this module has no capability for) remains absent |
-| E-AC-09 | partial | WP-E | governance-export-delivery-tests (PHX-WP-E, break-proofed): lag exposed on a failed acknowledgement is pinned; CONFIRMED ABSENT: the "advisory destination" concept itself -- no such distinction exists anywhere in scope, so "canonical governance continues under an unavailable advisory destination" is not representable |
-| E-AC-10 | not-started | WP-E | NO CARRIER: no named lifecycle boundary blocks only the exact unacknowledged source range |
-| EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file |
-| H-AC-08 | partial | WP-HAC08 | agent-decision-journal-tests (PHX-WP-HAC08): a third, independent event kind `legacy-import-observation` (closed legacySourceClass/authorityProofStatus/sourceReference shape, non-authoritative by construction via the existing origin==="agent" binding) is now representable, drift-tested. Still no production caller: CONFIRMED ABSENT (repo-wide search) that any code path imports/migrates a legacy record at all |
-| H-AC-12 | partial | WP-H | guard-push/guard-devplan/change-control validate the decision reference; the DUAL-EVALUATION during migration with shared owner and expiry has no carrier |
-| K-AC-05 | partial | WP-K | governance-event-store-tests: fork detection now proven to also block append and recovery, not only verify/query (PHX-WP-K, break-proofed). Still absent: no disposition operation exists anywhere in the module -- "governed disposition appended through the sanctioned recovery operation" has no code to test against |
-| L-AC-01 | partial | WP-L | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event |
-| P-AC-01 | partial | WP-P | CONFIRMED ABSENT (PHX-WP-P): schema/compatibility/merge pinned; provenance, dependency and signature-policy validation have no corresponding field anywhere in the pack schema, no test was written around the gap |
-| P-AC-03 | partial | WP-P | CONFIRMED ABSENT (PHX-WP-P): planOrganizationPolicyActivation pinned; newly-required artifacts, external effects and backfill range have no corresponding field anywhere in the activation-plan schema, no test was written around the gap |
-| P-AC-06 | partial | WP-P | audit-bundle-core-tests: missing, misplaced, illegally-mutable, stale and truncated each pinned (PHX-WP-P, break-proofed). legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it, and no code checks a package file is referenced by an artifact |
-| P-AC-08 | partial | ELEPHANT | CORRECTED 2026-08-09 (independent Critic FAIL, F3): the reconcile transaction is built and gate-registered (444/444, harness/scripts/pipeline-state.test.mjs), but no shipped entry point ever supplies deps.featurePackageReconcileApproval -- pipeline-state.mjs:5644 has no default (`??`) fallback, unlike its sibling deps, and both CLI entry points call run() with none. Only the test file ever provides the resolver. The command as shipped cannot be invoked by any real operator or agent -- structurally identical to the "interface built, no caller" gap this session found and disclosed for A-AC-04, just not caught here until independent review |
-| P-AC-09 | not-started | WP-P | NO CARRIER: no export-backfill preview or explicit consent path exists |
-| P-AC-11 | partial | WP-P | organization-policy-core-tests: mode (closed reference-only/projection/controlled-publication set) and approval (union, no downgrade) pinned (PHX-WP-P, break-proofed). Target class/binding, owned fields/sections, lifecycle event, preview, retention and revision readback remain unpinned: documentClasses is closed to exactly class/mode/approvalRequired, no field exists for the rest |
-| PX0-AC-05 | not-started | WP-PX0 | CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): the authority-revision receipt is only ever printed once to apply's stdout or embedded in the retired-on-success private journal -- no durable retention exists anywhere |
-| PX0-AC-06 | not-started | WP-PX0 | CONFIRMED ABSENT (PHX-WP-PX0, full command-path read): recover has exactly three outcome classes (clean, recovered-postimage x2, diverged) -- no recovered-preimage success outcome exists anywhere |
-| PX0-AC-13 | partial | WP-PX0 | ruleset-freshness-host.mjs selects the host transport correctly, but no suite exercises it and bootstrap does not wire it |
-| R-AC-02 | not-started | WP-R | CONFIRMED ABSENT (PHX-WP-R): recovery-proposed/recovered states exist in the schema but are unreachable through any exported function -- no capability correlates a rejected path, alternatives, or selected recovery to the offer |
-| R-AC-04 | partial | WP-R | external-command-offer-tests (PHX-WP-R): operation class, target, exact pre/post digests, and recoverability are bound and validated together; a distinct "required cleanup/readback" field beyond the recoverability enum does not exist |
-| R-AC-08 | partial | WP-R | external-command-offer-tests (PHX-WP-R): a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent -- no such state exists at all, only prospective values inside recoverability |
-| R-AC-09 | partial | WP-R | external-command-offer-tests (PHX-WP-R): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful); stale and duplicate detection remain absent -- no timestamp field, no supersession semantics for command-offer events |
-| R-AC-10 | partial | WP-R | fail-closed on the append is pinned; the policy-defined typed non-material exception is absent |
-| R-AC-11 | partial | WP-R | external-command-offer-tests (PHX-WP-R): a mandatory public-safe typed omission is pinned; "sanctioned machine-local state" storage and a distinct "commitment" field are absent from this module (it stores nothing by design; commitment only exists in the unrelated document-lifecycle.mjs) |
-| R-AC-13 | partial | WP-R | external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing |
-| V-AC-02 | partial | WP-V | evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid and not-applicable each labelled visibly, six of nine (PHX-WP-V, break-proofed). estimate, assumption and human decision remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules -- no field carries them at all |
-| V-AC-06 | partial | WP-V | evidence-view-renderer-tests: exact CSP directive value, skip-link keyboard focus target, and landmark/table accessibility structure all pinned (PHX-WP-V, break-proofed). Mobile/desktop snapshot checks remain absent: a viewport meta tag and one CSS breakpoint exist but no test or tooling captures a deterministic snapshot of either, and this repo has no headless-render/visual-regression infrastructure at all |
+| EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file (reconfirmed 2026-08-17 by independent re-verification, zero hits for "unpublished"/"Nova"/"Cyborg"/"Nightwing") |
+| H-AC-08 | partial | WP-HAC08 | `legacy-import-observation` kind is representable, drift-tested. Still no production caller: CONFIRMED ABSENT that any code path imports/migrates a legacy record at all |
+| L-AC-01 | partial | WP-L | the closed lifecycle schema and validator are pinned; NO PRODUCER exists — no Pipeline path emits a lifecycle event. Structural root cause: this is the single gap behind the epic's "libraries built, integration left" shape and leads the sequence below |
+| P-AC-06 | partial | WP-P | missing, misplaced, illegally-mutable, stale and truncated each pinned. legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it |
+| P-AC-09 | partial | WP-P | RETRACTS "no carrier" (2026-08-17): `computeBackfillRange` (organization-policy-activation.mjs) already covers the preview half, shared with P-AC-03. Narrower remainder: `activateOrganizationPolicy`'s `authorize()` is one generic activation grant, not a distinct "explicit backfill consent" scoped to the identified historical range, and no code exports/backfills the historical events themselves |
+| R-AC-08 | partial | WP-R | a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent — no such state exists, only prospective values inside recoverability |
+| R-AC-09 | partial | WP-R | missing offer link, contradictory outcome evidence, cross-repository/cross-scope substitution, and now `occurredAtEpochMs` (closed 2026-08-10, commit `8d8996bc`) are pinned. Duplicate detection deliberately not rebuilt here — it lives at the store layer (`idempotencyKey`, governance-event-store.mjs) by design, not an absence |
+| R-AC-13 | partial | WP-R | 9 of 11 required fixture classes now named; approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing |
+| V-AC-02 | partial | WP-V | seven of nine now labelled (fact/unknown/unavailable/redacted/invalid/not-applicable/human-decision, the last closed 2026-08-1x and missed by this document until the 2026-08-17 correction). estimate and assumption remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules |
 
-### Class P — not closeable by writing code (6)
+### Class P — not closeable by writing code (12)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
+| A-AC-14 | partial | WP-A | RECLASSIFIED B → P 2026-08-17: "decomposition" is confirmed not representable anywhere in `kind`, `state`, or any command-offer enum (investigated and settled by PHX-WP-A2, re-confirmed 2026-08-17). Building new representational capacity for a 13th scenario is a scope decision, not a quick test — closes by either a PO-approved schema extension or an acceptance.md amendment accepting 12/13, the same route H-AC-11 already used |
+| L-AC-08 | partial | WP-DOC→WP-PO | RECLASSIFIED D → P 2026-08-17: docs/governance-replay.md's "Traceability" section already honestly documents that the `cancellation` kind has no structural distinction from `status: "cancelled"` — no confident justification could be constructed. More documentation cannot close this; it needs a design decision (fold `cancellation` into `status`, or build a real distinction) |
 | EPIC-AC-01 | partial | WP-PO | the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues |
 | EPIC-AC-03 | partial | WP-PO | an outstanding deviation is recorded (the bound Spec section 7 inventory omits six implemented modules) and is not yet repaired through the sanctioned route |
-| EPIC-AC-04 | partial | WP-PO | Full Verify and blocking Security pass only on the last PUSHED candidate (`3387065`), not the integrated one measured here (see the gates table below). An independent high-risk Critic on the integrated candidate is no longer absent -- it ran 2026-08-09 and returned FAIL (5 major, 2 minor); privacy review and explicit PO acceptance remain absent |
-| EPIC-AC-05 | constraint | WP-PO | a prohibition, and it currently bites -- see the summary count above for the exact figure; deliberately not hardcoded here after an independent Critic FAIL found this line stale against the generated total more than once (F4, 2026-08-09) |
+| EPIC-AC-04 | partial | WP-PO | privacy review, an integrated-candidate Critic pass, and explicit PO acceptance remain absent |
+| EPIC-AC-05 | constraint | WP-PO | a prohibition, and it currently bites — auto-clears once the rest of this table is empty |
+| H-AC-09 | not-started | WP-PO | NO CARRIER, and no design is available to build: authorizing guarded work in another repository is exactly the capability CLAUDE.md's Sprint-0 hard rule forbids outright. Closes only via a Phase-4 migration or a PO scope amendment |
+| H-AC-11 | partial | WP-PO | portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4) |
+| H-AC-12 | partial | WP-PO | the shared dual-evaluation primitive exists and closes 2 of ~6 named readers (guard-devplan.mjs, change-control.mjs). PO decided 2026-08-11 the existing alternate mechanisms satisfy intent for the rest — but landing that decision needs an acceptance.md amendment, the same blocked route as P-AC-06/H-AC-11-O-4; stays open pending that amendment, not pending more code |
+| P-AC-11 | partial | WP-PO | four of five remaining dimensions given representation and one (ownedSections) genuinely enforced (2026-08-16, PHX-WP-PAC11-ENFORCE/FIX). A delta Critic re-review of the fix range has not run: QG-01 forbids handing a diff to the Critic while deterministic gates are red, and Verify cannot go fully green until the installed-plugin GMW/HGO v3-anchor gap is fixed (see `docs/state.md`'s 2026-08-16 checkpoint / the corresponding backlog item) — a structural block on the re-review, not a code task available now |
+| PX0-AC-05 | partial | WP-PO | the positive half (durable retention) is implemented and tested. A prior fix's commit-tree needs a PO-side correction (a disclosed commit-attribution swap, prepared fix at `6c889079`/`cd38619e`, docs/state.md 2026-08-12) before a fresh Critic re-review can run — the PO's own terminal or a GG-07 double-confirmation override, not agent-dispatchable |
+| PX0-AC-13 | partial | WP-PO | clause 2 (fail-closed under `host-authorized-wsl`) is satisfied (`createWslHostFailClosedSpawn`, acceptance.md amended 2026-08-12). Clause 1 stays open by PO-acknowledged design: real host delegation needs a caller-supplied host-transport executor that does not exist yet anywhere in this codebase (design/codex-wsl-freshness-host-action-family.md §13, still open) — not resolvable by more autonomous dispatch work without that design question answered first |
+
+## Sequence, corrected
+
+With Classes A/D/S empty, the sequence collapses to: **Class B first** (14 items, real code, no PO
+gate — L-AC-01 leads, since it is the one structural gap several other rows describe as their own
+missing half), **Class P last** (12 items, twelve different PO actions, several already queued and
+waiting only on the PO's own terminal or a design answer — not parallelizable with agent work).
 | H-AC-09 | not-started | WP-PO | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target. RECLASSIFIED Class S -> Class P 2026-08-09 (PO-confirmed): the clause's own subject -- authorizing guarded work IN another repository -- is exactly the capability CLAUDE.md's Sprint-0 hard rule currently forbids outright ("Read-only toward the three project repos ... never a write ... until an explicitly approved Phase-4 migration"). There is no design to scope: building a cross-repository binding mechanism for a write capability this repo is not yet authorized to exercise would be building ahead of its own governing policy, not closing a gap. Closes only if/when a Phase-4 migration lifts the restriction, or the PO narrows the clause's scope by amendment (the same route H-AC-11 already used) -- either way, not a code task available now |
 | H-AC-11 | partial | WP-PO | portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4) |
 

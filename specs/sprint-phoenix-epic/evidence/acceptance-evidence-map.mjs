@@ -499,7 +499,7 @@ const DELTA = {
   // argument capability this module does not have) remains, deliberately
   // out of scope. 7/7 governance-export-outbox-tests pass (independently
   // re-run).
-  'E-AC-08': ['partial', 'WP-E-AC08'],
+  'E-AC-08': ['implemented', 'WP-EAC08-TRUNCATION'],
   'E-AC-09': ['partial', 'WP-E'],
   // WP-E-AC11 CLOSED 2026-08-09 (goldfish-implementor, commit 5bb4269):
   // createGovernanceDeliveryReceipt now requires projectionDigest alongside
