@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8c274aa4fc68f44d0d2ed35fae693ba95b281d1d939a65c6ad4003566e3e2e57"
+    "transitionHead": "c2aca6ed61edd29f0ec12912e29afb52fe79bc440b5719d232a7b931e080f3cc"
   },
   "counts": {
-    "open": 100,
+    "open": 101,
     "in_progress": 22,
     "closed": 96
   },
@@ -495,6 +495,14 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Independent read-only analysis of the PO's private Codex+Pipeline 0.5.4 happy-path re-test (fifth local candidate, final successful session, 2026-08-09), cross-checked against direct code reading of po-human-approval.mjs. Corrects an earlier self-report from inside that same Codex session, which misidentified the failing subcommand."
+    },
+    {
+      "id": "pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Found while investigating two orphaned worktrees (agent-a2b2a34b84f687185, agent-ae0bcdcb0ead6ecec) left over from prior sessions, 2026-08-17. Both worktrees' own commits were confirmed already superseded on main and discarded; this is a genuine, separate, still-open gap noticed while comparing GF-059's original fix against the current file."
     },
     {
       "id": "pipeline.cross-repository-override-ledger-binding",

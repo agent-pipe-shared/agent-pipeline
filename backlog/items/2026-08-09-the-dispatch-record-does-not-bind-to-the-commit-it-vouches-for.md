@@ -98,7 +98,28 @@ session."
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Direction 1 (mechanical binding check) already exists —
+  `plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs` implements
+  SHA binding, outcome terminality, path coverage, and recorded-model-vs.-
+  agent-definition checking against exactly the five failure shapes this
+  item describes, with its own header citing this item by name. It is
+  deliberately NOT wired into `harness/scripts/verify.mjs` (TP-3) — a
+  standalone diagnostic runnable at close, in CI, or by a Critic against a
+  review set, so it never silently strengthens the gate. The Critic
+  reviewing `NVA-GMWFIX-2` ran it live against `04a663d9` and found two real
+  record defects with it (non-terminal outcome, missing `effort` field),
+  both fixed the same session — direct evidence the tool works, not just
+  that it exists. Directions 2 (write-ordering so the record survives
+  truncation the way the commit does) and 3 (an Elephant-specific trailer
+  distinct from the sanctioned `stage-0 (elephant)` form already in use) are
+  genuinely still open design questions, unimplemented. This item stays
+  open for those two; it is not the "not yet dispatched" state a hasty
+  re-read of this item briefly (and incorrectly) recorded in `docs/state.md`
+  on 2026-08-17 before this correction.
+- **Rationale:** avoid dispatching duplicate work for something that already
+  exists and is independently proven to catch real defects; keep the item
+  open only for its genuinely unimplemented remainder.
+- **Assignment (if accepted):** Directions 2/3 unassigned, no urgency signal
+  beyond this item's own text — pick up in a dedicated design pass, not
+  this AFK block.
+- **Date:** 2026-08-17
