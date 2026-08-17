@@ -446,6 +446,36 @@ try {
     );
   });
 
+  // F2 (NVA-A7FIX-1, Nova A Slice A7 comprehensive gate Critic review): ADR-0058
+  // Decision 3 documents NEVER_LIFTABLE_KERNEL_PATHS as covering "the code that
+  // verifies windows", but omitted the two modules this file itself imports and
+  // calls to actually perform that verification -- createPoApprovalIntent from
+  // po-approval-proof.mjs, and readCriticalHumanProofPolicy/verifyAgainstTrustAnchors
+  // from critical-human-proof-policy.mjs (imports above, lines 65-66). A GS-6-scoped
+  // window was therefore NOT excluded from covering an edit to the very code that
+  // verifies all future windows -- the exact "recursive hole" Decision 3 exists to
+  // close, reproduced verbatim in the implemented list but incomplete relative to
+  // the ADR's own stated principle.
+  check("F2 NVA-A7FIX-1: NEVER_LIFTABLE_KERNEL_PATHS covers the two window-verifier modules", () => {
+    const root = repoFixture("gmw-kernel-verifiers-");
+    assert.equal(
+      isNeverLiftableKernelPath(
+        join(root, "plugins", "pipeline-core", "lib", "critical-human-proof-policy.mjs"),
+        { rootDir: root },
+      ),
+      true,
+      "critical-human-proof-policy.mjs verifies windows (readCriticalHumanProofPolicy/verifyAgainstTrustAnchors) and must never be liftable",
+    );
+    assert.equal(
+      isNeverLiftableKernelPath(
+        join(root, "plugins", "pipeline-core", "lib", "po-approval-proof.mjs"),
+        { rootDir: root },
+      ),
+      true,
+      "po-approval-proof.mjs verifies windows (createPoApprovalIntent) and must never be liftable",
+    );
+  });
+
   // ---- CEREMONY-1 (A): the record a signing command may show the human ---------------
   // The summary exists so the PO is not asked to authorize a bare digest (ADR-0061
   // Decision 4). Two properties matter more than the text itself: it is READ from the

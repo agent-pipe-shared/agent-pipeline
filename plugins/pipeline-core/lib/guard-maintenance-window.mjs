@@ -125,6 +125,15 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
   "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
   "project/critical-human-proof.json",
+  // F2 (NVA-A7FIX-1): the two modules THIS file itself imports and calls
+  // (createPoApprovalIntent above; readCriticalHumanProofPolicy/
+  // verifyAgainstTrustAnchors above) to actually verify a window and every
+  // push/deploy/publication/release-preflight proof. ADR-0058 Decision 3
+  // documents this list as covering "the code that verifies windows"; these two
+  // were the recursive hole that principle names but the implemented list
+  // omitted.
+  "plugins/pipeline-core/lib/critical-human-proof-policy.mjs",
+  "plugins/pipeline-core/lib/po-approval-proof.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
