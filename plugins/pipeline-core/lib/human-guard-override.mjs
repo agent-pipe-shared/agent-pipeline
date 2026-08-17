@@ -700,12 +700,15 @@ function repositoryObservation(root, spawn = spawnSync) {
 // into the cross-repository-target class, ACCEPTED the same in-root path as an out-of-root
 // target (fail-open), skipping the in-root symlink-safety walk and the relative-path
 // hardBoundaryPath() refusal that class deliberately never runs.
-const separatorNormalized = (value) => (process.platform === "win32" ? value.split("\\").join("/") : value);
+// NVA-HGOFIX-2: platform is injected (default process.platform), mirroring the file's own
+// secureDirectory()/safePrivateFile() idiom, so the win32 branch of this security-relevant
+// normalization is provable from a POSIX host instead of only reachable on a real win32 one.
+const separatorNormalized = (value, { platform = process.platform } = {}) => (platform === "win32" ? value.split("\\").join("/") : value);
 
-function safePath(root, candidate) {
+function safePath(root, candidate, { platform = process.platform } = {}) {
   if (typeof candidate !== "string" || candidate.trim() === "" || candidate.includes("\0")) return null;
   const absolute = resolve(root, candidate);
-  const rel = separatorNormalized(relative(root, absolute));
+  const rel = separatorNormalized(relative(root, absolute), { platform });
   if (rel === "" || rel === "." || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return null;
   let cursor = root;
   const components = rel.split("/");
@@ -783,13 +786,18 @@ function pipelineSourcePath(path) {
 // equal to or prefixed by). It is never asked whether the target exists, is a git
 // repository, or is safe from a symlink swap between authorization and consumption --
 // HGO's physical-identity model (topology(), physicalRoot()) never extends there.
-function crossBoundaryTarget(root, candidate) {
+function crossBoundaryTarget(root, candidate, { platform = process.platform } = {}) {
   if (typeof candidate !== "string" || candidate.trim() === "" || candidate.includes("\0")) return null;
   const absolute = resolve(root, candidate);
-  const rel = separatorNormalized(relative(root, absolute));
+  const rel = separatorNormalized(relative(root, absolute), { platform });
   const escapes = rel === ".." || rel.startsWith("../") || isAbsolute(rel);
   if (!escapes) return null;
-  if (hardBoundaryPath(separatorNormalized(absolute))) return null;
+  // NVA-HGOFIX-2: this check stays deliberately unnormalized on POSIX (the default platform
+  // here) -- a final component merely SHAPED like `..\secrets` is not refused there, because
+  // no capability is gained: any other non-matching name reaches the same admission, and the
+  // cross-repository-target class this feeds never runs a symlink walk regardless of the name
+  // that got it there.
+  if (hardBoundaryPath(separatorNormalized(absolute, { platform }))) return null;
   return absolute;
 }
 
@@ -1279,7 +1287,7 @@ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
   };
 }
 
-function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = null } = {}) {
+function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = null, platform = process.platform } = {}) {
   const paths = [];
   const serialized = canonical(toolInput);
   if (/(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:token|password|secret)\s*[:=]\s*["']?[A-Za-z0-9+/_=-]{12,})/u.test(serialized)) {
@@ -1382,7 +1390,11 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
           paths.push(classified.path.relative);
           continue;
         }
-        const normalizedToken = token.replace(/\\/gu, "/");
+        // NVA-HGOFIX-2: this rewrite is a WIN32-ONLY concern (see separatorNormalized()
+        // above) -- unconditionally applying it on POSIX could misclassify a legitimate
+        // in-root token whose name merely contains a backslash as a hard-boundary/protected
+        // path (fail-closed), never a security hole, but still an undisclosed behavior change.
+        const normalizedToken = platform === "win32" ? token.replace(/\\/gu, "/") : token;
         if (!token.startsWith("-") && hardBoundaryPath(normalizedToken)) {
           return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [normalizedToken] };
         }
@@ -2459,6 +2471,11 @@ export const humanGuardOverrideInternals = {
   eligibility,
   secureDirectory,
   safePrivateFile,
+  // NVA-HGOFIX-2: exposed so the suite can drive the win32 platform seam directly, without
+  // going through eligibility()'s full argv-parsing path.
+  safePath,
+  crossBoundaryTarget,
+  separatorNormalized,
   // Exposed only so Full Verify can directly exercise the local-plugin-install
   // attestation against THIS repository's own, real .claude-plugin/marketplace.json
   // and plugins/pipeline-core tree (Critic finding F1, dispatch CRITIC-REMEDY-09) --

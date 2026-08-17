@@ -260,6 +260,40 @@ test("the external-path check uses the platform's own separator, so an in-reposi
   assert.doesNotMatch(outside.stderr, /outside the repository/u);
 });
 
+/**
+ * NVA-HGOFIX-2 (backlog/items/2026-08-17-guard-human-override-cli-and-a-second-site-
+ * still-normalize-backslashes-unconditionally.md, finding 1). `externalJson()`'s
+ * `platform` parameter already existed for the win32-vs-POSIX `path` API selection above,
+ * but its own `.split("\\").join("/")` rewrite ran unconditionally regardless of it -- on
+ * POSIX (this suite's default host), a backslash is an ordinary filename character, so an
+ * in-repository proof file whose first path component literally contains one (e.g. a
+ * directory named `..\secret`) got rewritten into a string starting with `../`, misreading
+ * a file that is actually INSIDE the repository as external -- the fail-open direction the
+ * backlog item names. No platform override is passed below: this exercises the real
+ * default-platform (POSIX) path on this test host, the same way the sibling win32 test
+ * above exercises win32 by injecting it.
+ */
+test("NVA-HGOFIX-2: the external-path check does not misread a POSIX in-repository file whose name merely contains a backslash as external", () => {
+  const digest = "a".repeat(64);
+  const argv = (proofPath) => [
+    "authorize-by-signature",
+    "--repo", "/repo",
+    "--request-sha256", digest,
+    "--plan-sha256", digest,
+    "--proof", proofPath,
+  ];
+
+  const inside = io();
+  assert.equal(main(argv("/repo/..\\secret/proof.json"), inside), 2);
+  assert.match(inside.stderr, /outside the repository/u);
+
+  // A genuinely external POSIX path still clears the check as before (and then fails for
+  // the ordinary reason that this host has no such file, which is not what is under test).
+  const outside = io();
+  assert.equal(main(argv("/elsewhere/proof.json"), outside), 2);
+  assert.doesNotMatch(outside.stderr, /outside the repository/u);
+});
+
 test("authorize-by-signature refuses an invalid proof with HGO-PROOF-INVALID on stderr and exit 2", () => {
   const root = fixture();
   const proofRoot = externalDir();

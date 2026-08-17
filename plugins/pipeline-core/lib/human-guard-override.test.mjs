@@ -17,7 +17,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
@@ -2150,6 +2150,75 @@ test("NVA-HGOFIX-1: crossBoundaryTarget() never rescues an in-root `..\\x` symli
       "an in-root symlink into .git was classified as a cross-repository target");
     assert.equal(result.eligible, false, "an in-root symlink attack must stay refused");
     assert.equal(result.code, "HGO-NONOVERRIDABLE-CROSS-BOUNDARY");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-HGOFIX-2 (backlog/items/2026-08-17-hgofix-1-separatornormalized-has-no-injection-
+// seam-and-line-792-has-no-test.md; backlog/items/2026-08-17-guard-human-override-cli-
+// and-a-second-site-still-normalize-backslashes-unconditionally.md): separatorNormalized()
+// itself had no platform-injection seam (only reachable/provable on a real win32 host),
+// and eligibility()'s Bash argv-token normalization was a second, unrelated unconditional
+// site. The tests below close both findings: an injectable `platform` seam on
+// separatorNormalized(), safePath() and crossBoundaryTarget(), a regression test pinning
+// the intentional POSIX-only behavioral delta crossBoundaryTarget()'s hardBoundaryPath()
+// check already shipped under NVA-HGOFIX-1, and a win32-only test for eligibility()'s
+// argv-token normalization.
+// ---------------------------------------------------------------------------------
+
+test("NVA-HGOFIX-2: separatorNormalized() and safePath() gain an injectable platform seam, provable from a POSIX host", () => {
+  assert.equal(humanGuardOverrideInternals.separatorNormalized("a\\b"), "a\\b",
+    "the default platform (POSIX on this host) must leave a backslash-bearing value untouched");
+  assert.equal(humanGuardOverrideInternals.separatorNormalized("a\\b", { platform: "win32" }), "a/b",
+    "the win32 branch must be reachable via the injected platform, without a real win32 host");
+
+  const root = fixture();
+  try {
+    const directory = "..\\hgofix-seam"; // one component containing a backslash, legal on POSIX
+    mkdirSync(join(root, directory));
+    writeFileSync(join(root, directory, "note.txt"), "in-root\n");
+    const filePath = `${directory}/note.txt`;
+    const posix = humanGuardOverrideInternals.safePath(root, filePath);
+    assert.notEqual(posix, null, "the default (POSIX) platform must still read this as in-root");
+    assert.equal(posix.relative, filePath);
+    assert.equal(humanGuardOverrideInternals.safePath(root, filePath, { platform: "win32" }), null,
+      "forcing platform: win32 must reach the normalization branch and read the same value as an escape");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-HGOFIX-2: crossBoundaryTarget()'s :792 hardBoundaryPath() check is intentionally unnormalized on POSIX, and its platform seam reaches the win32 branch", () => {
+  const root = fixture();
+  try {
+    // Genuinely escapes root; the final literal component is SHAPED like a secrets path
+    // but contains a backslash, which is an ordinary filename character on POSIX.
+    const candidate = "../..\\secrets";
+    const posixTarget = humanGuardOverrideInternals.crossBoundaryTarget(root, candidate);
+    assert.equal(posixTarget, resolve(root, candidate),
+      "a POSIX-legal single-component name merely SHAPED like a secrets path must not be refused -- see the :792 comment for why this is intentional");
+    assert.equal(humanGuardOverrideInternals.crossBoundaryTarget(root, candidate, { platform: "win32" }), null,
+      "forcing platform: win32 must reach the normalization branch and refuse the same candidate once it reads as /secrets");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-HGOFIX-2: eligibility()'s Bash argv-token normalization (:1385) is win32-only; POSIX behavior is unchanged", () => {
+  const root = fixture();
+  try {
+    // Single-quoted so the closed-shell tokenizer preserves the literal backslash (outside
+    // quotes it is the tokenizer's own escape character, exactly like real POSIX shells).
+    const command = "touch 'secrets\\backup.txt'";
+    const posixResult = humanGuardOverrideInternals.eligibility(root, "Bash", { command });
+    assert.equal(posixResult.eligible, true,
+      "a token merely CONTAINING a backslash must not be misread as a hard-boundary path on POSIX");
+    const win32Result = humanGuardOverrideInternals.eligibility(root, "Bash", { command }, { platform: "win32" });
+    assert.equal(win32Result.eligible, false);
+    assert.equal(win32Result.code, "HGO-NONOVERRIDABLE-PATH");
+    assert.deepEqual(win32Result.paths, ["secrets/backup.txt"]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

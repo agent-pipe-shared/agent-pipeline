@@ -55,7 +55,13 @@ function externalJson(repoRoot, path, platform = process.platform) {
   const api = platform === "win32" ? win32Path : posixPath;
   const root = api.resolve(repoRoot);
   const source = api.resolve(path);
-  const rel = api.relative(root, source).split("\\").join("/");
+  // NVA-HGOFIX-2: api.relative() already returns the platform-correct separator (win32Path
+  // returns backslashes there, posixPath never does), so this rewrite is only needed to
+  // normalize the win32 answer -- applying it unconditionally on POSIX could turn a legal
+  // in-repository component name that merely CONTAINS a backslash into an apparent `../`
+  // escape, misreading an in-repository proof file as external.
+  const relRaw = api.relative(root, source);
+  const rel = platform === "win32" ? relRaw.split("\\").join("/") : relRaw;
   const outside = rel === ".." || rel.startsWith("../") || api.isAbsolute(rel);
   if (!outside) throw new Error("--proof must be supplied outside the repository");
   return JSON.parse(readFileSync(source, "utf8"));
