@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatched-agents-return-truncated-mid-step
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: a6fa43f2fc191ecf76ef7c5b13a02ff64034b24b
+closure_evidence: backlog/items/2026-08-07-dispatched-agents-return-truncated-mid-step.md
 due: 2026-08-21
 source: "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day."
 ---
@@ -124,3 +128,13 @@ does not wait for the first:
   would miss the richer data and the design work already done on `08-08`.
 - **Assignment (if accepted):** see `08-08` item's own Triage.
 - **Date:** 2026-08-11
+
+## Closure (2026-08-17)
+
+The 2026-08-11 consolidation decision above (commit `a6fa43f2fc191ecf76ef7c5b13a02ff64034b24b`)
+was recorded but this item's own `status` frontmatter was never actually
+flipped to `closed` at the time — corrected now. Canonical, actively-tracked
+thread: `backlog/items/2026-08-08-long-dispatches-truncate-before-emitting-their-report.md`
+(`pipeline.long-dispatches-truncate-before-emitting-their-report`). This
+item's own historical data (WSL hypothesis, the 57-68-vs-21 tool-use
+correlation table) remains as filed, for the record.

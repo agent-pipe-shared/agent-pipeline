@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.claude-greenfield-run-happy-path-findings
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 1174512bc78911af47640faebfd9f025da492492
+closure_evidence: backlog/items/2026-08-09-what-the-claude-greenfield-run-adds-to-the-happy-path-findings.md
 source: "Command-level analysis of the PO's Claude-with-Pipeline greenfield run of 2026-08-09 (transcript ad321d5e), read from the session log. 50 failing tool results across the run."
 due: 2026-08-16
 ---
@@ -153,3 +157,14 @@ root-caused separately in
 - Findings 2–5 (silent push gate, missing `--help`, authority-staleness
   refusals, missing git-identity/repo warnings) are tracked by their own
   separately-filed items where they exist; not re-triaged here.
+
+## Closure (2026-08-17)
+
+Finding 1 (the only finding this item itself owns; 2–5 are tracked by their
+own separately-filed items) is verified resolved: commit
+`1174512bc78911af47640faebfd9f025da492492` (2026-08-10,
+`fix(onboarding): correct the seeded kickoff language before it is
+snapshotted`, `GF-079`) corrects the seeded kickoff language before it is
+snapshotted into the PO profile receipt, closing exactly the
+freeze-before-the-PO-answer-exists gap this finding describes. Confirmed
+live in `plugins/pipeline-core/lib/project-onboarding-v3.mjs`.
