@@ -91,10 +91,11 @@ function record(v) { return v !== null && typeof v === "object" && !Array.isArra
 function hasTargetBinding(entry) { return record(entry) && Object.hasOwn(entry, "targetBinding"); }
 function validTargetBinding(v) { return exact(v, ["targetClass", "targetRef"]) && TARGET_CLASSES.has(v.targetClass) && TARGET_REF.test(v.targetRef); }
 function sameTargetBinding(left, right) { if (left === undefined && right === undefined) return true; if (left === undefined || right === undefined) return false; return left.targetClass === right.targetClass && left.targetRef === right.targetRef; }
-// WP-PAC11: a bounded, deduplicated array of opaque TARGET_REF-shaped ids
-// (reusing the same shape targetRef already established) or of closed
-// LIFECYCLE_EVENTS values; both close the "no free-form prose" requirement
-// the same way targetBinding does for a single reference.
+// WP-PAC11: a bounded, deduplicated array of opaque OWNED_SECTION_REF-shaped
+// ids (see the F1-fix comment above OWNED_SECTION_REF's definition for why
+// this is not targetRef-shaped) or of closed LIFECYCLE_EVENTS values; both
+// close the "no free-form prose" requirement the same way targetBinding does
+// for a single reference.
 function validIdArray(value, { isMember, maxLength }) { if (!Array.isArray(value) || value.length > maxLength) return false; const seen = new Set(); for (const item of value) { if (!isMember(item) || seen.has(item)) return false; seen.add(item); } return true; }
 function validOwnedSections(value) { return validIdArray(value, { isMember: (item) => typeof item === "string" && OWNED_SECTION_REF.test(item), maxLength: 32 }); }
 function validLifecycleEvents(value) { return validIdArray(value, { isMember: (item) => LIFECYCLE_EVENTS.has(item), maxLength: LIFECYCLE_EVENTS.size }); }

@@ -172,11 +172,14 @@ test("P-AC-01 validates a pack's signature policy and rejects an unknown algorit
   for (const value of malformed) assert.throws(() => validateOrganizationPolicyPack(value, { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-SIGNATURE");
 });
 // WP-PAC11: ownedSections is a bounded, deduplicated array of opaque
-// TARGET_REF-shaped ids (same shape as targetRef, not a hardcoded enum --
-// governed-document sections vary per organization, so only the SHAPE is
-// closed, exactly like targetRef itself). A well-formed declaration is
-// admitted; a free-prose, duplicate, or malformed-id value is refused under
-// the same OPP-DOCUMENT code every other document-class shape violation uses.
+// OWNED_SECTION_REF-shaped ids (not a hardcoded enum -- governed-document
+// sections vary per organization, so only the SHAPE is closed; not
+// TARGET_REF-shaped either -- see the F1-fix comment in organization-policy.mjs
+// above OWNED_SECTION_REF's definition for why these are two different
+// scoping dimensions with two different legal character sets). A well-formed
+// declaration is admitted; a free-prose, duplicate, or malformed-id value is
+// refused under the same OPP-DOCUMENT code every other document-class shape
+// violation uses.
 test("P-AC-11 accepts a closed ownedSections declaration and rejects a non-closed one", () => {
   const accepted = validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], ownedSections: ["threat-model", "risk-register"] }] }), { coreVersion: "0.4.7" });
   assert.deepEqual(accepted.documentClasses[0].ownedSections, ["threat-model", "risk-register"]);
