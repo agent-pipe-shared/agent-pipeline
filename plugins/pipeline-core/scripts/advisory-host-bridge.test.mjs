@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -13,6 +14,10 @@ import {
   createAdvisoryConsultationRecord,
   createAdvisoryDemand,
 } from "../lib/advisory-lifecycle-v2.mjs";
+import { canonicalizeJson } from "../lib/governance-event.mjs";
+import { queryPortableGovernanceStream } from "../lib/governance-event-store.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import {
   runAdvisoryHostBridge,
   runCodexAdvisoryThroughSelectedSandbox,
@@ -257,4 +262,150 @@ test("a stale or foreign host execution cannot be relabelled as the current sele
   assert.equal(result.advisoryResult.ok, false);
   assert.equal(result.advisoryResult.answer, null);
   assert.equal(result.advisoryResult.code, "selected-sandbox-required");
+});
+
+// --- A-AC-05: the advisory-decision governance-event wiring ---------------
+
+/** Mirrors governance-event-store.test.mjs's own fixtureRoot registry shape exactly, scoped to this file rather than importing a test-only fixture across modules. */
+function agentGovernanceRegistryFixture(fingerprint) {
+  return {
+    schema: "pipeline.governance-stream-registry.v1",
+    repositoryFingerprint: fingerprint,
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventDigestDomain: "pipeline.governance-event.v1\0",
+    storageRoot: "governance/events",
+    streams: [
+      { streamId: "human", origin: "human", authorityClass: "human-authority", relativeRoot: "human", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "agent", origin: "agent", authorityClass: "non-authoritative", relativeRoot: "agent", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+      { streamId: "lifecycle", origin: "lifecycle", authorityClass: "non-authoritative", relativeRoot: "lifecycle", storageProfile: "repository-public-safe", genesis: { sequence: 0, eventDigest: null } },
+    ],
+  };
+}
+
+function agentGovernanceCapturePolicyFixture() {
+  return {
+    schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: "c".repeat(64), defaultAction: "deny",
+    streams: [
+      { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+      { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+      { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    ],
+    sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false },
+    mandatoryEventClasses: [],
+  };
+}
+
+/** A real temporary git repository with a valid governance registry/capture-policy, matching governance-event-store.test.mjs's own convention for the filesystem/git boundary rather than a mocked store. */
+async function governanceRepoRoot() {
+  const root = await mkdtemp(join(tmpdir(), "advisory-decision-governance-"));
+  execFileSync("git", ["init", "-q", root]);
+  const repository = discoverRepository(root);
+  const fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  await mkdir(join(root, "governance/events"), { recursive: true });
+  await writeFile(join(root, "governance/events/registry.json"), `${canonicalizeJson(agentGovernanceRegistryFixture(fingerprint))}\n`);
+  await writeFile(join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(agentGovernanceCapturePolicyFixture())}\n`);
+  return { root, fingerprint };
+}
+
+/** Captures the bridge's stdout adapter-protocol emissions (the CLI's only externally observable result shape) without altering runAdvisoryHostBridge's own output contract. */
+async function captureStdout(run) {
+  const original = process.stdout.write.bind(process.stdout);
+  const lines = [];
+  process.stdout.write = (chunk, ...rest) => { lines.push(String(chunk)); return original(chunk, ...rest); };
+  try {
+    const code = await run();
+    return { code, events: lines.filter((line) => line.trim() !== "").map((line) => JSON.parse(line)) };
+  } finally {
+    process.stdout.write = original;
+  }
+}
+
+function nativeClaudeAdvisoryInput(dispatch, question) {
+  const demand = createAdvisoryDemand({
+    runner: "claude", profile: "epic", reason: "risk-review", question, evidenceSha256: "e".repeat(64), dispatch,
+  }).demand;
+  return { runner: "claude", profile: "epic", question, dispatch, demand };
+}
+
+test("A-AC-05: an answered coordinateAdvisory receipt is durably recorded on the agent governance stream", async () => {
+  const { root, fingerprint } = await governanceRepoRoot();
+  const inputRoot = await mkdtemp(join(tmpdir(), "host-advisor-aac05-"));
+  try {
+    const inputPath = join(inputRoot, "input.json");
+    const receiptPath = join(inputRoot, "receipt.json");
+    const dispatch = { dispatchId: "aac05-dispatch-01", queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40) };
+    await writeFile(inputPath, JSON.stringify(nativeClaudeAdvisoryInput(dispatch, "Which route is safest for this cutover?")));
+    const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
+      ["--input", inputPath, "--receipt", receiptPath],
+      {
+        repoRoot: root,
+        makeHostAdapter: () => async () => ({
+          status: "answered", answer: "Prefer the smaller batch.",
+          identity: { provider: "anthropic", modelId: "claude-fable", effort: "not-applicable" },
+        }),
+      },
+    ));
+    assert.equal(code, 0);
+    const completed = events.find((event) => event.type === "advisory.completed");
+    assert.equal(completed.ok, true);
+    assert.equal(completed.code, "answered");
+    assert.equal(completed.agentDecisionEvent.appended, true, JSON.stringify(completed.agentDecisionEvent));
+    assert.equal(typeof completed.agentDecisionEvent.eventId, "string");
+
+    const receipt = JSON.parse(await readFile(receiptPath, "utf8"));
+    assert.equal(receipt.observed.status, "answered");
+
+    // Independently readable back, per the dispatch's own goal: a fresh query
+    // against the portable store, not a value threaded through from above.
+    const stream = await queryPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "agent" });
+    assert.equal(stream.events.length, 1);
+    const [event] = stream.events;
+    assert.equal(event.origin, "agent");
+    assert.equal(event.eventType, "agent.selection");
+    assert.equal(event.candidate.commit, dispatch.candidateCommit);
+    assert.equal(event.candidate.tree, dispatch.candidateTree);
+    assert.equal(event.payload.eventId, completed.agentDecisionEvent.eventId);
+    assert.equal(event.payload.kind, "selection");
+    assert.deepEqual(event.payload.identity.map((entry) => entry.dimension).sort(), ["adapter", "effort", "model", "profile", "runner"]);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(inputRoot, { recursive: true, force: true });
+  }
+});
+
+test("A-AC-05: a governance-event append failure never withholds the advisory answer (fail-open)", async () => {
+  // A real git repository with NO governance/events/registry.json: the store's
+  // own loadRegistry fails closed naturally (GES-MISSING), exercising a real
+  // append failure rather than an injected mock -- the same fixture-fidelity
+  // convention governanceRepoRoot() above follows for the success case.
+  const root = await mkdtemp(join(tmpdir(), "advisory-decision-broken-"));
+  execFileSync("git", ["init", "-q", root]);
+  const inputRoot = await mkdtemp(join(tmpdir(), "host-advisor-aac05-fail-"));
+  try {
+    const inputPath = join(inputRoot, "input.json");
+    const receiptPath = join(inputRoot, "receipt.json");
+    const dispatch = { dispatchId: "aac05-dispatch-02", queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40) };
+    await writeFile(inputPath, JSON.stringify(nativeClaudeAdvisoryInput(dispatch, "Is this rollback reversible?")));
+    const { code, events } = await captureStdout(() => runAdvisoryHostBridge(
+      ["--input", inputPath, "--receipt", receiptPath],
+      {
+        repoRoot: root,
+        makeHostAdapter: () => async () => ({
+          status: "answered", answer: "Yes, it is reversible.",
+          identity: { provider: "anthropic", modelId: "claude-fable", effort: "not-applicable" },
+        }),
+      },
+    ));
+    assert.equal(code, 0, "an unrelated governance-recording failure must not turn a real advisory answer into a non-zero exit");
+    const completed = events.find((event) => event.type === "advisory.completed");
+    assert.equal(completed.ok, true);
+    assert.equal(completed.answer, "Yes, it is reversible.", "the advisory answer must survive the append failure intact");
+    assert.equal(completed.agentDecisionEvent.appended, false);
+    assert.equal(typeof completed.agentDecisionEvent.code, "string");
+    assert.equal(Object.hasOwn(completed.agentDecisionEvent, "eventId"), false, "a failed append must not claim an eventId it never persisted");
+  } finally {
+    await rm(root, { recursive: true, force: true });
+    await rm(inputRoot, { recursive: true, force: true });
+  }
 });
