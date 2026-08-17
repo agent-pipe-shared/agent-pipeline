@@ -404,6 +404,8 @@ const TEST_SUITES = [
   { name: "backlog-state-check", file: join(pluginScriptsDir, "check-backlog-state.mjs") },
   { name: "parallel-dispatch-planner-tests", file: join(libDir, "parallel-dispatch-planner.test.mjs") },
   { name: "parallel-sprint-integration-tests", file: join(libDir, "parallel-sprint-integration.test.mjs") },
+  { name: "epic-ac02-publication-check-tests", file: join(pluginScriptsDir, "check-epic-ac02-publication.test.mjs") },
+  { name: "epic-ac02-publication-check", file: join(pluginScriptsDir, "check-epic-ac02-publication.mjs") },
   { name: "continuity-status-tests", file: join(libDir, "continuity-status.test.mjs") },
   { name: "continuity-status-cli-tests", file: join(pluginScriptsDir, "continuity-status.test.mjs") },
   { name: "delivery-course-tests", file: join(libDir, "delivery-course.test.mjs") },
