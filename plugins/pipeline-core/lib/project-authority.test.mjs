@@ -4,8 +4,9 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import {
   applyPendingProjectAuthorityRecovery, applyProjectAuthorityMigration,
   classifyProjectAuthority,
@@ -62,6 +63,7 @@ function completeDescriptor(base, sessionId) {
   return started;
 }
 const VENDORED = "plugins/pipeline-core";
+const MODULE_PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 // A project that installs this plugin from the marketplace: real mixed
 // authority, the vendored package path ignored, and NO vendored copy -- the
 // shape `loadedPackageEvidence()` can never prove on its own.
@@ -306,7 +308,7 @@ try {
   ok("byte-identical self-application adopts with persisted receipt and replays as noop", () => {
     const base = root(); git(base, ["init", "-q"]); legacy(base);
     write(base, NEUTRAL_MANIFEST, "schema: pipeline.manifest.v0\nprovisional: kickoff\n");
-    cpSync(join(process.cwd(), "plugins/pipeline-core"), join(base, "plugins/pipeline-core"), { recursive: true });
+    cpSync(MODULE_PLUGIN_ROOT, join(base, "plugins/pipeline-core"), { recursive: true });
     git(base, ["add", "."]); git(base, ["-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "fixture"]);
     const refsBefore = { commit: git(base, ["rev-parse", "HEAD"]), tree: git(base, ["rev-parse", "HEAD^{tree}"]), branch: git(base, ["branch", "--show-current"]) };
     const provenance = inspectProjectAuthorityProvenance({ rootDir: base });
@@ -323,7 +325,7 @@ try {
   ok("schema-valid downstream receipt-bound adoption plans and applies", () => {
     const base = root(); git(base, ["init", "-q"]); legacy(base);
     write(base, NEUTRAL_MANIFEST, "schema: pipeline.manifest.v0\nprovisional: downstream\n");
-    cpSync(join(process.cwd(), "plugins/pipeline-core"), join(base, "plugins/pipeline-core"), { recursive: true });
+    cpSync(MODULE_PLUGIN_ROOT, join(base, "plugins/pipeline-core"), { recursive: true });
     git(base, ["add", "."]); git(base, ["-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "fixture"]);
     const first = inspectProjectAuthorityProvenance({ rootDir: base });
     const seed = planProjectAuthorityMigration({ rootDir: base, provenance: first });
@@ -353,7 +355,7 @@ try {
     for (const [name, mutate] of cases) {
       const base = root(); git(base, ["init", "-q"]); legacy(base);
       write(base, NEUTRAL_MANIFEST, `schema: pipeline.manifest.v0\nprovisional: ${name}\n`);
-      cpSync(join(process.cwd(), "plugins/pipeline-core"), join(base, "plugins/pipeline-core"), { recursive: true });
+      cpSync(MODULE_PLUGIN_ROOT, join(base, "plugins/pipeline-core"), { recursive: true });
       git(base, ["add", "."]); git(base, ["-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "fixture"]);
       const provenance = inspectProjectAuthorityProvenance({ rootDir: base });
       assert.equal(provenance.status, "ready", name);
@@ -463,7 +465,7 @@ try {
   });
   ok("a stale vendored copy is replaced exactly and a current one is a no-op", () => {
     const base = root(); marketplace(base);
-    cpSync(join(process.cwd(), VENDORED), join(base, VENDORED), { recursive: true });
+    cpSync(MODULE_PLUGIN_ROOT, join(base, VENDORED), { recursive: true });
     assert.equal(planVendoredPackageSync({ rootDir: base }).status, "noop");
     assert.equal(inspectProjectAuthorityProvenance({ rootDir: base }).status, "ready");
     write(base, `${VENDORED}/stale-extra-file.txt`, "drift\n");
