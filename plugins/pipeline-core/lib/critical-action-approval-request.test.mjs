@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 
 import {
-  criticalActionSubjectSha256, createCriticalActionApprovalRequest,
+  CRITICAL_ACTION_KINDS, criticalActionSubjectSha256, createCriticalActionApprovalRequest,
   verifyCriticalActionApprovalRequest,
 } from "./critical-action-approval-request.mjs";
 
@@ -25,5 +25,20 @@ check("candidate drift is rejected", () => assert.equal(verifyCriticalActionAppr
 check("cross-kind use is rejected", () => assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: candidate, expectedAction: { ...action, kind: "deploy" }, now: "2026-08-02T18:30:00.000Z" }).code, "CRITICAL-ACTION-REQUEST-MISMATCH"));
 check("expired proof is rejected", () => assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy, proof, expectedCandidate: candidate, expectedAction: action, now: "2026-08-02T19:00:00.001Z" }).code, "CRITICAL-ACTION-PROOF-EXPIRED"));
 check("subject digest changes with target", () => assert.notEqual(subjectSha256, criticalActionSubjectSha256({ kind: "push", candidate, subject: { source: candidate.commit, remote: "origin", destination: "refs/heads/other" } })));
+
+// ADR-0064: release-preflight is a fourth kind, not a reuse of an existing one.
+check("release-preflight is a fourth CRITICAL_ACTION_KIND", () => {
+  assert.deepEqual(CRITICAL_ACTION_KINDS, ["push", "deploy", "publication", "release-preflight"]);
+});
+check("a release-preflight request round-trips end to end, and cross-kind substitution stays refused", () => {
+  const rpSubject = { schema: "pipeline.release-preflight-consent-subject.v1", version: "1.2.3", base: { commit: "c".repeat(40), tree: "d".repeat(40) }, lifecycle: { featureId: "cyb-4", manifestPath: "lifecycle.json", manifestSha256: "e".repeat(64) }, retentionPolicySha256: "f".repeat(64) };
+  const rpSubjectSha256 = criticalActionSubjectSha256({ kind: "release-preflight", candidate, subject: rpSubject });
+  const rpAction = { kind: "release-preflight", subjectSha256: rpSubjectSha256, expiresAt };
+  const rpRequest = createCriticalActionApprovalRequest({ candidate, featureId: "sprint-nova-epic", planBytes: plan, specBytes: spec, action: rpAction });
+  const rpProof = { schema: "pipeline.po-approval-proof.v1", intentSha256: rpRequest.approvalIntent.sha256, keyReference: "test-key", publicKey, signatureBase64: sign(null, Buffer.from(rpRequest.approvalIntent.sha256), keys.privateKey).toString("base64") };
+  const verified = verifyCriticalActionApprovalRequest({ request: rpRequest, trustPolicy, proof: rpProof, expectedCandidate: candidate, expectedAction: rpAction, now: "2026-08-02T18:30:00.000Z" });
+  assert.equal(verified.verified, true);
+  assert.equal(verifyCriticalActionApprovalRequest({ request: rpRequest, trustPolicy, proof: rpProof, expectedCandidate: candidate, expectedAction: { ...rpAction, kind: "publication" }, now: "2026-08-02T18:30:00.000Z" }).code, "CRITICAL-ACTION-REQUEST-MISMATCH");
+});
 
 console.log(`critical-action-approval-request: ${tests} tests passed`);

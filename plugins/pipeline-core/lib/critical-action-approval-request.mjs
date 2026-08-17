@@ -9,7 +9,7 @@ import { createHash } from "node:crypto";
 import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
 
 export const CRITICAL_ACTION_APPROVAL_REQUEST_SCHEMA = "pipeline.critical-action-approval-request.v1";
-export const CRITICAL_ACTION_KINDS = Object.freeze(["push", "deploy", "publication"]);
+export const CRITICAL_ACTION_KINDS = Object.freeze(["push", "deploy", "publication", "release-preflight"]);
 
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40,64}$/u;
