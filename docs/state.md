@@ -7,7 +7,88 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again (10): checkpoint 9's A-AC-05 claim corrected, conflictPolicy dispatched — P-AC-11's last open dimension (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (11): P-AC-11 CLOSED (146/157 implemented); A-AC-01/A-AC-05 investigated, A-AC-05 wiring dispatched (READ THIS FIRST)
+
+**P-AC-11 closed.** `PHX-WP-PAC11-CONFLICTPOLICY` (`fc034721`) independently re-verified:
+full `node harness/scripts/verify.mjs` gate re-run at that candidate matches the `80aa72df`
+baseline's 9 pre-existing non-green suites exactly (none new), `external-reference-adapter-tests`
+still only the known pre-existing X-AC-10 live-repo-path case (38/39, all 3 new
+WP-PAC11-CONFLICTPOLICY cases green), `security-scan.mjs` independently re-run CLEAN. Evidence
+map updated (commit `ea9cf5e2`): `VERDICTS['P-AC-11']` flips `partial` → `implemented`, removed
+from the `CLOSURE` table per its own "for every criterion that is not implemented" scope. New
+totals: **146 implemented / 10 partial / 1 constraint = 157, 10 open** (not 11 — P-AC-11 is gone
+from the open count, not just reclassified). As with the prior dispatch, `dispatch-record.json`
+was left at `"outcome": "in-progress"` despite the explicit instruction — the landed commit itself
+was complete this time, so no defect followed, but the pattern recurring across TWO consecutive
+dispatches is now called out explicitly in the next dispatch's own briefing rather than absorbed a
+third time silently.
+
+**A-AC-01/A-AC-05 investigated** (the item checkpoint (10) flagged as "genuinely
+uninvestigated"): `specs/sprint-phoenix-epic/design/agent-decision-identity-scoping.md` already
+answers this in full (written before checkpoints 9/10, apparently not consulted when they were
+written — the same "stale carried-over claim" failure mode checkpoint (10) itself corrected once
+already). Key findings, read directly from the doc and cross-checked against current source:
+- §4/§5.1: `main-session-route.mjs`'s `reconcileMainSessionRoute` records *before* the dependent
+  action (satisfies A-AC-01's ordering requirement structurally) — but no Claude host adapter
+  currently supplies `pipelineMainSessionRoute`, so every reconciliation today yields
+  `MSR-UNVERIFIED` with all four dimensions `null`. Building a producer there NOW would record
+  that a decision happened while recording no identity — the doc's own recommendation (§7 step 3)
+  is to DEFER this, not build it, until that host-adapter precondition exists. A-AC-01 stays
+  genuinely blocked on missing host capability, correctly still `partial`/Class B, not a
+  dispatchable gap today.
+- §6/§7 step 4: A-AC-01's `revalidationTrigger` field gap is ALREADY CLOSED — confirmed via grep,
+  `agent-decision-journal.mjs:58,73-75` carries the field (optional, `CODE`-pattern-validated),
+  matching the closure table's "PO ANSWERED: add the field now" record. No further action needed
+  on this half.
+- §6/§7 step 2: A-AC-05's producer (`advisory-decision-event.mjs`, commit `63dac0b4`,
+  `buildAdvisoryDecisionEvent`) is EXACTLY the producer this design doc recommended building first
+  (five dimensions, closed adapter enum, fallback kind, drift check) — already done. What remains,
+  confirmed by reading the module's own header comment plus a direct grep (zero call sites in
+  `advisory-coordinator.mjs`/`advisory-host-bridge.mjs`): the translator has no production caller.
+  `specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`'s `POINTERS['A-AC-05']` text is
+  STALE — it predates `63dac0b4` and doesn't mention the translator existing at all; left
+  uncorrected for now (not blocking, will be refreshed together with the wiring dispatch's own
+  update once it lands, one edit instead of two).
+
+**Dispatched `PHX-WP-AAC05-WIRING`** (goldfish-deep, sonnet/xhigh — genuine design latitude:
+exact `governance-event.mjs` envelope-field derivation, the append-failure-visibility shape; no
+model override): wires `buildAdvisoryDecisionEvent` into `advisory-host-bridge.mjs`'s live
+`coordinateAdvisory` call path so an answered advisory persists a real event via
+`appendPortableGovernanceEvent` under the `"agent"` stream. Confirmed before dispatch:
+`repositoryFingerprint` has a canonical derivation already in use
+(`derivePoGateRepositoryFingerprint({gitCommonDir,primaryRoot})` from `discoverRepository`,
+`governance-event-store.mjs:83-90`) — no separate fingerprint design question, contrary to what
+the translator's own header comment implied. Also confirmed: `representedEventClasses` gives this
+event's `kind` (`selection`/`fallback`) exactly `{candidate,privacy}`, both `fail-open` per
+`JOURNALING_UNAVAILABLE_DISPOSITIONS` — no new capture-policy machinery needed, low-stakes by the
+existing closed table. Also flagged in-briefing as in-scope: `advisory-decision-event.test.mjs`
+exists but was never registered in `verify.mjs` (a real gap left by `63dac0b4`) — registering it
+is part of this dispatch's DoD. Explicitly out of scope: `main-session-route.mjs`/A-AC-01 (per the
+deferral finding above). Not yet landed as of this checkpoint.
+
+**Remaining open (10 of 157):** Class B — A-AC-01 (blocked on missing host-adapter capability, not
+a dispatchable gap right now), A-AC-05 (wiring dispatched, in flight), EPIC-AC-02 (built, TP-3
+registration line deliberately left to its own file owner), H-AC-12 (git-guard override consumption
+still fully untouched), L-AC-01 (2 of 9 kinds have a producer; 7 remaining need a source vocabulary
+that doesn't exist yet). Class P — H-AC-11 (GMW no-join-handle, proved-impossibility half),
+PX0-AC-13 (structurally unreachable in-process, needs an out-of-process host adapter design),
+EPIC-AC-01/03/04/05 (end-of-epic ceremony).
+
+**Next steps:** wait for `PHX-WP-AAC05-WIRING`'s notification, independently re-verify per
+established practice (diff review file-by-file, re-run the three named test files plus the full
+`verify.mjs` gate regardless of how finished the report looks, check `dispatch-record.json`'s
+`outcome` field, diff against the `fc034721`/`ea9cf5e2` baseline suite-by-suite). If clean: update
+the evidence map's `POINTERS['A-AC-05']` (folding in both the `63dac0b4` producer's existence and
+this dispatch's wiring in one edit), flip `VERDICTS['A-AC-05']` if the criterion is now fully met,
+commit. A-AC-01 stays parked (host-adapter precondition, not actionable). After that, the next
+Class-B candidates by "ordered by whether anything else waits on them" are H-AC-12 (git-guard
+override consumption) or L-AC-01 (needs a source vocabulary decision first, likely PO-gated) — pick
+whichever investigation surfaces a cleaner dispatchable scope first. All future dispatches: no
+`model` override. All chat/AskUserQuestion text in German.
+
+---
+
+## CHECKPOINT — 2026-08-17, continued again (10): checkpoint 9's A-AC-05 claim corrected, conflictPolicy dispatched — P-AC-11's last open dimension
 
 **Correction to checkpoint (9):** its "A-AC-05 (producer dispatch not yet fired, bundle with A-AC-01)"
 line was WRONG — carried over stale from an earlier compacted summary, not re-checked against the
