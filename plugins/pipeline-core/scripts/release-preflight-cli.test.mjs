@@ -2,14 +2,17 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { ReleasePreflightCliError, buildReleasePreflight } from "./release-preflight-cli.mjs";
+import { criticalActionSubjectSha256, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 
 const POLICY = "c".repeat(64);
+const CLI_PATH = fileURLToPath(new URL("./release-preflight-cli.mjs", import.meta.url));
 const roots = [];
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
@@ -44,20 +47,90 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
     featureId: "fixture-feature",
     documents: { prd: "docs/prd.md", spec: "docs/spec.md", acceptance: "docs/acceptance.md", result: "docs/result.md" },
   });
+  // ADR-0064 Decision 6: a hand-supplied --consent claiming "approved" now requires an
+  // explicit, committed release-preflight waiver. Every fixture that exercises that
+  // scenario as a SEPARATE, still-valid path (as opposed to the new proof-verified
+  // path) needs one recorded, so this is the RIGHT fix for a test whose own purpose is
+  // downstream repository-observation/reducer behavior, not "how was approval reached".
+  if (consentStatus === "approved") {
+    write("project/critical-human-proof.json", {
+      schema: "pipeline.critical-human-proof-policy.v2",
+      requiredKinds: ["release-preflight"],
+      waivedKinds: [{ kind: "release-preflight", reason: "fixture: hand-supplied consent exercised directly under ADR-0064 Decision 6" }],
+    });
+  }
   git("add", "-A");
   git("commit", "-qm", "base");
   const baseCommit = git("rev-parse", "HEAD");
   write("docs/result.md", "# result\n\nsecond revision\n");
   git("add", "-A");
   git("commit", "-qm", "candidate");
+  const candidateCommit = git("rev-parse", "HEAD");
+  const candidateTree = git("rev-parse", "HEAD^{tree}");
   if (dirty) write("docs/spec.md", "# spec\n\nuncommitted\n");
-  return { base, baseCommit };
+  return { base, baseCommit, candidateCommit, candidateTree, git };
 }
 
 const build = ({ base, baseCommit }, over = {}) => buildReleasePreflight({
   rootDir: base, preflightId: "fixture-preflight", baseCommit,
   consentPath: "consent.json", lifecyclePath: "lifecycle.json", retentionPolicySha256: POLICY, ...over,
 });
+
+/** A fresh Ed25519 keypair, PEM-exported, exactly the shape `po-approval-proof.mjs`
+ * demands -- the same convention `critical-action-approval-request.test.mjs` uses,
+ * never a real operator key. */
+function keypair() {
+  const keys = generateKeyPairSync("ed25519");
+  const publicKey = keys.publicKey.export({ format: "pem", type: "spki" }).toString();
+  return { keys, publicKey };
+}
+
+/** The exact ADR-0064 Decision 2 subject shape `release-preflight-cli.mjs` itself
+ * rebuilds from its own observations -- mirrored here from the SAME fixture facts
+ * (never re-derived independently) so a test's signed proof binds the real subject. */
+function subjectFor(context, { retentionPolicySha256 = POLICY, lifecyclePath = "lifecycle.json" } = {}) {
+  const baseTree = context.git("rev-parse", `${context.baseCommit}^{tree}`);
+  const manifestSha256 = sha256(readFileSync(join(context.base, lifecyclePath)));
+  const version = readFileSync(join(context.base, "VERSION"), "utf8").trim();
+  return {
+    schema: "pipeline.release-preflight-consent-subject.v1",
+    version,
+    base: { commit: context.baseCommit, tree: baseTree },
+    lifecycle: { featureId: "fixture-feature", manifestPath: lifecyclePath, manifestSha256 },
+    retentionPolicySha256,
+  };
+}
+
+/** A real, verifiable critical-action request/proof pair -- the same construction
+ * `critical-action-approval-request.test.mjs` already establishes as the convention. */
+function signedProofPair({ candidate, subject, expiresAt, keys, publicKey, keyReference = "fixture-key", kind = "release-preflight" }) {
+  const subjectSha256 = criticalActionSubjectSha256({ kind, candidate, subject });
+  const action = { kind, subjectSha256, expiresAt };
+  const request = createCriticalActionApprovalRequest({
+    candidate, featureId: "fixture-feature", planBytes: Buffer.from("plan"), specBytes: Buffer.from("spec"), action,
+  });
+  const proof = {
+    schema: "pipeline.po-approval-proof.v1",
+    intentSha256: request.approvalIntent.sha256,
+    keyReference,
+    publicKey,
+    signatureBase64: sign(null, Buffer.from(request.approvalIntent.sha256), keys.privateKey).toString("base64"),
+  };
+  return { request, proof };
+}
+
+/** A directory OUTSIDE any fixture repository -- the ADR-0064 Decision 5 transport
+ * every recorded request/proof pair must live in. */
+function externalDir() {
+  const dir = mkdtempSync(join(tmpdir(), "release-preflight-proof-"));
+  roots.push(dir);
+  return dir;
+}
+function writeExternal(dir, name, value) {
+  const path = join(dir, name);
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`);
+  return path;
+}
 
 let passed = 0;
 let failed = 0;
@@ -156,6 +229,170 @@ try {
       record.gates.inventory.filter((gate) => gate.kind === "external").map((gate) => gate.id),
       ["remote", "human"],
     );
+  });
+
+  // ADR-0064 Decision 5: the additive --proof-request/--proof path.
+  check("RPC11 a verified --proof-request/--proof pair derives an approved consent per the Decision 5 field mapping", () => {
+    const context = fixture();
+    const { keys, publicKey } = keypair();
+    const subject = subjectFor(context);
+    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
+    const expiresAt = "2099-01-01T00:00:00.000Z";
+    const { request, proof } = signedProofPair({ candidate, subject, expiresAt, keys, publicKey });
+    const dir = externalDir();
+    const proofRequestPath = writeExternal(dir, "request.json", request);
+    const proofPath = writeExternal(dir, "proof.json", proof);
+    const now = "2026-08-17T00:00:00.000Z";
+    const { record } = build(context, { consentPath: null, proofRequestPath, proofPath, now });
+    assert.equal(record.status, "ready", record.reasons.join(", "));
+    assert.equal(record.consent.status, "approved");
+    assert.equal(record.consent.decisionId, request.approvalIntent.sha256);
+    assert.equal(record.consent.evaluatedAt, now);
+    assert.equal(record.consent.expiresAt, expiresAt);
+    assert.match(record.consent.authoritySha256, /^[0-9a-f]{64}$/u);
+  });
+
+  check("RPC12 --consent and --proof-request/--proof are mutually exclusive and exactly one is required (buildReleasePreflight layer)", () => {
+    const common = { rootDir: "/nonexistent-rpc12", preflightId: "x", baseCommit: "y", lifecyclePath: "l.json", retentionPolicySha256: POLICY };
+    const scenarios = [
+      { over: { consentPath: "c.json", proofRequestPath: "p.json", proofPath: "q.json" }, note: "both consent and proof pair supplied" },
+      { over: {}, note: "neither supplied" },
+      { over: { proofRequestPath: "p.json" }, note: "--proof-request without --proof" },
+      { over: { proofPath: "q.json" }, note: "--proof without --proof-request" },
+    ];
+    for (const { over, note } of scenarios) {
+      assert.throws(() => buildReleasePreflight({ ...common, ...over }), (error) => {
+        assert.ok(error instanceof ReleasePreflightCliError, `${note}: ${error?.message}`);
+        assert.equal(error.code, "RPC-USAGE", note);
+        return true;
+      }, note);
+    }
+  });
+
+  check("RPC13 --consent and --proof-request/--proof exclusivity is enforced at the CLI parseArgs layer", () => {
+    const baseArgs = ["--preflight-id", "x", "--base", "y", "--lifecycle", "l.json", "--retention-policy", POLICY, "--out", "out.json"];
+    const scenarios = [
+      { extra: ["--consent", "c.json", "--proof-request", "p.json", "--proof", "q.json"], note: "both supplied" },
+      { extra: [], note: "neither supplied" },
+      { extra: ["--proof-request", "p.json"], note: "--proof-request without --proof" },
+      { extra: ["--proof", "q.json"], note: "--proof without --proof-request" },
+    ];
+    for (const { extra, note } of scenarios) {
+      const result = spawnSync("node", [CLI_PATH, ...baseArgs, ...extra], { encoding: "utf8" });
+      assert.equal(result.status, 2, `${note}: stderr=${result.stderr}`);
+      assert.match(result.stderr, /RPC-USAGE/u, note);
+    }
+  });
+
+  // Negative corpus (ADR-0064 Risk section): each must be caught, never silently accepted.
+  check("RPC14 a proof recorded for a different candidate is refused, not silently accepted", () => {
+    const context = fixture();
+    const { keys, publicKey } = keypair();
+    const subject = subjectFor(context);
+    const wrongCandidate = { commit: context.baseCommit, tree: context.git("rev-parse", `${context.baseCommit}^{tree}`) };
+    const { request, proof } = signedProofPair({ candidate: wrongCandidate, subject, expiresAt: "2099-01-01T00:00:00.000Z", keys, publicKey });
+    const dir = externalDir();
+    const proofRequestPath = writeExternal(dir, "request.json", request);
+    const proofPath = writeExternal(dir, "proof.json", proof);
+    assert.throws(() => build(context, { consentPath: null, proofRequestPath, proofPath }), (error) => {
+      assert.ok(error instanceof ReleasePreflightCliError, error?.message);
+      assert.equal(error.code, "RPC-CONSENT-UNVERIFIED", error.message);
+      return true;
+    });
+  });
+
+  check("RPC15 cross-kind substitution stays refused for release-preflight, mirroring push/deploy/publication", () => {
+    const context = fixture();
+    const { keys, publicKey } = keypair();
+    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
+    // A subject shaped for "push" rather than "release-preflight" -- a real, signed
+    // approval for a DIFFERENT kind, replayed against this gate.
+    const pushSubject = { source: candidate.commit, remote: "origin", destination: "refs/heads/main" };
+    const { request, proof } = signedProofPair({ candidate, subject: pushSubject, expiresAt: "2099-01-01T00:00:00.000Z", keys, publicKey, kind: "push" });
+    const dir = externalDir();
+    const proofRequestPath = writeExternal(dir, "request.json", request);
+    const proofPath = writeExternal(dir, "proof.json", proof);
+    assert.throws(() => build(context, { consentPath: null, proofRequestPath, proofPath }), (error) => {
+      assert.ok(error instanceof ReleasePreflightCliError, error?.message);
+      assert.equal(error.code, "RPC-CONSENT-UNVERIFIED", error.message);
+      return true;
+    });
+  });
+
+  check("RPC16 an expired proof yields consent.status \"expired\" and the record stays blocked, never approved", () => {
+    const context = fixture();
+    const { keys, publicKey } = keypair();
+    const subject = subjectFor(context);
+    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
+    const expiresAt = "2020-01-01T00:00:00.000Z";
+    const { request, proof } = signedProofPair({ candidate, subject, expiresAt, keys, publicKey });
+    const dir = externalDir();
+    const proofRequestPath = writeExternal(dir, "request.json", request);
+    const proofPath = writeExternal(dir, "proof.json", proof);
+    const { record } = build(context, { consentPath: null, proofRequestPath, proofPath, now: "2026-08-17T00:00:00.000Z" });
+    assert.equal(record.status, "blocked");
+    assert.ok(record.reasons.includes("consent-not-approved"), record.reasons.join(", "));
+    assert.equal(record.consent.status, "expired");
+    assert.equal(record.consent.decisionId, request.approvalIntent.sha256);
+    assert.equal(record.consent.evaluatedAt, expiresAt);
+  });
+
+  check("RPC17 an edited subject preimage -- any field the subject digest covers -- is caught, not silently accepted", () => {
+    const context = fixture();
+    const { keys, publicKey } = keypair();
+    const signedSubject = subjectFor(context, { retentionPolicySha256: POLICY });
+    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
+    const { request, proof } = signedProofPair({ candidate, subject: signedSubject, expiresAt: "2099-01-01T00:00:00.000Z", keys, publicKey });
+    const dir = externalDir();
+    const proofRequestPath = writeExternal(dir, "request.json", request);
+    const proofPath = writeExternal(dir, "proof.json", proof);
+    // The CLI is invoked with a DIFFERENT retentionPolicySha256 than the one the proof
+    // was signed over -- one field the subject digest covers (ADR-0064 Decision 2) --
+    // simulating exactly the edited-subject-preimage attack the ADR's Risk section names.
+    const tamperedPolicy = "d".repeat(64);
+    assert.notEqual(tamperedPolicy, POLICY);
+    assert.throws(() => build(context, { consentPath: null, proofRequestPath, proofPath, retentionPolicySha256: tamperedPolicy }), (error) => {
+      assert.ok(error instanceof ReleasePreflightCliError, error?.message);
+      assert.equal(error.code, "RPC-CONSENT-UNVERIFIED", error.message);
+      return true;
+    });
+  });
+
+  check("RPC18 a proof signed by a key outside the project's committed trust-anchor set is refused", () => {
+    const context = fixture();
+    const { keys, publicKey } = keypair();
+    const subject = subjectFor(context);
+    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
+    const { request, proof } = signedProofPair({ candidate, subject, expiresAt: "2099-01-01T00:00:00.000Z", keys, publicKey, keyReference: "fixture-key" });
+    mkdirSync(join(context.base, "project"), { recursive: true });
+    writeFileSync(join(context.base, "project/critical-human-proof.json"), `${JSON.stringify({
+      schema: "pipeline.critical-human-proof-policy.v3",
+      requiredKinds: ["release-preflight"],
+      waivedKinds: [],
+      trustAnchors: [{ keyReference: "operator-key", publicKeySha256: "0".repeat(64) }],
+    }, null, 2)}\n`);
+    const dir = externalDir();
+    const proofRequestPath = writeExternal(dir, "request.json", request);
+    const proofPath = writeExternal(dir, "proof.json", proof);
+    assert.throws(() => build(context, { consentPath: null, proofRequestPath, proofPath }), (error) => {
+      assert.ok(error instanceof ReleasePreflightCliError, error?.message);
+      assert.equal(error.code, "RPC-CONSENT-UNVERIFIED", error.message);
+      return true;
+    });
+  });
+
+  check("RPC19 a missing proof or request artifact is refused, never treated as an absent-but-fine input", () => {
+    const context = fixture();
+    const dir = externalDir();
+    assert.throws(() => build(context, {
+      consentPath: null,
+      proofRequestPath: join(dir, "missing-request.json"),
+      proofPath: join(dir, "missing-proof.json"),
+    }), (error) => {
+      assert.ok(error instanceof ReleasePreflightCliError, error?.message);
+      assert.equal(error.code, "RPC-INPUT", error.message);
+      return true;
+    });
   });
 
   console.log(`\nrelease-preflight-cli: ${passed} passed, ${failed} failed`);
