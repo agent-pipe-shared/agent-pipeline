@@ -1,0 +1,24 @@
+feat(pipeline-core): fail verification on an unpublished sibling-Sprint commit
+
+EPIC-AC-02 had no carrier: nothing expressed what "consuming an unpublished
+Nova, Cyborg or Nightwing commit" is. The only commit identity a feature
+package can bind is candidate.commit, and public-release-state already types
+publication as published|unpublished, so the criterion becomes decidable: a
+bound candidate commit whose ancestry carries a sibling-Epic commit that is
+not reachable from that Epic's own published tip must not pass verification.
+
+checkUnpublishedSiblingSprintConsumption decides exactly that from
+caller-supplied Git observations - the module still never invokes Git - and
+fails closed: unobserved provenance, an unpublished sibling tip, an unobserved
+or tip-drifted ancestry probe, and a non-zero merge-base --is-ancestor status
+are all refusals; only an exit-code-0 probe against exactly the published tip
+commit is a published consumption. The receipt is digest-sealed like every
+other receipt in this module.
+
+The new checks join the suite verify.mjs already registers as blocking, so a
+refusal fails Phoenix verification. Evaluating the real manifests against live
+tips inside verify still needs a registration line in verify.mjs, which is
+TP-3-protected and deliberately untouched.
+
+Dispatch: PHX-WP-EPICAC02 (goldfish)
+AI-Assisted: true

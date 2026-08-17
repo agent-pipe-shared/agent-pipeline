@@ -2,11 +2,18 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   PARALLEL_SPRINT_DISPOSITIONS,
   PARALLEL_SPRINT_IMPACT_REVIEW_SCHEMA,
+  PARALLEL_SPRINT_PUBLICATION_GATE_INPUT_SCHEMA,
+  PARALLEL_SPRINT_PUBLICATION_GATE_RECEIPT_SCHEMA,
   PARALLEL_SPRINT_RECOVERY_ACTIONS,
   PARALLEL_SPRINT_SELECTION_SCHEMA,
+  checkUnpublishedSiblingSprintConsumption,
   digestParallelSprintValue,
   planParallelSprintIntegration,
 } from "./parallel-sprint-integration.mjs";
@@ -294,4 +301,211 @@ check("does not promote across a confirmed defer decision", () => {
   assert.equal(blocked.action.kind, PARALLEL_SPRINT_RECOVERY_ACTIONS.IMPACT_REVIEW_RECEIPT);
 });
 
-process.stdout.write(`${passed}/14 checks passed.\n`);
+// --- EPIC-AC-02: unpublished sibling-Sprint consumption gate ----------------
+
+const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+const NOVA_COMMIT = "9".repeat(40);
+const NOVA_TIP = "7".repeat(40);
+
+function featurePackage(overrides = {}) {
+  return {
+    schema: "pipeline.feature-package.v1",
+    feature: { id: "sprint-phoenix-epic", rigor: 2 },
+    state: "verifying",
+    artifacts: [],
+    candidate: { commit: "e".repeat(40), tree: "f".repeat(40) },
+    supersedes: null,
+    ...overrides,
+  };
+}
+
+function ancestryProbe(tipCommit, exitCode) {
+  return { probe: "merge-base--is-ancestor", tipCommit, exitCode };
+}
+
+function consumption(overrides = {}) {
+  return {
+    epic: "nova",
+    commit: NOVA_COMMIT,
+    source: "candidate-commit-ancestry",
+    publishedTip: { ref: "v0.4.7", commit: NOVA_TIP, publicationStatus: "published" },
+    reachability: ancestryProbe(NOVA_TIP, 0),
+    ...overrides,
+  };
+}
+
+function gateInput(overrides = {}) {
+  return {
+    schema: PARALLEL_SPRINT_PUBLICATION_GATE_INPUT_SCHEMA,
+    package: featurePackage(),
+    siblingProvenance: { probe: "branch-contains", epics: ["nova"] },
+    consumptions: [consumption()],
+    ...overrides,
+  };
+}
+
+check("permits a package that binds no candidate commit at all", () => {
+  const receipt = checkUnpublishedSiblingSprintConsumption(gateInput({
+    package: featurePackage({ state: "draft", candidate: null }),
+    siblingProvenance: "unobserved",
+    consumptions: [],
+  }));
+  assert.equal(receipt.schema, PARALLEL_SPRINT_PUBLICATION_GATE_RECEIPT_SCHEMA);
+  assert.equal(receipt.status, "verification-permitted");
+  assert.equal(receipt.code, "PSI-PUB-NO-BOUND-COMMIT");
+  assert.deepEqual(receipt.findings, []);
+});
+
+check("permits a Nova commit proven reachable from Nova's published tip", () => {
+  const receipt = checkUnpublishedSiblingSprintConsumption(gateInput());
+  assert.equal(receipt.status, "verification-permitted");
+  assert.equal(receipt.code, "PSI-PUB-SIBLING-CONSUMPTION-PUBLISHED");
+  assert.deepEqual(receipt.publishedConsumptions, [{ epic: "nova", commit: NOVA_COMMIT }]);
+  assert.deepEqual(receipt.findings, []);
+});
+
+check("fails verification when the consumed Nova commit is unpublished", () => {
+  const receipt = checkUnpublishedSiblingSprintConsumption(gateInput({
+    consumptions: [consumption({ reachability: ancestryProbe(NOVA_TIP, 1) })],
+  }));
+  assert.equal(receipt.status, "verification-failed");
+  assert.equal(receipt.code, "PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT");
+  assert.deepEqual(receipt.publishedConsumptions, []);
+  assert.deepEqual(receipt.findings, [{
+    code: "PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT",
+    epic: "nova",
+    commit: NOVA_COMMIT,
+  }]);
+});
+
+check("fails verification when sibling-Epic provenance was never observed", () => {
+  const receipt = checkUnpublishedSiblingSprintConsumption(gateInput({
+    siblingProvenance: "unobserved",
+    consumptions: [],
+  }));
+  assert.equal(receipt.status, "verification-failed");
+  assert.equal(receipt.code, "PSI-PUB-PROVENANCE-UNOBSERVED");
+});
+
+check("fails verification when the Cyborg tip is itself unpublished", () => {
+  const receipt = checkUnpublishedSiblingSprintConsumption(gateInput({
+    siblingProvenance: { probe: "branch-contains", epics: ["cyborg"] },
+    consumptions: [consumption({
+      epic: "cyborg",
+      publishedTip: { ref: "sprint_cyborg", commit: NOVA_TIP, publicationStatus: "unpublished" },
+    })],
+  }));
+  assert.equal(receipt.status, "verification-failed");
+  assert.equal(receipt.code, "PSI-PUB-SIBLING-TIP-UNPUBLISHED");
+});
+
+check("fails verification when Nightwing reachability was never probed", () => {
+  const receipt = checkUnpublishedSiblingSprintConsumption(gateInput({
+    siblingProvenance: { probe: "branch-contains", epics: ["nightwing"] },
+    consumptions: [consumption({ epic: "nightwing", reachability: "unobserved" })],
+  }));
+  assert.equal(receipt.status, "verification-failed");
+  assert.equal(receipt.code, "PSI-PUB-REACHABILITY-UNOBSERVED");
+});
+
+check("refuses a consumption claim that no bound candidate commit could carry", () => {
+  const receipt = checkUnpublishedSiblingSprintConsumption(gateInput({
+    package: featurePackage({ candidate: null }),
+  }));
+  assert.equal(receipt.status, "verification-failed");
+  assert.equal(receipt.code, "PSI-PUB-CONSUMPTION-WITHOUT-BOUND-COMMIT");
+});
+
+check("refuses an unattributed Epic, a drifted tip probe, and an unusable input", () => {
+  const unattributed = checkUnpublishedSiblingSprintConsumption(gateInput({
+    siblingProvenance: { probe: "branch-contains", epics: [] },
+  }));
+  assert.equal(unattributed.code, "PSI-PUB-CONSUMPTION-UNATTRIBUTED");
+  const drifted = checkUnpublishedSiblingSprintConsumption(gateInput({
+    consumptions: [consumption({ reachability: ancestryProbe("6".repeat(40), 0) })],
+  }));
+  assert.equal(drifted.code, "PSI-PUB-REACHABILITY-TIP-DRIFT");
+  const unknownEpic = checkUnpublishedSiblingSprintConsumption(gateInput({
+    consumptions: [{ ...consumption(), epic: "sentinel" }],
+  }));
+  assert.equal(unknownEpic.code, "PSI-PUB-CONSUMPTION-INVALID");
+  assert.equal(checkUnpublishedSiblingSprintConsumption({ schema: "other" }).code, "PSI-PUB-INPUT-SCHEMA");
+  assert.equal(checkUnpublishedSiblingSprintConsumption(gateInput({
+    package: { ...featurePackage(), schema: "pipeline.feature-package.v0" },
+  })).code, "PSI-PUB-PACKAGE-MANIFEST-INVALID");
+  for (const receipt of [unattributed, drifted, unknownEpic]) assert.equal(receipt.status, "verification-failed");
+});
+
+check("seals every gate receipt against its own body", () => {
+  const receipt = checkUnpublishedSiblingSprintConsumption(gateInput());
+  const { receiptSha256, ...body } = receipt;
+  assert.equal(receiptSha256, digestParallelSprintValue(body));
+  const other = checkUnpublishedSiblingSprintConsumption(gateInput({
+    consumptions: [consumption({ reachability: ancestryProbe(NOVA_TIP, 1) })],
+  }));
+  assert.notEqual(other.requestSha256, receipt.requestSha256);
+});
+
+check("admits every feature package this repository holds today", () => {
+  const specs = join(REPO_ROOT, "specs");
+  if (!existsSync(specs)) return;
+  let seen = 0;
+  for (const entry of readdirSync(specs, { withFileTypes: true })) {
+    const manifestPath = join(specs, entry.name, "lifecycle.json");
+    if (!entry.isDirectory() || !existsSync(manifestPath)) continue;
+    seen += 1;
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    const receipt = checkUnpublishedSiblingSprintConsumption({
+      schema: PARALLEL_SPRINT_PUBLICATION_GATE_INPUT_SCHEMA,
+      package: manifest,
+      siblingProvenance: "unobserved",
+      consumptions: [],
+    });
+    if (manifest.candidate === null) {
+      // No bound commit exists, so nothing can be consumed: no Git needed.
+      assert.equal(receipt.status, "verification-permitted", `${entry.name}: ${receipt.code}`);
+      assert.equal(receipt.code, "PSI-PUB-NO-BOUND-COMMIT");
+    } else {
+      // A bound commit without an observation never passes by default.
+      assert.equal(receipt.status, "verification-failed", `${entry.name}: ${receipt.code}`);
+      assert.equal(receipt.code, "PSI-PUB-PROVENANCE-UNOBSERVED");
+    }
+    assert.equal(receipt.packageId, manifest.feature.id);
+  }
+  assert.ok(seen > 0, "no feature package manifests were found");
+});
+
+check("decides both directions from real git merge-base exit codes", () => {
+  let head; let parent;
+  try {
+    const git = (args) => execFileSync("git", ["-C", REPO_ROOT, ...args], { encoding: "utf8" }).trim();
+    head = git(["rev-parse", "HEAD"]);
+    parent = git(["rev-parse", "HEAD~1"]);
+  } catch {
+    return; // No Git or no history here: the constructed probes above still bind the contract.
+  }
+  const probe = (commit, tipCommit) => {
+    try {
+      execFileSync("git", ["-C", REPO_ROOT, "merge-base", "--is-ancestor", commit, tipCommit], { stdio: "ignore" });
+      return 0;
+    } catch (error) {
+      return typeof error.status === "number" ? error.status : 128;
+    }
+  };
+  const observed = (commit, tipCommit) => checkUnpublishedSiblingSprintConsumption(gateInput({
+    package: featurePackage({ candidate: { commit: head, tree: head } }),
+    consumptions: [consumption({
+      commit,
+      publishedTip: { ref: "main", commit: tipCommit, publicationStatus: "published" },
+      reachability: ancestryProbe(tipCommit, probe(commit, tipCommit)),
+    })],
+  }));
+  assert.equal(probe(parent, head), 0);
+  assert.equal(observed(parent, head).status, "verification-permitted");
+  assert.equal(probe(head, parent), 1);
+  const refused = observed(head, parent);
+  assert.equal(refused.status, "verification-failed");
+  assert.equal(refused.code, "PSI-PUB-CONSUMES-UNPUBLISHED-COMMIT");
+});
+
+process.stdout.write(`${passed}/25 checks passed.\n`);
