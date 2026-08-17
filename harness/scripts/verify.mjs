@@ -244,6 +244,7 @@ const TEST_SUITES = [
   { name: "advisory-receipt-tests", file: join(libDir, "advisory-receipt.test.mjs") },
   { name: "advisory-lifecycle-v2-tests", file: join(libDir, "advisory-lifecycle-v2.test.mjs") },
   { name: "advisory-coordinator-tests", file: join(libDir, "advisory-coordinator.test.mjs") },
+  { name: "advisory-decision-event-tests", file: join(libDir, "advisory-decision-event.test.mjs") },
   { name: "critic-export-policy-tests", file: join(libDir, "critic-export-policy.test.mjs") },
   { name: "advisory-host-bridge-tests", file: join(pluginScriptsDir, "advisory-host-bridge.test.mjs") },
   { name: "codex-sandbox-preflight-tests", file: join(scriptDir, "codex-sandbox-preflight.test.mjs") },
