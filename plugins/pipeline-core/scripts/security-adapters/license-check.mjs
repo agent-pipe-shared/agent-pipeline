@@ -26,13 +26,13 @@
  *     ... ] }`. `version` is optional (used only to make a finding's `path` more specific).
  *
  * BEHAVIOR: either file absent -> SKIPPED (with a reason naming which path is missing and
- * where). An absent `allowlistPath` additionally carries `classification: "success"` -- it means
- * "this project configures no license policy", which is a project state, NOT a scanner failure;
+ * where), and BOTH absent-file branches carry `classification: "success"` -- it means "this
+ * project configures no license policy" (absent `allowlistPath`) or "this project declares no
+ * dependencies to check" (absent `declaredPath`), which are project states, NOT scanner failures;
  * without that explicit classification the runner's `scannerEntry` default renders a SKIPPED
- * result as `scanner_error`. NOTE the deliberate asymmetry: the absent-`declaredPath` branch
- * below is still unclassified and therefore still reads as `scanner_error`. That is the same
- * defect class, left untouched here because it is outside this change's scope, not because it
- * is correct. Either file present but not valid JSON -> ERROR (never silently treated as "no
+ * result as `scanner_error`. (The absent-`declaredPath` branch used to be unclassified and read
+ * as `scanner_error` -- fixed to match its sibling, same defect class, same fix.) Either file
+ * present but not valid JSON -> ERROR (never silently treated as "no
  * dependencies"). Otherwise: for every declared dependency whose `license` is NOT in
  * `allow` (or IS explicitly in `deny`), emit one finding, severity fixed "high" (briefing:
  * "license-check violations -> high"). No violations -> PASS.
@@ -97,8 +97,15 @@ export async function run({ config = {} } = {}) {
     };
   }
   if (!declaredPath || !existsSync(declaredPath)) {
+    // NOT CONFIGURED -- same clean-skip shape as the absent-allowlistPath branch above (mirrors
+    // NVA-BL-32). A project that configures a license allowlist but ships no
+    // third-party-licenses.json declaration has nothing for this control to check, which is a
+    // legitimate project state, not a broken scanner. `classification: "success"` is load-bearing
+    // for the same reason as above: without it, `scannerEntry` defaults this SKIPPED result to
+    // `scanner_error`.
     return {
       status: "SKIPPED",
+      classification: "success",
       findings: [],
       raw: null,
       reason: `no declared third-party-licenses.json found: ${declaredPath ?? "(no path configured)"}`,

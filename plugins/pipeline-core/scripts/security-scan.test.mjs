@@ -855,6 +855,15 @@ process.exit(0);
     },
   });
   assertEqual("license-check run: missing declared file -> SKIPPED", result.status, "SKIPPED");
+  // NVA-MICRO-1 (sub-item A): an absent declared third-party-licenses.json means "this project
+  // declares no dependencies to check" -- a clean, completed skip, same defect class as the
+  // absent-allowlist case below (NVA-BL-32). It must NOT surface as a scanner failure.
+  assertEqual(
+    "license-check run: missing declared file -> classification success (not configured, not a scanner error)",
+    { classification: result.classification, findingCount: result.findings.length },
+    { classification: "success", findingCount: 0 },
+  );
+  assertIncludes("license-check run: missing declared file reason names the missing file", result.reason, "no declared third-party-licenses.json found");
 }
 {
   const rootDir = makeRootDir("license-missing-allowlist-root");
