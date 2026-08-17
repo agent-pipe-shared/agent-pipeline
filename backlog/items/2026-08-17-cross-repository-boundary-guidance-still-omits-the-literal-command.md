@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: b095535da9d5190dcefeecdddf95c4bf3b9495da
+closure_evidence: plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs
 source: "Found while investigating two orphaned worktrees (agent-a2b2a34b84f687185, agent-ae0bcdcb0ead6ecec) left over from prior sessions, 2026-08-17. Both worktrees' own commits were confirmed already superseded on main and discarded; this is a genuine, separate, still-open gap noticed while comparing GF-059's original fix against the current file."
 ---
 
@@ -73,3 +77,18 @@ Not designed here. Two questions for whoever picks this up:
   `crossRepositoryOnlyDenial`) once question 1 (deliberate asymmetry vs.
   oversight) is answered — not yet dispatched.
 - **Date:** 2026-08-17
+
+### Closed 2026-08-18 (overnight AFK block, NVA-MICRO-3)
+
+Question 1 answered: measured to be an oversight (GF-059's dispatch never
+reached `crossRepositoryOnlyDenial`), not a deliberate risk-class
+distinction. Fixed per question 2: extracted the shared `commandIsSafe`
+secret-screen logic into `commandDisclosureFields()`, applied to
+`crossRepositoryOnlyDenial` identically to the already-fixed host-boundary
+site. Two new regression checks (safe command discloses `command`/
+`copyCommand`; secret-bearing command never leaks the secret verbatim).
+Independently re-verified: `node --test
+plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs` → both new checks
+green; one pre-existing, unrelated failure (Codex manifest-stamp format
+drift in `.codex-plugin/plugin.json`, untouched by this commit — confirmed
+via `git show --stat`) is unaffected, not a regression from this diff.

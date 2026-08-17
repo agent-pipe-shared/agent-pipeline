@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.grammar-refusal-does-not-say-which-part-failed
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: 8e2d21ca9c8205e7b23b2d3d7b5d78288c237104
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 due: 2026-08-22
 source: "Found by REPAIRMAP-1 while building the repair map, and immediately suffered by that same dispatch: it lost its own final commit to this refusal after 40 tool uses of otherwise-good work."
 ---
@@ -140,3 +144,16 @@ for exactly this kind of review.
   document why not.
 - **Assignment (if accepted):** unassigned, next available implement slot.
 - **Date:** 2026-08-17
+
+### Closed 2026-08-18 (overnight AFK block, NVA-MICRO-3)
+
+Measured, per Direction: every command reaching the
+GUARD-OPERATOR-UNAPPROVED/GUARD-REDIRECT-UNAPPROVED branch has an accepted
+parse containing at least one of `|&<>()`, and `retryActionsForDeniedCommand`
+returns `[]` unconditionally on the first such character (its per-part
+recovery only ever handles `;`/newline-joined segments) — confirmed
+empirically across `&&`, `|`, `>`, `2>&1`, `| tee`. Wiring the call through
+would be dead code, not a fix, so the outcome is a confirmed non-fix: the
+literal `[]` stays, with a one-line comment now stating why. No behavior
+change. Independently re-verified: `node --test
+plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` → 96/96 green.

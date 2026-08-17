@@ -61,7 +61,7 @@
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.critical-push-signing-ceremony-gives-no-path-feedback | open | workflow-improvement | pipeline | 2026-08-09 | — |
-| pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
@@ -70,7 +70,7 @@
 | pipeline.dispatch-reported-creating-a-record-it-never-created | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.dispatched-agents-return-truncated-mid-step | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path | open | defect | pipeline | 2026-08-10 | — |
+| pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.documentation-information-architecture | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
@@ -91,7 +91,7 @@
 | pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | open | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | 2026-08-09 | — |
-| pipeline.grammar-refusal-does-not-say-which-part-failed | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.grammar-refusal-does-not-say-which-part-failed | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.greenfield-seeded-with-private-overlay-calibration | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit | open | idea | pipeline | 2026-08-17 | — |
@@ -178,7 +178,7 @@
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | closed | defect | pipeline | 2026-08-11 | — |
-| pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | open | defect | pipeline | 2026-08-10 | — |
+| pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | closed | defect | pipeline | 2026-08-09 | — |
@@ -239,6 +239,7 @@
 | pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions | open | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.two-manifest-literals-bypass-the-single-seed-owner | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.verify-authorship-defaults-to-source-markers-not-behavior | closed | workflow-improvement | pipeline | 2026-08-10 | — |
@@ -259,6 +260,6 @@
 
 ## Counts
 
-- open: 96
+- open: 93
 - in_progress: 22
-- closed: 133
+- closed: 137

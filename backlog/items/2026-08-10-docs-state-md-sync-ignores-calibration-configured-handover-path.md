@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: 7bdf0e4f36910693c5b9c3b426263cf528d9b41c
+closure_evidence: plugins/pipeline-core/lib/onboarding-continuity.test.mjs
 source: "Critic review (claude-opus-5, max, functional-equivalent-read-only lane) of GF-090 (commits 1b9ca12e/049ab1a8), 2026-08-10. Finding F2, verdict FAIL (alongside major finding F1, fixed as GF-091). Full report: scratch/critic-843d081a/critic-notes.md."
 due: 2026-08-24
 ---
@@ -55,3 +59,13 @@ calibration-configured alternate path if option (a) is chosen.
 - **Assignment (if accepted):** candidate for a goldfish-implementor
   dispatch once direction (a) vs (b) is picked — not yet dispatched.
 - **Date:** 2026-08-17
+
+### Closed 2026-08-18 (overnight AFK block, NVA-MICRO-3)
+
+Fixed per direction (a): `syncStateMdNextAction` now resolves the same
+`calibration.handover` field `projectReadContinuityStatus` already resolves,
+falling back to `docs/state.md` on any resolution failure so the sync stays
+advisory and never throws. New regression test proves a custom handover
+path is resynced and `docs/state.md` is never written as a fallback when a
+custom path is configured. Independently re-verified: `node --test
+plugins/pipeline-core/lib/onboarding-continuity.test.mjs` → 154/154 green.
