@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9b184d098c46671e7eb995150aa13a4100cda4d260a18bc521441f76afd35aac"
+    "transitionHead": "c3d4f550e9376fec42c5b6b9ed32a73a2622ec6db86e327dd5ea9e18c592b721"
   },
   "counts": {
-    "open": 107,
+    "open": 108,
     "in_progress": 22,
     "closed": 98
   },
@@ -1150,6 +1150,14 @@
       "owner": "pipeline",
       "created": "2026-08-17",
       "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; the original report's line numbers were corrupted by transcription and were not trusted -- independently re-located and confirmed against this repository's own current source before filing."
+    },
+    {
+      "id": "pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\Web\\Toolbox (Windows Claude) session's handover, live-blocking. Independently verified line-for-line against this repository's current source before filing."
     },
     {
       "id": "pipeline.mp22-orchestrator-self-implementation-has-no-enforcement",
