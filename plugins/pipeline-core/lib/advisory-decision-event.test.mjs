@@ -12,6 +12,7 @@ import {
 } from "./advisory-decision-event.mjs";
 import { ADVISORY_RECEIPT_SCHEMA, validateAdvisoryReceipt } from "./advisory-receipt.mjs";
 import { AgentDecisionJournalError } from "./agent-decision-journal.mjs";
+import { canonicalSha256 } from "./governance-event.mjs";
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
@@ -57,7 +58,7 @@ test("A-AC-05 translates a first-attempt success into a validated selection even
   assert.equal(event.supersedesEventId, null);
   assert.equal(
     event.candidateDigest,
-    sha256(JSON.stringify({ candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40) })),
+    canonicalSha256({ commit: "a".repeat(40), tree: "b".repeat(40) }),
   );
   // The event came back through validateAgentDecisionEvent, not around it.
   assert.equal(Object.isFrozen(event), true);

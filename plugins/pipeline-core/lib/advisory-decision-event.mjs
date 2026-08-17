@@ -47,10 +47,9 @@
  * `relatedHumanDecisionId` and `supersedesEventId` are always `null`. The record
  * says which identity answered, never that the answer was approved or acted on.
  */
-import { createHash } from "node:crypto";
-
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
 import { validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
+import { canonicalSha256 } from "./governance-event.mjs";
 
 /** The two `reasonCode`s this translator emits, one per admissible `kind`. */
 export const ADVISORY_DECISION_REASON_CODES = Object.freeze({
@@ -110,13 +109,16 @@ function providerForRunner(runner) {
 }
 
 /**
- * The candidate this decision is bound to. Hashed over a two-key literal in
- * fixed order -- no canonicalizer is warranted for two keys, and inventing one
- * would add a second hashing convention to this family.
+ * The candidate this decision is bound to. Shaped and hashed as `{commit, tree}`
+ * via `canonicalSha256` -- not a two-key literal of this module's own choosing --
+ * because `governance-event-store.mjs`'s agent-origin binding check compares this
+ * digest against `canonicalSha256(event.candidate)`, and `event.candidate` is
+ * always `{commit, tree}` (the same shape the human/lifecycle streams already
+ * bind against). A different preimage shape or hash function here can never
+ * equal that check's output for any real value.
  */
 function candidateDigest(dispatch) {
-  const bound = JSON.stringify({ candidateCommit: dispatch.candidateCommit, candidateTree: dispatch.candidateTree });
-  return createHash("sha256").update(bound).digest("hex");
+  return canonicalSha256({ commit: dispatch.candidateCommit, tree: dispatch.candidateTree });
 }
 
 function identityEntry(dimension, value) {
