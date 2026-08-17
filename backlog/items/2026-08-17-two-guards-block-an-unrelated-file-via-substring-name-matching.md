@@ -75,3 +75,24 @@ files), not a same-session Elephant patch.
 - **Assignment (if accepted):** goldfish-deep, guardrail-tier (MP-07), plus
   Critic review before considered done.
 - **Date:** 2026-08-17
+
+## Progress (2026-08-17)
+
+**A — fixed.** Landed as part of dispatch NVA-LCGUARD-4's Gap 1:
+`gateStrengthShellRefusal()` now uses a boundary-aware
+`matchesProtectedBasename()` (`(?<![a-z0-9._-])needle(?![a-z0-9._-])`)
+instead of raw `includes()`, so `pipeline.yaml.bak` no longer matches
+`pipeline.yaml`. Verified: `guard-lifecycle-ready.test.mjs` 93/93 pass,
+including new test `NVA-LCGUARD-4 gap 1`. Commit
+`e854b7bbdc82850d266d93068fe9f78fa3d7284c`.
+
+**B — still open, tracked separately as `NVA-GG11FIX-1`.** Blocked: the fix
+requires adding a test case to `guard-git.test.mjs`, a TP-1 protected test
+path. `repair-map.mjs --help` for the applicable code
+(`HGO-AUTHOR-ROOT-REQUIRED`) reports `liftable: author-repair-required`,
+`by: attended-author-outside-session`, `command: (none)` — confirmed there
+is no in-session-triggerable override for this lift class (unlike the
+general `HGO-ELIGIBLE` case, which prints a 3-command
+plan/prepare-authorization/authorize-by-signature sequence). This item stays
+`open`, scoped to part B only, until the PO does something out-of-session to
+lift it or an alternative path is found.
