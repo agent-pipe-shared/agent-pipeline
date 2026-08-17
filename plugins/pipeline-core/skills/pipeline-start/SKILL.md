@@ -78,10 +78,12 @@ commit author (`project-onboarding-v3.mjs`'s `applyProjectOnboardingV3`,
 neither `user.name` nor `user.email` resolves locally or globally) is a
 blocking question, the same as the kickoff goal/profile/language questions
 already are — never a diagnostic to notice and act on later, and never a
-default or invented value. Ask the PO once for both the author name and email,
-then set both in THIS repository's local config only: `git config user.name
-"<name>"` and `git config user.email "<email>"` — never `--global`, and never
-a value the PO did not type.
+default or invented value. Ask the PO once now for both the author name and
+email, then hold the answered values — do not set them yet. Apply them via
+`git config user.name "<name>"` and `git config user.email "<email>"` in THIS
+repository's local config only, immediately before authoring this
+repository's first commit, never sooner — never `--global`, and never a value
+the PO did not type.
 
 After a required restart, an already seeded repository shows this consent
 was exercised; resume ordinary bootstrap without re-asking. Stop for new

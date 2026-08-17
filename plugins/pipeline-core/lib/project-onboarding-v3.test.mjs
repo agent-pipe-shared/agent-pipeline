@@ -3369,6 +3369,15 @@ test("onboarding seeds ignore rules for the paths it writes into, and never touc
 // claim about who a human is, and a seed inventing one would put a fabricated
 // name in permanent history -- worse than the stop it prevents. Only the
 // delivery mechanism changed, from a passive diagnostic to a real ask-step.
+//
+// AUTHORID-2 (2026-08-17 follow-on refinement, backlog:
+// 2026-08-17-git-identity-must-be-set-immediately-before-first-commit-not-at-
+// setup-time.md). A live Codex happy-path restart test showed the "ask early"
+// half of AUTHORID-1 working as intended, but the agent then ran `git config`
+// immediately, before onboarding readiness -- that is the part this refines.
+// The ask still fires at the same point and still asks for both fields at
+// once; only the guidance text changed, to explicitly defer the `git config`
+// write until immediately before the repository's first commit.
 test("onboarding asks for a commit author it cannot name, and never invents one", () => {
   const missing = root();
   const configured = root();
@@ -3395,6 +3404,8 @@ test("onboarding asks for a commit author it cannot name, and never invents one"
       "the guidance must never name a --global config command");
     assert.match(applied.nextAction.guidance, /never --global/u,
       "the guidance must explicitly rule global scope out");
+    assert.match(applied.nextAction.guidance, /immediately before .*first commit/u,
+      "the guidance must defer the git config write to immediately before the first commit, never sooner");
     // Asked, never written: the seed must not have configured an identity itself.
     assert.equal(existsSync(join(missing, ".git", "config")) === false
       || !readFileSync(join(missing, ".git", "config"), "utf8").includes("[user]"), true,
