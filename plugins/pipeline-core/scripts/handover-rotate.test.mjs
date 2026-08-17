@@ -208,4 +208,77 @@ const SAMPLE = [
   }
 }
 
+// == NVA-HANDOVER-ROT-2 F1: --handover-path escaping root is rejected, typed error, zero write ==
+{
+  const root = fixtureRoot("traversal-handover-path");
+  try {
+    recordExtractionAcknowledged(root);
+    const outsideTarget = join(dirname(root), "outside-secret.md");
+    assert.throws(
+      () => rotateHandover({
+        root, handoverPath: "../outside-secret.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
+      }),
+      (error) => error instanceof HandoverRotationError && error.code === "HANDOVER-ROTATION-PATH-ESCAPES-ROOT",
+    );
+    assert.equal(existsSync(outsideTarget), false, "no write must occur outside root for a traversal --handover-path");
+    assert.equal(existsSync(join(root, ARCHIVE_DIR)), false, "no archive directory created inside root either");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == NVA-HANDOVER-ROT-2 F1: --rotation-date must be strict YYYY-MM-DD, typed error, zero write ==
+{
+  const root = fixtureRoot("traversal-rotation-date");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    recordExtractionAcknowledged(root);
+    assert.throws(
+      () => rotateHandover({
+        root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "../../../etc/evil",
+      }),
+      (error) => error instanceof HandoverRotationError && error.code === "HANDOVER-ROTATION-INVALID-DATE",
+    );
+    assert.equal(existsSync(join(root, ARCHIVE_DIR)), false, "a rejected rotation date must create no archive directory");
+    assert.equal(readFileSync(join(root, "docs", "state.md"), "utf8"), SAMPLE, "the live file must remain untouched");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == NVA-HANDOVER-ROT-2 F1: --slug is ALWAYS slugify()'d, never used raw -- a traversal payload is neutralized, not raw-joined ==
+{
+  const root = fixtureRoot("traversal-slug");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    recordExtractionAcknowledged(root);
+    const plan = rotateHandover({
+      root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s",
+      rotationDate: "2026-08-17", slug: "../../../../etc/evil",
+    });
+    assert.equal(plan.archivePath, `${ARCHIVE_DIR}/2026-08-17--etc-evil.md`, "a hostile slug is sanitized into a flat, traversal-proof filename");
+    assert.ok(!plan.archivePath.includes(".."), "the resolved archive path never contains a traversal segment");
+    assert.equal(existsSync(join(root, plan.archivePath)), true, "the archive file was written inside the repository");
+    assert.equal(existsSync(join(dirname(root), "evil.md")), false, "no write occurred outside root as a result of the hostile slug");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == NVA-HANDOVER-ROT-2 F4: the read-only status check never creates the acknowledgment marker as a side effect ==
+{
+  const root = fixtureRoot("status-read-only");
+  try {
+    const markerPath = join(root, ".git", "agent-pipeline", "handover-rotation", "extraction-acknowledged.json");
+    assert.equal(isExtractionAcknowledged(root), false);
+    assert.equal(existsSync(markerPath), false, "checking status must never create the acknowledgment marker");
+    assert.equal(isExtractionAcknowledged(root), false, "calling it repeatedly stays read-only");
+    assert.equal(existsSync(markerPath), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 console.log("handover-rotate.test.mjs: all assertions passed");

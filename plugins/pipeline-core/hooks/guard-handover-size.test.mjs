@@ -157,4 +157,52 @@ withFixture("unknown-shape", { maxBytes: 10 }, (root) => {
   assert.equal(proposedHandoverBytes({ tool_name: "Grep", tool_input: {} }, "xx"), null);
 }
 
+// == NVA-HANDOVER-ROT-2 F2: $-pattern sequences in new_string must be treated as LITERAL text, not
+// interpreted by String.prototype.replace() -- growing edit ==
+withFixture("dollar-sequences-growing", { maxBytes: 55 }, (root) => {
+  const prefix = "P".repeat(5);
+  const suffix = "S".repeat(5);
+  const oldStr = "M";
+  const current = `${prefix}${oldStr}${suffix}`; // 11 bytes
+  writeFileSync(join(root, "docs", "state.md"), current, "utf8");
+  const newStr = "$&$`$'$$" + "X".repeat(40); // 48 literal chars, all four special sequences present
+  const literalReplacement = prefix + newStr + suffix; // correct: no $-pattern interpretation
+  const buggyReplacementFull = current.replace(oldStr, newStr); // pre-fix behavior, for contrast only -- not production code
+  assert.notEqual(literalReplacement.length, buggyReplacementFull.length, "fixture must actually diverge under $-pattern interpretation");
+  assert.equal(
+    proposedHandoverBytes({ tool_name: "Edit", tool_input: { old_string: oldStr, new_string: newStr } }, current),
+    Buffer.byteLength(literalReplacement, "utf8"),
+    "the simulated size must match the literal replacement, not the $-interpreted one",
+  );
+  const result = evaluateHandoverSizeGuard(
+    { tool_name: "Edit", tool_input: { file_path: join(root, "docs", "state.md"), old_string: oldStr, new_string: newStr } },
+    { rootDir: root },
+  );
+  assert.equal(result.exitCode, 2, "a genuine literal growth at/over cap is still correctly blocked");
+});
+
+// == NVA-HANDOVER-ROT-2 F2: same -- shrinking edit that $-pattern interpretation would have
+// misclassified as a large GROWTH, falsely refusing a legitimate rotation ==
+withFixture("dollar-sequences-shrinking", { maxBytes: 69 }, (root) => {
+  const prefix = "P".repeat(30);
+  const suffix = "S".repeat(30);
+  const oldStr = "MATCHTHIS";
+  const current = `${prefix}${oldStr}${suffix}`; // 69 bytes, AT the cap
+  writeFileSync(join(root, "docs", "state.md"), current, "utf8");
+  const newStr = "$&$`$'$$"; // 8 literal chars -- a genuine net decrease of 1 byte (69 -> 68)
+  const literalReplacement = prefix + newStr + suffix;
+  const buggyReplacementFull = current.replace(oldStr, newStr); // pre-fix behavior, for contrast only
+  assert.equal(literalReplacement.length, 68);
+  assert.ok(buggyReplacementFull.length > current.length, "fixture must reproduce the historical false-growth misclassification");
+  assert.equal(
+    proposedHandoverBytes({ tool_name: "Edit", tool_input: { old_string: oldStr, new_string: newStr } }, current),
+    Buffer.byteLength(literalReplacement, "utf8"),
+  );
+  const result = evaluateHandoverSizeGuard(
+    { tool_name: "Edit", tool_input: { file_path: join(root, "docs", "state.md"), old_string: oldStr, new_string: newStr } },
+    { rootDir: root },
+  );
+  assert.equal(result.exitCode, 0, "a genuine net-decreasing rotation edit must never be blocked, even with $-pattern-shaped content");
+});
+
 console.log("guard-handover-size.test.mjs: all assertions passed");
