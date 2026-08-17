@@ -85,7 +85,21 @@ PO/design call, not an implementation task:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+PO decided via `AskUserQuestion` on 2026-08-17, in response to the standing "everything from
+Phoenix must be closed" directive: **build it.** Wire `lifecycleEvents` into the write-decision
+path in `external-reference-adapter.mjs`, reusing the four-of-six overlap with
+`feature-package-topology.mjs`'s `FEATURE_STATES` this session already confirmed. The one open
+implementation-detail question this build still needs an answer to — what a policy naming only
+`proposed`/`active` should mean for a write observed while the epic itself is in a non-shared
+build-phase state such as `draft`/`implementing` — is delegated to the dispatch as a bounded,
+disclosed judgment call (goldfish-deep, design latitude explicitly granted for this one mapping
+decision only), not re-escalated to the PO: it is a narrow implementation-detail choice within an
+already-approved build, not a fresh architecture question.
+
+- **Decision:** Build it.
+- **Rationale:** Genuinely buildable (unlike `retention`/`conflictPolicy`) — carrier
+  (`binding.identity`) available before the first external call, four of six values already
+  share a vocabulary with an existing enforced dimension (`ownedSections`'s sibling pattern).
+- **Assignment (if accepted):** `pipeline`, next Goldfish dispatch cycle (bounded mapping-choice
+  latitude granted per above).
+- **Date:** 2026-08-17.

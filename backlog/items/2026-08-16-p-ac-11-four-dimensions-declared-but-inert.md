@@ -86,7 +86,22 @@ not an implementation task.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+PO decided per-dimension via `AskUserQuestion` on 2026-08-17, in response to the standing
+"everything from Phoenix must be closed" directive:
+
+- **`previewRequired` — satisfied by construction.** `preview()` runs unconditionally on every
+  governed write already; amend `acceptance.md`/`docs/organization-policy-packs.md` to say so
+  explicitly rather than build conditional preview (which would be a real, riskier behavior
+  change to a preview-first-by-design adapter). Register-class amendment, Elephant-direct, no code
+  change — next step.
+- **`retention` — drop the dimension.** No natural bridge exists between `identity.retention`'s
+  `[active,retain,archive]` and the policy's three categorical commitments; remove `retention` from
+  `documentClasses` entirely. This IS a schema change (removes a validated field, updates tests) —
+  needs a real Goldfish dispatch, not direct Elephant authorship. Queued, not yet dispatched.
+- **`conflictPolicy` — still open, PO wants deeper discussion.** Building real enforcement would
+  WEAKEN today's always-reject-on-conflict behavior in some cases (auto-resolve when policy
+  allows) — a genuine behavior-relaxation call, not resolved by a quick multiple-choice. Revisit
+  with a fuller options brief before asking again.
+- **Assignment (if accepted):** `pipeline` (retention drop: next Goldfish dispatch cycle;
+  previewRequired amendment: this session, direct).
+- **Date:** 2026-08-17.
