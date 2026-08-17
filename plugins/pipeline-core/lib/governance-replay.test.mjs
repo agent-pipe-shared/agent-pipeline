@@ -30,7 +30,7 @@ test("L-AC-07 replays serial, parallel, retry, cancellation and recovery fixture
     event(2, { eventId: "event-2", status: "completed", reasonCode: "DONE" }),
     event(3, { eventId: "event-3", status: "active", reasonCode: "RETRIED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-1", attemptId: "attempt-2", workerId: "worker-1", correlationId: "correlation-1", queueRevision: 0 } }),
     event(4, { eventId: "event-4", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-2", attemptId: "attempt-1", workerId: "worker-2", correlationId: "correlation-2", queueRevision: 0 } }),
-    event(5, { eventId: "event-5", kind: "cancellation", status: "cancelled", reasonCode: "CANCELLED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-2", attemptId: "attempt-1", workerId: "worker-2", correlationId: "correlation-2", queueRevision: 0 } }),
+    event(5, { eventId: "event-5", kind: "status", status: "cancelled", reasonCode: "CANCELLED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-2", attemptId: "attempt-1", workerId: "worker-2", correlationId: "correlation-2", queueRevision: 0 } }),
     event(6, { eventId: "event-6", kind: "recovery", status: "completed", reasonCode: "RECOVERED", correlation: { packageId: "phoenix-3", dispatchId: "dispatch-3", attemptId: "attempt-1", workerId: "worker-3", correlationId: "correlation-3", queueRevision: 0 } }),
   ];
   const first = projectGovernanceReplay(fixture);

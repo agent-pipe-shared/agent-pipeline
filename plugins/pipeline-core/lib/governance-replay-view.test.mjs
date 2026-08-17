@@ -63,9 +63,9 @@ test("marks deterministically computed kinds (verification, candidate-invalidati
   assert.equal(markerCount(html, "value-record-deterministic"), 2);
 });
 
-test("marks raw runner-reported kinds (dispatch, status, cancellation) with the value-record-runner-observed class", () => {
-  const html = renderGovernanceReplayView(buildGovernanceReplayViewModel(observed(timelineOf(event(1, { kind: "dispatch" }), event(2, { kind: "status" }), event(3, { kind: "cancellation" })))));
-  assert.equal(markerCount(html, "value-record-runner-observed"), 3);
+test("marks raw runner-reported kinds (dispatch, status) with the value-record-runner-observed class", () => {
+  const html = renderGovernanceReplayView(buildGovernanceReplayViewModel(observed(timelineOf(event(1, { kind: "dispatch" }), event(2, { kind: "status" })))));
+  assert.equal(markerCount(html, "value-record-runner-observed"), 2);
 });
 
 test("gives different L-AC-04 record classes visibly distinct CSS classes within the same rendered timeline", () => {

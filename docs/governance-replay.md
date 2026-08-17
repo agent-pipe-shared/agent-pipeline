@@ -67,14 +67,6 @@ justified only by competitor or provider parity.
   not just "something happened," from a durable record instead of a claim —
   which is exactly what the replay viewer renders per dispatch (see "Local
   timeline and topology view" above).
-- `cancellation` — honesty note, not a confident justification: the module
-  defines no field that structurally distinguishes a `cancellation`-kind
-  event from a `status`-kind event carrying `status: "cancelled"` (no
-  cross-validation like the `candidate-invalidation` pairing exists for this
-  kind, `lifecycle-governance-events.mjs:82-88`). The code and this document
-  cannot honestly state what concrete audit question the dedicated
-  `cancellation` kind answers that a `status: "cancelled"` event does not —
-  this is flagged as unclear rather than guessed at.
 
 **Fields** (`lifecycle-governance-events.mjs:78`):
 

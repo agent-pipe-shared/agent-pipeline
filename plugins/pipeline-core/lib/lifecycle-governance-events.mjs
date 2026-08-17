@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const CODE = /^[A-Z][A-Z0-9._:-]{0,127}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
-const KINDS = new Set(["dispatch", "status", "cancellation", "candidate-invalidation", "verification", "review", "gate", "recovery", "reconciliation"]);
+const KINDS = new Set(["dispatch", "status", "candidate-invalidation", "verification", "review", "gate", "recovery", "reconciliation"]);
 const STATUSES = new Set(["proposed", "active", "completed", "failed", "cancelled", "unknown", "unavailable", "invalidated"]);
 
 export class LifecycleGovernanceEventError extends Error {
