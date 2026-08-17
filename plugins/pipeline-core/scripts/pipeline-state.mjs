@@ -297,7 +297,7 @@ import {
   validateContinuityState,
 } from "../lib/continuity-state.mjs";
 import { createControlExecutionExchange } from "../lib/control-execution-exchange.mjs";
-import { buildLifecycleDispatchEvent } from "../lib/control-execution-lifecycle-event.mjs";
+import { buildLifecycleDispatchEvent, buildLifecycleStatusEvent } from "../lib/control-execution-lifecycle-event.mjs";
 import {
   canonicalJson as canonicalDecisionJson,
   sha256Canonical,
@@ -2185,6 +2185,83 @@ function planDispatchLifecycleEvent(sub, dir, previous, next, flags, deps) {
   }
 }
 
+/* The continuity acknowledgement vocabulary (`FINAL_OUTCOMES` in
+ * `continuity-host-adapter.mjs`) has exactly two members, and both name a
+ * status of the exchange's `terminal` class. The class's other three
+ * (`cancelled`, `unknown`, `unavailable`) are deliberately unreachable from
+ * here: no continuity transition can observe them today, and mapping something
+ * onto them would fabricate an outcome the state machine never saw. */
+const LIFECYCLE_TERMINAL_STATUS = Object.freeze({ succeeded: "succeeded", failed: "failed" });
+
+/* PHX L-AC-01 (status kind). The mirror of the admission above: this transaction
+ * is the only one that acknowledges a delivered final for the dispatch currently
+ * at the queue head, so the terminal event is produced HERE, from the exact
+ * dispatch identity that is about to stop being current.
+ *
+ * The exchange is built from the state BEFORE the transition, deliberately. The
+ * post-transition state either carries no dispatch at all (the exchange shape
+ * refuses that) or already carries the next one, so projecting from it would
+ * attribute one worker's outcome to another. The identity is not taken on trust
+ * either: it must be the exact identity the observation reports, which is the
+ * same equality `continuity-host-adapter.mjs` enforces downstream before any
+ * integration is admitted.
+ *
+ * Opt-in for the same honest reason as the admission event: worker and
+ * correlation identity live in the coordinator, not in the continuity state.
+ *
+ * Planning happens BEFORE the Result and State writes; the event file is written
+ * only after the transaction reports the terminal state itself as committed. A
+ * replay, a duplicate final or a Result-only repair therefore emits nothing --
+ * and, because a lifecycle event is append-only evidence whose target is refused
+ * if it already exists, asking for the event again on such a retry is refused by
+ * name rather than silently skipped. Retries that only repair the Result are run
+ * without these flags. */
+function planStatusLifecycleEvent(sub, dir, previous, request, flags, deps) {
+  const requested = LIFECYCLE_EVENT_FLAGS.filter((flag) => !isBlank(flags[flag]));
+  if (requested.length === 0) return { ok: true, planned: null };
+  if (sub !== "continuity-integrate-final") return { ok: false, code: "PS-LIFECYCLE-EVENT-SCOPE" };
+  if (requested.length !== LIFECYCLE_EVENT_FLAGS.length) return { ok: false, code: "PS-LIFECYCLE-EVENT-ARGUMENTS" };
+  const dispatch = previous?.queueHead?.dispatch ?? null;
+  const identity = request?.observation?.identity ?? null;
+  const status = LIFECYCLE_TERMINAL_STATUS[request?.observation?.final?.outcome];
+  if (dispatch === null || identity === null || status === undefined
+    || canonicalJson(identity) !== canonicalJson(dispatch)) {
+    return { ok: false, code: "PS-LIFECYCLE-EVENT-NO-TERMINAL" };
+  }
+  const target = boundLifecycleEventTarget(dir, flags["lifecycle-event-out"]);
+  if (!target.ok) return target;
+  const candidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
+  if (!candidate.ok) return { ok: false, code: "PS-LIFECYCLE-EVENT-CANDIDATE" };
+  try {
+    const exchange = createControlExecutionExchange({
+      continuityState: previous,
+      // The State writer observes exactly one tree -- its own repository at
+      // integration time. It has no separate knowledge of the worker's output
+      // commit, so both bindings name the tree that was actually observed rather
+      // than asserting a candidate commit nobody here has seen.
+      gitBinding: { baseCommit: candidate.commit, candidateCommit: candidate.commit, candidateTree: candidate.tree },
+      orchestrationAssignment: {
+        parentOrchestrationId: flags["parent-orchestration-id"],
+        workerId: flags["worker-id"],
+        correlationId: flags["correlation-id"],
+      },
+      invalidation: { state: "valid", reasonCode: null, supersededByQueueRevision: null },
+      event: {
+        class: "terminal",
+        status,
+        observedAt: (deps.now ?? (() => new Date().toISOString()))(),
+        // The evidence is the delivered final's own canonical digest, the same
+        // digest the acknowledgement is about to bind into the state.
+        evidenceSha256: request.observation.final.resultDigest,
+      },
+      extensions: {},
+    });
+    return { ok: true, planned: { path: target.path, event: buildLifecycleStatusEvent({ exchange }) } };
+  } catch {
+    return { ok: false, code: "PS-LIFECYCLE-EVENT-PROJECTION" };
+  }
+}
+
 /* A lifecycle event is append-only evidence: an existing path is refused, never
  * overwritten, and the target may not leave the repository root. */
 function boundLifecycleEventTarget(dir, relativePath) {
@@ -2236,6 +2313,11 @@ function runContinuityCommand(sub, flags, deps) {
       return 2;
     }
     if (sub === "continuity-integrate-final") {
+      const lifecycle = planStatusLifecycleEvent(sub, dir, existing.state.continuity ?? null, request.value, flags, deps);
+      if (!lifecycle.ok) {
+        console.error(`Error: dispatch status lifecycle event refused (${lifecycle.code}); zero mutation.`);
+        return 2;
+      }
       const transaction = runFinalIntegrationTransaction(dir, existing, expected.value, request.value, lock, deps);
       if (!transaction.ok) {
         const disposition = transaction.committed === null
@@ -2245,6 +2327,16 @@ function runContinuityCommand(sub, flags, deps) {
             : "zero State and Result mutation";
         console.error(`Error: continuity final transaction refused (${transaction.code}); ${disposition}.`);
         return 2;
+      }
+      // Only the transaction that committed the terminal state itself produces the
+      // event; a duplicate final or a Result-only repair changed no dispatch state.
+      if (lifecycle.planned !== null && transaction.code === "PS-CONTINUITY-FINAL-COMMITTED") {
+        const emitted = writeLifecycleEventFile(lifecycle.planned);
+        if (!emitted.ok) {
+          console.error(`Error: continuity state committed at revision ${transaction.revision}, but the dispatch status lifecycle event could not be persisted (${emitted.code}); mutation is NOT reported as zero.`);
+          return 2;
+        }
+        console.log(`PS-LIFECYCLE-EVENT-WRITTEN: status event ${lifecycle.planned.event.eventId} persisted.`);
       }
       console.log(`${transaction.code}: continuity revision ${transaction.revision}; ${transaction.mutated ? "transaction persisted" : "accepted with zero mutation"}.`);
       return 0;

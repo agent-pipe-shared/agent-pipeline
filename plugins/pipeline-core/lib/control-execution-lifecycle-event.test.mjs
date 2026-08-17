@@ -7,7 +7,10 @@ import {
   ControlExecutionLifecycleEventError,
   LIFECYCLE_DISPATCH_PROJECTION,
   LIFECYCLE_DISPATCH_SOURCE_CLASS,
+  LIFECYCLE_STATUS_PROJECTION,
+  LIFECYCLE_STATUS_SOURCE_CLASS,
   buildLifecycleDispatchEvent,
+  buildLifecycleStatusEvent,
 } from "./control-execution-lifecycle-event.mjs";
 
 const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64), O = "1".repeat(40), P = "2".repeat(40);
@@ -79,5 +82,67 @@ for (const projection of Object.values(LIFECYCLE_DISPATCH_PROJECTION)) {
   assert.equal(lifecycleSource.includes(`"${projection.status}"`), true, `status ${projection.status} is no longer in the lifecycle vocabulary`);
 }
 assert.equal(lifecycleSource.includes('"dispatch"'), true);
+
+// --- L-AC-01 (status kind): a terminal projects through the same closed schema -
+const terminalExchange = createControlExecutionExchange({ ...base, event: { class: "terminal", status: "succeeded", observedAt: "2026-08-17T01:00:00Z", evidenceSha256: C } });
+const terminal = buildLifecycleStatusEvent({ exchange: terminalExchange });
+assert.equal(terminal.kind, "status");
+assert.equal(terminal.status, "completed");
+assert.equal(terminal.reasonCode, "DISPATCH_SUCCEEDED");
+assert.deepEqual(validateLifecycleGovernanceEvent(structuredClone(terminal)), terminal);
+assert.equal(Object.isFrozen(terminal), true);
+assert.deepEqual(Object.keys(terminal).sort(), ["candidate", "correlation", "eventId", "invalidatesEventId", "kind", "reasonCode", "status", "supersedesEventId"]);
+// The identity set is the ended dispatch's own; a status event starts no chain.
+assert.deepEqual(terminal.correlation, event.correlation);
+assert.deepEqual(terminal.candidate, event.candidate);
+assert.equal(terminal.invalidatesEventId, null);
+assert.equal(terminal.supersedesEventId, null);
+
+// --- determinism, and no collision with the dispatch event of the same identity
+assert.equal(buildLifecycleStatusEvent({ exchange: terminalExchange }).eventId, terminal.eventId);
+assert.equal(terminal.eventId, `lge-${createHash("sha256").update(`pipeline.lifecycle-status-event.v1\0${canonicalJson({ kind: "status", status: "completed", reasonCode: "DISPATCH_SUCCEEDED", correlation: terminal.correlation, candidate: terminal.candidate })}`, "utf8").digest("hex")}`);
+assert.notEqual(terminal.eventId, event.eventId);
+assert.notEqual(buildLifecycleStatusEvent({ exchange: createControlExecutionExchange({ ...base, continuityState: otherState, event: { class: "terminal", status: "succeeded", observedAt: "2026-08-17T01:00:00Z", evidenceSha256: C } }) }).eventId, terminal.eventId);
+assert.equal(buildLifecycleStatusEvent({ exchange: terminalExchange, eventId: "lge-injected-2" }).eventId, "lge-injected-2");
+assert.throws(() => buildLifecycleStatusEvent({ exchange: terminalExchange, eventId: "not a valid id" }), (error) => error.code === "LGE-SHAPE");
+
+// --- every terminal status keeps its own outcome; none is folded into another --
+assert.deepEqual(Object.keys(LIFECYCLE_STATUS_PROJECTION).sort(), ["cancelled", "failed", "succeeded", "unavailable", "unknown"]);
+for (const [status, projection] of Object.entries(LIFECYCLE_STATUS_PROJECTION)) {
+  const projected = buildLifecycleStatusEvent({ exchange: { ...terminalExchange, event: { ...terminalExchange.event, status } } });
+  assert.equal(projected.status, projection.status);
+  assert.equal(projected.reasonCode, projection.reasonCode);
+  assert.equal(projected.kind, "status");
+  // Only a real success may read as completed, and a cancellation stays one.
+  assert.equal(projected.status === "completed", status === "succeeded");
+  assert.equal(projected.status === "cancelled", status === "cancelled");
+}
+
+// --- refusals are by name, never a coerced result ----------------------------
+assert.equal(LIFECYCLE_STATUS_SOURCE_CLASS, "terminal");
+for (const klass of ["admission", "progress", "cancellation", "verification", "review-handoff"]) {
+  const status = klass === "admission" ? "admitted" : klass === "progress" ? "running" : klass === "cancellation" ? "requested" : klass === "verification" ? "passed" : "ready";
+  assert.throws(() => buildLifecycleStatusEvent({ exchange: { ...terminalExchange, event: { ...terminalExchange.event, class: klass, status } } }), (error) => error instanceof ControlExecutionLifecycleEventError && error.code === "CLE-CLASS-UNSUPPORTED");
+}
+for (const reasonCode of ["queue-advanced", "authority-drift", "base-drift", "candidate-superseded", "cancelled"]) {
+  const invalidation = { state: "invalidated", reasonCode, supersededByQueueRevision: null };
+  assert.throws(() => buildLifecycleStatusEvent({ exchange: { ...terminalExchange, package: { ...terminalExchange.package, invalidation } } }), (error) => error.code === "CLE-EXCHANGE-INVALIDATED");
+}
+for (const broken of [undefined, null, {}, { ...terminalExchange, schema: "other" }, { ...terminalExchange, orchestration: { ...terminalExchange.orchestration, workerId: "not valid" } }, { ...terminalExchange, foo: 1 }]) {
+  assert.throws(() => buildLifecycleStatusEvent({ exchange: broken }), (error) => error.code === "CLE-EXCHANGE-INVALID");
+}
+assert.throws(() => buildLifecycleStatusEvent(), (error) => error.code === "CLE-EXCHANGE-INVALID");
+
+// --- drift guards: source vocabulary complete, target vocabulary still valid ---
+const exchangeSource = await import("node:fs").then(({ readFileSync }) => readFileSync(new URL("./control-execution-exchange.mjs", import.meta.url), "utf8"));
+const terminalClass = /terminal: new Set\(\[([^\]]*)\]\)/u.exec(exchangeSource);
+assert.notEqual(terminalClass, null);
+// If the source class ever grows a status, the projection is incomplete and this
+// fails here rather than silently refusing that status at runtime.
+assert.deepEqual([...terminalClass[1].matchAll(/"([^"]+)"/gu)].map(([, value]) => value).sort(), Object.keys(LIFECYCLE_STATUS_PROJECTION).sort());
+for (const projection of Object.values(LIFECYCLE_STATUS_PROJECTION)) {
+  assert.equal(lifecycleSource.includes(`"${projection.status}"`), true, `status ${projection.status} is no longer in the lifecycle vocabulary`);
+}
+assert.equal(lifecycleSource.includes('"status"'), true);
 
 console.log("control-execution-lifecycle-event: ok");
