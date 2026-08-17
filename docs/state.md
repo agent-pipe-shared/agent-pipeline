@@ -7,7 +7,74 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again (5): 15/157 open, Class B down to 6, P-AC-11's reconcile landed and a delta Critic review in flight (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (6): 15/157 open unchanged, P-AC-11's delta Critic saga closed with two self-caused majors fixed/disposed, H-AC-11 dispatch 1a drafted and ready to fire (READ THIS FIRST)
+
+**Since checkpoint (5):** the third P-AC-11 delta Critic dispatch (properly 4-commit-scoped,
+properly opus-routed) returned **FAIL** — but this time both majors were the Elephant session's
+own process mistakes, not the dispatched fix's. Fixed/disposed all five findings; open count
+**unchanged at 15 of 157** (P-AC-11 was always going to stay `partial` regardless of this review's
+outcome). Also drafted (not yet dispatched) a complete Goldfish briefing for H-AC-11's first
+sub-dispatch.
+
+- **P-AC-11 delta Critic round 3 — FAIL, disposed.** Findings: **F-1** (major) — the submitted
+  fix-verification evidence was a 3-file `node --test` transcript, not the declared
+  `harness/scripts/verify.mjs` gate, ended red, and had been hand-edited after the run to scrub a
+  leaked absolute path (QG-01/QG-02/QG-03 violation, independent of the narrowing). **F-2** (major)
+  — `e3e59153` (closing the earlier F5 finding, +33 doc lines) was authored directly by this
+  Elephant session, no `Dispatch:` trailer, no verify evidence — EL-16/EL-01's stage-0 ~25-line cap
+  applies to documentation, not just code, and this blew past it. **F-3** (minor) — two comments
+  left describing `ownedSections` as `TARGET_REF`-shaped after the F1 fix moved it to
+  `OWNED_SECTION_REF`. **F-4** (minor) — a backlog item cited the wrong `acceptance.md` line range
+  for P-AC-11 (409-412, actually A-AC-07/A-AC-08 — P-AC-11 is 604-607), and
+  `docs/organization-policy-packs.md` pointed all four inert dimensions at an item that explicitly
+  disclaims covering one of them. **F-5** (minor) — two commits each bundle two unrelated concerns.
+  **The same review's own Category-1 hunt independently reconfirmed F1/F2/F4 and both halves of F3
+  (three dimensions + lifecycleEvents/F-A) all still closed at source** — two independent Critic
+  passes now agree on the substance; this round's majors are about how the closure was produced and
+  proven, not what was produced.
+  - **Disposition (EL-03(c), no further dispatch needed):** F-3 and F-4 fixed directly as stage-0
+    fast-path commits (`2021c2b6`, `feab16c2` — comment/pointer-only, well under the file/line
+    caps). F-1 remedied going forward: reran the **full** `harness/scripts/verify.mjs` at candidate
+    `028b54a7` (F-3+F-4+a stray-index cleanup on top of the 4-commit range) and archived its own
+    unedited `evidence/verify-latest.json` verbatim (`pac11-remediation-verify-028b54a7.json`,
+    diffed byte-identical before commit) — 373/373 suites ran, same 5 pre-existing/tracked suites
+    non-green, none new. F-2 and F-5 **accepted as disclosed, unremedied process debt**: reverting
+    `e3e59153` would conflict with the already-landed F-4 fix on the same paragraph for zero
+    functional benefit (content independently double-verified correct); unbundling `289287e7`/
+    `ff237c18` needs history rewrite, forbidden. Recorded in full in the P-AC-11 evidence-map
+    pointer (commit `28c45b57`) and in two feedback memories: `critic-evidence-must-be-script-written`
+    strengthened with this exact recurrence (narrowing the gate "because the fix was scoped" is
+    itself the forbidden evidence-sufficiency judgment call, and hand-editing a leaked-path artifact
+    disqualifies it independently of the narrowing), and a new
+    `feedback_el16-applies-to-docs-not-just-code` memory (a >25-line doc addition needs a real
+    dispatch, even a cheap mechanic-tier one, same as code).
+  - **Verdict stays `partial`, unaffected either way** by this delta review's outcome — the
+    underlying gap (previewRequired/retention/conflictPolicy confirmed no-enforcement-point) is a
+    capability question the review closes findings on, not a dimension it enforces.
+- **H-AC-11's code half scoped properly, dispatch 1a drafted, not yet fired.** A prep fork read
+  design §5.4/§7/§8/§9/§11-§15 in full and found the prior checkpoint's scope note wrong: increment
+  2's payload schema is **not currently dispatchable at all** (needs the spec §6.1 amendment already
+  deferred to epic close alongside EPIC-AC-03), and increment 1 doesn't fit one dispatch — it splits
+  into 1a (pure builders + unit tests, self-contained, ready to fire), 1b (CLI wiring, depends on
+  1a), 1c (O-2 narrowing-read closure incl. the mandatory `NEVER_LIFTABLE_KERNEL_PATHS` addition,
+  kernel-adjacent, needs its own high-scrutiny Critic pass), 1d (O-1 identity registry, independent).
+  Full correction and 1a's complete 6-field briefing recorded in checkpoint (5)'s "Next steps" line
+  (now superseded by this checkpoint's own next-steps below — read there for the drafted briefing
+  text before dispatching).
+- Plugin reload cross-checked mid-session (PO ran `/reload-plugins`): `pipeline-core` on
+  `0.5.5+claude.20260817095442.3e6f844`, matching the local marketplace source exactly; agent count
+  (14) and hook count (13) both verified exact; all 8 skill directories present and intact. Clean.
+
+**Next steps, in order:** (1) fire H-AC-11 dispatch 1a (`PHX-HAC11-INC1-BUILDERS`, pure builders +
+unit tests for `lib/guard-authority-ledger-intake.mjs`, drafted in full — see checkpoint (5)'s "Next
+steps" for the complete briefing text, fill in the live ruleset SHA at dispatch time, model
+claude-opus-5/xhigh per MP-05); (2) once 1a lands and is independently re-verified, draft and fire
+1b (CLI wiring) — do NOT draft 1c/1d's briefings until 1a's diff exists, cite its real exports; (3)
+EPIC-AC-02's TP-3 window + dispatch if capacity allows; (4) EPIC-AC-03's ceremony and the H-AC-11
+spec.md §6.1 amendment, bundled, at epic close, per the PO's own decision to defer — this also
+unblocks H-AC-11 increment 2.
+
+## CHECKPOINT — 2026-08-17, continued again (5): 15/157 open, Class B down to 6, P-AC-11's reconcile landed and a delta Critic review in flight
 
 **Since the checkpoint below:** all three items staged there landed. H-AC-12's GMW/TP-5 window
 was consumed by `PHX-WP-HAC12` (commit `ae13b68b`, independently re-verified — see below);
@@ -88,11 +155,29 @@ see below); and A-AC-09 closed via a fresh Elephant-context investigation. Open 
 
 **Next steps, in order:** (1) check on the corrected P-AC-11 delta Critic dispatch, apply its
 verdict (PASS closes nothing new by itself — the underlying dimension gap stays partial
-regardless — but a FAIL would need a fix-and-rework cycle); (2) H-AC-11's code half (increment 1 +
-increment 2's schema, scoped to `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §5.4/§7,
-NOT §9's full bundle) — still not dispatched, still the top Class-P-adjacent priority; (3)
-EPIC-AC-02's TP-3 window + dispatch if capacity allows; (4) EPIC-AC-03's ceremony and the H-AC-11
-spec.md §6.1 amendment, bundled, at epic close, per the PO's own decision to defer.
+regardless — but a FAIL would need a fix-and-rework cycle); (2) H-AC-11's code half — still not
+dispatched, still the top Class-P-adjacent priority, but **the scope in the line above this one was
+wrong and is corrected here**: a prep fork (2026-08-17) that read design §5.4/§7/§8/§9/§11-§15 in
+full found increment 2's payload schema is **not currently dispatchable at all**, not merely
+lower-priority — §5.4 requires a spec §6.1 amendment first (that list is declared closed,
+`spec.md:278-301`), and that amendment is the same one already deferred to epic close alongside
+EPIC-AC-03 per the PO's own decision (see (4) below); building increment 2 now would either violate
+the closed list or pre-empt a deferred PO call. Increment 1 (portable events, no kernel change, no
+spec amendment) is real scope but does not fit one dispatch — the fork's recommended split, in
+order: **1a** pure builders + unit tests (`lib/guard-authority-ledger-intake.mjs`, U-1..U-10,
+no I/O, no kernel/hook touch — self-contained, lowest risk, drafted in full as
+`PHX-HAC11-INC1-BUILDERS` and ready to fire, model claude-opus-5/xhigh per MP-05); **1b** CLI
+wiring (`guard-maintenance-window.mjs`/`guard-human-override.mjs`/`governance-authority.mjs`
+scripts) + integration tests I-1..I-14, depends on 1a's actual exports; **1c** the O-2
+narrowing-read closure — `hooks/guard-testpath.mjs`/`guard-gate-strength.mjs` plus the mandatory
+`NEVER_LIFTABLE_KERNEL_PATHS` companion addition in `lib/guard-maintenance-window.mjs` (§15.1.6
+(iv), §15.4) — kernel-adjacent, needs its own dedicated high-scrutiny Critic pass, must not be
+folded into 1a/1b even though it extends the same file; **1d** the O-1 identity registry
+(`lib/human-governance-identity-registry.mjs`), independent, parallelizable with 1c. Dispatch 1a
+first; draft 1b/1c/1d's briefings once 1a's diff exists so they cite real exports instead of the
+design doc's proposed names. (3) EPIC-AC-02's TP-3 window + dispatch if capacity allows; (4)
+EPIC-AC-03's ceremony and the H-AC-11 spec.md §6.1 amendment, bundled, at epic close, per the PO's
+own decision to defer — this is also the blocker named in (2) above for increment 2.
 
 ## CHECKPOINT — 2026-08-17, continued again (4): 17/157 open, Class P down to 9, three signature ceremonies staged, H-AC-11 increment 2 approved
 
