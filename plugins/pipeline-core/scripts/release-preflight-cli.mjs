@@ -246,16 +246,33 @@ function verifyReleasePreflightProof({ root, request, proof, expectedCandidate, 
  * observations (never trusts the recorded one), and verifies with
  * `verifyCriticalActionApprovalRequest`. On `CRITICAL-ACTION-PROOF-VERIFIED`, builds
  * the five-field consent object per the ADR's field-mapping table. On
- * `CRITICAL-ACTION-PROOF-EXPIRED`, status is `"expired"` and `authoritySha256` is the
- * digest of the exact proof artifact -- the same value verification would have
- * produced as `proofSha256` had the expiry check not short-circuited first, computed
- * with `po-approval-proof.mjs`'s own exported `canonical` (`sha256(canonical(proof))`),
- * the identical function `verifyPoApprovalProof` itself calls internally to produce
- * `proofSha256` -- ONE formula, imported and reused, not a second definition that
- * merely happens to agree for today's all-string proof field set (`canonicalJson`,
- * `release-preflight.mjs`'s own formula, additionally special-cases numbers and would
- * diverge for a non-string field). Any other code exits by throwing: this function
- * never writes a consent object for a proof it could not verify.
+ * `CRITICAL-ACTION-PROOF-EXPIRED`, status is `"expired"` regardless of what follows --
+ * that outcome, and the `consent-not-approved` blocker it reaches, never changes.
+ *
+ * Record-fidelity fix (Critic finding F3, this dispatch): `authoritySha256` must never
+ * imply a verification guarantee this path did not actually check.
+ * `verifyCriticalActionApprovalRequest` short-circuits on expiry (its own
+ * `expiresAt < now` check) *before* ever calling `verifyPoApprovalProof`, so naively
+ * hashing the raw, external `proof` object here would carry the exact same field shape
+ * as the verified branch's `authoritySha256` while never having checked the signature
+ * at all -- a stale PASS-shaped record would be indistinguishable from a real one. The
+ * fix re-runs the *exact same*, unmodified `verifyReleasePreflightProof` path a second
+ * time, evaluated `now: request.action.expiresAt` -- the latest instant this proof
+ * could truthfully claim to still be valid (the same "as-of" instant `evaluatedAt`
+ * below already uses, for the identical invariant reason). This calls
+ * `verifyCriticalActionApprovalRequest` again rather than rebuilding its rebuild/verify
+ * logic a second time in this file (the exact duplication class this file's neighbours
+ * already warn against) and does not alter that shared function's control flow or
+ * short-circuit order at all -- push/deploy/publication observe zero behaviour change.
+ * If that second, honest check verifies, `authoritySha256` is the real
+ * `proofSha256` -- by construction the same value `sha256(canonical(proof))` always
+ * produced here, now because it was actually checked rather than merely assumed to
+ * agree. If it does not verify (bad signature, wrong key), `authoritySha256` is instead
+ * the digest of an explicitly-labelled unverified-claim wrapper around the proof --
+ * mathematically distinct from a real `proofSha256`, so the two cases are no longer
+ * silently identical in shape. Any other code from the FIRST verification exits by
+ * throwing: this function never writes a consent object for a proof that failed for a
+ * reason other than expiry.
  */
 function resolveConsentFromVerifiedProof({ root, candidate, proofRequestPath, proofPath, subject, now }) {
   const request = readExternalJson(root, proofRequestPath, "--proof-request");
@@ -275,8 +292,12 @@ function resolveConsentFromVerifiedProof({ root, candidate, proofRequestPath, pr
     };
   }
   if (verified.code === "CRITICAL-ACTION-PROOF-EXPIRED") {
+    const asOfExpiry = verifyReleasePreflightProof({ root, request, proof, expectedCandidate: candidate, expectedAction, now: request.action.expiresAt });
+    const authoritySha256 = asOfExpiry.code === "CRITICAL-ACTION-PROOF-VERIFIED"
+      ? asOfExpiry.proofSha256
+      : sha256(canonicalPoApprovalProof({ schema: "pipeline.release-preflight-consent-authority-unverified.v1", proof }));
     return {
-      authoritySha256: sha256(canonicalPoApprovalProof(proof)),
+      authoritySha256,
       decisionId: request.approvalIntent.sha256,
       // NOT `now`: this branch is only reached when `expiresAt < now` (the check
       // inside `verifyCriticalActionApprovalRequest`), so `evaluatedAt: now` would

@@ -348,6 +348,45 @@ try {
     assert.equal(record.consent.authoritySha256, expectedAuthoritySha256);
   });
 
+  // Critic finding F3 (record-fidelity, this dispatch): RPC16 above uses a GENUINELY
+  // valid signature that merely arrived after its own expiry, so its authoritySha256
+  // equalling the "verified" formula is not distinguishing -- a genuinely re-verified
+  // proof and a naively-hashed raw proof produce the identical value for a well-signed
+  // proof either way. This test is the one RPC16 cannot be: an expired proof whose
+  // signature does NOT actually verify, proving the fix actually re-checks rather than
+  // trusting the raw claim.
+  check("RPC21 an expired proof whose signature does not actually verify still stays \"expired\"/blocked (unchanged), but authoritySha256 no longer claims a checked authority", () => {
+    const context = fixture();
+    const { keys, publicKey } = keypair();
+    const subject = subjectFor(context);
+    const candidate = { commit: context.candidateCommit, tree: context.candidateTree };
+    const expiresAt = "2020-01-01T00:00:00.000Z";
+    const { request, proof: signed } = signedProofPair({ candidate, subject, expiresAt, keys, publicKey });
+    // Same well-formed request/proof shape as RPC16 (so it still reaches
+    // CRITICAL-ACTION-PROOF-EXPIRED on the first, real-`now` verification pass, exactly
+    // like RPC16), except the signature covers a DIFFERENT message than intentSha256 --
+    // a well-formed Ed25519 signature that `verifyPoApprovalProof` reports as
+    // PO-APPROVAL-PROOF-MISMATCH, never PO-APPROVAL-PROOF-VERIFIED.
+    const proof = { ...signed, signatureBase64: sign(null, Buffer.from("not-the-real-intent-digest"), keys.privateKey).toString("base64") };
+    const dir = externalDir();
+    const proofRequestPath = writeExternal(dir, "request.json", request);
+    const proofPath = writeExternal(dir, "proof.json", proof);
+    const { record } = build(context, { consentPath: null, proofRequestPath, proofPath, now: "2026-08-17T00:00:00.000Z" });
+    // Unchanged behaviour -- the exact DoD constraint: status/blocking are identical to
+    // RPC16's genuinely-signed case regardless of whether the signature itself checks out.
+    assert.equal(record.status, "blocked");
+    assert.ok(record.reasons.includes("consent-not-approved"), record.reasons.join(", "));
+    assert.equal(record.consent.status, "expired");
+    assert.equal(record.consent.evaluatedAt, expiresAt);
+    // The fix itself: an invalid-signature expired proof must NOT carry the same
+    // authoritySha256 a genuinely verified proof would (RPC16's value/formula) -- the
+    // pre-fix code computed exactly that value regardless of whether the signature
+    // actually checked out, which is the record-fidelity defect this closes.
+    const wouldHaveBeenClaimedVerified = createHash("sha256").update(canonicalPoApprovalProof(proof)).digest("hex");
+    assert.notEqual(record.consent.authoritySha256, wouldHaveBeenClaimedVerified, "an invalid-signature expired proof must not carry the same authoritySha256 a genuinely verified one would");
+    assert.match(record.consent.authoritySha256, /^[0-9a-f]{64}$/u);
+  });
+
   check("RPC17 an edited subject preimage -- any field the subject digest covers -- is caught, not silently accepted", () => {
     const context = fixture();
     const { keys, publicKey } = keypair();
