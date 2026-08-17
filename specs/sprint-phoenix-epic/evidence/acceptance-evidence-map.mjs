@@ -400,6 +400,22 @@ const DELTA = {
   'R-AC-02': ['not-started', 'WP-R'],
   'R-AC-04': ['partial', 'WP-R'],
   'R-AC-08': ['partial', 'WP-R'],
+
+  // R-AC-08 CLOSED 2026-08-17 (PHX-WP-RAC08, commit b753c9fa, independently
+  // re-verified): the prior "no such state exists at all" gap is now built.
+  // `recordCommandRecoveryOccurrence` (external-command-offer.mjs) adds two
+  // real occurred states -- rollback-performed, cleanup-performed -- distinct
+  // from the pre-existing prospective-only `recoverability` shape, each
+  // discharge-checked against the anchor's own recoverability, appended
+  // once/never-rewritten via the same appendValidated path every other
+  // recorder in the file uses. agent-decision-journal.mjs's COMMAND_STATES
+  // enum and its published schema extended in step to admit the two new
+  // states (a closed enum, so this was required, not scope creep).
+  // 46/46 external-command-offer-tests pass (41 pre-existing + 5 new), 51/51
+  // agent-decision-journal-tests pass (49 pre-existing + 2 new); both
+  // independently re-run at the synced candidate.
+  'R-AC-08': ['implemented', 'WP-RAC08'],
+
   'R-AC-09': ['partial', 'WP-R'],
   'R-AC-11': ['partial', 'WP-R'],
   // UPDATE 2026-08-17 (Elephant measurement correction, no code change): all
@@ -1443,7 +1459,7 @@ const POINTERS = {
   'R-AC-05': 'agent-decision-journal-tests: every enumerated private field and every untyped digest refused at both journal boundaries',
   'R-AC-06': 'external-command-offer-tests: user execution stays unobserved; completion admitted only with bounded evidence',
   'R-AC-07': 'external-command-offer-tests: failed, partial, cancelled, mismatch and unknown outcomes retained distinctly',
-  'R-AC-08': 'external-command-offer-tests (PHX-WP-R): a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent -- no such state exists at all, only prospective values inside recoverability',
+  'R-AC-08': 'external-command-offer-tests (PHX-WP-R): a readback lifecycle event appends exactly once and never rewrites the original offer. CLOSES 2026-08-17 (PHX-WP-RAC08, commit b753c9fa, independently re-verified): rollback/cleanup as *occurred* events -- previously absent by design, no such state existed at all -- are now built via `recordCommandRecoveryOccurrence`, two new COMMAND_STATES (rollback-performed, cleanup-performed), discharge-checked against the anchor\'s own recoverability, appended once/never-rewritten. Deliberately a separate recorder from recordCommandRecoveryDisposition (that function\'s anchor set, preEvidenceDigest===null requirement and no-discharge-rule shape are each wrong for an occurred undo). agent-decision-journal.mjs\'s COMMAND_STATES enum and published schema extended in step, required by the closed-enum shape, not scope creep. 46/46 + 51/51 tests pass, independently re-run at the synced candidate; no discrepancy between the commit\'s own claims and independent verification',
   'R-AC-09': 'agent-decision-journal/external-command-offer-tests (PHX-WP-R + WP-R-AC09): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful), AND occurredAtEpochMs now closes the stale clause. 41/41 + 30/30 tests pass. CLOSES 2026-08-17 (PHX-WP-RAC09, commit 5c05a117, independently re-verified): the "duplicate detection lives at the store layer" reasoning was corrected, not just narrowed -- governance-event-store.mjs\'s idempotencyKey covers a DIFFERENT identity (envelope retry-safety), not the lifecycle eventId offers/outcomes actually correlate through, so two records under different idempotency keys but the same lifecycle eventId could both land and both replay valid. `projectCommandOfferReplay` (unconditional) now detects a shared lifecycle eventId or an unlinked duplicate offer-evidence record and renders replay invalid -- proven with real appended records. governance-event-store.mjs itself untouched; the fix needed nothing from it. All six trigger words now close. 41/41 tests pass, independently re-run; pre-existing cases confirmed byte-identical to their pre-commit versions',
   'R-AC-10': 'fail-closed on the append is pinned; the policy-defined typed non-material exception is absent',
   'R-AC-11': 'external-command-offer/agent-decision-journal-tests (PHX-WP-R + WP-R-AC11): a mandatory public-safe typed omission is pinned, AND recordPrivateHandoffCommitment now wires this module to the existing restricted-machine-local store via a caller-supplied put callback, exposing only a commitment digest + receipt id. 44/44 + 36/36 tests pass',

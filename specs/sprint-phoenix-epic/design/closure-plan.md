@@ -126,9 +126,24 @@ actually correlate through; `projectCommandOfferReplay` now closes the real gap,
 proven with real appended records. All six R-AC-09 trigger words now close. Moves out of Class B
 entirely (8 remain, was 9). Open count: **17 of 157** (was 18).
 
+**UPDATE, 2026-08-17 (PHX-WP-RAC08, commit `b753c9fa`, independently re-verified).** R-AC-08
+closes: `implemented`. The prior "no such state exists at all" gap is built:
+`recordCommandRecoveryOccurrence` (external-command-offer.mjs) adds two real occurred states —
+rollback-performed, cleanup-performed — distinct from the pre-existing prospective-only
+`recoverability` shape, each discharge-checked against the anchor's own recoverability, appended
+once/never-rewritten via the same `appendValidated` path every other recorder in the file uses.
+Deliberately a separate recorder from `recordCommandRecoveryDisposition` rather than an extension
+of it — that function's anchor set, `preEvidenceDigest === null` requirement and no-discharge-rule
+shape are each wrong for an occurred undo. `agent-decision-journal.mjs`'s `COMMAND_STATES` enum
+and its published schema extended in step, required by the closed-enum shape, not scope creep.
+46/46 external-command-offer-tests pass (41 pre-existing + 5 new), 51/51
+agent-decision-journal-tests pass (49 pre-existing + 2 new); both independently re-run at the
+synced candidate. Moves out of Class B entirely (7 remain, was 8). Open count: **16 of 157**
+(was 17).
+
 ## What this design is for
 
-The measurement established that **17 of 157** acceptance criteria are not
+The measurement established that **16 of 157** acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart — provided it is regenerated when the verdict data moves, which is the exact
@@ -143,9 +158,9 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 0 | (both prior members, A-AC-14/PX0-AC-03, closed — see below) |
 | D — documentation missing | 0 | (prior member L-AC-08 reclassified to P 2026-08-17, then closed the same day — see below) |
 | S — seam missing | 0 | (prior member E-AC-20 closed 2026-08-10) |
-| B — capability missing | 8 | real implementation plus its tests |
+| B — capability missing | 7 | real implementation plus its tests |
 | P — not code | 9 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **17** | |
+| **total** | **16** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -305,7 +320,7 @@ these, is in
 [`../evidence/acceptance-evidence-map-20260817f.md`](../evidence/acceptance-evidence-map-20260817f.md)
 — not repeated here, since this document's job is the OPEN set.
 
-### Class B — an absent capability (8)
+### Class B — an absent capability (7)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -315,7 +330,6 @@ these, is in
 | A-AC-09 | partial | WP-A | `assertMandatoryCaptureNotSkipped` (governance-event-store.mjs) lets a caller avoid persisting a non-mandatory event, tested; nothing computes "routine/low-impact" itself — the caller still decides |
 | EPIC-AC-02 | partial | WP-EPIC | UPDATE 2026-08-17 (PHX-WP-EPICAC02, commit `77d2d8d5`, independently re-verified): `checkUnpublishedSiblingSprintConsumption` built — a real, non-invented, caller-observation-driven gate, tested (25/25), already registered as a blocking suite in `verify.mjs:405`. Stays open: no live `verify.mjs` check yet calls it against real `specs/*/lifecycle.json` manifests — that registration line is TP-3-protected |
 | L-AC-01 | partial | WP-L | UPDATE 2026-08-17 (PHX-WP-LAC01, commit `fd57d390`): first real producer landed — `continuity-cas` now durably persists a schema-valid `dispatch`-kind lifecycle event via a new translator, independently re-verified (unit + call-site + 506/506 gated regression + e2e readback). UPDATE 2026-08-17 (PHX-WP-LAC01B, commit `8e4be420`): second real producer landed — `continuity-integrate-final` now durably persists a `status`-kind event via a sibling translator, independently re-verified (unit + call-site tests green, gated regression 504/506 — the 2 failures are the same pre-existing FTP-ARTIFACT-2 acceptance.md-digest-staleness cause, confirmed pre-existing by re-running the identical suite at the prior commit). Honest count: **2 of 9** — NOT status+cancellation as hoped: the real continuity outcome vocabulary only ever observes succeeded/failed, so cancellation stays unreached despite the projection covering it. `candidate-invalidation` also confirmed to have no real caller (invalidation is always constructed `{state:"valid"}`; zero non-test producers of an invalidated state anywhere). Remaining 7 kinds all need a source vocabulary to exist before a producer can — a capability gap now, not a translator-authoring gap. Registering the new call-site suites into `harness/scripts/verify.mjs` is blocked by the same installed-plugin TP-3 gap as the other four parked reds |
-| R-AC-08 | partial | WP-R | a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent — no such state exists, only prospective values inside recoverability |
 | V-AC-02 | partial | WP-V | eight of nine now labelled. UPDATE 2026-08-17 (PHX-WP-VAC02, commit `8325f2d0`, independently re-verified): `assumption` genuinely labelled — the governance-export delivery observation was previously mislabelled `fact` with no digest/canonical-source binding. `estimate` stays unpinned, confirmed absent by design: the one real estimate in this repo belongs to a different report entirely and has no path into the Evidence Viewer today |
 
 ### Class P — not closeable by writing code (9)
