@@ -55,10 +55,16 @@ check("F1 protected paths are regular in-repository files without aliasing", () 
 });
 
 check("F1 current Critic execution surfaces remain byte-identical to the protected baseline", () => {
+  // Accumulate every mismatch across the whole loop before asserting once, rather
+  // than throwing on the first (assert.equal per entry): a fail-fast loop hides
+  // every stale pin after the first one from whoever reads the run's own output
+  // (backlog: preimage-repin-disclosure-incomplete-for-roles-critic).
+  const mismatches = [];
   for (const entry of inventory.files) {
     const actual = digest(readFileSync(join(repoRoot, ...entry.path.split("/"))));
-    assert.equal(actual, entry.rawSha256, entry.path);
+    if (actual !== entry.rawSha256) mismatches.push({ path: entry.path, expected: entry.rawSha256, actual });
   }
+  assert.deepEqual(mismatches, []);
 });
 
 check("F1 inventory records full lowercase SHA-256 values", () => {
