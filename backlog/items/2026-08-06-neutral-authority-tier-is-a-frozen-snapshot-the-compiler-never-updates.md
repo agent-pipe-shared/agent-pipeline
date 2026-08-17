@@ -134,3 +134,13 @@ resolver serves is the tier the compiler writes.
   `d4b2fcc`/`2c24ec7`, Sprint Nova session, 2026-08-06. Step 3 unassigned;
   sequenced after 0.5.2 per `docs/state.md`.
 - **Date:** 2026-08-06
+
+## Re-verification, 2026-08-17
+
+Re-checked live: `plugins/pipeline-core/config/runtime-projection-v3-owned-keys.json`
+still names only `.claude/*`/`.codex/*` targets — no `project/*` entry.
+Step 3 is confirmed still not done. Stays open, current-scope (not
+deferred): the tier-agreement check (step 4) makes future drift visible but
+does not prevent it, and this repository is now several candidates past the
+"after 0.5.2" sequencing note without step 3 landing — worth flagging as
+overdue against its own stated sequencing, not just still-open.

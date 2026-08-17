@@ -194,7 +194,22 @@ item; Direction 1–3 stay open regardless of that rework's outcome.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, stays open, current-scope (not deferred).
+  `specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md:38`
+  confirms Issue `#57`'s canonical-reconciliation writer/ledger work is
+  effectively done ("only candidate-freeze, fresh Critic and PO gate
+  remain"), but that is a different mechanism than this item's actual
+  failure chain. This item depends specifically on `NVA-B61-7`
+  (platform-neutral capability diagnostics and reversible reinstall,
+  matrix line 70), which the same matrix still describes only as required
+  scope, not as delivered — the escalated-exec attestation trigger and the
+  in-session recovery candidate this item's Direction 1-3 ask for remain
+  unconfirmed and unfixed.
+- **Rationale:** cross-checked against the current issue-acceptance-matrix
+  rather than assumed stale from the item's own 2026-08-09 date.
+- **Assignment (if accepted):** remains assigned wherever `NVA-B61-7` lands,
+  as the item already states; not fixed in this triage pass
+  (docs/backlog-only, and the item's own text already excludes touching
+  `codex-pretool-guard.mjs`/`onboarding-continuity.mjs` outside a dedicated
+  authorized pass).
+- **Date:** 2026-08-17

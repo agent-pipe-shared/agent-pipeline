@@ -186,7 +186,27 @@ project root.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, partially delivered — stays open, current-scope
+  (not deferred; the PO's own narrow-gauge split was explicitly "adopted
+  now", only the full config-UI treatment goes to Nightwing, as this item's
+  own body already states). Direction 4 (make `signature` mode
+  self-explaining) is done: the seeded `pipeline.user.yaml` comment block
+  (`project-onboarding-v3.mjs:999`) names `gates.push_approval` and the exact
+  setting in plain text at seed time. Related key-directory awareness
+  (`PO-KEYDIR-01(A)`) also landed — see the sibling item
+  `2026-08-07-human-approval-ux-directory-clarity-and-single-command.md`.
+  NOT verified as done: an actual bootstrap `collect-input` question for
+  `gates.push_approval` / the machine-plane PO-key-directory guided creation
+  (grepped `project-onboarding-v3.mjs` for a `collect-input`-shaped
+  push-approval prompt — none found) — the narrow-gauge base still reads as
+  "explains itself once seeded" rather than "asks first".
+- **Rationale:** verified the self-explaining-default claim directly in
+  source; the bootstrap-question claim was checked by targeted grep, not a
+  full flow trace — a future session should confirm end-to-end rather than
+  trust this grep alone before closing.
+- **Assignment (if accepted):** the remaining bootstrap-question wiring needs
+  a dedicated goldfish-deep dispatch (onboarding/lifecycle code, real design
+  latitude); not fixed in this triage pass (docs/backlog-only). Full
+  config-UI treatment remains Nightwing per this item's own PO-recorded
+  decision.
+- **Date:** 2026-08-17

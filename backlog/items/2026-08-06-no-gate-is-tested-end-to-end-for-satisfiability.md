@@ -119,3 +119,12 @@ red test, which is agent work, instead of an apparent decision point.
   entry to `guardrails/quality-gates.md` for step 4. Steps 2/3's
   generalization stays exactly as unassigned as the 2026-08-06 entry above
   states.
+
+## Re-verification, 2026-08-17
+
+Re-checked `guardrails/quality-gates.md` directly: no QG entry states "test
+what the change altered, not only what it was meant to fix". QG-07
+(reproduce before you fix) and QG-09 (no unproven "cannot happen" claims)
+are the nearest neighbors and neither covers it. Step 4 is confirmed still
+not implemented. Stays open, current-scope: small, well-scoped, already
+PO-decided — not deferred.

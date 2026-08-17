@@ -123,7 +123,24 @@ Related, same family: the confirmation prompt is English-only
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, partially delivered — stays open, current-scope.
+  Proposal 1 (record the key directory in configuration, checked before
+  prompting) is done: `po-human-approval.mjs` has a repo-scoped key-directory
+  store (`PO-KEYDIR-01(A)`, 2026-08-11 PO decision,
+  `repoScopedKeyDirectoryPath()` / `REPO_KEY_DIRECTORY_SCHEMA` at :100-101).
+  Proposal 2 (`sign-intent --request <path>` rendering scope/effect/duration
+  in plain language, refusing if it disagrees with `--intent-sha256`) is NOT
+  done — `sign-intent`'s USAGE and argument parsing (`po-human-approval.mjs:35,374`)
+  still take only `--intent-sha256`, no `--request` flag exists. Proposal 3
+  (state the human/agent boundary per command) is partially done:
+  `docs/push-release-flow.md:153` explicitly marks the signing layer
+  "human-only, by design" — but `docs/po-human-approval.md` itself was not
+  re-checked line-by-line for the same statement and may still be silent.
+- **Rationale:** verified live against current `po-human-approval.mjs` source
+  (grep for the USAGE string, the key-directory constants, and the sign-intent
+  argument branch) rather than assumed from the item's own prose.
+- **Assignment (if accepted):** remaining work — the `sign-intent --request`
+  flag and its cross-check against `--intent-sha256` — needs a dedicated
+  goldfish-deep dispatch (signing-ceremony code); not fixed in this triage
+  pass (docs/backlog-only).
+- **Date:** 2026-08-17

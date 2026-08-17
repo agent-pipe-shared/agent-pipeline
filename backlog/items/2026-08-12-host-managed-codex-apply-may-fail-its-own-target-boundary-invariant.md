@@ -53,7 +53,30 @@ intentional and harmless.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, confirmed as a real reachable defect (upgraded from
+  "unconfirmed" — this triage pass read the code rather than reproducing the
+  fixture). `prepare(root, targets, deps)`
+  (`runner-profile-migration-v3.mjs:786-787`) calls
+  `validateTargetBoundary(targets)` directly with the caller-supplied
+  `targets` array, which for a host-managed-Codex plan is the
+  `.claude/`-filtered `projectedTargets`/`internal` array built at
+  `:578-581`. `validateTargetBoundary()` (`:714-721`) compares against
+  `expected = runtimePaths().sort(...)` (`:256-262`), which reads the FULL,
+  unfiltered runtime-ownership manifest with no host-managed-Codex awareness
+  at all. A host-managed-Codex apply's target count is therefore structurally
+  smaller than `expected.length` by construction — the mismatch is not an
+  edge case, it is guaranteed for every host-managed-Codex apply that reaches
+  this path. Stays open, current-scope (not deferred): this can block a real
+  host-managed-Codex onboarding apply today, which is exactly the class of
+  problem the PO's Windows-handover blockers this session were about — no
+  direct link confirmed, but the severity profile matches and it should not
+  wait for a later sprint.
+- **Rationale:** verified by reading `runtimePaths()`, `validateTargetBoundary()`
+  and the `prepare()` call site directly; the filter/expectation mismatch is
+  unconditional on the host-managed-Codex branch, not merely plausible.
+- **Assignment (if accepted):** needs a dedicated goldfish-deep dispatch
+  (guardrail/transaction-integrity code) — either make
+  `validateTargetBoundary()` host-managed-Codex-aware (filter `expected` the
+  same way `projectedTargets` is filtered) or explain in code why the two
+  must differ. Not fixed in this triage pass (docs/backlog-only).
+- **Date:** 2026-08-17

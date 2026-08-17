@@ -53,3 +53,17 @@ branch. Small, bounded, same shape as the fix it mirrors — should not need
 fresh design.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted, confirmed still open. Verified live:
+  `plugins/pipeline-core/scripts/security-adapters/license-check.mjs:99-105`
+  — the absent-`declaredPath` branch still returns without a
+  `classification` key (only `reason`), unlike the fixed sibling at :93
+  which explicitly sets `classification: "success"`. The module's own header
+  comment (:32-33) still documents this as a deliberate, tracked asymmetry.
+  Stays open, current-scope: small, well-scoped, mirrors an already-landed
+  fix pattern, not deferrable material.
+- **Rationale:** matches the item's own claim exactly on direct code read.
+- **Assignment (if accepted):** small goldfish-implementor dispatch (mirrors
+  `NVA-BL-32` exactly, no design latitude); not fixed in this triage pass
+  (docs/backlog-only).
+- **Date:** 2026-08-17
