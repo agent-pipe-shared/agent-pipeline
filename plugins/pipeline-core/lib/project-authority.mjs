@@ -11,7 +11,7 @@
  */
 import { createHash } from "node:crypto";
 import {
-  closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync,
+  closeSync, copyFileSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync,
   readdirSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
@@ -26,6 +26,7 @@ export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
 export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";
 export const PROJECT_AUTHORITY_CLASSIFICATION_SCHEMA = "pipeline.project-authority-classification.v1";
 export const PROJECT_AUTHORITY_ADOPTION_RECEIPT_SCHEMA = "pipeline.project-authority-adoption-receipt.v1";
+export const PROJECT_AUTHORITY_VENDOR_SYNC_SCHEMA = "pipeline.project-authority-vendor-sync.v1";
 export const PROJECT_AUTHORITY_CONTRACT_VERSION = "project-authority.v1";
 export const PROJECT_AUTHORITY_CONTRACT_SHA256 = createHash("sha256").update("project-authority.v1|pipeline.yaml|pipeline-state.json|pipeline.json|guard-config.json|guard-override.log.jsonl").digest("hex");
 export const NEUTRAL_MANIFEST = "project/pipeline.yaml";
@@ -49,11 +50,30 @@ const TARGETS = Object.freeze([
   { path: NEUTRAL_GUARD_AUDIT, legacy: LEGACY_GUARD_AUDIT, kind: "project-guard-audit" },
 ]);
 const PLANS = new WeakMap();
+const VENDOR_SYNC_PLANS = new WeakMap();
 const RECOVERY_PLANS = new WeakMap();
 const SESSION_CLEANUP_RECOVERY_PLANS = new WeakMap();
 const SHA256 = /^[0-9a-f]{64}$/u;
 const GIT_OBJECT = /^[0-9a-f]{40,64}$/u;
 const MODULE_PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+/**
+ * The one vendored destination `loadedPackageEvidence()` compares against,
+ * stated once.  For a real root, `projectPath(root, VENDORED_PACKAGE_PATH)`
+ * returns the identical absolute path that function computes itself as
+ * `join(destination, "plugins", "pipeline-core")`.
+ */
+const VENDORED_PACKAGE_PATH = "plugins/pipeline-core";
+/**
+ * The `loadedPackageEvidence()` failures an explicit vendored-package sync can
+ * repair.  Every other failure (malformed manifest, symlinked destination) is
+ * reported as `PA-VENDOR-COPY-UNKNOWN` and must NOT be offered the sync as its
+ * remedy: those are not a missing copy, they are a broken one.
+ */
+export const SELF_HEALABLE_VENDOR_PROVENANCE_CODES = Object.freeze(["PA-VENDOR-COPY-MISSING", "PA-VENDOR-COPY-STALE"]);
+const VENDOR_PROVENANCE_CODES = new Map([
+  ["destination package is missing", "PA-VENDOR-COPY-MISSING"],
+  ["loaded and destination packages differ", "PA-VENDOR-COPY-STALE"],
+]);
 
 class IntentionalInterruption extends Error {}
 const sha = (value) => createHash("sha256").update(value).digest("hex");
@@ -121,7 +141,10 @@ export function inspectProjectAuthorityProvenance({ rootDir = process.cwd() } = 
     const root = realRoot(rootDir);
     const git = gitEvidence(root);
     const runtime = loadedPackageEvidence(root);
-    if (runtime.error) return { status: "unavailable", reason: "loaded package provenance unavailable" };
+    // The status and reason are unchanged; `code` is additive, and names WHICH
+    // package failure this is so a caller can tell "no local copy exists yet"
+    // (repairable by an explicit sync) from "the copy that exists is broken".
+    if (runtime.error) return { status: "unavailable", reason: "loaded package provenance unavailable", code: VENDOR_PROVENANCE_CODES.get(runtime.error) ?? "PA-VENDOR-COPY-UNKNOWN" };
     return { status: "ready", ...git, ...runtime, authorityContractSha256: PROJECT_AUTHORITY_CONTRACT_SHA256 };
   } catch { return { status: "unavailable", reason: "runtime provenance unavailable" }; }
 }
@@ -1058,4 +1081,187 @@ export function applyPendingProjectAuthorityRecovery(plan, { rootDir = process.c
     const journal = JSON.parse(raw); validateJournal(root, journal); restore(root, journal); RECOVERY_PLANS.delete(plan);
     return recoveryResult("recovered", { restored: journal.targets.map(({ path }) => path) });
   } catch (error) { return recoveryResult("rejected", { reason: error.message }); }
+}
+
+/*
+ * Vendored-package sync.
+ *
+ * `loadedPackageEvidence()` proves package provenance by comparing the loaded
+ * package against a byte-identical copy at `<root>/plugins/pipeline-core`.  A
+ * project that installs this plugin through the standard marketplace mechanism
+ * loads it from the marketplace cache and structurally never has that copy, so
+ * its provenance is permanently `unavailable` and the mixed-authority migration
+ * path is permanently unreachable.  This pair is the explicit repair: it
+ * provisions exactly that copy, as a plan the operator can read and an apply
+ * they must activate -- never a silent background write, and never a second,
+ * weaker provenance rule.  The gate itself is untouched.
+ *
+ * The copy is deliberately NOT journalled like the five authority TARGETS.  It
+ * holds no project bytes, is disposable, and is exactly reconstructible from
+ * the loaded package, so an interrupted copy needs no preimage and no rollback:
+ * a partial copy simply fails `loadedPackageEvidence()`'s digest comparison --
+ * fail-closed, indistinguishable from having no copy at all -- until the same
+ * command is run again.
+ */
+function loadedPackageManifest() {
+  // A second, local read of the manifest `loadedPackageEvidence()` also reads.
+  // That function is a fixed provenance contract and is deliberately not
+  // refactored to share this; the duplication is three lines and it keeps the
+  // gate's own code byte-unchanged.
+  const manifest = JSON.parse(readFileSync(join(MODULE_PLUGIN_ROOT, ".codex-plugin", "plugin.json"), "utf8"));
+  if (!manifest || typeof manifest !== "object" || typeof manifest.version !== "string" || !manifest.version) throw new Error("plugin manifest is invalid");
+  return manifest;
+}
+function vendorSyncResult(status, extra = {}) { return { schema: PROJECT_AUTHORITY_VENDOR_SYNC_SCHEMA, status, requiresExplicitActivation: true, ...extra }; }
+function vendorSyncAuthenticated(plan) {
+  try {
+    const remembered = VENDOR_SYNC_PLANS.get(plan);
+    return remembered && planSignature(plan) === remembered.signature ? remembered : null;
+  } catch { return null; }
+}
+
+/**
+ * May this root receive the vendored copy?  Two questions, both answered by Git
+ * rather than guessed, both fail-closed:
+ *
+ * 1. Does the destination hold TRACKED files?  Then those bytes are the
+ *    project's own, whatever the directory is named, and a sync would delete
+ *    committed content.  Refuse; this is never repaired on the project's behalf.
+ * 2. Would the copied files be ignored?  Asked about a path INSIDE the
+ *    destination, not the destination itself: the recommended rule
+ *    `/plugins/pipeline-core/` is directory-only, and `git check-ignore` cannot
+ *    match a directory-only rule against a directory that does not exist yet
+ *    (measured) -- which is precisely the state a marketplace consumer is in
+ *    before its first sync.  A contained path answers the question that
+ *    actually matters, "will the bytes I am about to write dirty this
+ *    repository?", for the anchored-directory and anchored-flat rule shape
+ *    alike.
+ *
+ * A tracked destination is reported even when an ignore rule also exists: git
+ * reports a tracked path as not-ignored, so without question 1 that project
+ * would be told to edit a `.gitignore` that is already correct.
+ */
+function vendoredPackageWriteEvidence(root, spawn = spawnSync) {
+  const run = (args) => spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
+  const tracked = run(["ls-files", "--", VENDORED_PACKAGE_PATH]);
+  if (tracked.error || tracked.status !== 0) return { status: "unavailable", reason: "git tracking evidence for the vendored package path is unavailable" };
+  if (String(tracked.stdout ?? "").trim().length > 0) return { status: "tracked", reason: `${VENDORED_PACKAGE_PATH} holds tracked project files; a sync would replace committed bytes` };
+  const ignored = run(["check-ignore", "--quiet", "--", `${VENDORED_PACKAGE_PATH}/.codex-plugin/plugin.json`]);
+  if (ignored.error || ignored.status === null) return { status: "unavailable", reason: "git ignore evidence for the vendored package path is unavailable" };
+  if (ignored.status === 0) return { status: "ignored" };
+  if (ignored.status === 1) return { status: "not-ignored", reason: `add /${VENDORED_PACKAGE_PATH}/ to this project's .gitignore, then plan the sync again` };
+  return { status: "unavailable", reason: "git ignore evidence for the vendored package path is unavailable" };
+}
+function vendoredDestination(root) {
+  // `projectPath` refuses a symlinked component and a path escape; its return
+  // value for a real root is `join(root, "plugins", "pipeline-core")`, the exact
+  // path `loadedPackageEvidence()` compares against.
+  const destinationRoot = projectPath(root, VENDORED_PACKAGE_PATH);
+  if (!existsSync(destinationRoot)) return { destinationRoot, state: "missing", digest: null };
+  return { destinationRoot, state: "present", digest: packageInventory(destinationRoot).digest };
+}
+function isLoadedPackage(destinationRoot) {
+  try { return realpathSync(destinationRoot) === realpathSync(MODULE_PLUGIN_ROOT); }
+  catch { return false; }
+}
+// Copy exactly the files `packageInventory()` admitted.  Its walk is the single
+// refusal for symlinks and non-regular files in the source tree, and driving
+// the copy from its entry list keeps the copier and the digest from ever
+// disagreeing about what the package is.
+function copyPackage(sourceRoot, destinationRoot, inventory) {
+  const base = realpathSync(sourceRoot);
+  mkdirSync(destinationRoot, { recursive: true });
+  for (const entry of inventory.entries) {
+    const parts = entry.path.split("/");
+    const target = join(destinationRoot, ...parts);
+    mkdirSync(dirname(target), { recursive: true });
+    copyFileSync(join(base, ...parts), target);
+  }
+}
+
+/** Preview the vendored copy `loadedPackageEvidence()` requires; never writes. */
+export function planVendoredPackageSync({ rootDir = process.cwd() } = {}) {
+  let root;
+  try { root = realRoot(rootDir); } catch (error) { return vendorSyncResult("invalid-root", { diagnostics: [error.message], targets: [] }); }
+  let source;
+  let manifestVersion;
+  try { source = packageInventory(MODULE_PLUGIN_ROOT); manifestVersion = loadedPackageManifest().version; }
+  catch (error) { return vendorSyncResult("invalid-source", { diagnostics: [error.message], targets: [] }); }
+  const loaded = { operation: "sync-vendored-package", destinationRoot: VENDORED_PACKAGE_PATH, packageSha256: source.digest, manifestVersion, fileCount: source.entries.length };
+  let destination;
+  try { destination = vendoredDestination(root); }
+  catch (error) { return vendorSyncResult("invalid-destination", { ...loaded, diagnostics: [error.message], targets: [] }); }
+  // Self-application: the loaded package IS the destination.  Already current by
+  // construction, and nothing here may ever remove it.
+  if (destination.state === "present" && isLoadedPackage(destination.destinationRoot)) {
+    return vendorSyncResult("noop", { ...loaded, diagnostics: ["the loaded package is the destination"], targets: [] });
+  }
+  if (destination.digest === source.digest) return vendorSyncResult("noop", { ...loaded, targets: [] });
+  const evidence = vendoredPackageWriteEvidence(root);
+  if (evidence.status === "tracked") return vendorSyncResult("tracked-destination", { ...loaded, code: "PA-VENDOR-COPY-TRACKED", diagnostics: [evidence.reason], targets: [] });
+  if (evidence.status === "not-ignored") return vendorSyncResult("gitignore-required", { ...loaded, code: "PA-VENDOR-COPY-NOT-IGNORED", diagnostics: [evidence.reason], targets: [] });
+  if (evidence.status !== "ignored") return vendorSyncResult("ignore-evidence-unavailable", { ...loaded, code: "PA-VENDOR-COPY-IGNORE-EVIDENCE-UNAVAILABLE", diagnostics: [evidence.reason], targets: [] });
+  const plan = vendorSyncResult("ready", {
+    ...loaded,
+    destinationState: destination.state,
+    destinationSha256: destination.digest,
+    targets: [{ path: VENDORED_PACKAGE_PATH, kind: "vendored-package", action: destination.state === "missing" ? "create-vendored-package" : "replace-vendored-package" }],
+    activation: { required: true, command: "vendor-sync --activate", vendoredCopyReplaced: destination.state === "present" },
+  });
+  VENDOR_SYNC_PLANS.set(plan, {
+    root,
+    signature: planSignature(plan),
+    destinationRoot: destination.destinationRoot,
+    destinationState: destination.state,
+    destinationSha256: destination.digest,
+    packageSha256: source.digest,
+  });
+  return plan;
+}
+
+/**
+ * Write the vendored copy under an unchanged, authenticated plan.
+ *
+ * The source is re-read HERE rather than taken from the plan: a plan may
+ * predate a plugin update, and the copy is only useful if it matches the
+ * package loaded at this moment -- that is the exact comparison
+ * `loadedPackageEvidence()` will make afterwards.  The receipt therefore
+ * reports the digest that was actually written, not the planned one.
+ *
+ * `interruptAfterCopy` is a test seam, the same one `applyProjectAuthority-
+ * Migration`'s `interruptAfterRename` is: it exists so the readback below can
+ * be proven to be real.  It can neither select the source nor move the
+ * destination.
+ */
+export function applyVendoredPackageSync(plan, { rootDir = process.cwd(), activate = false, interruptAfterCopy } = {}) {
+  const state = vendorSyncAuthenticated(plan);
+  if (!state || plan.status !== "ready") return vendorSyncResult("rejected", { reason: "unauthenticated or changed vendored package sync plan" });
+  if (!activate) return vendorSyncResult("activation-required", { reason: "explicit activation required" });
+  try {
+    const root = realRoot(rootDir);
+    if (root !== state.root) throw new Error("sync root differs from the authenticated plan root");
+    const destination = vendoredDestination(root);
+    if (destination.destinationRoot !== state.destinationRoot) throw new Error("vendored package destination differs from the authenticated plan destination");
+    if (destination.state !== state.destinationState || destination.digest !== state.destinationSha256) throw new Error("vendored package destination changed since planning");
+    if (destination.state === "present" && isLoadedPackage(destination.destinationRoot)) throw new Error("the loaded package is the destination");
+    const evidence = vendoredPackageWriteEvidence(root);
+    if (evidence.status !== "ignored") throw new Error(evidence.reason);
+    const source = packageInventory(MODULE_PLUGIN_ROOT);
+    const manifestVersion = loadedPackageManifest().version;
+    if (destination.state === "present") rmSync(destination.destinationRoot, { recursive: true, force: true });
+    copyPackage(MODULE_PLUGIN_ROOT, destination.destinationRoot, source);
+    if (interruptAfterCopy?.({ destinationRoot: VENDORED_PACKAGE_PATH, fileCount: source.entries.length })) throw new Error("interrupted after the vendored package copy");
+    if (packageInventory(destination.destinationRoot).digest !== source.digest) throw new Error("vendored package readback failed");
+    const provenance = loadedPackageEvidence(root);
+    if (provenance.error) throw new Error(`vendored package provenance readback failed: ${provenance.error}`);
+    VENDOR_SYNC_PLANS.delete(plan);
+    return vendorSyncResult("applied", {
+      operation: "sync-vendored-package",
+      destinationRoot: VENDORED_PACKAGE_PATH,
+      packageSha256: provenance.packageSha256,
+      manifestVersion,
+      fileCount: source.entries.length,
+      targets: [VENDORED_PACKAGE_PATH],
+    });
+  } catch (error) { return vendorSyncResult("rejected", { reason: error.message }); }
 }

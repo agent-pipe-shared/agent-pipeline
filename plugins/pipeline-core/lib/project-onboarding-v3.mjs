@@ -70,6 +70,8 @@ import {
   planProjectAuthorityMigration,
   planProjectAuthoritySessionCleanupRecovery,
   inspectProjectAuthorityProvenance,
+  PROJECT_AUTHORITY_VENDOR_SYNC_SCHEMA,
+  SELF_HEALABLE_VENDOR_PROVENANCE_CODES,
   readProjectAuthority,
   resolveProjectAuthorityPaths,
 } from "./project-authority.mjs";
@@ -3465,6 +3467,39 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner) {
         rootDir: legacy.root,
         provenance: provenance.status === "ready" ? provenance : undefined,
       });
+      // A marketplace-installed project has no vendored plugin copy, so the
+      // mixed-authority adoption path above can never plan `ready` for it: its
+      // package provenance is `unavailable` and the planner refuses with
+      // PA-PROVENANCE-REQUIRED.  Without this branch that project falls through
+      // to `invalid` with `nextAction: null` -- a dead end.  Name the sync that
+      // provisions the missing evidence; a BROKEN copy is not offered it.
+      if (projectAuthority.status === "mixed"
+        && migration.status === "provenance-rejected"
+        && migration.code === "PA-PROVENANCE-REQUIRED"
+        && provenance.status === "unavailable"
+        && SELF_HEALABLE_VENDOR_PROVENANCE_CODES.includes(provenance.code)) {
+        return lifecycleResult({
+          status: "migration-required",
+          root: legacy.root,
+          runner,
+          intent,
+          repository,
+          runtime: emptyRuntime(),
+          nextAction: commandAction(
+            [PROJECT_AUTHORITY_MIGRATION_WRITER, "vendor-sync", "--root", legacy.root],
+            false,
+            false,
+            PROJECT_AUTHORITY_VENDOR_SYNC_SCHEMA,
+            ["ready", "noop"],
+          ),
+          diagnostics: [lifecycleDiagnostic(
+            "$.authority",
+            "project_authority_vendor_sync_required",
+            "mixed-authority adoption requires a local copy of the loaded Pipeline package as provenance, which a marketplace install does not have",
+            "review and apply the typed vendored-package sync, then inspect again; it writes only the ignored local package copy",
+          )],
+        });
+      }
       if ((projectAuthority.status === "mixed" || projectAuthority.code === "PA-LEGACY-STATE-RETIREMENT-REQUIRED")
         && migration.status === "ready") {
         return lifecycleResult({

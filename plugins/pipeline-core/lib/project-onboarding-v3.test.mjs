@@ -1920,6 +1920,32 @@ test("healthy legacy authority exposes one typed runner-neutral migration action
   } finally { dispose(path); }
 });
 
+test("mixed authority without a vendored package copy is offered the sync, not a dead end", () => {
+  const path = root();
+  try {
+    // The live shape: a neutral manifest beside a real legacy calibration the
+    // neutral layer does not have yet, in a project that loads this plugin from
+    // the marketplace and therefore has no local copy to prove provenance with.
+    initializeRestartRequiredRoot(path);
+    writeFileSync(join(path, ".claude/pipeline-state.json"), "{\"schema\":\"pipeline.state.v0\"}\n");
+    assert.equal(readProjectAuthority({ rootDir: path }).status, "mixed");
+    const inspected = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "bootstrap", deps: fakeDeps });
+    assert.equal(inspected.status, "migration-required");
+    assertDiagnostic(inspected, "project_authority_vendor_sync_required");
+    assertSingleLineAction(inspected.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [PROJECT_AUTHORITY_MIGRATION_SCRIPT, "vendor-sync", "--root", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.project-authority-vendor-sync.v1",
+        statuses: ["ready", "noop"],
+      },
+    });
+  } finally { dispose(path); }
+});
+
 test("bootstrap inspection of a blank local root offers the portable seed instead of rejecting its absent Git control path", () => {
   const path = root();
   try {

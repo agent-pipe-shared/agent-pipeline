@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -14,6 +14,7 @@ import {
   inspectProjectAuthorityProvenance, planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, readProjectAuthority,
   applyProjectAuthoritySessionCleanupRecovery, planProjectAuthoritySessionCleanupRecovery,
   AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath,
+  applyVendoredPackageSync, planVendoredPackageSync,
 } from "./project-authority.mjs";
 import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
 
@@ -59,6 +60,17 @@ function completeDescriptor(base, sessionId) {
     descriptorSha256: started.descriptorSha256,
   });
   return started;
+}
+const VENDORED = "plugins/pipeline-core";
+// A project that installs this plugin from the marketplace: real mixed
+// authority, the vendored package path ignored, and NO vendored copy -- the
+// shape `loadedPackageEvidence()` can never prove on its own.
+function marketplace(base, { ignore = true } = {}) {
+  git(base, ["init", "-q"]);
+  legacy(base);
+  write(base, NEUTRAL_MANIFEST, "schema: pipeline.manifest.v0\nprovisional: kickoff\n");
+  if (ignore) write(base, ".gitignore", `/${VENDORED}/\n`);
+  return base;
 }
 let passed = 0;
 let interruptedRoot;
@@ -420,6 +432,108 @@ try {
     const calibration = resolveAuthorityArtifactPath("calibration", { rootDir: base });
     assert.equal(calibration.relPath, LEGACY_CALIBRATION);
     assert.equal(calibration.exists, true);
+  });
+  ok("a marketplace install provisions its own provenance copy and reaches the adoption path", () => {
+    const base = root(); marketplace(base);
+    const missing = inspectProjectAuthorityProvenance({ rootDir: base });
+    assert.equal(readProjectAuthority({ rootDir: base }).status, "mixed");
+    assert.equal(missing.status, "unavailable");
+    assert.equal(missing.code, "PA-VENDOR-COPY-MISSING");
+    assert.equal(planProjectAuthorityMigration({ rootDir: base }).code, "PA-PROVENANCE-REQUIRED");
+    const plan = planVendoredPackageSync({ rootDir: base });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.destinationRoot, VENDORED);
+    assert.equal(plan.destinationState, "missing");
+    assert.deepEqual(plan.targets.map(({ path, action }) => ({ path, action })), [{ path: VENDORED, action: "create-vendored-package" }]);
+    assert.equal(applyVendoredPackageSync(plan, { rootDir: base }).status, "activation-required");
+    assert.equal(existsSync(join(base, VENDORED)), false);
+    const applied = applyVendoredPackageSync(plan, { rootDir: base, activate: true });
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.packageSha256, plan.packageSha256);
+    assert.equal(applied.fileCount, plan.fileCount);
+    const proven = inspectProjectAuthorityProvenance({ rootDir: base });
+    assert.equal(proven.status, "ready");
+    assert.equal(proven.code, undefined);
+    assert.equal(proven.packageSha256, applied.packageSha256);
+    const migration = planProjectAuthorityMigration({ rootDir: base, provenance: proven });
+    assert.equal(migration.status, "ready");
+    assert.equal(migration.operation, "adopt-existing-neutral");
+    assert.equal(planVendoredPackageSync({ rootDir: base }).status, "noop");
+    assert.equal(applyVendoredPackageSync(plan, { rootDir: base, activate: true }).status, "rejected");
+  });
+  ok("a stale vendored copy is replaced exactly and a current one is a no-op", () => {
+    const base = root(); marketplace(base);
+    cpSync(join(process.cwd(), VENDORED), join(base, VENDORED), { recursive: true });
+    assert.equal(planVendoredPackageSync({ rootDir: base }).status, "noop");
+    assert.equal(inspectProjectAuthorityProvenance({ rootDir: base }).status, "ready");
+    write(base, `${VENDORED}/stale-extra-file.txt`, "drift\n");
+    assert.equal(inspectProjectAuthorityProvenance({ rootDir: base }).code, "PA-VENDOR-COPY-STALE");
+    const plan = planVendoredPackageSync({ rootDir: base });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.destinationState, "present");
+    assert.equal(plan.targets[0].action, "replace-vendored-package");
+    assert.notEqual(plan.destinationSha256, plan.packageSha256);
+    assert.equal(applyVendoredPackageSync(plan, { rootDir: base, activate: true }).status, "applied");
+    assert.equal(existsSync(join(base, VENDORED, "stale-extra-file.txt")), false);
+    assert.equal(inspectProjectAuthorityProvenance({ rootDir: base }).status, "ready");
+  });
+  ok("the vendored sync refuses every unproven destination without writing anything", () => {
+    const notIgnored = root(); marketplace(notIgnored, { ignore: false });
+    const required = planVendoredPackageSync({ rootDir: notIgnored });
+    assert.equal(required.status, "gitignore-required");
+    assert.equal(required.code, "PA-VENDOR-COPY-NOT-IGNORED");
+    assert.match(required.diagnostics[0], /\/plugins\/pipeline-core\//u);
+    assert.equal(existsSync(join(notIgnored, VENDORED)), false);
+    // The refusal names the line to add; it never writes a .gitignore itself.
+    assert.equal(existsSync(join(notIgnored, ".gitignore")), false);
+
+    const tracked = root(); marketplace(tracked);
+    write(tracked, `${VENDORED}/own.txt`, "the project's own bytes\n");
+    git(tracked, ["add", "-f", `${VENDORED}/own.txt`]);
+    assert.equal(planVendoredPackageSync({ rootDir: tracked }).status, "tracked-destination");
+    assert.equal(readFileSync(join(tracked, VENDORED, "own.txt"), "utf8"), "the project's own bytes\n");
+
+    const symlinked = root(); marketplace(symlinked);
+    write(symlinked, `${VENDORED}/kept.txt`, "kept\n");
+    symlinkSync(join(symlinked, LEGACY_CALIBRATION), join(symlinked, VENDORED, "escape.json"));
+    assert.equal(inspectProjectAuthorityProvenance({ rootDir: symlinked }).code, "PA-VENDOR-COPY-UNKNOWN");
+    assert.equal(planVendoredPackageSync({ rootDir: symlinked }).status, "invalid-destination");
+    assert.equal(readFileSync(join(symlinked, VENDORED, "kept.txt"), "utf8"), "kept\n");
+
+    const bare = root();
+    assert.equal(planVendoredPackageSync({ rootDir: bare }).status, "ignore-evidence-unavailable");
+    assert.equal(existsSync(join(bare, VENDORED)), false);
+    assert.equal(planVendoredPackageSync({ rootDir: join(bare, "absent") }).status, "invalid-root");
+  });
+  ok("the vendored sync apply refuses an unauthenticated, drifted or unverified write", () => {
+    const base = root(); marketplace(base);
+    assert.equal(applyVendoredPackageSync({ status: "ready" }, { rootDir: base, activate: true }).status, "rejected");
+    const mutated = planVendoredPackageSync({ rootDir: base });
+    mutated.fileCount += 1;
+    assert.equal(applyVendoredPackageSync(mutated, { rootDir: base, activate: true }).status, "rejected");
+    assert.equal(existsSync(join(base, VENDORED)), false);
+
+    const foreign = root(); marketplace(foreign);
+    const foreignPlan = planVendoredPackageSync({ rootDir: foreign });
+    assert.equal(applyVendoredPackageSync(foreignPlan, { rootDir: base, activate: true }).status, "rejected");
+    assert.equal(existsSync(join(base, VENDORED)), false);
+
+    write(foreign, `${VENDORED}/appeared.txt`, "someone else wrote here\n");
+    const drifted = applyVendoredPackageSync(foreignPlan, { rootDir: foreign, activate: true });
+    assert.equal(drifted.status, "rejected");
+    assert.equal(drifted.reason, "vendored package destination changed since planning");
+    assert.equal(readFileSync(join(foreign, VENDORED, "appeared.txt"), "utf8"), "someone else wrote here\n");
+
+    const corrupted = root(); marketplace(corrupted);
+    const corruptPlan = planVendoredPackageSync({ rootDir: corrupted });
+    const readback = applyVendoredPackageSync(corruptPlan, { rootDir: corrupted, activate: true, interruptAfterCopy: () => {
+      write(corrupted, `${VENDORED}/.codex-plugin/plugin.json`, "{\"version\":\"0.0.0-corrupt\"}\n");
+      return false;
+    } });
+    assert.equal(readback.status, "rejected");
+    assert.equal(readback.reason, "vendored package readback failed");
+    // A copy that failed verification is never mistaken for provenance.
+    assert.equal(inspectProjectAuthorityProvenance({ rootDir: corrupted }).code, "PA-VENDOR-COPY-STALE");
   });
   ok("an unknown artifact kind is a caller error, not a silent legacy fallback", () => {
     assert.throws(() => resolveAuthorityArtifactPath("settings", { rootDir: root() }), TypeError);
