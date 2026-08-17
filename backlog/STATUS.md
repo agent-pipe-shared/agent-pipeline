@@ -167,7 +167,7 @@
 | pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | open | defect | pipeline | 2026-08-10 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-settings-enabled-two-pipeline-core-plugin-instances-at-once | open | defect | pipeline | 2026-08-17 | — |
@@ -240,6 +240,6 @@
 
 ## Counts
 
-- open: 109
+- open: 108
 - in_progress: 22
-- closed: 101
+- closed: 102

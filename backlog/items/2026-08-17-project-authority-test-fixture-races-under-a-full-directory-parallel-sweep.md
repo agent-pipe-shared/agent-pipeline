@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 214fb743afd87acf8d3ecae75f057bae7eab1c5b
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-patest-1-closure.md
 source: "Critic review of NVA-VENDORSYNC-1 (9ab96e01, claude-opus-5 at max), finding F2 — the dispatch's own claims record overclaimed a green plugin-wide sweep when project-authority.test.mjs actually failed there. Independently re-verified: the suite passes 29/29 standalone (node --test plugins/pipeline-core/lib/project-authority.test.mjs) and cleanly under the serialized harness/scripts/verify.mjs gate (evidence/verify-latest.json, exact-bound to 9ab96e01); it only fails inside a whole-plugin-directory `node --test` sweep that runs many test files concurrently."
 ---
 
@@ -64,3 +68,21 @@ process's working directory or what else is running concurrently in the same
   session as a Verify fallback) stays a trustworthy signal.
 - **Assignment:** queued; not dispatched this AFK block.
 - **Date:** 2026-08-17
+
+## Closure (2026-08-17)
+
+Dispatched as `NVA-PATEST-1` (goldfish-implementor, claude-sonnet-5/medium —
+mechanical fixture fix, no design latitude). Fixed exactly as proposed: a new
+`MODULE_PLUGIN_ROOT` constant derived from the test file's own
+`import.meta.url` (mirroring `project-authority.mjs`'s own derivation), all
+four `cpSync(join(process.cwd(), ...), ...)` fixture-copy sites rewritten to
+use it. Verified standalone (`node --test
+plugins/pipeline-core/lib/project-authority.test.mjs`, 29/29 passed) and under
+the whole-directory sweep this bug only reproduced under (`project-authority`
+tests no longer among the sweep's failures; the sweep's remaining failures —
+`human-guard-override.test.mjs`'s marketplace-registry-state tests,
+`windows-assurance-verify-registration.test.mjs` — are pre-existing and
+tracked separately). Committed as `214fb743afd87acf8d3ecae75f057bae7eab1c5b`.
+No Critic dispatch: test-fixture-only change, no production/guardrail code
+touched, class-niedrig per MP-07's cascade — self-verified by the Elephant
+against the diff and both test runs instead.

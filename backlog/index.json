@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e49692df75859c3e389ed52138a27b9cf1ffe63bdfdb211cfc2ef1fe398d94e1"
+    "transitionHead": "845bac545b80b8ee8455011d525656c862445a0fbe7ed6ab6d76499a6bc3cd70"
   },
   "counts": {
-    "open": 109,
+    "open": 108,
     "in_progress": 22,
-    "closed": 101
+    "closed": 102
   },
   "items": [
     {
@@ -1579,11 +1579,15 @@
     },
     {
       "id": "pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Critic review of NVA-VENDORSYNC-1 (9ab96e01, claude-opus-5 at max), finding F2 — the dispatch's own claims record overclaimed a green plugin-wide sweep when project-authority.test.mjs actually failed there. Independently re-verified: the suite passes 29/29 standalone (node --test plugins/pipeline-core/lib/project-authority.test.mjs) and cleanly under the serialized harness/scripts/verify.mjs gate (evidence/verify-latest.json, exact-bound to 9ab96e01); it only fails inside a whole-plugin-directory `node --test` sweep that runs many test files concurrently."
+      "source": "Critic review of NVA-VENDORSYNC-1 (9ab96e01, claude-opus-5 at max), finding F2 — the dispatch's own claims record overclaimed a green plugin-wide sweep when project-authority.test.mjs actually failed there. Independently re-verified: the suite passes 29/29 standalone (node --test plugins/pipeline-core/lib/project-authority.test.mjs) and cleanly under the serialized harness/scripts/verify.mjs gate (evidence/verify-latest.json, exact-bound to 9ab96e01); it only fails inside a whole-plugin-directory `node --test` sweep that runs many test files concurrently.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "214fb743afd87acf8d3ecae75f057bae7eab1c5b",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-patest-1-closure.md"
     },
     {
       "id": "pipeline.project-reset-does-not-classify-the-proof-policy-artifact",
