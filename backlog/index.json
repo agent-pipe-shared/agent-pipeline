@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bc7455c03f8768d52e1744eb7d5afa0e7be11dabb942c8db4cdacd45877e43ef"
+    "transitionHead": "f5cb8943a79e11d8466d0760f9d3cbc3e640f246371b5a988d733a9551c2b403"
   },
   "counts": {
-    "open": 111,
+    "open": 110,
     "in_progress": 22,
-    "closed": 102
+    "closed": 103
   },
   "items": [
     {
@@ -430,11 +430,15 @@
     },
     {
       "id": "pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (Windows, native Claude) session's handover, filed after a reinstall/fresh-bootstrap repair path left the project at continuity-damaged/nextAction:null. The report's specific mechanism claim (gated on a `historyObservation`/`docs/HISTORY.md` check) was checked against current source and does not hold; filed here with the corrected mechanism. PO reports both current Windows user-repo sessions are fully blocked on this dead end -- fix accepted as urgent."
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (Windows, native Claude) session's handover, filed after a reinstall/fresh-bootstrap repair path left the project at continuity-damaged/nextAction:null. The report's specific mechanism claim (gated on a `historyObservation`/`docs/HISTORY.md` check) was checked against current source and does not hold; filed here with the corrected mechanism. PO reports both current Windows user-repo sessions are fully blocked on this dead end -- fix accepted as urgent.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "28c1ba0c3d3c2f5c27b519dba7adc42907ef6462",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-contrep-2-closure.md"
     },
     {
       "id": "pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file",

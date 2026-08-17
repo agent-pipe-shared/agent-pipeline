@@ -49,7 +49,7 @@
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | 2026-08-10 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | 2026-08-09 | — |
-| pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | in_progress | defect | pipeline | 2026-08-10 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -243,6 +243,6 @@
 
 ## Counts
 
-- open: 111
+- open: 110
 - in_progress: 22
-- closed: 102
+- closed: 103

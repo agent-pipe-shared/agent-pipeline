@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 28c1ba0c3d3c2f5c27b519dba7adc42907ef6462
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-contrep-2-closure.md
 source: "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (Windows, native Claude) session's handover, filed after a reinstall/fresh-bootstrap repair path left the project at continuity-damaged/nextAction:null. The report's specific mechanism claim (gated on a `historyObservation`/`docs/HISTORY.md` check) was checked against current source and does not hold; filed here with the corrected mechanism. PO reports both current Windows user-repo sessions are fully blocked on this dead end -- fix accepted as urgent."
 ---
 
@@ -96,3 +100,19 @@ classification for any other caller.
   standing practice.
 - **Assignment:** dispatched same-session as NVA-CONTREP-1.
 - **Date:** 2026-08-17
+
+## Closure
+
+NVA-CONTREP-1 investigated this Proposal's own suggested mechanism
+(automatic derivation of PO authority from repository content) and found it
+unsound — no such derivation exists once `pipeline-state.json` is absent.
+NVA-CONTREP-2 delivered an operator-confirmed alternative instead: the
+operator states featureId/PRD/Spec/language once (a `collect-input` ask,
+mirroring `collectAuthorIdentityAction()`), independently validated
+(existence + digest binding) before synthesis — never fabricated. This
+satisfies the Proposal's actual invariant ("never inventing an
+`activeFeature`/authority pair that isn't independently evidenced") more
+strictly than the Proposal's own suggested mechanism did. Full closure
+evidence: `specs/sprint-nova-epic/evidence/backlog/2026-08-17-contrep-2-closure.md`.
+Reviewed by a consolidated Critic dispatch: PASS with 2 minor findings
+(F-6, F-7 — see closure evidence), no blockers.
