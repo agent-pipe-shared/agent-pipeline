@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c3d4f550e9376fec42c5b6b9ed32a73a2622ec6db86e327dd5ea9e18c592b721"
+    "transitionHead": "a64ae64cad5cb31eabb03639d2a1fe015146c42f765f4a2f845290f810554a19"
   },
   "counts": {
-    "open": 108,
+    "open": 109,
     "in_progress": 22,
-    "closed": 98
+    "closed": 99
   },
   "items": [
     {
@@ -808,6 +808,14 @@
       "source": "Live observation of the PO's private Codex+Pipeline 0.5.4 happy-path test run (fifth local candidate), 2026-08-09 (sanitized, no PO-identifying data)."
     },
     {
+      "id": "pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Critic review of NVA-HGOFIX-1 (a4aeaca4, claude-opus-5 at max), finding F3 — explicitly an out-of-scope disclosure, not counted against that diff's PASS verdict."
+    },
+    {
       "id": "pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table",
       "status": "open",
       "type": "workflow-improvement",
@@ -956,6 +964,14 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-v3-trustanchors-gmw-hgo-fix-closure.md"
     },
     {
+      "id": "pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Critic review of NVA-HGOFIX-1 (a4aeaca4, claude-opus-5 at max), findings F1 and F2. Verdict PASS; both minor, filed as follow-ups rather than reworked into that commit."
+    },
+    {
       "id": "pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant",
       "status": "open",
       "type": "defect",
@@ -981,11 +997,15 @@
     },
     {
       "id": "pipeline.human-guard-override-shares-the-po-human-approval-posix-normalization-bug",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Independently flagged twice this session as an out-of-scope disclosure: once by the round-1 Critic reviewing d2e2fc4c (NVA-WINPATH-1), once by the NVA-WINPATH-2 goldfish-deep dispatch that fixed the sibling bug. Neither investigated it (explicitly out of scope for both); confirmed directly against this repository's source before filing."
+      "source": "Independently flagged twice this session as an out-of-scope disclosure: once by the round-1 Critic reviewing d2e2fc4c (NVA-WINPATH-1), once by the NVA-WINPATH-2 goldfish-deep dispatch that fixed the sibling bug. Neither investigated it (explicitly out of scope for both); confirmed directly against this repository's source before filing.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "a4aeaca43caea04801cd4809c37beeb475cd9959",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-hgo-posix-normalization-closure.md"
     },
     {
       "id": "pipeline.installing-consumer-is-never-asked-any-setup-decision",

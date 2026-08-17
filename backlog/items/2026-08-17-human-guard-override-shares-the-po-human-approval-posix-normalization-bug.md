@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.human-guard-override-shares-the-po-human-approval-posix-normalization-bug
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: a4aeaca43caea04801cd4809c37beeb475cd9959
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-hgo-posix-normalization-closure.md
 source: "Independently flagged twice this session as an out-of-scope disclosure: once by the round-1 Critic reviewing d2e2fc4c (NVA-WINPATH-1), once by the NVA-WINPATH-2 goldfish-deep dispatch that fixed the sibling bug. Neither investigated it (explicitly out of scope for both); confirmed directly against this repository's source before filing."
 ---
 
@@ -76,14 +80,17 @@ sibling fix, not a same-session edit.
 
 - **Decision:** accepted — confirmed with exact line numbers against this
   repository's current source, not just trusted from the two disclosures
-  that flagged it. Not dispatched this AFK block (queued behind
-  `NVA-SUITEREG-2` and the `guard-lifecycle-ready.mjs` allowlist fix to
-  avoid concurrent non-isolated Goldfish writers sharing this checkout).
+  that flagged it. Dispatched as `NVA-HGOFIX-1` (goldfish-deep) once
+  `NVA-SUITEREG-2` and the `guard-lifecycle-ready.mjs` allowlist fix had
+  landed.
 - **Rationale:** same defect class, same fix pattern, same file family
   (HGO/push-approval ceremony) as the already-fixed, already-Critic-PASSed
-  (pending re-review) sibling in `po-human-approval.mjs`. `human-guard-
-  override.mjs` is itself the TP-3 override mechanism's own implementation
-  — high scrutiny warranted.
-- **Assignment (if accepted):** next available dispatch slot in this AFK
-  block, after the currently in-flight/queued work above.
+  sibling in `po-human-approval.mjs`. `human-guard-override.mjs` is itself
+  the TP-3 override mechanism's own implementation — high scrutiny
+  warranted.
+- **Outcome:** the dispatch confirmed a genuinely more serious defect than
+  the preliminary read below suggested — a real fail-open reachability gap
+  in `crossBoundaryTarget()`, not just a directional risk. Fixed, Critic
+  **PASS** (3 minor findings, filed as follow-ups; see closure evidence).
+  Closed `a4aeaca4`.
 - **Date:** 2026-08-17
