@@ -100,10 +100,12 @@ packs can resolve to something more permissive than its strictest contributor.
 **Four of these six are declared but not yet consumed by any decision path.** Only
 `mode`, `approvalRequired`, `targetBinding` and `ownedSections` currently scope a real
 permission decision; `lifecycleEvents`, `previewRequired`, `retention` and
-`conflictPolicy` validate and merge but change no behaviour anywhere. That gap is
-tracked, with its per-dimension reasons, in
-`backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md` — declaring
-one of the four today is not an error, but it is also not enforcement.
+`conflictPolicy` validate and merge but change no behaviour anywhere. `previewRequired`,
+`retention` and `conflictPolicy`'s gap is tracked, with its per-dimension reasons, in
+`backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md`; `lifecycleEvents`'
+own gap (that item explicitly disclaims covering it) is tracked separately in
+`backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md` —
+declaring one of the four today is not an error, but it is also not enforcement.
 
 Activation is a separate, transactional step from resolution
 (`organization-policy-activation.mjs`). `planOrganizationPolicyActivation`

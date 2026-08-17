@@ -58,7 +58,7 @@ and one was blocked on a mistaken premise.
 
 `plugins/pipeline-core/lib/organization-policy.mjs` (declares all five);
 `plugins/pipeline-core/lib/external-reference-adapter.mjs` (consumes one);
-acceptance criterion `P-AC-11` (`specs/sprint-phoenix-epic/acceptance.md:409-412`),
+acceptance criterion `P-AC-11` (`specs/sprint-phoenix-epic/acceptance.md:604-607`),
 which stays `partial` for exactly this reason.
 
 ## Proposal
