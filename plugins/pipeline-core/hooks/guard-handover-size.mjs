@@ -77,9 +77,20 @@ export function proposedHandoverBytes(input, currentContent) {
 
   if (toolName === "Edit") {
     if (typeof toolInput.old_string !== "string" || typeof toolInput.new_string !== "string") return null;
-    const next = toolInput.replace_all === true
-      ? currentContent.split(toolInput.old_string).join(toolInput.new_string)
-      : currentContent.replace(toolInput.old_string, toolInput.new_string);
+    let next;
+    if (toolInput.replace_all === true) {
+      next = currentContent.split(toolInput.old_string).join(toolInput.new_string);
+    } else {
+      // NVA-HANDOVER-ROT-2 F2: literal single-occurrence replacement computed by hand -- NEVER
+      // via String.prototype.replace(), whose replacement-string argument interprets $&, $`, $',
+      // $$ (and $<name>) as special patterns even when the search pattern is a plain string. A
+      // new_string containing one of those sequences would otherwise inflate the simulated
+      // post-write size and could misclassify a genuinely shrinking rotation edit as growing.
+      const matchIndex = currentContent.indexOf(toolInput.old_string);
+      next = matchIndex === -1
+        ? currentContent
+        : currentContent.slice(0, matchIndex) + toolInput.new_string + currentContent.slice(matchIndex + toolInput.old_string.length);
+    }
     return Buffer.byteLength(next, "utf8");
   }
 

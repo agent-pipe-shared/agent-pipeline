@@ -37,7 +37,7 @@
  * pinned by this script's own test suite).
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
@@ -243,6 +243,11 @@ export function rewriteLiveFileContent({ preambleLines, hasTrailingNewline, rema
 
 // -- Orchestration --
 
+// NVA-HANDOVER-ROT-2 F1: --rotation-date becomes part of the archive file name, so it is
+// validated against a strict YYYY-MM-DD shape before use -- this also closes a path-traversal
+// vector (e.g. `--rotation-date ../../../etc/evil`).
+const ROTATION_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
 /**
  * Pure planning entry point: computes everything (archive content, new live
  * content, archive path) without touching the filesystem. Kept separate from
@@ -252,8 +257,17 @@ export function rewriteLiveFileContent({ preambleLines, hasTrailingNewline, rema
 export function planRotation({
   liveContent, handoverPath, sectionHeadings, summary, dateRange, slug, rotationDate,
 }) {
+  if (typeof rotationDate !== "string" || !ROTATION_DATE_RE.test(rotationDate)) {
+    throw new HandoverRotationError(
+      "HANDOVER-ROTATION-INVALID-DATE",
+      `--rotation-date must be a strict YYYY-MM-DD value; got: ${JSON.stringify(rotationDate)}.`,
+    );
+  }
   const plan = planHandoverRotation(liveContent, { sectionHeadings });
-  const resolvedSlug = slug ?? slugify(plan.archiveSections[0].title);
+  // NVA-HANDOVER-ROT-2 F1: --slug is ALWAYS passed through slugify(), never used raw -- a
+  // caller-supplied slug is exactly as untrusted as the auto-derived one, and slugify() is what
+  // keeps the archive file name a flat, traversal-proof token either way.
+  const resolvedSlug = slugify(slug ?? plan.archiveSections[0].title);
   const archivePath = `${ARCHIVE_DIR}/${rotationDate}--${resolvedSlug}.md`;
   const archiveContent = buildArchiveFileContent({
     archiveSections: plan.archiveSections, handoverPath, rotationDate, summary,
@@ -279,6 +293,25 @@ function toPortableRelativeLink(relativePath) {
   return relativePath.split(/[\\/]+/u).join("/");
 }
 
+/**
+ * NVA-HANDOVER-ROT-2 F1: defense-in-depth containment check. Resolves `candidatePath` and
+ * confirms it stays strictly inside `root` -- rejects with a typed error rather than silently
+ * clamping if a caller-supplied path (--handover-path, or the resolved archive path) resolves
+ * outside the repository root. No file is read or written before this check runs.
+ */
+function assertPathWithinRoot(root, candidatePath, label) {
+  const resolvedRoot = resolve(root);
+  const resolvedCandidate = resolve(candidatePath);
+  const rootWithSep = resolvedRoot.endsWith(sep) ? resolvedRoot : `${resolvedRoot}${sep}`;
+  if (resolvedCandidate !== resolvedRoot && !resolvedCandidate.startsWith(rootWithSep)) {
+    throw new HandoverRotationError(
+      "HANDOVER-ROTATION-PATH-ESCAPES-ROOT",
+      `${label} resolves outside the repository root (${resolvedRoot}): ${resolvedCandidate}. No file was read or written.`,
+    );
+  }
+  return resolvedCandidate;
+}
+
 /** Full I/O orchestration used by the CLI: read, gate on acknowledgment, plan, write. */
 export function rotateHandover({
   root, handoverPath, sectionHeadings, summary, dateRange, slug, rotationDate = new Date().toISOString().slice(0, 10),
@@ -286,6 +319,7 @@ export function rotateHandover({
   assertExtractionAcknowledged(root);
   const resolvedHandoverPath = handoverPath ?? resolveHandoverConfig({ rootDir: root }).path;
   const fullHandoverPath = join(root, resolvedHandoverPath);
+  assertPathWithinRoot(root, fullHandoverPath, "The handover path (--handover-path)");
   if (!existsSync(fullHandoverPath)) {
     throw new HandoverRotationError("HANDOVER-ROTATION-FILE-NOT-FOUND", `${resolvedHandoverPath} not found under ${root}.`);
   }
@@ -294,6 +328,7 @@ export function rotateHandover({
     liveContent, handoverPath: resolvedHandoverPath, sectionHeadings, summary, dateRange, slug, rotationDate,
   });
   const fullArchivePath = join(root, plan.archivePath);
+  assertPathWithinRoot(root, fullArchivePath, "The resolved archive path");
   mkdirSync(dirname(fullArchivePath), { recursive: true });
   if (existsSync(fullArchivePath)) {
     throw new HandoverRotationError(
@@ -314,6 +349,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === "--root") args.root = argv[++i];
     else if (a === "--acknowledge-extraction-done") args.acknowledge = true;
+    else if (a === "--status") args.status = true;
     else if (a === "--section-heading") args.sectionHeadings.push(argv[++i]);
     else if (a === "--summary") args.summary = argv[++i];
     else if (a === "--date-range") args.dateRange = argv[++i];
@@ -332,6 +368,19 @@ if (isDirectInvocation(import.meta.url)) {
   }
   const root = resolve(args.root);
   try {
+    if (args.status) {
+      // Read-only: NVA-HANDOVER-ROT-2 F4. Never records the marker, only reports it -- the
+      // close-block ritual checks this first so `--acknowledge-extraction-done` stays a
+      // deliberate human/Elephant judgment call, never a routine automated step.
+      const acknowledged = isExtractionAcknowledged(root);
+      console.log(acknowledged
+        ? `Extraction acknowledgment: RECORDED for ${root}.`
+        : `Extraction acknowledgment: NOT recorded for ${root}. Rotation is refused (ADR-0066 Decision 6) until `
+          + "--acknowledge-extraction-done is run -- only once the one-time durable-rule extraction pass (ADR-0066 "
+          + "Decision 7) is genuinely complete for this repository. This is a human/Elephant judgment call, never "
+          + "an automated step of routine closing.");
+      process.exit(0);
+    }
     if (args.acknowledge) {
       const record = recordExtractionAcknowledged(root);
       console.log(`Extraction acknowledgment recorded for ${root} at ${record.acknowledgedAt} (schema ${HANDOVER_MEASUREMENT_SCHEMA} handover measurement in effect).`);
