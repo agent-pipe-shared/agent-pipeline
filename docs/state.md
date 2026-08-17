@@ -7,7 +7,51 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again (7): 12/157 open (was 15), PO drove "everything from Phoenix must close" — five criteria closed this round, H-AC-11 increment-1 builders landed, remaining PO decisions and dispatch queue recorded (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (8): retention dropped from P-AC-11, lifecycleEvents build dispatched (READ THIS FIRST)
+
+**Since checkpoint (7):** `PHX-WP-PAC11-DROPRETENTION` (goldfish-mechanic, no model override, per the
+token/routing correction) landed as `3ce9434b` — removed the `retention` dimension from
+`organization-policy.mjs`'s `documentClasses` (the `RETENTION` set, its closed-key/validation/merge
+branches, its object-literal sites), replaced the two `retention`-specific tests with one proving a
+pack still declaring it now fails the closed-key check, and updated `docs/organization-policy-packs.md`
+and `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11 amendment accordingly.
+Independently re-verified by the Elephant: diffs read file-by-file (clean, matches the brief exactly),
+`external-reference-adapter.mjs`'s diff confirmed empty across the whole range
+(`git diff --stat 7dd50c80 3ce9434b -- .../external-reference-adapter.mjs`), 27/27
+`organization-policy-core-tests` re-run separately at the candidate in `.git/phx-verify`. Evidence map's
+P-AC-11 pointer extended with the closure note (commit `4df43d10`); totals unchanged (145/11/0/1 — P-AC-11
+itself correctly stays `partial`, since `lifecycleEvents`/`conflictPolicy` are still open).
+
+Fired the next Class-B item off checkpoint 7's queue: `PHX-WP-PAC11-LIFECYCLEEVENTS`
+(`pipeline-core:goldfish-deep`, sonnet/xhigh, no model override, agentId `a51504c591d682b65`,
+currently running) — wires `lifecycleEvents` into `planExternalReferenceWrite`'s decision path the
+same way `ownedSections` is already enforced, per the PO's 2026-08-17 "build it" decision recorded in
+`backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md`'s Triage section.
+Bounded design latitude granted for exactly one judgment call: mapping the two `FEATURE_STATES` values
+with no identically-named `LIFECYCLE_EVENTS` counterpart (`draft`/`awaiting-approval`/`approved`/
+`implementing`/`verifying` onto `proposed`/`active` — the other four terminal states already match
+verbatim) onto a total, unambiguous mapping, pinned by its own coverage test. Not yet landed/verified
+as of this checkpoint.
+
+**Remaining open (11 of 157, pending the above landing):** Class B —
+P-AC-11 (`lifecycleEvents` in flight, `conflictPolicy` still needs a fuller PO options brief),
+H-AC-12 (Git-guard override reader, needs a TP-5 window), A-AC-01 (already corrected via the
+2026-08-17 fork commit, listed here only pending a final confirmatory pass), A-AC-05 (producer
+dispatch not yet fired, bundle with A-AC-01 per checkpoint 7), L-AC-01 (5 buildable kinds:
+verification/review/gate/recovery/reconciliation, plus the separate candidate-invalidation
+capability), EPIC-AC-02 (TP-3 window + dispatch). Class P — H-AC-11 (increment-1 continues:
+dispatch 1b CLI wiring), PX0-AC-13 (8-member action-family build), EPIC-AC-01/03/04/05
+(end-of-epic ceremony, bundled with H-AC-11's spec §6.1 amendment).
+
+**Next steps:** (1) wait for `PHX-WP-PAC11-LIFECYCLEEVENTS`'s task-notification, independently
+re-verify (sync `.git/phx-verify`, re-run the adapter+policy test files, confirm the mapping is total
+by reading the new pinned test), update the evidence map, commit; (2) continue down the Class-B
+queue in the order above. All future dispatches: no `model` override (configured `sonnet` routing)
+unless an exceptional, explicitly-justified case arises. All chat/AskUserQuestion text in German.
+
+---
+
+## CHECKPOINT — 2026-08-17, continued again (7): 12/157 open (was 15), PO drove "everything from Phoenix must close" — five criteria closed this round, H-AC-11 increment-1 builders landed, remaining PO decisions and dispatch queue recorded
 
 **Since checkpoint (6):** the PO stated the standing goal explicitly — "everything from Phoenix
 must be closed", superseding the earlier default of leaving PO-architecture questions parked
