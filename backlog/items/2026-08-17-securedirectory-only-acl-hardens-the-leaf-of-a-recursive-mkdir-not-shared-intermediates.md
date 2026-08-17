@@ -96,3 +96,30 @@ in the wrong place.
   as closed.
 - **Assignment:** unassigned.
 - **Date:** 2026-08-17
+
+### Progress, 2026-08-17 (later, overnight AFK block) — NVA-PAWINACL-2 landed, Windows re-confirmation still outstanding
+
+Dispatched and independently re-verified: commit `a98bcb98`.
+`secureDirectory()` now records every missing path component before
+`mkdirSync(recursive:true)` creates them, then applies the same
+harden/assess treatment to each one (direction 1 from the Proposal above),
+mirroring `ensurePhysicalPrivateDirectory()`'s existing walk. Two new
+regression tests (`human-guard-override.test.mjs`) prove both the
+multi-component case and that an already-secure existing parent is only
+assessed, never re-hardened. The secondary fix also landed:
+`publishReceipt()`'s catch-all now returns `PO-PROFILE-RECEIPT-DIRECTORY-INSECURE`
+for a DACL-insecure directory specifically, distinct from the generic
+write-failed code (`po-gate-profile-publisher.mjs`/`.test.mjs`, one new
+regression test, exercised via a locally-scoped `process.platform`
+override since `ensurePhysicalPrivateDirectory()` has no dependency-injection
+seam for the Windows primitives — disclosed as a deviation, not hidden).
+`node --test` on both touched suites: green except the known, pre-existing
+`HGO-EXTERNAL-MARKETPLACE` class (5 failures, identical to every other run
+this session, unrelated to this diff).
+
+**Stays open** for exactly the caveat already stated above: this cannot be
+live-verified on real Windows from this host. Whoever next runs a native
+Windows session against this candidate should re-run the triggering
+situation (a cross-platform-created `.git/agent-pipeline/` followed by a
+`po-gate-profile-repair.mjs apply`) and confirm the fix before this item is
+actually closed.
