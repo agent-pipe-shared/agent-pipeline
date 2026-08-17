@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 05e6f1fe9ffa254841373bdc7a801aec9f1bffe8
+closure_evidence: backlog/items/2026-08-07-codex-critic-isolation-fixture-rejects-merge-commit-head.md
 source: "Discovered running harness/scripts/verify.mjs against the NOVA-GMW-1 merge commit 8bc5ceb (first real merge commit into this repository's live main-branch history), 2026-08-07."
 due: 2026-09-06
 expires: 2026-09-06
@@ -100,3 +104,24 @@ capacity:
 Direction 1 (synthetic single-parent test fixture): the test file builds its
 own single-parent fixture commit instead of depending on this repository's
 real live HEAD shape. Dispatched.
+
+### Closure, 2026-08-17 — already fixed before this dispatch ran
+
+`NVA-TRIAGEFIX-1`'s sub-task A found, before writing any code, that this was
+already fixed on 2026-08-11/12 by commits `33f6734f6e4fefca2af04818db658873bcc57c83`
+("test(codex-critic): bind isolation fixtures to a synthetic single-parent
+candidate") and `05e6f1fe9ffa254841373bdc7a801aec9f1bffe8` ("test(codex-critic-
+isolation): add permanent merge-head rejection regression test") — both on this
+branch, both predating this item's closure but landing after its 2026-08-07
+filing. Every `candidateCommit` derivation in
+`codex-critic-isolation.test.mjs` now uses `syntheticRepo()`/
+`candidateFixtureRepo()` helpers (lines 899-912, 1115-1139) instead of this
+repository's live HEAD; `buildExactFixture`'s single-parent requirement
+itself is unchanged. Verified live: `node --test plugins/pipeline-core/
+scripts/codex-critic-isolation.test.mjs` — 58/58 passed, exit 0.
+
+This item's own 2026-08-17 re-verification (the full-backlog triage pass,
+batch 1) checked only whether `buildExactFixture`'s requirement had changed
+(it had not) and missed that the TEST FILE's own derivation had been fixed
+separately — a real miss, not a hypothetical one; caught only because the
+dispatched fix attempt read the code before writing anything.

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.backlog-ledger-baseline-migration-commit-unreachable
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: d16c734572d141ed19bc6a695d24278930b07dac
+closure_evidence: backlog/items/2026-08-11-backlog-ledger-baseline-migration-commit-unreachable.md
 source: "Full Verify's backlog-state-check, recurring throughout the 2026-08-11 AFK block, finally investigated directly on Stop-hook challenge."
 due: 2026-09-10
 expires: 2026-09-10
@@ -121,3 +125,34 @@ Option 1 (accept and document): a fixed, one-time-checked allowlist of the
 38 known-unreachable legacy evidence-commit triples
 (commit/actor/evidence.kind), so `check-backlog-state.mjs` stops re-flagging
 them as fresh drift every run. No new ledger event. Dispatched.
+
+### Closure, 2026-08-17 — superseded by a general mechanism already built and closed one item over
+
+`NVA-TRIAGEFIX-1`'s sub-task B stopped before writing code: the *substance*
+of the PO-approved Option 1 was already implemented, on 2026-08-16, by
+`2026-08-16-ledger-drift-classification-has-no-reachability-cutoff.md`
+(closed same day as this one, commit `d16c734572d141ed19bc6a695d24278930b07dac`)
+— that item's own body explicitly names this item as the historical case its
+fix accepts. `backlog-state.mjs`'s `BACKLOG_FINDING_SEVERITY`
+classification (introduced by `NVA-LEDGER-B`, 2026-08-16,
+`backlog-state.mjs:787-800`) reclassifies an unreachable-`evidence.commit`
+finding as DRIFT (reported, non-blocking) rather than INTEGRITY (blocking),
+with `LEDGER_DRIFT_CUTOFF_SEQUENCE = 417` re-tightening it back to INTEGRITY
+for anything appended after the historical batch. This is WHY every
+`check-backlog-state.mjs` run this session has shown the 38 baseline-
+migration events as `DRIFT`, never `FAIL` — the gate this item worried about
+was already fixed before this item was re-triaged today.
+
+**The PO-approved Option 1 (a literal per-event allowlist) would have been a
+regression, not a fix:** the code comment at `backlog-state.mjs:796-798`
+records that a hand-pinned exception was already tried once before
+(`f3ac7cfd`) and replaced by this shape-based classification specifically
+because a fixed allowlist doesn't generalize and "never silently swallowed"
+is a deliberate design position — new findings must still show. Not
+implemented, correctly — the dispatch stopped rather than building the
+regression. This item's own re-triage on 2026-08-17 (batch 1 of the
+full-backlog triage) should have cross-referenced the sibling item's own
+text (which names this one) and closed this one that same day; it did not,
+and the miss propagated into a PO decision built on an incomplete premise.
+Caught only because the dispatched fix attempt read the code before writing
+anything, exactly the discipline this repository asks of every dispatch.
