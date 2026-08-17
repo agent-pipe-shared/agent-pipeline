@@ -39,7 +39,7 @@ import test from "node:test";
 import { authorizeCriticalPushCommand, parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
-import { createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 // Namespace import ON PURPOSE (same reason as in lib/guard-maintenance-window.test.mjs):
@@ -421,6 +421,114 @@ test("authorize-critical states what it is about to authorize -- and what it doe
     }
     assert.match(prompt, /does not cover/iu, "the disclosure must state what the approval does NOT cover");
     assert.match(prompt, /type exactly "approve"/iu, "the existing typed-token gate must still be the last thing asked");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+/* ------------------------------------------------------------------ *
+ * ADR-0064: release-preflight as a fourth critical-action kind, and the
+ * additive --subject preimage input (kind-agnostic, but load-bearing for
+ * this kind's confirmation disclosure).
+ * ------------------------------------------------------------------ */
+
+const RELEASE_PREFLIGHT_SUBJECT = Object.freeze({
+  schema: "pipeline.release-preflight-consent-subject.v1",
+  version: "1.4.0",
+  base: { commit: "e".repeat(40), tree: "f".repeat(40) },
+  lifecycle: { featureId: "nova-a6", manifestPath: "specs/nova-a6/lifecycle.json", manifestSha256: "1".repeat(64) },
+  retentionPolicySha256: "2".repeat(64),
+});
+
+test("authorize-critical --kind release-preflight with --subject derives --subject-sha256 and shows the decoded subject plus the kind-specific scope sentence", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    writeFileSync(join(dirs.repoRoot, "subject.json"), `${JSON.stringify(RELEASE_PREFLIGHT_SUBJECT, null, 2)}\n`);
+    const expiresAt = futureExpiry();
+    const expected = criticalActionSubjectSha256({ kind: "release-preflight", candidate: CANDIDATE, subject: RELEASE_PREFLIGHT_SUBJECT });
+    const prompts = [];
+    const result = runHumanApproval([
+      "authorize-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
+      "--kind", "release-preflight", "--subject", "subject.json", "--expires-at", expiresAt,
+    ], {
+      observeCandidate: () => ({ ...CANDIDATE }),
+      readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+    });
+    assert.equal(result.ok, true);
+    assert.equal(result.action.subjectSha256, expected, "--subject-sha256 must be DERIVED from --subject, not left unset");
+    assert.equal(prompts.length, 1);
+    const [prompt] = prompts;
+    assert.ok(prompt.includes(RELEASE_PREFLIGHT_SUBJECT.version), "must decode the release version");
+    assert.ok(prompt.includes(RELEASE_PREFLIGHT_SUBJECT.base.commit), "must decode the base commit");
+    assert.ok(prompt.includes(RELEASE_PREFLIGHT_SUBJECT.lifecycle.featureId), "must decode the lifecycle feature id");
+    assert.ok(prompt.includes(RELEASE_PREFLIGHT_SUBJECT.lifecycle.manifestPath), "must decode the lifecycle manifest path");
+    assert.ok(prompt.includes(RELEASE_PREFLIGHT_SUBJECT.lifecycle.manifestSha256), "must decode the lifecycle manifest sha256");
+    assert.ok(prompt.includes(RELEASE_PREFLIGHT_SUBJECT.retentionPolicySha256), "must decode the retention policy sha256");
+    assert.match(prompt, /not a release, not a publication authorization/u, "must state the kind-specific scope sentence");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical --subject refuses a --subject-sha256 that disagrees with the digest it recomputes, before any prompt or write", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    writeFileSync(join(dirs.repoRoot, "subject.json"), `${JSON.stringify(RELEASE_PREFLIGHT_SUBJECT, null, 2)}\n`);
+    let confirmationAsked = false;
+    const dependencies = {
+      observeCandidate: () => ({ ...CANDIDATE }),
+      readConfirmation: () => { confirmationAsked = true; return "approve"; },
+    };
+    assert.throws(
+      () => runHumanApproval([
+        "authorize-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
+        "--kind", "release-preflight", "--subject", "subject.json",
+        "--subject-sha256", subjectDigest("wrong-subject-digest"), "--expires-at", futureExpiry(),
+      ], dependencies),
+      /--subject-sha256 does not match the digest computed from --subject/u,
+    );
+    assert.equal(confirmationAsked, false);
+    assert.equal(existsSync(criticalArtifacts(dirs, "release-preflight").request), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical --kind release-preflight without --subject still states the kind-specific scope sentence, undecoded", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const expiresAt = futureExpiry();
+    const prompts = [];
+    runHumanApproval(criticalArgv("authorize-critical", dirs, { kind: "release-preflight", subjectSha256: subjectDigest("bare-digest-only"), expiresAt }), {
+      observeCandidate: () => ({ ...CANDIDATE }),
+      readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; },
+    });
+    assert.equal(prompts.length, 1);
+    assert.match(prompts[0], /not a release, not a publication authorization/u, "the scope sentence is a fact about the KIND, shown even without a decoded preimage");
+    assert.ok(!prompts[0].includes("release version:"), "nothing to decode without --subject: no field lines invented");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical --subject is kind-agnostic: it works unchanged for --kind push too", () => {
+  const dirs = criticalDirs();
+  try {
+    keyFixture(dirs.directory);
+    const pushSubject = { source: CANDIDATE.commit, remote: "origin", destination: "refs/heads/main" };
+    writeFileSync(join(dirs.repoRoot, "push-subject.json"), `${JSON.stringify(pushSubject, null, 2)}\n`);
+    const expected = criticalActionSubjectSha256({ kind: "push", candidate: CANDIDATE, subject: pushSubject });
+    const result = runHumanApproval([
+      "authorize-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--feature-id", FEATURE_ID, "--plan", PLAN, "--spec", SPEC,
+      "--kind", "push", "--subject", "push-subject.json", "--expires-at", futureExpiry(),
+    ], { observeCandidate: () => ({ ...CANDIDATE }), readConfirmation: () => "approve" });
+    assert.equal(result.action.subjectSha256, expected);
   } finally {
     cleanup(dirs);
   }

@@ -24,7 +24,7 @@ import { fileURLToPath } from "node:url";
 
 import { approvalRequestFromExternalJson, observeCleanCandidate, run as runApprovalRequest } from "./po-approval-request.mjs";
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
-import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { CRITICAL_ACTION_KINDS, criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
@@ -32,7 +32,7 @@ import { boundedOpaqueCopyCommand, renderProjectOnboardingAction } from "../lib/
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
 // PIPELINE_GUARD_OVERRIDE, PIPELINE_LIVE_CERTIFICATION_AUTHORITY,
 // PIPELINE_SECURITY_REVIEWER_ID elsewhere in this plugin); PO_APPROVAL_DIRECTORY
@@ -282,7 +282,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   // GF-104: keyReference always carries a default ("local-po-key") even when the
@@ -500,7 +500,10 @@ function requireExplicitConfirmation(summaryLines, dependencies, language = DEFA
 function criticalRequestFieldError(args) {
   if (!text(args.plan)) return "critical approval request is invalid: --plan is required and must be a repository-relative path";
   if (!text(args.spec)) return "critical approval request is invalid: --spec is required and must be a repository-relative path";
-  if (!SHA.test(args.subjectSha256 ?? "")) return "critical approval request is invalid: --subject-sha256 must be exactly 64 lowercase hexadecimal characters";
+  // ADR-0064 Decision 4: with --subject supplied, resolveSubjectPreimage() (below) has
+  // already derived args.subjectSha256 from it before this runs, so the general shape
+  // check is unconditional here -- only WHERE the digest came from differs by caller.
+  if (!SHA.test(args.subjectSha256 ?? "")) return "critical approval request is invalid: --subject-sha256 must be exactly 64 lowercase hexadecimal characters, or supply --subject <repo-relative-path> to derive it";
   if (!text(args.expiresAt)) return "critical approval request is invalid: --expires-at is required";
   const expiresAtMs = Date.parse(args.expiresAt);
   if (!Number.isFinite(expiresAtMs)) return `critical approval request is invalid: --expires-at is not a parsable timestamp: ${JSON.stringify(args.expiresAt)}`;
@@ -509,22 +512,89 @@ function criticalRequestFieldError(args) {
 }
 
 /**
+ * ADR-0064 Decision 4: the one additive, kind-agnostic input. When --subject is
+ * supplied, its bytes -- read through the same `readPublicRepositoryFile` primitive
+ * --plan/--spec already use -- are the JSON preimage `criticalActionSubjectSha256` is
+ * computed over. The digest is REBUILT from that preimage and the observed candidate,
+ * never trusted from a caller-supplied --subject-sha256: a --subject-sha256 supplied
+ * alongside --subject must agree with the rebuilt digest or the request is refused.
+ * Kind-agnostic because `criticalActionSubjectSha256` itself is: this never inspects
+ * the preimage's own shape, so it works unchanged for `push`/`deploy`/`publication`
+ * subjects too, not only for `release-preflight`.
+ *
+ * Mutates `args.subjectSha256` in place, mirroring `criticalRequestFieldError`'s own
+ * existing `--expires-at` normalization -- so every downstream reader of `args` sees
+ * the one derived value, never the caller's omitted one.
+ */
+function resolveSubjectPreimage({ args, repository, candidate }) {
+  if (!text(args.subject)) return null;
+  let bytes;
+  try { bytes = readPublicRepositoryFile(repository, args.subject); }
+  catch { fail("critical approval request is invalid: --subject could not be read as a repository-relative file"); }
+  let preimage;
+  try { preimage = JSON.parse(bytes.toString("utf8")); }
+  catch { fail("critical approval request is invalid: --subject must be valid JSON"); }
+  let computed;
+  try { computed = criticalActionSubjectSha256({ kind: args.kind, candidate, subject: preimage }); }
+  catch { fail("critical approval request is invalid: --subject could not be hashed for this --kind"); }
+  if (text(args.subjectSha256) && args.subjectSha256 !== computed) {
+    fail(`critical approval request is invalid: --subject-sha256 does not match the digest computed from --subject (expected ${computed})`);
+  }
+  args.subjectSha256 = computed;
+  return preimage;
+}
+
+/**
  * The one construction of a critical request, shared by the agent-facing
  * `prepare-critical` and the human-facing `authorize-critical`. Deliberately a
  * single call site of `createCriticalActionApprovalRequest`: a second way of
  * building the intent digest would be a second definition of the binding, and
  * it would agree right up until the moment it did not.
+ *
+ * Returns `subjectPreimage` alongside `request` (null unless --subject was supplied)
+ * so a caller that wants to *show* the human what they are approving -- only
+ * `authorize-critical` does -- has it, without re-reading or re-parsing the file.
  */
 function criticalApprovalRequest({ args, repository, featureId, dependencies }) {
+  const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);
+  const subjectPreimage = resolveSubjectPreimage({ args, repository, candidate });
   const invalid = criticalRequestFieldError(args);
   if (invalid) fail(invalid);
-  return createCriticalActionApprovalRequest({
-    candidate: (dependencies.observeCandidate ?? observeCleanCandidate)(repository),
+  const request = createCriticalActionApprovalRequest({
+    candidate,
     featureId,
     planBytes: readPublicRepositoryFile(repository, args.plan),
     specBytes: readPublicRepositoryFile(repository, args.spec),
     action: { kind: args.kind, subjectSha256: args.subjectSha256, expiresAt: args.expiresAt },
   });
+  return { request, subjectPreimage };
+}
+
+/**
+ * ADR-0061 Decision 4 requires the command's own output to state what is being
+ * approved; a bare digest is adequate for `push` only because
+ * `docs/push-release-flow.md:103-110` documents that shape out of band (ADR-0064
+ * Decision 4). For `release-preflight` it is not, so this decodes the subject
+ * preimage (when --subject supplied one) and always states the kind-specific scope
+ * -- true of the KIND itself, not of any one preimage, so it is shown even when no
+ * preimage was supplied (a bare --subject-sha256 invocation still needs to hear it).
+ */
+function releasePreflightConfirmationLines(kind, subjectPreimage) {
+  if (kind !== "release-preflight") return [];
+  const decoded = subjectPreimage !== null && typeof subjectPreimage === "object" && !Array.isArray(subjectPreimage)
+    ? [
+      `release version: ${subjectPreimage.version}`,
+      `base commit: ${subjectPreimage.base?.commit}`,
+      `lifecycle feature id: ${subjectPreimage.lifecycle?.featureId}`,
+      `lifecycle manifest path: ${subjectPreimage.lifecycle?.manifestPath}`,
+      `lifecycle manifest sha256: ${subjectPreimage.lifecycle?.manifestSha256}`,
+      `retention policy sha256: ${subjectPreimage.retentionPolicySha256}`,
+    ]
+    : [];
+  return [
+    ...decoded,
+    "this consents that a release attempt for the candidate above may be prepared and taken to the independently operated final gates; it is not a release, not a publication authorization, and not a pass of any of those gates.",
+  ];
 }
 
 /**
@@ -740,7 +810,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     // Fail closed on missing key material before anything is written or observed:
     // there is no point preparing a request this terminal could not sign.
     if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before authorize-critical");
-    const request = criticalApprovalRequest({ args, repository, featureId, dependencies });
+    const { request, subjectPreimage } = criticalApprovalRequest({ args, repository, featureId, dependencies });
     // Written before the prompt, and only ever the request built above: any file
     // already sitting at this path is overwritten, never read, so a stale request
     // has no path to a signature.
@@ -754,6 +824,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       `action expires at: ${request.action.expiresAt}`,
       `feature id: ${featureId}`,
       `approval intent sha256: ${intentSha256}`,
+      ...releasePreflightConfirmationLines(request.action.kind, subjectPreimage),
       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
     ], dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
@@ -761,7 +832,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   }
   if (args.command === "prepare" || args.command === "prepare-critical") {
     if (critical) {
-      const request = criticalApprovalRequest({ args, repository, featureId, dependencies });
+      const { request } = criticalApprovalRequest({ args, repository, featureId, dependencies });
       write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
       return { ok: true, code: "PO-HUMAN-CRITICAL-REQUEST-READY", candidate: request.candidate, intentSha256: request.approvalIntent.sha256, action: request.action };
     }
