@@ -2094,6 +2094,58 @@ test("NVA-LCREADONLY-1: partial lifecycle admits exactly mkdir scratch and the f
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// NVA-LCREADONLY-2 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-
+// tmp-fallback.md): the Critic-found major from NVA-LCREADONLY-1 -- the narrow diagnosis
+// lane above existed but was undiscoverable, because the denial a `partial` session actually
+// reads never named it. This proves the denial message itself now names both admitted
+// actions when, and only when, typedLifecycleStatus is exactly "partial" -- every other
+// status (restart-required and the untyped/null case) keeps the prior two-line message,
+// byte-for-byte, with no leaked mention of the diagnosis lane.
+test("NVA-LCREADONLY-2: partial denial names the diagnosis lane; other statuses stay unchanged", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+
+    // A denied write that does NOT match the admitted lane still refuses, but its own denial
+    // message must now also disclose the lane a stuck session could otherwise never find.
+    const partialResult = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(partialResult.exitCode, 2);
+    assert.match(partialResult.stderr, /Pipeline session readiness is partial\./u);
+    assert.match(
+      partialResult.stderr,
+      /Re-run the typed project-onboarding-v3 inspection with intent session/u,
+    );
+    assert.match(partialResult.stderr, /creating the repository's own scratch directory/u);
+    assert.match(partialResult.stderr, /writing exactly scratch\/incident-report\.md via Write or Edit/u);
+
+    // restart-required must keep exactly the prior two-line message -- no new text leaked in.
+    const restartResult = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("restart-required"); },
+    });
+    assert.equal(restartResult.exitCode, 2);
+    assert.match(restartResult.stderr, /Pipeline session readiness is restart-required\./u);
+    assert.doesNotMatch(restartResult.stderr, /scratch/u);
+    assert.doesNotMatch(restartResult.stderr, /incident-report/u);
+    assert.doesNotMatch(restartResult.stderr, /diagnosis lane/u);
+
+    // The untyped/null case (an unrecognized status, not in CONTROLLING_NON_READY_STATUSES)
+    // must also keep its own prior message unchanged, with no leaked mention either.
+    const nullResult = evaluateLifecycleReadyGuard(edit("src/other-file.mjs"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("some-status-outside-the-registry"); },
+    });
+    assert.equal(nullResult.exitCode, 2);
+    assert.match(nullResult.stderr, /Pipeline-governed project writes require an exact V4 ready result for session intent\./u);
+    assert.doesNotMatch(nullResult.stderr, /scratch/u);
+    assert.doesNotMatch(nullResult.stderr, /incident-report/u);
+    assert.doesNotMatch(nullResult.stderr, /diagnosis lane/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // GF-078 bug 1: Codex's own write-capable tool is `apply_patch`, whose tool_input carries
 // the whole patch envelope under `command`, never a Claude-shaped `file_path`. Before the
 // fix, isRestartResumeHintInputWrite() gated on WRITE_TOOLS (Edit/Write/NotebookEdit only)

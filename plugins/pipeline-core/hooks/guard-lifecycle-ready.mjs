@@ -292,16 +292,28 @@ function blocked(
       "Pipeline-governed project writes require an exact V4 ready result for session intent.",
       "Re-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.",
     ]
-    : [
-      `Pipeline session readiness is ${typedLifecycleStatus}.`,
-      "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
-    ];
+    : typedLifecycleStatus === "partial"
+      ? [
+        `Pipeline session readiness is ${typedLifecycleStatus}.`,
+        "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
+        // NVA-LCREADONLY-2 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-
+        // and-tmp-fallback.md): NVA-LCREADONLY-1 admitted this narrow diagnosis lane but never
+        // named it in the denial a blocked session actually reads, so a stuck session had no
+        // way to discover it existed. Named here, conditional on exactly `partial` -- every
+        // other status keeps the two-line message above, unchanged.
+        `A narrow diagnosis lane stays admitted while status is partial: creating the `
+          + `repository's own ${PARTIAL_LIFECYCLE_SCRATCH_DIR} directory and writing exactly `
+          + `${PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH} via Write or Edit.`,
+      ]
+      : [
+        `Pipeline session readiness is ${typedLifecycleStatus}.`,
+        "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
+      ];
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + `${code}: `
-      + `${guidance[0]}\n`
-      + `${guidance[1]}\n`,
+      + guidance.map((line) => `${line}\n`).join(""),
   );
 }
 
