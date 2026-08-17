@@ -165,10 +165,16 @@ test("authorize-by-signature reaches authorizeHumanGuardOverrideBySignature() an
 /**
  * NVA-SIGENTRY-1 DoD check 2. `emit-signature-digest` must print the exact digest
  * `authorizeHumanGuardOverrideBySignature()` gates arming on for the identical
- * `(repo, request, plan, reason)` inputs -- proved two ways: (1) it equals `armRequest`'s
+ * `(repo, request, plan)` inputs -- proved two ways: (1) it equals `armRequest`'s
  * own independently-reconstructed `intent.sha256` (built the same way an external signer
  * would, without calling into any of this module's exported helpers), and (2) a proof
  * built over the CLI's printed digest actually arms via `authorize-by-signature`.
+ *
+ * NVA-SIGENTRY-2 F1: no `--reason` flag on this invocation -- the CLI no longer accepts
+ * one at all (see the sibling "no longer accepts a --reason flag" test below), always
+ * using the fixed `HGO_SIGNATURE_REASON` internally. This is the "correct/default reason"
+ * half of the F1 DoD: the digest without a caller-suppliable reason still matches exactly
+ * what the verifier gates arming on.
  */
 test("emit-signature-digest prints the exact digest authorizeHumanGuardOverrideBySignature() gates arming on", () => {
   const root = fixture();
@@ -181,7 +187,6 @@ test("emit-signature-digest prints the exact digest authorizeHumanGuardOverrideB
       "--repo", root,
       "--request-sha256", requestSha256,
       "--plan-sha256", planSha256,
-      "--reason", HGO_SIGNATURE_REASON,
     ], captured);
     assert.equal(status, 0, captured.stderr);
     const value = JSON.parse(captured.stdout);
@@ -214,6 +219,40 @@ test("emit-signature-digest validates its flag set like the sibling subcommands"
   const status = main(["emit-signature-digest", "--repo", "/tmp/does-not-matter"], captured);
   assert.equal(status, 2);
   assert.match(captured.stderr, /HGO-USAGE/u);
+});
+
+/**
+ * NVA-SIGENTRY-2 F1 (Critic blocker survived from NVA-SIGENTRY-1): `emit-signature-digest`
+ * used to accept a `--reason` argument, bind it into the printed digest, and validate it
+ * only for non-emptiness -- so a caller could pass any text and still get a well-formed,
+ * exit-0 digest that `authorizeHumanGuardOverrideBySignature()` (which always signs
+ * against the FIXED `HGO_SIGNATURE_REASON` constant internally, never a caller-supplied
+ * one) would never accept. Fixed by dropping the `--reason` flag from this subcommand
+ * entirely, so there is no caller-suppliable value left to get wrong: the command always
+ * uses `HGO_SIGNATURE_REASON` internally now, exactly like
+ * `authorizeHumanGuardOverrideBySignature()` itself. Proved here with a value that is NOT
+ * `HGO_SIGNATURE_REASON` -- it must never reach the digest-printing branch (any `--reason`
+ * flag, right or wrong, is now simply an unrecognised flag, refused by the same
+ * `exactFlagSet()` usage check as every other unknown flag).
+ */
+test("emit-signature-digest no longer accepts a --reason flag; a non-canonical value never prints a digest and exits non-zero", () => {
+  const root = fixture();
+  try {
+    const { requestSha256, planSha256 } = armRequest(root, { file_path: "notes.md", content: "cli wrong reason\n" });
+    const captured = io();
+    const status = main([
+      "emit-signature-digest",
+      "--repo", root,
+      "--request-sha256", requestSha256,
+      "--plan-sha256", planSha256,
+      "--reason", "not the canonical HGO_SIGNATURE_REASON text",
+    ], captured);
+    assert.equal(status, 2);
+    assert.match(captured.stderr, /HGO-USAGE/u);
+    assert.equal(captured.stdout, "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 /**

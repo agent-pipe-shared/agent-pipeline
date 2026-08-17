@@ -9,6 +9,7 @@ import {
   authorizeHumanGuardOverride,
   authorizeHumanGuardOverrideBySignature,
   buildHumanGuardOverrideSignatureIntent,
+  HGO_SIGNATURE_REASON,
   HumanGuardOverrideError,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
@@ -24,7 +25,7 @@ function usage() {
     "Usage:",
     "  guard-human-override.mjs plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs prepare-authorization --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --reason <text> [--author-source-root <absolute-root>]",
-    "  guard-human-override.mjs emit-signature-digest --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --reason <text> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs emit-signature-digest --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs authorize --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --selection-sha256 <64hex> --reason <text> --reason-sha256 <64hex> [--author-source-root <absolute-root>] --activate",
     "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
@@ -138,20 +139,32 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
     // `authorizeHumanGuardOverrideBySignature()` gates arming on
     // (buildHumanGuardOverrideSignatureIntent()) -- so this prints provably the same
     // value the verifier checks, never a second, independently-reconstructed one.
+    //
+    // NVA-SIGENTRY-2 F1: no `--reason` flag here at all, deliberately -- there used to be
+    // one, bound into the printed digest and validated only for non-emptiness. Any value
+    // other than the fixed `HGO_SIGNATURE_REASON` constant produced a well-formed, exit-0
+    // digest that `authorizeHumanGuardOverrideBySignature()` would never accept, because
+    // that verifier always signs against the FIXED constant internally (never a
+    // caller-supplied reason) -- see its own call to `prepareHumanGuardOverrideAuthorization()`
+    // a few lines below `reason: HGO_SIGNATURE_REASON` in the library. A caller-suppliable
+    // reason here was therefore never a real choice, only a way to get the digest wrong
+    // silently. Dropping the flag (rather than accepting it and rejecting non-canonical
+    // values) removes the whole caller-suppliable surface: there is no value left to get
+    // wrong, mirroring `authorizeHumanGuardOverrideBySignature()`'s own signature, which
+    // never took a `reason` parameter either.
     if (command === "emit-signature-digest") {
       const parsed = flags(rest);
-      if (!exactFlagSet(parsed, ["repo", "request-sha256", "plan-sha256", "reason"], ["author-source-root"])
+      if (!exactFlagSet(parsed, ["repo", "request-sha256", "plan-sha256"], ["author-source-root"])
         || typeof parsed.repo !== "string"
         || !SHA256.test(parsed["request-sha256"] ?? "")
-        || !SHA256.test(parsed["plan-sha256"] ?? "")
-        || typeof parsed.reason !== "string" || parsed.reason.trim() === "") throw new Error(usage());
+        || !SHA256.test(parsed["plan-sha256"] ?? "")) throw new Error(usage());
       const authorSourceRoot = parsed["author-source-root"] ?? null;
       const prepared = prepareHumanGuardOverrideAuthorization({
         rootDir: parsed.repo,
         pluginRoot: PLUGIN_ROOT,
         requestSha256: parsed["request-sha256"],
         planSha256: parsed["plan-sha256"],
-        reason: parsed.reason,
+        reason: HGO_SIGNATURE_REASON,
         scriptPath: SCRIPT,
         authorSourceRoot,
       });
