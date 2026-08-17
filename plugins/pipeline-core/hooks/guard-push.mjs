@@ -130,6 +130,7 @@ import { criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/cri
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { checkExternalPushLedgerConsumption, externalPushLedgerGate } from "../lib/external-push-ledger.mjs";
+import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "../lib/git-cmd.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -1634,6 +1635,65 @@ if (pushGate.approval === "standing-approved") {
           forCommit ?? null,
         )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name> --remote <remote> --destination <full-ref>. NOTE: with gates.push.approval "required" this state record is NECESSARY BUT NOT SUFFICIENT -- the critical-proof check below is independent and also applies. A pushApproval in mutable state is never executable authority on its own.`,
       );
+    }
+    // H-AC-12 dual-evaluation, wired in `lib/change-control.mjs`'s exact opt-in shape: this
+    // block is reached ONLY when the recorded approval carries a `decisionReference` key at
+    // all (`Object.hasOwn`, same test `evaluateChangeControlGate` uses for its optional
+    // `pipelineAuthority.decisionReference`). Absent -- which is every approval any writer
+    // produces today -- nothing here runs and check (c) stays byte-for-byte what it was.
+    //   `legacyOk` is the pre-existing commit-bound record verdict computed immediately
+    // above (`forCommit === sourceCommit`), NOT a hardcoded true: it can be false, so the
+    // two readers can genuinely disagree in EITHER direction and both directions fail closed.
+    //   The second reader resolves the canonical decision reference against what this guard
+    // can independently observe about the push actually being attempted: its candidate commit
+    // AND tree (the legacy record binds the commit only), and the repository fingerprint of
+    // the governed session root. `fallbackProjectDir()`, never `projectDir` -- reading the
+    // fingerprint from the PUSHED repository would let a nested target repository mint its own
+    // anchor, the same T6-F1 root cause the ADR-0055 waiver below and the external-ledger
+    // check already read from the session root for.
+    //   Shape validation lives inside the shared primitive (`isDecisionReference`), which
+    // resolves a malformed reference as "the second reader disagrees" instead of throwing:
+    // an uncaught throw in this hook exits 1, which this hook's harness treats as ALLOW,
+    // silently discarding every other accumulated failure (same reasoning as the
+    // `discoverRepository` catch below). The compatibility owner and expiry are read off the
+    // evaluation result and named in the operator-visible failure, per H-AC-12's second
+    // sentence -- carried, not silently enforced as a cutover (see the primitive's header).
+    if (approval !== null && typeof approval === "object" && Object.hasOwn(approval, "decisionReference")) {
+      const evaluation = dualEvaluateDecisionReference({
+        legacyOk: Boolean(forCommit) && forCommit === sourceCommit,
+        reference: approval.decisionReference,
+        resolveReference: (reference) => {
+          const referenceTree = resolveSourceTree();
+          if (referenceTree === null) return false; // candidate unresolvable -> cannot confirm
+          let fingerprint;
+          try {
+            const repository = discoverRepository(fallbackProjectDir(), { timeout: 5000 });
+            fingerprint = derivePoGateRepositoryFingerprint({
+              gitCommonDir: repository.commonDir,
+              primaryRoot: repository.primaryRoot,
+            });
+          } catch {
+            return false; // topology unresolved -> the second reader cannot confirm -> disagreement
+          }
+          return reference.candidate.commit === sourceCommit
+            && reference.candidate.tree === referenceTree
+            && reference.checkpoint.repositoryFingerprint === fingerprint;
+        },
+      });
+      if (!evaluation.ok) {
+        // Operand text is deliberately NOT interpolated (SEC-01, same as the attestation
+        // failure below): only booleans and the compatibility metadata travel into the
+        // transcript.
+        failures.push(
+          "Push approval decision reference disagrees with the recorded approval "
+          + `(H-AC-12 dual-evaluation: legacy=${evaluation.legacyOk}, decision-reference=${evaluation.ledgerOk}; `
+          + `compatibility owner "${evaluation.compat.owner}", expiry `
+          + `${new Date(evaluation.compat.expiresAtEpochMs).toISOString()}). The canonical decision ID must `
+          + "reference and validate THIS candidate commit, tree and repository before the push becomes "
+          + "effective. Re-record it: node harness/scripts/pipeline-state.mjs approve-push ... "
+          + "--decision-reference <repo-relative-json>.",
+        );
+      }
     }
     // ADR-0055: the project may stand the private-key proof down for `push` with an
     // explicit, reasoned waiver. The human gate itself still applies — the approval

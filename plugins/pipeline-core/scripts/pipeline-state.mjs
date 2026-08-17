@@ -314,6 +314,7 @@ import {
   appendExternalPushLedgerConsumption,
   externalPushLedgerGate,
 } from "../lib/external-push-ledger.mjs";
+import { dualEvaluateDecisionReference } from "../lib/decision-reference-dual-evaluation.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {
   applyLegacyV2RevocationRecovery,
@@ -944,6 +945,69 @@ function readContinuityRequest(dir, requestFile) {
   } catch {
     return { ok: false, code: "PS-CONTINUITY-REQUEST" };
   }
+}
+
+/**
+ * H-AC-12's dual-evaluation for the two commands that GRANT human authority from this CLI
+ * (`approve-push`, `approve-deploy`). ONE body rather than duplicated per command, mirroring
+ * how `hooks/guard-devplan.mjs` keeps a single `resolveHumanDecisionReadback` for its own two
+ * callers, and shaped exactly like `lib/change-control.mjs`'s optional `decisionReference`:
+ * strictly opt-in, so an invocation that passes no `--decision-reference` never reaches this
+ * function and both commands behave byte-for-byte as they did before.
+ *
+ * `legacyOk` is `true` because every caller invokes this only AFTER all of its pre-existing
+ * checks have passed (policy, flags, candidate, proof verification, replay) and BEFORE its
+ * first mutation -- the same "this point is only reached once the legacy verdict already
+ * holds" contract guard-devplan.mjs's generalized path documents.
+ *
+ * The second, decision-anchored reader binds the canonical reference to what this process can
+ * independently observe about the action actually being recorded: the candidate commit AND
+ * tree, plus the repository fingerprint derived from the real Git topology. An unresolvable
+ * topology returns `false` (disagreement -> fail closed), never a pass-through.
+ */
+function evaluateOptInDecisionReference(dir, requestFile, candidate) {
+  const path = safeRequestFile(dir, requestFile);
+  if (path === null) return { ok: false, code: "DECISION-REFERENCE-FILE" };
+  let reference;
+  try { reference = JSON.parse(readFileSync(path, "utf8")); } catch { return { ok: false, code: "DECISION-REFERENCE-UNREADABLE" }; }
+  // A reference that cannot be read must NEVER degrade into "no reference was supplied": the
+  // shared primitive treats null/undefined as "no second reader consulted" and returns the
+  // legacy verdict unchanged, so an unreadable or non-object file is refused HERE -- otherwise
+  // a broken file would silently buy back the exact single-evaluation path this criterion closes.
+  if (reference === null || typeof reference !== "object" || Array.isArray(reference)) {
+    return { ok: false, code: "DECISION-REFERENCE-UNREADABLE" };
+  }
+  const evaluation = dualEvaluateDecisionReference({
+    legacyOk: true,
+    reference,
+    resolveReference: (ref) => {
+      let fingerprint;
+      try {
+        const repository = discoverRepository(dir, { timeout: 5000 });
+        fingerprint = derivePoGateRepositoryFingerprint({
+          gitCommonDir: repository.commonDir,
+          primaryRoot: repository.primaryRoot,
+        });
+      } catch {
+        return false; // topology unresolved -> the second reader cannot confirm -> disagreement
+      }
+      return ref.candidate.commit === candidate.commit
+        && ref.candidate.tree === candidate.tree
+        && ref.checkpoint.repositoryFingerprint === fingerprint;
+    },
+  });
+  if (!evaluation.ok) {
+    return {
+      ok: false,
+      code: "DECISION-REFERENCE-DISAGREEMENT",
+      // H-AC-12's second sentence: the shared compatibility owner and expiry are carried on
+      // the evaluation result and surfaced to the operator, never left implicit in a comment.
+      detail: `legacy=${evaluation.legacyOk}, decision-reference=${evaluation.ledgerOk}, `
+        + `compatibility owner "${evaluation.compat.owner}", expiry `
+        + `${new Date(evaluation.compat.expiresAtEpochMs).toISOString()}`,
+    };
+  }
+  return { ok: true, reference };
 }
 
 function hashBoundRepoFile(dir, binding, maxBytes = 1_048_576) {
@@ -6814,9 +6878,16 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       const pushWaived = pushMode.waived === true;
-      const expectedFlags = pushWaived
-        ? new Set(["by", "remote", "destination"])
-        : new Set(["by", "remote", "destination", "proof-request", "proof-authority", "proof"]);
+      // H-AC-12: `--decision-reference` is an OPTIONAL flag, admitted into the exact-flag set
+      // ONLY when the caller actually passed it. `parseExactFlags` requires every named flag to
+      // be PRESENT (`Object.keys(out).length === names.size`), so admitting it unconditionally
+      // would break every existing invocation -- presence detection keeps the absent case's
+      // flag set, parse result, approval record and state write byte-for-byte unchanged.
+      const decisionReferenceRequested = rest.includes("--decision-reference");
+      const pushBaseFlags = pushWaived
+        ? ["by", "remote", "destination"]
+        : ["by", "remote", "destination", "proof-request", "proof-authority", "proof"];
+      const expectedFlags = new Set(decisionReferenceRequested ? [...pushBaseFlags, "decision-reference"] : pushBaseFlags);
       const parsed = parseExactFlags(rest, expectedFlags);
       const by = parsed.value?.by;
       if (!parsed.ok || isBlank(by)) {
@@ -6863,10 +6934,26 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error("Error: approve-push refused (CRITICAL-PROOF-REPLAY); external proof was already consumed.");
         return 2;
       }
+      // H-AC-12: the canonical decision ID is referenced and validated HERE -- after every
+      // pre-existing check has passed and before the first mutation, since the grant becomes
+      // effective only at `writeState` below. Refusing at this point leaves zero mutation.
+      let decisionReference;
+      if (decisionReferenceRequested) {
+        const decision = evaluateOptInDecisionReference(dir, parsed.value["decision-reference"], observed);
+        if (!decision.ok) {
+          console.error(`Error: approve-push refused (${decision.code})${decision.detail === undefined ? "" : `; ${decision.detail}`}; human authority was NOT recorded.`);
+          return 2;
+        }
+        decisionReference = decision.reference;
+      }
       // The record states on its face what backed it: a consumed proof, or the waiver
       // and its reason. There is no third, unlabelled state.
       const approvalRecord = { approvedBy: by, approvedAt, forCommit: head.commit, criticalProof: verified.proof, remote, destination, threatModel: threatModelBinding };
       if (verified.waived !== undefined) approvalRecord.criticalProofWaiver = verified.waived;
+      // Written only when one was supplied and validated, so `hooks/guard-push.mjs`'s own
+      // opt-in dual-evaluation (its check (c)) has the reference to re-validate at read time.
+      // Absent, the record is byte-identical to what this command wrote before.
+      if (decisionReference !== undefined) approvalRecord.decisionReference = decisionReference;
       const next = {
         ...base,
         schema: SCHEMA_ID,
@@ -7051,9 +7138,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       // question — "is the proof still demanded" is. Keying off requiredKinds alone
       // would force the operator to pass three proof paths that are never read.
       const deployProofDemanded = policy.requiredKinds.has("deploy") && !policy.waivers?.has("deploy");
-      const expectedFlags = new Set(deployProofDemanded
+      // H-AC-12: optional `--decision-reference`, admitted only when actually passed -- see
+      // approve-push's identical note on why `parseExactFlags` makes unconditional admission a
+      // breaking change, and `evaluateOptInDecisionReference` for the dual-evaluation itself.
+      const decisionReferenceRequested = rest.includes("--decision-reference");
+      const deployBaseFlags = deployProofDemanded
         ? ["env", "artifact", "by", "proof-request", "proof-authority", "proof"]
-        : ["env", "artifact", "by"]);
+        : ["env", "artifact", "by"];
+      const expectedFlags = new Set(decisionReferenceRequested ? [...deployBaseFlags, "decision-reference"] : deployBaseFlags);
       const parsed = parseExactFlags(rest, expectedFlags);
       const env = parsed.value?.env;
       const artifact = parsed.value?.artifact;
@@ -7082,6 +7174,22 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         proof = verified.proof;
         waiver = verified.waived ?? null;
       }
+      // H-AC-12: same consumption point as approve-push -- after every pre-existing check,
+      // before the first mutation (`writeState` below is where the grant becomes effective).
+      let decisionReference;
+      if (decisionReferenceRequested) {
+        const deployCandidate = gitCandidate(dir);
+        if (!deployCandidate.ok) {
+          console.error("Error: approve-deploy refused (DECISION-REFERENCE-CANDIDATE-UNRESOLVED); human authority was NOT recorded.");
+          return 2;
+        }
+        const decision = evaluateOptInDecisionReference(dir, parsed.value["decision-reference"], deployCandidate);
+        if (!decision.ok) {
+          console.error(`Error: approve-deploy refused (${decision.code})${decision.detail === undefined ? "" : `; ${decision.detail}`}; human authority was NOT recorded.`);
+          return 2;
+        }
+        decisionReference = decision.reference;
+      }
       const priorApprovals = Array.isArray(base.deployApprovals) ? base.deployApprovals : [];
       // Labelled, exactly as the push record is: a consumed proof, or the waiver that
       // stood it down. A waived approval must never be byte-identical to one recorded
@@ -7090,6 +7198,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         forArtifact: artifact, forEnvironment: env, approvedBy: by, approvedAt,
         ...(proof === null ? {} : { criticalProof: proof }),
         ...(waiver === null ? {} : { criticalProofWaiver: waiver }),
+        // Absent unless one was supplied and validated -- the entry stays byte-identical then.
+        ...(decisionReference === undefined ? {} : { decisionReference }),
       };
       const next = {
         ...base,
