@@ -55,7 +55,16 @@ Per [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop):
 
 1. Review all items with `status: open` (at a natural session/phase boundary, not mid-execution).
 2. Decide per item: **accept** (note phase/release in the item) / **reject** (rationale in the item, `status: rejected`) / **defer** (`status: deferred`, state the condition).
-3. Merge duplicates: the newer item points to the older one (`merged-into: <filename>`), `status: rejected` with rationale "duplicate of …".
+3. Merge duplicates: close the newer item with `status: closed` and real
+   `closure_commit`/`closure_evidence` fields (the older, canonical item's
+   own path), and open its body with a `**Rejected as a duplicate:**` lead
+   sentence naming the older item and the rationale. There is no
+   `merged-into` frontmatter key and no `status: rejected` value —
+   `parseBacklogItem()`'s frontmatter key regex only accepts
+   `[a-z_]+` (no hyphens, so `merged-into` never parses) and the ledger's
+   status enum only accepts `open`/`in_progress`/`closed` (see
+   `backlog/items/2026-08-17-guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell.md`
+   for a worked example).
 4. When scope is unclear (architecture/guardrail impact, cost, irreversibility): the PO decides, not the Elephant alone (operating-model §2.1).
 5. The triage decision is documented **in the item itself** (section "Triage" in the template) — never only verbally or in chat.
 
