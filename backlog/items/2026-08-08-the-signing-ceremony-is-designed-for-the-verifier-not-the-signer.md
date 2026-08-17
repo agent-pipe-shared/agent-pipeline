@@ -215,3 +215,31 @@ script are NOT covered by NVA-SIGENTRY-1 — still open, tracked as
 follow-ups (a candidate `NVA-SIGDISCLOSE-1` for 2/6/8 plus the humanName
 message split, to run after NVA-SIGENTRY-1 lands to avoid touching
 `po-human-approval.mjs` concurrently).
+
+### Progress, 2026-08-17 — NVA-SIGENTRY-1 landed
+
+Landed and independently re-verified (60/60, 9/9, 38 pass/5 pre-existing
+unrelated fail across the three touched suites) — see the sibling item's
+own Closure section for full evidence. **Finding 7 is now closed**:
+`sign-intent` describes an HGO signature-mode digest via
+`describeHumanGuardOverrideSelection()`, wired as a second resolver
+alongside the existing GMW one (GMW tried first; falls through to HGO;
+falls through to the honest "will not invent one" fallback only if both
+miss) — a human signing an HGO digest now sees its eligible paths, denying
+guard's rationale and expiry, closing the blind-signature gap for this
+ceremony specifically. **Finding 3's underlying condition is narrowed but
+not itself fixed**: an HGO digest that DOES resolve no longer needs the
+humanName-vs-wrong-key message split to matter for that path, but the
+message text itself (finding 3/4, `po-human-approval.mjs` ~269-353) is
+unchanged and still wrong when it does trigger (e.g. via the unrelated
+key-setup path finding 3 actually describes).
+
+**Still open, unchanged: findings 1 (GMW disclosure), 2
+(`PO-APPROVAL-TRUST-MISMATCH` value disclosure), 5 (`setup`'s repair-loop
+message), 6 (capability-store single-bad-record silences the whole store),
+8 (`--repo-root .` bare usage dump), and the unified orchestrating wrapper
+script.** A candidate `NVA-SIGDISCLOSE-1` covering 2/3(message text)/5/6/8
+remains a reasonable next dispatch, now unblocked (NVA-SIGENTRY-1's
+concurrent `po-human-approval.mjs` edits are committed, no more collision
+risk); finding 1 lives in `guard-maintenance-window.mjs`, independent of
+that file.

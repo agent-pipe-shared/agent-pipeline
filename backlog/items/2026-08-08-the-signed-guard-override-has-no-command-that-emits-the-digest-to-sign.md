@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 9c6bc9230a62cc580383f3803d59d26939bb7900
+closure_evidence: backlog/items/2026-08-08-the-signed-guard-override-has-no-command-that-emits-the-digest-to-sign.md
 created: 2026-08-08
 due: 2026-08-15
 source: "Found while walking the signature-mode HGO flow end to end for the GS-2 migration of project/critical-human-proof.json, 2026-08-08. The flow is walkable by reading library source, not by following the CLI."
@@ -132,3 +136,31 @@ emits the signable digest, teach the signing describer to resolve an HGO
 selection) — the single-entry-point wrapper script and the sibling item's
 disclosure/robustness findings are explicitly out of this dispatch's scope,
 tracked as follow-ups.
+
+## Closure (2026-08-17)
+
+`NVA-SIGENTRY-1` landed this item's core ask directly: `guard-human-override.mjs`
+gained `emit-signature-digest --repo --request-sha256 --plan-sha256 --reason`,
+which runs `plan` + `prepare-authorization` and prints the exact digest
+`authorizeHumanGuardOverrideBySignature()` gates on — the same value, proven
+by a test that arms a real capability from the CLI's own printed digest, via
+a shared extracted helper (`buildHumanGuardOverrideSignatureIntent()`) so
+there is exactly one implementation of the recipe, never two to drift
+apart. The blind-signature half (`sign-intent` describing an HGO digest) is
+also done, closing this item's finding 2/Direction 2 ask as a side effect —
+see the sibling item's own closure-progress note.
+
+Independently re-verified: `node --test
+plugins/pipeline-core/lib/human-guard-override.test.mjs` (38 pass, 5
+pre-existing unrelated `HGO-EXTERNAL-MARKETPLACE` failures, confirmed
+identical on the pre-dispatch baseline), `node --test
+plugins/pipeline-core/scripts/guard-human-override.test.mjs` (9/9), `node
+--test plugins/pipeline-core/scripts/po-human-approval.test.mjs` (60/60).
+Commits `2da8cf32dcb13de7f697a4b7c7d3bfaa94eaedcb` (extracted helper),
+`9c6bc9230a62cc580383f3803d59d26939bb7900` (`emit-signature-digest`),
+`97bb2ee2ed0f34ff7522c7e987fd8c733c68d721` (describer wiring).
+
+Still needs Critic review before being considered fully done (security-tier
+per MP-07) — not yet scheduled. The unified single-entry-point wrapper
+script (chaining plan→prepare→sign→install→verify as one command) remains
+explicitly out of scope, tracked as its own future follow-up.
