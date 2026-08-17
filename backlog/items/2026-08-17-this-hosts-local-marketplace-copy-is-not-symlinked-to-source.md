@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 64654077003d35a133a942883d2da146c982dfda
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-local-plugin-install-attestation-closure.md
 source: "Independent full-Verify run on this checkout, 2026-08-17, while landing NVA-A7FIX-2/NVA-HGOFIX-1 -- human-guard-override-tests failed 5 of its cases with HGO-EXTERNAL-MARKETPLACE, unrelated to any commit made this session."
 ---
 
@@ -84,3 +88,16 @@ apart, and today's tooling has more than one way to notice that drift.
 - **Rationale:** the check's own severity is correct (fail closed on an unverified external root) — the gap is that it only recognizes one of the PO's two legitimate deployment shapes.
 - **Assignment (if accepted):** next available dedicated design slot.
 - **Date:** 2026-08-17
+
+## Closure (2026-08-17)
+
+Implemented exactly per the Proposal by `NVA-MKTHASH-1`/`NVA-MKTHASH-2`
+this session: `externalLocalMarketplaceObservation()` now accepts a real,
+non-symlinked directory copy when its full content hash (the same
+`pluginSourceTreeSha256()` walker, bounded for the external call site)
+exactly equals this checkout's own hash, alongside the unchanged
+symlink/junction path. ADR-0052 amended with a dated section recording
+this as a second sanctioned shape. Live-confirmed against this host's
+real, freshly-resynced marketplace copy (not just unit tests). Full
+closure evidence (shared with the related attestation-binding item):
+`specs/sprint-nova-epic/evidence/backlog/2026-08-17-local-plugin-install-attestation-closure.md`.

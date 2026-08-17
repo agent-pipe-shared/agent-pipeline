@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a94afc3b7822d9411a28803d725b84e3c464659a5ecb05dafd5ab34459575131"
+    "transitionHead": "3489a25a4e71f5a05ecf6a537b95ebeb546de16acd0a0d091d759abdcab00f1f"
   },
   "counts": {
-    "open": 110,
+    "open": 109,
     "in_progress": 22,
-    "closed": 105
+    "closed": 106
   },
   "items": [
     {
@@ -2136,11 +2136,15 @@
     },
     {
       "id": "pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Independent full-Verify run on this checkout, 2026-08-17, while landing NVA-A7FIX-2/NVA-HGOFIX-1 -- human-guard-override-tests failed 5 of its cases with HGO-EXTERNAL-MARKETPLACE, unrelated to any commit made this session."
+      "source": "Independent full-Verify run on this checkout, 2026-08-17, while landing NVA-A7FIX-2/NVA-HGOFIX-1 -- human-guard-override-tests failed 5 of its cases with HGO-EXTERNAL-MARKETPLACE, unrelated to any commit made this session.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "64654077003d35a133a942883d2da146c982dfda",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-local-plugin-install-attestation-closure.md"
     },
     {
       "id": "pipeline.three-smaller-greenfield-defects",
