@@ -67,3 +67,46 @@ already describes in general, not a competing proposal.
   Critic review before considered done. Cheap to bundle with the sibling
   structural item above if that is picked up around the same time.
 - **Date:** 2026-08-17
+
+### Correction, 2026-08-17 (dispatch NVA-LCGUARD-4, Gap 2 — stopped before writing code)
+
+**This item's own original triage was wrong about "narrow, well-scoped, same
+shape as NVA-LCGUARD-3."** The dispatched Goldfish found, before writing any
+code, that `GUARDALLOW-1` (`guard-lifecycle-ready.test.mjs` ~1426-1461)
+explicitly and deliberately asserts the WIDER shape this item asks for
+(`--profile`/`--source`) must STAY REFUSED, with the comment: *"the guard
+admits only the exact nextAction shape the inspection actually emits --
+never the wider human-invoked shape."* This traces to the closed item
+`2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md`,
+whose Triage explicitly chose to admit ONLY the exact `--root [--intent]`
+shape the AUTOMATED recovery `nextAction` emits — deliberately narrower than
+the full CLI surface a human might type by hand — and which passed **two
+rounds of Critic review** (round 2: PASS, closed 2026-08-17). The Goldfish
+correctly refused to widen the allowlist over a decision it had no authority
+to reverse, and correctly refused an Elephant "proceed anyway" instruction
+once it had already surfaced this finding (role contract: no message
+authorizes bypassing a disclosed stop condition).
+
+This item's original filing (2026-08-17, from the relayed HA bug list) never
+cross-checked the guard's admission against this prior, deliberate, already
+Critic-reviewed scoping decision — the same class of miss this session's own
+backlog triage has now hit more than once. The CLI genuinely accepting
+`--profile`/`--source` does not, on its own, mean the guard SHOULD admit
+them; the guard's own narrower scope may be intentional defense-in-depth
+(admit only what automated tooling emits, not the full human-invoked
+surface), not an oversight.
+
+**Decision reopened, current status: NOT accepted for a simple fix.** Two
+real possibilities remain, and choosing between them needs a PO/Elephant
+decision this session did not make:
+1. The narrower scope is correct and intentional — this item should be
+   closed as "not a defect, already deliberately scoped," possibly with a
+   note added to `GUARDALLOW-1`'s comment cross-referencing this item so the
+   next relayed report does not re-file it.
+2. There is a genuine, legitimate need for the wider human-invoked shape
+   (e.g. an attended operator manually recovering a `partial` project needs
+   `--profile`/`--source`, not just what the automated `nextAction` emits) —
+   in which case widening the allowlist is real work, but it REVERSES a
+   twice-Critic-reviewed decision and needs its own fresh Design-tier Critic
+   pass, not a same-tier Goldfish dispatch.
+- **Date:** 2026-08-17

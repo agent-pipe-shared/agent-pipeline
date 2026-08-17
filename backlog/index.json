@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7a2205ed88eee223d26f26f780278086911d75fc980ecc1f08e4b1f0fee44103"
+    "transitionHead": "4165f5c0afa752536119a3f67dcff1c5b80f050e7b93c3fb98bd960bd01d81d6"
   },
   "counts": {
-    "open": 101,
+    "open": 100,
     "in_progress": 22,
-    "closed": 122
+    "closed": 123
   },
   "items": [
     {
@@ -69,11 +69,15 @@
     },
     {
       "id": "pipeline.advisor-consent-is-requested-before-the-readiness-preflight",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed."
+      "source": "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "6ba4e5884e14a5e3ff08361603fb3a5eb07bffbf",
+      "closureEvidence": "backlog/items/2026-08-17-advisor-consent-is-requested-before-the-readiness-preflight.md"
     },
     {
       "id": "pipeline.afk-assumption-mode",

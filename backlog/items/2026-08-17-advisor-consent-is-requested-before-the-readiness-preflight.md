@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.advisor-consent-is-requested-before-the-readiness-preflight
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 6ba4e5884e14a5e3ff08361603fb3a5eb07bffbf
+closure_evidence: backlog/items/2026-08-17-advisor-consent-is-requested-before-the-readiness-preflight.md
 created: 2026-08-17
 source: "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed."
 ---
@@ -54,3 +58,17 @@ consent followed by an immediate failure.
   reordering, no in-task design latitude beyond sequencing), plus Critic
   review before considered done.
 - **Date:** 2026-08-17
+
+## Closure (2026-08-17)
+
+Fixed via goldfish-implementor dispatch NVA-ADVREADY-1 — a new Trigger Gate
+step 1 in `advisor-consult/SKILL.md` requires confirming project-onboarding
+readiness (naming `requireProjectOnboardingReady`/`PORG-NOT-READY` by name)
+BEFORE requesting or recording Advisor-export consent; prior steps 1-4
+renumbered to 2-5, content otherwise unchanged. Documentation-only change
+(no executable test suite for a skill file); verified by re-reading the
+edited section and confirming no other file references the old step
+numbers. Commit `6ba4e5884e14a5e3ff08361603fb3a5eb07bffbf`.
+
+Still needs the Critic review noted in Assignment above before being
+considered fully done — not yet scheduled.
