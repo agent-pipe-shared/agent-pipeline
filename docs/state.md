@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-18 (full AFK block continues: NVA-PAWINACL-2, NVA-MICRO-1, NVA-RTPROJ2-1, NVA-MICRO-3 and NVA-MICRO-4 landed — nine backlog items closed, one new preimage-drift item filed, backlog triage now largely exhausted of ready mechanical work — see "2026-08-18 (overnight AFK block, continued)" below, which is now the current block)
+**Last updated:** 2026-08-18 (full AFK block continues: NVA-PAWINACL-2, NVA-MICRO-1, NVA-RTPROJ2-1, NVA-MICRO-3, NVA-MICRO-4 and NVA-SKILLBUDGET-1 landed — 12 backlog items closed, a live SKILL.md budget regression found and fixed by a fresh Full Verify, candidate-freeze-quality Verify/Security evidence refreshed (267/269, exact binding, CLEAN security) — see "2026-08-18 (overnight AFK block, continued 2)" below, which is now the current block)
 **Project status:** ACTIVE
 **Release version:** `0.5.4` released
 **Release state:** version `0.5.4` · tag `v0.5.4` · commit `dd1eb9eedeb7ac48860c8ec9745750c9a8367b32` · tree `b6857469bbc84de94c0f917ed64dc59b0eccc8de` · status `published`
@@ -7662,6 +7662,16 @@ Continuing the full-AFK-mode block from "2026-08-17 (continued 16)" above. All w
 **Three triage forks swept ~33 of the ~96 open backlog items** (full-file reads, live-source re-verification, Correction/Reopened-subsection checks) and found the well is now largely dry: every remaining item checked either needs a PO/design decision, is already deferred to a named future sprint (Alfred/Nightwing/Phoenix) with recorded rationale, needs guardrail/security-tier Critic-gated work, or has its own triage explicitly marking it not-ready. No further Bucket-A candidates are queued as of this write.
 
 **Still open, unchanged from the prior block:** the Nova A candidate-freeze/gate-binding ceremony (deliberately deferred — a Full Verify/Security run bound to a frozen commit would be immediately invalidated by the next backlog-dispatch commit landing; now a stronger candidate for a near-term checkpoint given the triage well running dry). `dialectFor()`'s host-OS-based shell-dialect inference and `observation-governance-bootstrap.mjs`'s vendor-sync false-positive (Toolbox findings 2 and 3) remain correctly deferred/low-priority, unchanged.
+
+## 2026-08-18 (overnight AFK block, continued 2) — a fresh clean Full Verify found and fixed a real regression; candidate-freeze-quality evidence refreshed
+
+With the backlog triage well largely dry (see section above), ran a fresh Full Verify + Security scan against HEAD as candidate-freeze-quality prep (Verify/Security only — the Critic zero-findings gate stays explicitly PO-gamble territory, not attempted, per the standing judgment recorded earlier this block).
+
+**Found a real, previously-uncaught regression.** `793af6c1` ("NVA-GITID-1", landed earlier this same block) reworded a paragraph in `plugins/pipeline-core/skills/pipeline-start/SKILL.md` and grew it from 17926 to 18060 bytes — 60 bytes over its own 18000-byte `BOOTSTRAP_PAYLOAD_MAX_BYTES` budget — without anyone re-running Verify in between. Two registered suites (`pipeline-start-v3-tests`, `bootstrap-payload-measure-cli-tests`) had been silently red since that commit. Fixed by `NVA-SKILLBUDGET-1` (`9717fb05`, goldfish-mechanic, light profile): tightened the git-identity deferral paragraph and deduplicated the closed-shell-grammar/commit-trailer paragraph against `templates/prompts/agent-obligations.md` (same technique as the prior precedent fix `e7c0b6d5`), bringing the file to 17738 bytes with real margin. Both target suites and the full `project-onboarding-v3.test.mjs` suite (122/122) independently re-verified green; the file's substantive content confirmed unchanged in meaning, only prose tightened.
+
+**Fresh clean Full Verify, done — candidate-freeze quality.** Against `9717fb05` (tree `8728115d`), binding **exact** (no concurrent write during either ~4-minute run): 267 of 269 suites pass. The only two remaining failures are the already-documented pre-existing classes, reconfirmed unrelated to this session's diffs: `human-guard-override-tests` (`HGO-EXTERNAL-MARKETPLACE`, local-marketplace-mirror staleness) and `codex-pretool-guard-tests` (one assertion checking `.codex-plugin/plugin.json`'s manifest-stamp OID format, untouched by any commit this session — confirmed via `git show --stat` during `NVA-MICRO-3`'s independent verification above). `security-scan.mjs`: CLEAN, exit 0 (gitleaks/semgrep/license-check all 0 findings). Evidence: `evidence/verify-latest.json`, `evidence/security-latest.json`.
+
+This is fresh, current Verify/Security evidence for whenever the PO chooses to spend the Critic-gamble step and formally freeze a Nova A candidate — it is not itself a candidate freeze (no PO activation, no Critic pass, no E1/E2 receipt sealed).
 
 ## Re-entry
 
