@@ -2,7 +2,7 @@
 
 > Agent-Pipeline · Sprint Nova · as of 2026-08-06
 
-**Status:** accepted · **Basis:** Dispatch MARKETPLACE-ID-06, confirmed by git history and the repeated `claude plugin validate` probes documented below.
+**Status:** accepted (2026-08-06; amendment 2026-08-17, see below) · **Basis:** Dispatch MARKETPLACE-ID-06, confirmed by git history and the repeated `claude plugin validate` probes documented below.
 
 ## Context
 
@@ -176,6 +176,46 @@ this dispatch's own probes (which ran on Linux).
   machine-local material, and both live outside the tracked docs/plugin
   trees). A root fully outside the checkout keeps that boundary intact and
   needs no `.gitignore` entry.
+
+## Amendment (2026-08-17): a content-hash-verified real-directory copy is also sanctioned
+
+Dispatch NVA-MKTHASH-1 (commit `0cb5bdfc`) extended
+`externalLocalMarketplaceObservation()` in
+`plugins/pipeline-core/lib/human-guard-override.mjs` to additionally accept a
+**real, non-symlinked directory copy** at the external local-marketplace
+root's `plugins/pipeline-core` entry, alongside the symlink/junction
+arrangement the Decision section above records as the only shape. This
+reconciles the enforcing code with `docs/claude-local-plugin-development.md`
+("Use a copy, not a symlink or junction... This is load-bearing"; see its
+"Why a copy and not a link" section), which already prescribed the copy shape
+as the recommended local-development practice on independent grounds — a
+link silently disarms symlink-aware guards (`import.meta.url` resolves
+through it while `process.argv[1]` does not, defeating `invokedDirectly`
+checks including the gate that admits writes at all) and collapses the
+distinction `guard-gate-strength.mjs` (GS-6) depends on between a source
+checkout's own plugin root and the currently-enforcing one — grounds this
+ADR's Decision section did not yet reflect.
+
+**Sanctioned second shape:** a real, independent directory at the external
+root's `plugins/pipeline-core` entry, copied from a checkout's own
+`plugins/pipeline-core` (e.g. `cp -a` / `robocopy /MIR`), accepted ONLY when
+its full recursive content hash — computed by the identical
+`pluginSourceTreeSha256()` walker used for a checkout's own attestation (same
+hard-fail on any internal symlink or unsafe entry, and, since dispatch
+NVA-MKTHASH-2, the same walker applied through a bounded variant for this
+external call site so a pathologically large or hostile copy also fails
+closed) — is EXACTLY equal to the requesting checkout's own plugin-source
+tree digest. Any divergence (stale, tampered, unrelated, or partially synced)
+fails closed exactly as a non-resolving symlink does, under a distinct
+message naming the actual cause.
+
+The symlink/junction shape recorded in the Decision section above remains
+fully sanctioned and unchanged; this amendment adds a second, independently
+verifiable shape rather than replacing it. Both shapes are folded into the
+same `statusSha256` attestation preimage, so a transition between shapes, or
+a divergence within either, invalidates any outstanding request, plan, or
+capability through the existing HGO-DRIFT comparison rather than passing
+unnoticed.
 
 ## Follow-up / review
 

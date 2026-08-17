@@ -1813,7 +1813,7 @@ test("NVA-MKTHASH-1: a real directory copy whose content diverges from this chec
   }
 });
 
-test("NVA-MKTHASH-1: an internal symlink planted inside the real directory copy still hard-fails via pluginSourceTreeSha256's own refusal", { skip: JUNCTION_SKIP }, () => {
+test("NVA-MKTHASH-1/NVA-MKTHASH-2: an internal symlink planted inside the real directory copy still hard-fails, now reported as a distinct external-marketplace failure naming the external tree", { skip: JUNCTION_SKIP }, () => {
   const base = externalFixture();
   try {
     const checkout = pipelineCheckout(base, "checkout");
@@ -1822,7 +1822,13 @@ test("NVA-MKTHASH-1: an internal symlink planted inside the real directory copy 
     cpSync(checkout.sourceRoot, copyRoot, { recursive: true });
     // Plant a symlink INSIDE the copy -- pluginSourceTreeSha256() hard-fails on
     // ANY internal symlink it walks (reused here completely unmodified), so this
-    // must refuse exactly as it would for the internal checkout's own tree.
+    // must still refuse exactly as it would for the internal checkout's own
+    // tree. NVA-MKTHASH-2 (F4): the failure is now wrapped at the external call
+    // site into a distinct HGO-EXTERNAL-MARKETPLACE error naming the external
+    // tree, rather than surfacing the internal-checkout HGO-PLUGIN-SOURCE
+    // wording verbatim -- pluginSourceTreeSha256()'s OWN error for its
+    // pre-existing internal caller is unchanged (pinned elsewhere in this
+    // suite).
     symlinkSync(join(copyRoot, ".codex-plugin"), join(copyRoot, "planted-link"), "junction");
     const registryReader = localRegistry(external);
     const checkoutTreeSha256 = humanGuardOverrideInternals.pluginSourceTreeSha256(checkout.sourceRoot);
@@ -1831,7 +1837,54 @@ test("NVA-MKTHASH-1: an internal symlink planted inside the real directory copy 
         { root: checkout.root },
         { registryReader, checkoutTreeSha256 },
       ),
-      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLUGIN-SOURCE",
+      (error) => error instanceof HumanGuardOverrideError
+        && error.code === "HGO-EXTERNAL-MARKETPLACE"
+        && error.message === "external local marketplace plugin entry contains a symbolic link",
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("NVA-MKTHASH-2 (F3): a real directory copy whose entry count exceeds the bounded walk fails closed with a distinct message, before completing the hash", () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const external = externalMarketplace(base, "external");
+    const copyRoot = join(external, "plugins", "pipeline-core");
+    cpSync(checkout.sourceRoot, copyRoot, { recursive: true });
+    // The bounded walk's own production limit
+    // (EXTERNAL_MARKETPLACE_WALK_MAX_ENTRIES) is not exported -- deliberately,
+    // so a test cannot silently rely on its exact numeric value drifting in
+    // step with a future change to the constant. Instead this exceeds ANY
+    // plausible bound by construction: enough loose files that no reasonably
+    // sized external copy could legitimately contain them all, while the
+    // synthetic checkout fixture above stays tiny (2 entries).
+    for (let index = 0; index < 5_005; index += 1) {
+      writeFileSync(join(copyRoot, `padding-${index}.txt`), "");
+    }
+    const registryReader = localRegistry(external);
+    const checkoutTreeSha256 = humanGuardOverrideInternals.pluginSourceTreeSha256(checkout.sourceRoot);
+    assert.throws(
+      () => humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+        { root: checkout.root },
+        { registryReader, checkoutTreeSha256 },
+      ),
+      (error) => error instanceof HumanGuardOverrideError
+        && error.code === "HGO-EXTERNAL-MARKETPLACE"
+        && error.message === "external local marketplace plugin entry exceeds the bounded walk"
+        // Distinct from both the content-mismatch and the resolution-failure
+        // messages -- an operator reading HGO-EXTERNAL-MARKETPLACE errors can
+        // tell a bound trip apart from an honest content divergence.
+        && error.message !== "external local marketplace plugin entry content does not match this checkout"
+        && error.message !== "external local marketplace does not resolve to this checkout",
+    );
+    // The internal checkout's own unbounded attestation is unaffected by the
+    // external bound -- same call, same value, proving pluginSourceTreeSha256's
+    // pre-existing caller was not touched by this change.
+    assert.equal(
+      humanGuardOverrideInternals.pluginSourceTreeSha256(checkout.sourceRoot),
+      checkoutTreeSha256,
     );
   } finally {
     rmSync(base, { recursive: true, force: true });

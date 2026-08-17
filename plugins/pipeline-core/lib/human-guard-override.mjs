@@ -207,32 +207,56 @@ function controlPathTopology(root) {
   return { root: physical, common };
 }
 
-// Reachability note (Critic finding F1, dispatch CRITIC-REMEDY-09): the
+// Reachability note (Critic finding F1, dispatch CRITIC-REMEDY-09; corrected
+// by dispatch NVA-MKTHASH-2 -- see below, the claim this comment originally
+// made is no longer true for one case and is restated accurately here): the
 // separate local marketplace root ADR-0052 prescribes for local development
-// carries a symlink at ITS OWN `plugins/pipeline-core` entry, pointing back
-// at a checkout's real source directory. That symlink is never walked here.
-// `sourceRoot` below is always `<repo.root>/plugins/pipeline-core` where
+// carries, at ITS OWN `plugins/pipeline-core` entry, EITHER a symlink/junction
+// pointing back at a checkout's real source directory (the original ADR-0052
+// shape), OR, since dispatch NVA-MKTHASH-1, a real, non-symlinked directory
+// COPY of that same source tree. Neither of those is `sourceRoot` below:
+// `sourceRoot` is always `<repo.root>/plugins/pipeline-core` where
 // `repo.root` is the checkout's own physical top-level (`physicalRoot()`
 // above always resolves and rejects a symlinked result), and
 // `localPluginInstallSourceObservation()` already requires that exact
-// directory itself to be a real, non-symlinked entry before calling this
-// function. The external local-marketplace root can never become `repo.root`
-// either: `isPipelineSourceRoot()` also requires `harness/scripts/verify.mjs`
-// to exist alongside it, which the local-marketplace root (containing only
-// `.claude-plugin/marketplace.json` and the symlink) never has. So the
-// ADR-0052 symlink arrangement is structurally outside the tree this
-// function ever walks; the hard-fail on an internal symlink stays exactly as
-// strict as before -- it still fail-closes if a checkout's own source tree
-// is tampered with to contain one. That external symlink is now observed
-// SEPARATELY, by `externalLocalMarketplaceObservation()` below (NVA-BL-20),
-// which follows exactly that one link in order to verify where it points and
-// still never walks the tree behind it.
-function pluginSourceTreeSha256(sourceRoot) {
+// directory itself to be a real, non-symlinked entry before calling THIS
+// function for the INTERNAL checkout's own attestation. The external
+// local-marketplace root can never become `repo.root` either:
+// `isPipelineSourceRoot()` also requires `harness/scripts/verify.mjs` to
+// exist alongside it, which the local-marketplace root (containing only
+// `.claude-plugin/marketplace.json` and its one `pipeline-core` entry) never
+// has. So THIS function itself never walks the external root directly; the
+// hard-fail on an internal symlink stays exactly as strict as before for the
+// internal checkout's own tree -- it still fail-closes if a checkout's own
+// source tree is tampered with to contain one. The external root is observed
+// SEPARATELY, by `externalLocalMarketplaceObservation()` below (NVA-BL-20 /
+// NVA-MKTHASH-1 / NVA-MKTHASH-2), and its reachability now differs by shape:
+// for a symlink/junction entry it follows exactly that one link to verify
+// where it points and never walks the tree behind it (unchanged since
+// CRITIC-REMEDY-09); for a real, non-symlinked directory-copy entry it DOES
+// walk that external tree -- exactly once, through the bounded
+// `externalPluginSourceTreeSha256()` variant of this same walker defined
+// below -- to compute its content hash for comparison against this
+// checkout's own. So the external tree is walked in exactly one of the two
+// accepted shapes, and this function's own unbounded call is still reached
+// only from the internal checkout's own attestation.
+// NVA-MKTHASH-2 (F3): `maxEntries`/`maxBytes` default to Infinity, which never
+// trips -- so the ONE pre-existing caller (the internal checkout's own
+// attestation above) is byte-for-byte unaffected: same visit order, same
+// checks, same messages, same unbounded walk it always ran. Only a caller
+// that supplies a finite bound (the external call site below,
+// `externalPluginSourceTreeSha256()`) can ever observe the new
+// "exceeds the bounded walk" failure.
+function pluginSourceTreeSha256(sourceRoot, { maxEntries = Infinity, maxBytes = Infinity } = {}) {
   const entries = [];
+  let entryCount = 0;
+  let byteTotal = 0;
   const visit = (directory, prefix = "") => {
     const children = readdirSync(directory, { withFileTypes: true })
       .sort((left, right) => left.name.localeCompare(right.name));
     for (const child of children) {
+      entryCount += 1;
+      if (entryCount > maxEntries) fail("HGO-PLUGIN-SOURCE", "local plugin source exceeds the bounded walk");
       const relativePath = prefix === "" ? child.name : `${prefix}/${child.name}`;
       const absolutePath = join(directory, child.name);
       const info = lstatSync(absolutePath);
@@ -244,11 +268,44 @@ function pluginSourceTreeSha256(sourceRoot) {
       if (!info.isFile() || info.nlink !== 1 || realpathSync(absolutePath) !== absolutePath) {
         fail("HGO-PLUGIN-SOURCE", "local plugin source contains an unsafe entry");
       }
+      byteTotal += info.size;
+      if (byteTotal > maxBytes) fail("HGO-PLUGIN-SOURCE", "local plugin source exceeds the bounded walk");
       entries.push({ path: relativePath, sha256: sha(readFileSync(absolutePath)) });
     }
   };
   visit(sourceRoot);
   return sha(entries);
+}
+
+// NVA-MKTHASH-2 (F3/F4): the ONLY caller of `pluginSourceTreeSha256()` that
+// walks a tree outside this checkout (`externalLocalMarketplaceObservation()`'s
+// real-directory-copy branch, NVA-MKTHASH-1). The registry read that can lead
+// here is already bounded (`EXTERNAL_REGISTRY_TIMEOUT_MS`/
+// `EXTERNAL_REGISTRY_MAX_BYTES` below); this applies the same bounded-external-
+// input posture to the recursive walk that answer can trigger, and re-fails any
+// `HGO-PLUGIN-SOURCE` this walker raises (bound exceeded, a planted symlink, or
+// an unsafe entry) as a distinct `HGO-EXTERNAL-MARKETPLACE` failure that names
+// the external tree instead of reusing the internal-checkout wording -- an
+// operator reading a fail-closed refusal on the override path should not have
+// to guess whether it was their own checkout or the external marketplace root
+// that failed. `pluginSourceTreeSha256()` itself, and its one internal caller,
+// are otherwise unchanged (see the comment on the function above).
+function externalPluginSourceTreeSha256(entryTarget) {
+  try {
+    return pluginSourceTreeSha256(entryTarget, {
+      maxEntries: EXTERNAL_MARKETPLACE_WALK_MAX_ENTRIES,
+      maxBytes: EXTERNAL_MARKETPLACE_WALK_MAX_BYTES,
+    });
+  } catch (error) {
+    if (!(error instanceof HumanGuardOverrideError) || error.code !== "HGO-PLUGIN-SOURCE") throw error;
+    if (error.message === "local plugin source exceeds the bounded walk") {
+      fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace plugin entry exceeds the bounded walk");
+    }
+    if (error.message === "local plugin source contains a symbolic link") {
+      fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace plugin entry contains a symbolic link");
+    }
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace plugin entry contains an unsafe entry");
+  }
 }
 
 // ---------------------------------------------------------------------------------
@@ -287,6 +344,16 @@ function pluginSourceTreeSha256(sourceRoot) {
 const EXTERNAL_LOCAL_MARKETPLACE_NAME = "agent-pipeline-local";
 const EXTERNAL_REGISTRY_TIMEOUT_MS = 5_000;
 const EXTERNAL_REGISTRY_MAX_BYTES = 64 * 1024;
+// NVA-MKTHASH-2 (F3): the registry read above is bounded (timeout + max
+// bytes); the recursive walk a registry answer naming a real directory-copy
+// entry can trigger (`externalPluginSourceTreeSha256()`, over `entryTarget`)
+// was not, unlike the registry read itself. Sized against this checkout's own
+// plugin-source tree (856 files / ~12.3 MiB, measured 2026-08-17) with
+// roughly 5x/10x headroom for ordinary growth, so an honest deployment never
+// trips them while a hostile or runaway external root still fails closed
+// instead of reading indefinitely.
+const EXTERNAL_MARKETPLACE_WALK_MAX_ENTRIES = 5_000;
+const EXTERNAL_MARKETPLACE_WALK_MAX_BYTES = 128 * 1024 * 1024;
 
 function codexMarketplaceRegistry(spawn) {
   let result;
@@ -410,12 +477,17 @@ function externalLocalMarketplaceObservation(repo, {
     || externalRealpath(pluginsDirectory, "external local marketplace plugins directory is unavailable") !== pluginsDirectory) {
     fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace plugins directory is unsafe");
   }
-  // The ONE entry that is legitimately a symlink or a directory junction, and is
-  // therefore followed instead of refused (pluginSourceTreeSha256 above still
-  // hard-fails on any symlink inside the tree it walks). Where this entry points
-  // IS the question, so it is resolved and required to be exactly this
-  // checkout's own plugin source root -- already content-hashed above by
-  // `pluginTreeSha256`, which is why the external tree is never walked twice.
+  // This entry is legitimately EITHER a symlink/directory junction (followed
+  // instead of refused; pluginSourceTreeSha256 above still hard-fails on any
+  // symlink inside the tree it walks) OR, since NVA-MKTHASH-1, a real,
+  // non-symlinked directory copy. For the symlink/junction case, where this
+  // entry points IS the question, so it is resolved and required to be
+  // exactly this checkout's own plugin source root -- already content-hashed
+  // above by `pluginTreeSha256`, so THAT case never walks the external tree at
+  // all (corrected per Critic finding F1, dispatch NVA-MKTHASH-2 -- this
+  // comment previously claimed that of both cases, which stopped being true
+  // once the real-directory-copy branch below started walking the external
+  // tree via the bounded `externalPluginSourceTreeSha256()`).
   const entryPath = join(pluginsDirectory, "pipeline-core");
   const entryInfo = externalStat(entryPath, "external local marketplace plugin entry is unavailable");
   const entryTarget = externalRealpath(entryPath, "external local marketplace plugin entry does not resolve");
@@ -435,17 +507,21 @@ function externalLocalMarketplaceObservation(repo, {
   // this checkout's own path above (a different filesystem location) -- that
   // is exactly the deliberate, PO-confirmed rsync-copy deployment shape the
   // symlink-only check above fails closed on today. Accept it ONLY when its
-  // full content hash, computed by the IDENTICAL walker used for this
-  // checkout's own attestation (pluginSourceTreeSha256, reused unmodified --
-  // so an internal symlink planted inside the copy still hard-fails exactly
-  // as it would for the internal checkout), is EXACTLY equal to the
-  // checkout's own hash. Any divergence -- stale, tampered, unrelated, or
-  // partially synced -- falls through to the same fail-closed posture as a
-  // non-resolving symlink, just with a message that names the actual failure
-  // mode (content mismatch, not resolution failure) instead of reusing the
-  // symlink-resolution message for an unrelated cause.
+  // full content hash, computed by the SAME walker used for this checkout's
+  // own attestation (pluginSourceTreeSha256, applied here through the bounded
+  // `externalPluginSourceTreeSha256()` variant added by NVA-MKTHASH-2 -- so
+  // an internal symlink planted inside the copy still hard-fails exactly as
+  // it would for the internal checkout, now surfaced as a distinct
+  // HGO-EXTERNAL-MARKETPLACE failure naming the external tree, and a
+  // pathologically large or hostile copy fails closed on the walk bound
+  // instead of reading indefinitely), is EXACTLY equal to the checkout's own
+  // hash. Any divergence -- stale, tampered, unrelated, or partially synced --
+  // falls through to the same fail-closed posture as a non-resolving symlink,
+  // just with a message that names the actual failure mode (content mismatch,
+  // not resolution failure) instead of reusing the symlink-resolution message
+  // for an unrelated cause.
   if (!entryInfo.isSymbolicLink() && entryInfo.isDirectory()) {
-    const copyTreeSha256 = pluginSourceTreeSha256(entryTarget);
+    const copyTreeSha256 = externalPluginSourceTreeSha256(entryTarget);
     if (checkoutTreeSha256 !== null && copyTreeSha256 === checkoutTreeSha256) {
       return {
         state: "verified",
@@ -981,7 +1057,7 @@ function decisionPreview({ toolName, toolInput, paths, commandClass, denials }) 
   const effect = commandClass === "local-plugin-install"
     ? {
       repository: "does not change the bound repository working tree, index, refs, or configuration",
-      external: "adds exactly pipeline-core@agent-pipeline-local to the host Codex plugin registry; attested are this checkout's manifest identity and plugin-source tree digest AND, whenever the host marketplace registry names a local agent-pipeline-local root, that root's own marketplace.json plus the fact that its plugins/pipeline-core resolves back into exactly this checkout, so a repointed or mutated external root refuses or invalidates this authorization; where the registry names no such root the external root stays unobserved and is NOT attested, and only this checkout's own manifest identity and plugin-source tree digest are",
+      external: "adds exactly pipeline-core@agent-pipeline-local to the host Codex plugin registry; attested are this checkout's manifest identity and plugin-source tree digest AND, whenever the host marketplace registry names a local agent-pipeline-local root, that root's own marketplace.json plus EITHER that its plugins/pipeline-core entry is a symlink/junction that resolves back into exactly this checkout, OR that it is a real, non-symlinked directory copy whose own full content hash (bounded walk; a planted internal symlink or an oversized/hostile copy still refuses closed) exactly equals this checkout's plugin-source tree digest, so a repointed, mutated, or content-diverged external root refuses or invalidates this authorization; where the registry names no such root the external root stays unobserved and is NOT attested, and only this checkout's own manifest identity and plugin-source tree digest are",
       rollbackRecovery: "read back the native plugin registry; removal/restart remains a separately attended operator action",
       residualRisk: "the host-wide Codex plugin selection changes and existing sessions keep their already-loaded plugin until the attended refresh boundary",
     }
