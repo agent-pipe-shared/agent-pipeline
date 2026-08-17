@@ -116,6 +116,41 @@ architecture prose or an implementation briefing.
   belonging to `design/gmw-hgo-evidence-intake-into-the-human-ledger.md`
   (H-AC-11/H-AC-12's design, unrelated to this criterion) — this clause
   is not part of that scheme and is referenced here by criterion ID only.
+
+  **Second amendment (PO, 2026-08-17).** Clause 1's disposition is upgraded
+  from the amendment above's "designed but unbuilt" to **structurally
+  unreachable from the process this criterion is evaluated in**. Two later
+  investigation dispatches (PHX-WP-PX0AC13-HOSTDELEGATION,
+  PHX-WP-PX0AC13-REMOVEATTESTATION) found, and this amendment re-verified
+  against current source, that no in-process mechanism can satisfy the
+  clause. `runPipelineUpdateAvailabilityCli`
+  (`plugins/pipeline-core/scripts/ruleset-freshness.mjs`) passes only a
+  `spawn` override into `inspectPipelineUpdateAvailability`; it never
+  supplies `networkPreflight` or `hostTransport`, and that module neither
+  imports nor calls `ruleset-freshness-host.mjs`.
+  `observePublicRemoteIdentity`'s host-transport branch is therefore
+  unreachable from the CLI entry point —
+  `selectHostTransport(undefined, undefined)` returns `null`,
+  so every CLI run falls through to the in-sandbox spawn, which under the
+  `host-authorized-wsl` boundary is `createWslHostFailClosedSpawn`'s
+  synthetic refusal. Nor could the CLI construct the missing inputs:
+  `createFreshnessHostAction` and `selectHostTransport` both require a
+  64-hex `expectedControlIdentitySha256`, and the only legitimate value is a
+  live external control-daemon observation —
+  `inspectHostRulesetFreshness` takes it from `observeCodexAppServer()`'s
+  `daemonIdentitySha256` (`ruleset-freshness-host.mjs`), and both
+  `executeRulesetFreshnessHostAction` and the common reader's receipt check
+  independently re-observe and re-compare it before any result is accepted,
+  so a fabricated value fails closed at the receipt comparison. In the same
+  rigor this repository's H-AC-11 amendment uses: this is a proved
+  structural result about the in-process path, not an unfinished
+  implementation of it. It does not make the clause unsatisfiable in
+  principle — satisfying it requires an out-of-process host adapter invoked
+  with a live daemon observation, which is exactly what
+  `design/codex-wsl-freshness-host-action-family.md` designs and what the
+  amendment above already conditions this clause's closure on. What the
+  upgrade settles is the disposition, not the exit: no in-process interim
+  can close clause 1, and none should be attempted.
 - **PX0-AC-14:** WHEN source/freshness diagnostics are rendered or persisted,
   THE SYSTEM SHALL omit tokens, credentials, home paths, cache paths, private
   remotes, SSH key paths, and account coordinates.
@@ -233,6 +268,31 @@ architecture prose or an implementation briefing.
   Tracked as O-4 in
   `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §14, owner
   `pipeline` (PHX-2).
+
+  **Amendment for O-4 (PO, 2026-08-17).** O-4 — left open by the amendment
+  above as the one condition under which the no-join-handle clause could
+  hold — is now decided: the clause is scoped to the record it actually
+  describes. No intake design can satisfy "no portable counterpart or join
+  handle" while this criterion's first clause simultaneously requires the
+  portable record to expose request, exact scope, and the policy/rule
+  digests; `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §5.2
+  shows the two records stay joinable through `scope.candidate`, `validity`,
+  `ruleDigest`, and the artifact digests even after every identifier is
+  removed. The second clause therefore binds the separately protected
+  restricted machine-local decision record of that design's §3.4 — the
+  profile whose envelope can omit every correlator by typed state — and not
+  the enforcement material a producer keeps for its own operation. What that
+  producer-side material must satisfy is stated separately and belongs to
+  the producer: GMW's machine-local window record exists to enforce a
+  window, it is not a ledger record, it is not created by this intake path,
+  and this clause does not govern it; its own privacy and retention
+  obligations travel with the producer rather than being discharged or
+  imposed here. This closes O-4
+  (`design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §14, owner
+  `pipeline`, PHX-2). It is a scoping decision, not evidence: it removes the
+  proved blocker recorded in the amendment above, and the clause is
+  satisfied only once the restricted profile demonstrably behaves as
+  described, under this criterion's ordinary evidence requirements.
 - **H-AC-12:** WHEN an existing guard, plan, release, deployment, or override
   path grants or consumes human authority, including `guard-devplan`,
   `guard-push`, `pipeline-state`, release planning, deploy approval/consumption,
@@ -240,6 +300,33 @@ architecture prose or an implementation briefing.
   the canonical decision ID before the transition becomes effective. Every
   direct reader SHALL dual-evaluate during migration, fail on disagreement,
   and carry the shared compatibility owner and expiry.
+
+  **Amendment (PO, 2026-08-17).** For two of the six enumerated readers,
+  existing mechanisms already satisfy this criterion's intent, and the PO
+  decided on 2026-08-11 that those two close on the mechanism they already
+  have rather than being rebuilt against the human ledger. **Release
+  planning:** `plugins/pipeline-core/scripts/release-version-plan.mjs`
+  derives `decisionId` as a domain-separated SHA-256 over the canonical
+  decision payload (`releaseVersionDecisionId`), refuses any decision whose
+  stored ID does not rebuild from the complete observation (`RVD-ID`), and
+  binds every plan to both that ID and the decision's own digest
+  (`plan.decisionId`, `plan.decisionSha256`) before the plan may be
+  consumed — a canonical, content-bound decision ID referenced and validated
+  before the transition becomes effective. **Deploy approval/consumption:**
+  `plugins/pipeline-core/lib/critical-action-authorization.mjs` rebuilds the
+  signed subject from what the guard can observe about the action actually
+  happening and verifies a detached Ed25519 signature against the key
+  identity committed in `project/critical-human-proof.json`, so a recorded
+  approval is consumed only when its proof verifies over that exact
+  artifact/environment and candidate — authority validated rather than
+  believed. This closes two of the six readers, not all of them.
+  `guard-devplan`, `guard-push`, `pipeline-state`, and Git-guard override
+  consumption remain open and are unaffected by this amendment; that the
+  deploy mechanism's module also serves a raw-push route does not close
+  `guard-push`, which is enumerated separately here and stays open. The
+  amendment addresses this criterion's first sentence for these two readers
+  only: the second sentence's migration dual-evaluation, shared
+  compatibility owner, and expiry are untouched.
 - **H-AC-13:** IF a proposed portable ledger entry contains a secret, raw
   prompt, complete transcript, unrestricted command/output, private path, or
   private coordinate, natural-person identifier, joinable pseudonym,
@@ -313,6 +400,31 @@ architecture prose or an implementation briefing.
   invalidation, route selection, decomposition, verification-scope change,
   escalation, fallback, redaction, tampering, retry, and missing journal
   availability.
+
+  **Amendment (PO, 2026-08-17).** The journal conformance suite covers 12 of
+  the 13 scenarios named above. Seven are pinned by dedicated named tests in
+  `plugins/pipeline-core/lib/agent-decision-journal.test.mjs`
+  (verification-scope change, escalation, fallback, redaction, retry,
+  missing journal availability, and tampering); five — unverified
+  assumptions, later confirmation, contradiction, candidate invalidation,
+  and route selection — are covered by that file's generic A-AC-02/A-AC-11
+  tests and are deliberately not duplicated as separately named cases. The
+  thirteenth, "decomposition", is confirmed not representable: no
+  `decomposition` value exists in `kind`, `state`, `assumptionState`, or any
+  command-offer state or assurance enum anywhere in
+  `plugins/pipeline-core/lib/agent-decision-journal.mjs`. Two prior
+  investigation dispatches established this and it is not reopened here —
+  PHX-WP-A, which reported A-AC-14 `absent` rather than padding the suite
+  with one shallow test per scenario, and PHX-WP-A2, which pinned the seven
+  then-uncovered scenarios and recorded the same negative finding for
+  "decomposition". The PO accepts 12 of 13 as this criterion's closed scope
+  rather than commissioning new schema surface — a new `kind` value plus its
+  published-schema, validator, and taxonomy consequences — for one untested
+  scenario. This is a scope narrowing, not a finding that the missing
+  scenario does not matter: an agent's decomposition of work is a real thing
+  to journal, it is simply not being built in Phoenix, and a later package
+  that wants it must add the enum value and its own coverage explicitly
+  rather than inheriting a claim from this criterion.
 - **A-AC-15:** WHEN the agent-journal package is declared complete, THE SYSTEM
   SHALL provide maintained schema, taxonomy, materiality policy, trust model,
   privacy threat model, retention, recovery, and operator documentation.
