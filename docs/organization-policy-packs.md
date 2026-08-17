@@ -97,15 +97,23 @@ packs meets the failure at activation, where a wrong diagnosis is expensive:
 Intersection never widens permission and OR never downgrades it, so no combination of
 packs can resolve to something more permissive than its strictest contributor.
 
-**Four of these six are declared but not yet consumed by any decision path.** Only
+**Three of these six are declared but not yet consumed by any decision path.** Only
 `mode`, `approvalRequired`, `targetBinding` and `ownedSections` currently scope a real
-permission decision; `lifecycleEvents`, `previewRequired`, `retention` and
-`conflictPolicy` validate and merge but change no behaviour anywhere. `previewRequired`,
-`retention` and `conflictPolicy`'s gap is tracked, with its per-dimension reasons, in
+permission decision, plus `previewRequired` as of the PO's 2026-08-17 amendment below;
+`lifecycleEvents`, `retention` and `conflictPolicy` validate and merge but change no
+behaviour anywhere. `retention` and `conflictPolicy`'s gap is tracked, with its
+per-dimension reasons, in
 `backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md`; `lifecycleEvents`'
 own gap (that item explicitly disclaims covering it) is tracked separately in
 `backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md` —
-declaring one of the four today is not an error, but it is also not enforcement.
+declaring one of the three today is not an error, but it is also not enforcement.
+
+**`previewRequired` (PO amendment, 2026-08-17):** satisfied by construction, not by
+enforcement — `external-reference-adapter.mjs`'s `preview()` runs unconditionally on
+every governed write regardless of this field's value, so "scope permission by ...
+preview" is already met structurally. The field stays declared for
+forward-compatibility; see `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11
+amendment for the full reasoning.
 
 Activation is a separate, transactional step from resolution
 (`organization-policy-activation.mjs`). `planOrganizationPolicyActivation`
