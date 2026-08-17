@@ -1077,6 +1077,28 @@ architecture prose or an implementation briefing.
 - **EPIC-AC-05:** IF any Phoenix issue criterion remains unimplemented,
   unverified, deferred without owner/expiry, or dependent on unavailable
   external/private evidence, THEN the Epic SHALL NOT claim complete.
+
+  **Amendment (PO, 2026-08-17).** A bare literal reading blocks completion
+  forever for any criterion honestly scoped down rather than force-built —
+  `unimplemented` never stops being true for one, so no wording elsewhere in
+  this document could ever satisfy this clause for it. That is not this
+  criterion's intent; it exists to stop a criterion being silently
+  abandoned, not to forbid a deliberate, reviewed disposition. A criterion
+  counts as `disposed` (distinct from bare `unimplemented`, and sufficient
+  for this clause) only when ALL of: (1) a PO-attributed amendment exists
+  directly on that criterion in this document, naming the concrete reason
+  further work is not attempted now; (2) a backlog item exists carrying an
+  explicit owner and either a calendar expiry or a named review trigger
+  (a future increment, a dependency's availability, an explicit event) —
+  `owner: pipeline, no expiry set` alone does not satisfy this without a
+  named trigger; (3) the amendment is not a same-session self-grant for
+  the same work item it disposes — it reflects a real PO decision, not the
+  Elephant declaring its own deferral sufficient. A `disposed` criterion
+  still shows as `partial`/not-`implemented` in the evidence map — this
+  amendment changes only what EPIC-AC-05 permits the Epic to claim, not any
+  individual criterion's own verdict, and it disposes none of the currently
+  open criteria by itself: each needs its own named PO-attributed amendment
+  meeting the three conditions above before it counts.
 - **EPIC-AC-06:** WHEN the implementation is ready for the first dispatch, THE
   SYSTEM SHALL require the Product Owner's literal `approved` against the
   readable PRD and bound Spec; design work alone SHALL NOT authorize code.
