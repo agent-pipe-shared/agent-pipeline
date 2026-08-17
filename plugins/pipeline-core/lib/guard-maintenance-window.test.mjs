@@ -870,22 +870,31 @@ try {
     assert.equal(windowCoversRule({ rootDir: root, ruleId: "GS-6" }).covered, true);
   });
 
-  check("GMW28 an explicit EMPTY v3 trustAnchors: [] (the \"any well-formed key\" posture) is accepted at install and at read, never treated as missing", () => {
+  check("GMW28 an explicit EMPTY v3 trustAnchors: [] is treated as no anchor available and fails closed at install -- GMW never adopts the \"any well-formed key\" posture, unlike the CRITICAL_ACTION_KINDS ceremonies", () => {
+    // NVA-GMWFIX-2: GMW28 previously asserted the WRONG (undisclosed) behavior imported by
+    // e31f0233/NVA-GMWFIX-1 -- an empty v3 trustAnchors set installing as "active". GMW is
+    // the ceremony that LIFTS GS-6/TP-* protection in the first place, so that posture here
+    // would make the whole ceremony self-serviceable by an agent with no human involved.
+    // Rewritten to pin the CORRECTED behavior: absent/empty is "no anchor available", the
+    // same fail-closed posture GMW had before NVA-GMWFIX-1.
     const root = repoFixture("gmw-v3-empty-", { policy: v3PolicyWithAnchors([]) });
     const plugin = pluginRootFixture();
     const { planSha256, specSha256 } = planSpecShas(root);
     const { intent, request } = prepareGuardMaintenanceWindowRequest({
-      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "v3 empty set, any key", featureId: "f",
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "v3 empty set, must fail closed", featureId: "f",
       planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
     });
-    // `trustPolicy: []` mirrors what the CLI's default-authority branch now hands
-    // install() when the committed policy carries an empty v3 set (see GMW31 below for
-    // the same posture exercised through the real CLI default-authority branch).
-    const installed = installGuardMaintenanceWindow({
-      rootDir: root, request, trustPolicy: [], proof: proofFor(intent), livePluginRoot: plugin,
-    });
-    assert.equal(installed.status, "active", "an empty trustAnchors set must admit a well-formed key's signature, not refuse it as missing");
-    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
+    // `trustPolicy: []` mirrors what the CLI's default-authority branch resolves when the
+    // committed policy carries an empty v3 set (see GMW31 for the CLI's default-authority
+    // branch exercised end to end against a POPULATED v3 set).
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy: [], proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "an empty trustAnchors set must be refused, not silently admitted as \"any well-formed key\"");
+    assert.equal(error.code, "GMW-TRUST-ANCHOR-MISSING", "the refusal must be the empty-anchor-set check, not an incidental failure");
+    assert.notEqual(error.code, "GMW-PROOF-INVALID", "must be distinguishable from an ordinary signature-verification failure");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind, and a read against an empty committed policy must also report absent");
   });
 
   check("GMW29 a legacy-only policy (singular trustAnchor, no trustAnchors array at all) still reads an installed window back as active -- the fix is additive, not breaking", () => {
@@ -965,6 +974,29 @@ try {
     const status = runGuardMaintenanceWindowCli(["status", "--repo-root", root]);
     assert.equal(status.value.status, "active");
     assert.equal(closeGuardMaintenanceWindow({ rootDir: root }).status, "closed");
+  });
+
+  check("GMW32 installGuardMaintenanceWindow's defense-in-depth check refuses a caller-supplied empty trustPolicy array even when the repository's OWN committed policy is populated -- proving the check trusts no caller's shape, not only the CLI's own resolution path", () => {
+    // Distinct from GMW28: GMW28's fixture carries an empty v3 set on disk too, so it
+    // exercises the resolution-site fix. This fixture uses the suite's DEFAULT (populated
+    // legacy trustAnchor) policy, and the caller still hands `trustPolicy: []` directly --
+    // bypassing the CLI's own resolution entirely -- to prove the install()-internal
+    // defense-in-depth check fires regardless of what a caller passes, per NVA-GMWFIX-2.
+    const root = repoFixture("gmw-empty-anchor-defense-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "defense in depth, empty caller-supplied trustPolicy", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy: [], proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "a caller-supplied empty trustPolicy array must be refused regardless of the repository's own committed policy");
+    assert.equal(error.code, "GMW-TRUST-ANCHOR-MISSING");
+    assert.notEqual(error.code, "GMW-PROOF-INVALID", "must be distinguishable from an ordinary signature-verification failure");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
   });
 
   console.log(`\nguard-maintenance-window: ${passed} passed, ${failed} failed`);

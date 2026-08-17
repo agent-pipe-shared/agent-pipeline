@@ -528,15 +528,27 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   } catch { fail("GMW-REQUEST-INVALID", "request intent is malformed"); }
   if (rebuiltIntent.sha256 !== request.intent.sha256) fail("GMW-REQUEST-INVALID", "request intent digest does not match its rebuilt preimage");
 
-  // NVA-GMWFIX-1: `trustPolicy` is either a single anchor object -- the shape every
-  // pre-existing caller and the CLI's `--authority` branch supply -- or a v3 anchor SET
-  // (an array, empty included for the "any well-formed key" posture) -- the shape the
-  // CLI's default-authority branch now supplies (mirrors trustAnchorsFor,
-  // lib/critical-action-authorization.mjs). Normalizing a lone object into a one-element
-  // set before calling verifyAgainstTrustAnchors keeps every existing single-anchor
-  // caller's behavior byte-for-byte identical (verifyAgainstTrustAnchors on a
-  // one-element, non-empty set is exactly verifyPoApprovalProof against that one anchor).
+  // NVA-GMWFIX-2: unlike the four CRITICAL_ACTION_KINDS ceremonies (trustAnchorsFor,
+  // lib/critical-action-authorization.mjs), the Guard Maintenance Window does NOT adopt
+  // "absent/empty trustAnchors accepts any well-formed key" -- GMW is the ceremony that
+  // LIFTS GS-6/TP-* protection in the first place, so that posture here would make the
+  // whole ceremony self-serviceable by an agent, with no human involved
+  // (docs/adr/0058-guard-maintenance-window.md). `trustPolicy` is either a single anchor
+  // object -- the shape every pre-existing caller and the CLI's `--authority` branch
+  // supply -- or a v3 anchor SET (an array) -- the shape the CLI's default-authority
+  // branch supplies when the committed policy carries a non-empty one. Normalizing a
+  // lone object into a one-element set before calling verifyAgainstTrustAnchors keeps
+  // every existing single-anchor caller's behavior byte-for-byte identical
+  // (verifyAgainstTrustAnchors on a one-element, non-empty set is exactly
+  // verifyPoApprovalProof against that one anchor). F3-style defense in depth (see "never
+  // trust a stored record's scope claim" a few lines above `currentGuardMaintenanceWindow`'s
+  // anchor resolution, same pattern): an EMPTY resolved set is refused HERE, before
+  // verification is ever attempted, regardless of what shape or source `trustPolicy` came
+  // from -- never trust a caller's anchor shape either.
   const anchors = Array.isArray(trustPolicy) ? trustPolicy : [trustPolicy];
+  if (anchors.length === 0) {
+    fail("GMW-TRUST-ANCHOR-MISSING", "resolved trust anchor set is empty; the Guard Maintenance Window never treats an empty/absent trustAnchors set as \"any well-formed key\"");
+  }
   const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof });
   if (!verified.verified) fail("GMW-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
 
@@ -644,16 +656,20 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
   // NVA-GMWFIX-1: this used to read the legacy SINGULAR `policy.trustAnchor` field only,
   // which is permanently `null` once `critical-human-proof.json` carries the v3
   // `trustAnchors` SET -- every window read back `absent`, including the one install()
-  // itself performs to build its own return value. Mirrors trustAnchorsFor
-  // (lib/critical-action-authorization.mjs) exactly: the v3 set wins whenever the
-  // document carries one at all, used AS-IS (empty array included -- the "any
-  // well-formed key" posture, never treated as "missing"); the legacy singular field is
-  // the fallback ONLY for a document that predates v3 (`trustAnchors === null`).
+  // itself performs to build its own return value. NVA-GMWFIX-2: unlike trustAnchorsFor
+  // (lib/critical-action-authorization.mjs), GMW does NOT adopt "absent/empty trustAnchors
+  // accepts any well-formed key" -- GMW is the ceremony that LIFTS GS-6/TP-* protection in
+  // the first place, so that posture here would make the whole ceremony self-serviceable
+  // by an agent (docs/adr/0058-guard-maintenance-window.md). A NON-EMPTY v3 set wins
+  // whenever the document carries one; an absent OR EMPTY v3 set falls through to the
+  // legacy singular field (the fallback for a document that predates v3, or that
+  // explicitly carries an empty v3 set), and finally to "absent" -- the SAME posture GMW
+  // had before NVA-GMWFIX-1 for the no-anchor-available case.
   let anchors;
   try {
     const policy = readCriticalHumanProofPolicy(repo.root);
     if (!policy.ok) return { status: "absent" };
-    if (policy.trustAnchors !== null) anchors = policy.trustAnchors;
+    if (Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0) anchors = policy.trustAnchors;
     else if (policy.trustAnchor !== null) anchors = [policy.trustAnchor];
     else return { status: "absent" };
   } catch { return { status: "absent" }; }
@@ -665,6 +681,11 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
     rebuiltIntent = rebuildGuardLiftIntent(record.intent.value, subjectSha256);
   } catch { return { status: "absent" }; }
   if (rebuiltIntent.sha256 !== record.intent.sha256) return { status: "absent" }; // tamper
+  // Defense in depth (belt-and-suspenders with the resolution above): never let an empty
+  // anchor set reach verification, regardless of how `anchors` above was resolved -- a
+  // future code path that resolves it differently must still be unable to pass an empty
+  // set through to verifyAgainstTrustAnchors.
+  if (!Array.isArray(anchors) || anchors.length === 0) return { status: "absent" };
   const verified = verifyAgainstTrustAnchors({ intent: rebuiltIntent, anchors, proof: record.proof });
   if (!verified.verified) return { status: "absent" }; // tamper / revoked anchor
 

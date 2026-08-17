@@ -129,16 +129,22 @@ export function run(argv = process.argv.slice(2)) {
         return { keyReference: authority?.keyReference, publicKeySha256: authority?.publicKeySha256 };
       })()
       : (() => {
-        // NVA-GMWFIX-1: mirrors trustAnchorsFor (lib/critical-action-authorization.mjs)
-        // exactly. The v3 `trustAnchors` SET wins whenever the document carries one at
-        // all, used AS-IS (empty array included -- the "any well-formed key" posture,
-        // never treated as "missing"); the legacy singular `trustAnchor` is the fallback
-        // ONLY for a document that predates v3 (`trustAnchors === null`).
-        // installGuardMaintenanceWindow's proof verification accepts either shape: a
-        // single anchor object (legacy) or an anchor array (v3 set).
+        // NVA-GMWFIX-2: unlike trustAnchorsFor (lib/critical-action-authorization.mjs),
+        // the Guard Maintenance Window does NOT treat an absent/empty v3 trustAnchors set
+        // as "any well-formed key may sign" -- GMW is the ceremony that LIFTS GS-6/TP-*
+        // protection in the first place, so that posture here would make the whole
+        // ceremony self-serviceable by an agent, with no human involved
+        // (docs/adr/0058-guard-maintenance-window.md). A NON-EMPTY v3 `trustAnchors` SET
+        // wins whenever the document carries one; an absent OR EMPTY v3 set falls through
+        // to the legacy singular `trustAnchor` field (the fallback for a document that
+        // predates v3, or that explicitly carries an empty v3 set), and finally to the
+        // fail-closed throw below. installGuardMaintenanceWindow's proof verification
+        // accepts either resolved shape: a single anchor object (legacy) or a non-empty
+        // anchor array (v3 set) -- and independently refuses an empty resolved set itself
+        // (defense in depth), so this branch's own fallthrough is not the only guard.
         const policy = readCriticalHumanProofPolicy(rootDir);
         if (!policy.ok) throw new Error("GMW-TRUST-ANCHOR-MISSING: project/critical-human-proof.json is unreadable or invalid");
-        if (policy.trustAnchors !== null) return policy.trustAnchors;
+        if (Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0) return policy.trustAnchors;
         if (policy.trustAnchor !== null) return policy.trustAnchor;
         throw new Error("GMW-TRUST-ANCHOR-MISSING: project/critical-human-proof.json carries no trustAnchor");
       })();
