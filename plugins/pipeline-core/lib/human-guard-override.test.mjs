@@ -1608,6 +1608,57 @@ test("native Windows private-state assurance is injected and fail-closed", () =>
   }
 });
 
+test("secureDirectory hardens EVERY newly-created path component, not only the leaf (NVA-PAWINACL-2)", () => {
+  const root = mkdtempSync(join(tmpdir(), "human-guard-multi-component-harden-"));
+  try {
+    // Neither "shared-parent" nor "leaf" exists yet -- a single recursive
+    // mkdirSync creates both in one call, the exact shape that left a shared
+    // intermediate (e.g. .git/agent-pipeline/) with the default inherited
+    // Windows ACL before this fix.
+    const parent = join(root, "shared-parent");
+    const target = join(parent, "leaf");
+    const hardened = [];
+    const result = humanGuardOverrideInternals.secureDirectory(target, {
+      platform: "win32",
+      hardenWindowsPrivateDirectoryFn(candidate) {
+        hardened.push(candidate);
+        return { status: "secure" };
+      },
+    });
+    assert.equal(result, target);
+    assert.deepEqual(hardened, [parent, target]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("secureDirectory only ASSESSES an already-secure existing parent, never re-hardens it, when adding a new child (NVA-PAWINACL-2)", () => {
+  const root = mkdtempSync(join(tmpdir(), "human-guard-existing-parent-new-child-"));
+  try {
+    const base = join(root, "base");
+    mkdirSync(base, { mode: 0o700 });
+    const child = join(base, "child");
+    const assessed = [];
+    const hardened = [];
+    const result = humanGuardOverrideInternals.secureDirectory(child, {
+      platform: "win32",
+      assessWindowsPrivatePathFn(candidate) {
+        assessed.push(candidate);
+        return { status: "secure" };
+      },
+      hardenWindowsPrivateDirectoryFn(candidate) {
+        hardened.push(candidate);
+        return { status: "secure" };
+      },
+    });
+    assert.equal(result, child);
+    assert.deepEqual(assessed, []);
+    assert.deepEqual(hardened, [child]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("F1 (dispatch CRITIC-REMEDY-09): the local-plugin-install attestation succeeds against THIS repository's own, real marketplace manifest and plugin source tree", () => {
   // Every other local-plugin-install test above uses a synthetic fixture and
   // therefore can never observe a regression in the real, committed

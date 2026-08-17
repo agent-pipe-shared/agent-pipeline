@@ -15,7 +15,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { basename, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
@@ -622,20 +622,50 @@ function secureDirectory(path, {
   assessWindowsPrivatePathFn = assessWindowsPrivatePath,
   hardenWindowsPrivateDirectoryFn = hardenWindowsPrivateDirectory,
 } = {}) {
-  const existed = existsSync(path);
-  mkdirSync(path, { recursive: true, mode: 0o700 });
-  const info = lstatSync(path);
-  if (!info.isDirectory() || info.isSymbolicLink()) {
-    fail("HGO-STORAGE", "override directory is unsafe");
+  // `mkdirSync(path, { recursive: true })` can silently create several missing
+  // intermediate components in one call (e.g. a shared `.../agent-pipeline/`
+  // parent AND its child in one shot). Walking and hardening only the final
+  // `path` therefore left a newly-created SHARED intermediate with the
+  // default inherited Windows ACL -- live-reproduced, NVA-PAWINACL-2. Record
+  // BEFORE creating anything which components are missing, from `path`
+  // upward to the nearest existing ancestor, so every one of them gets the
+  // same harden/assess treatment the original code only gave the leaf --
+  // mirroring the walk `ensurePhysicalPrivateDirectory()`
+  // (po-gate-profile-publisher.mjs) already does for the identical problem,
+  // adapted to this function's own dependency-injection signature.
+  const missing = [];
+  let cursor = path;
+  while (!existsSync(cursor)) {
+    missing.unshift(cursor);
+    const parent = dirname(cursor);
+    if (parent === cursor) break; // filesystem root guard, defensive only
+    cursor = parent;
   }
-  if (platform === "win32") {
-    const assurance = existed
-      ? assessWindowsPrivatePathFn(path)
-      : hardenWindowsPrivateDirectoryFn(path);
-    if (assurance.status !== "secure") fail("HGO-DACL", "override directory DACL is not owner-private");
-  } else if ((info.mode & 0o077) !== 0) {
-    try { chmodSync(path, 0o700); } catch {}
-    if ((lstatSync(path).mode & 0o077) !== 0) fail("HGO-PERMISSIONS", "override directory is not owner-private");
+
+  mkdirSync(path, { recursive: true, mode: 0o700 });
+
+  // Every component in `missing` was, by construction, absent before the
+  // mkdirSync above and is therefore newly created by it. If nothing was
+  // missing, `path` itself already existed -- the original single-path
+  // behavior for that case.
+  const walk = missing.length > 0
+    ? missing.map((component) => ({ component, created: true }))
+    : [{ component: path, created: false }];
+
+  for (const { component, created } of walk) {
+    const info = lstatSync(component);
+    if (!info.isDirectory() || info.isSymbolicLink()) {
+      fail("HGO-STORAGE", "override directory is unsafe");
+    }
+    if (platform === "win32") {
+      const assurance = created
+        ? hardenWindowsPrivateDirectoryFn(component)
+        : assessWindowsPrivatePathFn(component);
+      if (assurance.status !== "secure") fail("HGO-DACL", "override directory DACL is not owner-private");
+    } else if ((info.mode & 0o077) !== 0) {
+      try { chmodSync(component, 0o700); } catch {}
+      if ((lstatSync(component).mode & 0o077) !== 0) fail("HGO-PERMISSIONS", "override directory is not owner-private");
+    }
   }
   return path;
 }

@@ -303,6 +303,41 @@ check("distinguishes post-rename directory durability uncertainty", () => {
   });
 });
 
+// NVA-PAWINACL-2: publishReceipt() must surface a specific code for a
+// DACL-insecure receipt directory, rather than the generic write-failed one.
+// ensurePhysicalPrivateDirectory()'s win32 branch and the real
+// windows-private-state.mjs primitives are not independently dependency-
+// injectable in this file (no seam for that exists here, only `io`/`now`/
+// `randomUUID`/`resolveTopology`; adding one would restructure
+// ensurePhysicalPrivateDirectory()'s signature, out of scope for this fix).
+// Off a genuine Windows host, the real primitives deterministically report
+// "unavailable" (no fixed PowerShell path exists), so forcing
+// `process.platform` to "win32" for the duration of one `publish()` call
+// reaches the same DACL-insecure-directory failure deterministically without
+// mocking any DACL primitive -- restored in `finally` either way. On a REAL
+// win32 host this technique is a no-op (platform is already "win32") and
+// whether the freshly created directory is actually DACL-insecure depends on
+// that host's own inherited ACL, so this regression only runs off Windows;
+// this fix cannot be live-verified on Windows from this host regardless (see
+// dispatch report).
+if (process.platform !== "win32") check("publishReceipt surfaces a specific code when the receipt directory is DACL-insecure (win32)", () => {
+  withFixture(({ publish }) => {
+    const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+    Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+    try {
+      const result = publish();
+      assert.deepEqual(result, {
+        ok: false,
+        code: "PO-PROFILE-RECEIPT-DIRECTORY-INSECURE",
+        reason: "the common profile receipt directory is not owner-private (Windows DACL)",
+      });
+    } finally {
+      Object.defineProperty(process, "platform", originalPlatform);
+    }
+  });
+});
+else process.stdout.write("[capability: real win32 host] skipping forced-platform DACL-insecure-directory regression\n");
+
 check("supports deterministic per-call dependencies while rejecting an open dependency surface", () => {
   withFixture(({ publish }) => {
     const result = publish({ updatedAt: undefined }, {

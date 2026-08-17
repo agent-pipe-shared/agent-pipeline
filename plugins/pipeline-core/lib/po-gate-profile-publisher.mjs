@@ -116,7 +116,15 @@ function ensurePhysicalPrivateDirectory(commonDir, relativeDirectory, io) {
     }
     if (process.platform === "win32") {
       const state = existed ? assessWindowsPrivatePath(cursor) : hardenWindowsPrivateDirectory(cursor);
-      if (state.status !== "secure") throw new Error("Windows receipt directory assurance unavailable");
+      if (state.status !== "secure") {
+        // Tagged distinctly (NVA-PAWINACL-2) so publishReceipt()'s catch-all
+        // can surface a specific code instead of the generic write-failed
+        // one -- a DACL-insecure directory was previously swallowed and
+        // live-reproduced as an uninformative PO-PROFILE-RECEIPT-WRITE-FAILED.
+        const error = new Error("Windows receipt directory assurance unavailable");
+        error.code = "PRIVATE-DIRECTORY-DACL-INSECURE";
+        throw error;
+      }
     }
   }
   if (!isInside(common, cursor)) throw new Error("receipt directory escaped Git common directory");
@@ -282,6 +290,12 @@ function publishReceipt({
       return rejected(
         "PO-PROFILE-RECEIPT-INITIAL-CONFLICT",
         "an existing PO profile receipt must not be replaced by kickoff initialization",
+      );
+    }
+    if (error?.code === "PRIVATE-DIRECTORY-DACL-INSECURE") {
+      return rejected(
+        "PO-PROFILE-RECEIPT-DIRECTORY-INSECURE",
+        "the common profile receipt directory is not owner-private (Windows DACL)",
       );
     }
     return rejected(
