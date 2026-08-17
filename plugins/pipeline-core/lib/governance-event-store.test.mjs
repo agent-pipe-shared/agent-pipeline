@@ -17,6 +17,7 @@ import {
   GOVERNANCE_FORK_DISPOSITION_APPROVAL,
   GovernanceEventStoreError,
   governanceForkDispositionApprovalSubject,
+  assertRestrictedRoot,
   createRestrictedAuthorization,
   appendPortableGovernanceEvent,
   eraseRestrictedGovernanceEvent,
@@ -839,4 +840,78 @@ test("K-AC-10 multi-stream query preserves each stream's own origin, authority c
   await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: [] }), (error) => error.code === "GES-MULTI-STREAM");
   await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle"], checkpoints: ["not-a-plain-object"] }), (error) => error.code === "GES-MULTI-STREAM");
   await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle"], checkpoints: { agent: agentAppended.checkpoint } }), (error) => error.code === "GES-MULTI-STREAM");
+});
+
+// PHX-WP-HAC11-WINACL: assertRestrictedRoot's win32 DACL-assurance branch is
+// exercised with an injected `io` seam (platform + assess/harden), the same
+// deterministic-on-any-host pattern afk-ledger.test.mjs uses for its own
+// sibling call -- no real Windows host is required.
+
+function secureWindowsIo(overrides = {}) {
+  return { platform: "win32", assess: () => ({ status: "secure" }), harden: () => ({ status: "secure" }), ...overrides };
+}
+
+test("PHX-WP-HAC11-WINACL: a newly-created restricted root on simulated win32 is hardened, never merely assessed", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const restrictedRoot = path.join(await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-")), "restricted");
+  t.after(() => cleanup(path.dirname(restrictedRoot)));
+  let hardenCalledWith = null;
+  let assessCalled = false;
+  const io = secureWindowsIo({
+    harden: (target) => { hardenCalledWith = target; return { status: "secure" }; },
+    assess: () => { assessCalled = true; return { status: "secure" }; },
+  });
+  const resolved = await assertRestrictedRoot(root, restrictedRoot, { create: true }, io);
+  assert.equal(resolved, restrictedRoot);
+  assert.equal(hardenCalledWith, restrictedRoot);
+  assert.equal(assessCalled, false);
+});
+
+test("PHX-WP-HAC11-WINACL: a pre-existing restricted root on simulated win32 is only assessed, never hardened", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-existing-")); t.after(() => cleanup(restrictedRoot));
+  let hardenCalled = false;
+  let assessCalledWith = null;
+  const io = secureWindowsIo({
+    harden: () => { hardenCalled = true; return { status: "secure" }; },
+    assess: (target) => { assessCalledWith = target; return { status: "secure" }; },
+  });
+  const resolved = await assertRestrictedRoot(root, restrictedRoot, { create: false }, io);
+  assert.equal(resolved, restrictedRoot);
+  assert.equal(assessCalledWith, restrictedRoot);
+  assert.equal(hardenCalled, false);
+});
+
+test("PHX-WP-HAC11-WINACL: a non-secure simulated win32 DACL assessment fails closed", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-insecure-")); t.after(() => cleanup(restrictedRoot));
+  await assert.rejects(
+    () => assertRestrictedRoot(root, restrictedRoot, { create: false }, secureWindowsIo({ assess: () => ({ status: "insecure" }) })),
+    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-RESTRICTED-WINDOWS-ASSURANCE",
+  );
+  await assert.rejects(
+    () => assertRestrictedRoot(root, restrictedRoot, { create: false }, secureWindowsIo({ assess: () => ({ status: "unavailable" }) })),
+    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-RESTRICTED-WINDOWS-ASSURANCE",
+  );
+  const createRestrictedRoot = path.join(await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-insecure-create-")), "restricted");
+  t.after(() => cleanup(path.dirname(createRestrictedRoot)));
+  await assert.rejects(
+    () => assertRestrictedRoot(root, createRestrictedRoot, { create: true }, secureWindowsIo({ harden: () => ({ status: "insecure" }) })),
+    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-RESTRICTED-WINDOWS-ASSURANCE",
+  );
+});
+
+test("PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged)", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-posix-")); t.after(() => cleanup(restrictedRoot));
+  let assessCalled = false;
+  let hardenCalled = false;
+  const resolved = await assertRestrictedRoot(root, restrictedRoot, { create: false }, {
+    platform: "linux",
+    assess: () => { assessCalled = true; return { status: "insecure" }; },
+    harden: () => { hardenCalled = true; return { status: "insecure" }; },
+  });
+  assert.equal(resolved, restrictedRoot);
+  assert.equal(assessCalled, false, "the win32 assurance seam must never be consulted off win32");
+  assert.equal(hardenCalled, false, "the win32 assurance seam must never be consulted off win32");
 });

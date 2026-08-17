@@ -4,9 +4,11 @@
  *
  * Canonical events are individual immutable files.  `heads.json` is a
  * replaceable source-last projection and is deliberately never used as an
- * integrity authority.  This module does not implement the separate,
- * owner-authenticated restricted-machine-local profile; callers must never
- * route restricted data through this portable writer.
+ * integrity authority.  This module also implements, separately, the
+ * owner-authenticated restricted-machine-local profile (the
+ * `*RestrictedGovernance*` functions below); callers must never route
+ * restricted data through the portable writer above, and must never route
+ * portable-profile data through the restricted-machine-local functions.
  */
 import { mkdir, open, readFile, realpath, readdir, rename, unlink, lstat, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
@@ -27,6 +29,7 @@ import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs
 import { isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
 import { validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.mjs";
 import { EVENT_CLASSES, representedEventClasses, validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
+import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
 const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
@@ -107,7 +110,18 @@ async function assertNoSymlinkAncestry(target) {
   }
 }
 
-async function assertRestrictedRoot(repositoryRoot, storeRoot, { create = false } = {}) {
+/**
+ * `create`/`create=false` selects harden-vs-assess exactly the way
+ * `private-boundary.mjs`'s `ensurePrivateDirectory` tracks `created` per
+ * directory: a freshly-created restricted root is hardened (we made it, so
+ * we may fix its DACL); a pre-existing one is only assessed, never
+ * hardened, so a raced-in or attacker-controlled directory is never
+ * silently claimed as ours. `io` is an injectable dependency seam (default
+ * real `process.platform`/`hardenWindowsPrivateDirectory`/
+ * `assessWindowsPrivatePath`), mirroring `afk-ledger.mjs`'s `resolveIo`
+ * pattern, so this win32-only branch is unit-testable on any host.
+ */
+export async function assertRestrictedRoot(repositoryRoot, storeRoot, { create = false } = {}, io = {}) {
   const target = assertAbsoluteOutsideRepository(repositoryRoot, storeRoot);
   if (create) await mkdir(target, { recursive: true, mode: 0o700 });
   await assertNoSymlinkAncestry(target);
@@ -115,6 +129,13 @@ async function assertRestrictedRoot(repositoryRoot, storeRoot, { create = false 
   const metadata = await stat(target);
   if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", "Restricted storage must not grant group or other access.");
   if (typeof process.getuid === "function" && metadata.uid !== process.getuid()) fail("GES-RESTRICTED-OWNER", "Restricted storage is not owned by this operator.");
+  const platform = io.platform ?? process.platform;
+  if (platform === "win32") {
+    const harden = io.harden ?? hardenWindowsPrivateDirectory;
+    const assess = io.assess ?? assessWindowsPrivatePath;
+    const state = create ? harden(target) : assess(target);
+    if (state.status !== "secure") fail("GES-RESTRICTED-WINDOWS-ASSURANCE", `Restricted storage Windows DACL assurance is ${state.status}.`);
+  }
   return target;
 }
 
