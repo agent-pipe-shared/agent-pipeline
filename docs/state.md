@@ -7,7 +7,95 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again (22): C-AC-13 closed, EPIC-AC-04 audit down to 1 substantive finding (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (23): E-AC-19 closed with a real producer, one PO signature outstanding (READ THIS FIRST)
+
+**E-AC-19 closed.** `PHX-WP-EAC19B` (goldfish-deep, xhigh) built
+`projectGovernanceExportViewStatus` (new file
+`governance-export-view-status.mjs`) — a pure translator from a REAL
+`deliverGovernanceExportBatch` result, optionally paired with a real
+`evaluateGovernanceExportBoundaryGate` evaluation, into `exportStatus`'s
+shape: `failureCount`/`quarantineCount` now come from real outbox entry
+state, and the criterion's sixth and last named item, `recoveryState`, is a
+new 10th field on `exportStatus`/`unavailableExportStatus`
+(`evidence-view-model.mjs`), rendered in `exportBlock`
+(`evidence-view-renderer.mjs`), carrying `evaluateGovernanceExportBoundaryGate`'s
+own guidance text verbatim. A new `view-status` CLI mode
+(`governance-export.mjs`) makes the producer operator-reachable.
+`integrityGaps` stays honestly `null` — no integrity-gap detector exists
+anywhere in this codebase, correctly not invented. The dispatch's own report
+got cut off mid-task (known truncated-final-report class, tool_uses near its
+70-use budget) — before committing and before registering the new test file
+in `verify.mjs`. Independently re-verified by the Elephant directly against
+the STAGED diff (nothing was lost): read all 9 files in full, confirmed a
+well-reasoned deviation (`receiptInputOf()` strips the `schema` tag before
+re-offering a receipt to `createGovernanceDeliveryReceipt`, whose own input
+contract excludes it — a genuine invocation-mechanics fix, not a design
+change), and re-ran all 7 real+sibling test files myself: 79/79 pass
+(`governance-export-view-status-tests` 11/11 new, plus 6 unchanged
+siblings). Committed as `af544cc4`; evidence-map flip to `implemented`
+committed separately as `54d2c761`.
+
+**One PO signature outstanding, not blocking.** The Elephant is structurally
+blocked from editing `harness/scripts/verify.mjs` directly (TP-3 guard); a
+dispatched `goldfish-mechanic` hit the identical guard for the same one-line
+registration (`governance-export-view-status-tests`) — this repo's
+`gates.push_approval: signature` admits no in-session or dispatch-level
+clearance, only a PO-signed external Ed25519 override
+(`guard-human-override.mjs`). Rather than run a full signature ceremony for
+one line, this is disclosed and left as a known, batchable gap — this repo's
+own history already has this exact pattern (`git log -- harness/scripts/verify.mjs`
+shows repeated "register N unregistered suites" commits). The new test file
+is real and passing when run directly; only Full Verify's own coverage of it
+awaits the PO's convenience. E-AC-19's verdict flips to `implemented` on
+that basis (the criterion is about functional completeness, not gate
+registration lag) — this is fully disclosed in POINTERS, not hidden.
+
+**Full Verify + security-scan re-run at `54d2c761` (dispatched via
+`run_in_background` throughout):** exactly the same 5 known reds
+(`guard-testpath-override-tests`, `doc-contract-tests`, `doc-contract-check`,
+`backlog-state-check`, `verify-suite-registration-check`) — 376 suites
+total, unchanged (the new file isn't counted yet, as expected). Security-scan
+CLEAN. Evidence copied back to the primary tree's `evidence/` (gitignored).
+
+**Totals: 150 implemented / 6 partial / 1 constraint = 157, 7 open.** The 7
+open items: `PX0-AC-13` (po), `H-AC-11` (po), `A-AC-01` (build — missing
+`pipelineMainSessionRoute` host-adapter capability), `L-AC-01` (po —
+lifecycle-event correlation-schema split, scoped, backlog item filed),
+`R-AC-06` (build — PO decision flagged at checkpoint 19 on 3 unreachable
+`COMMAND_STATES`), `EPIC-AC-04` (build — Full Verify/Security pass is on the
+integrated tree, not the last pushed candidate), `EPIC-AC-05` (constraint —
+a deliberate prohibition, not a defect).
+
+**EPIC-AC-04 Critic-audit status: all 10 confirmed findings now fixed or
+formally scoped.** The one substantive item remaining, `R-AC-06`'s
+architecture gap, needs a genuine PO decision (scope down via an
+acceptance.md amendment matching `L-AC-01`'s disposition, or design a schema
+extension for `displayed`/`generated`/`asserted`) — not further code work.
+`E-AC-14`'s citation-staleness finding stays explicitly unconfirmed/
+unaddressed, unchanged since checkpoint 21.
+
+**Also found, deliberately NOT touched:** roughly 300 stale orphan `CLOSURE`
+entries across this session's evidence-map edits, for criteria that flipped
+to `implemented` earlier in this epic's history without their `CLOSURE` row
+being removed — harmless (the generated report only consults `CLOSURE` for
+currently-open IDs), not a priority cleanup, noted for a future pass.
+
+**Next steps:** of the 7 remaining open items, `A-AC-01`/`L-AC-01`/`R-AC-06`
+are genuinely blocked on a missing capability or a PO decision — not
+force-buildable. `PX0-AC-13`/`H-AC-11`/`EPIC-AC-04` are `po`-class or
+gate-table entries that close only via an external event (a Critic PASS on
+a pushed candidate), not agent work. `EPIC-AC-05` is a permanent constraint.
+This means the remaining open Phoenix items are now ALL genuinely
+PO-decision-gated or external-event-gated, not agent-actionable by further
+autonomous dispatch — the two flagged PO decisions (R-AC-06's scope
+question, checkpoint 19; L-AC-01's schema-split disposition, already
+decided/scoped this session) and the one outstanding verify.mjs signature
+(this checkpoint) are what's left. All chat/AskUserQuestion text in German;
+repo content in English per ADR-0011.
+
+---
+
+## CHECKPOINT — 2026-08-17, continued again (22): C-AC-13 closed, EPIC-AC-04 audit down to 1 substantive finding
 
 **C-AC-13 closed.** `PHX-WP-DOC3` (goldfish-implementor, template-built briefing) rewrote `docs/change-control.md`'s "Threat model", "Policy precedence", "Operator runbook", and "Failure/rollback/recovery procedures" sections to cover the five real behaviors the EPIC-AC-04 audit found undocumented: `resolveChangeControlProfile` (C-AC-09), `detectChangeClassShopping` (C-AC-02), the `reviewPolicy` advisory/mandatory split (C-AC-12), the optional `decisionReference` dual-evaluation wiring (H-AC-12), and the emergency retrospective-evidence requirement (C-AC-07, `emergency-review-required` status) — and re-verified every `change-control.mjs:N` citation in the doc against the module's current line numbers. Independently re-verified by the Elephant: read the full diff (195 insertions/45 deletions, `docs/change-control.md` only), spot-checked roughly 30 individual citations against a fresh direct read of the whole 283-line module — every one correct — and independently re-ran both test files myself: `change-control.test.mjs` 33/33, `scripts/change-control.test.mjs` 3/3, both unchanged as claimed (a doc-only commit). Commit `b8182b7b`. Verdict flipped `partial` → `implemented` (commit `8d3f31d5`), CLOSURE entry removed. Along the way, found (but deliberately left alone, out of scope) roughly 300 stale orphan `CLOSURE` entries for criteria that flipped to `implemented` earlier in this epic's history without their `CLOSURE` row being removed per the file's own documented invariant — harmless dead weight (the generated report only ever consults `CLOSURE` for currently-open IDs), not a priority cleanup.
 
