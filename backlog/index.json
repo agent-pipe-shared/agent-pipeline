@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2dfbaa5163068fd1328aa3a02dcba1c797f8c07c3aa326b1b0a990b3d86d1777"
+    "transitionHead": "f254969dadcfe7ae2081bd33aa4a2f692bc80a4846c90baf5f25049b8709f6ff"
   },
   "counts": {
-    "open": 96,
+    "open": 97,
     "in_progress": 22,
     "closed": 127
   },
@@ -2293,6 +2293,14 @@
       "owner": "pipeline",
       "created": "2026-08-17",
       "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing."
+    },
+    {
+      "id": "pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Discovered by dispatch NVA-HANDOVER-ROT-1 while wiring its own new close-block step alongside the pre-existing one; disclosed rather than reconciled unilaterally, per the dispatch's own explicit scope boundary."
     },
     {
       "id": "pipeline.two-manifest-literals-bypass-the-single-seed-owner",

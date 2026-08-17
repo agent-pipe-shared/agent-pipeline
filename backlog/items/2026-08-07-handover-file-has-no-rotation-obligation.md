@@ -121,3 +121,36 @@ own current file needs before real rotation is safe (ADR-0066 Decision 7,
 also not done here). This item closes only once BOTH the mechanism is built
 and tested AND the extraction pass has landed, or is re-split into two
 items if that turns out cleaner once the mechanism dispatch is scoped.
+
+### Correction + progress, 2026-08-17 (later the same day) — `NVA-HANDOVER-ROT-1` landed; the 2026-08-17 update above was itself wrong
+
+The "Update, 2026-08-17" note above ("no `docs/state-archive/` or
+equivalent extraction target exists") was misleading: it was checked
+against the filesystem, not against git history, and a rotation mechanism
+had already existed since 2026-08-12 (`rotate-handover-sections.mjs`,
+commit `93f638e5`) — it had simply never been run with `--apply`, so no
+archive directory existed on disk yet. See
+[ADR-0066](../../docs/adr/0066-handover-rotation-extraction-archive-hard-size-gate.md)'s
+own "Correction, 2026-08-17" section for the full account and why this
+does not make the new hard-cap gate redundant (the pre-existing script
+structurally cannot rotate a still-open block).
+
+`NVA-HANDOVER-ROT-1` landed: `handover-rotate.mjs` (explicit rotation +
+extraction-acknowledgment gate), `handover-rotation.mjs`
+(measurement/config library), `guard-handover-size.mjs` (hard-cap
+PreToolUse guard, built and tested, NOT wired into `hooks.json` — TP-4
+protected), and a new `close-block/SKILL.md` step 6d. All three new test
+suites independently re-verified green by the Elephant, plus a regression
+check on the pre-existing `rotate-handover-sections.test.mjs` (7/7,
+unchanged). Commits `c546f5df`, `c707d931`, `1dbf1e7e`, `6a7d9e93`.
+
+**Status stays `open`.** Two things remain, both explicitly out of this
+dispatch's scope: (1) the one-time extraction pass over this repository's
+real `docs/state.md` (ADR-0066 Decision 7) — still not done, still the
+larger remaining piece; (2) wiring `guard-handover-size.mjs` into
+`hooks.json` (TP-4, needs an authorized session — exact snippet recorded in
+`evidence/dispatch-record-NVA-HANDOVER-ROT-1.json`). A new, smaller
+follow-up was also filed:
+`backlog/items/2026-08-17-two-handover-rotation-mechanisms-use-different-archive-conventions.md`
+(reconciling the two archive-naming conventions — not urgent, not
+blocking).

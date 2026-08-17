@@ -47,6 +47,40 @@ bullets without ever closing — a purely block-boundary-triggered rotation
 does nothing for a block that simply never closes. The mechanism needs a
 second, independent trigger that does not wait for a close event at all.
 
+## Correction, 2026-08-17 (discovered while dispatching this ADR's own Follow-up)
+
+This ADR was drafted on the mistaken premise that no rotation mechanism
+existed yet — the basis backlog item's own 2026-08-17 update said so
+("no `docs/state-archive/` or equivalent extraction target exists"), and
+that check was not re-verified against actual repository history before
+writing Decision-level text implying a from-scratch build. It was
+incomplete: `plugins/pipeline-core/scripts/rotate-handover-sections.mjs`
+already existed, landed 2026-08-12 (commit `93f638e5`), already implements
+candidate 2 (block/feature-boundary rotation) from this ADR's own basis
+item, and was already wired into `close-block/SKILL.md` step 6c. It had
+simply never been run with `--apply` against the real file, which is why
+`docs/state-archive/` did not exist on disk — a true fact that was read as
+"no mechanism exists" rather than "an existing mechanism has never fired."
+
+**This does not make Decisions 3(b)/4 (the hard size gate) redundant.**
+`rotate-handover-sections.mjs`'s own fail-safe design retains any section
+carrying an open marker ("(current)"/"(in progress)") unconditionally — by
+construction, it can never rotate a single still-OPEN block, which is
+exactly the "riesen Sprint" case this ADR's hard gate exists for. The two
+mechanisms address genuinely different triggers, not the same one twice.
+
+**It does leave a real, disclosed inconsistency**: two archive-naming
+conventions now coexist under `docs/state-archive/` — `rotate-handover-
+sections.mjs`'s monthly `<YYYY-MM>.md` buckets (with a pointer-line
+in-place marker) and this ADR's own per-event `<ISO-date>--<slug>.md` files
+(with a table-based "Archived history" index). Reconciling this into one
+convention, or explicitly documenting why two conventions is the right
+permanent shape (one heuristic/close-time, one explicit/forced), is
+tracked as its own Follow-up item below — not decided here, and not
+attempted by the `NVA-HANDOVER-ROT-1` dispatch that built Decisions 3(b)/4
+(explicit coordinator instruction: disclose, do not reconcile
+unilaterally).
+
 ## Decision
 
 **1. Archive format.** Rotated content moves to `docs/state-archive/`, one
@@ -183,12 +217,26 @@ acknowledgment that extraction is complete.
 
 ## Follow-up
 
-- Build the rotation script (`plugins/pipeline-core/scripts/handover-rotate.mjs`)
-  and the hard-cap guard hook, both configurable per Decision 5, with tests
-  exercising: below-cap is inert, at/over-cap refuses a growing edit, a
-  shrinking edit is always admitted, block/feature-boundary rotation via
-  `close-block`/`close-feature`, and the `--acknowledge-extraction-done`
-  refusal for a repository that has never run extraction.
+- **Done (2026-08-17, `NVA-HANDOVER-ROT-1`):** the rotation script
+  (`plugins/pipeline-core/scripts/handover-rotate.mjs`), the measurement/
+  config library (`plugins/pipeline-core/lib/handover-rotation.mjs`), and
+  the hard-cap guard hook (`plugins/pipeline-core/hooks/guard-handover-size.mjs`)
+  are built and tested against synthetic fixtures — below-cap is inert,
+  at/over-cap refuses a growing edit, a shrinking edit is always admitted,
+  the `--acknowledge-extraction-done` refusal fires for an un-acknowledged
+  repository. `close-block/SKILL.md` gained step 6d pointing at the new
+  script. **Not done:** the guard hook is NOT wired into `hooks.json` (TP-4
+  protected, no in-session override) — the exact wiring snippet is recorded
+  in `evidence/dispatch-record-NVA-HANDOVER-ROT-1.json`'s `report` field,
+  awaiting an authorized session.
+- **New, discovered during the above (see Correction section):** reconcile
+  `rotate-handover-sections.mjs` (candidate 2, heuristic/close-time,
+  monthly archive buckets) and `handover-rotate.mjs` (this ADR's own
+  explicit/forced mechanism, per-event archive files) — either converge on
+  one archive-naming convention, or explicitly document the two-mechanism
+  shape (one per trigger type) as the permanent design. Not urgent
+  (no correctness bug, just an inconsistency a browsing human/agent would
+  notice), but should not be silently forgotten either.
 - The one-time extraction pass over this repository's own current
   `docs/state.md` (Decision 7) — a large, separate, judgment-heavy dispatch;
   the live file cannot be rotated for real until it completes.
