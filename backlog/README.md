@@ -54,7 +54,16 @@ implementation, or closure.
 Per [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop): triage is owned by the **Elephant of the next pipeline session** (not the Goldfish who created the item — separation of proposal and decision).
 
 1. Review all items with `status: open` (at a natural session/phase boundary, not mid-execution).
-2. Decide per item: **accept** (note phase/release in the item) / **reject** (rationale in the item, `status: rejected`) / **defer** (`status: deferred`, state the condition).
+2. Decide per item: **accept** (note phase/release in the item) / **reject**
+   (rationale in the item's Triage "Decision:" prose; the ledger's status
+   enum only accepts `open`/`in_progress`/`closed`, so a reject moves
+   `status:` to `closed` the same way step 3's duplicate-merge does — there
+   is no `status: rejected` value) / **defer** (state the condition in the
+   Triage "Decision:" prose; the item's `status:` stays `open` — deferral is
+   a scheduling note, not a distinct status value; see
+   `backlog/items/2026-08-07-adr-0047-numbering-collision.md` for a worked
+   example: `status: open`, `Decision: deferred — owned by the Phoenix
+   sprint`).
 3. Merge duplicates: close the newer item with `status: closed` and real
    `closure_commit`/`closure_evidence` fields (the older, canonical item's
    own path), and open its body with a `**Rejected as a duplicate:**` lead
