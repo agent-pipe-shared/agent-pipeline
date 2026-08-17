@@ -1580,23 +1580,13 @@ const POINTERS = {
 //   po     - not closeable by writing code: a human gate, a recorded deviation
 //            needing the sanctioned authority route, or a proved impossibility.
 const CLOSURE = {
-  'PX0-AC-01': ['assert', 'WP-PX0'],
-  'PX0-AC-03': ['assert', 'WP-PX0'],
-  'PX0-AC-04': ['assert', 'WP-PX0'],
   // PX0-AC-05/PX0-AC-13 reclassified build -> po 2026-08-11 (PHX-WP-DELTA-STALE4):
   // DELTA-0811 confirmed code+tests are complete and green for both; the only
   // remaining blocker is an independent Critic PASS on this exact candidate
   // (a human/process gate, not further code work) -- not closeable by writing
   // code, matching the "po" class definition exactly.
-  'PX0-AC-05': ['po', 'WP-PX0'],
-  'PX0-AC-06': ['build', 'WP-PX0'],
-  'PX0-AC-07': ['assert', 'WP-PX0'],
-  'PX0-AC-08': ['build', 'WP-PX0'],
   'PX0-AC-13': ['po', 'WP-PX0'],
 
-  'K-AC-05': ['build', 'WP-K'],
-  'K-AC-08': ['assert', 'WP-K'],
-  'K-AC-10': ['build', 'WP-K'],
 
   // H-AC-08 moved to the Class P group below 2026-08-17 (PHX-WP-HAC08 investigation) --
   // see its POINTERS entry. (Was seam -> build 2026-08-09.)
@@ -1605,23 +1595,10 @@ const CLOSURE = {
   // H-AC-12 closed and removed from this table 2026-08-17 (PHX-WP-HAC12-GITGUARD):
   // Git-guard override consumption was its last open reader, satisfied by
   // construction (a PO amendment, not a code change).
-  'H-AC-14': ['doc', 'WP-DOC'],
-  'H-AC-15': ['assert', 'WP-H'],
 
   'A-AC-01': ['build', 'WP-A'],
-  'A-AC-02': ['assert', 'WP-A'],
-  'A-AC-03': ['build', 'WP-A'],
-  'A-AC-04': ['build', 'WP-A'],
   // A-AC-05 closed and removed from this table 2026-08-17 (PHX-WP-AAC05-WIRING):
   // the advisory-decision producer is now wired into its live call path.
-  'A-AC-07': ['build', 'WP-A'],
-  'A-AC-08': ['build', 'WP-A'],
-  'A-AC-09': ['build', 'WP-A'],
-  'A-AC-10': ['build', 'WP-A'],
-  'A-AC-12': ['assert', 'WP-A'],
-  'A-AC-13': ['assert', 'WP-A'],
-  'A-AC-14': ['assert', 'WP-A'],
-  'A-AC-15': ['doc', 'WP-DOC'],
 
   // L-AC-01 reclassified 'po' 2026-08-17 (this session): the remaining 7
   // triggers need a schema-design decision (non-dispatch correlation shape)
@@ -1629,55 +1606,17 @@ const CLOSURE = {
   // acceptance.md amendment. Tracked in
   // backlog/items/2026-08-17-lifecycle-event-schema-has-no-non-dispatch-correlation-shape.md.
   'L-AC-01': ['po', 'WP-L'],
-  'L-AC-02': ['build', 'WP-L'],
-  'L-AC-04': ['build', 'WP-L'],
-  'L-AC-07': ['assert', 'WP-L'],
   // L-AC-08 CLOSED 2026-08-17 (this session, docs/governance-replay.md
   // Fields-section fix): see POINTERS for the full narrative.
 
-  'P-AC-01': ['build', 'WP-P'],
-  'P-AC-03': ['build', 'WP-P'],
-  'P-AC-06': ['build', 'WP-P'],
-  'P-AC-08': ['build', 'ELEPHANT'],
-  'P-AC-09': ['build', 'WP-P'],
-  'P-AC-10': ['assert', 'WP-P'],
   // P-AC-11 closed and removed from this table 2026-08-17 (PHX-WP-PAC11-CONFLICTPOLICY):
   // conflictPolicy was its last open dimension; VERDICTS now reads implemented.
-  'P-AC-13': ['doc', 'WP-DOC'],
 
-  'V-AC-02': ['build', 'WP-V'],
-  'V-AC-06': ['build', 'WP-V'],
-  'V-AC-07': ['assert', 'WP-V'],
-  'V-AC-09': ['assert', 'WP-V'],
 
-  'X-AC-11': ['seam', 'WP-X'],
-  'X-AC-12': ['assert', 'WP-X'],
-  'X-AC-14': ['build', 'WP-X'],
-  'X-AC-15': ['doc', 'WP-DOC'],
 
-  'C-AC-02': ['build', 'WP-C'],
-  'C-AC-07': ['build', 'WP-C'],
-  'C-AC-09': ['build', 'WP-C'],
-  'C-AC-12': ['build', 'WP-C'],
 
-  'E-AC-02': ['build', 'WP-E'],
-  'E-AC-04': ['build', 'WP-E'],
-  'E-AC-06': ['assert', 'WP-E'],
-  'E-AC-09': ['build', 'WP-E'],
-  'E-AC-10': ['build', 'WP-E'],
-  'E-AC-11': ['build', 'WP-E'],
-  'E-AC-14': ['assert', 'WP-E'],
-  'E-AC-20': ['seam', 'WP-E'],
-  'E-AC-21': ['doc', 'WP-DOC'],
 
   'R-AC-06': ['po', 'WP-R'],
-  'R-AC-04': ['build', 'WP-R'],
-  'R-AC-08': ['build', 'WP-R'],
-  'R-AC-09': ['build', 'WP-R'],
-  'R-AC-10': ['build', 'WP-R'],
-  'R-AC-11': ['build', 'WP-R'],
-  'R-AC-12': ['build', 'WP-R'],
-  'R-AC-13': ['build', 'WP-R'],
 
   // Reclassified build -> po 2026-08-17 (PHX-WP-HAC08 investigation-only dispatch,
   // NO CARRIER, no commit): the corrected finding is not "no legacy source exists" --
@@ -1690,8 +1629,6 @@ const CLOSURE = {
   // "building a caller to satisfy a criterion" anti-pattern already reverted once
   // (cc43a182) and names it a PO amendment decision, deliberately not taken by a
   // dispatch -- the same shape as H-AC-09's reclassification below.
-  'H-AC-08': ['po', 'WP-PO'],
-  'H-AC-09': ['po', 'WP-PO'],
   // EPIC-AC-01 CLOSED 2026-08-17 (this session, feature-package-reconcile,
   // PO-signed, commit 8e91872e): see POINTERS for the full narrative.
   // EPIC-AC-02 CLOSED 2026-08-17 (PHX-WP-EPICAC02-VERIFYCHECK, commit ebc75a77
