@@ -368,6 +368,15 @@ function externalLocalMarketplaceLocation(registry) {
 function externalLocalMarketplaceObservation(repo, {
   registryReader = codexMarketplaceRegistry,
   spawn = spawnSync,
+  // NVA-MKTHASH-1: this checkout's OWN pluginSourceTreeSha256(sourceRoot),
+  // threaded in by the one caller (localPluginInstallSourceObservation, which
+  // already computes it for statusSha256's own preimage) rather than
+  // recomputed here from a second code path. A direct caller that omits it
+  // (e.g. every existing link-shaped test in this suite) gets `null`, which
+  // can never equal a real hash -- so the new real-directory acceptance path
+  // below fails closed by default instead of silently trusting an unverified
+  // comparison value.
+  checkoutTreeSha256 = null,
 } = {}) {
   const registry = registryReader(spawn);
   // A registry that is unreadable, or that does not answer in the documented
@@ -410,19 +419,44 @@ function externalLocalMarketplaceObservation(repo, {
   const entryPath = join(pluginsDirectory, "pipeline-core");
   const entryInfo = externalStat(entryPath, "external local marketplace plugin entry is unavailable");
   const entryTarget = externalRealpath(entryPath, "external local marketplace plugin entry does not resolve");
-  if (entryTarget !== join(repo.root, "plugins", "pipeline-core")) {
-    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace does not resolve to this checkout");
+  if (entryTarget === join(repo.root, "plugins", "pipeline-core")) {
+    const targetInfo = externalStat(entryTarget, "external local marketplace plugin entry is unavailable");
+    if (!targetInfo.isDirectory()) {
+      fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace plugin entry is not a directory");
+    }
+    return {
+      state: "verified",
+      rootSha256: sha(located),
+      manifestSha256: sha(readFileSync(manifestPath)),
+      entryKind: entryInfo.isSymbolicLink() ? "link" : "directory",
+    };
   }
-  const targetInfo = externalStat(entryTarget, "external local marketplace plugin entry is unavailable");
-  if (!targetInfo.isDirectory()) {
-    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace plugin entry is not a directory");
+  // NVA-MKTHASH-1: a real, non-symlinked directory here can never resolve to
+  // this checkout's own path above (a different filesystem location) -- that
+  // is exactly the deliberate, PO-confirmed rsync-copy deployment shape the
+  // symlink-only check above fails closed on today. Accept it ONLY when its
+  // full content hash, computed by the IDENTICAL walker used for this
+  // checkout's own attestation (pluginSourceTreeSha256, reused unmodified --
+  // so an internal symlink planted inside the copy still hard-fails exactly
+  // as it would for the internal checkout), is EXACTLY equal to the
+  // checkout's own hash. Any divergence -- stale, tampered, unrelated, or
+  // partially synced -- falls through to the same fail-closed posture as a
+  // non-resolving symlink, just with a message that names the actual failure
+  // mode (content mismatch, not resolution failure) instead of reusing the
+  // symlink-resolution message for an unrelated cause.
+  if (!entryInfo.isSymbolicLink() && entryInfo.isDirectory()) {
+    const copyTreeSha256 = pluginSourceTreeSha256(entryTarget);
+    if (checkoutTreeSha256 !== null && copyTreeSha256 === checkoutTreeSha256) {
+      return {
+        state: "verified",
+        rootSha256: sha(located),
+        manifestSha256: sha(readFileSync(manifestPath)),
+        entryKind: "directory-copy",
+      };
+    }
+    fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace plugin entry content does not match this checkout");
   }
-  return {
-    state: "verified",
-    rootSha256: sha(located),
-    manifestSha256: sha(readFileSync(manifestPath)),
-    entryKind: entryInfo.isSymbolicLink() ? "link" : "directory",
-  };
+  fail("HGO-EXTERNAL-MARKETPLACE", "external local marketplace does not resolve to this checkout");
 }
 
 // NVA-BL-20 F5: `options` is forwarded verbatim to
@@ -465,12 +499,18 @@ function localPluginInstallSourceObservation(repo, options = {}) {
     && Array.isArray(marketplaceValue?.plugins)
     && marketplaceValue.plugins.some((entry) => entry?.name === "pipeline-core" && entry?.source === "./plugins/pipeline-core");
   if (!registered) fail("HGO-PLUGIN-SOURCE", "local marketplace does not bind pipeline-core");
+  // NVA-MKTHASH-1: computed HERE, once, so it can be threaded into
+  // externalLocalMarketplaceObservation() below as the exact comparison value
+  // for a real, non-symlinked directory-copy entry -- the SAME hash
+  // statusSha256's own preimage folds in a few lines down, never a second,
+  // independently recomputed value from a different code path.
+  const pluginTreeSha256 = pluginSourceTreeSha256(sourceRoot);
   // NVA-BL-20: the external root the admitted command actually resolves
   // through, folded into the SAME attestation hash -- so a repointed or mutated
   // external root, and equally a transition into or out of the typed
   // `unobserved` state, invalidates the request/plan/capability chain that
   // `statusSha256` binds.
-  const externalMarketplace = externalLocalMarketplaceObservation(repo, options);
+  const externalMarketplace = externalLocalMarketplaceObservation(repo, { ...options, checkoutTreeSha256: pluginTreeSha256 });
   return {
     fingerprintSha256: sha({ physicalRoot: repo.root, physicalCommon: repo.common }),
     head: null,
@@ -490,7 +530,7 @@ function localPluginInstallSourceObservation(repo, options = {}) {
       kind: "local-plugin-install-source.v2",
       marketplaceSha256: sha(readFileSync(marketplace)),
       manifestSha256: sha(readFileSync(manifest)),
-      pluginTreeSha256: pluginSourceTreeSha256(sourceRoot),
+      pluginTreeSha256,
       externalMarketplace,
     }),
   };
@@ -2487,4 +2527,12 @@ export const humanGuardOverrideInternals = {
   // synthetic fixtures with an injected registry reader, instead of depending on
   // the machine's own Codex registry state, which a test cannot control.
   externalLocalMarketplaceObservation,
+  // NVA-MKTHASH-1: exposed so the suite can compute the checkout's own
+  // plugin-source tree hash directly, the same value
+  // localPluginInstallSourceObservation() threads into
+  // externalLocalMarketplaceObservation() as checkoutTreeSha256 -- needed to
+  // drive the new directory-copy acceptance path from a direct call to
+  // externalLocalMarketplaceObservation(), the way the existing NVA-BL-20
+  // link-shaped tests already drive that function directly.
+  pluginSourceTreeSha256,
 };

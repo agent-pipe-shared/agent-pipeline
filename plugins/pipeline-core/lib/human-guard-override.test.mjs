@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
   copyFileSync,
+  cpSync,
   existsSync,
   linkSync,
   mkdtempSync,
@@ -1736,6 +1737,141 @@ test("NVA-BL-20: the attestation exposes the external-marketplace state it hashe
     assert.equal(
       attest(() => null).statusSha256,
       "05f14cb8707b25d4f06714c3bea1354648d2cd6638b93b67caa83a79f440863e",
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-MKTHASH-1: the PO's actual, deliberate local-development shape rsync-copies a
+// REAL, independent directory to the external local-marketplace root's own
+// plugins/pipeline-core entry, rather than symlinking it (ADR-0052's only
+// documented arrangement so far). externalLocalMarketplaceObservation() ADDITIONALLY
+// accepts that shape now, but ONLY when the copy's full content hash -- via the
+// identical pluginSourceTreeSha256() walker used for this checkout's own
+// attestation -- exactly equals this checkout's own hash. The existing
+// symlink/junction path above is untouched; these tests cover only the new branch.
+// ---------------------------------------------------------------------------------
+
+test("NVA-MKTHASH-1: a real, content-identical directory copy at the external entry is verified via hash equality", () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const external = externalMarketplace(base, "external");
+    cpSync(checkout.sourceRoot, join(external, "plugins", "pipeline-core"), { recursive: true });
+    const registryReader = localRegistry(external);
+    const checkoutTreeSha256 = humanGuardOverrideInternals.pluginSourceTreeSha256(checkout.sourceRoot);
+    const verified = humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+      { root: checkout.root },
+      { registryReader, checkoutTreeSha256 },
+    );
+    assert.equal(verified.state, "verified");
+    assert.equal(verified.entryKind, "directory-copy");
+    assert.match(verified.rootSha256, /^[a-f0-9]{64}$/u);
+    assert.match(verified.manifestSha256, /^[a-f0-9]{64}$/u);
+    // Omitting the comparison value entirely -- the default every OTHER direct
+    // caller in this suite gets -- still fails closed: the new path is opt-in
+    // via the threaded hash, never a blanket "any real directory here is fine".
+    assert.throws(
+      () => humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+        { root: checkout.root },
+        { registryReader },
+      ),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-EXTERNAL-MARKETPLACE",
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("NVA-MKTHASH-1: a real directory copy whose content diverges from this checkout fails closed with a distinct message", () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const external = externalMarketplace(base, "external");
+    cpSync(checkout.sourceRoot, join(external, "plugins", "pipeline-core"), { recursive: true });
+    // One extra file is enough to diverge the tree hash -- a stale, tampered,
+    // unrelated, or partially synced copy all reduce to this same shape.
+    writeFileSync(join(external, "plugins", "pipeline-core", "smuggled.txt"), "not part of this checkout\n");
+    const registryReader = localRegistry(external);
+    const checkoutTreeSha256 = humanGuardOverrideInternals.pluginSourceTreeSha256(checkout.sourceRoot);
+    assert.throws(
+      () => humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+        { root: checkout.root },
+        { registryReader, checkoutTreeSha256 },
+      ),
+      (error) => error instanceof HumanGuardOverrideError
+        && error.code === "HGO-EXTERNAL-MARKETPLACE"
+        && error.message === "external local marketplace plugin entry content does not match this checkout"
+        // Distinct from the symlink-resolution failure message -- an operator
+        // reading HGO-EXTERNAL-MARKETPLACE errors can tell which case they hit.
+        && error.message !== "external local marketplace does not resolve to this checkout",
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("NVA-MKTHASH-1: an internal symlink planted inside the real directory copy still hard-fails via pluginSourceTreeSha256's own refusal", { skip: JUNCTION_SKIP }, () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const external = externalMarketplace(base, "external");
+    const copyRoot = join(external, "plugins", "pipeline-core");
+    cpSync(checkout.sourceRoot, copyRoot, { recursive: true });
+    // Plant a symlink INSIDE the copy -- pluginSourceTreeSha256() hard-fails on
+    // ANY internal symlink it walks (reused here completely unmodified), so this
+    // must refuse exactly as it would for the internal checkout's own tree.
+    symlinkSync(join(copyRoot, ".codex-plugin"), join(copyRoot, "planted-link"), "junction");
+    const registryReader = localRegistry(external);
+    const checkoutTreeSha256 = humanGuardOverrideInternals.pluginSourceTreeSha256(checkout.sourceRoot);
+    assert.throws(
+      () => humanGuardOverrideInternals.externalLocalMarketplaceObservation(
+        { root: checkout.root },
+        { registryReader, checkoutTreeSha256 },
+      ),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLUGIN-SOURCE",
+    );
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test("NVA-MKTHASH-1: a real directory copy is folded into statusSha256, and a subsequent content mutation moves OUT of the verified state", () => {
+  const base = externalFixture();
+  try {
+    const checkout = pipelineCheckout(base, "checkout");
+    const external = externalMarketplace(base, "external");
+    cpSync(checkout.sourceRoot, join(external, "plugins", "pipeline-core"), { recursive: true });
+    const registryReader = localRegistry(external);
+    const observed = humanGuardOverrideInternals.localPluginInstallSourceObservation(
+      { root: checkout.root, common: join(checkout.root, ".git") },
+      { registryReader },
+    );
+    assert.equal(observed.externalMarketplace.state, "verified");
+    assert.equal(observed.externalMarketplace.entryKind, "directory-copy");
+    const unobserved = humanGuardOverrideInternals.localPluginInstallSourceObservation(
+      { root: checkout.root, common: join(checkout.root, ".git") },
+      { registryReader: () => null },
+    );
+    assert.match(observed.statusSha256, /^[a-f0-9]{64}$/u);
+    assert.notEqual(observed.statusSha256, unobserved.statusSha256);
+    // Unlike the sibling symlink-path test above (whose manifest mutation stays
+    // WITHIN the "verified" state, so a second successful statusSha256 is
+    // asserted there), a content mutation of the copy itself moves this
+    // observation OUT of "verified" entirely -- the copy no longer hash-matches
+    // this checkout, so the call THROWS instead of returning a new verified
+    // value. This is an intentional, expected difference between the two
+    // acceptance paths: a symlink's manifest is a file separate from the linked
+    // tree it resolves to, but a directory copy's own tree IS the thing hashed.
+    writeFileSync(join(external, "plugins", "pipeline-core", "smuggled.txt"), "not part of this checkout\n");
+    assert.throws(
+      () => humanGuardOverrideInternals.localPluginInstallSourceObservation(
+        { root: checkout.root, common: join(checkout.root, ".git") },
+        { registryReader },
+      ),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-EXTERNAL-MARKETPLACE",
     );
   } finally {
     rmSync(base, { recursive: true, force: true });
