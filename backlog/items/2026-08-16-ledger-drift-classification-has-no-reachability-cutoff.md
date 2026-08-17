@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ledger-drift-classification-has-no-reachability-cutoff
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: d16c734572d141ed19bc6a695d24278930b07dac
+closure_evidence: backlog/items/2026-08-16-ledger-drift-classification-has-no-reachability-cutoff.md
 source: "Self-observed while making the backlog-ledger gate green in the 2026-08-16 candidate; the classification change is the same candidate's work, and the PO agreed to file the weakening it introduces as its own item rather than leave it implicit."
 ---
 
@@ -59,3 +63,13 @@ to the data but drifts if the ledger is ever rebuilt.
 - **Rationale:** not architecture/ADR-scale, a bounded implementation choice with tradeoffs already stated in the item body — resolved here rather than escalated, per this session's PO-set autonomy for exactly this class of decision.
 - **Assignment (if accepted):** Nova A AFK-session closeout, folded into the next local 0.5.5 candidate.
 - **Date:** 2026-08-16
+
+## Closure (2026-08-17)
+
+Verified live: `plugins/pipeline-core/lib/backlog-state.mjs:836` carries
+`export const LEDGER_DRIFT_CUTOFF_SEQUENCE = 417;`, and `classifyFinding()`
+(:843-861) resolves a DRIFT-shaped finding's ledger sequence against it,
+reclassifying anything above the cutoff back to INTEGRITY (blocking) —
+exactly the fix this item's own Triage decided on 2026-08-16. Landed in
+commit `d16c734572d141ed19bc6a695d24278930b07dac` (2026-08-16), the same day
+the Triage decision was recorded. Closing.

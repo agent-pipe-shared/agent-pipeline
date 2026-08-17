@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.kickoff-apply-action-drops-runner
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-15
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 5918d9d6b6d6b0ca72acd19a90cb2cfc6207728d
+closure_evidence: backlog/items/2026-08-08-kickoff-apply-action-drops-the-runner-the-plan-was-made-for.md
 source: "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Observed by the PO; located in the source afterwards."
 ---
 
@@ -207,7 +211,23 @@ already past kickoff.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** close — the item's own stated remaining blocker
+  ("stays open until the manifest-repair instance is triaged") is now
+  satisfied and more: `applyProjectOnboardingManifestRepairV4`
+  (`project-onboarding-v3.mjs:2955-2965`) now takes `runner` and calls
+  `requireRunner(runner, "applyProjectOnboardingManifestRepairV4")` at
+  `:2962` — not merely triaged elsewhere, actually fixed, in the same
+  commit/day as mechanisms A/B/C.
+- **Rationale:** verified live via `git blame` on the exact lines —
+  `requireRunner` was added by commit `5918d9d6b6d6b0ca72acd19a90cb2cfc6207728d`
+  (2026-08-08), the same day as the item's own recorded `94b8a72` resolution.
+- **Assignment (if accepted):** none — no further code change.
+- **Date:** 2026-08-17
+
+## Closure (2026-08-17)
+
+All three original mechanisms (A/B/C) were already closed in `94b8a72`
+(2026-08-08, recorded above). The one condition this item was deliberately
+kept open for — the identical no-runner-parameter shape in
+`applyProjectOnboardingManifestRepairV4` — is now also fixed, in commit
+`5918d9d6b6d6b0ca72acd19a90cb2cfc6207728d` (same day). Closing.

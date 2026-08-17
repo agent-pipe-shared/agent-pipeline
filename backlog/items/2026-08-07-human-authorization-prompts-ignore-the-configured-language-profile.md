@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.human-authorization-prompts-ignore-the-configured-language-profile
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-09-06
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 598a8388a819086a10a649ff696b2a5b925b6fec
+closure_evidence: backlog/items/2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md
 source: "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
 ---
 
@@ -89,3 +93,17 @@ runs and before any artifact exists.
 - **Rationale:** PO, 2026-08-12: "empfehlung."
 - **Assignment (if accepted):** queued for implementation this session.
 - **Date:** 2026-08-12
+
+## Closure (2026-08-17)
+
+Verified against current source: `requireExplicitConfirmation(summaryLines,
+dependencies, language = DEFAULT_HUMAN_FACING_LANGUAGE)`
+(`plugins/pipeline-core/scripts/po-human-approval.mjs:488`) now selects from
+`CONFIRMATION_PROMPT_FRAME[language]` (German frame present, e.g. line 420),
+falling back to `DEFAULT_HUMAN_FACING_LANGUAGE` on any unknown/unreadable
+value; the language is resolved from
+`continuity.runtime.humanFacingLanguage` via `resolveHumanFacingLanguage()`
+(:452). `CONFIRMATION_TOKEN = "approve"` (:392) stays a stable English
+constant, exactly the recommended decision. Landed in commit
+`598a8388a819086a10a649ff696b2a5b925b6fec` (2026-08-12), independent of this
+triage pass. Closing.
