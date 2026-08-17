@@ -157,7 +157,22 @@ architecture prose or an implementation briefing.
   sentence amended the same day to permit the one bounded local write Part B
   needs). Clause 1 is now unblocked for implementation — building the
   out-of-process host adapter design §13 conditioned this clause's closure on
-  is dispatchable; not yet built as of this amendment. WHEN source/freshness diagnostics are rendered or persisted,
+  is dispatchable; not yet built as of this amendment.
+
+  **Fourth amendment (PO, 2026-08-17): clause 1 dropped, cost/benefit
+  decision, not a design blocker.** The out-of-process host adapter matters
+  only for a Codex-runner session inside a network-denied WSL sandbox
+  specifically — Claude/Elephant sessions are never sandboxed this way and
+  never hit this path. The design (§4's eight-member closed action family)
+  is real, fully specified, and buildable per the third amendment above, but
+  the PO judged the benefit too narrow for the engineering cost: without it,
+  an affected Codex+WSL session simply reports `unknown` freshness (the
+  existing, safe, already-shipped fallback — not a broken or dangerous
+  state) instead of a positively confirmed `known` one. Clause 1 is
+  permanently dropped from this criterion's scope, not deferred. **Verdict
+  flips to `implemented`**: clause 2 (the criterion's only remaining
+  requirement) is independently confirmed satisfied by
+  `createWslHostFailClosedSpawn` (first amendment above). WHEN source/freshness diagnostics are rendered or persisted,
   THE SYSTEM SHALL omit tokens, credentials, home paths, cache paths, private
   remotes, SSH key paths, and account coordinates.
 - **PX0-AC-15:** WHEN the ruleset source is private or local, THE SYSTEM SHALL
