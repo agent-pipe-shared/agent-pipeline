@@ -17,9 +17,19 @@ export const EVIDENCE_AMENDMENT_SCHEMA = "pipeline.backlog-evidence-amendment.v1
 export const INDEX_SCHEMA = "pipeline.backlog-index.v1";
 export const SENTINEL_RECOVERY_CATALOG_SCHEMA = "pipeline.sentinel-backlog-recovery.v1";
 export const PROJECT_CLOSURE_READBACK_SCHEMA = "pipeline.project-closure-readback.v1";
-export const BACKLOG_STATUSES = Object.freeze(["open", "in_progress", "closed"]);
+export const BACKLOG_STATUSES = Object.freeze(["open", "in_progress", "closed", "rejected", "deferred"]);
 export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-radar", "defect", "idea", "requirement"]);
-const FORWARD_TRANSITIONS = Object.freeze({ open: "in_progress", in_progress: "closed" });
+// `open` branches three ways (backlog/README.md Triage rules: accept moves work
+// into `in_progress`; reject/defer are the two other triage outcomes, applied
+// only to `open` items "at a natural session/phase boundary, not mid-execution" —
+// never to an item already `in_progress`). `in_progress`, `closed`, `rejected`,
+// and `deferred` are otherwise terminal: this module records no path back out
+// of a triage disposition, matching what backlog/README.md documents today.
+const FORWARD_TRANSITIONS = Object.freeze({
+  open: Object.freeze(["in_progress", "rejected", "deferred"]),
+  in_progress: Object.freeze(["closed"]),
+});
+const STATUS_ENUM_TEXT = `${BACKLOG_STATUSES.slice(0, -1).join(", ")}, or ${BACKLOG_STATUSES.at(-1)}`;
 
 const ITEM_REQUIRED = Object.freeze(["schema", "id", "type", "owner", "status", "created", "source"]);
 const ITEM_OPTIONAL = Object.freeze(["tracking", "due", "expires", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
@@ -226,7 +236,7 @@ export function validateBacklogItem(item) {
   if (!ITEM_ID.test(asString(metadata.id))) errors.push(`${path}: id must be a lowercase stable identifier`);
   if (!BACKLOG_TYPES.includes(metadata.type)) errors.push(`${path}: type is not in the canonical item taxonomy`);
   if (!OWNER.test(asString(metadata.owner))) errors.push(`${path}: owner must be pipeline or project:<slug>`);
-  if (!BACKLOG_STATUSES.includes(metadata.status)) errors.push(`${path}: status must be open, in_progress, or closed`);
+  if (!BACKLOG_STATUSES.includes(metadata.status)) errors.push(`${path}: status must be ${STATUS_ENUM_TEXT}`);
   if (!validDate(asString(metadata.created))) errors.push(`${path}: created must be an ISO calendar date`);
   if (asString(metadata.source).trim().length === 0) errors.push(`${path}: source must be non-empty`);
   if (own(metadata, "tracking") && asString(metadata.tracking).trim().length === 0) errors.push(`${path}: tracking must be non-empty when present`);
@@ -309,8 +319,9 @@ export function validateSentinelRecoveryCatalog(catalog) {
     if (!ITEM_ID.test(asString(entry.id))) errors.push(`${label} id must be a lowercase stable identifier`);
     else if (ids.has(entry.id)) errors.push(`${label} duplicates id ${entry.id}`);
     else ids.add(entry.id);
-    if (!BACKLOG_STATUSES.includes(entry.status)) errors.push(`${label} status must be open, in_progress, or closed`);
+    if (!BACKLOG_STATUSES.includes(entry.status)) errors.push(`${label} status must be ${STATUS_ENUM_TEXT}`);
     else if (entry.status === "closed") errors.push(`${label} must not claim closed status during recovery`);
+    else if (entry.status === "rejected" || entry.status === "deferred") errors.push(`${label} must not claim ${entry.status} status during recovery`);
     if (!BACKLOG_TYPES.includes(entry.type)) errors.push(`${label} type is not in the canonical item taxonomy`);
   }
   const expected = new Set(SENTINEL_RECOVERY_IDS);
@@ -751,7 +762,7 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
         if (event.to !== prior) errors.push(`${label}: reachability amendment must preserve status`);
       } else if (event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND) {
         if (event.to !== prior) errors.push(`${label}: reachability amendment must preserve status`);
-      } else if (FORWARD_TRANSITIONS[prior] !== event.to) errors.push(`${label}: ${prior} may only move to ${FORWARD_TRANSITIONS[prior]}`);
+      } else if (!(FORWARD_TRANSITIONS[prior] ?? []).includes(event.to)) errors.push(`${label}: ${prior} may only move to ${(FORWARD_TRANSITIONS[prior] ?? []).join(" or ") || "no further status"}`);
     }
     if (BACKLOG_STATUSES.includes(event.to)) stateById.set(event.id, event.to);
     const projectedCommit = projectedClosureCommit(event);
@@ -930,9 +941,7 @@ export function projectBacklog(items, events) {
     "",
     "## Counts",
     "",
-    `- open: ${counts.open}`,
-    `- in_progress: ${counts.in_progress}`,
-    `- closed: ${counts.closed}`,
+    ...BACKLOG_STATUSES.map((status) => `- ${status}: ${counts[status]}`),
     "",
   ].join("\n");
   return { index, indexText: `${JSON.stringify(index, null, 2)}\n`, statusText: status };
@@ -949,7 +958,7 @@ export function planBacklogTransition(items, events, input) {
   if (index === -1) return { ok: false, errors: [`transition: unknown item id ${id}`], items, events, projection: null };
   const original = items[index];
   const from = original.metadata.status;
-  if (FORWARD_TRANSITIONS[from] !== to) errors.push(`transition: ${from} may only move to ${FORWARD_TRANSITIONS[from] ?? "no further status"}`);
+  if (!(FORWARD_TRANSITIONS[from] ?? []).includes(to)) errors.push(`transition: ${from} may only move to ${(FORWARD_TRANSITIONS[from] ?? []).join(" or ") || "no further status"}`);
   if (!validDate(asString(at))) errors.push("transition: at must be an ISO calendar date");
   if (!ITEM_ID.test(asString(actor))) errors.push("transition: actor must be a lowercase stable identifier");
   if (asString(reason).trim().length === 0) errors.push("transition: reason must be non-empty");

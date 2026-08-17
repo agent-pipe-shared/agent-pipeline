@@ -37,13 +37,23 @@ Every item carries exactly one type in the frontmatter field `type`:
 
 ### Status lifecycle
 
-`open` → `in_progress` → `closed`
+`open` → `in_progress` → `closed`, with two additional triage-only outcomes
+reachable directly from `open`: `open` → `rejected` and `open` → `deferred`.
 
 - **open** — created or triaged but not currently being implemented.
 - **in_progress** — accepted and assigned to active work; the reason and
   evidence remain in the append-only transition ledger.
 - **closed** — implemented with closure evidence and the sanctioned ledger
   transition; a baseline migration never creates this state.
+- **rejected** — triaged and declined, with rationale recorded in the item
+  (see Triage rules below); reachable only from `open`, never mid-execution.
+- **deferred** — triaged and postponed, with the condition for revisiting it
+  recorded in the item (see Triage rules below); reachable only from `open`,
+  never mid-execution.
+
+`rejected` and `deferred` are terminal in the transition ledger, matching
+today's documented process: neither this section nor the Triage rules below
+describe a path back out of a triage disposition.
 
 The 2026-07-20 migration mapped legacy `new`/`open` to `open` and
 `accepted`/`in-progress` to `in_progress`. It preserved bodies and scheduling

@@ -8,6 +8,7 @@
 | pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.accepted-adrs-drift-from-implementation-undetected | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.adr-0045-topology-divergence-from-package-and-skill | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.adr-0047-numbering-collision | closed | defect | pipeline | 2026-08-07 | — |
@@ -37,7 +38,7 @@
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.command-offer-schema-has-no-displayed-generated-asserted-states | open | requirement | pipeline | 2026-08-17 | — |
+| pipeline.command-offer-schema-has-no-displayed-generated-asserted-states | rejected | requirement | pipeline | 2026-08-17 | — |
 | pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -109,6 +110,7 @@
 | pipeline.po-gate-authority-receipt-readback | open | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.prepared-maintenance-window-dies-at-the-next-commit | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive | open | follow-up | pipeline | 2026-08-17 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-authority-dual-state-repair-and-failclosed-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -160,6 +162,8 @@
 
 ## Counts
 
-- open: 98
+- open: 99
 - in_progress: 26
 - closed: 28
+- rejected: 1
+- deferred: 0

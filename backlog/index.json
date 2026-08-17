@@ -3,12 +3,14 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "58be067542fa927118330a584ffd209351abf703c49e91955a1e2ca12d0bda30"
+    "transitionHead": "4364e632254afa2b1eaec4c26f0eb6fd480368415a47a91940f79898d22e0341"
   },
   "counts": {
-    "open": 98,
+    "open": 99,
     "in_progress": 26,
-    "closed": 28
+    "closed": 28,
+    "rejected": 1,
+    "deferred": 0
   },
   "items": [
     {
@@ -34,6 +36,13 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md."
+    },
+    {
+      "id": "pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17"
     },
     {
       "id": "pipeline.accepted-adrs-drift-from-implementation-undetected",
@@ -290,7 +299,7 @@
     },
     {
       "id": "pipeline.command-offer-schema-has-no-displayed-generated-asserted-states",
-      "status": "open",
+      "status": "rejected",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-17"
@@ -898,6 +907,13 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Found on 2026-08-08 while planning a TP-3/TP-5 window for Phoenix. The Elephant was about to hand the PO a prepare command with two implementation dispatches still in flight; reading install() first showed that every commit those dispatches made would have voided the signature before it could be used. Caught by reading, not by a refusal -- the ceremony gives no warning at prepare time."
+    },
+    {
+      "id": "pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive",
+      "status": "open",
+      "type": "follow-up",
+      "owner": "pipeline",
+      "created": "2026-08-17"
     },
     {
       "id": "pipeline.private-overlay-activation-bridge",

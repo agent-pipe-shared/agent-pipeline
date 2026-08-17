@@ -401,11 +401,49 @@ function managedRepairInput(root, overrides = {}) {
     && renderBacklogItem(parsed.item) === source, parsed.errors.join("; "));
 }
 {
-  const invalid = item({ status: "deferred" });
+  // "cancelled" is not a canonical status; "deferred" moved into the canonical
+  // vocabulary with PHX-WP-BACKLOG-STATUS-VOCAB (BS02d covers it directly).
+  const invalid = item({ status: "cancelled" });
   const closureLeak = item({ closure_commit: "a".repeat(40) });
   check("BS02 only canonical statuses are accepted and closure data cannot leak onto open work",
     validateBacklogItem(invalid).some((error) => error.includes("status must be open"))
       && validateBacklogItem(closureLeak).some((error) => error.includes("only closed items")));
+}
+{
+  const rejected = item({ status: "rejected" });
+  const deferred = item({ status: "deferred" });
+  check("BS02d rejected and deferred are canonical, schema-valid statuses (backlog/README.md Triage rules)",
+    validateBacklogItem(rejected).length === 0 && validateBacklogItem(deferred).length === 0,
+    `${validateBacklogItem(rejected).join("; ")} / ${validateBacklogItem(deferred).join("; ")}`);
+}
+{
+  const first = event();
+  const toRejected = event({ sequence: 2, from: "open", to: "rejected", previousHash: first.entryHash, reason: "Triage: duplicate of an existing item." });
+  const toDeferred = event({ sequence: 2, from: "open", to: "deferred", previousHash: first.entryHash, reason: "Triage: deferred pending a future ADR." });
+  const rejectedItem = item({ status: "rejected" });
+  const deferredItem = item({ status: "deferred" });
+  const toInProgress = event({ sequence: 2, from: "open", to: "in_progress", previousHash: first.entryHash, reason: "Execution started." });
+  const thenRejected = event({ sequence: 3, from: "in_progress", to: "rejected", previousHash: toInProgress.entryHash, reason: "Attempted mid-execution rejection." });
+  check("BS02e a ledger event with to: rejected or to: deferred is schema-valid, and rejected/deferred are reachable only from open",
+    validateTransitionLedger([first, toRejected], [rejectedItem]).length === 0
+      && validateTransitionLedger([first, toDeferred], [deferredItem]).length === 0
+      && validateTransitionLedger([first, toInProgress, thenRejected], [rejectedItem]).some((error) => error.includes("in_progress may only move to closed")),
+    [...validateTransitionLedger([first, toRejected], [rejectedItem]), ...validateTransitionLedger([first, toDeferred], [deferredItem])].join("; "));
+}
+{
+  const items = [item({ id: "pipeline.a", status: "rejected" }), item({ id: "pipeline.b", status: "deferred" }), item({ id: "pipeline.c", status: "open" })];
+  const openA = event({ id: "pipeline.a", to: "open", reason: "Adopt canonical tracking." });
+  const rejectA = event({ id: "pipeline.a", from: "open", to: "rejected", sequence: 2, previousHash: openA.entryHash, reason: "Triage: rejected." });
+  const openB = event({ id: "pipeline.b", to: "open", sequence: 3, previousHash: rejectA.entryHash, reason: "Adopt canonical tracking." });
+  const deferB = event({ id: "pipeline.b", from: "open", to: "deferred", sequence: 4, previousHash: openB.entryHash, reason: "Triage: deferred." });
+  const openC = event({ id: "pipeline.c", to: "open", sequence: 5, previousHash: deferB.entryHash, reason: "Adopt canonical tracking." });
+  const chain = [openA, rejectA, openB, deferB, openC];
+  const projection = projectBacklog(items, chain);
+  check("BS02f the counts summary includes rejected and deferred, over a fully valid ledger",
+    validateTransitionLedger(chain, items).length === 0
+      && projection.index.counts.rejected === 1 && projection.index.counts.deferred === 1
+      && projection.statusText.includes("- rejected: 1") && projection.statusText.includes("- deferred: 1"),
+    [validateTransitionLedger(chain, items).join("; "), projection.statusText].join(" | "));
 }
 {
   const requirement = item({ type: "requirement" });
