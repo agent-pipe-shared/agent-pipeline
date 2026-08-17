@@ -131,7 +131,7 @@ function armRequest(root, toolInput, signer = COMMITTED_SIGNER) {
     publicKey: signer.publicKey,
     signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), signer.privateKey).toString("base64"),
   };
-  return { requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof };
+  return { requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, intent };
 }
 
 test("authorize-by-signature reaches authorizeHumanGuardOverrideBySignature() and prints its JSON result on stdout", () => {
@@ -160,6 +160,60 @@ test("authorize-by-signature reaches authorizeHumanGuardOverrideBySignature() an
     rmSync(root, { recursive: true, force: true });
     rmSync(proofRoot, { recursive: true, force: true });
   }
+});
+
+/**
+ * NVA-SIGENTRY-1 DoD check 2. `emit-signature-digest` must print the exact digest
+ * `authorizeHumanGuardOverrideBySignature()` gates arming on for the identical
+ * `(repo, request, plan, reason)` inputs -- proved two ways: (1) it equals `armRequest`'s
+ * own independently-reconstructed `intent.sha256` (built the same way an external signer
+ * would, without calling into any of this module's exported helpers), and (2) a proof
+ * built over the CLI's printed digest actually arms via `authorize-by-signature`.
+ */
+test("emit-signature-digest prints the exact digest authorizeHumanGuardOverrideBySignature() gates arming on", () => {
+  const root = fixture();
+  const proofRoot = externalDir();
+  try {
+    const { requestSha256, planSha256, proof, intent } = armRequest(root, { file_path: "notes.md", content: "cli emit digest\n" });
+    const captured = io();
+    const status = main([
+      "emit-signature-digest",
+      "--repo", root,
+      "--request-sha256", requestSha256,
+      "--plan-sha256", planSha256,
+      "--reason", HGO_SIGNATURE_REASON,
+    ], captured);
+    assert.equal(status, 0, captured.stderr);
+    const value = JSON.parse(captured.stdout);
+    assert.equal(value.schema, "pipeline.human-guard-override-signature-digest.v1");
+    assert.equal(value.requestSha256, requestSha256);
+    assert.equal(value.planSha256, planSha256);
+    assert.equal(value.intentSha256, intent.sha256);
+
+    // The SAME printed digest, signed and handed back, actually arms -- not merely equal
+    // by coincidence, but the same value the verifier checks.
+    const proofPath = join(proofRoot, "proof.json");
+    writeFileSync(proofPath, JSON.stringify(proof));
+    assert.equal(proof.intentSha256, value.intentSha256);
+    const armed = main([
+      "authorize-by-signature",
+      "--repo", root,
+      "--request-sha256", requestSha256,
+      "--plan-sha256", planSha256,
+      "--proof", proofPath,
+    ], io());
+    assert.equal(armed, 0);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(proofRoot, { recursive: true, force: true });
+  }
+});
+
+test("emit-signature-digest validates its flag set like the sibling subcommands", () => {
+  const captured = io();
+  const status = main(["emit-signature-digest", "--repo", "/tmp/does-not-matter"], captured);
+  assert.equal(status, 2);
+  assert.match(captured.stderr, /HGO-USAGE/u);
 });
 
 /**

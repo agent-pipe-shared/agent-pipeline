@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import {
   authorizeHumanGuardOverride,
   authorizeHumanGuardOverrideBySignature,
+  buildHumanGuardOverrideSignatureIntent,
   HumanGuardOverrideError,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
@@ -23,6 +24,7 @@ function usage() {
     "Usage:",
     "  guard-human-override.mjs plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs prepare-authorization --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --reason <text> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs emit-signature-digest --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --reason <text> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs authorize --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --selection-sha256 <64hex> --reason <text> --reason-sha256 <64hex> [--author-source-root <absolute-root>] --activate",
     "  guard-human-override.mjs authorize-by-signature --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --proof <external-public-json> [--author-source-root <absolute-root>]",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
@@ -126,6 +128,48 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         scriptPath: SCRIPT,
         authorSourceRoot: parsed["author-source-root"] ?? null,
       }), null, 2)}\n`);
+      return 0;
+    }
+    // NVA-SIGENTRY-1: the one command ADR-0059's own Decision 1 promises but never
+    // shipped -- "inspect the prepared request's digest, sign it externally, hand back
+    // the proof" required reading library source and reconstructing the recipe by hand
+    // until now. Runs the exact same `plan` + `prepare-authorization` library calls
+    // above, unchanged, then derives the signable digest through the SAME shared helper
+    // `authorizeHumanGuardOverrideBySignature()` gates arming on
+    // (buildHumanGuardOverrideSignatureIntent()) -- so this prints provably the same
+    // value the verifier checks, never a second, independently-reconstructed one.
+    if (command === "emit-signature-digest") {
+      const parsed = flags(rest);
+      if (!exactFlagSet(parsed, ["repo", "request-sha256", "plan-sha256", "reason"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
+        || !SHA256.test(parsed["request-sha256"] ?? "")
+        || !SHA256.test(parsed["plan-sha256"] ?? "")
+        || typeof parsed.reason !== "string" || parsed.reason.trim() === "") throw new Error(usage());
+      const authorSourceRoot = parsed["author-source-root"] ?? null;
+      const prepared = prepareHumanGuardOverrideAuthorization({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        planSha256: parsed["plan-sha256"],
+        reason: parsed.reason,
+        scriptPath: SCRIPT,
+        authorSourceRoot,
+      });
+      const planned = planHumanGuardOverride({
+        rootDir: parsed.repo,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: parsed["request-sha256"],
+        scriptPath: SCRIPT,
+        authorSourceRoot,
+      });
+      const intent = buildHumanGuardOverrideSignatureIntent({ prepared, planned });
+      write(`${JSON.stringify({
+        schema: "pipeline.human-guard-override-signature-digest.v1",
+        requestSha256: parsed["request-sha256"],
+        planSha256: parsed["plan-sha256"],
+        selectionSha256: prepared.selectionSha256,
+        intentSha256: intent.sha256,
+      }, null, 2)}\n`);
       return 0;
     }
     if (command === "authorize") {
