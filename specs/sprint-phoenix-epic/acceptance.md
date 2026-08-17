@@ -231,10 +231,50 @@ architecture prose or an implementation briefing.
 - **H-AC-08:** WHEN a legacy approval/override/deploy record cannot prove its
   original authority tuple, THE SYSTEM SHALL import it only as an unverified
   observation that cannot satisfy a gate.
+
+  **Amendment (PO, 2026-08-17).** Satisfied by construction, not by a live
+  import path. Two independent investigations (PHX-WP-HAC08, 2026-08-09
+  build and 2026-08-17 re-investigation) confirmed by repo-wide search that
+  no code path in `plugins/`, `harness/`, or `scripts/` currently imports or
+  migrates a legacy record at all — the WHEN-clause's antecedent has no live
+  trigger today. A real candidate source of class `guard-override-jsonl-record`
+  does exist (`project/guard-override.log.jsonl`) but is the guard's own live
+  token-consumption ledger, not a dormant record awaiting migration, and the
+  one real historical import path this repo ever had
+  (`scripts/migrate-backlog-state.mjs`) is permanently closed
+  (`applyBacklogMigration` refuses once `backlog/transitions.ndjson` exists,
+  and it does) and, while it ran, deliberately refused authority-bearing
+  legacy records rather than importing them as observations. The clause's
+  guarantee holds regardless: `legacy-import-observation`
+  (`plugins/pipeline-core/lib/agent-decision-journal.mjs`, drift-tested) is
+  the ONLY representable shape a legacy-record import can take in this
+  codebase, and it is non-authoritative by construction (rides the existing,
+  unmodified `origin === "agent"` → `authorityClass: "non-authoritative"`
+  binding), so any future caller that does perform such an import is
+  structurally unable to produce anything that satisfies a gate. No further
+  code closes this any more completely than the existing shape already does.
 - **H-AC-09:** WHEN cross-repository guarded work is authorized, THE SYSTEM
   SHALL bind evaluation, token consumption, ledger placement, and target
   repository to one physical target and SHALL NOT copy private coordinates
   into the coordinator repository.
+
+  **Amendment (PO, 2026-08-17).** Satisfied by construction, not by a live
+  binding mechanism. This clause's WHEN-condition — cross-repository guarded
+  work being authorized — currently has no trigger in this repository at
+  all: CLAUDE.md's Sprint-0 hard rule ("Read-only toward the three project
+  repos ... never a write ... until an explicitly approved Phase-4
+  migration") forbids the System from authorizing any cross-repository
+  guarded work today, and no Phase-4 migration roadmap exists anywhere in
+  this repository (confirmed 2026-08-17: repo-wide search for a Phase-4
+  migration plan/design returns nothing). Since the antecedent cannot fire
+  under current policy, the clause's guarantee holds vacuously and
+  permanently unless and until a future Phase-4 migration authorizes
+  cross-repository guarded work — at which point this criterion becomes live
+  again and needs a real binding mechanism that does not exist yet (the
+  external-push-ledger machinery this repo has today is scoped to
+  single-repository push proofs only). Building that mechanism now, ahead of
+  the policy that would ever call it, would be building ahead of this
+  repo's own governing policy rather than closing a gap.
 - **H-AC-10:** WHEN a PO authorizes bounded direct Elephant implementation or
   another role exception, THE SYSTEM SHALL record exact scope, reason, expiry,
   constraints, and mandatory follow-up review; it SHALL NOT create a standing

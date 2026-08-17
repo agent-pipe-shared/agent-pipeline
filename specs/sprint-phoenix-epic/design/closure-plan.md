@@ -101,9 +101,21 @@ events and a real delivered disposition. 80/80 across the full affected regressi
 independently re-run at the exact commit. **P-AC-09 closes: `implemented`.** Moves out of Class B
 entirely (9 remain, was 10). Open count: **20 of 157** (was 21).
 
+**UPDATE, 2026-08-17 (PO amendment, `acceptance.md`, both append-only, no code change).** H-AC-08
+and H-AC-09 both close, satisfied by construction rather than a live path. H-AC-08: its
+WHEN-antecedent (a legacy record import) has no live trigger anywhere in this repo (confirmed
+twice, 2026-08-09 and 2026-08-17), and the one representable shape a future import could ever take
+(`legacy-import-observation`) is non-authoritative by construction, so the guarantee holds
+regardless of whether the antecedent ever fires. H-AC-09: its WHEN-antecedent (cross-repository
+guarded work being authorized) cannot fire under CLAUDE.md's Sprint-0 hard rule — confirmed no
+Phase-4 migration roadmap exists anywhere in this repo — so it is vacuously and permanently
+satisfied under current policy, reopening only if a future Phase-4 migration authorizes such work.
+**Both close: `implemented`.** Move out of Class P entirely (9 remain, was 11). Open count:
+**18 of 157** (was 20).
+
 ## What this design is for
 
-The measurement established that **20 of 157** acceptance criteria are not
+The measurement established that **18 of 157** acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart — provided it is regenerated when the verdict data moves, which is the exact
@@ -119,8 +131,8 @@ one list is what has made the epic look larger and more uniform than it is.
 | D — documentation missing | 0 | (prior member L-AC-08 reclassified to P 2026-08-17, then closed the same day — see below) |
 | S — seam missing | 0 | (prior member E-AC-20 closed 2026-08-10) |
 | B — capability missing | 9 | real implementation plus its tests |
-| P — not code | 11 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **20** | |
+| P — not code | 9 | a human gate, a sanctioned authority revision, or a proved impossibility |
+| **total** | **18** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -294,16 +306,14 @@ these, is in
 | R-AC-09 | partial | WP-R | missing offer link, contradictory outcome evidence, cross-repository/cross-scope substitution, and now `occurredAtEpochMs` (closed 2026-08-10, commit `8d8996bc`) are pinned. Duplicate detection deliberately not rebuilt here — it lives at the store layer (`idempotencyKey`, governance-event-store.mjs) by design, not an absence |
 | V-AC-02 | partial | WP-V | seven of nine now labelled (fact/unknown/unavailable/redacted/invalid/not-applicable/human-decision, the last closed 2026-08-1x and missed by this document until the 2026-08-17 correction). estimate and assumption remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules |
 
-### Class P — not closeable by writing code (11)
+### Class P — not closeable by writing code (9)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | EPIC-AC-01 | partial | WP-PO | the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues |
-| H-AC-08 | partial | WP-PO | `legacy-import-observation` kind is representable, drift-tested. UPDATE 2026-08-17 (PHX-WP-HAC08, NO CARRIER, no code change): a real source artifact exists (`project/guard-override.log.jsonl`) but no import ACTIVITY does — the live guard ledger needs no re-recording, and the one real legacy-import path (`migrate-backlog-state.mjs`) is permanently closed and semantically refuses these records. Building a producer here would recreate the reverted `cc43a182` anti-pattern (design/agent-decision-journal-production-producer.md sec.5) — a PO amendment decision, same shape as H-AC-09 |
 | EPIC-AC-03 | partial | WP-PO | an outstanding deviation is recorded (the bound Spec section 7 inventory omits six implemented modules) and is not yet repaired through the sanctioned route. INVESTIGATED 2026-08-17: the route is `plugins/pipeline-core/scripts/phoenix-authority-revision.mjs`, a proof-gated wrapper around `pipeline-state.mjs`'s `continuity-authority-revision-plan`/`-apply` — it requires an external Ed25519 proof directory (`phoenix-authority-approval.mjs verify`) before either `plan` or `apply` will run. Not agent-executable without that external signature; an agent can draft the proposal content (the six missing modules for the Spec §7 inventory) so the PO's own action is limited to signing |
 | EPIC-AC-04 | partial | WP-PO | privacy review, an integrated-candidate Critic pass, and explicit PO acceptance remain absent |
 | EPIC-AC-05 | constraint | WP-PO | a prohibition, and it currently bites — auto-clears once the rest of this table is empty |
-| H-AC-09 | not-started | WP-PO | NO CARRIER, and no design is available to build: authorizing guarded work in another repository is exactly the capability CLAUDE.md's Sprint-0 hard rule forbids outright. Closes only via a Phase-4 migration or a PO scope amendment |
 | H-AC-11 | partial | WP-PO | portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half. UPDATE 2026-08-17 (PHX-WP-POAMEND, commit `e9054995`): O-4 decided by amendment — the clause is scoped to the restricted machine-local record, not a producer's own enforcement material. Stays open: the restricted-profile intake path itself is still unbuilt (design §9, increment 2/D-1) |
 | H-AC-12 | partial | WP-PO | the shared dual-evaluation primitive exists and closes 2 of ~6 named readers (guard-devplan.mjs, change-control.mjs). UPDATE 2026-08-17 (PHX-WP-POAMEND, commit `e9054995`): the 2026-08-11 PO decision for release-planning/deploy-consumption now landed as an acceptance.md amendment — closes those 2 readers formally, bringing the closed set to 4 of ~6. Stays open: guard-push.mjs, pipeline-state.mjs (TP-5/GMW-blocked), and Git-guard override consumption remain, not pending more code for those two |
 | P-AC-11 | partial | WP-PO | four of five remaining dimensions given representation and one (ownedSections) genuinely enforced (2026-08-16, PHX-WP-PAC11-ENFORCE/FIX). A delta Critic re-review of the fix range has not run: QG-01 forbids handing a diff to the Critic while deterministic gates are red, and Verify cannot go fully green until the installed-plugin GMW/HGO v3-anchor gap is fixed (see `docs/state.md`'s 2026-08-16 checkpoint / the corresponding backlog item) — a structural block on the re-review, not a code task available now |
@@ -314,6 +324,6 @@ these, is in
 
 With Classes A/D/S empty, the sequence collapses to: **Class B first** (9 items, real code, no PO
 gate — L-AC-01 leads, since it is the one structural gap several other rows describe as their own
-missing half), **Class P last** (11 items, eleven different PO actions, several already queued and
+missing half), **Class P last** (9 items, nine different PO actions, several already queued and
 waiting only on the PO's own terminal or a design answer — not parallelizable with agent work).
 
