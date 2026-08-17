@@ -85,9 +85,9 @@ test("redacted package projection is deterministic and withholds artifact paths"
   assert.equal(model.source.manifest, null); assert.equal(model.artifacts[0].path, "artifact-1"); assert.equal(model.artifacts[0].sourcePath, null); assert.ok(model.notices.some((entry) => entry.valueClass === "redacted"));
 });
 test("projects explicitly supplied delivery observation without changing the candidate claim", () => {
-  const fixture = packageFixture(); const exportObservation = { schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "retryable-failure", cursor: 2, lag: 3, receipt: { batchId: "batch-1", acknowledgementClass: "partial", terminalDisposition: "retryable-failure" } };
+  const fixture = packageFixture(); const exportObservation = { schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "retryable-failure", cursor: 2, lag: 3, receipt: { batchId: "batch-1", acknowledgementClass: "partial", terminalDisposition: "retryable-failure" }, failureCount: 2, quarantineCount: 1, integrityGaps: ["EG-DIGEST-MISMATCH"] };
   const model = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation });
-  assert.equal(model.status, "unknown"); assert.equal(model.exportStatus.state, "retryable-failure"); assert.equal(model.exportStatus.lag, 3);
+  assert.equal(model.status, "unknown"); assert.equal(model.exportStatus.state, "retryable-failure"); assert.equal(model.exportStatus.lag, 3); assert.equal(model.exportStatus.failureCount, 2); assert.equal(model.exportStatus.quarantineCount, 1); assert.deepEqual(model.exportStatus.integrityGaps, ["EG-DIGEST-MISMATCH"]);
   assert.throws(() => buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation: { ...exportObservation, receipt: { raw: "forbidden" } } }), (error) => error.code === "EVM-EXPORT");
 });
 // V-AC-02: the delivery observation is the one supplied input this projection
@@ -97,7 +97,7 @@ test("projects explicitly supplied delivery observation without changing the can
 // only when an observation was actually supplied.
 test("V-AC-02 declares the supplied delivery observation as an assumption, and only when one is supplied", () => {
   const fixture = packageFixture();
-  const exportObservation = { schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "delivered", cursor: 4, lag: 0, receipt: null };
+  const exportObservation = { schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "delivered", cursor: 4, lag: 0, receipt: null, failureCount: 0, quarantineCount: 0, integrityGaps: [] };
   const assumed = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation });
   const declared = assumed.notices.filter((entry) => entry.valueClass === "assumption");
   assert.equal(declared.length, 1);
@@ -105,6 +105,43 @@ test("V-AC-02 declares the supplied delivery observation as an assumption, and o
   const unsupplied = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest });
   assert.equal(unsupplied.notices.some((entry) => entry.valueClass === "assumption"), false);
   assert.equal(unsupplied.exportStatus.state, "unavailable");
+  assert.equal(unsupplied.exportStatus.failureCount, null);
+  assert.equal(unsupplied.exportStatus.quarantineCount, null);
+  assert.equal(unsupplied.exportStatus.integrityGaps, null);
+});
+// E-AC-19: failure/quarantine counts are non-negative integers or an explicit
+// `null` (never observed); malformed values fail closed exactly like every
+// other shape check in this block.
+test("E-AC-19 accepts observed failure/quarantine counts and rejects malformed ones", () => {
+  const fixture = packageFixture();
+  const base = { schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "quarantined", cursor: 1, lag: 1, receipt: null };
+  const valid = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation: { ...base, failureCount: 3, quarantineCount: 5, integrityGaps: null } });
+  assert.equal(valid.exportStatus.failureCount, 3); assert.equal(valid.exportStatus.quarantineCount, 5); assert.equal(valid.exportStatus.integrityGaps, null);
+  for (const badObservation of [
+    { ...base, failureCount: -1, quarantineCount: 0, integrityGaps: null },
+    { ...base, failureCount: 1.5, quarantineCount: 0, integrityGaps: null },
+    { ...base, failureCount: "3", quarantineCount: 0, integrityGaps: null },
+    { ...base, failureCount: 0, quarantineCount: -1, integrityGaps: null },
+    { ...base, failureCount: 0, quarantineCount: 0 },
+  ]) {
+    assert.throws(() => buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation: badObservation }), (error) => error.code === "EVM-EXPORT");
+  }
+});
+// E-AC-19/K-AC-09: `integrityGaps` distinguishes "not observed" (`null`) from
+// "checked, none found" (`[]`) -- both are valid and must not collapse into
+// each other. A malformed entry (wrong type, wrong shape) fails closed.
+test("E-AC-19 distinguishes absent integrity gaps from an empty, checked list, and rejects malformed entries", () => {
+  const fixture = packageFixture();
+  const base = { schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "pending", cursor: 0, lag: 0, receipt: null, failureCount: 0, quarantineCount: 0 };
+  const notObserved = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation: { ...base, integrityGaps: null } });
+  assert.equal(notObserved.exportStatus.integrityGaps, null);
+  const checkedNone = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation: { ...base, integrityGaps: [] } });
+  assert.deepEqual(checkedNone.exportStatus.integrityGaps, []);
+  const checkedSome = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation: { ...base, integrityGaps: ["EG-DIGEST-MISMATCH", "EG-SEQUENCE-GAP"] } });
+  assert.deepEqual(checkedSome.exportStatus.integrityGaps, ["EG-DIGEST-MISMATCH", "EG-SEQUENCE-GAP"]);
+  for (const badGaps of [["bad-lowercase"], [123], "not-an-array", [""]]) {
+    assert.throws(() => buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation: { ...base, integrityGaps: badGaps } }), (error) => error.code === "EVM-EXPORT");
+  }
 });
 // V-AC-02: `estimate` is a distinct class from both `fact` and `assumption`.
 // The gate estimate is a coordinator-recorded projected range surfaced through

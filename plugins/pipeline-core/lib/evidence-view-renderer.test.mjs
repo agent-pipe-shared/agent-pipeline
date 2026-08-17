@@ -135,6 +135,25 @@ test("V-AC-02 labels supplied delivery-observation values as assumptions, keeps 
   const absent = renderEvidenceView({ ...base, exportStatus: { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null }, notices: [] });
   assert.doesNotMatch(absent, /data-value-class="assumption"/);
 });
+// E-AC-19: failure/quarantine counts and integrity gaps follow the exact same
+// caller-supplied, unverified-premise discipline as the sibling exportStatus
+// fields above (V-AC-02): present values are `assumption`, absent ones stay
+// `unavailable`. `integrityGaps` additionally distinguishes "not observed"
+// (`null`, renders `unavailable`) from "checked, none found" (`[]`, renders
+// `assumption`/"none") -- the two must never collapse into each other.
+test("E-AC-19 renders failure/quarantine counts and integrity gaps as assumptions when observed and unavailable when absent", () => {
+  const base = { schema: "pipeline.evidence-view-model.v2", authority: "non-authoritative", source: { topology: "valid" }, feature: { id: "f", lifecycleState: "completed" }, candidate: { state: "fact", commit: "a".repeat(40), tree: "b".repeat(40) }, status: "unknown", sharing: "private", artifacts: [], notices: [] };
+  const observed = renderEvidenceView({ ...base, exportStatus: { state: "quarantined", destinationProfile: "audit", cursor: 4, lag: 0, receipt: null, failureCount: 2, quarantineCount: 5, integrityGaps: ["EG-DIGEST-MISMATCH"] } });
+  assert.match(observed, /<dt>Failure count<\/dt><dd><span class="value value-assumption" data-value-class="assumption">2<\/span><\/dd>/);
+  assert.match(observed, /<dt>Quarantine count<\/dt><dd><span class="value value-assumption" data-value-class="assumption">5<\/span><\/dd>/);
+  assert.match(observed, /<dt>Integrity gaps<\/dt><dd><span class="value value-assumption" data-value-class="assumption">EG-DIGEST-MISMATCH<\/span><\/dd>/);
+  const checkedNone = renderEvidenceView({ ...base, exportStatus: { state: "delivered", destinationProfile: "audit", cursor: 4, lag: 0, receipt: null, failureCount: 0, quarantineCount: 0, integrityGaps: [] } });
+  assert.match(checkedNone, /<dt>Integrity gaps<\/dt><dd><span class="value value-assumption" data-value-class="assumption">none<\/span><\/dd>/);
+  const absent = renderEvidenceView({ ...base, exportStatus: { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null, failureCount: null, quarantineCount: null, integrityGaps: null } });
+  assert.match(absent, /<dt>Failure count<\/dt><dd><span class="value value-unavailable" data-value-class="unavailable">unavailable<\/span><\/dd>/);
+  assert.match(absent, /<dt>Quarantine count<\/dt><dd><span class="value value-unavailable" data-value-class="unavailable">unavailable<\/span><\/dd>/);
+  assert.match(absent, /<dt>Integrity gaps<\/dt><dd><span class="value value-unavailable" data-value-class="unavailable">unavailable<\/span><\/dd>/);
+});
 // V-AC-02: `estimate` is rendered as its own visible class, distinct from both
 // `fact` and `assumption`. A resolved projection shows the gate and the range
 // under that class; an unresolved or inapplicable one shows only its own state
