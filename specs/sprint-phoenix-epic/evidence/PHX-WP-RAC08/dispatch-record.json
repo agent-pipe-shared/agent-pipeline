@@ -1,0 +1,32 @@
+{
+  "taskId": "PHX-WP-RAC08",
+  "model": "claude-opus-5 (effort xhigh)",
+  "rulesetSha": "2d25aa24c69d7585d321bf9ab4d12ad53d87ae83e2d85ff6dcb4753bcb0c0cba",
+  "dispatcher": "elephant",
+  "outcome": "success",
+  "criterion": "R-AC-08 (rollback/cleanup occurred half; recovery apply + readback were already covered)",
+  "log": [
+    { "phase": "opening dispatch record", "toolUses": 3 },
+    { "phase": "investigation: acceptance R-AC-06..09, whole external-command-offer.mjs, its test file, validateCommandOfferEvent/COMMAND_STATES/recoverability/requiredCleanup in agent-decision-journal.mjs", "toolUses": 10, "finding": "COMMAND_STATES had 16 members, none meaning an occurred rollback/cleanup; the only rollback/cleanup vocabulary was prospective (recoverability = rollback-required/cleanup-required) plus requiredCleanup.status (what/whether). The evidence map's own pointer text names the same gap: 'no rollback/cleanup COMMAND_STATES entries at all (R-AC-08)'." },
+    { "phase": "design decision", "toolUses": 15, "finding": "Two new states (rollback-performed, cleanup-performed) plus a SEPARATE recorder recordCommandRecoveryOccurrence -- not new states inside recordCommandRecoveryDisposition, because three of that function's rules are wrong for an occurred undo (anchor set offered/recovery-proposed, mandatory preEvidenceDigest === null, no discharge rule) and relaxing any of them would widen an existing transition." },
+    { "phase": "implementation", "toolUses": 22, "files": ["plugins/pipeline-core/lib/agent-decision-journal.mjs", "plugins/pipeline-core/lib/external-command-offer.mjs", "governance/schemas/agent-decision-event.schema.json"] },
+    { "phase": "tests", "toolUses": 25, "files": ["plugins/pipeline-core/lib/external-command-offer.test.mjs", "plugins/pipeline-core/lib/agent-decision-journal.test.mjs"] },
+    { "phase": "verification", "toolUses": 30, "finding": "external-command-offer.test.mjs 46/46 pass (41 pre-existing unmodified + 5 new); agent-decision-journal.test.mjs 51/51 pass (49 pre-existing unmodified + 2 new); node --check clean on both touched modules." }
+  ],
+  "dod": [
+    { "check": "a real appended occurred event exists for both rollback and cleanup, distinguishable from any prospective recoverability value", "result": "passed", "evidence": "external-command-offer-test.tap: 'R-AC-08: an occurred rollback and an occurred cleanup are each appended exactly once ... distinct from every prospective recoverability value'; asserts receipt.status is not any member of the recoverability enum" },
+    { "check": "tests prove append-once and never-rewrite for both, via before/after byte comparison", "result": "passed", "evidence": "same test: JSON.stringify witnesses over offer + proposal + authorized mutating outcome compared before/after; append spy call count === 1; second recording refused pre-append with ECO-DUPLICATE and 0 appends" },
+    { "check": "illegal predecessor states still refused; no existing anchor state's transitions widened", "result": "passed", "evidence": "'refuses every illegal predecessor state' test: offered/acknowledged/authorized/copied/attempted/recovery-proposed and both occurred states all rejected with ECO-OCCURRENCE-ANCHOR; the 8 legal anchors still admitted; occurred states also unreachable through recordCommandOutcome (ECO-OUTCOME) and recordCommandRecoveryDisposition (ECO-RECOVERY-STATE)" },
+    { "check": "node --test on every touched file, 0 failures; every pre-existing case passes with original assertions unmodified", "result": "passed", "evidence": "external-command-offer-test.tap (46/46), agent-decision-journal-test.tap (51/51); no pre-existing test line was edited (only the import line extended and new tests appended)" },
+    { "check": "node --check on the touched file", "result": "passed", "evidence": "node --check on external-command-offer.mjs and agent-decision-journal.mjs, exit 0, no output" }
+  ],
+  "evidence": [
+    { "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination=specs/sprint-phoenix-epic/evidence/PHX-WP-RAC08/external-command-offer-test.tap plugins/pipeline-core/lib/external-command-offer.test.mjs", "exitCode": 0, "artifact": "specs/sprint-phoenix-epic/evidence/PHX-WP-RAC08/external-command-offer-test.tap", "pass": 46, "fail": 0 },
+    { "command": "node --test --test-reporter=spec --test-reporter-destination=stdout --test-reporter=tap --test-reporter-destination=specs/sprint-phoenix-epic/evidence/PHX-WP-RAC08/agent-decision-journal-test.tap plugins/pipeline-core/lib/agent-decision-journal.test.mjs", "exitCode": 0, "artifact": "specs/sprint-phoenix-epic/evidence/PHX-WP-RAC08/agent-decision-journal-test.tap", "pass": 51, "fail": 0 },
+    { "command": "node --check plugins/pipeline-core/lib/external-command-offer.mjs", "exitCode": 0 },
+    { "command": "node --check plugins/pipeline-core/lib/agent-decision-journal.mjs", "exitCode": 0 }
+  ],
+  "scopeNote": "The briefing listed agent-decision-journal.mjs as a read-only reference, but the closed COMMAND_STATES vocabulary lives there, so an occurred state is not expressible without editing it; it is not in the briefing's forbidden list, and field 3 asks for node --test on every touched file. governance/schemas/agent-decision-event.schema.json was extended for the same reason: its published command-offer state enum mirrors COMMAND_STATES and would otherwise reject a valid new event. Both disclosed as deviations in the report.",
+  "commit": null,
+  "report": null
+}

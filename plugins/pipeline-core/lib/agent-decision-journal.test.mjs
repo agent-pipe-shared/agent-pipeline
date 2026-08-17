@@ -610,3 +610,26 @@ test("H-AC-08 keeps the published legacy-import-observation schema closed and in
   assert.deepEqual(branch.required.slice().sort(),["authorityProofStatus","candidateDigest","eventId","kind","legacySourceClass","reasonCode","relatedHumanDecisionId","sourceReferenceDigest","sourceReferencePath","state","supersedesEventId"]);
   for(const entry of schema.oneOf)assert.equal(entry.additionalProperties,false,"a journal event shape stopped being closed");
 });
+
+// R-AC-08: the two OCCURRED recovery facts. `recoverability` stays the
+// prospective category; these are states, so a caller can never read "a
+// rollback was required" as "a rollback happened".
+const OCCURRED_RECOVERY=[["rollback-performed","rollback-required"],["cleanup-performed","cleanup-required"]];
+test("R-AC-08 admits an occurred rollback/cleanup state only when it discharges the matching prospective requirement",()=>{
+  for(const [state,recoverability] of OCCURRED_RECOVERY){
+    const performed=validateCommandOfferEvent(offer({eventId:`${state}-1`,state,executionAssurance:"not-applicable",offerEventId:"offer-origin",recoverability,postEvidenceDigest:"a".repeat(64)}));
+    assert.equal(performed.state,state,`${state} must be representable as its own occurred state, not as a recoverability value`);
+    assert.equal(performed.recoverability,recoverability);
+    assert.equal(Object.isFrozen(performed),true);
+    for(const wrong of ["not-applicable","recoverable","rollback-required","cleanup-required"].filter((entry)=>entry!==recoverability))
+      assert.throws(()=>validateCommandOfferEvent(offer({eventId:`${state}-2`,state,executionAssurance:"not-applicable",offerEventId:"offer-origin",recoverability:wrong})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-COMMAND-OCCURRENCE-SCOPE",`${state} was admitted against a ${wrong} record that never declared the requirement`);
+    assert.throws(()=>validateCommandOfferEvent(offer({eventId:`${state}-3`,state,executionAssurance:"observed-completed",offerEventId:"offer-origin",recoverability})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-COMMAND-OCCURRENCE-SCOPE",`${state} was allowed to grade the offered command's execution as completed`);
+    assert.throws(()=>validateCommandOfferEvent(offer({eventId:`${state}-4`,state,executionAssurance:"not-applicable",recoverability})),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-COMMAND-LINK",`${state} was admitted with no link to the record it recovers from`);
+  }
+});
+test("R-AC-08 keeps the published command-offer state enum in step with the validator for both occurred recovery states",()=>{
+  const schema=JSON.parse(readFileSync(new URL("../../../governance/schemas/agent-decision-event.schema.json",import.meta.url),"utf8"));
+  const branch=schema.oneOf.find((entry)=>entry.properties.kind.const==="command-offer");
+  for(const [state] of OCCURRED_RECOVERY)assert.equal(branch.properties.state.enum.includes(state),true,`the published schema would reject a valid ${state} event`);
+  assert.deepEqual(branch.properties.recoverability.enum,["not-applicable","recoverable","cleanup-required","rollback-required"],"the prospective recoverability category must not have grown an occurred value");
+});

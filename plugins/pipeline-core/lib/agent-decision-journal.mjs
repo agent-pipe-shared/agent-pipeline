@@ -6,7 +6,26 @@ const KINDS=new Set(["assumption","selection","verification-scope","fallback","e
 const ASSUMPTION_STATES=new Set(["assumed","inferred","observed","verified","contradicted","unavailable","unknown"]);
 /** A-AC-05: identity provenance/assurance, admissible only on the kinds where an identity choice is material to the decision being recorded (`selection`, `escalation`, `fallback`); `assumption`/`verification-scope` never carry it. */
 const IDENTITY_DIMENSIONS=new Set(["runner","model","effort","profile","role","adapter","capability"]), IDENTITY_PROVENANCE=new Set(["same-dispatch-observed","requested-route","inherited-session","unknown"]), IDENTITY_ASSURANCE=new Set(["verified","reported","inferred","unknown"]), IDENTITY_KINDS=new Set(["selection","escalation","fallback"]);
-const COMMAND_STATES=new Set(["offered","acknowledged","authorized","copied","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch","recovery-proposed","recovered"]);
+/**
+ * R-AC-08: `rollback-performed`/`cleanup-performed` are the two OCCURRED
+ * recovery facts. Every other rollback/cleanup notion on this shape is
+ * prospective and stays that way: `recoverability` is a closed category
+ * naming WHETHER a mutation would need rolling back or cleaning up
+ * (`rollback-required`/`cleanup-required`), and `requiredCleanup` names WHAT
+ * that follow-up is -- neither is ever the assertion that it happened.
+ * Recording the occurrence therefore needed a `state`, exactly like every
+ * other "this happened" fact in this vocabulary (`attempted`,
+ * `readback-verified`, `recovered`), not a fourth `recoverability` value:
+ * widening that enum would have made the occurred fact indistinguishable
+ * from the requirement it discharges, and would have let it be smuggled onto
+ * an `offered` event that has by definition executed nothing.
+ *
+ * `recovered` is deliberately NOT reused: it records that an alternative was
+ * SELECTED (R-AC-02's considered-recovery axis, `recordCommandRecoveryDisposition`),
+ * which is a decision, not a carried-out mutation-undo. A lifecycle can hold
+ * both, in that order, and each keeps its own event.
+ */
+const COMMAND_STATES=new Set(["offered","acknowledged","authorized","copied","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch","recovery-proposed","recovered","rollback-performed","cleanup-performed"]);
 const COMMAND_ASSURANCE=new Set(["not-applicable","attempted","execution-unobserved","observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch"]);
 const OMITTABLE=new Set(["raw-command","arguments","private-coordinates","unrestricted-output","prompt","transcript","credential"]);
 /** R-AC-04: whether a recorded required cleanup/readback has itself been carried out -- a dimension distinct from `recoverability`'s category and from the original operation's `state`/`executionAssurance`. */
@@ -167,6 +186,20 @@ export function validateCommandOfferEvent(value) {
   if(value.state==="attempted"&&value.executionAssurance!=="attempted")fail("ADJ-COMMAND-OUTCOME");
   if(value.state==="execution-unobserved"&&value.executionAssurance!=="execution-unobserved")fail("ADJ-COMMAND-OUTCOME");
   if(["observed-completed","readback-verified","failed","partial","cancelled","unknown","unavailable","readback-mismatch"].includes(value.state)&&value.executionAssurance!==value.state)fail("ADJ-COMMAND-OUTCOME");
+  /**
+   * R-AC-08: an occurred recovery fact is structurally bound to the prospective
+   * requirement it discharges -- `rollback-performed` only ever on a
+   * `rollback-required` record, `cleanup-performed` only on a `cleanup-required`
+   * one -- so no caller (this validator's users included, not only
+   * `external-command-offer.mjs`) can assert that a rollback happened for a
+   * mutation nothing ever recorded as needing one. `executionAssurance` is
+   * pinned to `not-applicable` because it grades the OFFERED command's
+   * execution; an undo action carries no new claim about that, and leaving it
+   * free would let a `rollback-performed` event label itself
+   * `observed-completed` (R-AC-06). Additive: no pre-existing state's rules
+   * change, and both constraints only refuse.
+   */
+  if((value.state==="rollback-performed"||value.state==="cleanup-performed")&&(value.executionAssurance!=="not-applicable"||value.recoverability!==(value.state==="rollback-performed"?"rollback-required":"cleanup-required")))fail("ADJ-COMMAND-OCCURRENCE-SCOPE");
   if(hasRequiredCleanup&&value.recoverability==="not-applicable")fail("ADJ-COMMAND-CLEANUP-SCOPE");
   if(hasCommitment!==hasCommitmentReceiptId)fail("ADJ-COMMAND-COMMITMENT-PAIRING");
   return Object.freeze({...value,operation:Object.freeze({...value.operation}),target:Object.freeze({...value.target}),omissions:Object.freeze([...value.omissions]),...(hasRequiredCleanup?{requiredCleanup:Object.freeze({...value.requiredCleanup})}:{})});

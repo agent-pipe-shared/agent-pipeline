@@ -1,0 +1,286 @@
+TAP version 13
+# Subtest: records a public-safe offer before presentation and requires verified append readback
+ok 1 - records a public-safe offer before presentation and requires verified append readback
+  ---
+  duration_ms: 1.425533
+  type: 'test'
+  ...
+# Subtest: requires a bound human decision for destructive pipeline attempts and appends before execution
+ok 2 - requires a bound human decision for destructive pipeline attempts and appends before execution
+  ---
+  duration_ms: 0.337644
+  type: 'test'
+  ...
+# Subtest: keeps user execution unobserved and admits completion only with bounded evidence
+ok 3 - keeps user execution unobserved and admits completion only with bounded evidence
+  ---
+  duration_ms: 0.357103
+  type: 'test'
+  ...
+# Subtest: retains failed, partial, cancelled, mismatch and unknown outcomes distinctly
+ok 4 - retains failed, partial, cancelled, mismatch and unknown outcomes distinctly
+  ---
+  duration_ms: 0.427894
+  type: 'test'
+  ...
+# Subtest: rejects offer substitution across candidate, repository, and scope
+ok 5 - rejects offer substitution across candidate, repository, and scope
+  ---
+  duration_ms: 0.177041
+  type: 'test'
+  ...
+# Subtest: R-AC-02: a considered recovery (recovery-proposed/recovered) has no correlation path — both states remain unreachable through the outcome recorder
+ok 6 - R-AC-02: a considered recovery (recovery-proposed/recovered) has no correlation path — both states remain unreachable through the outcome recorder
+  ---
+  duration_ms: 0.332983
+  type: 'test'
+  ...
+# Subtest: R-AC-02: recordCommandRecoveryDisposition correlates a considered recovery-proposed alternative to the existing offer, carrying its typed rejection reason
+ok 7 - R-AC-02: recordCommandRecoveryDisposition correlates a considered recovery-proposed alternative to the existing offer, carrying its typed rejection reason
+  ---
+  duration_ms: 0.142701
+  type: 'test'
+  ...
+# Subtest: R-AC-02: recordCommandRecoveryDisposition correlates a recovered selection, chained via supersedesEventId to the chosen recovery-proposed alternative, to the existing offer
+ok 8 - R-AC-02: recordCommandRecoveryDisposition correlates a recovered selection, chained via supersedesEventId to the chosen recovery-proposed alternative, to the existing offer
+  ---
+  duration_ms: 0.141992
+  type: 'test'
+  ...
+# Subtest: R-AC-02: recordCommandRecoveryDisposition fails closed on an undocumented evidence gap, cross-scope substitution, and a mismatched anchor state
+ok 9 - R-AC-02: recordCommandRecoveryDisposition fails closed on an undocumented evidence gap, cross-scope substitution, and a mismatched anchor state
+  ---
+  duration_ms: 0.279103
+  type: 'test'
+  ...
+# Subtest: R-AC-04: binds operation class, target, exact pre/post evidence digests, and recoverability together on a state-mutating outcome; rejects malformed digests or an unrecognized recoverability value
+ok 10 - R-AC-04: binds operation class, target, exact pre/post evidence digests, and recoverability together on a state-mutating outcome; rejects malformed digests or an unrecognized recoverability value
+  ---
+  duration_ms: 0.473484
+  type: 'test'
+  ...
+# Subtest: R-AC-04: requiredCleanup records what cleanup/readback is required, distinct from recoverability's own category, through recordCommandOutcome
+ok 11 - R-AC-04: requiredCleanup records what cleanup/readback is required, distinct from recoverability's own category, through recordCommandOutcome
+  ---
+  duration_ms: 0.252163
+  type: 'test'
+  ...
+# Subtest: R-AC-08: a readback lifecycle event appends exactly once and never re-appends or mutates the original offer
+ok 12 - R-AC-08: a readback lifecycle event appends exactly once and never re-appends or mutates the original offer
+  ---
+  duration_ms: 0.561875
+  type: 'test'
+  ...
+# Subtest: R-AC-09: a missing required offer link is never rendered successful
+ok 13 - R-AC-09: a missing required offer link is never rendered successful
+  ---
+  duration_ms: 0.126761
+  type: 'test'
+  ...
+# Subtest: R-AC-09: contradictory independent outcome evidence is never rendered successful
+ok 14 - R-AC-09: contradictory independent outcome evidence is never rendered successful
+  ---
+  duration_ms: 0.142522
+  type: 'test'
+  ...
+# Subtest: R-AC-09: cross-repository and cross-scope substitution are rejected, not only candidate-digest substitution
+ok 15 - R-AC-09: cross-repository and cross-scope substitution are rejected, not only candidate-digest substitution
+  ---
+  duration_ms: 0.152191
+  type: 'test'
+  ...
+# Subtest: R-AC-09: a well-formed occurrence timestamp flows through recordCommandOffer end-to-end, and a malformed one is rejected before append
+ok 16 - R-AC-09: a well-formed occurrence timestamp flows through recordCommandOffer end-to-end, and a malformed one is rejected before append
+  ---
+  duration_ms: 0.156892
+  type: 'test'
+  ...
+# Subtest: R-AC-09: an outcome's occurrence timestamp is never compared against the offer's -- a later, different value on the outcome is not treated as substitution
+ok 17 - R-AC-09: an outcome's occurrence timestamp is never compared against the offer's -- a later, different value on the outcome is not treated as substitution
+  ---
+  duration_ms: 0.114131
+  type: 'test'
+  ...
+# Subtest: R-AC-11: a public-safe typed omission is mandatory — dropping one of the four required labels is rejected; an extra sanctioned label (e.g. credential) is admitted
+ok 18 - R-AC-11: a public-safe typed omission is mandatory — dropping one of the four required labels is rejected; an extra sanctioned label (e.g. credential) is admitted
+  ---
+  duration_ms: 0.130141
+  type: 'test'
+  ...
+# Subtest: R-AC-13: an offer carrying any raw command, argument, or secret-bearing field — benign or malicious content alike — is structurally rejected, never admitted
+ok 19 - R-AC-13: an offer carrying any raw command, argument, or secret-bearing field — benign or malicious content alike — is structurally rejected, never admitted
+  ---
+  duration_ms: 0.170372
+  type: 'test'
+  ...
+# Subtest: R-AC-13: an independently public-safe governed script identity round-trips as a digest and is rejected when malformed, never as script content
+ok 20 - R-AC-13: an independently public-safe governed script identity round-trips as a digest and is rejected when malformed, never as script content
+  ---
+  duration_ms: 0.154982
+  type: 'test'
+  ...
+# Subtest: R-AC-13: approval-without-run states (acknowledged, authorized, copied) remain unreachable through the outcome recorder
+ok 21 - R-AC-13: approval-without-run states (acknowledged, authorized, copied) remain unreachable through the outcome recorder
+  ---
+  duration_ms: 0.286993
+  type: 'test'
+  ...
+# Subtest: R-AC-13: duplicate/retry — recording the same outcome eventId twice is not detected or prevented at this layer (idempotency is delegated entirely to the append() callback)
+ok 22 - R-AC-13: duplicate/retry — recording the same outcome eventId twice is not detected or prevented at this layer (idempotency is delegated entirely to the append() callback)
+  ---
+  duration_ms: 0.142751
+  type: 'test'
+  ...
+# Subtest: R-AC-09: a duplicated lifecycle record is rendered invalid on replay, never successful, and is refused before append once the journal is supplied
+ok 23 - R-AC-09: a duplicated lifecycle record is rendered invalid on replay, never successful, and is refused before append once the journal is supplied
+  ---
+  duration_ms: 0.425824
+  type: 'test'
+  ...
+# Subtest: R-AC-09: two unlinked evidences for one offer are duplicated; an explicitly superseding re-record and a distinct later state are not
+ok 24 - R-AC-09: two unlinked evidences for one offer are duplicated; an explicitly superseding re-record and a distinct later state are not
+  ---
+  duration_ms: 0.323813
+  type: 'test'
+  ...
+# Subtest: R-AC-12: the motivating Phoenix bootstrap trajectory fixture — rejected guard path, attended local repair, unchanged public-privacy boundary, successful readback, no remote write and no machine-specific value
+ok 25 - R-AC-12: the motivating Phoenix bootstrap trajectory fixture — rejected guard path, attended local repair, unchanged public-privacy boundary, successful readback, no remote write and no machine-specific value
+  ---
+  duration_ms: 0.463784
+  type: 'test'
+  ...
+# Subtest: R-AC-10: journaling unavailable still fails closed by default for recordCommandOffer/recordPipelineAttempt, unaffected by the new non-material exception path
+ok 26 - R-AC-10: journaling unavailable still fails closed by default for recordCommandOffer/recordPipelineAttempt, unaffected by the new non-material exception path
+  ---
+  duration_ms: 0.284122
+  type: 'test'
+  ...
+# Subtest: R-AC-10: a typed non-material exception is admitted for a non-authoritative, not-required offer when journaling is unavailable, and never claims execution
+ok 27 - R-AC-10: a typed non-material exception is admitted for a non-authoritative, not-required offer when journaling is unavailable, and never claims execution
+  ---
+  duration_ms: 0.141102
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the non-material exception is rejected for destructive, guard-bypass, and authority-changing offers -- it never becomes a general journaling bypass
+ok 28 - R-AC-10: the non-material exception is rejected for destructive, guard-bypass, and authority-changing offers -- it never becomes a general journaling bypass
+  ---
+  duration_ms: 0.133451
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the non-material exception is rejected when authorityRequirement is human-decision-required, even for an otherwise non-authoritative offer
+ok 29 - R-AC-10: the non-material exception is rejected when authorityRequirement is human-decision-required, even for an otherwise non-authoritative offer
+  ---
+  duration_ms: 0.080421
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the non-material exception refuses to run when an append function is actually supplied -- it is not a shortcut around working journaling
+ok 30 - R-AC-10: the non-material exception refuses to run when an append function is actually supplied -- it is not a shortcut around working journaling
+  ---
+  duration_ms: 0.06151
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the non-material exception is scoped to the offered state, not attempted or any outcome state
+ok 31 - R-AC-10: the non-material exception is scoped to the offered state, not attempted or any outcome state
+  ---
+  duration_ms: 0.06582
+  type: 'test'
+  ...
+# Subtest: R-AC-11: recordPrivateHandoffCommitment stores a private-only handoff detail via a caller-supplied restricted-store put and returns a public-safe commitment digest, never the detail itself
+ok 32 - R-AC-11: recordPrivateHandoffCommitment stores a private-only handoff detail via a caller-supplied restricted-store put and returns a public-safe commitment digest, never the detail itself
+  ---
+  duration_ms: 0.738017
+  type: 'test'
+  ...
+# Subtest: R-AC-11: recordPrivateHandoffCommitment rejects a readback that reports a different commitment than what was computed
+ok 33 - R-AC-11: recordPrivateHandoffCommitment rejects a readback that reports a different commitment than what was computed
+  ---
+  duration_ms: 0.117281
+  type: 'test'
+  ...
+# Subtest: R-AC-11: recordPrivateHandoffCommitment rejects a malformed put readback shape
+ok 34 - R-AC-11: recordPrivateHandoffCommitment rejects a malformed put readback shape
+  ---
+  duration_ms: 0.104761
+  type: 'test'
+  ...
+# Subtest: R-AC-11: recordPrivateHandoffCommitment fails closed when the private detail or the put callback is missing
+ok 35 - R-AC-11: recordPrivateHandoffCommitment fails closed when the private detail or the put callback is missing
+  ---
+  duration_ms: 0.118381
+  type: 'test'
+  ...
+# Subtest: R-AC-11: end-to-end -- a stored private handoff detail's commitment flows into a public command-offer event and appends
+ok 36 - R-AC-11: end-to-end -- a stored private handoff detail's commitment flows into a public command-offer event and appends
+  ---
+  duration_ms: 0.226962
+  type: 'test'
+  ...
+# Subtest: R-AC-11: a command-offer event carrying only one half of the commitment pair is rejected before append
+ok 37 - R-AC-11: a command-offer event carrying only one half of the commitment pair is rejected before append
+  ---
+  duration_ms: 0.171012
+  type: 'test'
+  ...
+# Subtest: R-AC-10: the exception receipt is structurally distinct from every journaled command state/appendValidated() receipt status, and cannot be reused as an offer/outcome event to claim completion
+ok 38 - R-AC-10: the exception receipt is structurally distinct from every journaled command state/appendValidated() receipt status, and cannot be reused as an offer/outcome event to claim completion
+  ---
+  duration_ms: 0.197642
+  type: 'test'
+  ...
+# Subtest: A-AC-10: journaling unavailable applies the represented event class's declared policy and exposes the gap in both directions
+ok 39 - A-AC-10: journaling unavailable applies the represented event class's declared policy and exposes the gap in both directions
+  ---
+  duration_ms: 0.470744
+  type: 'test'
+  ...
+# Subtest: A-AC-10: the general policy path is strictly stricter than R-AC-10's non-material exception, never looser
+ok 40 - A-AC-10: the general policy path is strictly stricter than R-AC-10's non-material exception, never looser
+  ---
+  duration_ms: 0.960569
+  type: 'test'
+  ...
+# Subtest: A-AC-10: the journaling-gap path is scoped to a genuinely unavailable journal and the offered state, and its record is never a journal receipt
+ok 41 - A-AC-10: the journaling-gap path is scoped to a genuinely unavailable journal and the offered state, and its record is never a journal receipt
+  ---
+  duration_ms: 0.215602
+  type: 'test'
+  ...
+# Subtest: R-AC-08: an occurred rollback and an occurred cleanup are each appended exactly once as their own lifecycle event, distinct from every prospective recoverability value, and rewrite neither the original offer, the proposal, nor the authorization
+ok 42 - R-AC-08: an occurred rollback and an occurred cleanup are each appended exactly once as their own lifecycle event, distinct from every prospective recoverability value, and rewrite neither the original offer, the proposal, nor the authorization
+  ---
+  duration_ms: 0.641116
+  type: 'test'
+  ...
+# Subtest: R-AC-08: an occurred rollback/cleanup refuses every illegal predecessor state -- nothing an existing anchor state could transition into is widened
+ok 43 - R-AC-08: an occurred rollback/cleanup refuses every illegal predecessor state -- nothing an existing anchor state could transition into is widened
+  ---
+  duration_ms: 0.966579
+  type: 'test'
+  ...
+# Subtest: R-AC-08: an occurred rollback/cleanup fails closed on an undeclared requirement, a mismatched or cross-scope link, a missing post-evidence digest, and a wrong state through this recorder
+ok 44 - R-AC-08: an occurred rollback/cleanup fails closed on an undeclared requirement, a mismatched or cross-scope link, a missing post-evidence digest, and a wrong state through this recorder
+  ---
+  duration_ms: 0.355023
+  type: 'test'
+  ...
+# Subtest: R-AC-08: requiredCleanup keeps its own axis on an occurred cleanup -- still-pending contradicts the occurrence, and a verified claim needs an independent observation that matches
+ok 45 - R-AC-08: requiredCleanup keeps its own axis on an occurred cleanup -- still-pending contradicts the occurrence, and a verified claim needs an independent observation that matches
+  ---
+  duration_ms: 0.380754
+  type: 'test'
+  ...
+# Subtest: R-AC-08: the occurred states are unreachable through the outcome recorder and the considered-recovery recorder, so the discharge guard has no bypass
+ok 46 - R-AC-08: the occurred states are unreachable through the outcome recorder and the considered-recovery recorder, so the discharge guard has no bypass
+  ---
+  duration_ms: 0.196942
+  type: 'test'
+  ...
+1..46
+# tests 46
+# suites 0
+# pass 46
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 67.578108

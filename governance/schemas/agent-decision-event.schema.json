@@ -41,7 +41,7 @@
       "properties": {
         "eventId": { "type": "string" },
         "kind": { "const": "command-offer" },
-        "state": { "enum": ["offered", "acknowledged", "authorized", "copied", "attempted", "execution-unobserved", "observed-completed", "readback-verified", "failed", "partial", "cancelled", "unknown", "unavailable", "readback-mismatch", "recovery-proposed", "recovered"] },
+        "state": { "enum": ["offered", "acknowledged", "authorized", "copied", "attempted", "execution-unobserved", "observed-completed", "readback-verified", "failed", "partial", "cancelled", "unknown", "unavailable", "readback-mismatch", "recovery-proposed", "recovered", "rollback-performed", "cleanup-performed"] },
         "reasonCode": { "type": "string" },
         "candidateDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "relatedHumanDecisionId": { "type": ["string", "null"] },

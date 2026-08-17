@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, acknowledgeOfferUnderJournalingGap, recordCommandRecoveryDisposition, recordPrivateHandoffCommitment, projectCommandOfferReplay } from "./external-command-offer.mjs";
+import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, acknowledgeOfferUnderJournalingGap, recordCommandRecoveryDisposition, recordCommandRecoveryOccurrence, recordPrivateHandoffCommitment, projectCommandOfferReplay } from "./external-command-offer.mjs";
 
 const SHA = (character) => character.repeat(64);
 function event(overrides = {}) { return { eventId: "offer-1", kind: "command-offer", state: "offered", reasonCode: "EXTERNAL_OPERATION_OFFERED", candidateDigest: SHA("a"), relatedHumanDecisionId: null, supersedesEventId: null, offerOrigin: "pipeline-initiated", operation: { operationClass: "governed-repair", version: "v1", governedArtifactSha256: SHA("b") }, target: { repositoryFingerprint: SHA("c"), scopeDigest: SHA("d") }, sideEffectClass: "non-authoritative", authorityRequirement: "not-required", policyDigest: SHA("e"), redactionPolicyDigest: SHA("f"), executionAssurance: "not-applicable", omissions: ["raw-command", "arguments", "private-coordinates", "unrestricted-output"], offerEventId: null, preEvidenceDigest: null, postEvidenceDigest: null, recoverability: "not-applicable", ...overrides }; }
@@ -370,4 +370,93 @@ test("A-AC-10: the journaling-gap path is scoped to a genuinely unavailable jour
   assert.notEqual(gap.schema, "pipeline.external-command-offer-receipt.v1");
   await assert.rejects(recordCommandOffer({ offer: gap, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
   await assert.rejects(recordCommandOutcome({ offer: event(), outcome: gap, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
+});
+
+// R-AC-08's rollback/cleanup half: an OCCURRED undo, as its own appended
+// lifecycle event. The prospective values these must never be confused with
+// are `recoverability`'s closed category; the assertions below pin that
+// separation directly rather than trusting the naming.
+const PROSPECTIVE_RECOVERABILITY = ["not-applicable", "recoverable", "cleanup-required", "rollback-required"];
+const REQUIREMENT_OF = { "rollback-performed": "rollback-required", "cleanup-performed": "cleanup-required" };
+function occurred(state, anchorEventId, overrides = {}) {
+  return event({ eventId: `${state}-1`, state, reasonCode: state === "rollback-performed" ? "RECOVERY_ROLLBACK_PERFORMED" : "RECOVERY_CLEANUP_PERFORMED", offerEventId: anchorEventId, executionAssurance: "not-applicable", recoverability: REQUIREMENT_OF[state], postEvidenceDigest: SHA("5"), ...overrides });
+}
+
+test("R-AC-08: an occurred rollback and an occurred cleanup are each appended exactly once as their own lifecycle event, distinct from every prospective recoverability value, and rewrite neither the original offer, the proposal, nor the authorization", async () => {
+  for (const state of ["rollback-performed", "cleanup-performed"]) {
+    const recoverability = REQUIREMENT_OF[state];
+    const authorizedOffer = event({ relatedHumanDecisionId: "decision-1", authorityRequirement: "human-decision-required", recoverability });
+    const proposal = follow("recovery-proposed", { eventId: "recovery-proposed-9", executionAssurance: "not-applicable", relatedHumanDecisionId: "decision-1", authorityRequirement: "human-decision-required", recoverability });
+    const mutating = follow("failed", { eventId: "failed-9", relatedHumanDecisionId: "decision-1", authorityRequirement: "human-decision-required", recoverability, postEvidenceDigest: SHA("4") });
+    await recordCommandRecoveryDisposition({ anchor: authorizedOffer, recovery: proposal, append });
+    await recordCommandOutcome({ offer: authorizedOffer, outcome: mutating, append });
+
+    // Byte witnesses over the three records R-AC-08 forbids rewriting.
+    const witness = [authorizedOffer, proposal, mutating].map((record) => JSON.stringify(record));
+    const occurrence = occurred(state, mutating.eventId, { relatedHumanDecisionId: "decision-1", authorityRequirement: "human-decision-required" });
+    const calls = [];
+    const receipt = await recordCommandRecoveryOccurrence({ anchor: mutating, occurrence, append: async (value) => { calls.push(value); return append(value); } });
+    assert.equal(receipt.status, state, `${state} must be recorded as its own occurred state`);
+    assert.equal(receipt.offerEventId, mutating.eventId, "the occurred undo must stay linked to the record that declared the requirement");
+    assert.equal(calls.length, 1, `${state} must append exactly once`);
+    assert.equal(calls[0].eventId, occurrence.eventId);
+    assert.deepEqual([authorizedOffer, proposal, mutating].map((record) => JSON.stringify(record)), witness, "an occurred undo must never rewrite the offer, proposal, or authorization it recovers from");
+    assert.equal(mutating.recoverability, recoverability, "the prospective requirement must survive its discharge unchanged");
+    assert.equal(PROSPECTIVE_RECOVERABILITY.includes(receipt.status), false, "the occurred fact must not be any prospective recoverability value");
+
+    // Append-once at the journal the events actually live in: a second
+    // recording of the same occurrence is refused before append.
+    let appended = 0;
+    await assert.rejects(recordCommandRecoveryOccurrence({ anchor: mutating, occurrence, journaled: [authorizedOffer, proposal, mutating, occurrence], append: async (value) => { appended += 1; return append(value); } }), (error) => error.code === "ECO-DUPLICATE" && error.replay.reasonCode === "DUPLICATE_LIFECYCLE_EVENT_ID");
+    assert.equal(appended, 0);
+  }
+});
+
+test("R-AC-08: an occurred rollback/cleanup refuses every illegal predecessor state -- nothing an existing anchor state could transition into is widened", async () => {
+  for (const state of ["rollback-performed", "cleanup-performed"]) {
+    const recoverability = REQUIREMENT_OF[state];
+    for (const anchorState of ["acknowledged", "authorized", "copied", "attempted", "recovery-proposed", "rollback-performed", "cleanup-performed"]) {
+      const anchor = follow(anchorState, { eventId: `${anchorState}-7`, executionAssurance: anchorState === "attempted" ? "attempted" : "not-applicable", recoverability: anchorState === "rollback-performed" || anchorState === "cleanup-performed" ? REQUIREMENT_OF[anchorState] : recoverability, postEvidenceDigest: anchorState === "rollback-performed" || anchorState === "cleanup-performed" ? SHA("5") : null });
+      await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: occurred(state, anchor.eventId, { recoverability }), append }), (error) => error.code === "ECO-OCCURRENCE-ANCHOR", `${anchorState} was admitted as an anchor for ${state}`);
+    }
+    const offeredAnchor = event({ recoverability });
+    await assert.rejects(recordCommandRecoveryOccurrence({ anchor: offeredAnchor, occurrence: occurred(state, offeredAnchor.eventId), append }), (error) => error.code === "ECO-OCCURRENCE-ANCHOR", "an offer alone has executed nothing that could have been undone");
+    // The legal anchors stay legal: every bounded outcome and a selected recovery.
+    for (const anchorState of ["execution-unobserved", "failed", "partial", "cancelled", "unknown", "unavailable", "readback-mismatch", "recovered"]) {
+      const anchor = follow(anchorState, { eventId: `${anchorState}-6`, executionAssurance: anchorState === "recovered" ? "not-applicable" : anchorState, recoverability });
+      assert.equal((await recordCommandRecoveryOccurrence({ anchor, occurrence: occurred(state, anchor.eventId), append })).status, state, `${anchorState} must remain a legal anchor for ${state}`);
+    }
+  }
+});
+
+test("R-AC-08: an occurred rollback/cleanup fails closed on an undeclared requirement, a mismatched or cross-scope link, a missing post-evidence digest, and a wrong state through this recorder", async () => {
+  const anchor = follow("failed", { eventId: "failed-5", recoverability: "rollback-required" });
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor: follow("failed", { eventId: "failed-5", recoverability: "recoverable" }), occurrence: occurred("rollback-performed", "failed-5"), append }), (error) => error.code === "ECO-OCCURRENCE-DISCHARGE");
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: occurred("cleanup-performed", "failed-5"), append }), (error) => error.code === "ECO-OCCURRENCE-DISCHARGE");
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: occurred("rollback-performed", "failed-4"), append }), (error) => error.code === "ECO-OCCURRENCE-LINK");
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: occurred("rollback-performed", "failed-5", { target: { repositoryFingerprint: SHA("c"), scopeDigest: SHA("0") } }), append }), (error) => error.code === "ECO-OCCURRENCE-LINK");
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: occurred("rollback-performed", "failed-5", { postEvidenceDigest: null }), append }), (error) => error.code === "ECO-OCCURRENCE-EVIDENCE");
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: follow("recovered", { eventId: "recovered-5", executionAssurance: "not-applicable", offerEventId: "failed-5" }), append }), (error) => error.code === "ECO-OCCURRENCE-STATE");
+  // Validator-level: the occurred state is structurally bound to the matching
+  // prospective requirement and can never grade the offered command's execution.
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: occurred("rollback-performed", "failed-5", { recoverability: "not-applicable" }), append }), (error) => error.code === "ADJ-COMMAND-OCCURRENCE-SCOPE");
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: occurred("rollback-performed", "failed-5", { executionAssurance: "observed-completed" }), append }), (error) => error.code === "ADJ-COMMAND-OCCURRENCE-SCOPE");
+});
+
+test("R-AC-08: requiredCleanup keeps its own axis on an occurred cleanup -- still-pending contradicts the occurrence, and a verified claim needs an independent observation that matches", async () => {
+  const anchor = follow("cancelled", { eventId: "cancelled-5", recoverability: "cleanup-required" });
+  const withStatus = (status) => occurred("cleanup-performed", "cancelled-5", { requiredCleanup: { cleanupClass: "manual-file-restore", status, digest: SHA("8") } });
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: withStatus("pending"), append }), (error) => error.code === "ECO-OCCURRENCE-CLEANUP");
+  assert.equal((await recordCommandRecoveryOccurrence({ anchor, occurrence: withStatus("completed"), append })).status, "cleanup-performed");
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: withStatus("verified"), append }), (error) => error.code === "ECO-OCCURRENCE-EVIDENCE");
+  await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: withStatus("verified"), append, verifyOccurrence: async () => ({ state: "cleanup-performed", postEvidenceDigest: SHA("0") }) }), (error) => error.code === "ECO-OCCURRENCE-EVIDENCE");
+  assert.equal((await recordCommandRecoveryOccurrence({ anchor, occurrence: withStatus("verified"), append, verifyOccurrence: async () => ({ state: "cleanup-performed", postEvidenceDigest: SHA("5") }) })).status, "cleanup-performed");
+});
+
+test("R-AC-08: the occurred states are unreachable through the outcome recorder and the considered-recovery recorder, so the discharge guard has no bypass", async () => {
+  for (const state of ["rollback-performed", "cleanup-performed"]) {
+    const occurrence = occurred(state, "offer-1");
+    await assert.rejects(recordCommandOutcome({ offer: event({ recoverability: REQUIREMENT_OF[state] }), outcome: occurrence, append }), (error) => error.code === "ECO-OUTCOME");
+    await assert.rejects(recordCommandRecoveryDisposition({ anchor: event({ recoverability: REQUIREMENT_OF[state] }), recovery: occurrence, append }), (error) => error.code === "ECO-RECOVERY-STATE");
+  }
 });
