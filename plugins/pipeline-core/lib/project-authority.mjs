@@ -21,6 +21,7 @@ import {
   inspectSessionClosure,
   listActiveSessionDescriptors,
 } from "./worktree-lifecycle.mjs";
+import { hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
 export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";
@@ -402,7 +403,10 @@ function provenanceEvidence(root, declared) {
   return { ok: true, value: { ...declared, observed: value, sourceCommit: declared.sourceCommit ?? source, destinationCommit: declared.destinationCommit ?? destination } };
 }
 
-function privateAdoptionArchive(root, planSha256, targets) {
+function privateAdoptionArchive(root, planSha256, targets, {
+  platform = process.platform,
+  hardenWindowsPrivateDirectoryFn = hardenWindowsPrivateDirectory,
+} = {}) {
   const git = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
     cwd: root,
     encoding: "utf8",
@@ -422,7 +426,21 @@ function privateAdoptionArchive(root, planSha256, targets) {
   if (existsSync(archive)) throw new Error("project authority adoption archive already exists");
   mkdirSync(archive, { recursive: true, mode: 0o700 });
   const archiveInfo = lstatSync(archive);
-  if (!archiveInfo.isDirectory() || archiveInfo.isSymbolicLink() || (archiveInfo.mode & 0o077) !== 0) {
+  if (!archiveInfo.isDirectory() || archiveInfo.isSymbolicLink()) {
+    throw new Error("project authority adoption archive is unsafe");
+  }
+  // The archive directory above is always freshly created (the existsSync
+  // throw two lines up rules out a pre-existing one), so the win32 branch
+  // only ever needs the "harden a freshly created directory" primitive --
+  // never the "assess an existing one" primitive `secureDirectory()` (in
+  // human-guard-override.mjs) also uses for its own, pre-existing-directory
+  // case. `mkdirSync(..., { mode: 0o700 })`'s `mode` is a documented no-op
+  // on Windows/NTFS, so `archiveInfo.mode` carries no real signal there.
+  if (platform === "win32") {
+    if (hardenWindowsPrivateDirectoryFn(archive).status !== "secure") {
+      throw new Error("project authority adoption archive is unsafe");
+    }
+  } else if ((archiveInfo.mode & 0o077) !== 0) {
     throw new Error("project authority adoption archive is unsafe");
   }
   const entries = [];
@@ -1275,3 +1293,11 @@ export function applyVendoredPackageSync(plan, { rootDir = process.cwd(), activa
     });
   } catch (error) { return vendorSyncResult("rejected", { reason: error.message }); }
 }
+
+// NVA-PAWINACL-1: exposed so the suite can drive privateAdoptionArchive()'s
+// win32 DACL-hardening seam directly (injected platform + a mocked
+// hardenWindowsPrivateDirectoryFn), the same pattern
+// humanGuardOverrideInternals.secureDirectory exposes in
+// human-guard-override.mjs for the sibling case -- without this, a POSIX
+// test host could never actually exercise the win32 branch.
+export const projectAuthorityInternals = { privateAdoptionArchive };

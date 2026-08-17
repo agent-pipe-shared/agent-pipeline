@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -16,6 +16,7 @@ import {
   applyProjectAuthoritySessionCleanupRecovery, planProjectAuthoritySessionCleanupRecovery,
   AUTHORITY_ARTIFACTS, resolveAuthorityArtifactPath,
   applyVendoredPackageSync, planVendoredPackageSync,
+  projectAuthorityInternals,
 } from "./project-authority.mjs";
 import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
 
@@ -539,6 +540,50 @@ try {
   });
   ok("an unknown artifact kind is a caller error, not a silent legacy fallback", () => {
     assert.throws(() => resolveAuthorityArtifactPath("settings", { rootDir: root() }), TypeError);
+  });
+  // NVA-PAWINACL-1: privateAdoptionArchive()'s directory-safety check on
+  // POSIX vs. win32. loadedPackageEvidence() is reached on every success
+  // path (even with zero targets), so these fixtures need the vendored
+  // package copy the "byte-identical self-application" test above also
+  // uses -- but not a commit, since privateAdoptionArchive() never calls
+  // gitEvidence().
+  ok("privateAdoptionArchive succeeds unchanged on the default POSIX path", () => {
+    const base = root(); git(base, ["init", "-q"]);
+    cpSync(MODULE_PLUGIN_ROOT, join(base, VENDORED), { recursive: true });
+    const record = projectAuthorityInternals.privateAdoptionArchive(base, "a".repeat(64), []);
+    assert.equal(record.entryCount, 0);
+    assert.equal(record.receipt.schema, "pipeline.project-authority-adoption-receipt.v1");
+    const archive = join(base, ".git", "agent-pipeline", "project-authority-adoption", "a".repeat(64));
+    assert.equal(existsSync(archive), true);
+    assert.equal(lstatSync(archive).mode & 0o077, 0);
+  });
+  ok("privateAdoptionArchive's win32 path genuinely bypasses the POSIX mode-bit check, not merely passing coincidentally", () => {
+    const base = root(); git(base, ["init", "-q"]);
+    cpSync(MODULE_PLUGIN_ROOT, join(base, VENDORED), { recursive: true });
+    const hardenCalls = [];
+    const record = projectAuthorityInternals.privateAdoptionArchive(base, "b".repeat(64), [], {
+      platform: "win32",
+      hardenWindowsPrivateDirectoryFn(path) {
+        hardenCalls.push(path);
+        // Corrupt the POSIX mode bits AFTER creation, from inside the mock --
+        // if the win32 branch still consulted archiveInfo.mode, this would
+        // now fail. It must succeed anyway: win32 trusts only this DACL
+        // primitive's returned status, never the POSIX mode bits.
+        chmodSync(path, 0o777);
+        return { status: "secure" };
+      },
+    });
+    const archive = join(base, ".git", "agent-pipeline", "project-authority-adoption", "b".repeat(64));
+    assert.deepEqual(hardenCalls, [archive]);
+    assert.notEqual(lstatSync(archive).mode & 0o077, 0);
+    assert.equal(record.entryCount, 0);
+  });
+  ok("privateAdoptionArchive's win32 path throws the unchanged error when DACL hardening reports non-secure", () => {
+    const base = root(); git(base, ["init", "-q"]);
+    assert.throws(() => projectAuthorityInternals.privateAdoptionArchive(base, "c".repeat(64), [], {
+      platform: "win32",
+      hardenWindowsPrivateDirectoryFn() { return { status: "insecure", reason: "private path DACL grants a non-owner principal" }; },
+    }), /^Error: project authority adoption archive is unsafe$/);
   });
   console.log(`project-authority: ${passed} passed, 0 failed`);
 } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
