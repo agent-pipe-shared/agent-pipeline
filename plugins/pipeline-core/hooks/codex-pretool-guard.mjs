@@ -206,6 +206,24 @@ try {
 // cross-repository-boundary-guidance-still-omits-the-literal-command).
 // Fails closed (`command`/`copyCommand` both null) on anything unexpected
 // from the probe itself, matching every sibling external-operator route.
+// Two caveats that apply at every call site, not just one:
+// - eligibility()'s secret screen is pattern-based, not exhaustive: it matches
+//   known credential shapes (gh*_ tokens, github_pat_, AKIA-style keys, PEM
+//   private-key headers, token/password/secret=<value> assignments) but does
+//   NOT catch every credential shape -- e.g. a bare `Authorization: Bearer
+//   <JWT>`-style value is NOT flagged (`eligible: true`) and would be emitted
+//   verbatim (Critic F2, GF-064). Closing that gap means widening the shared
+//   regex, which is a separate change from this helper's job.
+// - `tool === "Bash"` is a real, load-bearing restriction, not a formality:
+//   Codex passes the full patch body in `tool_input.command` for an
+//   apply_patch call (the same field eligibility() reads), so `rawCommand`
+//   holds the ENTIRE patch body for apply_patch, not "". This gate is what
+//   actually stops that body from being emitted verbatim here (Critic F3,
+//   GF-064).
+// `copyCommand` is a bounded, pre-quoted rendering of the same exact command
+// (GF-094) so a relaying agent can copy it verbatim instead of re-quoting it;
+// it is never an additional disclosure path -- gated by the exact same
+// `commandIsSafe` conjunct as `command`, never independently.
 function commandDisclosureFields(root, tool, toolInput, rawCommand) {
   let secretBearing = true;
   try {
@@ -547,46 +565,21 @@ if (denials.length > 0) {
       // the state every sibling external-operator route in this file already uses.
       let hostBoundaryAction = { toolName, toolInputSha256, repositoryRoot: projectRoot };
       if (hostBoundary) {
-        let secretBearing = true;
-        try {
-          // eligibility()'s secret screen (lib/human-guard-override.mjs) is
-          // pattern-based, not exhaustive: it matches known credential shapes
-          // (gh*_ tokens, github_pat_, AKIA-style keys, PEM private-key headers,
-          // token/password/secret=<value> assignments) but does NOT catch every
-          // credential shape -- e.g. a bare `Authorization: Bearer <JWT>`-style
-          // value in a command is NOT flagged (`eligible: true`) and would be
-          // emitted verbatim below (Critic F2, GF-064). Closing that gap would
-          // mean widening the shared regex, which is out of scope here.
-          const probe = eligibility(projectRoot, toolName, input?.tool_input ?? {});
-          secretBearing = probe.eligible === false && probe.code === "HGO-NONOVERRIDABLE-SECRET";
-        } catch { /* fail closed: secretBearing stays true, guidance stays hash-only */ }
-        // Corrected (Critic F3, GF-064): the prior comment here claimed Bash was the
-        // only tool with a shell command at all and that `command` above was already
-        // "" for Edit/Write/apply_patch -- that is false for apply_patch. Codex passes
-        // the full patch body in `tool_input.command` for an apply_patch call (the same
-        // field lib/human-guard-override.mjs's eligibility() reads at line ~951), and
-        // `command` above (line 178, `input?.tool_input?.command`) reads that field
-        // unconditionally -- so for apply_patch it holds the ENTIRE patch body, not "".
-        // The `toolName === "Bash"` check below is therefore a real, load-bearing
-        // restriction: it is what actually stops a complete apply_patch body from being
-        // emitted verbatim in this guidance, not a formality over an already-empty string.
-        // Match the codebase's own null-for-no-command convention (actionPreview() at
-        // lib/human-guard-override.mjs:669-684) instead.
-        const commandIsSafe = toolName === "Bash" && !secretBearing;
+        // Shared with the HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY route above (line
+        // ~423): commandDisclosureFields() (line ~209) is this file's single
+        // secret screen + Bash-only gate for external-operator command
+        // disclosure -- never a second, independently-maintained copy here
+        // (Critic F1, NVA-A7CRITICFIX-1). Its doc comment carries the same
+        // eligibility()-is-not-exhaustive caveat (Critic F2, GF-064) and the
+        // same reasoning for why the Bash-only gate is load-bearing against a
+        // full apply_patch body (Critic F3, GF-064), plus the copyCommand
+        // rationale (GF-094) -- all still true for this call site, now stated
+        // once instead of twice.
         hostBoundaryAction = {
           toolName,
           toolInputSha256,
           repositoryRoot: projectRoot,
-          command: commandIsSafe ? command : null,
-          // GF-094: a bounded, pre-quoted rendering of that same exact command
-          // (analogous to restartCopyCommands()'s `launch.copyCommand`), so the
-          // relaying agent can copy this verbatim instead of re-quoting/re-wrapping
-          // the raw string itself -- the live failure this closes had Codex's own
-          // re-quoting of a multi-word, non-ASCII `--goal` value, plus its own line
-          // wrapping when relaying it, corrupt the human's real terminal. Never an
-          // additional disclosure path: gated by the exact same `commandIsSafe`
-          // conjunct as `command` above, never independently.
-          copyCommand: commandIsSafe ? boundedOpaqueCopyCommand(command) : null,
+          ...commandDisclosureFields(projectRoot, toolName, input?.tool_input, command),
         };
       }
       overrideGuidance = [
