@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, acknowledgeOfferUnderJournalingGap, recordCommandRecoveryDisposition, recordCommandRecoveryOccurrence, recordPrivateHandoffCommitment, projectCommandOfferReplay } from "./external-command-offer.mjs";
+import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, acknowledgeOfferUnderJournalingGap, recordCommandRecoveryDisposition, recordCommandRecoveryOccurrence, recordCommandUserAcknowledgement, recordPrivateHandoffCommitment, projectCommandOfferReplay } from "./external-command-offer.mjs";
 
 const SHA = (character) => character.repeat(64);
 function event(overrides = {}) { return { eventId: "offer-1", kind: "command-offer", state: "offered", reasonCode: "EXTERNAL_OPERATION_OFFERED", candidateDigest: SHA("a"), relatedHumanDecisionId: null, supersedesEventId: null, offerOrigin: "pipeline-initiated", operation: { operationClass: "governed-repair", version: "v1", governedArtifactSha256: SHA("b") }, target: { repositoryFingerprint: SHA("c"), scopeDigest: SHA("d") }, sideEffectClass: "non-authoritative", authorityRequirement: "not-required", policyDigest: SHA("e"), redactionPolicyDigest: SHA("f"), executionAssurance: "not-applicable", omissions: ["raw-command", "arguments", "private-coordinates", "unrestricted-output"], offerEventId: null, preEvidenceDigest: null, postEvidenceDigest: null, recoverability: "not-applicable", ...overrides }; }
@@ -451,6 +451,46 @@ test("R-AC-08: requiredCleanup keeps its own axis on an occurred cleanup -- stil
   await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: withStatus("verified"), append }), (error) => error.code === "ECO-OCCURRENCE-EVIDENCE");
   await assert.rejects(recordCommandRecoveryOccurrence({ anchor, occurrence: withStatus("verified"), append, verifyOccurrence: async () => ({ state: "cleanup-performed", postEvidenceDigest: SHA("0") }) }), (error) => error.code === "ECO-OCCURRENCE-EVIDENCE");
   assert.equal((await recordCommandRecoveryOccurrence({ anchor, occurrence: withStatus("verified"), append, verifyOccurrence: async () => ({ state: "cleanup-performed", postEvidenceDigest: SHA("5") }) })).status, "cleanup-performed");
+});
+
+test("R-AC-06: recordCommandUserAcknowledgement appends each of acknowledged, authorized, and copied, anchored to the existing offer", async () => {
+  for (const state of ["acknowledged", "authorized", "copied"]) {
+    const acknowledgement = follow(state, { executionAssurance: "not-applicable" });
+    const receipt = await recordCommandUserAcknowledgement({ offer: event(), acknowledgement, append });
+    assert.equal(receipt.status, state);
+    assert.equal(receipt.offerEventId, "offer-1");
+  }
+});
+
+test("R-AC-06: recordCommandUserAcknowledgement never labels a user response executed, completed, or succeeded -- only the three named states are reachable through this recorder", async () => {
+  for (const state of ["execution-unobserved", "observed-completed", "attempted", "failed", "partial"]) {
+    const acknowledgement = follow(state);
+    await assert.rejects(recordCommandUserAcknowledgement({ offer: event(), acknowledgement, append }), (error) => error.code === "ECO-ACKNOWLEDGEMENT");
+  }
+  // "executed"/"completed"/"succeeded" are not even valid schema states --
+  // structurally impossible to record through any path, this one included.
+  for (const state of ["executed", "completed", "succeeded"]) {
+    await assert.rejects(recordCommandUserAcknowledgement({ offer: event(), acknowledgement: follow(state), append }), (error) => error.code === "ADJ-COMMAND-OFFER");
+  }
+});
+
+test("R-AC-06: recordCommandUserAcknowledgement rejects a non-offered anchor and offer substitution across candidate, repository, and scope", async () => {
+  const acknowledgement = follow("acknowledged", { executionAssurance: "not-applicable" });
+  await assert.rejects(recordCommandUserAcknowledgement({ offer: follow("attempted"), acknowledgement, append }), (error) => error.code === "ECO-ACKNOWLEDGEMENT");
+  const substituted = follow("acknowledged", { executionAssurance: "not-applicable", candidateDigest: SHA("0") });
+  await assert.rejects(recordCommandUserAcknowledgement({ offer: event(), acknowledgement: substituted, append }), (error) => error.code === "ECO-ACKNOWLEDGEMENT");
+});
+
+test("R-AC-06: recordCommandUserAcknowledgement follows the same append-once, readback-verified, duplicate-refusing discipline as every other recorder", async () => {
+  const acknowledgement = follow("authorized", { eventId: "authorized-1", executionAssurance: "not-applicable" });
+  const calls = [];
+  const receipt = await recordCommandUserAcknowledgement({ offer: event(), acknowledgement, append: async (value) => { calls.push(value); return append(value); } });
+  assert.equal(receipt.status, "authorized");
+  assert.equal(calls.length, 1);
+  await assert.rejects(recordCommandUserAcknowledgement({ offer: event(), acknowledgement, append: async () => ({ eventId: "authorized-1", candidateDigest: SHA("a"), integrity: "unknown" }) }), (error) => error.code === "ECO-READBACK");
+  let appended = 0;
+  await assert.rejects(recordCommandUserAcknowledgement({ offer: event(), acknowledgement, journaled: [event(), acknowledgement], append: async (value) => { appended += 1; return append(value); } }), (error) => error.code === "ECO-DUPLICATE" && error.replay.reasonCode === "DUPLICATE_LIFECYCLE_EVENT_ID");
+  assert.equal(appended, 0);
 });
 
 test("R-AC-08: the occurred states are unreachable through the outcome recorder and the considered-recovery recorder, so the discharge guard has no bypass", async () => {
