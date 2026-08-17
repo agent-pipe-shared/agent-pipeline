@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c2aca6ed61edd29f0ec12912e29afb52fe79bc440b5719d232a7b931e080f3cc"
+    "transitionHead": "ee29ef8804ccccc199cde267b255e35128889edd2388b23483f3219d71c23a7b"
   },
   "counts": {
-    "open": 101,
+    "open": 104,
     "in_progress": 22,
     "closed": 96
   },
@@ -375,6 +375,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Reported by the PO on 2026-08-17, relaying a live diagnosis from a downstream consumer-project session (Windows, D:\\Dev\\Web\\Toolbox) whose own guard-recovery command used --root \"$PWD\" and failed. Independently confirmed against this repository's own source before filing; no fix proposed yet, see Proposal."
     },
     {
       "id": "pipeline.compare-three-parallel-happy-path-tests-in-detail",
@@ -1028,6 +1036,14 @@
       "source": "Critic review (PASS, F3) of NVA-BL-32 (backlog/items/2026-08-09-the-security-scan-looks-for-its-license-allowlist-in-the-pipelines-own-repository.md), 2026-08-11 — flagged as documented-instead-of-fixed without an owner/expiry (QG-06), not as a blocker to that diff."
     },
     {
+      "id": "pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Reported by the PO on 2026-08-17, relaying a live-blocking audit from a downstream consumer-project session (Windows, D:\\Dev\\Web\\Toolbox) doing onboarding recovery against a vendored copy of this plugin. Independently confirmed against this repository's own source before filing."
+    },
+    {
       "id": "pipeline.lifecycle-guard-does-not-know-the-human-signing-commands",
       "status": "open",
       "type": "defect",
@@ -1492,6 +1508,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "user-requested feature expansion after the first public observation publication"
+    },
+    {
+      "id": "pipeline.project-settings-enabled-two-pipeline-core-plugin-instances-at-once",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Caught live by the PO while verifying the 0.5.5 toolbox-refresh candidate: `/reload-plugins` in this repository's own dev session reported \"Reloaded: 2 plugins\" instead of 1."
     },
     {
       "id": "pipeline.promotion-freezes-a-prd-the-po-gate-will-reject",
