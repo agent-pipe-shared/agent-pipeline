@@ -2,11 +2,12 @@
 
 > Agent-Pipeline · Nova sprint (`sprint-nova-epic`) · as of 2026-08-16
 
-**Status:** proposed (2026-08-16, drafted at the PO's instruction; a human must
-review and mark it accepted before it is cited as authority) · **Basis:** PO
-instruction, chat, 2026-08-16, answering a decision matrix — build this now, and
-model the ceremony *"möglichst 1:1 mit signature/chat funktion"* (as close to 1:1
-as possible with the existing push-approval signature/chat mechanism);
+**Status:** accepted (2026-08-17, PO instruction, chat: *"okay Freigabe für meine
+Entscheidungen erteilt setze alles um"* — approval granted, implement
+everything) · **Basis:** PO instruction, chat, 2026-08-16, answering a decision
+matrix — build this now, and model the ceremony *"möglichst 1:1 mit
+signature/chat funktion"* (as close to 1:1 as possible with the existing
+push-approval signature/chat mechanism);
 `specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md` rows `#56`
 (line 46) and `#98` (line 47); `specs/sprint-nova-epic/plans/nova-a.md` Slices
 A6/A6R. **Constrained by** [ADR-0061](0061-uniform-human-approval-ceremony.md);

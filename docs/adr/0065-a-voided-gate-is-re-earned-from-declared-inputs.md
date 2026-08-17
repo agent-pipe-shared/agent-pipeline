@@ -2,9 +2,13 @@
 
 > Agent-Pipeline · Nova sprint (`sprint-nova-epic`) · as of 2026-08-17
 
-**Status:** proposed (2026-08-17; a human must review and mark it accepted before
-it is cited as authority — this ADR claims no PO acceptance of its content) ·
-**Basis:** backlog item
+**Status:** accepted (2026-08-17, PO instruction, chat: *"okay Freigabe für meine
+Entscheidungen erteilt setze alles um"* — approval granted, implement
+everything. Decision 8's own conservative default — push/release-bound Verify
+runs force full re-execution, `--no-reuse`, buying no reuse benefit for the
+release-gate case specifically — is accepted as-proposed absent a more specific
+PO answer; this is the deliberately cautious reading, not a silent pick of the
+more permissive alternative) · **Basis:** backlog item
 `backlog/items/2026-08-16-every-gate-binds-the-whole-tree-so-any-later-commit-voids-it.md`,
 whose Triage reads *"accepted — deferred to a dedicated design round, not this AFK
 block"* and assigns *"a future dedicated design session, paired with
