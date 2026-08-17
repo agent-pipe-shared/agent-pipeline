@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-design-to-implementation-handover-exists
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: f11f80b5bb6fec834a5aaa2cda2718b83e216184
+closure_evidence: backlog/items/2026-08-08-no-design-to-implementation-handover-exists.md
 due: 2026-08-22
 source: "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 6 of 12. Located in code by that session."
 ---
@@ -102,3 +106,20 @@ Q2 confirmed: Option A, a proposal (not a blocking gate) — consistent with
 the mp22 decision (incentive over new enforcement surface). `nextAction`
 proposes `set-phase --phase implementation` once the plan gate is cleared;
 the operator stays in control. Dispatched.
+
+### Closure, 2026-08-17
+
+Implemented per Q2's confirmed direction: `designToImplementationHandoverAction()`
+in `project-onboarding-v3.mjs` proposes `set-phase --phase implementation`
+once `persistedPoAuthority` reports `lifecycleStatus: "approved"` while phase
+is still `design`; `guard-devplan.mjs` remains the sole mechanism that
+actually refuses implementation writes, unaffected by whether the proposal
+exists. New regression test covers the full lifecycle (draft/awaiting-
+approval → `nextAction: null`; approved+design → proposal appears with exact
+argv/schema; the proposal alone does not admit an implementation write;
+implementing → `nextAction: null` again). Verified independently: `node
+--test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs` — 122/122
+passed, 0 failed. Landed `f11f80b5bb6fec834a5aaa2cda2718b83e216184`. Q3
+(`nextAction: null` at `ready` deserving scrutiny in general) was not itself
+in scope of this dispatch — it remains legitimate: e.g. `implementing` phase
+correctly has no proposal.
