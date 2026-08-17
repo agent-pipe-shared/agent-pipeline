@@ -521,7 +521,14 @@ export function prepareGuardMaintenanceWindowRequest({
   // the digest): it records the expiry basis so a later prepare can tell "same request"
   // from "same expiry by coincidence". Nothing downstream trusts it — install() and
   // currentGuardMaintenanceWindow() never read it.
-  const request = { schema: GMW_REQUEST_SCHEMA, subject, intent, preparation: { ttlSeconds, preparedAtMs: nowMs } };
+  // `protectedTestPatterns` (F2 fix, NVA-GMWFIX-4) is likewise UNSIGNED envelope
+  // metadata, captured ONCE here from the live guard-config.json this repository
+  // currently resolves to -- install()'s tolerance check (intervenedCommitsStayWithinScope)
+  // uses ONLY this frozen snapshot for TP-* pattern matching, never a fresh read of the
+  // live file, and fails the whole tolerance path closed if the live file has drifted
+  // from it by the time install() runs.
+  const protectedTestPatterns = captureProtectedTestPatternsSnapshot(rootDir);
+  const request = { schema: GMW_REQUEST_SCHEMA, subject, intent, preparation: { ttlSeconds, preparedAtMs: nowMs }, protectedTestPatterns };
   writeAtomic(paths.request, Buffer.from(`${JSON.stringify(request)}\n`, "utf8"));
   return { intent, subject, request, reused: false };
 }
@@ -539,33 +546,80 @@ export function prepareGuardMaintenanceWindowRequest({
  * same explicit-`id`-else-`TP-<n>` convention, same case-insensitive regex) -- reused
  * rather than reinvented, because a commit-scope check that used a DIFFERENT notion of
  * "what TP-3 protects" than the guard that actually enforces TP-3 would be worse than
- * no check at all. Any config read/parse/entry failure yields an EMPTY map, never a
- * partial guess: an id this cannot resolve a pattern for can never be proven in-scope
- * below -- fail-closed here, unlike guard-testpath.mjs's own WARN-and-continue posture,
- * because here an unresolved id must block the tolerance rather than silently pass one.
+ * no check at all. Resolves to the physical config path this repository currently uses;
+ * `null` when it cannot be resolved at all. Shared by `captureProtectedTestPatternsSnapshot`
+ * (prepare-time, frozen) and `liveProtectedTestPatternsConfigSha256` (install-time,
+ * drift-detection only -- see the F2 fix note above `intervenedCommitsStayWithinScope`).
  */
-function loadProtectedTestPatterns(rootDir) {
-  const patterns = new Map();
-  let configPath;
+function resolveGuardConfigPath(rootDir) {
   try {
     const authority = resolveProjectAuthorityPaths({ rootDir });
     const guardConfigRelPath = authority.status === "ready"
       ? authority.guardConfig
       : (existsSync(join(rootDir, NEUTRAL_GUARD_CONFIG)) ? NEUTRAL_GUARD_CONFIG : LEGACY_GUARD_CONFIG);
-    configPath = join(rootDir, guardConfigRelPath);
-  } catch { return patterns; }
+    return join(rootDir, guardConfigRelPath);
+  } catch { return null; }
+}
+
+/**
+ * F2 fix (NVA-GMWFIX-4, Critic finding against NVA-GMWFIX-3/c8acb6a6): called ONLY at
+ * `prepareGuardMaintenanceWindowRequest` time, this is the ONE read of the live,
+ * mutable `guard-config.json` whose result ever governs a TP-* tolerance decision --
+ * captured once, persisted onto the request record (`protectedTestPatterns`, an
+ * unsigned field, same trust tier as `preparation`: an attacker able to tamper with the
+ * owner-private request.json already has a much stronger foothold than editing an
+ * ordinarily-writable guard-config.json, and this snapshot's whole purpose is closing
+ * the LATTER gap). `configSha256` is the raw config file's own content hash (`null`
+ * when the config cannot be resolved/read at all); `patterns` is the resolved
+ * `{id, pattern}` list at that moment, same validation as the loader this replaces:
+ * entry pattern must be a non-empty string and a constructible RegExp, or it is dropped.
+ */
+function captureProtectedTestPatternsSnapshot(rootDir) {
+  const configPath = resolveGuardConfigPath(rootDir);
+  if (configPath === null) return { configSha256: null, patterns: [] };
   let raw;
-  try { raw = readFileSync(configPath, "utf8"); } catch { return patterns; }
+  try { raw = readFileSync(configPath, "utf8"); } catch { return { configSha256: null, patterns: [] }; }
+  const configSha256 = sha(raw);
+  const patterns = [];
   try {
     const cfg = JSON.parse(raw);
     const list = Array.isArray(cfg?.protectedTestPaths) ? cfg.protectedTestPaths : [];
     for (const [i, entry] of list.entries()) {
       if (typeof entry?.pattern !== "string" || entry.pattern === "") continue;
       const id = typeof entry?.id === "string" && entry.id !== "" ? entry.id : `TP-${i + 1}`;
-      try { patterns.set(id, new RegExp(entry.pattern, "i")); } catch { /* invalid regex: id stays unresolved */ }
+      try { new RegExp(entry.pattern, "i"); } catch { continue; } // invalid regex: drop, mirrors the loader this replaces
+      patterns.push({ id, pattern: entry.pattern });
     }
-  } catch { /* unparsable config -> empty map */ }
-  return patterns;
+  } catch { /* unparsable config -> configSha256 still recorded, patterns stay empty */ }
+  return { configSha256, patterns };
+}
+
+/**
+ * Install-time-only: hashes the raw bytes of the LIVE guard-config.json this repository
+ * currently resolves to, for the SOLE purpose of detecting drift against the
+ * prepare-time-frozen `configSha256` -- never used to derive the patterns actually
+ * matched below. `null` exactly mirrors `captureProtectedTestPatternsSnapshot`'s own
+ * null case (unresolvable/unreadable config), so a config absent at both prepare and
+ * install time is never reported as drift.
+ */
+function liveProtectedTestPatternsConfigSha256(rootDir) {
+  const configPath = resolveGuardConfigPath(rootDir);
+  if (configPath === null) return null;
+  try { return sha(readFileSync(configPath, "utf8")); } catch { return null; }
+}
+
+/** Compiles a FROZEN `{id, pattern}` list (from a request's `protectedTestPatterns.patterns`,
+ * never from a live read) into the `Map<id, RegExp>` shape `pathWithinScope` expects. An
+ * unresolvable/malformed entry contributes nothing -- absence of a pattern is never an
+ * unbounded match, same posture as the loader this replaces. */
+function compileFrozenTestPatterns(patterns) {
+  const map = new Map();
+  if (!Array.isArray(patterns)) return map;
+  for (const entry of patterns) {
+    if (!object(entry) || typeof entry.id !== "string" || entry.id === "" || typeof entry.pattern !== "string" || entry.pattern === "") continue;
+    try { map.set(entry.id, new RegExp(entry.pattern, "i")); } catch { /* invalid regex: id stays unresolved */ }
+  }
+  return map;
 }
 
 /**
@@ -575,8 +629,19 @@ function loadProtectedTestPatterns(rootDir) {
  * via `normalizeRepoRelativePath`); a `TP-<n>` id means "matches that id's own
  * configured pattern" via `testPatterns`. A rule id this cannot resolve a pattern for
  * contributes nothing -- absence of a pattern is never treated as an unbounded match.
+ *
+ * F1 fix (NVA-GMWFIX-4, Critic finding against NVA-GMWFIX-3/c8acb6a6): checked FIRST,
+ * before and overriding both branches below -- a path that is `isNeverLiftableKernelPath`
+ * (this module's own, ADR-0058's, definition of a path no window may ever cover) is OUT
+ * of scope unconditionally, regardless of what `scopeRuleIds` claims. Without this, a
+ * GS-6-scoped window tolerated a commit rewriting the guard kernel itself: `livePluginRoot`
+ * always contains the plugin's own kernel directory, so a bare GS-6 containment check
+ * alone calls the guard kernel "in scope"; and a TP-* pattern can equally happen to match
+ * a kernel path (e.g. this repository's own TP-4 on `hooks/hooks.json`) without ever
+ * being checked against the kernel list at all.
  */
-function pathWithinScope(absolutePath, repoRelativePath, { scopeRuleIds, livePluginRoot, testPatterns }) {
+function pathWithinScope(absolutePath, repoRelativePath, { scopeRuleIds, livePluginRoot, testPatterns, rootDir }) {
+  if (isNeverLiftableKernelPath(absolutePath, { rootDir, livePluginRoot })) return false;
   if (scopeRuleIds.includes("GS-6") && normalizeRepoRelativePath(livePluginRoot, absolutePath) !== null) return true;
   for (const ruleId of scopeRuleIds) {
     if (ruleId === "GS-6") continue;
@@ -604,7 +669,7 @@ function pathWithinScope(absolutePath, repoRelativePath, { scopeRuleIds, livePlu
  * contract with its caller is a boolean, and the caller's own strict, pre-existing
  * refusal is what stands whenever this returns `false`.
  */
-function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, currentCommit, scopeRuleIds, livePluginRoot, rootDir }) {
+function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, currentCommit, scopeRuleIds, livePluginRoot, rootDir, frozenProtectedTestPatterns }) {
   try {
     if (typeof candidateCommit !== "string" || candidateCommit === "") return false;
     const spawnGit = (args) => spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
@@ -617,7 +682,19 @@ function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, curren
     const lines = String(revList.stdout ?? "").split("\n").map((line) => line.trim()).filter((line) => line !== "");
     if (lines.length === 0) return false; // inconsistent with the caller's own currentCommit !== candidateCommit check
 
-    const testPatterns = loadProtectedTestPatterns(rootDir);
+    // F2 fix (NVA-GMWFIX-4, Critic finding against NVA-GMWFIX-3/c8acb6a6): the TP-*
+    // pattern set used below is the FROZEN, prepare-time snapshot persisted onto the
+    // request record -- NEVER a fresh read of the live, mutable guard-config.json (that
+    // read used to let an intervening config edit -- or an uncommitted working-tree
+    // edit, since the old loader read the live file, not a specific commit -- silently
+    // re-bind what a signed TP-<n> id means). A live config that has drifted AT ALL
+    // since prepare -- even in a way that would not itself change the pattern actually
+    // used below -- voids the whole tolerance path (fail closed), rather than silently
+    // choosing between the frozen and the live definition.
+    const frozen = object(frozenProtectedTestPatterns) ? frozenProtectedTestPatterns : { configSha256: null, patterns: [] };
+    const liveConfigSha256 = liveProtectedTestPatternsConfigSha256(rootDir);
+    if (liveConfigSha256 !== (frozen.configSha256 ?? null)) return false;
+    const testPatterns = compileFrozenTestPatterns(frozen.patterns);
 
     for (const line of lines) {
       const hashes = line.split(/\s+/u);
@@ -636,7 +713,7 @@ function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, curren
         const repoRelativePath = fields[1];
         if (typeof repoRelativePath !== "string" || repoRelativePath === "") return false;
         const absolutePath = resolve(root, repoRelativePath);
-        if (!pathWithinScope(absolutePath, repoRelativePath, { scopeRuleIds, livePluginRoot, testPatterns })) return false;
+        if (!pathWithinScope(absolutePath, repoRelativePath, { scopeRuleIds, livePluginRoot, testPatterns, rootDir })) return false;
       }
     }
     return true;
@@ -691,6 +768,7 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
     const tolerated = intervenedCommitsStayWithinScope({
       root: repo.root, spawn, candidateCommit: candidate.commit, currentCommit,
       scopeRuleIds: request.subject.scopeRuleIds, livePluginRoot, rootDir: repo.root,
+      frozenProtectedTestPatterns: request.protectedTestPatterns,
     });
     if (!tolerated) {
       fail("GMW-CANDIDATE-COMMIT-MISMATCH", "current HEAD commit does not match the signed candidate commit");

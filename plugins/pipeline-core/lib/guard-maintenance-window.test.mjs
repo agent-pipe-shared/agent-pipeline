@@ -1208,6 +1208,140 @@ try {
     assert.equal(installed.status, "active", "a commit whose only changed file matches the window's own signed TP-9 pattern must not void the signature");
   });
 
+  // ---- NVA-GMWFIX-4 F1: the commit-tolerance path must never treat a
+  // NEVER_LIFTABLE_KERNEL_PATHS/PLUGIN_KERNEL_SUFFIXES entry as "in scope", regardless
+  // of whether GS-6 or a TP-* pattern is what a naive containment/match check would
+  // otherwise call it. Reproduces GMW33's exact fixture shape (nestedPluginFixture,
+  // livePluginRoot nested inside the repository), but targets a REAL kernel path
+  // (plugins/pipeline-core/hooks/hooks.json) instead of the ordinary guard-example.mjs
+  // GMW33 uses -- pre-fix, this tolerated (wrongly); post-fix, it must still refuse.
+  check("GMW39 (F1) a GS-6-scoped window still refuses an intervening commit that touches a NEVER_LIFTABLE_KERNEL_PATHS file, even though it sits physically inside the window's own signed livePluginRoot", () => {
+    const root = repoFixture("gmw-kernel-in-gs6-scope-");
+    const plugin = nestedPluginFixture(root);
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "kernel path must never be tolerated even under GS-6", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+
+    // A new commit lands, touching hooks.json -- physically inside `livePluginRoot` (a
+    // bare GS-6 containment check alone would call it "in scope"), but it is ALSO one of
+    // NEVER_LIFTABLE_KERNEL_PATHS, the module's own definition of a path no window may
+    // ever cover.
+    writeFileSync(join(plugin, "hooks", "hooks.json"), JSON.stringify({ tampered: true }));
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "rewrite the guard kernel manifest"], { cwd: root });
+
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "a GS-6-scoped window must never tolerate a commit touching a NEVER_LIFTABLE_KERNEL_PATHS file");
+    assert.equal(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
+  });
+
+  check("GMW40 (F1) a TP-* scoped window whose own pattern happens to match a kernel path (mirroring this repository's own TP-4 on hooks/hooks.json) still refuses a commit touching that kernel path", () => {
+    const root = repoFixture("gmw-kernel-in-tp-scope-");
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(
+      join(root, ".claude", "guard-config.json"),
+      JSON.stringify({ protectedTestPaths: [{ id: "TP-9", pattern: "plugins/pipeline-core/hooks/hooks\\.json$" }] }),
+    );
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "add guard-config with a TP pattern that overlaps a kernel path"], { cwd: root });
+    const plugin = nestedPluginFixture(root);
+
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["TP-9"], ttlSeconds: 300, reason: "TP pattern overlapping a kernel path must never tolerate it", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+
+    writeFileSync(join(plugin, "hooks", "hooks.json"), JSON.stringify({ tampered: true }));
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "rewrite the guard kernel manifest via a TP-scoped window"], { cwd: root });
+
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "a TP-* pattern that happens to match a kernel path must never tolerate a commit touching it");
+    assert.equal(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
+  });
+
+  // ---- NVA-GMWFIX-4 F2: the TP-* pattern set the tolerance check consults must be the
+  // one FROZEN at prepare time, never a fresh read of the live, mutable guard-config.json
+  // -- an intervening edit (here, a widened pattern, left uncommitted exactly like the
+  // finding's own attack description) must not broaden what a signed TP-<n> id means.
+  check("GMW41 (F2) a live guard-config.json pattern WIDENED after prepare, before install, does not broaden the tolerance check -- the frozen prepare-time pattern still governs", () => {
+    const root = repoFixture("gmw-tp-frozen-widen-");
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(
+      join(root, ".claude", "guard-config.json"),
+      JSON.stringify({ protectedTestPaths: [{ id: "TP-9", pattern: "narrow-protected\\.mjs$" }] }),
+    );
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "add guard-config"], { cwd: root });
+
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["TP-9"], ttlSeconds: 300, reason: "frozen TP pattern must not follow a live widen", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+
+    // Widen TP-9's pattern in the LIVE config AFTER prepare, WITHOUT committing it -- the
+    // exact "uncommitted working-tree edit" shape the finding names.
+    writeFileSync(
+      join(root, ".claude", "guard-config.json"),
+      JSON.stringify({ protectedTestPaths: [{ id: "TP-9", pattern: ".*" }] }),
+    );
+
+    // A new commit lands, touching a file that matches ONLY the widened pattern, never
+    // the narrow one actually signed at prepare time.
+    writeFileSync(join(root, "unrelated-widened-match.mjs"), "// only matches the widened pattern\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "add file only the widened pattern would cover"], { cwd: root });
+
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "a commit only in-scope under a POST-prepare widened pattern must still refuse");
+    assert.equal(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
+  });
+
+  check("GMW42 (F2 regression guard) an UNMUTATED guard-config.json (identical TP pattern at prepare and install) still tolerates a commit that matches it -- the frozen-pattern fix must not break the ordinary case", () => {
+    const root = repoFixture("gmw-tp-frozen-unmutated-");
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(
+      join(root, ".claude", "guard-config.json"),
+      JSON.stringify({ protectedTestPaths: [{ id: "TP-9", pattern: "narrow-protected\\.mjs$" }] }),
+    );
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "add guard-config"], { cwd: root });
+
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["TP-9"], ttlSeconds: 300, reason: "unmutated config, still tolerated", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+
+    // No mutation of guard-config.json at all between prepare and install.
+    writeFileSync(join(root, "narrow-protected.mjs"), "// matches the SAME pattern signed at prepare time\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "add file matching the unmutated pattern"], { cwd: root });
+
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+    });
+    assert.equal(installed.status, "active", "an unmutated, still-matching TP pattern must still be tolerated");
+  });
+
   console.log(`\nguard-maintenance-window: ${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });
