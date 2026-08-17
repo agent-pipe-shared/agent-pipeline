@@ -3,12 +3,14 @@
   "model": "claude-sonnet-5",
   "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
   "dispatcher": "elephant",
-  "outcome": "in-progress",
+  "outcome": "done-with-open-item",
   "log": [
     { "phase": "read-context", "toolUses": 3 },
     { "phase": "implement-nudge", "toolUses": 5 },
     { "phase": "add-tests", "toolUses": 7 },
     { "phase": "unit-verify", "toolUses": 8, "result": "node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs -> 15 pass, exit 0" },
-    { "phase": "full-verify-attempt", "toolUses": 10, "result": "candidate-preflight failed: unrelated tracked files dirty (docs/change-control.md, project/pipeline-state.json, several evidence dispatch-record.json files) outside briefed scope; not something this task may commit or stash" }
-  ]
+    { "phase": "full-verify-attempt", "toolUses": 10, "result": "candidate-preflight failed: unrelated tracked files dirty (docs/change-control.md, project/pipeline-state.json, plugins/pipeline-core/scripts/dispatch-record.json, PHX-WP-EAC08/dispatch-record.json, PHX-WP-RAC06/dispatch-record.json) outside briefed scope; not committable/stashable by this task" },
+    { "phase": "commit", "toolUses": 16, "result": "86c9fb56 feat(pipeline-core): nudge PO toward a less identifying key-reference on fresh setup" }
+  ],
+  "report": "See final assistant message for the full six-section report."
 }
