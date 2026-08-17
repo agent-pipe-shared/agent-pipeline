@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2150c2634013f6d4b744e50338e60831154e4ed2abfde334e1043d4ece2df8ce"
+    "transitionHead": "18935a037798b080622e5498c4052986a3df41adafb849639275c4320ced8465"
   },
   "counts": {
-    "open": 104,
+    "open": 108,
     "in_progress": 22,
     "closed": 97
   },
@@ -18,6 +18,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, live greenfield onboarding with the Claude runner, 2026-08-07: 'der status wird initial falsch gesetzt und es gibt keinen sauberen lauf zum PRD und Freigabe'. The session located both halves in code before reporting."
+    },
+    {
+      "id": "pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover, which attributed this to runner-profile-migration-v3.mjs's generator omitting a schema field. That specific root-cause attribution is checked against source and appears WRONG -- filed here with the corrected, narrower, still-unresolved finding."
     },
     {
       "id": "pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question",
@@ -776,6 +784,14 @@
       "closureEvidence": "backlog/evidence/2026-08-08-consumer-seed-calibration-closure.md"
     },
     {
+      "id": "pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit",
+      "status": "open",
+      "type": "enhancement",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; verified against source -- accurately described, and this repository's own gate-strength design is deliberately fail-closed here (see docstring cited below), so this is a feature-gap/enhancement request, not a defect."
+    },
+    {
       "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
       "status": "open",
       "type": "defect",
@@ -1122,6 +1138,14 @@
       "owner": "pipeline",
       "created": "2026-07-25",
       "source": "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix"
+    },
+    {
+      "id": "pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; the original report's line numbers were corrupted by transcription and were not trusted -- independently re-located and confirmed against this repository's own current source before filing."
     },
     {
       "id": "pipeline.mp22-orchestrator-self-implementation-has-no-enforcement",
@@ -2115,6 +2139,14 @@
       "closureRepository": "self",
       "closureCommit": "635f348b4c29d52ab2db0672719421abd96ba4f7",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; the report's own mechanism claim ('silently skipped') was checked against source and found imprecise -- the real gap is narrower but still real, confirmed by direct code reading."
     },
     {
       "id": "pipeline.windows-directory-durability",
