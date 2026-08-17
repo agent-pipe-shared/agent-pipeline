@@ -158,7 +158,7 @@
 | pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
-| pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
@@ -253,6 +253,6 @@
 
 ## Counts
 
-- open: 98
+- open: 97
 - in_progress: 22
-- closed: 125
+- closed: 126

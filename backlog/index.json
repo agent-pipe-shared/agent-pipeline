@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "286199acb7888bf50b885153633a436fc2ae4573267b5e4df74e5458d597eab0"
+    "transitionHead": "4a2c333fbdbf80c4e46d75c2b1dde134e39f2bfcc5b859798853747369c68d92"
   },
   "counts": {
-    "open": 98,
+    "open": 97,
     "in_progress": 22,
-    "closed": 125
+    "closed": 126
   },
   "items": [
     {
@@ -1530,11 +1530,15 @@
     },
     {
       "id": "pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed."
+      "source": "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "67335361ad70924cd5668db72d994c152f2db035",
+      "closureEvidence": "backlog/items/2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback.md"
     },
     {
       "id": "pipeline.permitted-edit-drops-session-into-unrecoverable-readiness",

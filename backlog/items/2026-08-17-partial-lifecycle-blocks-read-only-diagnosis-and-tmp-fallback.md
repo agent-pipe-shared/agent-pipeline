@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 67335361ad70924cd5668db72d994c152f2db035
+closure_evidence: backlog/items/2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback.md
 created: 2026-08-17
 source: "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed."
 ---
@@ -58,3 +62,30 @@ around the `partial` block itself.
 - **Assignment (if accepted):** goldfish-deep, guardrail-tier (MP-07), plus
   Critic review before considered done.
 - **Date:** 2026-08-17
+
+## Closure (2026-08-17)
+
+Fixed via goldfish-deep dispatch NVA-LCREADONLY-1. Narrowly additive to the
+existing `isReadOnlyDiagnosticCommand()` read-only lane: a session stuck at
+exactly `lifecycleStatus === "partial"` may now also create the
+repository's own `scratch` directory (`mkdir scratch` / `mkdir -p scratch`,
+exact target, nothing else) and write one fixed file,
+`scratch/incident-report.md`, via Write or Edit — nothing else, no other
+path, no directory write, no glob. Deliberately NOT a general `node -e` or
+arbitrary write escape hatch, exactly as this item's own proposal required.
+Every other write, every other mkdir target, and every other
+`PORG-NOT-READY` lifecycle status (`restart-required` among them) stay
+refused exactly as before; the existing `GUARDALLOW-1` allowlist branch was
+not touched.
+
+Independently re-verified: reviewed the diff directly,
+`node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` —
+94/94 pass, including the new `NVA-LCREADONLY-1` test covering all 7 DoD
+cases (both mkdir shapes admitted; six exact-match negative mkdir/path
+cases refused; both Write/Edit incident-report admissions; the
+`restart-required` status still refusing both operations; a `ready`
+session's behavior unchanged). Commit
+`67335361ad70924cd5668db72d994c152f2db035`.
+
+Still needs the Critic review noted in Assignment above before being
+considered fully done — not yet scheduled.
