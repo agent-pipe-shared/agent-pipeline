@@ -151,3 +151,31 @@ file-write case safe (`23d93b0a`, `64450b35`) — the new commit must remain
 within the already-authorized scope. This is a security-tier change
 (MP-07) and needs the same careful design/Critic treatment as the original
 fix. Dispatched.
+
+### Implementation landed (NVA-GMWFIX-3, 2026-08-17) — status stays `open`, Critic review pending
+
+Dispatch `NVA-GMWFIX-3` (goldfish-deep) implemented
+`intervenedCommitsStayWithinScope()`: an intervening commit (or a short
+linear chain of them) between `prepare` and `install` no longer trips
+`GMW-CANDIDATE-COMMIT-MISMATCH`, provided every file every commit in the
+range touches is provably inside the window's own already-signed scope
+(`GS-6`, or a `TP-*` id resolved via `guard-testpath.mjs`'s own
+`protectedTestPaths` config — reused, not reinvented). Positive, narrow
+proof only: fails closed on a merge/root commit, a rename (even when both
+halves are individually in-scope), an out-of-scope file, an unparseable
+diff, or any git invocation that does not succeed as expected. The
+unchanged-commit path keeps its original `GMW-CANDIDATE-TREE-MISMATCH`
+defense-in-depth check unchanged.
+
+Run truncated after GREEN, before its own commit/report — Elephant
+closeout: diff reviewed directly, `node --test
+plugins/pipeline-core/lib/guard-maintenance-window.test.mjs` independently
+rerun, 41/41 pass (35 prior + 6 new: `GMW33`-`GMW38`, covering the
+in-scope-commit admission, an out-of-scope file still refusing, a merge
+commit still refusing, a rename still refusing, a failed git invocation
+still refusing, and the `TP-*` scope path). Commit `c8acb6a6`.
+
+**Status stays `open`, not `closed`:** per the original dispatch's own
+explicit instruction, this security-tier change needs a Critic review
+before being treated as complete — not yet scheduled. Do not close this
+item on the implementation alone.
