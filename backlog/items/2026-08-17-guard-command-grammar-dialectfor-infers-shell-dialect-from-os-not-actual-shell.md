@@ -7,9 +7,8 @@ status: closed
 created: 2026-08-17
 closed_at: 2026-08-17
 closure_repository: self
-closure_commit: 5e26fa6f
+closure_commit: 5e26fa6fa6c871498cff6e4cd0dbae8796ede83d
 closure_evidence: backlog/items/2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell.md
-merged-into: 2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell.md
 source: "Relayed by the PO 2026-08-17 from a live Windows (D:\\Dev\\Web\\Toolbox) Claude session's handover, item #2, found while diagnosing the NVA-PAWINACL-1 blocker; independently confirmed against this repository's current source before filing, including both call sites."
 ---
 

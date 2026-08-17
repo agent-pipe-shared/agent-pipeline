@@ -836,7 +836,7 @@
       "source": "Relayed by the PO 2026-08-17 from a live Windows (D:\\Dev\\Web\\Toolbox) Claude session's handover, item #2, found while diagnosing the NVA-PAWINACL-1 blocker; independently confirmed against this repository's current source before filing, including both call sites.",
       "closedAt": "2026-08-17",
       "closureRepository": "self",
-      "closureCommit": "5e26fa6f",
+      "closureCommit": "5e26fa6fa6c871498cff6e4cd0dbae8796ede83d",
       "closureEvidence": "backlog/items/2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell.md"
     },
     {
