@@ -309,7 +309,40 @@ export function loadVerifyResumeArtifacts({ runsRoot, currentRunId, suites }) {
   return { receipts, logs };
 }
 
-export function compileVerifySuites({ repoRoot, suites, candidateTree, environment = process.env }) {
+// ADR-0065 candidate (b): Tier-B narrowing is a lookup keyed by suite name/id, not a suite
+// registration field -- so opting a suite in never needs an edit to harness/scripts/verify.mjs
+// (TP-3-protected, no active Guard Maintenance Window this session; TP-3's pattern is
+// `harness/scripts/verify\.mjs$` alone, so this file and its own test are unaffected). A suite
+// absent from this table stays Tier A. The default table is overridable via
+// compileVerifySuites/runVerifyJournal's `tierBDeclarations` parameter purely so tests can
+// exercise the mechanism against a synthetic suite without ever touching this production table.
+const TIER_B_DECLARATIONS = Object.freeze({
+  // Confirmed live before this dispatch: this suite performs zero filesystem/child-process I/O
+  // beyond importing its one dependency, and needs no --allow-fs-write at all.
+  "human-role-label-tests": Object.freeze({
+    reads: Object.freeze([
+      "plugins/pipeline-core/lib/human-role-labels.mjs",
+      "plugins/pipeline-core/lib/human-role-labels.test.mjs",
+    ]),
+  }),
+});
+
+function tierBDeclaredFiles({ suite, rel, implementationSha256, repoRoot, declaration }) {
+  const byPath = new Map([[rel, implementationSha256]]);
+  for (const declaredPath of declaration.reads ?? []) {
+    const absolute = resolve(repoRoot, declaredPath);
+    const declaredRel = relative(repoRoot, absolute).split(sep).join("/");
+    if (declaredRel === "" || declaredRel === ".." || declaredRel.startsWith("../") || !regularPhysicalFile(absolute)) {
+      throw new Error(`VERIFY-SUITE-TIER-B-INPUT-UNSAFE:${suite.name}`);
+    }
+    if (!byPath.has(declaredRel)) byPath.set(declaredRel, sha(readFileSync(absolute)));
+  }
+  return [...byPath.entries()]
+    .map(([path, fileSha256]) => ({ path, fileSha256 }))
+    .sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
+}
+
+export function compileVerifySuites({ repoRoot, suites, candidateTree, environment = process.env, tierBDeclarations = TIER_B_DECLARATIONS }) {
   const environmentContractSha256 = digestJson({
     node: process.version,
     platform: process.platform,
@@ -323,22 +356,29 @@ export function compileVerifySuites({ repoRoot, suites, candidateTree, environme
     if (rel === "" || rel === ".." || rel.startsWith("../") || !regularPhysicalFile(absolute)) throw new Error(`VERIFY-SUITE-INPUT-UNSAFE:${suite.name}`);
     const implementationSha256 = sha(readFileSync(absolute));
     const dependsOn = [...(suite.dependsOn ?? [])].sort();
-    // Tier A (ADR-0065 Decision 2): every suite still declares the repository root via
-    // "declared-tree:root", so behaviour stays provably unchanged -- any candidate whose tree
-    // differs at all produces a different sha256 here and the suite still re-runs. Narrowing a
-    // specific suite to a real subtree (a distinct "declared-tree:<slug>" per the ADR's own
-    // shape) is candidate (c)'s job, not this change's. "suite-dependencies" is new: it restores
-    // the one check that dropping `suites: registrations` from policySha256 (below) would
-    // otherwise silently lose -- a suite's OWN dependsOn list changing now invalidates its OWN
-    // receipt via declared-input-drift instead of via the removed whole-policy digest.
-    const inputs = {
-      files: [{ path: rel, fileSha256: implementationSha256 }],
-      nonFiles: [
-        { kind: "declared-tree:root", path: null, sha256: sha(candidateTree) },
-        { kind: "suite-arguments", path: null, sha256: digestJson(suite.args ?? []) },
-        { kind: "suite-dependencies", path: null, sha256: digestJson(dependsOn) },
-      ].sort((a, b) => a.kind.localeCompare(b.kind)),
-    };
+    const declaration = tierBDeclarations[suite.name] ?? null;
+    // "suite-dependencies" applies to every suite regardless of tier: it restores the one check
+    // that dropping `suites: registrations` from policySha256 (below) would otherwise silently
+    // lose -- a suite's OWN dependsOn list changing now invalidates its OWN receipt via
+    // declared-input-drift instead of via the removed whole-policy digest.
+    const sharedNonFiles = [
+      { kind: "suite-arguments", path: null, sha256: digestJson(suite.args ?? []) },
+      { kind: "suite-dependencies", path: null, sha256: digestJson(dependsOn) },
+    ];
+    // Tier A (ADR-0065 Decision 2, the default -- every suite not named in tierBDeclarations):
+    // the suite still declares the repository root via "declared-tree:root", so behaviour stays
+    // provably unchanged -- any candidate whose tree differs at all produces a different sha256
+    // here and the suite still re-runs.
+    // Tier B (this candidate, one suite only): "declared-tree:*" is dropped entirely, never
+    // replaced by a `declared-tree:<slug>` subtree digest -- a suite whose real input is a small,
+    // named set of leaf files needs no subtree form (that form is candidate (c)'s job, for a
+    // suite whose declared input is a real subtree). `executeSuite` derives the exact Node
+    // --permission grant from this same `inputs.files` list at run time (isTierBRegistration/
+    // tierBSpawnFlags below), so the declaration and the runtime grant can never drift apart --
+    // there is only one list, read once here and consulted again there.
+    const inputs = declaration
+      ? { files: tierBDeclaredFiles({ suite, rel, implementationSha256, repoRoot, declaration }), nonFiles: [...sharedNonFiles].sort((a, b) => a.kind.localeCompare(b.kind)) }
+      : { files: [{ path: rel, fileSha256: implementationSha256 }], nonFiles: [{ kind: "declared-tree:root", path: null, sha256: sha(candidateTree) }, ...sharedNonFiles].sort((a, b) => a.kind.localeCompare(b.kind)) };
     return { id: suite.name, implementationSha256, inputs, environmentContractSha256, dependsOn };
   });
 }
@@ -349,10 +389,27 @@ function appendProgress(run, event, emit) {
   emit(JSON.stringify(event));
 }
 
+// ADR-0065 candidate (b): a registration is Tier B iff it declares no "declared-tree:*" input --
+// compileVerifySuites is the sole producer of registrations and only ever omits that kind for a
+// suite named in tierBDeclarations. The exact Node --permission grant is derived below from the
+// SAME `inputs.files` list the receipt itself carries, so the declaration and the runtime grant
+// can never disagree with each other -- there is nothing here to keep in sync by hand. A Tier-B
+// suite is NEVER given --allow-child-process (ADR-0065 Decision clarification 2, hard rule,
+// Risk paragraph): this function has no parameter for one and never emits one, under any
+// declaration.
+function isTierBRegistration(registration) {
+  return !registration.inputs.nonFiles.some((entry) => entry.kind.startsWith("declared-tree:"));
+}
+
+function tierBSpawnFlags(registration, repoRoot) {
+  return ["--permission", ...registration.inputs.files.map((file) => `--allow-fs-read=${resolve(repoRoot, file.path)}`)];
+}
+
 function executeSuite({ suite, registration, run, candidate, policySha256, index, total, clock, spawn }) {
   const startedAt = now(clock);
   appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "started", startedAt, completedAt: null, receiptSha256: null, diagnosticDigest: null }, console.log);
-  const result = spawn(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "buffer", cwd: suite.cwd, maxBuffer: MAX_LOG_BYTES });
+  const permissionFlags = isTierBRegistration(registration) ? tierBSpawnFlags(registration, suite.cwd) : [];
+  const result = spawn(process.execPath, [...permissionFlags, suite.file, ...(suite.args ?? [])], { encoding: "buffer", cwd: suite.cwd, maxBuffer: MAX_LOG_BYTES });
   const stdout = Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout ?? "");
   const stderr = Buffer.isBuffer(result.stderr) ? result.stderr : Buffer.from(result.stderr ?? "");
   const diagnostic = result.error ? Buffer.from(`\n[verify-runner-error] ${result.error.code ?? "ERROR"}\n`) : Buffer.alloc(0);
@@ -400,8 +457,8 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
   return receipt;
 }
 
-export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnSync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}` }) {
-  const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree });
+export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnSync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS }) {
+  const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree, tierBDeclarations });
   // ADR-0065 coupling (3): this digest no longer covers `suites: registrations`, so one suite's
   // registration changing no longer invalidates every OTHER suite's receipt via
   // verify-policy-drift. Everything that term contributed per-suite is already checked per-suite

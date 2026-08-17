@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { closeSync, chmodSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import { digestJson } from "../lib/verify-resume.mjs";
 import { compileVerifySuites, createVerifyRun, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
 
@@ -219,5 +221,90 @@ test("a manifest with a drifted cleanup registration cannot authorize receipt re
     const next = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-after-registration-drift", spawn, registerRun });
     assert.equal(calls, 2);
     assert.deepEqual(next.plan.reusable, []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ADR-0065 candidate (b): a Tier-A suite spawns with no --permission flags at all (regression, bit-identical to before this change)", () => {
+  const f = fixture();
+  let capturedArgv = null;
+  const spawn = (command, argv) => { capturedArgv = argv; return spawnPass(); };
+  try {
+    runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-tier-a-argv", spawn, registerRun });
+    assert.deepEqual(capturedArgv, [f.suiteFile]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ADR-0065 candidate (b): the real human-role-label-tests registration declares exactly its own two files, never the repository root", () => {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const suiteFile = join(repoRoot, "plugins", "pipeline-core", "lib", "human-role-labels.test.mjs");
+  const [registration] = compileVerifySuites({ repoRoot, suites: [{ name: "human-role-label-tests", file: suiteFile, dependsOn: [] }], candidateTree: "9".repeat(40) });
+  assert.deepEqual(registration.inputs.files.map((file) => file.path), [
+    "plugins/pipeline-core/lib/human-role-labels.mjs",
+    "plugins/pipeline-core/lib/human-role-labels.test.mjs",
+  ]);
+  for (const file of registration.inputs.files) assert.match(file.fileSha256, /^[a-f0-9]{64}$/u);
+  // Never "declared-tree:root", and never any "declared-tree:<slug>" -- ADR-0065's own clarification
+  // 1 that a two-leaf-file suite needs no subtree slug form at all.
+  assert.deepEqual(registration.inputs.nonFiles.map((entry) => entry.kind), ["suite-arguments", "suite-dependencies"]);
+  assert.equal(registration.inputs.nonFiles.some((entry) => entry.kind.startsWith("declared-tree:")), false);
+  // A different, unrelated suite not named in the Tier-B table stays Tier A in the exact same call.
+  const [other] = compileVerifySuites({ repoRoot, suites: [{ name: "some-other-suite", file: suiteFile, dependsOn: [] }], candidateTree: "9".repeat(40) });
+  assert.equal(other.inputs.nonFiles.some((entry) => entry.kind === "declared-tree:root"), true);
+});
+
+test("ADR-0065 candidate (b): a Tier-B suite that reaches an undeclared path fails under the REAL Node permission model, not a mock", () => {
+  const f = fixture();
+  const allowedFile = join(f.root, "tierb-allowed.mjs");
+  writeFileSync(allowedFile, "export const allowed = true;\n", { mode: 0o600 });
+  const undeclaredFile = join(f.root, "tierb-secret.txt");
+  writeFileSync(undeclaredFile, "undeclared content\n", { mode: 0o600 });
+  const suiteFile = join(f.root, "tierb-negative.test.mjs");
+  writeFileSync(
+    suiteFile,
+    [
+      "import { readFileSync } from 'node:fs';",
+      "import './tierb-allowed.mjs';",
+      `readFileSync(${JSON.stringify(undeclaredFile)});`,
+      "process.stdout.write('should never be reached\\n');",
+      "",
+    ].join("\n"),
+    { mode: 0o600 },
+  );
+  const tierBDeclarations = { "tierb-negative-suite": { reads: ["tierb-allowed.mjs"] } };
+  const suites = [{ name: "tierb-negative-suite", file: suiteFile, dependsOn: [] }];
+  try {
+    // Real spawnSync, real Node --permission flags -- the exact same runVerifyJournal path
+    // production uses, not a mocked spawn. This is the "negative corpus proving a suite fails
+    // when an undeclared read is introduced" the ADR's Risk paragraph and Follow-up section
+    // require before any suite is promoted to Tier B.
+    const result = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites, policyInputs: { harness: "test" }, runId: "verify-tierb-negative", spawn: spawnSync, registerRun, tierBDeclarations });
+    assert.equal(result.terminal.status, "failed");
+    assert.notEqual(result.steps[0].exitCode, 0);
+    const artifactName = verifySuiteArtifactName("tierb-negative-suite");
+    const log = readFileSync(join(result.runDir, "logs", `${artifactName}.log`), "utf8");
+    // The real Node runtime's own denial shape, not a hand-written assertion string.
+    assert.match(log, /ERR_ACCESS_DENIED/u);
+    assert.match(log, /FileSystemRead/u);
+    assert.equal(log.includes("should never be reached"), false);
+    const receipt = JSON.parse(readFileSync(join(result.runDir, "receipts", `${artifactName}.json`), "utf8"));
+    assert.deepEqual(receipt.inputs.files.map((file) => file.path), ["tierb-allowed.mjs", "tierb-negative.test.mjs"]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ADR-0065 candidate (b): a Tier-B suite whose declared reads are actually sufficient still passes under the REAL Node permission model", () => {
+  const f = fixture();
+  const allowedFile = join(f.root, "tierb-ok-allowed.mjs");
+  writeFileSync(allowedFile, "export const allowed = true;\n", { mode: 0o600 });
+  const suiteFile = join(f.root, "tierb-ok.test.mjs");
+  writeFileSync(suiteFile, "import { allowed } from './tierb-ok-allowed.mjs';\nprocess.stdout.write(`ok ${allowed}\\n`);\n", { mode: 0o600 });
+  const tierBDeclarations = { "tierb-ok-suite": { reads: ["tierb-ok-allowed.mjs"] } };
+  const suites = [{ name: "tierb-ok-suite", file: suiteFile, dependsOn: [] }];
+  try {
+    const result = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites, policyInputs: { harness: "test" }, runId: "verify-tierb-positive", spawn: spawnSync, registerRun, tierBDeclarations });
+    assert.equal(result.terminal.status, "passed");
+    assert.equal(result.steps[0].exitCode, 0);
+    const artifactName = verifySuiteArtifactName("tierb-ok-suite");
+    const log = readFileSync(join(result.runDir, "logs", `${artifactName}.log`), "utf8");
+    assert.match(log, /ok true/u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
