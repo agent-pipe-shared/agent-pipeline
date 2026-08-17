@@ -129,7 +129,19 @@ function overridePlanCommands(rootDir, requestSha256, approvalMode) {
       : [script, "authorize-by-signature", "--repo", rootDir, "--request-sha256", requestSha256,
         "--plan-sha256", "<plan-sha256>", "--proof", "<external-proof.json>"],
   };
-  return [plan, prepare, authorize];
+  // NVA-SIGENTRY-2 F2: `signature` mode's only path from "prepared" to "signable" is
+  // `emit-signature-digest`, run before the human is expected to sign anything
+  // out-of-band -- omitting it here left this map's own signature-mode row incomplete in
+  // exactly the way the original backlog item was filed to close. Chat mode has no
+  // signing step at all (an in-session `--activate` IS the authorization), so it stays a
+  // 3-command sequence; only the signature-mode sequence grows to 4.
+  if (approvalMode === "chat") return [plan, prepare, authorize];
+  const emitDigest = {
+    executable: process.execPath,
+    argv: [script, "emit-signature-digest", "--repo", rootDir, "--request-sha256", requestSha256,
+      "--plan-sha256", "<plan-sha256>"],
+  };
+  return [plan, prepare, emitDigest, authorize];
 }
 
 /**

@@ -383,7 +383,19 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
         "chat mode must offer the in-session activate step");
       assert.doesNotMatch(reason, /authorize-by-signature/u,
         "chat mode must not offer the signature-only final step");
+      assert.doesNotMatch(reason, /emit-signature-digest/u,
+        "chat mode has no signing step; nothing to emit a digest for");
     } else {
+      // NVA-SIGENTRY-2 F2: the digest-emission step must be reachable from the printed
+      // guidance alone, at the point where the human/agent actually needs it -- before
+      // signing, i.e. between prepare-authorization and authorize-by-signature.
+      assert.match(reason, /emit-signature-digest --repo/u,
+        "signature mode must offer the digest-emission step before signing");
+      assert.match(
+        reason,
+        /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+        "emit-signature-digest must sit between prepare-authorization and authorize-by-signature",
+      );
       assert.match(reason, /\bauthorize-by-signature --repo\b[^\n]*--proof <external-proof\.json>/u,
         "signature mode must offer its own decisive final step");
       assert.doesNotMatch(reason, /--activate/u,

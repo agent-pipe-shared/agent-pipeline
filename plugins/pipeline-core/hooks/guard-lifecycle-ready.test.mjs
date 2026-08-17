@@ -2477,6 +2477,7 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
     assert.match(chatResult.stderr, /prepare-authorization --repo/u);
     assert.match(chatResult.stderr, /\bauthorize --repo\b[^\n]*--activate/u);
     assert.doesNotMatch(chatResult.stderr, /authorize-by-signature/u);
+    assert.doesNotMatch(chatResult.stderr, /emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
     assert.doesNotMatch(chatResult.stderr, /capability consumed/u);
 
     const sigRoot = hgoGitFixture("signature");
@@ -2486,7 +2487,15 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
     assert.match(sigResult.stderr, /Human override available for this exact command/u);
     assert.match(sigResult.stderr, /\bplan --repo\b/u);
     assert.match(sigResult.stderr, /prepare-authorization --repo/u);
-    assert.match(sigResult.stderr, /authorize-by-signature --repo/u);
+    // NVA-SIGENTRY-2 F2: the digest-emission step must appear before the human is expected
+    // to sign anything out-of-band -- i.e. between prepare-authorization and
+    // authorize-by-signature, not merely somewhere in the guidance text.
+    assert.match(sigResult.stderr, /emit-signature-digest --repo/u);
+    assert.match(
+      sigResult.stderr,
+      /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+      "emit-signature-digest must sit between prepare-authorization and authorize-by-signature",
+    );
     assert.doesNotMatch(sigResult.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
@@ -2552,6 +2561,7 @@ test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, an
     assert.match(sig.stderr, /Human override available for this exact command/u);
     assert.match(sig.stderr, /\bplan --repo\b/u);
     assert.match(sig.stderr, /prepare-authorization --repo/u);
+    assert.match(sig.stderr, /emit-signature-digest --repo/u);
     assert.match(sig.stderr, /authorize-by-signature --repo/u);
     assert.doesNotMatch(sig.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
 
@@ -2562,6 +2572,7 @@ test("NOVA-XREPO-HGO-1: with nothing armed a cross-repo denial still refuses, an
     assert.match(chat.stderr, /GUARD-CROSS-REPO-MUTATION/u);
     assert.match(chat.stderr, /\bauthorize --repo\b[^\n]*--activate/u);
     assert.doesNotMatch(chat.stderr, /authorize-by-signature/u);
+    assert.doesNotMatch(chat.stderr, /emit-signature-digest/u, "chat mode has no signing step; nothing to emit a digest for");
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
@@ -2813,6 +2824,7 @@ function overrideReachability(command, projectDir) {
     return { code, reach: `never-liftable:${recorded.status}:${recorded.code ?? "<none>"}` };
   }
   assert.match(result.stderr, /Human override available for this exact command/u, command);
+  assert.match(result.stderr, /emit-signature-digest --repo/u, command);
   assert.match(result.stderr, /authorize-by-signature --repo/u, command);
   const planned = planHumanGuardOverride({
     rootDir: projectDir,

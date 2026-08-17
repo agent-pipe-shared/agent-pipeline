@@ -276,6 +276,7 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
               `Then, outside this session (presence of a valid, correctly-bound Ed25519 ` +
                 `signature IS the authorization -- there is no in-session activate step for this mode):`,
               `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
+              `${process.execPath} ${JSON.stringify(script)} emit-signature-digest --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256>`,
               `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
             ].join("\n");
           overrideGuidance = [
