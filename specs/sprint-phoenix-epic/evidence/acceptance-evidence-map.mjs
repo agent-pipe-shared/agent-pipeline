@@ -1597,7 +1597,17 @@ const CLOSURE = {
   // Git-guard override consumption was its last open reader, satisfied by
   // construction (a PO amendment, not a code change).
 
-  'A-AC-01': ['build', 'WP-A'],
+  // A-AC-01 reclassified 'po' 2026-08-18 (this session, correcting a stale
+  // entry): POINTERS documents the design doc's own explicit precondition-
+  // not-met guidance ("if no Claude host adapter can supply
+  // pipelineMainSessionRoute, this step ... should be deferred rather than
+  // built") -- a proved impossibility from within this repo, not an absent
+  // capability this session can implement; matches the 'po' class definition
+  // ("a proved impossibility"), not 'build'. No Claude host adapter anywhere
+  // in plugins/pipeline-core produces pipelineMainSessionRoute (grep-confirmed
+  // fresh 2026-08-18: only the one consumer, post-compact-reground.mjs, and
+  // its own test fixture reference the key at all).
+  'A-AC-01': ['po', 'WP-A'],
   // A-AC-05 closed and removed from this table 2026-08-17 (PHX-WP-AAC05-WIRING):
   // the advisory-decision producer is now wired into its live call path.
 
