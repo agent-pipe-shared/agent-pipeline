@@ -7,6 +7,18 @@
 
 ---
 
+## CHECKPOINT — 2026-08-17, continued again (18): L-AC-08 CLOSED, the 9th finding fixed (147/157 implemented); context critically overdue for /compact (READ THIS FIRST)
+
+**L-AC-08 closed.** `docs/governance-replay.md`'s Fields section gained real, grounded entries for `correlation.correlationId` and `correlation.queueRevision`, read directly from where each field is actually populated (`pipeline-state.mjs:2232-2234`, `control-execution-lifecycle-event.mjs:163`) rather than guessed — `correlationId` traced to "a caller holding only the orchestrator's own correlation token can still find every event for that invocation," `queueRevision` traced to the same candidate-binding discipline `candidate.commit`/`.tree` already use. All 6 required correlation fields and 8 of 9 kinds now traced. Verdict flips back to `implemented`. Commit `32734cda`. Full Verify + security-scan re-run at that commit (both dispatched via `run_in_background` this checkpoint to keep the already-huge session context from growing further): exactly the same 5 known reds, Security CLEAN, no regression.
+
+**Totals: 147 implemented / 9 partial / 1 constraint = 157, 10 open.** Remaining from the EPIC-AC-04 Critic audit: R-AC-06, E-AC-08, E-AC-19, C-AC-13 (all need real capability work or a real content-authorship pass, not attempted rushed). Plus the standing items: A-AC-01, H-AC-11, PX0-AC-13, EPIC-AC-04 (partial), EPIC-AC-05 (constraint).
+
+**Context is critically overdue for `/compact`** — repeatedly flagged to the PO this checkpoint (554k+ at last check, well past the 100–150k handover window) but not yet run. Everything material is persisted here; nothing is at risk, but continuing much further in this same window risks degraded quality. If this checkpoint is being read after a `/compact` or fresh session, that already happened — treat this note as historical.
+
+**Next steps:** R-AC-06 needs a real producer + schema decision (why were acknowledged/authorized/copied ever excluded from `recordCommandOutcome` — deliberate or an oversight? read the exclusion's own history before building). E-AC-08 needs a design decision on whether cross-state cursor-rollback detection is representable in the current outbox model at all. E-AC-19 needs new evidence-view-model fields (failure/quarantine counts, integrity gaps) threaded from the export/outbox layer. C-AC-13 needs a real doc-authorship dispatch (EL-16 territory, six commits' worth of undocumented behavior). None of these are quick — each deserves its own careful pass, not a rushed tonight fix. All future dispatches: no `model` override on the Goldfish/Critic system. All chat/AskUserQuestion text in German.
+
+---
+
 ## CHECKPOINT — 2026-08-17, continued again (17): EPIC-AC-04 Critic audit returned FAIL, 10 confirmed findings, 8 fixed same session (146/157 implemented); gates table rewritten with current facts (READ THIS FIRST)
 
 **The EPIC-AC-04 Critic audit workflow completed and found real defects.** 12 parallel group-auditors independently re-verified the CURRENT integrated state (not a diff) against every acceptance.md criterion; 15 disputed findings went through 3-way adversarial re-verification; 10 survived. Every one of the 10 was independently re-checked by the Elephant directly against source before any action was taken (never accepted on the workflow's word alone, same standing practice as every dispatch this campaign) — all 10 held up.
