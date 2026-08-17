@@ -3891,6 +3891,14 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
  * prevents — that safety property carries over unchanged; only the delivery
  * mechanism (ask, not warn) changed.
  *
+ * 2026-08-17 refinement (backlog: 2026-08-17-git-identity-must-be-set-
+ * immediately-before-first-commit-not-at-setup-time.md): a live Codex
+ * happy-path restart test showed the calling agent asking early as intended,
+ * then also running `git config` immediately, before onboarding readiness --
+ * the guidance below now explicitly defers the `git config` write until
+ * immediately before the repository's first commit; the ask itself is
+ * unchanged.
+ *
  * Non-fatal by construction: an unreadable Git, a host-managed mount this seed
  * does not own, or any probe failure resolves to "nothing missing" rather than
  * a false alarm.
@@ -3915,7 +3923,10 @@ const AUTHOR_IDENTITY_FIELD_MAX_BYTES = 320;
 
 // Same `collect-input` shape as `collectGoalAction()`, asking for both fields
 // at once: the PO's own wording asks once for both, never one at a time and
-// never a default for whichever key happens to already resolve.
+// never a default for whichever key happens to already resolve. The `git
+// config` write the guidance describes is deferred to immediately before the
+// repository's first commit, not the moment the values are collected -- see
+// the 2026-08-17 note on `unresolvedAuthorIdentityKeys()` above.
 function collectAuthorIdentityAction(missing) {
   return {
     kind: "collect-input",
@@ -3925,7 +3936,7 @@ function collectAuthorIdentityAction(missing) {
     ],
     mutation: false,
     requiresConfirmation: false,
-    guidance: `this repository cannot name a commit author (${missing.join(" and ")} unset); ask the PO once for the author name and email, then set both in THIS repository's local config only -- git config user.name "<name>" and git config user.email "<email>" -- never --global, and never a value the PO did not type`,
+    guidance: `this repository cannot name a commit author (${missing.join(" and ")} unset); ask the PO once now for the author name and email, then hold the answered values -- do not set them yet -- and apply them via git config user.name "<name>" and git config user.email "<email>" in THIS repository's local config only, immediately before authoring this repository's first commit, never sooner -- never --global, and never a value the PO did not type`,
     expected: { schema: PLAN_SCHEMA, statuses: ["applied"] },
   };
 }
