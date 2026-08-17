@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.plugin-package-should-vendor-canon-references-via-build-step
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
 due: 2026-08-24
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 3f3f88524e13bda316165d9fc8df479fded779bf
+closure_evidence: backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md
 source: "PO decision, 2026-08-10, on the plugin-packaging gap confirmed the same day (backlog item / commit tracking the quick copy-fix pending): 'jetzt a) und c) für später festhalten es sauber zu machen' — a direct copy now, this item tracks doing it properly afterward."
 ---
 
@@ -147,3 +151,26 @@ documented-instead-of-fixed exception.
   latitude needed for the classification scheme) now that capacity allows.
 - **Rationale:** PO, 2026-08-12: "empfehlung."
 - **Date:** 2026-08-12
+
+## Closure (2026-08-17)
+
+Verified against current source: `harness/scripts/generate-vendored-canon.mjs`
+(commit `3f3f88524e13bda316165d9fc8df479fded779bf`, "feat(harness): generate
+vendored canon copies from classified repo-root originals") implements
+exactly the described generated build step — its own header comment cites
+this backlog item by path and implements the classification scheme this item
+added as scope: an explicit allowlist of universal sources
+(`guardrails/*.md`, `roles/*.md`, `templates/prompts/*.md` auto-discovered by
+each directory's own dual-audience contract, plus `docs/push-release-flow.md`
+named individually), never a blanket directory copy. A companion
+`generate-vendored-canon.test.mjs` exists.
+
+One narrower gap remains, out of this item's core scope and already tracked
+elsewhere: `generate-vendored-canon.test.mjs` is not registered in
+`harness/scripts/verify.mjs` (confirmed — no reference in either
+`verify.mjs` or `docs/pending-verify-registrations.md`), so drift between
+source and vendored copy is not machine-enforced for every file the way F3
+originally asked. That is an instance of the systemic gap
+`2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md` already
+tracks, not a reason to keep this item open — closing here and leaving that
+cross-reference so it is not lost.

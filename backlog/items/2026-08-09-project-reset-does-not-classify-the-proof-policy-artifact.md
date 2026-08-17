@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.project-reset-does-not-classify-the-proof-policy-artifact
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 44b7252f081786fc0b8b9faa0e47d59ebfe085fe
+closure_evidence: backlog/items/2026-08-09-project-reset-does-not-classify-the-proof-policy-artifact.md
 source: "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff."
 ---
 
@@ -39,7 +43,12 @@ classified.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** close — resolved.
+- **Rationale:** verified against current source: `project-reset.mjs:371-382`
+  (commit `44b7252f081786fc0b8b9faa0e47d59ebfe085fe`, 2026-08-12) adds both
+  `CRITICAL_HUMAN_PROOF_POLICY_PATH` and `PUSH_THREAT_MODEL_PATH` to the
+  removal set under the existing `runtimeSeededFile` kind, exactly the
+  direction this item proposed, with a code comment directly citing this
+  item's own path.
+- **Assignment (if accepted):** none — already done.
+- **Date:** 2026-08-17
