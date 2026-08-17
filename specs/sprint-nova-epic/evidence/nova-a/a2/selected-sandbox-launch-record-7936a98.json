@@ -1,0 +1,86 @@
+{
+  "schema": "pipeline.selected-sandbox-launch-evidence.v1",
+  "generatedAtIso": "2026-08-17T23:31:33.116Z",
+  "outcome": "available-attested",
+  "log": [
+    {
+      "step": "created",
+      "state": "unprobed",
+      "dispositionId": "nva-a29-launch-8adea4b78f32"
+    },
+    {
+      "step": "probe-start",
+      "ok": true,
+      "code": null,
+      "launch": true
+    },
+    {
+      "step": "probe-success",
+      "ok": true,
+      "code": null,
+      "state": "available-attested"
+    }
+  ],
+  "disposition": {
+    "schema": "pipeline.selected-sandbox-disposition.v1",
+    "dispositionId": "nva-a29-launch-8adea4b78f32",
+    "duty": "selected-sandbox-launch",
+    "transport": "selected-network-open-read-only-v1",
+    "fingerprint": {
+      "runnerSha256": "bc17c508ffeed0ec622934f9b7fa72f8e78da65350e63c3eceb56fa688aa5e12",
+      "hostBootSha256": "4b1cc8f6838e2f1acfbf25e8751d7727445a9ef0b6204a2332eec8ed3c921a38",
+      "platformClass": "linux",
+      "architectureClass": "x64",
+      "sandboxSha256": "b68caacd476fd90c51bdaa339882274c0dd4644320b805f1b05a7e13ec4d9bfc",
+      "profileSha256": "62f8aa471bef1d2606a290cbc8c06c0488cc45ec8301a7c731c14489f9bcf57d",
+      "policySha256": "459c9ef9d59217d5d7a9385fafb7313d1708b695840f528a2ee6ca82bd0cab00",
+      "duty": "selected-sandbox-launch",
+      "contractVersion": "nova-a29-launch-v1"
+    },
+    "state": "available-attested",
+    "failure": null,
+    "attempt": {
+      "attemptId": "attempt-7b20c872fe816db0",
+      "index": 0,
+      "startedMonotonicMs": 147
+    },
+    "challenge": {
+      "nonceSha256": "1df9bf26bcc8baee52a9df3d2b62dd4d3fa351e77816b903b24ad4d679ccb0fb",
+      "bits": 256
+    },
+    "childReceipt": {
+      "childIdSha256": "5baee3c116cdaeca9826c7c03f141dfcd33a0bd7c1e2c0adbb5c1c4738202f8c",
+      "attemptId": "attempt-7b20c872fe816db0",
+      "nonceSha256": "1df9bf26bcc8baee52a9df3d2b62dd4d3fa351e77816b903b24ad4d679ccb0fb",
+      "duty": "selected-sandbox-launch",
+      "transport": "selected-network-open-read-only-v1",
+      "subjectSha256": "7fb3456fd3eb3910d7f5e320abdc39685228e244d0dcbc76d9e2a075567478c3",
+      "assurance": "sandbox-read-only-except-coordinator-scratch-network-open",
+      "resultSha256": "b793aab04395301554226e07cdfb503bdd48b4de908ea5361289ab52afb2618e",
+      "terminal": true
+    },
+    "expiry": {
+      "kind": "none",
+      "eligibleAfterMonotonicMs": null
+    },
+    "forceReprobe": null,
+    "assurance": {
+      "requested": "selected-sandbox",
+      "observed": "sandbox-read-only-except-coordinator-scratch-network-open",
+      "evidenceSha256": "b793aab04395301554226e07cdfb503bdd48b4de908ea5361289ab52afb2618e"
+    },
+    "previousSha256": "d5695bc5e84f240ed307d0092af84d29f25b917f1ab2a40d5f2e969a65b06e04",
+    "recordSha256": "c42d9dee5ceeb614d243b34c38ffec78ff37154536f38f3cbaebea2d3434eb2a"
+  },
+  "observation": {
+    "pid": 2815343,
+    "platform": "linux",
+    "arch": "x64",
+    "nowMs": 1787009493114,
+    "stdoutSha256": "1f92656890fef16eb17fde16588e336901486d6eb205503a365994281a73cbd4",
+    "stderr": "",
+    "status": 0,
+    "durationMs": 26
+  },
+  "failureObservation": null
+}
