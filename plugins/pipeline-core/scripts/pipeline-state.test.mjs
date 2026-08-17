@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
-import { run } from "./pipeline-state.mjs";
+import { externalPathIsOutsideRoot, run } from "./pipeline-state.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -323,6 +323,43 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   assert.equal(approval.result, 0, `a legacy two-field authority file must keep being accepted: ${approval.lines.join(" ")}`);
   const state = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
   assert.deepEqual(state.pushApproval.lastApproved.threatModel, expectedThreatModel);
+}
+
+// NVA-WINPATH-3 (backlog/items/2026-08-17-external-public-json-cross-drive-windows-paths-are-
+// not-recognized-as-outside-the-project-root.md): externalPublicJson()'s containment check
+// previously used the default (host-platform) relative(), whose win32 answer for two DIFFERENT
+// drive letters is the unchanged absolute target path, never a ".."-prefixed one -- so a
+// genuinely external cross-drive proof path was silently misclassified as "inside", and
+// approve-push refused a real, correctly PO-signed proof with CRITICAL-PROOF-EXTERNAL-PATH.
+// `externalPathIsOutsideRoot` is the extracted, platform-injectable containment check exercised
+// directly here -- pure string logic, no filesystem access, so the win32 answer is provable on
+// this (POSIX) CI host, exactly like the sibling fixes' own test seam (NVA-WINPATH-1/2 in
+// po-human-approval.test.mjs, `outside()`).
+{
+  // The repro: root and path on different Windows drive letters. Before the fix this resolved
+  // `false` (wrongly "inside"); the correct answer is `true` ("outside").
+  assert.equal(externalPathIsOutsideRoot("D:\\proj", "C:\\Users\\x\\key.json", "win32"), true,
+    "NVA-WINPATH-3: a cross-drive Windows path must be classified as outside the project root");
+
+  // Regression guard: an ordinary same-drive path INSIDE the root must still classify as
+  // inside, not outside -- the fix must not turn every path "outside" by accident.
+  assert.equal(externalPathIsOutsideRoot("D:\\proj", "D:\\proj\\sub\\file.json", "win32"), false,
+    "a same-drive path inside the root must still classify as inside");
+
+  // Regression guard for the sibling fix's own shape (NVA-WINPATH-1/2): a genuinely external,
+  // SAME-drive path must still classify as outside once win32's backslash-separated relative()
+  // output is normalized.
+  assert.equal(externalPathIsOutsideRoot("D:\\proj", "D:\\other\\key.json", "win32"), true,
+    "a same-drive path outside the root must still classify as outside (NVA-WINPATH-1/2 shape)");
+
+  // The root itself is never "outside" itself.
+  assert.equal(externalPathIsOutsideRoot("D:\\proj", "D:\\proj", "win32"), false,
+    "the root itself must never classify as outside itself");
+
+  // POSIX behaviour is unaffected by the platform-selection fix.
+  assert.equal(externalPathIsOutsideRoot("/repo", "/other/key.json", "linux"), true);
+  assert.equal(externalPathIsOutsideRoot("/repo", "/repo/sub/key.json", "linux"), false);
+  assert.equal(externalPathIsOutsideRoot("/repo", "/repo", "linux"), false);
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");

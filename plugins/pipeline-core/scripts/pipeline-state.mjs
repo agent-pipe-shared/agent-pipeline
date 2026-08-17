@@ -278,7 +278,7 @@ import {
   writeSync,
 } from "node:fs";
 import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, posix as posixPath, relative, resolve, sep, win32 as win32Path } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
@@ -2703,12 +2703,40 @@ function resolvePushThreatModelArtifact(dir) {
   return boundRepositoryArtifact(dir, PUSH_THREAT_MODEL_DEFAULT_PATH);
 }
 
+/**
+ * NVA-WINPATH-3 (backlog/items/2026-08-17-external-public-json-cross-drive-windows-paths-are-
+ * not-recognized-as-outside-the-project-root.md): platform-aware containment check for
+ * externalPublicJson()'s proof-path bound. `externalPublicJson()` itself resolves `root`/`path`
+ * through `realpathSync` first (real filesystem symlink resolution, security-relevant), then
+ * hands the two already-resolved absolute strings here for the platform-aware relative-path
+ * test -- mirroring the same win32Path/posixPath + isAbsolute-fallback pattern already fixed in
+ * po-human-approval.mjs's `outside()` (NVA-WINPATH-1/2) and guard-human-override.mjs's
+ * `externalJson()`. Node's default (host-platform) `relative()` used here previously returns,
+ * on win32, the unchanged absolute target path -- never a ".."-prefixed one -- when `root` and
+ * `path` sit on DIFFERENT drive letters, so a bare `relative(root, path).startsWith("..")` test
+ * silently misclassified a genuinely external cross-drive path as "inside". `platform` is
+ * injected (default `process.platform`) so the win32 answer is provable from either host, same
+ * seam as the two siblings above; the function is pure string logic with no filesystem access,
+ * so it is testable with fabricated win32 path strings on a POSIX CI host.
+ */
+export function externalPathIsOutsideRoot(rootPath, targetPath, platform = process.platform) {
+  const api = platform === "win32" ? win32Path : posixPath;
+  const root = api.resolve(rootPath);
+  const target = api.resolve(targetPath);
+  const raw = api.relative(root, target);
+  // Win32-only backslash normalization, exactly like the two sibling fixes: a backslash is an
+  // ORDINARY filename character on POSIX, never a path separator, so unconditional
+  // normalization would misclassify a legal POSIX name that merely CONTAINS a backslash.
+  const rel = platform === "win32" ? raw.split("\\").join("/") : raw;
+  return rel !== "" && (rel === ".." || rel.startsWith("../") || api.isAbsolute(rel));
+}
+
 function externalPublicJson(dir, value) {
   if (typeof value !== "string" || !isAbsolute(value)) return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-PATH" };
   const root = realpathSync(resolve(dir));
   let path;
   try { path = realpathSync(value); } catch { return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-PATH" }; }
-  if (path === root || !relative(root, path).startsWith("..")) return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-PATH" };
+  if (!externalPathIsOutsideRoot(root, path)) return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-PATH" };
   try {
     const stat = lstatSync(path);
     if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || stat.size > EXTERNAL_PUBLIC_ARTIFACT_MAX_BYTES) return { ok: false, code: "CRITICAL-PROOF-EXTERNAL-FILE" };
