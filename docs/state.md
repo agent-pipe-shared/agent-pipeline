@@ -7,7 +7,94 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again (4): 17/157 open, Class P down to 9, three signature ceremonies staged, H-AC-11 increment 2 approved (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (5): 15/157 open, Class B down to 6, P-AC-11's reconcile landed and a delta Critic review in flight (READ THIS FIRST)
+
+**Since the checkpoint below:** all three items staged there landed. H-AC-12's GMW/TP-5 window
+was consumed by `PHX-WP-HAC12` (commit `ae13b68b`, independently re-verified — see below);
+`PHX-WP-RAC08` landed (commit `b753c9fa`, independently re-verified, closed R-AC-08); the
+`feature-package-reconcile` ceremony for P-AC-11 was completed (after one candidate-drift redo —
+see below); and A-AC-09 closed via a fresh Elephant-context investigation. Open count: **15 of
+157** (was 17). Class B: **6** (was 8).
+
+- **R-AC-08 CLOSED** (`implemented`, commit `07b33ee6`). Independently re-verified via a fresh
+  fork: `recordCommandRecoveryOccurrence` builds real `rollback-performed`/`cleanup-performed`
+  occurred events, distinct from the pre-existing prospective-only `recoverability` shape,
+  discharge-checked, append-once. 46/46 + 51/51 tests pass, both re-run independently. No
+  discrepancy between the commit's own claims and independent findings.
+- **H-AC-12 advanced, stays `partial`** (commit `ae13b68b` + evidence-map commit `e98c5298`).
+  `guard-push.mjs` and `pipeline-state.mjs`'s `approve-push`/`approve-deploy` now dual-evaluate an
+  optional `decisionReference`, fail-closed, `MIGRATION_COMPAT`-tracked — independently
+  re-verified (6/6 + 11/11 new tests, gated `pipeline-state.test.mjs` 504/506 with the two reds
+  confirmed pre-existing/unrelated live-repo-state assertions). **Real caveat, not just a
+  disclosed footnote:** these two readers validate the decision reference's *structural
+  self-consistency* only (shape/candidate/tree/fingerprint), never `decisionId`/`decisionDigest`/
+  `eventDigest` against an actual ledger — unlike Git-guard override consumption's
+  `governance-authority.mjs` wrapper, which IS the real canonical-ledger mechanism. Currently
+  inert (nothing writes a `decisionReference` for push/deploy yet). Git-guard override
+  consumption itself remains fully untouched — that's the one reader where the real mechanism is
+  already available and the gap actually matters.
+- **P-AC-11's `feature-package-reconcile` ceremony: DONE** (applied at candidate `e98c5298`,
+  manifest fix committed as `a62f95c4`). Had to be redone from scratch once: the first ceremony
+  (bound to `572ea19f`) was invalidated by candidate drift when R-AC-08 landed in between building
+  the request and consuming the proof. Recomputed the plan digest fresh
+  (`planSha256 62973385ac2800865951554dfb97c093d63e3362b8b172659625a69`), rebuilt the request, got
+  a fresh PO signature, `cp`'d to `~/agent-pipeline-po-nova/`, ran the reconcile — `status:
+  "applied"`, single digest-only change (`acceptance.md`). **Lesson recorded:** before starting a
+  signed-ceremony request, message any other live session working in the same repo/branch first
+  (`SendMessage` to check — did this via the "Nova" peer session this round, got a clean "no
+  collision" answer) and avoid landing any other commit between building the request and consuming
+  the proof.
+  - Re-ran the full `harness/scripts/verify.mjs` gate at the reconciled candidate: **5 suites
+    non-green, all independently confirmed pre-existing/tracked, none new:**
+    `guard-testpath-override-tests` (OT09, TP-7-gated, long-tracked real regression needing
+    author repair), `doc-contract-tests`/`doc-contract-check` (pre-existing, tracked since
+    2026-08-12), `backlog-state-check` (pre-existing field-defect backlog items, tracked), and
+    `verify-suite-registration-check` (baseline unregistered-suite set + H-AC-12's 2 new sibling
+    test files, disclosed and expected — registering them needs the same TP-3 window as
+    everything else touching `verify.mjs`). QG-01's block on P-AC-11's Critic re-review is
+    cleared.
+  - **Delta Critic re-review dispatched for the fix range (289287e7, c7eb2297, e3e59153) —
+    verdict pending, check on resume.** Self-caught and corrected a real scoping error: a first
+    dispatch attempt enumerated only 2 of the 3 fix commits (missed `e3e59153`, the F5 doc-only
+    close, which sits chronologically between `c7eb2297` and the P-AC-11 arc's own record
+    commits) — did NOT accept that dispatch's result, redispatched with the corrected 3-commit
+    scope before reading its output. The first (incomplete-scope) dispatch may still return a
+    notification; disregard it, only the second (corrected) one's verdict counts.
+- **A-AC-09 CLOSED** (`implemented`, commit `61a8a969`, Elephant-context investigation, no
+  dispatch). The prior "nothing computes routine/low-impact" framing was the wrong bar: the
+  criterion's THEN-clause ("avoid producing exhaustive reasoning or token-level telemetry") is a
+  negative content requirement, satisfied unconditionally. Every field across
+  `agent-decision-journal.mjs`'s three closed event shapes (agent-decision, command-offer,
+  legacy-import-observation) is a bounded enum, a short ID/CODE-pattern identifier, a SHA-256
+  digest, a bounded integer, or a bounded path pattern — never free text, per the module's own
+  explicit source comment (`agent-decision-journal.mjs:60-61`). No acceptance.md amendment
+  needed — same class of correction as R-AC-09's measurement fix, not a PO decision.
+- **EPIC-AC-02 investigated further, NOT dispatched this round.** `checkUnpublishedSiblingSprintConsumption`
+  (`plugins/pipeline-core/lib/parallel-sprint-integration.mjs:592`) is a pure decision function —
+  "it never invokes Git: the caller supplies the observations." Wiring a REAL check into
+  `verify.mjs` needs a new caller that actually observes the sibling Sprint Epics' (Nova, Cyborg,
+  Nightwing — parallel sibling branches/checkouts of this SAME repo, not the three external
+  <PROJECT_A/B/C> repos the Sprint-0 read-only rule restricts) real git ancestry/publication
+  state against real `specs/*/lifecycle.json` manifests, then registers a new suite entry in
+  `harness/scripts/verify.mjs` (TP-3-protected). This is real design+implementation work (what
+  counts as a sibling's "published tip" operationally still needs pinning down), not a
+  registration-line mechanical addition — scoped as the next Class-B candidate, needs its own
+  TP-3 GMW window + dispatch, NOT started this round.
+- Remaining Class B (6): A-AC-01, A-AC-03, A-AC-05 (all three: same deferred continuity
+  course-decision architecture question, PO already deferred, not independently dispatchable),
+  EPIC-AC-02 (scoped above, needs a TP-3 window + dispatch), L-AC-01 (stays a PO/architecture
+  question), V-AC-02 (the `estimate` half stays unsatisfied-by-absence — no real carrier for a
+  gate-estimate ETA exists in the Evidence Viewer today; an Elephant scope call, not urgent).
+
+**Next steps, in order:** (1) check on the corrected P-AC-11 delta Critic dispatch, apply its
+verdict (PASS closes nothing new by itself — the underlying dimension gap stays partial
+regardless — but a FAIL would need a fix-and-rework cycle); (2) H-AC-11's code half (increment 1 +
+increment 2's schema, scoped to `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §5.4/§7,
+NOT §9's full bundle) — still not dispatched, still the top Class-P-adjacent priority; (3)
+EPIC-AC-02's TP-3 window + dispatch if capacity allows; (4) EPIC-AC-03's ceremony and the H-AC-11
+spec.md §6.1 amendment, bundled, at epic close, per the PO's own decision to defer.
+
+## CHECKPOINT — 2026-08-17, continued again (4): 17/157 open, Class P down to 9, three signature ceremonies staged, H-AC-11 increment 2 approved
 
 **Since the checkpoint below:** H-AC-08/H-AC-09 closed via PO amendment; three more Class-B
 dispatches (V-AC-02, EPIC-AC-02, R-AC-09) landed and were independently re-verified; GMW-ANCHORS-INVALID
