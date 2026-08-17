@@ -53,11 +53,12 @@ import { createHash } from "node:crypto";
 import { lstatSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import { canonicalJson, createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
+import { createReleasePreflight, validateReleasePreflight } from "./release-preflight.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { criticalActionSubjectSha256, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { criticalProofWaiverFor, isWellFormedEd25519PublicKey, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
 
 const DOCUMENTS = Object.freeze(["prd", "spec", "acceptance", "result"]);
 const FINAL_GATES = Object.freeze(["verify", "security", "critic", "remote", "human"]);
@@ -247,10 +248,14 @@ function verifyReleasePreflightProof({ root, request, proof, expectedCandidate, 
  * the five-field consent object per the ADR's field-mapping table. On
  * `CRITICAL-ACTION-PROOF-EXPIRED`, status is `"expired"` and `authoritySha256` is the
  * digest of the exact proof artifact -- the same value verification would have
- * produced as `proofSha256` had the expiry check not short-circuited first,
- * computed the same way (`sha256(canonicalJson(proof))`,
- * `po-approval-proof.mjs`'s own formula). Any other code exits by throwing: this
- * function never writes a consent object for a proof it could not verify.
+ * produced as `proofSha256` had the expiry check not short-circuited first, computed
+ * with `po-approval-proof.mjs`'s own exported `canonical` (`sha256(canonical(proof))`),
+ * the identical function `verifyPoApprovalProof` itself calls internally to produce
+ * `proofSha256` -- ONE formula, imported and reused, not a second definition that
+ * merely happens to agree for today's all-string proof field set (`canonicalJson`,
+ * `release-preflight.mjs`'s own formula, additionally special-cases numbers and would
+ * diverge for a non-string field). Any other code exits by throwing: this function
+ * never writes a consent object for a proof it could not verify.
  */
 function resolveConsentFromVerifiedProof({ root, candidate, proofRequestPath, proofPath, subject, now }) {
   const request = readExternalJson(root, proofRequestPath, "--proof-request");
@@ -271,7 +276,7 @@ function resolveConsentFromVerifiedProof({ root, candidate, proofRequestPath, pr
   }
   if (verified.code === "CRITICAL-ACTION-PROOF-EXPIRED") {
     return {
-      authoritySha256: sha256(canonicalJson(proof)),
+      authoritySha256: sha256(canonicalPoApprovalProof(proof)),
       decisionId: request.approvalIntent.sha256,
       // NOT `now`: this branch is only reached when `expiresAt < now` (the check
       // inside `verifyCriticalActionApprovalRequest`), so `evaluatedAt: now` would

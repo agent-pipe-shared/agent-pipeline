@@ -8,7 +8,11 @@ const ID = /^[a-z][a-z0-9-]{0,63}$/u;
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const text = (value) => typeof value === "string" && value.trim() !== "";
 const candidate = (value) => own(value, ["commit", "tree"]) && OID.test(value.commit) && OID.test(value.tree) && value.commit !== value.tree;
-const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : value !== null && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}` : JSON.stringify(value);
+/** Exported so a caller that must compute a proof's digest before verification can
+ * even run (e.g. an already-expired proof, `release-preflight-cli.mjs`'s
+ * `CRITICAL-ACTION-PROOF-EXPIRED` branch) reuses this exact formula instead of
+ * maintaining a second, only-coincidentally-matching one. */
+export const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : value !== null && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}` : JSON.stringify(value);
 
 export const PO_APPROVAL_INTENT_SCHEMA = "pipeline.po-approval-intent.v1";
 export const PO_APPROVAL_PROOF_SCHEMA = "pipeline.po-approval-proof.v1";
