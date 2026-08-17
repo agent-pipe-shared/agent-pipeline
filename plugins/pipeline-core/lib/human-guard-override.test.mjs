@@ -26,6 +26,7 @@ import test from "node:test";
 import {
   authorizeHumanGuardOverride,
   authorizeHumanGuardOverrideBySignature,
+  buildHumanGuardOverrideSignatureIntent,
   consumeHumanGuardOverride,
   HGO_SIGNATURE_REASON,
   HumanGuardOverrideError,
@@ -201,6 +202,43 @@ test("ADR-0059 Decision 1: a valid, correctly-bound signed proof arms the identi
     const audit = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
     const auditEvents = readFileSync(audit, "utf8").trim().split("\n").map((line) => JSON.parse(line).event);
     assert.deepEqual(auditEvents.map(({ type }) => type), ["denied", "authorized", "consumed"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// NVA-SIGENTRY-1 DoD check 1: the extracted buildHumanGuardOverrideSignatureIntent()
+// helper must produce the IDENTICAL digest this already-passing test's own,
+// independently-reconstructed intent (prepareSignedArming() above builds it without
+// calling into any exported library helper, exactly as an external signer would) --
+// proving the authorizeHumanGuardOverrideBySignature() refactor changed nothing
+// observable about what gets signed.
+test("NVA-SIGENTRY-1: buildHumanGuardOverrideSignatureIntent() produces the same digest an existing signed-authorization test already expects", () => {
+  const root = fixtureSignature();
+  try {
+    const toolInput = { file_path: "notes.md", content: "signed regression\n" };
+    const { scriptPath, recorded, plan, prepared, intent } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    const rebuilt = buildHumanGuardOverrideSignatureIntent({ prepared, planned: plan });
+    assert.equal(rebuilt.sha256, intent.sha256);
+    assert.deepEqual(rebuilt.value, intent.value);
+    // And the value the verifier itself gates on, for the same inputs, arms successfully --
+    // the extracted helper's output is not merely equal, it is the same value in use.
+    const armed = authorizeHumanGuardOverrideBySignature({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: recorded.requestSha256,
+      planSha256: plan.planSha256,
+      proof: {
+        schema: PO_APPROVAL_PROOF_SCHEMA,
+        intentSha256: rebuilt.sha256,
+        keyReference: SIG_KEY_REFERENCE,
+        publicKey: sigPublicKey,
+        signatureBase64: sign(null, Buffer.from(rebuilt.sha256, "utf8"), sigPair.privateKey).toString("base64"),
+      },
+      nowMs: 3000,
+      scriptPath,
+    });
+    assert.equal(armed.status, "armed");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

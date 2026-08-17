@@ -2293,6 +2293,43 @@ export function authorizeHumanGuardOverride({
 }
 
 /**
+ * NVA-SIGENTRY-1: the exact intent-building recipe `authorizeHumanGuardOverrideBySignature()`
+ * gates arming on, extracted so any other caller that needs the SAME signable digest --
+ * the `emit-signature-digest` CLI command, and this module's own
+ * `describeHumanGuardOverrideSelection()` -- computes it through this one function
+ * rather than a second hand-copy. `prepared`/`planned` are exactly the return values of
+ * `prepareHumanGuardOverrideAuthorization()`/`planHumanGuardOverride()` for the same
+ * `(requestSha256, planSha256)` pair; this function performs no I/O of its own and calls
+ * neither, so a caller that reuses this correctly cannot observe a different digest than
+ * the verifier gates on -- there is only the one recipe, never two to drift apart.
+ *
+ * The `global-plugin-install` exclusion lives HERE, not only in the caller below: that
+ * mode's repository observation carries no commit/tree to bind a candidate to (see
+ * `localPluginInstallSourceObservation`), so a digest-emission caller that reaches this
+ * far without separately checking `planned.mode` still gets the same
+ * `HGO-SIGNATURE-UNSUPPORTED-MODE` refusal `authorizeHumanGuardOverrideBySignature()`
+ * gives, rather than a confusing `HGO-SIGNATURE-INTENT-INVALID` from a missing candidate
+ * field.
+ */
+export function buildHumanGuardOverrideSignatureIntent({ prepared, planned }) {
+  if (planned.mode === "global-plugin-install") {
+    fail("HGO-SIGNATURE-UNSUPPORTED-MODE", "signed authorization does not cover the local-plugin-install class; use the chat-mode path");
+  }
+  try {
+    return createPoApprovalIntent({
+      kind: HGO_SIGNATURE_INTENT_KIND,
+      featureId: HGO_SIGNATURE_INTENT_FEATURE_ID,
+      planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
+      specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+      candidate: { commit: planned.repository.head, tree: planned.repository.tree },
+      policyRevision: HGO_SIGNATURE_INTENT_POLICY_REVISION,
+      subjectSha256: prepared.selectionSha256,
+      decision: HGO_SIGNATURE_INTENT_DECISION,
+    });
+  } catch { fail("HGO-SIGNATURE-INTENT-INVALID", "signed authorization intent could not be built from the current repository observation"); }
+}
+
+/**
  * ADR-0059 Decision 1: the signed admission path, alongside the existing chat-mode
  * one. Mirrors `authorizeHumanGuardOverride()`'s exact capability-building/audit/
  * persistence shape (prepare -> plan -> build capabilityCore -> mac -> persist), but
@@ -2315,7 +2352,9 @@ export function authorizeHumanGuardOverride({
  * planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256, specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
  * candidate: { commit: repository.head, tree: repository.tree }, policyRevision:
  * "human-guard-override-signature-v1", subjectSha256: selectionSha256, decision:
- * "authorize" }).sha256` with the PO's own Ed25519 key.
+ * "authorize" }).sha256` with the PO's own Ed25519 key -- or, more directly, run the
+ * `emit-signature-digest` CLI command, which computes the identical value through
+ * `buildHumanGuardOverrideSignatureIntent()` above.
  *
  * Deliberate scope narrowing (reported deviation, not required by ADR-0059's own
  * scope): the `global-plugin-install` denial class carries no commit/tree in its
@@ -2356,22 +2395,7 @@ export function authorizeHumanGuardOverrideBySignature({
     scriptPath,
     authorSourceRoot,
   });
-  if (planned.mode === "global-plugin-install") {
-    fail("HGO-SIGNATURE-UNSUPPORTED-MODE", "signed authorization does not cover the local-plugin-install class; use the chat-mode path");
-  }
-  let intent;
-  try {
-    intent = createPoApprovalIntent({
-      kind: HGO_SIGNATURE_INTENT_KIND,
-      featureId: HGO_SIGNATURE_INTENT_FEATURE_ID,
-      planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
-      specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
-      candidate: { commit: planned.repository.head, tree: planned.repository.tree },
-      policyRevision: HGO_SIGNATURE_INTENT_POLICY_REVISION,
-      subjectSha256: prepared.selectionSha256,
-      decision: HGO_SIGNATURE_INTENT_DECISION,
-    });
-  } catch { fail("HGO-SIGNATURE-INTENT-INVALID", "signed authorization intent could not be built from the current repository observation"); }
+  const intent = buildHumanGuardOverrideSignatureIntent({ prepared, planned });
   // NVA-HGOFIX-1: this used to read the legacy SINGULAR `policy.trustAnchor` field only,
   // which is permanently `null` once `critical-human-proof.json` carries the v3
   // `trustAnchors` SET -- every signed admission failed with HGO-TRUST-ANCHOR-MISSING,
