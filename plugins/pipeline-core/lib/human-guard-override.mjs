@@ -794,13 +794,39 @@ function stateObservation(root) {
   return { status: "present", path: stateRelPath, sha256: sha(bytes), continuityRevision: revision };
 }
 
+// NVA-HGOHEAD-1: git's own well-known empty-tree object id. A freshly `git init`-ed
+// repository with zero commits ("unborn HEAD") is a normal, expected git state, not
+// a broken adapter -- but `git rev-parse HEAD` fails on it (exit 128) the exact same
+// generic way it fails on a genuinely broken repository, so git()'s uniform HGO-GIT
+// handling cannot tell the two apart by itself. This constant, together with a
+// defined `head: null` sentinel below, gives the unborn state a fixed, reproducible
+// observation instead of an uncaught crash.
+const UNBORN_TREE_OID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+// `git symbolic-ref -q HEAD` succeeding (HEAD is attached to a branch ref) together
+// with `git rev-parse --verify -q HEAD` failing (that branch resolves to no object
+// yet) is git's own, locale-independent, exit-code-only signal for "unborn branch" --
+// deliberately not a match against `git rev-parse HEAD`'s human-readable stderr text,
+// which is fragile across git versions/locales and has no precedent anywhere else in
+// this file (every other branch here reads `result.status`/`result.error`, never
+// stderr content). A detached HEAD, or a genuinely missing/corrupt HEAD, both fail
+// `symbolic-ref -q HEAD` too and so still fall through to the original crash path
+// below, unchanged.
+function isUnbornBranch(root, spawn) {
+  const symbolic = spawn("git", ["symbolic-ref", "-q", "HEAD"], { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
+  if (symbolic?.status !== 0 || symbolic?.error) return false;
+  const verify = spawn("git", ["rev-parse", "--verify", "-q", "HEAD"], { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
+  return verify?.status !== 0 || Boolean(verify?.error);
+}
+
 function repositoryObservation(root, spawn = spawnSync) {
   const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], spawn);
   const physicalCommon = realpathSync(isAbsolute(common) ? common : resolve(root, common));
+  const unborn = isUnbornBranch(root, spawn);
   return {
     fingerprintSha256: sha({ physicalRoot: realpathSync(root), physicalCommon }),
-    head: git(root, ["rev-parse", "HEAD"], spawn),
-    tree: git(root, ["rev-parse", "HEAD^{tree}"], spawn),
+    head: unborn ? null : git(root, ["rev-parse", "HEAD"], spawn),
+    tree: unborn ? UNBORN_TREE_OID : git(root, ["rev-parse", "HEAD^{tree}"], spawn),
     statusSha256: sha(git(root, ["status", "--porcelain=v1", "--untracked-files=all"], spawn)),
     state: stateObservation(root),
   };

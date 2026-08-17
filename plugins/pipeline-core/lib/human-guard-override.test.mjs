@@ -2433,3 +2433,130 @@ test("repository identity failures name the sanitized Git operation", () => {
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------
+// NVA-HGOHEAD-1: an unborn HEAD (a freshly `git init`-ed repository with zero commits)
+// is a completely normal, expected git state -- confirmed live: before this fix,
+// `git rev-parse HEAD` failing on it (real shape observed: exit 128, stderr "fatal:
+// ambiguous argument 'HEAD': unknown revision or path not in the working tree.") was
+// indistinguishable, inside git()'s generic handling, from a genuinely broken
+// repository, and repositoryObservation() propagated it as an uncaught
+// HumanGuardOverrideError (code: "HGO-GIT") instead of handling the case at all.
+// ---------------------------------------------------------------------------------
+
+function fixtureUnborn() {
+  const root = mkdtempSync(join(tmpdir(), "human-guard-override-unborn-"));
+  git(root, "init", "-q", "-b", "main");
+  return root;
+}
+
+// git's own well-known empty-tree object id -- reproduced independently here (never
+// imported), matching the module's own UNBORN_TREE_OID.
+const UNBORN_TREE_OID = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
+test("NVA-HGOHEAD-1: a fresh repository with no commits (unborn HEAD) does not crash recordHumanGuardDenial()/planHumanGuardOverride()", () => {
+  const root = fixtureUnborn();
+  try {
+    const toolInput = { file_path: "notes.md", content: "unborn\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.equal(request.status, "planned");
+    const plan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      nowMs: 2000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(plan.status, "planned");
+    assert.equal(plan.repository.head, null, "unborn HEAD must be a defined sentinel, never a crash");
+    assert.equal(plan.repository.tree, UNBORN_TREE_OID, "unborn HEAD's tree must be git's well-known empty-tree object id");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-HGOHEAD-1: two unborn-HEAD observations of the same otherwise-unchanged repository compare equal (no spurious HGO-DRIFT)", () => {
+  const root = fixtureUnborn();
+  try {
+    const toolInput = { file_path: "notes.md", content: "unborn\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    // planHumanGuardOverride() independently re-derives repositoryObservation() and compares
+    // it, via canonical(), against the one recordHumanGuardDenial() already persisted. If the
+    // unborn observation were not deterministic this would throw HGO-DRIFT even though
+    // nothing about the repository actually changed between the two calls.
+    const plan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      nowMs: 2000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(plan.status, "planned");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-HGOHEAD-1: a repository that gains its first commit between record and plan is reported as drift, never as a silent match against the unborn observation", () => {
+  const root = fixtureUnborn();
+  try {
+    const toolInput = { file_path: "notes.md", content: "unborn\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    git(root, "config", "user.name", "Fixture");
+    git(root, "config", "user.email", "fixture@example.invalid");
+    git(root, "commit", "--allow-empty", "-q", "-m", "first commit");
+    assert.throws(
+      () => planHumanGuardOverride({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: request.requestSha256,
+        nowMs: 2000,
+        scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DRIFT",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-HGOHEAD-1: a rev-parse HEAD failure that is NOT the unborn-branch shape still throws HGO-GIT unchanged (the special case stays narrowly scoped)", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "committed\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.throws(
+      () => planHumanGuardOverride({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: request.requestSha256,
+        nowMs: 2000,
+        // Only the exact `rev-parse HEAD` call fails; `symbolic-ref -q HEAD` and
+        // `rev-parse --verify -q HEAD` both still run for real against a repository that
+        // DOES have a commit, so isUnbornBranch() correctly answers false and this reaches
+        // the original, unweakened generic failure path.
+        spawn(command, args, options) {
+          if (args[0] === "rev-parse" && args[1] === "HEAD" && args.length === 2) {
+            return { status: null, error: Object.assign(new Error("blocked"), { code: "EPERM" }) };
+          }
+          return spawnSync(command, args, options);
+        },
+        scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+      }),
+      (error) => error instanceof HumanGuardOverrideError
+        && error.code === "HGO-GIT"
+        && error.message.includes("operation=rev-parse-HEAD")
+        && error.message.includes("outcome=EPERM"),
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
