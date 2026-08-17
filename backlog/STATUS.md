@@ -77,6 +77,7 @@
 | pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | open | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | open | requirement | pipeline | 2026-08-17 | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | 2026-08-06 | — |
@@ -157,6 +158,6 @@
 
 ## Counts
 
-- open: 95
+- open: 96
 - in_progress: 26
 - closed: 28

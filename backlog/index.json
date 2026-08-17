@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "32f207d170f21ac51c25578217cd6995d9736d5a2fbd8fc562236428b048c032"
+    "transitionHead": "adfe9cb1c984ed01ebd2547b47abab86fc3081400cb443523ff59c463bf46ce1"
   },
   "counts": {
-    "open": 95,
+    "open": 96,
     "in_progress": 26,
     "closed": 28
   },
@@ -618,6 +618,13 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "merge report section 4 findings 1/2/4/5/6/11 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+    },
+    {
+      "id": "pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-17"
     },
     {
       "id": "pipeline.live-plugin-root-undefended-in-the-shell-lane",
