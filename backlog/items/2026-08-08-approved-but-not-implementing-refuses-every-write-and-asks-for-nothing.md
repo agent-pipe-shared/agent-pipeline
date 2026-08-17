@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.approved-not-implementing-is-a-silent-trap
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: c01dbf76199e249e2a7873b3558ff58ff2c76653
+closure_evidence: backlog/items/2026-08-08-approved-but-not-implementing-refuses-every-write-and-asks-for-nothing.md
 source: "Reported by the Phoenix session of 2026-08-08, which lost a dispatch round to it and diagnosed it correctly."
 ---
 
@@ -85,3 +89,13 @@ implementation`. Runner- and platform-independent.
 - **Rationale:** PO, 2026-08-12: "option 2."
 - **Assignment (if accepted):** queued for implementation this session.
 - **Date:** 2026-08-12
+
+## Closure (2026-08-17)
+
+Verified against current source: `pipeline-state.mjs`'s `approve-plan` case
+now prints, immediately after recording approval —
+`plugins/pipeline-core/scripts/pipeline-state.mjs:5126`: `'Next: implementation
+writes remain refused until you run \`set-phase --phase implementation\` --
+approval and implementation-start are separate deliberate acts.'` — exactly
+Option 2 as decided. Landed commit `c01dbf76199e249e2a7873b3558ff58ff2c76653`
+(2026-08-12), independent of this triage pass. Closing.
