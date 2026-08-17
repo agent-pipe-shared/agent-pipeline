@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, acknowledgeOfferUnderJournalingGap, recordCommandRecoveryDisposition, recordPrivateHandoffCommitment } from "./external-command-offer.mjs";
+import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, acknowledgeOfferUnderJournalingGap, recordCommandRecoveryDisposition, recordPrivateHandoffCommitment, projectCommandOfferReplay } from "./external-command-offer.mjs";
 
 const SHA = (character) => character.repeat(64);
 function event(overrides = {}) { return { eventId: "offer-1", kind: "command-offer", state: "offered", reasonCode: "EXTERNAL_OPERATION_OFFERED", candidateDigest: SHA("a"), relatedHumanDecisionId: null, supersedesEventId: null, offerOrigin: "pipeline-initiated", operation: { operationClass: "governed-repair", version: "v1", governedArtifactSha256: SHA("b") }, target: { repositoryFingerprint: SHA("c"), scopeDigest: SHA("d") }, sideEffectClass: "non-authoritative", authorityRequirement: "not-required", policyDigest: SHA("e"), redactionPolicyDigest: SHA("f"), executionAssurance: "not-applicable", omissions: ["raw-command", "arguments", "private-coordinates", "unrestricted-output"], offerEventId: null, preEvidenceDigest: null, postEvidenceDigest: null, recoverability: "not-applicable", ...overrides }; }
@@ -179,6 +179,31 @@ test("R-AC-13: duplicate/retry — recording the same outcome eventId twice is n
   assert.equal(first.eventId, second.eventId);
   assert.equal(first.status, "failed");
   assert.equal(second.status, "failed");
+});
+
+test("R-AC-09: a duplicated lifecycle record is rendered invalid on replay, never successful, and is refused before append once the journal is supplied", async () => {
+  const outcome = follow("failed");
+  const journaled = [event(), outcome];
+  const duplicated = projectCommandOfferReplay({ journaled: [...journaled, outcome] });
+  assert.equal(duplicated.integrity, "invalid");
+  assert.equal(duplicated.status, "duplicated");
+  assert.equal(duplicated.reasonCode, "DUPLICATE_LIFECYCLE_EVENT_ID");
+  assert.equal(projectCommandOfferReplay({ journaled }).integrity, "valid");
+  let appended = 0;
+  await assert.rejects(recordCommandOutcome({ offer: event(), outcome, journaled, append: async (value) => { appended += 1; return append(value); } }), (error) => error.code === "ECO-DUPLICATE" && error.replay.integrity === "invalid");
+  assert.equal(appended, 0);
+});
+
+test("R-AC-09: two unlinked evidences for one offer are duplicated; an explicitly superseding re-record and a distinct later state are not", async () => {
+  const offered = event();
+  const first = follow("failed", { eventId: "failed-1" });
+  const second = follow("failed", { eventId: "failed-3" });
+  assert.equal(projectCommandOfferReplay({ journaled: [offered, first, second] }).reasonCode, "DUPLICATE_OFFER_EVIDENCE");
+  const superseding = follow("failed", { eventId: "failed-3", supersedesEventId: "failed-1" });
+  assert.equal(projectCommandOfferReplay({ journaled: [offered, first, superseding] }).integrity, "valid");
+  const laterState = follow("readback-verified", { eventId: "readback-1", postEvidenceDigest: SHA("9") });
+  assert.equal(projectCommandOfferReplay({ journaled: [offered, follow("execution-unobserved"), laterState] }).integrity, "valid");
+  await assert.rejects(recordCommandOutcome({ offer: offered, outcome: second, append, journaled: [offered, first] }), (error) => error.code === "ECO-DUPLICATE" && error.replay.reasonCode === "DUPLICATE_OFFER_EVIDENCE");
 });
 
 test("R-AC-12: the motivating Phoenix bootstrap trajectory fixture — rejected guard path, attended local repair, unchanged public-privacy boundary, successful readback, no remote write and no machine-specific value", async () => {
