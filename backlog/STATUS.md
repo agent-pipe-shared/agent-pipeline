@@ -132,6 +132,7 @@
 | pipeline.maintenance-window-signature-voided-by-unrelated-write | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | 2026-08-17 | — |
+| pipeline.merged-into-frontmatter-key-documented-but-unsupported | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.mp22-orchestrator-self-implementation-has-no-enforcement | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -244,6 +245,6 @@
 
 ## Counts
 
-- open: 109
+- open: 110
 - in_progress: 22
 - closed: 105

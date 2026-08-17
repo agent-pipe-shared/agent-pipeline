@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ba90a762f1b50b981c54117fe11645e85a184c0c334843e024e1b728bfcb6efa"
+    "transitionHead": "a94afc3b7822d9411a28803d725b84e3c464659a5ecb05dafd5ab34459575131"
   },
   "counts": {
-    "open": 109,
+    "open": 110,
     "in_progress": 22,
     "closed": 105
   },
@@ -1218,6 +1218,14 @@
       "closureRepository": "self",
       "closureCommit": "4af6bb0b289f6afc3ab95c560e3cd142d795bddc",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-manifest-repair-runner-gate-closure.md"
+    },
+    {
+      "id": "pipeline.merged-into-frontmatter-key-documented-but-unsupported",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Elephant self-caught, 2026-08-17: followed backlog/README.md's own documented duplicate-merge convention verbatim and it broke check-backlog-state.mjs."
     },
     {
       "id": "pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have",
