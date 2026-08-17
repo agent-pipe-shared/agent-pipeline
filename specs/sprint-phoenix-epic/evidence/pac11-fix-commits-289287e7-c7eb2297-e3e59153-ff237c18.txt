@@ -1,0 +1,819 @@
+commit 289287e7a03e10ff031554fd2ee3762c30c213cc
+Author: agent-pipe-shared <301875187+agent-pipe-shared@users.noreply.github.com>
+Date:   Sun Aug 16 20:22:05 2026 +0200
+
+    docs(backlog): file the P-AC-11 inert-dimensions blocker and the evidence ignore defect
+    
+    Closes the record half of Critic finding F3, which was blocking precisely because
+    four deliberately deferred P-AC-11 dimensions carried no owner and no expiry
+    anywhere in the repository. Filing the item is what supplies both. It also records
+    what independent review confirmed and refuted about them: previewRequired,
+    conflictPolicy and retention are genuinely blocked on something that does not
+    exist yet, while the lifecycleEvents deferral rested on a premise the Critic
+    falsified, so that one is tracked as F2 rather than here. Each of the three needs
+    a build-it, satisfied-by-construction, or drop-the-dimension disposition -- the
+    same three-way shape H-AC-11 and PX0-AC-13 already used.
+    
+    The second item records why two dispatches this session could not commit their
+    dispatch records: .gitignore's evidence/ rule has no leading slash, so it matches
+    every directory of that name at any depth, including the Spec packages' durable
+    per-package audit artifacts that ADR-0045's topology expects tracked. The files of
+    that kind already in history were force-added past it one at a time. The fix is to
+    anchor the pattern, which is what its own comment already claims it means, but
+    measured before filing: anchoring surfaces ~75 untracked files at once, which
+    leaves the tree dirty and makes the verify candidate preflight and security-scan
+    refuse -- so it needs a curation pass, including an absolute-path check on every
+    file before any of them enters history, rather than a one-line edit.
+    
+    Ledger entries written by reconcile-backlog-ledger.mjs --activate.
+    
+    AI-Assisted: true
+
+diff --git a/backlog/STATUS.md b/backlog/STATUS.md
+index d3258300..88cc5a9d 100644
+--- a/backlog/STATUS.md
++++ b/backlog/STATUS.md
+@@ -59,6 +59,7 @@
+ | pipeline.first-verify-run-is-red-with-four-failures | open | defect | pipeline | 2026-08-08 | — |
+ | pipeline.gate-strength-override-route-advertised-not-offered | open | defect | pipeline | 2026-08-08 | — |
+ | pipeline.gate-strength-shell-comment-understates-its-own-scope | open | defect | pipeline | 2026-08-07 | — |
++| pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | open | defect | pipeline | 2026-08-16 | — |
+ | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | open | requirement | pipeline | 2026-08-07 | — |
+ | pipeline.governance-product-verify-suites-deregistered | open | defect | pipeline | 2026-08-07 | — |
+ | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
+@@ -91,6 +92,7 @@
+ | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
+ | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | open | defect | pipeline | 2026-08-07 | — |
+ | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | open | defect | pipeline | 2026-08-07 | — |
++| pipeline.p-ac-11-four-dimensions-declared-but-inert | open | defect | pipeline | 2026-08-16 | — |
+ | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
+ | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | open | defect | pipeline | 2026-08-07 | — |
+ | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
+@@ -149,6 +151,6 @@
+ 
+ ## Counts
+ 
+-- open: 88
++- open: 90
+ - in_progress: 26
+ - closed: 27
+diff --git a/backlog/index.json b/backlog/index.json
+index 1d67c84c..6f16049d 100644
+--- a/backlog/index.json
++++ b/backlog/index.json
+@@ -3,10 +3,10 @@
+   "generatedFrom": {
+     "items": "backlog/items/*.md",
+     "ledger": "backlog/transitions.ndjson",
+-    "transitionHead": "95a3961affbe592aad75d539a1e680d4294d9c3a5b195be612497d2a74f0f176"
++    "transitionHead": "91e0a1a1d9b33e457318461a98af4969e599c32be1710cd7e84259c9d5d38e16"
+   },
+   "counts": {
+-    "open": 88,
++    "open": 90,
+     "in_progress": 26,
+     "closed": 27
+   },
+@@ -471,6 +471,14 @@
+       "created": "2026-08-07",
+       "source": "Adjacent finding by the Elephant while verifying the GMW lift question for the WP2-WP3 Part A residuals (2026-08-07). Verified against the code, not assumed. Recorded rather than fixed because the affected file is a NEVER_LIFTABLE_KERNEL_PATH and cannot be edited in-session."
+     },
++    {
++      "id": "pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts",
++      "status": "open",
++      "type": "defect",
++      "owner": "pipeline",
++      "created": "2026-08-16",
++      "source": "Found 2026-08-16 when two dispatches in one session correctly refused to force-add their dispatch records, and the Critic separately flagged that the evidence artifact it was given sat under scratch/ rather than the calibration's canonical evidence/ location. Verified with git check-ignore before filing."
++    },
+     {
+       "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",
+       "status": "open",
+@@ -744,6 +752,14 @@
+       "created": "2026-08-07",
+       "source": "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07."
+     },
++    {
++      "id": "pipeline.p-ac-11-four-dimensions-declared-but-inert",
++      "status": "open",
++      "type": "defect",
++      "owner": "pipeline",
++      "created": "2026-08-16",
++      "source": "Independent Critic review of 0d3d9bcc..8be6c308, finding F3 (blocker), 2026-08-16. Full report: specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md."
++    },
+     {
+       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
+       "status": "open",
+diff --git a/backlog/items/2026-08-16-gitignore-evidence-rule-swallows-durable-spec-artifacts.md b/backlog/items/2026-08-16-gitignore-evidence-rule-swallows-durable-spec-artifacts.md
+new file mode 100644
+index 00000000..f81b55da
+--- /dev/null
++++ b/backlog/items/2026-08-16-gitignore-evidence-rule-swallows-durable-spec-artifacts.md
+@@ -0,0 +1,91 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts
++type: defect
++owner: pipeline
++status: open
++created: 2026-08-16
++source: "Found 2026-08-16 when two dispatches in one session correctly refused to force-add their dispatch records, and the Critic separately flagged that the evidence artifact it was given sat under scratch/ rather than the calibration's canonical evidence/ location. Verified with git check-ignore before filing."
++due: 2026-09-15
++---
++
++# `.gitignore`'s `evidence/` rule is unanchored, so it also swallows the Spec packages' durable audit artifacts
++
++## Description
++
++`.gitignore:25` is `evidence/`, unanchored. Its own comment (`:22-24`) says what
++it is for: "Machine-generated verify evidence (QG-03, AC-G4-2): regenerated every
++`node harness/scripts/verify.mjs` run — a status snapshot, not a durable audit
++trail". That describes the repository-root `evidence/` directory, which holds
++`verify-latest.json` and `security-latest.json`.
++
++Because the pattern has no leading slash, git applies it at **every depth**. It
++therefore also matches `specs/<package>/evidence/`, which holds the opposite kind
++of artifact: durable, per-package audit records — Critic reports, dispatch
++records, findings registries, acceptance evidence maps — that ADR-0045's canonical
++artifact topology expects to be tracked.
++
++Confirmed, not inferred:
++
++```
++git check-ignore -v specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md
++.gitignore:25:evidence/   specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md
++```
++
++The files of that kind already in history got there by being force-added past this
++rule, one at a time. Nothing records that this is required, so a dispatch that
++follows the stated policy silently loses its record instead.
++
++## Triggering situation
++
++Two dispatches on 2026-08-16, independently:
++
++- `PHX-VF-INVENTORY` was briefed to write a dispatch record to
++  `specs/sprint-phoenix-epic/evidence/`. It found the ignore rule, judged that
++  force-adding against a documented repository policy was not its call, and
++  reported the conflict instead of resolving it unilaterally. That was the right
++  judgement, and the consequence is that the record exists only on disk.
++- `PHX-WP-PAC11` hit the same wall and was briefed not to attempt a record at all.
++
++The Critic then flagged the downstream effect from the other side: the evidence
++artifact it was handed sat under `scratch/`, "outside the calibration's canonical
++`evidence/` location" — non-blocking on its own, but it is what made a separate,
++more serious QG-03 substitution visible.
++
++## Affected artifact
++
++`.gitignore:25`; every `specs/<package>/evidence/` directory.
++
++## Proposal
++
++Anchor the rule to the repository root — `/evidence/` instead of `evidence/` —
++which is exactly what the existing comment already claims it means. Verified in a
++working copy before filing: `evidence/verify-latest.json` stays ignored, and the
++Spec package's durable artifacts become visible.
++
++**This is deliberately not a one-line fix, and the reason is measured rather than
++assumed.** Anchoring the rule surfaces roughly 75 previously-invisible untracked
++files under `specs/sprint-phoenix-epic/evidence/` alone. Left untracked they make
++the working tree dirty, and both `harness/scripts/verify.mjs`'s candidate
++preflight and `security-scan.mjs` refuse a dirty tree — so the naive fix breaks
++the verify gate the moment it lands. The change therefore has to be made together
++with a curation pass that decides, per file, tracked or ignored:
++
++- genuinely durable and belongs in history: Critic reports, dispatch records,
++  findings registries, acceptance evidence maps, design diffs;
++- genuinely a regenerated snapshot and should stay ignored: the per-run
++  `*-verify-*.json` observations, which are the same category as the root
++  directory's own contents and may need their own narrower pattern;
++- and every file added must first be checked for machine-specific absolute paths,
++  which `guardrails/git.md` and this repository's hard rules forbid in history —
++  a bulk add would be exactly the wrong way to do this.
++
++Do it as one briefed dispatch with the curation list fixed up front, not as an
++opportunistic edit inside another work package.
++
++## Triage (filled in by the Elephant of the next Pipeline session)
++
++- **Decision:**
++- **Rationale:**
++- **Assignment (if accepted):**
++- **Date:**
+diff --git a/backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md b/backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md
+new file mode 100644
+index 00000000..8593de72
+--- /dev/null
++++ b/backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md
+@@ -0,0 +1,92 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.p-ac-11-four-dimensions-declared-but-inert
++type: defect
++owner: pipeline
++status: open
++created: 2026-08-16
++source: "Independent Critic review of 0d3d9bcc..8be6c308, finding F3 (blocker), 2026-08-16. Full report: specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md."
++due: 2026-09-15
++---
++
++# Four P-AC-11 policy dimensions are declarable but inert, with no owner and no expiry
++
++## Description
++
++Commit `9352331d` gave a `documentClasses` entry five new P-AC-11 scoping
++dimensions, and `8be6c308` wired exactly one of them (`ownedSections`) to a real
++permission decision. The other four — `lifecycleEvents`, `previewRequired`,
++`retention`, `conflictPolicy` — ship validated, merge-tested and **consumed by
++nothing**. A pack declaring them changes no behaviour anywhere.
++
++The Critic rated this a **blocker** under
++`governance/examples/policies/checklist.md:37-39` item 8, which requires a named
++owner and an expiry for a deliberately deferred gap and makes any NOT MET item
++blocking by its own definition, and under `guardrails/quality-gates.md` QG-06
++("a known gap with a TODO comment and no due date is a finding, not a
++mitigation"). At the time of the finding the deferral was recorded only in a
++commit body and a source comment; a repo-wide search for the four names returned
++only the two changed modules and their two test files — no backlog item, no docs
++entry, no register entry. **This item is that missing record**; filing it is what
++gives the deferral an owner and a date.
++
++Honest caveat, recorded rather than argued away: the Critic noted that
++`checklist.md` describes itself as generic fixture content, and ticked it as in
++force because `.claude/pipeline.yaml:117-119` resolves it as this project's
++`policies_path`. Whether that fixture genuinely binds this repository under
++self-application (ADR-0015/ADR-0030) is a separate question this item does not
++decide — the substance stands either way.
++
++## Triggering situation
++
++`PHX-WP-PAC11-ENFORCE` ran investigation-first and reported, per dimension,
++whether a genuine enforcement point exists. Its verdicts, and their status after
++independent review:
++
++| dimension | verdict | Critic's independent check |
++|---|---|---|
++| `ownedSections` | enforceable — implemented | confirmed; separately defective, see the F1 item below |
++| `previewRequired` | no enforcement point | **confirmed correct** — `preview()` runs unconditionally on every governed path (`external-reference-adapter.mjs:83`), so there is nothing for the flag to gate |
++| `conflictPolicy` | no enforcement point | **confirmed correct** — `:82` returns `status: "conflict"` unconditionally; neither closed value changes admit/deny without a new reconciliation path |
++| `retention` | no enforcement point | **confirmed correct** — `identity.retention` ∈ `[active, retain, archive]` (`:29`) has zero overlap with the policy's three categorical commitments |
++| `lifecycleEvents` | no enforcement point | **refuted** — four of six values are verbatim identical to `FEATURE_STATES`, and a carrier is available before the first external call; tracked as Critic finding F2, not by this item |
++
++So three of the four are genuinely blocked on something that does not exist yet,
++and one was blocked on a mistaken premise.
++
++## Affected artifact
++
++`plugins/pipeline-core/lib/organization-policy.mjs` (declares all five);
++`plugins/pipeline-core/lib/external-reference-adapter.mjs` (consumes one);
++acceptance criterion `P-AC-11` (`specs/sprint-phoenix-epic/acceptance.md:409-412`),
++which stays `partial` for exactly this reason.
++
++## Proposal
++
++Not one fix — the three confirmed-inert dimensions each need a different thing to
++exist first, and none of those things is in scope for a policy-model change:
++
++- **`previewRequired`** needs a structurally optional preview path. The adapter is
++  a preview-first controller by design (its own header comment), so making preview
++  skippable is a change to that design, not a wiring task. Plausibly the honest
++  disposition is that this dimension is satisfied *by construction* — preview is
++  always required — and the criterion should say so rather than the schema
++  pretending it is configurable.
++- **`conflictPolicy`** needs a second, softer conflict path that the two closed
++  values could genuinely distinguish. Today there is one path and it always blocks.
++- **`retention`** is categorical-over-time, not a property of a single write
++  decision. Its consumer is more likely a retention/lifecycle sweep than the write
++  planner, and no such sweep exists.
++
++Each of the three should be resolved as either "build the thing it needs",
++"amend the criterion to state it is satisfied by construction", or "amend the
++criterion to drop the dimension" — the same three-way shape already used for
++`H-AC-11` and `PX0-AC-13` in this epic. That is a PO/design call per dimension,
++not an implementation task.
++
++## Triage (filled in by the Elephant of the next Pipeline session)
++
++- **Decision:**
++- **Rationale:**
++- **Assignment (if accepted):**
++- **Date:**
+diff --git a/backlog/transitions.ndjson b/backlog/transitions.ndjson
+index 817ff53f..17f45a4a 100644
+--- a/backlog/transitions.ndjson
++++ b/backlog/transitions.ndjson
+@@ -255,3 +255,5 @@
+ {"actor":"backlog-reconciliation","at":"2026-08-16","entryHash":"e34672bc280ec8ec435a4fad7a592aefdfd1c7ddca7afbb11a0d67d1b43ed58b","evidence":{"commit":"8a92d3773d279dd0b6fbd6064ddd64ec7b519e05","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-11-semgrep-timeout-on-oversized-pipeline-state-test-file.md"},"from":null,"id":"pipeline.semgrep-timeout-oversized-pipeline-state-test","previousHash":"b003a60d82f9fad2cd3bab49c35413d55aedab7da26aea123d3495c97bdc3cbc","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":255,"to":"open"}
+ {"actor":"backlog-reconciliation","at":"2026-08-16","entryHash":"5d3dd62806b052240687c60f8ae70f971987da1055f704a135b55e86c3467c20","evidence":{"commit":"8a92d3773d279dd0b6fbd6064ddd64ec7b519e05","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-11-semgrep-timeout-on-oversized-pipeline-state-test-file.md"},"from":"open","id":"pipeline.semgrep-timeout-oversized-pipeline-state-test","previousHash":"e34672bc280ec8ec435a4fad7a592aefdfd1c7ddca7afbb11a0d67d1b43ed58b","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":256,"to":"in_progress"}
+ {"actor":"backlog-reconciliation","at":"2026-08-16","entryHash":"95a3961affbe592aad75d539a1e680d4294d9c3a5b195be612497d2a74f0f176","evidence":{"commit":"ba1a7d282913357208d31f2fc4eea6857a64639d","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-11-semgrep-timeout-on-oversized-pipeline-state-test-file.md"},"from":"in_progress","id":"pipeline.semgrep-timeout-oversized-pipeline-state-test","previousHash":"5d3dd62806b052240687c60f8ae70f971987da1055f704a135b55e86c3467c20","reason":"Record in the ledger the closure this backlog item file's own frontmatter already documents (closed_at, closure_repository, closure_commit, closure_evidence). This entry attests the sync to that pre-existing closure record, not a new implementation or review of its own.","schema":"pipeline.backlog-transition.v1","sequence":257,"to":"closed"}
++{"actor":"backlog-reconciliation","at":"2026-08-16","entryHash":"74d6ab16d8f22070a9ec25a1b3fa877a07322562a7e55bbf220b1a57a37e248b","evidence":{"commit":"325aca9fd517eabd1548847f4bcc8d0105b64c39","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-16-gitignore-evidence-rule-swallows-durable-spec-artifacts.md"},"from":null,"id":"pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts","previousHash":"95a3961affbe592aad75d539a1e680d4294d9c3a5b195be612497d2a74f0f176","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":258,"to":"open"}
++{"actor":"backlog-reconciliation","at":"2026-08-16","entryHash":"91e0a1a1d9b33e457318461a98af4969e599c32be1710cd7e84259c9d5d38e16","evidence":{"commit":"325aca9fd517eabd1548847f4bcc8d0105b64c39","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md"},"from":null,"id":"pipeline.p-ac-11-four-dimensions-declared-but-inert","previousHash":"74d6ab16d8f22070a9ec25a1b3fa877a07322562a7e55bbf220b1a57a37e248b","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":259,"to":"open"}
+
+commit c7eb2297b40410d316f48ed8f6203d33abfca21d
+Author: agent-pipe-shared <301875187+agent-pipe-shared@users.noreply.github.com>
+Date:   Sun Aug 16 20:27:52 2026 +0200
+
+    fix(pipeline-core): close P-AC-11 Critic findings F1/F2/F4 (ownedSections domain, lifecycleEvents justification, adapter shape trust)
+    
+    F1 (major): ownedSections values were validated against TARGET_REF (a
+    lowercase 3-64-char slug shape) while the value they gate,
+    desired.changes[].field, is validated by external-reference-adapter.mjs's
+    own ID pattern (uppercase, '.', '_', ':', leading digit, up to 256 chars
+    allowed). Any field name outside TARGET_REF's narrower shape --
+    customfield_10001, body.storage, lifecycleState, id -- was permanently
+    unrepresentable in policy and rejected identically to a real denial.
+    Fixed by widening organization-policy.mjs's ownedSections check to a new,
+    exported OWNED_SECTION_REF pattern duplicated (not imported, to keep the
+    policy model the lower layer) from the adapter's ID pattern, and pinned
+    equal to it by a dedicated source-equality test so a future narrowing of
+    either side fails loudly instead of silently reopening the gap.
+    
+    F2 (major): the prior commit's stated reason for leaving lifecycleEvents
+    unenforced ("disjoint vocabularies for different concepts") is false --
+    LIFECYCLE_EVENTS and feature-package-topology.mjs's FEATURE_STATES share
+    four values verbatim (completed, superseded, abandoned, retained).
+    Verified at source and chosen to leave lifecycleEvents unenforced (the
+    other admissible outcome): enforcing it would require deciding what a
+    policy naming only proposed/active should mean for a write observed in a
+    non-shared build-phase state such as draft or implementing, which is a
+    product policy decision this dispatch has no authority to invent, and
+    would risk re-creating F1's same unreachable-value defect one level up.
+    Replaced the false claim with the true one, in a source comment (not a
+    commit message) at organization-policy.mjs's LIFECYCLE_EVENTS
+    declaration, and added a pinning test asserting both the real overlap
+    and the real non-overlap so neither claim can drift silently again.
+    
+    F4 (minor): planExternalReferenceWrite deliberately does not trust the
+    supplied policy's shape elsewhere (a non-array documentClasses coerces
+    to []), but the new ownedSections gate called .includes() directly:
+    a string value degraded ownership into a substring test, and null threw
+    a raw TypeError out of an API whose every other failure is a typed
+    rejection. Restored the same defensive coercion (non-array -> []),
+    which fails closed instead of leaking a permissive match or an
+    uncaught exception.
+    
+    Each finding's defect was reproduced RED before the fix (organization-
+    policy.test.mjs / external-reference-adapter.test.mjs), then fixed and
+    reverified GREEN; the adapter suite's one pre-existing, unrelated
+    failure (X-AC-10, stale manifest digest) is unchanged in count and cause.
+    
+    F3 and F5 (checklist-gap ownership and docs update) are out of this
+    dispatch's scope.
+    
+    Dispatch: PHX-WP-PAC11-FIX (goldfish)
+    AI-Assisted: true
+
+diff --git a/plugins/pipeline-core/lib/external-reference-adapter.mjs b/plugins/pipeline-core/lib/external-reference-adapter.mjs
+index 87fc719e..00c45f3f 100644
+--- a/plugins/pipeline-core/lib/external-reference-adapter.mjs
++++ b/plugins/pipeline-core/lib/external-reference-adapter.mjs
+@@ -3,7 +3,7 @@
+ import { FEATURE_CLASSES, FEATURE_STATES } from "./feature-package-topology.mjs";
+ import { canonicalSha256 } from "./governance-event.mjs";
+ 
+-const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u; const SHA = /^[a-f0-9]{64}$/u;
++export const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u; const SHA = /^[a-f0-9]{64}$/u;
+ const CLASSES = new Set(["issue-tracker", "knowledge-base", "document-store", "forge"]); const DOCUMENT_CLASSES = new Set(["architecture", "operations", "security", "privacy", "continuity", "recovery", "release", "change-management"]); const RELATIONS = new Set(["tracks", "specifies", "implements", "documents", "mirrors", "reviews", "evidences", "releases", "supersedes", "relates-to", "evidence-for", "published-from"]); const DIRECTIONS = new Set(["pipeline-to-external", "external-observation-only", "independent"]); const MODES = new Set(["reference-only", "projection", "controlled-publication"]); const OWNERSHIP = new Set(["pipeline-owned", "external-owned", "projection-only", "independently-maintained", "unsupported"]); const FRESHNESS = new Set(["fresh", "stale", "deleted", "moved", "merged", "duplicated", "inaccessible", "out-of-order"]); const OPERATIONS = new Set(["inspect", "preview", "apply", "readback", "reconcile"]);
+ function fail(code, message = "External reference operation is invalid.") { const error = new Error(message); error.code = code; throw error; }
+ function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
+@@ -71,7 +71,16 @@ export async function planExternalReferenceWrite({ reference, capabilities, desi
+     // this document class. A declared list (even empty) is a real restriction;
+     // an undeclared field is neutral -- same declared-vs-undeclared precedent
+     // mode/targetBinding already established above.
+-    if (Object.hasOwn(entry, "ownedSections") && desired.changes.some((change) => !entry.ownedSections.includes(change.field))) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-owned-sections", plan: null });
++    // F4: this gate must hold the same posture as :64's documentClasses
++    // coercion -- a caller-supplied ownedSections whose runtime shape is not
++    // actually an array (a bare string, null, etc.) is never trusted as the
++    // real list; it is treated as the strictest declared value (empty),
++    // which rejects every change, instead of degrading `.includes()` into a
++    // substring test or throwing a raw TypeError out of a typed API.
++    if (Object.hasOwn(entry, "ownedSections")) {
++      const ownedSections = Array.isArray(entry.ownedSections) ? entry.ownedSections : [];
++      if (desired.changes.some((change) => !ownedSections.includes(change.field))) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-owned-sections", plan: null });
++    }
+   }
+   // X-AC-10: the canonical identity is resolved before any external contact, so
+   // an unresolvable or ambiguous artifact never reaches the provider at all.
+diff --git a/plugins/pipeline-core/lib/external-reference-adapter.test.mjs b/plugins/pipeline-core/lib/external-reference-adapter.test.mjs
+index 6965ff6e..b5fb8c71 100644
+--- a/plugins/pipeline-core/lib/external-reference-adapter.test.mjs
++++ b/plugins/pipeline-core/lib/external-reference-adapter.test.mjs
+@@ -292,6 +292,22 @@ test("WP-PAC11 leaves an undeclared ownedSections neutral, unlike a declared-but
+   assert.equal(blocked.status, "rejected"); assert.equal(blocked.reason, "policy-owned-sections");
+ });
+ 
++// F4: planExternalReferenceWrite deliberately does not trust the
++// caller-supplied policy shape elsewhere (:64 coerces a non-array
++// documentClasses to []); the ownedSections gate must hold the same posture
++// instead of degrading a bare string into a substring test or throwing a raw
++// TypeError out of an API whose every other failure is a typed rejection.
++test("F4 does not degrade ownedSections into a substring test when a hand-built policy declares it as a bare string", async () => {
++  const stringOwned = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, ownedSections: "summary", packIds: ["security-baseline"] }]);
++  const desiredNarrow = { requestId: "publish-42", changes: [{ field: "sum", valueSha256: "b".repeat(64), ownership: "pipeline-owned" }] };
++  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired: desiredNarrow, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: stringOwned });
++  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-owned-sections");
++});
++test("F4 does not throw a raw TypeError when a hand-built policy declares ownedSections as null", async () => {
++  const nullOwned = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, ownedSections: null, packIds: ["security-baseline"] }]);
++  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: nullOwned });
++  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-owned-sections");
++});
+ test("X-AC-11 never consults organization policy for an ungoverned reference, even when one is supplied", async () => {
+   const invalidPolicy = { not: "a valid effective policy" };
+   const withPolicy = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: invalidPolicy });
+diff --git a/plugins/pipeline-core/lib/organization-policy.mjs b/plugins/pipeline-core/lib/organization-policy.mjs
+index 370c997d..43e8295a 100644
+--- a/plugins/pipeline-core/lib/organization-policy.mjs
++++ b/plugins/pipeline-core/lib/organization-policy.mjs
+@@ -17,13 +17,47 @@ const SIGNATURE_ALGORITHMS = new Set(["ed25519", "none"]);
+ // target -- any other shape (missing sub-field, extra field, wrong type,
+ // unknown targetClass) is rejected exactly like every other closed field.
+ const TARGET_CLASSES = new Set(["artifact", "repository-path-pattern", "external-system"]); export const TARGET_REF = /^[a-z][a-z0-9-]{2,63}$/u;
++// F1 fix: ownedSections values name external-reference-adapter.mjs's own
++// changes[].field values (validated there by its own ID pattern), NOT
++// targetRef-shaped pack-level identifiers -- they are a different scoping
++// dimension with a different legal character set (field names commonly carry
++// uppercase letters, '.', '_', ':', and a leading digit, none of which
++// TARGET_REF's slug shape admits). This file deliberately does not import
++// from external-reference-adapter.mjs (wrong dependency direction: the
++// policy model is the lower layer), so this pattern is a duplicate of that
++// file's ID pattern, pinned equal by a test in organization-policy.test.mjs
++// that fails if either one narrows and silently reopens the gap. The
++// character set is purely structural (case/punctuation/length), so widening
++// it admits no provider, vendor, or product name.
++export const OWNED_SECTION_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u;
+ // WP-PAC11: the five remaining P-AC-11 scoping dimensions (owned
+ // fields/sections, lifecycle event, preview, retention, conflict policy),
+ // each OPTIONAL and closed, following targetBinding's own precedent exactly.
+ // lifecycleEvents reuses the epic's OWN canonical lifecycle-state vocabulary
+ // verbatim (acceptance.md V-AC-08: "proposed, active, completed, superseded,
+ // abandoned, or retained") rather than inventing a parallel one.
+-const LIFECYCLE_EVENTS = new Set(["proposed", "active", "completed", "superseded", "abandoned", "retained"]);
++//
++// F2 fix: this vocabulary is NOT disjoint from feature-package-topology.mjs's
++// FEATURE_STATES -- four values are shared verbatim (completed, superseded,
++// abandoned, retained; pinned in organization-policy.test.mjs so neither
++// claim can drift silently again). The true reason external-reference-
++// adapter.mjs still does not enforce lifecycleEvents against an artifact's
++// binding.identity.lifecycleState is that the two vocabularies describe two
++// different lifecycle AUTHORITIES, not one shared authority with gaps:
++// LIFECYCLE_EVENTS is the epic's own V-AC-08 publication-event vocabulary
++// (WHEN, in the epic's governance process, a publication event happens),
++// while FEATURE_STATES is a feature package's OWN build/implementation
++// lifecycle (plan-spec-state-v2.mjs's draft through implementing, plus
++// verifying). Mapping every one of those build-phase states (draft,
++// awaiting-approval, approved, implementing, verifying -- none of which
++// lifecycleEvents can even represent) onto a publication-event decision is a
++// product policy call this file has no authority to invent; wiring it in
++// without that call would silently re-create F1's same unreachable-value
++// defect one level up. lifecycleEvents therefore stays declared-but-
++// unenforced here, the same posture this file already gives previewRequired
++// and conflictPolicy, until a dispatch with that authority defines the
++// mapping (tracked as a checklist gap, not resolved by this comment).
++export const LIFECYCLE_EVENTS = new Set(["proposed", "active", "completed", "superseded", "abandoned", "retained"]);
+ // retention is deliberately a closed set of CATEGORICAL commitments, never a
+ // concrete duration/period: a literal "N days/years" value would be
+ // inventing a legal/product retention-schedule decision this dispatch has no
+@@ -62,7 +96,7 @@ function sameTargetBinding(left, right) { if (left === undefined && right === un
+ // LIFECYCLE_EVENTS values; both close the "no free-form prose" requirement
+ // the same way targetBinding does for a single reference.
+ function validIdArray(value, { isMember, maxLength }) { if (!Array.isArray(value) || value.length > maxLength) return false; const seen = new Set(); for (const item of value) { if (!isMember(item) || seen.has(item)) return false; seen.add(item); } return true; }
+-function validOwnedSections(value) { return validIdArray(value, { isMember: (item) => typeof item === "string" && TARGET_REF.test(item), maxLength: 32 }); }
++function validOwnedSections(value) { return validIdArray(value, { isMember: (item) => typeof item === "string" && OWNED_SECTION_REF.test(item), maxLength: 32 }); }
+ function validLifecycleEvents(value) { return validIdArray(value, { isMember: (item) => LIFECYCLE_EVENTS.has(item), maxLength: LIFECYCLE_EVENTS.size }); }
+ // WP-PAC11: the closed key set grows by exactly the optional dimensions THIS
+ // entry itself declares (Object.hasOwn) -- same technique packKeys already
+diff --git a/plugins/pipeline-core/lib/organization-policy.test.mjs b/plugins/pipeline-core/lib/organization-policy.test.mjs
+index aa1204d9..bd03d546 100644
+--- a/plugins/pipeline-core/lib/organization-policy.test.mjs
++++ b/plugins/pipeline-core/lib/organization-policy.test.mjs
+@@ -1,6 +1,8 @@
+ // SPDX-License-Identifier: SUL-1.0
+ import assert from "node:assert/strict"; import test from "node:test";
+-import { OrganizationPolicyError, resolveEffectiveOrganizationPolicy, validateOrganizationPolicyPack } from "./organization-policy.mjs";
++import { ID } from "./external-reference-adapter.mjs";
++import { FEATURE_STATES } from "./feature-package-topology.mjs";
++import { LIFECYCLE_EVENTS, OrganizationPolicyError, OWNED_SECTION_REF, resolveEffectiveOrganizationPolicy, validateOrganizationPolicyPack } from "./organization-policy.mjs";
+ // WP-P-AC11: targetBinding is an OPTIONAL closed field (see
+ // organization-policy.mjs); this fixture default declares one so most tests
+ // below exercise the scoped path, and dedicated tests cover omission,
+@@ -212,6 +214,39 @@ test("P-AC-11 accepts a closed lifecycleEvents declaration and rejects a non-clo
+   ];
+   for (const value of malformed) assert.throws(() => validateOrganizationPolicyPack(value, { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
+ });
++// F1: ownedSections must admit exactly the value domain
++// external-reference-adapter.mjs's own ID pattern already accepts for
++// changes[].field (uppercase letters, '.', '_', ':', a leading digit, and
++// lengths TARGET_REF's slug shape would have excluded) -- otherwise a
++// document class can never declare ownership of a legal field name and every
++// such write is permanently unrepresentable in policy.
++test("F1 admits ownedSections field names outside TARGET_REF's slug shape that external-reference-adapter.mjs's changes[].field domain already accepts", () => {
++  for (const fieldName of ["customfield_10001", "body.storage", "lifecycleState", "id", "a:b", "9x", "a".repeat(200)]) {
++    const accepted = validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], ownedSections: [fieldName] }] }), { coreVersion: "0.4.7" });
++    assert.deepEqual(accepted.documentClasses[0].ownedSections, [fieldName], fieldName);
++  }
++});
++// F1: pins ownedSections' value domain to exactly external-reference-
++// adapter.mjs's own ID pattern for changes[].field, so a future narrowing of
++// either one (this file must not import the other -- see organization-
++// policy.mjs's own comment) fails this test loudly instead of silently
++// re-creating the gap the two regexes previously left.
++test("F1 pins ownedSections' value domain equal to external-reference-adapter.mjs's changes[].field domain", () => {
++  assert.equal(OWNED_SECTION_REF.source, ID.source);
++  assert.equal(OWNED_SECTION_REF.flags, ID.flags);
++});
++// F2: pins the true relationship between lifecycleEvents and
++// feature-package-topology's FEATURE_STATES -- NOT disjoint (four terminal
++// values shared verbatim), but the non-shared states on each side (the
++// epic's own proposed/active, and the feature package's own pre-terminal
++// build-phase states) stay explicitly, provably non-shared. Fails loudly if
++// either vocabulary changes without this relationship being re-examined.
++test("F2 pins lifecycleEvents' overlap and non-overlap with feature-package-topology's FEATURE_STATES", () => {
++  const events = [...LIFECYCLE_EVENTS];
++  assert.deepEqual(events.filter((value) => FEATURE_STATES.includes(value)).sort(), ["abandoned", "completed", "retained", "superseded"]);
++  assert.deepEqual(events.filter((value) => !FEATURE_STATES.includes(value)).sort(), ["active", "proposed"]);
++  assert.deepEqual([...FEATURE_STATES].filter((value) => !events.includes(value)).sort(), ["approved", "awaiting-approval", "draft", "implementing", "verifying"]);
++});
+ // WP-PAC11: lifecycleEvents shares ownedSections' genuine subset lattice, so
+ // it merges the same safe-intersection way instead of mode/targetBinding's
+ // exact-match-only rule.
+
+commit e3e591539b48942b8e1a2d6f881b447af74b9f35
+Author: agent-pipe-shared <301875187+agent-pipe-shared@users.noreply.github.com>
+Date:   Sun Aug 16 20:29:31 2026 +0200
+
+    docs(organization-policy): describe the resolution failure modes and merge algebra
+    
+    Closes Critic finding F5. The "Pack, schema, and activation policy" section
+    enumerated the merge algebra exhaustively but described neither the merge rules
+    this sprint added nor the resolution failure they can now produce, so an operator
+    combining two packs where only one declares retention would meet an
+    OPP-RESOLVE-CONFLICT that the sole document describing resolution failures does
+    not explain.
+    
+    Documents all six optional documentClasses keys with their merge rules in one
+    table, including that targetBinding and retention fail resolution on a mismatch
+    and that declared-against-undeclared counts as a mismatch for both, while
+    intersection and OR treat an undeclared side as neutral. States the invariant the
+    rules exist to produce: no combination of packs resolves to something more
+    permissive than its strictest contributor.
+    
+    Also repairs the closed-shape sentence's pre-existing staleness, which the Critic
+    noted separately and did not charge to this diff: provenance, dependencies and
+    signaturePolicy were already unlisted pack keys, as was targetBinding at entry
+    level.
+    
+    Records honestly that four of the six are declared but consumed by nothing, and
+    points at the backlog item carrying the per-dimension reasons, so the table cannot
+    be read as a claim of enforcement.
+    
+    AI-Assisted: true
+
+diff --git a/docs/organization-policy-packs.md b/docs/organization-policy-packs.md
+index e066dfc2..f278bb40 100644
+--- a/docs/organization-policy-packs.md
++++ b/docs/organization-policy-packs.md
+@@ -72,6 +72,39 @@ every pack that declares it, and `approvalRequired` combines as a logical OR
+ so an additional pack can only add review, never remove it
+ (`organization-policy.mjs:18-23,34`).
+ 
++That closed shape has since grown optional keys at both levels, and this section
++was stale on both counts before 2026-08-16. A pack may additionally carry
++`provenance`, `dependencies` and `signaturePolicy`; a `documentClasses` entry may
++additionally carry `targetBinding`, `ownedSections`, `lifecycleEvents`,
++`previewRequired`, `retention` and `conflictPolicy`. Every one of them is optional
++in the strict sense: an entry declaring none of them validates and resolves exactly
++as it did before they existed, and the closed-key check simply grows by the keys the
++entry itself declares.
++
++Each optional entry key carries its own merge rule, and two of them can fail
++resolution outright — which matters operationally, because an operator combining two
++packs meets the failure at activation, where a wrong diagnosis is expensive:
++
++| key | merge rule across packs declaring the same class |
++|---|---|
++| `targetBinding` | never merged — a mismatch, **including declared against undeclared**, fails `OPP-RESOLVE-CONFLICT` |
++| `retention` | exact match only — a mismatch, **including declared against undeclared**, fails `OPP-RESOLVE-CONFLICT` |
++| `ownedSections` | set intersection; an undeclared side is neutral and yields the declared list |
++| `lifecycleEvents` | set intersection; an undeclared side is neutral |
++| `previewRequired` | logical OR — a later pack can add a required preview, never remove one |
++| `conflictPolicy` | ranked maximum toward the stricter `reject` |
++
++Intersection never widens permission and OR never downgrades it, so no combination of
++packs can resolve to something more permissive than its strictest contributor.
++
++**Four of these six are declared but not yet consumed by any decision path.** Only
++`mode`, `approvalRequired`, `targetBinding` and `ownedSections` currently scope a real
++permission decision; `lifecycleEvents`, `previewRequired`, `retention` and
++`conflictPolicy` validate and merge but change no behaviour anywhere. That gap is
++tracked, with its per-dimension reasons, in
++`backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md` — declaring
++one of the four today is not an error, but it is also not enforcement.
++
+ Activation is a separate, transactional step from resolution
+ (`organization-policy-activation.mjs`). `planOrganizationPolicyActivation`
+ is a pure, non-mutating function: it resolves the effective policy, reads the
+
+commit ff237c18b190f0102bfeb606e6305d9257aa9d66
+Author: agent-pipe-shared <301875187+agent-pipe-shared@users.noreply.github.com>
+Date:   Mon Aug 17 11:54:44 2026 +0200
+
+    docs(backlog): file P-AC-11's lifecycleEvents owner/expiry gap, scrub an evidence path
+    
+    The first (incomplete-scope) delta Critic dispatch for P-AC-11's fix
+    range caught two real defects independent of its missing third commit,
+    both accepted and acted on rather than discarded with the rest of that
+    result:
+    
+    F-A (blocker): closing Critic finding F2 (289287e7/c7eb2297) fixed the
+    false justification for leaving lifecycleEvents unenforced but never
+    gave the deferral itself an owner and expiry -- the checklist item 8
+    requirement F3's sibling item already gave the other three inert
+    dimensions. Filed as its own backlog item, the missing record.
+    
+    F-C (minor): the mechanical test-run evidence artifact
+    (pac11-fix-verify-c7eb2297.txt) embedded a machine-specific absolute
+    path in a stack trace. Genericized.
+    
+    The dispatch's requested claude-opus-5 route was never actually passed
+    to the Agent tool call (only described in the prompt text), so the
+    review ran on the session's default model instead -- the dispatch's
+    own verdict is formally invalid on that route mismatch, but its
+    evidence-backed findings are not, hence acting on F-A/F-C now. A
+    corrected dispatch (proper 3-commit scope, proper model parameter)
+    follows.
+    
+    AI-Assisted: true
+
+diff --git a/backlog/STATUS.md b/backlog/STATUS.md
+index 48b1d90a..a9fa9df3 100644
+--- a/backlog/STATUS.md
++++ b/backlog/STATUS.md
+@@ -97,6 +97,7 @@
+ | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | open | defect | pipeline | 2026-08-07 | — |
+ | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | open | defect | pipeline | 2026-08-07 | — |
+ | pipeline.p-ac-11-four-dimensions-declared-but-inert | open | defect | pipeline | 2026-08-16 | — |
++| pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry | open | defect | pipeline | 2026-08-17 | — |
+ | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
+ | pipeline.part-a-limitation-2-orphaned-by-the-r2-rework | open | defect | pipeline | 2026-08-07 | — |
+ | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
+@@ -156,6 +157,6 @@
+ 
+ ## Counts
+ 
+-- open: 95
++- open: 96
+ - in_progress: 26
+ - closed: 27
+diff --git a/backlog/index.json b/backlog/index.json
+index 5af590b1..80537e47 100644
+--- a/backlog/index.json
++++ b/backlog/index.json
+@@ -3,10 +3,10 @@
+   "generatedFrom": {
+     "items": "backlog/items/*.md",
+     "ledger": "backlog/transitions.ndjson",
+-    "transitionHead": "e47c66fad8df8c06aa1d03fef4e26d78a3a2118eb6b8b7dbe6d5394a7a17254e"
++    "transitionHead": "f2b4f5e8579a07cddb19cbbd3058ffd0086b2d387c82de545844cb8f32ca74b2"
+   },
+   "counts": {
+-    "open": 95,
++    "open": 96,
+     "in_progress": 26,
+     "closed": 27
+   },
+@@ -792,6 +792,14 @@
+       "created": "2026-08-16",
+       "source": "Independent Critic review of 0d3d9bcc..8be6c308, finding F3 (blocker), 2026-08-16. Full report: specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md."
+     },
++    {
++      "id": "pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry",
++      "status": "open",
++      "type": "defect",
++      "owner": "pipeline",
++      "created": "2026-08-17",
++      "source": "Delta Critic re-review of the P-AC-11 fix range (289287e7, c7eb2297), finding F-A (blocker), 2026-08-17."
++    },
+     {
+       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
+       "status": "open",
+diff --git a/backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md b/backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md
+new file mode 100644
+index 00000000..2aab689a
+--- /dev/null
++++ b/backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md
+@@ -0,0 +1,91 @@
++---
++schema: pipeline.backlog-item.v1
++id: pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry
++type: defect
++owner: pipeline
++status: open
++created: 2026-08-17
++source: "Delta Critic re-review of the P-AC-11 fix range (289287e7, c7eb2297), finding F-A (blocker), 2026-08-17."
++due: 2026-09-15
++---
++
++# P-AC-11's `lifecycleEvents` dimension still has no owner or expiry anywhere in the repository
++
++## Description
++
++`backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md` gave
++three of the four declared-but-inert P-AC-11 dimensions
++(`previewRequired`/`retention`/`conflictPolicy`) an owner and a due date, but
++explicitly carved `lifecycleEvents` out of its own scope, twice: the filing
++commit's own message ("the `lifecycleEvents` deferral rested on a premise the
++Critic falsified, so that one is tracked as F2 rather than here") and the item
++body's Triggering-situation table ("tracked as Critic finding F2, not by this
++item").
++
++`c7eb2297` then closed F2 — the false "disjoint vocabularies" justification was
++replaced with an accurate one — but closing F2 only fixed the *reason given* for
++leaving `lifecycleEvents` unenforced. It did not give the *deferral itself* an
++owner or an expiry. The replacement source comment
++(`organization-policy.mjs`, at the `LIFECYCLE_EVENTS` declaration) says exactly
++this: "`lifecycleEvents` therefore stays declared-but-unenforced here... until a
++dispatch with that authority defines the mapping (**tracked as a checklist gap,
++not resolved by this comment**)" — naming the gap without filing the record that
++closes it. A repo-wide search for `lifecycleEvents` under `backlog/` still
++returns only the one item that explicitly disclaims covering it.
++
++A delta Critic re-review of the fix range caught this as its own finding
++(F-A, rated **blocker**, same citation the original F3 finding used):
++`governance/examples/policies/checklist.md` item 8 requires a named owner and
++an expiry for any deliberately deferred gap and makes a NOT MET item blocking
++by its own definition; `guardrails/quality-gates.md` QG-06 says a known gap
++named only in a source comment, with no due date, is a finding, not a
++mitigation. **This item is that missing record.**
++
++## Triggering situation
++
++`lifecycleEvents` is validated and merge-tested (`organization-policy.mjs`) but
++consumed by nothing: `external-reference-adapter.mjs` has no code path that
++reads it to gate or shape a decision. Four of its six closed values
++(`completed`, `superseded`, `abandoned`, `retained`) are verbatim identical to
++`feature-package-topology.mjs`'s `FEATURE_STATES`, and a carrier
++(`binding.identity`) is available before the first external call — so, unlike
++`previewRequired`/`retention`/`conflictPolicy`, this dimension is not blocked on
++something that does not exist yet. It is blocked on a genuine product-policy
++question this repository has not answered: what should a policy naming only
++`proposed`/`active` mean for a write observed while the epic itself is in a
++non-shared build-phase state such as `draft` or `implementing`? Enforcing the
++overlap without answering that risks reproducing F1's exact defect one level up
++(an unrepresentable-value trap), which is why `PHX-WP-PAC11-FIX` declined to
++invent an answer.
++
++## Affected artifact
++
++`plugins/pipeline-core/lib/organization-policy.mjs` (`LIFECYCLE_EVENTS`
++declaration and comment); `plugins/pipeline-core/lib/external-reference-adapter.mjs`
++(the intended, currently absent, consumer); acceptance criterion `P-AC-11`
++(`specs/sprint-phoenix-epic/acceptance.md:604-607`), which stays `partial` for
++this reason among others.
++
++## Proposal
++
++The same three-way shape the sibling item already uses for the other three
++dimensions, and that `H-AC-11`/`PX0-AC-13` used elsewhere in this epic — a
++PO/design call, not an implementation task:
++
++- **Build it:** decide what a `proposed`/`active`-only policy should mean for a
++  write observed in a non-shared build-phase epic state, then wire
++  `lifecycleEvents` into the same decision path `ownedSections` uses.
++- **Satisfied by construction:** if the four-of-six overlap is judged
++  sufficient as-is (e.g. the two epic-only values are simply never reachable in
++  a governed external write's lifetime), amend the criterion or its evidence to
++  say so explicitly rather than leaving the dimension declared-but-silent.
++- **Drop the dimension:** if no version of the mapping is judged worth
++  building, remove `lifecycleEvents` from `documentClasses` rather than leaving
++  a permanently inert key.
++
++## Triage (filled in by the Elephant of the next Pipeline session)
++
++- **Decision:**
++- **Rationale:**
++- **Assignment (if accepted):**
++- **Date:**
+diff --git a/backlog/transitions.ndjson b/backlog/transitions.ndjson
+index 8a0ade8e..9c90ba21 100644
+--- a/backlog/transitions.ndjson
++++ b/backlog/transitions.ndjson
+@@ -262,3 +262,4 @@
+ {"actor":"backlog-reconciliation","at":"2026-08-16","entryHash":"231c95527e6c96f2d80ba61d8c46907167723b4f765a700c5bd010c80e0fafd4","evidence":{"commit":"4fcb7f9ea1ebf516cabd2fed74c8745e5e06fd81","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-16-agent-decision-journal-code-pattern-array-coercion.md"},"from":null,"id":"pipeline.agent-decision-journal-code-pattern-array-coercion","previousHash":"6194cff0b18016352b0e6e351201ffb80f724b05604f35322663398cbda56362","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":262,"to":"open"}
+ {"actor":"backlog-reconciliation","at":"2026-08-17","entryHash":"6b9eeaccb32e27b94612649d4ec7158e3d26f4a505977c6a66f1bcc2f6567520","evidence":{"commit":"6bf4480e70081671b112327b9b7516d081453c52","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-17-evidence-gitignore-left-dozens-of-durable-artifacts-untracked.md"},"from":null,"id":"pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked","previousHash":"231c95527e6c96f2d80ba61d8c46907167723b4f765a700c5bd010c80e0fafd4","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":263,"to":"open"}
+ {"actor":"backlog-reconciliation","at":"2026-08-17","entryHash":"e47c66fad8df8c06aa1d03fef4e26d78a3a2118eb6b8b7dbe6d5394a7a17254e","evidence":{"commit":"b4f059f9770f6e4b930d55d2974aa9da80cc192c","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-17-published-lifecycle-event-schema-still-enumerates-cancellation.md"},"from":null,"id":"pipeline.published-lifecycle-event-schema-still-enumerates-cancellation","previousHash":"6b9eeaccb32e27b94612649d4ec7158e3d26f4a505977c6a66f1bcc2f6567520","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":264,"to":"open"}
++{"actor":"backlog-reconciliation","at":"2026-08-17","entryHash":"f2b4f5e8579a07cddb19cbbd3058ffd0086b2d387c82de545844cb8f32ca74b2","evidence":{"commit":"7e47269c7578bc0bad6af2df8acdca128a62fea4","kind":"item-file-reconciliation","reference":"backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md"},"from":null,"id":"pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry","previousHash":"e47c66fad8df8c06aa1d03fef4e26d78a3a2118eb6b8b7dbe6d5394a7a17254e","reason":"Record in the ledger the status this backlog item file already asserts. The item file is the pre-existing record; this entry claims no implementation, no review, and no closure of its own.","schema":"pipeline.backlog-transition.v1","sequence":265,"to":"open"}
+diff --git a/specs/sprint-phoenix-epic/evidence/pac11-fix-verify-c7eb2297.txt b/specs/sprint-phoenix-epic/evidence/pac11-fix-verify-c7eb2297.txt
+index bb26ea0b..2115def6 100644
+--- a/specs/sprint-phoenix-epic/evidence/pac11-fix-verify-c7eb2297.txt
++++ b/specs/sprint-phoenix-epic/evidence/pac11-fix-verify-c7eb2297.txt
+@@ -79,7 +79,7 @@ test at .git/phx-verify/plugins/pipeline-core/lib/external-reference-adapter.tes
+   + 'unresolved'
+   - 'resolved'
+ 
+-      at TestContext.<anonymous> (file:///home/skar667/src/agent-pipeline-share_phoenix/.git/phx-verify/plugins/pipeline-core/lib/external-reference-adapter.test.mjs:104:10)
++      at TestContext.<anonymous> (file://<repo-root>/.git/phx-verify/plugins/pipeline-core/lib/external-reference-adapter.test.mjs:104:10)
+       at Test.runInAsyncScope (node:async_hooks:227:14)
+       at Test.run (node:internal/test_runner/test:1382:25)
+       at Test.processPendingSubtests (node:internal/test_runner/test:960:18)
