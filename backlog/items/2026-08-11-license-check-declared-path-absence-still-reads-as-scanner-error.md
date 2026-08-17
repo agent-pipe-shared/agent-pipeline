@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.license-check-declared-path-absence-still-reads-as-scanner-error
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
 due: 2026-08-25
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 04e28774d8416904cccee5dd1fc561db4d2a86af
+closure_evidence: plugins/pipeline-core/scripts/security-scan.test.mjs
 source: "Critic review (PASS, F3) of NVA-BL-32 (backlog/items/2026-08-09-the-security-scan-looks-for-its-license-allowlist-in-the-pipelines-own-repository.md), 2026-08-11 — flagged as documented-instead-of-fixed without an owner/expiry (QG-06), not as a blocker to that diff."
 ---
 
@@ -67,3 +71,13 @@ fresh design.
   `NVA-BL-32` exactly, no design latitude); not fixed in this triage pass
   (docs/backlog-only).
 - **Date:** 2026-08-17
+
+### Closed 2026-08-17 (overnight AFK block, NVA-MICRO-1)
+
+Fixed exactly as proposed: the absent-`declaredPath` branch now sets
+`classification: "success"`, mirroring `NVA-BL-32`'s sibling fix.
+`security-scan.test.mjs`'s existing missing-declared-file case extended
+with the same assertions the missing-allowlist case already carries.
+Independently re-verified: `node --test
+plugins/pipeline-core/scripts/security-adapters/license-check.test.mjs`
+(10/10) and `security-scan.test.mjs` (131/131), both green.

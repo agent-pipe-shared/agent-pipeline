@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.restart-resume-hint-write-misses-the-project-prefix
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Live observation of the PO's private Codex+Pipeline 0.5.4 happy-path test run (fifth local candidate), 2026-08-09 (sanitized, no PO-identifying data)."
 due: 2026-08-16
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: bbbc0e01485e1e6c366df2280e3fe3fcaa95027c
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 ---
 
 # A pre-restart resume-hint write to the wrong path is denied and escalates to a full human-in-terminal ceremony instead of naming the one correct path
@@ -62,3 +66,16 @@ not yet have it.
   improvement (name `project/.resume-hint-input.json` directly for a
   near-miss write before any external-operator escalation).
 - **Date:** 2026-08-17
+
+### Closed 2026-08-17 (overnight AFK block, NVA-MICRO-1)
+
+Fixed exactly as proposed: a new `restartResumeHintNearMissWrite()`
+detects a write sharing the resume-hint input file's exact basename at a
+different resolved path, and `blocked()`'s denial message names
+`project/.resume-hint-input.json` directly for that case, before falling
+through to the generic message. Does not widen what is admitted
+(`verdict(0)` still only from the exact-match branch); confirmed the
+pre-existing property that `GUARD-LIFECYCLE-NOT-READY` never escalates to
+the HGO external-operator ceremony either way. Independently re-verified:
+`node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`
+(96/96, including the new regression test).

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.merged-into-frontmatter-key-documented-but-unsupported
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 35c46c26344d2292f5823ce726882dd04a5990bf
+closure_evidence: backlog/README.md
 source: "Elephant self-caught, 2026-08-17: followed backlog/README.md's own documented duplicate-merge convention verbatim and it broke check-backlog-state.mjs."
 ---
 
@@ -74,3 +78,15 @@ enforced behavior should not persist silently.
 - **Assignment:** queued; likely a quick docs-only fix (direction (a)) is
   the pragmatic default unless the PO wants the richer schema (direction (b)).
 - **Date:** 2026-08-17
+
+### Closed 2026-08-17 (overnight AFK block, NVA-MICRO-1)
+
+Direction (a): `backlog/README.md`'s duplicate-merge convention rewritten
+to describe the actually-working pattern (`status: closed` with real
+`closure_commit`/`closure_evidence`, merge target named in body prose),
+pointing at a real worked example already in the repo. No schema/tooling
+change. `node harness/scripts/check-doc-contracts.mjs` clean. A sibling gap
+in the SAME file (step 2 still documents unsupported `status: rejected`/
+`status: deferred` values) was self-caught while verifying this fix and
+filed separately:
+`backlog/items/2026-08-17-backlog-readme-still-documents-rejected-and-deferred-as-status-values.md`.

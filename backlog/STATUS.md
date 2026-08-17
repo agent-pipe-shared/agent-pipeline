@@ -29,6 +29,7 @@
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-baseline-migration-commit-unreachable | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | open | workflow-improvement | pipeline | 2026-08-11 | — |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
@@ -97,7 +98,7 @@
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal | open | defect | pipeline | 2026-08-09 | — |
-| pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | closed | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | closed | defect | pipeline | 2026-08-07 | — |
@@ -112,7 +113,7 @@
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | closed | defect | pipeline | 2026-08-07 | — |
@@ -124,7 +125,7 @@
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.ledger-drift-classification-has-no-reachability-cutoff | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-event-403-has-a-short-hash-evidence-commit | closed | defect | pipeline | 2026-08-12 | — |
-| pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | open | defect | pipeline | 2026-08-11 | — |
+| pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | closed | defect | pipeline | 2026-08-16 | — |
@@ -136,7 +137,7 @@
 | pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.merged-into-frontmatter-key-documented-but-unsupported | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.mixed-authority-migration-requires-a-vendored-plugin-copy-marketplace-installs-never-have | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.mp22-orchestrator-self-implementation-has-no-enforcement | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -201,7 +202,7 @@
 | pipeline.reopen-design-invites-the-edit-that-ends-the-session | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
-| pipeline.restart-resume-hint-write-misses-the-project-prefix | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.restart-resume-hint-write-misses-the-project-prefix | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.runner-neutrality-before-third-runner | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | open | defect | pipeline | 2026-08-08 | — |
@@ -258,6 +259,6 @@
 
 ## Counts
 
-- open: 101
+- open: 97
 - in_progress: 22
-- closed: 127
+- closed: 132

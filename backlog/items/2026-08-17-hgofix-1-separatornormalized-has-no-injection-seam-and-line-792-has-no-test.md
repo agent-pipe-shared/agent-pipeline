@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 5cb07a93377206f14ed4447fb03ba7e7687fad73
+closure_evidence: plugins/pipeline-core/lib/human-guard-override.test.mjs
 source: "Critic review of NVA-HGOFIX-1 (a4aeaca4, claude-opus-5 at max), findings F1 and F2. Verdict PASS; both minor, filed as follow-ups rather than reworked into that commit."
 ---
 
@@ -75,3 +79,17 @@ closure remains required per CLAUDE.md MP-07.
   security-relevant code; no urgency, no live defect.
 - **Assignment:** queued; not dispatched this AFK block.
 - **Date:** 2026-08-17
+
+### Closed 2026-08-17 (already resolved by a prior same-day commit, confirmed during a later AFK block)
+
+While dispatching an unrelated batch (`NVA-MICRO-1`), found this was
+already fully fixed earlier the same day by commit `5cb07a93`
+("`NVA-HGOFIX-2`"), which predates that dispatch: `separatorNormalized()`
+gained the injectable `platform = process.platform` parameter mirroring
+the file's own existing idiom, and a POSIX regression test now reaches the
+`:792`-class `hardBoundaryPath(separatorNormalized(...))` call with a
+`..\secrets`-shaped component, pinning the documented intentional
+non-refusal. Independently re-verified live in source (current line
+numbers shifted to ~878/972 after intervening commits) and via `node
+--test plugins/pipeline-core/lib/human-guard-override.test.mjs` (green
+apart from the known pre-existing `HGO-EXTERNAL-MARKETPLACE` class).

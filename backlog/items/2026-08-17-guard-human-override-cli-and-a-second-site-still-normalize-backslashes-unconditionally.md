@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 5cb07a93377206f14ed4447fb03ba7e7687fad73
+closure_evidence: plugins/pipeline-core/scripts/guard-human-override.test.mjs
 source: "Critic review of NVA-HGOFIX-1 (a4aeaca4, claude-opus-5 at max), finding F3 — explicitly an out-of-scope disclosure, not counted against that diff's PASS verdict."
 ---
 
@@ -63,3 +67,14 @@ external-proof boundary), treat as guardrail/security-adjacent —
   leaving two known residual instances.
 - **Assignment:** queued; not dispatched this AFK block.
 - **Date:** 2026-08-17
+
+### Closed 2026-08-17 (already resolved by a prior same-day commit, confirmed during a later AFK block)
+
+Both sites fixed by commit `5cb07a93` ("`NVA-HGOFIX-2`"), which predates
+this confirmation: `guard-human-override.mjs`'s `externalJson()` (site 1,
+`:58`) now gates its split/join on `platform === "win32"`; the
+`token.replace(/\\/gu, "/")` site (site 2, was `:1385`, confirmed live at
+its current shifted location) is gated the same way. Independently
+re-verified against current source and `node --test` on both touched
+files (green apart from the known pre-existing `HGO-EXTERNAL-MARKETPLACE`
+class).
