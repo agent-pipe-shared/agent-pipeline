@@ -155,6 +155,12 @@
       "member": "guard-git"
     },
     {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-handover-size.mjs",
+      "member": "guard-handover-size"
+    },
+    {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
@@ -2645,6 +2651,55 @@
         }
       ],
       "configurationPath": ".claude/pipeline.yaml",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "handover-hard-size-gate",
+      "publicName": "Handover hard size gate",
+      "problem": "A long-running block can grow the canonical handover file without bound between close-time rotations.",
+      "benefit": "A PreToolUse guard refuses a growing write at or over a configured byte cap, while always admitting a shrinking (rotation) write, once activated.",
+      "status": "planned",
+      "surfaceIds": [
+        "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size"
+      ],
+      "runners": [
+        "claude"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "claude-host-hook-contract"
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/hooks/guard-handover-size.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/hooks/guard-handover-size.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-handover-hard-size-gate",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
       "specializedOnlyReason": null
     },
     {
