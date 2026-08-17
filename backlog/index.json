@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "845bac545b80b8ee8455011d525656c862445a0fbe7ed6ab6d76499a6bc3cd70"
+    "transitionHead": "946c487beac602b3c05fff5ca7d2b0e5ccdbf9db2aff7eacd361ca9c7451c877"
   },
   "counts": {
-    "open": 108,
+    "open": 109,
     "in_progress": 22,
     "closed": 102
   },
@@ -798,6 +798,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
+    },
+    {
+      "id": "pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Relayed by the PO 2026-08-17 from a live Windows (D:\\Dev\\Web\\Toolbox) Claude session's handover, item #2, found while diagnosing the NVA-PAWINACL-1 blocker; independently confirmed against this repository's current source before filing, including both call sites."
     },
     {
       "id": "pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal",
