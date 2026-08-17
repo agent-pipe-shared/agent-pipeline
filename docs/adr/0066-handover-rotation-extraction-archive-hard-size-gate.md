@@ -228,7 +228,9 @@ acknowledgment that extraction is complete.
   script. **Not done:** the guard hook is NOT wired into `hooks.json` (TP-4
   protected, no in-session override) — the exact wiring snippet is recorded
   in `evidence/dispatch-record-NVA-HANDOVER-ROT-1.json`'s `report` field,
-  awaiting an authorized session.
+  awaiting an authorized session. **Owner:** pipeline. **Due:** 2026-09-08
+  (three weeks out; a TP-4 wiring ceremony, not tied to any other sprint
+  milestone).
 - **New, discovered during the above (see Correction section):** reconcile
   `rotate-handover-sections.mjs` (candidate 2, heuristic/close-time,
   monthly archive buckets) and `handover-rotate.mjs` (this ADR's own
