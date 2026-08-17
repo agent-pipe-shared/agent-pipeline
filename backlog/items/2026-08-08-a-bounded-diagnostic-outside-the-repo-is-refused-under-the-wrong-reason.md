@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 2f466462dbe97bc1330e7578bd21af2d958f1488
+closure_evidence: backlog/items/2026-08-08-a-bounded-diagnostic-outside-the-repo-is-refused-under-the-wrong-reason.md
 source: "Reported by a Goldfish during the 2026-08-08 hardening block and then reproduced and isolated directly by the Elephant."
 ---
 
@@ -101,3 +105,13 @@ the in-repo control passes.
 - **Rationale:** PO, 2026-08-12: "empfehlung."
 - **Assignment (if accepted):** queued for implementation this session.
 - **Date:** 2026-08-12
+
+## Closure (2026-08-17)
+
+Verified against current source: `guard-lifecycle-ready.mjs:192` defines
+`READ_SCOPE_DENIAL_CODE = "GUARD-READ-SCOPE-OUTSIDE-ROOT"`, with commentary
+confirming it is "Deliberately NOT the cross-repository-mutation family:
+nothing here writes anywhere" — exactly direction 1's decided outcome.
+Landed commit `2f466462dbe97bc1330e7578bd21af2d958f1488`, "fix(guard): give
+the outside-root bounded diagnostic its own code and a true remedy".
+Closing.

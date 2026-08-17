@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.briefing-model-field-contradicts-agent-definition
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: e7d729042a1dfdf6439c74959b143eade6d7870c
+closure_evidence: backlog/items/2026-08-08-a-briefings-model-field-can-contradict-the-agent-it-dispatches.md
 source: "Three dispatches in the 2026-08-08 decisions wave were briefed 'claude-opus-5 at xhigh' and ran on claude-sonnet-5. Two of them reported the mismatch themselves; the Elephant's first reading of it was wrong in the opposite direction."
 ---
 
@@ -89,3 +93,16 @@ different dispatches against the same agent type.
 - **Rationale:** PO, 2026-08-12: "empfehöung" [empfehlung].
 - **Assignment (if accepted):** queued for implementation this session.
 - **Date:** 2026-08-12
+
+## Closure (2026-08-17)
+
+Verified against current source: `templates/prompts/goldfish-task.md:195`
+now requires `agentType` (the exact `subagent_type` invoked) and derives
+field 6's `model`/`effort` from that agent's own definition file rather
+than hand-typing them, citing itself as "NVA-BL-78 — derive the model, do
+not hand-type it twice." `plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs:373-377`
+cross-checks `agentType` against the recorded model/effort and downgrades a
+would-be PASS to FAIL, classification `model-mismatch`, when they disagree
+— exactly Option C+B as decided. Landed commit
+`e7d729042a1dfdf6439c74959b143eade6d7870c`, "fix(dispatch-authorship):
+derive recorded model from the dispatched agent definition". Closing.
