@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f2b4f5e8579a07cddb19cbbd3058ffd0086b2d387c82de545844cb8f32ca74b2"
+    "transitionHead": "32f207d170f21ac51c25578217cd6995d9736d5a2fbd8fc562236428b048c032"
   },
   "counts": {
-    "open": 96,
+    "open": 95,
     "in_progress": 26,
-    "closed": 27
+    "closed": 28
   },
   "items": [
     {
@@ -794,11 +794,15 @@
     },
     {
       "id": "pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Delta Critic re-review of the P-AC-11 fix range (289287e7, c7eb2297), finding F-A (blocker), 2026-08-17."
+      "source": "Delta Critic re-review of the P-AC-11 fix range (289287e7, c7eb2297), finding F-A (blocker), 2026-08-17.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "6919b55bd7d2b68255ab7ed1d820adec63dea369",
+      "closureEvidence": "backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md"
     },
     {
       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
