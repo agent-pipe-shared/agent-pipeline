@@ -124,7 +124,19 @@ for exactly this kind of review.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, remains open in current backlog (not deferred).
+- **Rationale:** re-verified live, 2026-08-17: the asymmetry described under
+  "What is still open" is unchanged at current line numbers (the file has
+  moved since filing) — `guard-lifecycle-ready.mjs:2089` still passes
+  `retryActionsForDeniedCommand(...)` for `GUARD-PARSE-UNSUPPORTED`, while
+  `:2111` still passes a literal `[]` for `GUARD-OPERATOR-UNAPPROVED` /
+  `GUARD-REDIRECT-UNAPPROVED`. This is minor day-to-day agent-ergonomics
+  friction affecting every session that hits an operator/redirect refusal
+  (a common occurrence, as this very triage pass repeatedly demonstrated),
+  cross-cutting rather than tied to a future sprint's scope — worth a cheap
+  `goldfish-mechanic`/`goldfish-implementor` pass once picked up: measure
+  whether `retryActionsForDeniedCommand` would return anything useful for
+  operator/redirect shapes, then either pass it through symmetrically or
+  document why not.
+- **Assignment (if accepted):** unassigned, next available implement slot.
+- **Date:** 2026-08-17

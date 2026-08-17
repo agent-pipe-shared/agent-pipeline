@@ -89,3 +89,14 @@ Candidates, explicitly not a commitment:
 - **Rationale:** PO, 2026-08-12: "empfehlung."
 - **Assignment (if accepted):** queued for implementation this session.
 - **Date:** 2026-08-12
+
+- **Update, 2026-08-17:** the 2026-08-12 "queued for implementation this
+  session" note did not happen in that session — re-verified live,
+  `docs/state.md` is now 7574 lines (up from "over 4,500" at filing), and no
+  `docs/state-archive/` or equivalent extraction target exists. The decision
+  (candidate 5 then candidate 2) still stands; only the stale "this session"
+  assignment framing needed correcting. Remains open, unassigned, growing
+  worse each session — worth prioritizing given the trend, not deferred to a
+  future sprint since it directly affects every session's own bootstrap cost
+  now.
+- **Date:** 2026-08-17
