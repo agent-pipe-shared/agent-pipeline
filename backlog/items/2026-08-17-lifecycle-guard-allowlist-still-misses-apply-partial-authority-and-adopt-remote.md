@@ -82,18 +82,43 @@ an open design question for whoever implements this, not resolved here.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted — all three gaps independently confirmed against
-  this repository's own current source (exact line numbers above,
-  cross-checked against the CLI's own construction sites in
-  `lib/project-onboarding-v3.mjs`), not just trusted from the relayed
-  report. Same defect class and same file as the already-fixed
-  `plan-partial-authority` gap (GUARDALLOW-1) — a guardrail/hook file, so
-  this goes through a `goldfish-deep` dispatch with mandatory Critic review,
-  not a same-session edit.
+- **Decision:** accepted for gaps 2 and 3 only. **Gap 1
+  (`plan-partial-authority --profile/--source`) is REJECTED as
+  mischaracterized** — corrected on direct source verification before
+  dispatch, 2026-08-17. `plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1432-1444`
+  already carries a deliberate, documented negative assertion for exactly
+  this shape, with its own comment: "`--profile`/`--source` are valid
+  CLI-level flags for this command (usage text), but the guard admits only
+  the exact `nextAction` shape the inspection actually emits — never the
+  wider human-invoked shape — so these still fall through to refusal."
+  Cross-checked against every `plan-partial-authority` construction site in
+  `lib/project-onboarding-v3.mjs` (lines 3436, 3717): both emit only the bare
+  `--root <root> [--intent <value>]` shape via `lifecycleArgv`; the
+  `--profile`/`--source` pair appears ONLY inside a free-text diagnostic hint
+  string (line 443, `"re-run plan-partial-authority with --profile and
+  --source canonical-fresh-v3 after PO selection"`), never as a machine-built
+  `commandAction`/`nextAction` argv. Unlike gaps 2 and 3 (each backed by an
+  exact `commandAction(...)` construction site that becomes 100% unreachable
+  if refused), gap 1 describes a shape a human/agent could construct by
+  reading the CLI's own `--help` usage text — a materially different,
+  already-deliberately-closed admission class. Widening the allowlist here
+  would require deleting or reversing an existing, intentional test, not
+  filling a gap.
+  Gaps 2 (`apply-partial-authority`) and 3 (`adopt-remote plan`/`adopt-remote
+  apply`) remain independently confirmed against exact construction sites
+  (`lib/project-onboarding-v3.mjs:470`, `:4111`, `:4198`) with no
+  countervailing test — genuine, currently-unreachable gaps. Same defect
+  class and same file as the already-fixed `plan-partial-authority` bare-root
+  gap (GUARDALLOW-1) — a guardrail/hook file, so this goes through a
+  `goldfish-deep` dispatch with mandatory Critic review, not a same-session
+  edit.
 - **Rationale:** `guard-lifecycle-ready.mjs` is a hook/guardrail file
   (MP-07); the pattern (a real CLI-constructed command the allowlist
-  refuses) is identical to the already-fixed sibling gap, and all three new
-  branches have a directly analogous existing branch to mirror.
+  refuses) is identical to the already-fixed sibling gap for gaps 2/3, each
+  with a directly analogous existing branch to mirror. Gap 1 does not fit
+  that pattern once the existing negative test is read, and briefing a
+  goldfish to "fix" it would have meant briefing it to delete a deliberate
+  safeguard — caught before dispatch rather than after a Critic FAIL.
 - **Assignment (if accepted):** next available dispatch slot in this AFK
-  block.
+  block, scoped to gaps 2 and 3 only.
 - **Date:** 2026-08-17
