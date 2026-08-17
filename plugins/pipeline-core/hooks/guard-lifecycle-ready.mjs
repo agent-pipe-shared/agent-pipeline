@@ -1384,15 +1384,17 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // the documented onboarding-recovery.md path for portable-seed-required when an existing
   // remote+branch is supplied. Only these two adopt-remote subcommands are ever admitted;
   // --remote is checked loosely (non-empty, not flag-shaped) -- genuinely caller-chosen at
-  // both construction sites. NVA-LCGUARD-2: --ref is pinned to the exact
-  // refs/heads/<branch> format lib/project-onboarding-v3.mjs:3988's REMOTE_REF_RE already
-  // enforces before either adopt-remote command is ever constructed -- this guard now
-  // mirrors that already-enforced format rather than deferring a decision that was already
-  // made.
+  // both construction sites. NVA-LCGUARD-2 round 2 (Critic finding F-B): --ref mirrors the
+  // FULL validRemoteAdoptionRequest gate at lib/project-onboarding-v3.mjs:3988-3990, not just
+  // its REMOTE_REF_RE half -- that gate also refuses "..", "//", a trailing "/", and a ".lock"
+  // suffix before either adopt-remote command is ever constructed, so a guard admitting those
+  // four extra shapes was a strict superset of what any construction site can emit.
   if (args[0] === "adopt-remote" && ["plan", "apply"].includes(args[1])
     && exactRoot(args, root, 2)
     && args[4] === "--remote" && typeof args[5] === "string" && args[5] !== "" && !args[5].startsWith("--")
     && args[6] === "--ref" && /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(args[7] ?? "")
+    && !(args[7] ?? "").includes("..") && !(args[7] ?? "").includes("//")
+    && !(args[7] ?? "").endsWith("/") && !(args[7] ?? "").endsWith(".lock")
     && ((args[1] === "plan" && args.length === 8)
       || (args[1] === "apply" && args[8] === "--plan-sha256" && HEX.test(args[9] ?? "")
         && args[10] === "--activate" && args.length === 11))) return true;

@@ -1558,6 +1558,13 @@ test("NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and n
       // NVA-LCGUARD-2: non-empty, non-flag-shaped --ref value with a refs/ prefix that is
       // NOT refs/heads/ -- also previously wrongly admitted.
       `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/tags/v1`,
+      // NVA-LCGUARD-2 round 2 (Critic F-B): --ref shapes that match REMOTE_REF_RE but that
+      // validRemoteAdoptionRequest (lib/project-onboarding-v3.mjs:3988-3990) still refuses --
+      // ".." traversal, a doubled slash, a trailing slash, and a ".lock" suffix.
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/a..b`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/a//b`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/a/`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/main.lock`,
     ]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
     }
