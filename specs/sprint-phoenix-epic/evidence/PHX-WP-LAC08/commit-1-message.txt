@@ -1,0 +1,23 @@
+refactor(pipeline-core): drop the undistinguishable cancellation lifecycle kind
+
+The lifecycle-event `kind` enum carried `cancellation` next to `status`, but no
+field, pairing rule or validation distinguished a `cancellation`-kind event from
+a `status`-kind event carrying `status: "cancelled"` — the replay documentation
+already recorded that as an unresolved honesty note rather than a stated audit
+need (L-AC-08). A kind that answers no question the existing representation
+already answers is a retained element without traceability, so it is removed
+instead of justified.
+
+`cancellation` is dropped from both hand-duplicated `KINDS` sets
+(`lifecycle-governance-events.mjs`, `governance-replay-view.mjs`) and from the
+renderer's `KIND_RECORD_CLASS` map; the surviving eight kinds each still map to
+one of the four L-AC-04 record classes. `STATUSES` is untouched — `cancelled`
+was and remains the representation. The L-AC-07 replay fixture folds its
+cancellation event to `kind: "status", status: "cancelled"` (the scenario
+category is unchanged, only its encoding), and the runner-observed
+classification test establishes the same class from `dispatch` and `status`
+without inventing a third kind. The replay doc's per-kind list loses the bullet
+that described a kind that no longer exists.
+
+Dispatch: PHX-WP-LAC08 (goldfish)
+AI-Assisted: true

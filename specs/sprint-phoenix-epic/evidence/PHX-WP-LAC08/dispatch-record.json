@@ -1,0 +1,17 @@
+{
+  "taskId": "PHX-WP-LAC08",
+  "model": "claude-opus-5[1m]",
+  "rulesetSha": "5125f494dd5a0f5315b8ea7f5f19e03ab4e0057e15c7198d5565d7b3d67ca937",
+  "dispatcher": "elephant",
+  "outcome": "landed",
+  "log": [
+    { "phase": "route-pre-check", "toolUses": 0, "note": "Field 6 requested claude-opus-5/xhigh; direct same-dispatch evidence names claude-opus-5[1m]. Consistent, no contradiction. Effort not directly observable." },
+    { "phase": "context-read", "toolUses": 23, "note": "governance-replay-view.mjs has zero import statements -> the KINDS Set is genuinely hand-duplicated, no shared source. Field-5 stop condition does not apply. lifecycle-governance-events.test.mjs exists and contains no 'cancellation' occurrence. No kind/status pairing rule references cancellation (only candidate-invalidation is cross-validated, lines 87-88)." },
+    { "phase": "edit", "toolUses": 29, "note": "Removed cancellation from both KINDS sets, from KIND_RECORD_CLASS (and corrected that line's doc comment 9 -> 8 kinds), folded the L-AC-07 fixture event to kind:status/status:cancelled, reduced the runner-observed test to dispatch+status (count 3 -> 2), deleted the governance-replay.md honesty-note bullet." },
+    { "phase": "verify", "toolUses": 31, "note": "node --test over the three affected test files: 20 pass, 0 fail. Junit artifact written by node itself to node-test-junit.xml. Re-grep of all six touched code/test files plus docs/governance-replay.md leaves exactly one 'cancellation' occurrence: the L-AC-07 test TITLE, which names a fixture scenario category (explicitly in-vocabulary per briefing field 4), not a kind." },
+    { "phase": "commit", "toolUses": 34, "note": "Commit 20014aab: code, tests, docs/governance-replay.md." },
+    { "phase": "commit", "toolUses": 36, "note": "acceptance.md amendment verified append-only via git diff --numstat: 12 insertions, 0 deletions." },
+    { "phase": "residue", "toolUses": 36, "note": "OUT OF BRIEFED SCOPE, NOT FIXED, needs a follow-up dispatch: governance/schemas/lifecycle-governance-event.schema.json:11 is a THIRD copy of the same kind enum and still lists \"cancellation\". Field 4 bounds scope to the named files ('Nothing else') and does not list this file either as in scope or as a different vocabulary. No test or code path reads that schema (only specs/sprint-phoenix-epic/spec.md:434 references it), so nothing breaks today, but the published contract now permits a kind the validator rejects." }
+  ],
+  "report": null
+}

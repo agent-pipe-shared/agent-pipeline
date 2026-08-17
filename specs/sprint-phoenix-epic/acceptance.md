@@ -438,6 +438,18 @@ architecture prose or an implementation briefing.
 - **L-AC-01:** WHEN dispatch, status, cancellation, candidate change,
   verification, review, gate, recovery, or reconciliation produces a material
   event, THE SYSTEM SHALL project it through a closed lifecycle schema.
+
+  **Amendment (PO, 2026-08-17).** The `cancellation` item in this enumeration is
+  satisfied by a `kind: "status"` event carrying `status: "cancelled"` — no
+  dedicated `cancellation` kind exists or is required. The closed schema defined
+  no field, pairing rule or validation that distinguished a `cancellation`-kind
+  event from that representation, so the code was corrected the same day (commit
+  `20014aab`) to stop emitting an undistinguishable duplicate kind; `cancelled`
+  remains a valid `status` and the cancellation scenario still replays. This
+  amendment changes the encoding of one enumerated trigger, not the criterion.
+  L-AC-01 stays `partial` regardless: only 1 of the 9 named triggers has a real
+  producer today (see this criterion's evidence-map pointer), and nothing here
+  changes that.
 - **L-AC-02:** WHEN an event derives from the #10 control/execution exchange,
   THE SYSTEM SHALL retain package, dispatch, attempt, queue, candidate, worker,
   correlation, and invalidation identity.

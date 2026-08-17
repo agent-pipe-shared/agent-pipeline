@@ -1,0 +1,15 @@
+docs(phoenix): amend L-AC-01 for the folded cancellation kind
+
+Append-only amendment, per this file's established convention (precedents
+39374ab6, 22eef567): the original EARS sentence is untouched, including its
+nine-trigger enumeration. The amendment records that the `cancellation` trigger
+is satisfied by a `kind: "status"` event carrying `status: "cancelled"` after
+commit 20014aab removed the undistinguishable duplicate kind, and restates that
+L-AC-01 stays `partial` because only one of the nine named triggers has a real
+producer.
+
+Also lands the PHX-WP-LAC08 evidence directory: the node-written junit artifact
+for the three affected test files and the dispatch record.
+
+Dispatch: PHX-WP-LAC08 (goldfish)
+AI-Assisted: true
