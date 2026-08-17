@@ -3397,14 +3397,31 @@ export function replaceNextActionSection(markdown, sectionText) {
  * advisory (see the backlog item cited on `nextActionSection` above).
  *
  * Fails closed on anything it cannot safely handle: an absent/unreadable
- * `docs/state.md`, or one with no recognizable "## Next action" heading (an
+ * handover file, or one with no recognizable "## Next action" heading (an
  * older project, or one that hand-edited the section), both skip the
- * rewrite rather than guess at a repair. Only the literal `docs/state.md`
- * path is synced; a project whose calibration configures a different
- * handover path is out of scope for this mechanism.
+ * rewrite rather than guess at a repair. The target path is resolved the
+ * same way `projectReadContinuityStatus` resolves it above (`docs/state.md`
+ * unless `calibration.handover` names something else); any failure while
+ * resolving calibration falls back to the `docs/state.md` default rather
+ * than throwing, since this sync is advisory and must never gate the
+ * caller's already-committed State write.
  */
 export function syncStateMdNextAction(dir, state) {
-  const path = join(dir, "docs", "state.md");
+  let handoverPath = "docs/state.md";
+  try {
+    const root = physicalRoot(dir);
+    const selectedPaths = authorityPaths(root);
+    const calibrationObservation = observeOptionalProjectFile(root, selectedPaths.calibration, "Pipeline calibration");
+    if (calibrationObservation.status === "present") {
+      const calibration = parseJsonObject(calibrationObservation, "Pipeline calibration");
+      handoverPath = calibration.handover === undefined
+        ? "docs/state.md"
+        : safeRelativePath(calibration.handover, "configured handover");
+    }
+  } catch {
+    handoverPath = "docs/state.md";
+  }
+  const path = join(dir, handoverPath);
   let markdown;
   try {
     markdown = readFileSync(path, "utf8");
