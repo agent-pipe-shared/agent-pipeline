@@ -1,0 +1,548 @@
+commit 9a20da733874c996595b1ce803d4c363461fc988
+Author:     agent-pipe-shared <301875187+agent-pipe-shared@users.noreply.github.com>
+AuthorDate: Mon Aug 17 21:26:56 2026 +0200
+Commit:     agent-pipe-shared <301875187+agent-pipe-shared@users.noreply.github.com>
+CommitDate: Mon Aug 17 21:26:56 2026 +0200
+
+    fix(pipeline-core): wire Windows DACL assurance into the restricted governance-event root
+
+    assertRestrictedRoot's owner-only guarantee was enforced only via POSIX
+    mode bits and process.getuid(), both silent no-ops on win32. It now
+    consults the same Windows DACL assurance primitive sibling modules
+    (afk-ledger.mjs, etc.) already use: harden a newly-created restricted
+    root, assess-only (never harden) a pre-existing one, fail closed on any
+    non-secure result. The platform and assess/harden functions are
+    injectable (io seam, mirroring afk-ledger.mjs's resolveIo pattern) so the
+    win32 branch is unit-testable on this host. Also corrects the module's
+    stale docstring, which claimed it does not implement the restricted-
+    machine-local profile it in fact implements in the same file.
+
+    Dispatch: PHX-WP-HAC11-WINACL (goldfish)
+    AI-Assisted: true
+
+diff --git a/plugins/pipeline-core/lib/governance-event-store.mjs b/plugins/pipeline-core/lib/governance-event-store.mjs
+index b3aaa8d6..25cb46a1 100644
+--- a/plugins/pipeline-core/lib/governance-event-store.mjs
++++ b/plugins/pipeline-core/lib/governance-event-store.mjs
+@@ -4,9 +4,11 @@
+  *
+  * Canonical events are individual immutable files.  `heads.json` is a
+  * replaceable source-last projection and is deliberately never used as an
+- * integrity authority.  This module does not implement the separate,
+- * owner-authenticated restricted-machine-local profile; callers must never
+- * route restricted data through this portable writer.
++ * integrity authority.  This module also implements, separately, the
++ * owner-authenticated restricted-machine-local profile (the
++ * `*RestrictedGovernance*` functions below); callers must never route
++ * restricted data through the portable writer above, and must never route
++ * portable-profile data through the restricted-machine-local functions.
+  */
+ import { mkdir, open, readFile, realpath, readdir, rename, unlink, lstat, stat } from "node:fs/promises";
+ import { spawn } from "node:child_process";
+@@ -27,6 +29,7 @@ import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs
+ import { isHumanRoleExceptionDecision, validateHumanRoleExceptionDecision } from "./human-role-exception-decision.mjs";
+ import { validateLifecycleGovernanceEvent } from "./lifecycle-governance-events.mjs";
+ import { EVENT_CLASSES, representedEventClasses, validateAgentDecisionEvent } from "./agent-decision-journal.mjs";
++import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+
+ const REGISTRY_SCHEMA = "pipeline.governance-stream-registry.v1";
+ const HEADS_SCHEMA = "pipeline.governance-event-heads.v1";
+@@ -107,7 +110,18 @@ async function assertNoSymlinkAncestry(target) {
+   }
+ }
+
+-async function assertRestrictedRoot(repositoryRoot, storeRoot, { create = false } = {}) {
++/**
++ * `create`/`create=false` selects harden-vs-assess exactly the way
++ * `private-boundary.mjs`'s `ensurePrivateDirectory` tracks `created` per
++ * directory: a freshly-created restricted root is hardened (we made it, so
++ * we may fix its DACL); a pre-existing one is only assessed, never
++ * hardened, so a raced-in or attacker-controlled directory is never
++ * silently claimed as ours. `io` is an injectable dependency seam (default
++ * real `process.platform`/`hardenWindowsPrivateDirectory`/
++ * `assessWindowsPrivatePath`), mirroring `afk-ledger.mjs`'s `resolveIo`
++ * pattern, so this win32-only branch is unit-testable on any host.
++ */
++export async function assertRestrictedRoot(repositoryRoot, storeRoot, { create = false } = {}, io = {}) {
+   const target = assertAbsoluteOutsideRepository(repositoryRoot, storeRoot);
+   if (create) await mkdir(target, { recursive: true, mode: 0o700 });
+   await assertNoSymlinkAncestry(target);
+@@ -115,6 +129,13 @@ async function assertRestrictedRoot(repositoryRoot, storeRoot, { create = false
+   const metadata = await stat(target);
+   if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", "Restricted storage must not grant group or other access.");
+   if (typeof process.getuid === "function" && metadata.uid !== process.getuid()) fail("GES-RESTRICTED-OWNER", "Restricted storage is not owned by this operator.");
++  const platform = io.platform ?? process.platform;
++  if (platform === "win32") {
++    const harden = io.harden ?? hardenWindowsPrivateDirectory;
++    const assess = io.assess ?? assessWindowsPrivatePath;
++    const state = create ? harden(target) : assess(target);
++    if (state.status !== "secure") fail("GES-RESTRICTED-WINDOWS-ASSURANCE", `Restricted storage Windows DACL assurance is ${state.status}.`);
++  }
+   return target;
+ }
+
+diff --git a/plugins/pipeline-core/lib/governance-event-store.test.mjs b/plugins/pipeline-core/lib/governance-event-store.test.mjs
+index 79ac8c64..048ac7ac 100644
+--- a/plugins/pipeline-core/lib/governance-event-store.test.mjs
++++ b/plugins/pipeline-core/lib/governance-event-store.test.mjs
+@@ -17,6 +17,7 @@ import {
+   GOVERNANCE_FORK_DISPOSITION_APPROVAL,
+   GovernanceEventStoreError,
+   governanceForkDispositionApprovalSubject,
++  assertRestrictedRoot,
+   createRestrictedAuthorization,
+   appendPortableGovernanceEvent,
+   eraseRestrictedGovernanceEvent,
+@@ -840,3 +841,77 @@ test("K-AC-10 multi-stream query preserves each stream's own origin, authority c
+   await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle"], checkpoints: ["not-a-plain-object"] }), (error) => error.code === "GES-MULTI-STREAM");
+   await assert.rejects(() => queryPortableGovernanceStreams({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamIds: ["lifecycle"], checkpoints: { agent: agentAppended.checkpoint } }), (error) => error.code === "GES-MULTI-STREAM");
+ });
++
++// PHX-WP-HAC11-WINACL: assertRestrictedRoot's win32 DACL-assurance branch is
++// exercised with an injected `io` seam (platform + assess/harden), the same
++// deterministic-on-any-host pattern afk-ledger.test.mjs uses for its own
++// sibling call -- no real Windows host is required.
++
++function secureWindowsIo(overrides = {}) {
++  return { platform: "win32", assess: () => ({ status: "secure" }), harden: () => ({ status: "secure" }), ...overrides };
++}
++
++test("PHX-WP-HAC11-WINACL: a newly-created restricted root on simulated win32 is hardened, never merely assessed", async (t) => {
++  const root = await fixtureRoot(); t.after(() => cleanup(root));
++  const restrictedRoot = path.join(await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-")), "restricted");
++  t.after(() => cleanup(path.dirname(restrictedRoot)));
++  let hardenCalledWith = null;
++  let assessCalled = false;
++  const io = secureWindowsIo({
++    harden: (target) => { hardenCalledWith = target; return { status: "secure" }; },
++    assess: () => { assessCalled = true; return { status: "secure" }; },
++  });
++  const resolved = await assertRestrictedRoot(root, restrictedRoot, { create: true }, io);
++  assert.equal(resolved, restrictedRoot);
++  assert.equal(hardenCalledWith, restrictedRoot);
++  assert.equal(assessCalled, false);
++});
++
++test("PHX-WP-HAC11-WINACL: a pre-existing restricted root on simulated win32 is only assessed, never hardened", async (t) => {
++  const root = await fixtureRoot(); t.after(() => cleanup(root));
++  const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-existing-")); t.after(() => cleanup(restrictedRoot));
++  let hardenCalled = false;
++  let assessCalledWith = null;
++  const io = secureWindowsIo({
++    harden: () => { hardenCalled = true; return { status: "secure" }; },
++    assess: (target) => { assessCalledWith = target; return { status: "secure" }; },
++  });
++  const resolved = await assertRestrictedRoot(root, restrictedRoot, { create: false }, io);
++  assert.equal(resolved, restrictedRoot);
++  assert.equal(assessCalledWith, restrictedRoot);
++  assert.equal(hardenCalled, false);
++});
++
++test("PHX-WP-HAC11-WINACL: a non-secure simulated win32 DACL assessment fails closed", async (t) => {
++  const root = await fixtureRoot(); t.after(() => cleanup(root));
++  const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-insecure-")); t.after(() => cleanup(restrictedRoot));
++  await assert.rejects(
++    () => assertRestrictedRoot(root, restrictedRoot, { create: false }, secureWindowsIo({ assess: () => ({ status: "insecure" }) })),
++    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-RESTRICTED-WINDOWS-ASSURANCE",
++  );
++  await assert.rejects(
++    () => assertRestrictedRoot(root, restrictedRoot, { create: false }, secureWindowsIo({ assess: () => ({ status: "unavailable" }) })),
++    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-RESTRICTED-WINDOWS-ASSURANCE",
++  );
++  const createRestrictedRoot = path.join(await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-insecure-create-")), "restricted");
++  t.after(() => cleanup(path.dirname(createRestrictedRoot)));
++  await assert.rejects(
++    () => assertRestrictedRoot(root, createRestrictedRoot, { create: true }, secureWindowsIo({ harden: () => ({ status: "insecure" }) })),
++    (error) => error instanceof GovernanceEventStoreError && error.code === "GES-RESTRICTED-WINDOWS-ASSURANCE",
++  );
++});
++
++test("PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io seam (default platform wins, POSIX checks unchanged)", async (t) => {
++  const root = await fixtureRoot(); t.after(() => cleanup(root));
++  const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-posix-")); t.after(() => cleanup(restrictedRoot));
++  let assessCalled = false;
++  let hardenCalled = false;
++  const resolved = await assertRestrictedRoot(root, restrictedRoot, { create: false }, {
++    platform: "linux",
++    assess: () => { assessCalled = true; return { status: "insecure" }; },
++    harden: () => { hardenCalled = true; return { status: "insecure" }; },
++  });
++  assert.equal(resolved, restrictedRoot);
++  assert.equal(assessCalled, false, "the win32 assurance seam must never be consulted off win32");
++  assert.equal(hardenCalled, false, "the win32 assurance seam must never be consulted off win32");
++});
+
+commit 645de9889ebca7191163227d8a2437326f4c8b4b
+Author:     agent-pipe-shared <301875187+agent-pipe-shared@users.noreply.github.com>
+AuthorDate: Mon Aug 17 21:34:15 2026 +0200
+Commit:     agent-pipe-shared <301875187+agent-pipe-shared@users.noreply.github.com>
+CommitDate: Mon Aug 17 21:34:15 2026 +0200
+
+    feat(pipeline-core): warn on a live same-repo concurrent session at bootstrap
+
+    A-AC-01's ordering-ambiguity risk only matters when two agent sessions
+    genuinely operate concurrently in the SAME physical repository root
+    (a different branch/worktree/clone is already handled elsewhere). Add
+    observeConcurrentSessionWarning(), a read-only, never-throwing scan over
+    already-registered session descriptors (listActiveSessionDescriptors +
+    inspectSessionOwnerRuntime) that surfaces a typed concurrentSessionWarning
+    field on observePipelineStartPreflight's result only when another session
+    (not this one) has a real "live" owner process registered for the same
+    repo -- never for a stale/reused/unavailable/unobserved descriptor, and
+    never affecting status/nextAction. Cheapest PO-requested mitigation: a
+    warning, never a hard block.
+
+    Dispatch: PHX-WP-AAC01-MULTISESSION (goldfish)
+    AI-Assisted: true
+
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+index 6ef2f0e9..6d32ac9f 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.mjs
+@@ -17,9 +17,14 @@ import {
+   evaluateSelfApplicationAttestation,
+   pluginRootHasSelfApplicationGit,
+ } from "../lib/self-application-attestation-gate.mjs";
++import {
++  inspectSessionOwnerRuntime,
++  listActiveSessionDescriptors,
++} from "../lib/worktree-lifecycle.mjs";
+ import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
+
+ export const SCHEMA = "pipeline.start-preflight.v1";
++export const CONCURRENT_SESSION_WARNING_SCHEMA = "pipeline.concurrent-session-warning.v1";
+ const PLUGIN_ID = "pipeline-core@agent-pipeline";
+ const LOCAL_PLUGIN_ID = "pipeline-core@agent-pipeline-local";
+ const NORMAL_BOOTSTRAP_CHECKS = Object.freeze([
+@@ -218,6 +223,64 @@ export function freshnessHostActionForPreflight(preflight) {
+   });
+ }
+
++/**
++ * Best-effort, read-only scan for another LIVE session already registered
++ * under the SAME physical repository root as `startPath` -- the cheap,
++ * PO-requested mitigation for A-AC-01's ordering-ambiguity risk, which only
++ * matters when two agent sessions genuinely operate concurrently in the same
++ * local checkout (a different branch/worktree/clone resolves to a different
++ * physical repository root and is out of scope here, already handled
++ * elsewhere). This never fails/blocks bootstrap: every uncertain outcome --
++ * no repository at `startPath`, no descriptors registered, a malformed
++ * descriptor, any read error -- degrades to `null`, never a thrown error and
++ * never a false positive.
++ *
++ * Only a REAL, currently-running owner process (`inspectSessionOwnerRuntime`
++ * status "live") on a session other than `currentSessionId` counts. A
++ * stale/orphaned descriptor ("not-live"/"reused") or an inconclusive read
++ * ("unavailable"/"unobserved") is never treated as a positive warning --
++ * exactly the false-positive class the PO explicitly does not want (a stale
++ * descriptor or a human reading in a second terminal must never warn).
++ *
++ * The returned object exposes nothing beyond what `inspectSessionOwnerRuntime`
++ * already exposes for that other session (sessionId, descriptorSha256,
++ * status) -- no nonce, no PID, no process-start identity, no conversation
++ * data (see that function's own docstring for the same guarantee).
++ */
++export function observeConcurrentSessionWarning({
++  startPath,
++  currentSessionId = null,
++  listDescriptors = listActiveSessionDescriptors,
++  inspectOwner = inspectSessionOwnerRuntime,
++} = {}) {
++  let descriptors;
++  try {
++    descriptors = listDescriptors(startPath);
++  } catch {
++    return null;
++  }
++  for (const descriptor of descriptors) {
++    if (descriptor.sessionId === currentSessionId) continue;
++    let owner;
++    try {
++      owner = inspectOwner(startPath, descriptor.sessionId, {
++        expectedDescriptorSha256: descriptor.descriptorSha256,
++      });
++    } catch {
++      continue;
++    }
++    if (owner.status === "live") {
++      return {
++        schema: CONCURRENT_SESSION_WARNING_SCHEMA,
++        sessionId: owner.sessionId,
++        descriptorSha256: owner.descriptorSha256,
++        status: owner.status,
++      };
++    }
++  }
++  return null;
++}
++
+ export function observePipelineStartPreflight({
+   env = process.env,
+   pluginList,
+@@ -226,6 +289,13 @@ export function observePipelineStartPreflight({
+   cwd = process.cwd(),
+   knownMarketplaces = readClaudeKnownMarketplaces,
+   observe,
++  // PHX-WP-AAC01-MULTISESSION: identifies which already-registered session
++  // descriptor (if any) is "this" call's own, so it is excluded from the
++  // concurrent-session scan below. Undefined/null for every production
++  // caller today (ordinary bootstrap does not yet register a descriptor of
++  // its own -- see the module-level open-follow-up note at the bottom of
++  // this file); callers that DO register one may pass its sessionId here.
++  currentSessionId = null,
+ } = {}) {
+   const pluginRoot = resolve(dirname(fileURLToPath(scriptUrl)), "..");
+   // CLAUDECODE is set by every Claude Code session (main and subagent); its
+@@ -352,6 +422,11 @@ export function observePipelineStartPreflight({
+       installedIdentity: installedIdentityForSource,
+     };
+   }
++  // PHX-WP-AAC01-MULTISESSION: informational only. Computed unconditionally
++  // (observeConcurrentSessionWarning never throws) and never influences
++  // `status`/`nextAction`/any other field above -- see that function's own
++  // docstring for the exact false-positive-avoidance contract.
++  const concurrentSessionWarning = observeConcurrentSessionWarning({ startPath: cwd, currentSessionId });
+   const result = {
+     schema: SCHEMA,
+     status,
+@@ -362,6 +437,7 @@ export function observePipelineStartPreflight({
+     pluginRoot,
+     rulesetSource,
+     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
++    concurrentSessionWarning,
+     nextAction: status === "ready"
+       ? {
+           kind: "command",
+@@ -410,6 +486,25 @@ export function observePipelineStartPreflight({
+   };
+ }
+
++// PHX-WP-AAC01-MULTISESSION -- OPEN FOLLOW-UP, documented honestly rather
++// than silently left unaddressed: this file only reads already-registered
++// session descriptors (`observeConcurrentSessionWarning`, above); it does
++// NOT register one of its own for an ordinary Elephant/Claude/Codex
++// bootstrap. `startSessionDescriptor` today has exactly one caller in the
++// whole codebase (`codex-onboarding-capabilities.mjs`'s narrow onboarding
++// capability probe, which registers and immediately retires within the same
++// call -- it never leaves a lasting descriptor). Registering one here would
++// require a real end-of-session retirement hook to avoid leaking an orphan
++// descriptor per bootstrap; this preflight library file, invoked once at
++// the START of bootstrap, has no such hook reachable from itself alone, and
++// none was invented under time pressure (see this task's dispatch report).
++// Net effect today: the warning field is real, wired, and exercised
++// end-to-end by this task's own tests (which register descriptors directly
++// via `startSessionDescriptor`), but stays structurally dormant in ordinary
++// production use until a follow-up task adds (a) descriptor registration at
++// a real bootstrap entry point and (b) its matching retirement at a real
++// session-end hook.
++
+ export function pipelineStartPreflightExitCode(result) {
+   return result?.status === "ready" || result?.status === "plugin-refresh-required" ? 0 : 2;
+ }
+diff --git a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+index 4c9cf517..93661d46 100644
+--- a/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
++++ b/plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs
+@@ -3,16 +3,18 @@
+
+ import assert from "node:assert/strict";
+ import { execFileSync } from "node:child_process";
+-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
++import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+ import { tmpdir } from "node:os";
+ import { join } from "node:path";
+ import test from "node:test";
+ import { pathToFileURL } from "node:url";
+
+ import { validateRulesetSource } from "../lib/ruleset-source.mjs";
++import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
+ import {
+   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
+   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
++  CONCURRENT_SESSION_WARNING_SCHEMA,
+ } from "./pipeline-start-preflight.mjs";
+
+ const manifest = JSON.stringify({ version: "0.4.5+test" });
+@@ -106,11 +108,12 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
+     cwd,
+   });
+   assert.deepEqual(Object.keys(result).sort(), [
+-    "bootstrapPayload", "executionBoundary", "handoff", "installedSource", "installedVersion",
+-    "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "version",
++    "bootstrapPayload", "concurrentSessionWarning", "executionBoundary", "handoff", "installedSource",
++    "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "version",
+   ]);
+   assert.equal(result.schema, SCHEMA);
+   assert.equal(result.status, "ready");
++  assert.equal(result.concurrentSessionWarning, null);
+   assert.equal(result.version, "0.4.5+test");
+   assert.equal(result.installedVersion, "0.4.5+test");
+   assert.equal(result.installedSource, "remote");
+@@ -779,3 +782,167 @@ test("PX0-AC-08(c): the previously-dangling freshnessHostActionForPreflight read
+     "if rulesetSource were still dangling/undefined, these two otherwise-identical preflights would bind the same digest",
+   );
+ });
++
++// ---- same-repo concurrent-session warning (PHX-WP-AAC01-MULTISESSION) ----
++
++/**
++ * A minimal real git checkout, independent of the plugin-identity/self-
++ * application fixtures above -- used purely as the physical repository root
++ * for session-descriptor registration/inspection. `cwd` for these tests is
++ * this fixture root, decoupled from `scriptUrl`/`observe` (which stay on
++ * this actual repo's own real self-application checkout, as in every other
++ * test in this file).
++ */
++function buildConcurrencyRepoFixture() {
++  const gitRoot = realpathSync(mkdtempSync(join(tmpdir(), "pipeline-start-preflight-concurrency-")));
++  const git = (args) => execFileSync("git", args, { cwd: gitRoot, stdio: ["ignore", "pipe", "pipe"] });
++  git(["init", "--quiet", "--initial-branch=main"]);
++  git(["config", "user.email", "fixture@example.invalid"]);
++  git(["config", "user.name", "fixture"]);
++  writeFileSync(join(gitRoot, "README.md"), "fixture\n");
++  git(["add", "-A"]);
++  git(["commit", "--quiet", "-m", "fixture"]);
++  return gitRoot;
++}
++
++test("PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a typed same-repo warning; status/nextAction never change", () => {
++  const gitRoot = buildConcurrencyRepoFixture();
++  try {
++    const mine = startSessionDescriptor(gitRoot, {
++      sessionId: "session-this-one",
++      ownerNonce: "owner-nonce-mine-0000000001",
++    });
++    const preflightOptions = {
++      env: {},
++      pluginList: pluginList(),
++      read: () => manifest,
++      cwd: gitRoot,
++      currentSessionId: mine.sessionId,
++    };
++
++    const beforeOther = preflight(preflightOptions);
++    assert.equal(beforeOther.concurrentSessionWarning, null, "only this session's own descriptor is registered so far");
++    assert.equal(beforeOther.status, "ready");
++
++    const other = startSessionDescriptor(gitRoot, {
++      sessionId: "session-another-live",
++      ownerNonce: "owner-nonce-other-0000000001",
++    });
++    const afterOther = preflight(preflightOptions);
++    assert.deepEqual(afterOther.concurrentSessionWarning, {
++      schema: CONCURRENT_SESSION_WARNING_SCHEMA,
++      sessionId: other.sessionId,
++      descriptorSha256: other.descriptorSha256,
++      status: "live",
++    });
++    assert.equal(JSON.stringify(afterOther.concurrentSessionWarning).includes(other.ownerNonce), false,
++      "the warning must never leak the other session's owner nonce");
++
++    // The warning is informational only: every other decision field of the
++    // preflight result stays identical between the warning-absent and the
++    // warning-present run (bootstrapPayload's own size/digest measurement is
++    // deliberately excluded from this comparison -- it mechanically reflects
++    // the serialized size of the whole payload, including this new field's
++    // value, by design; that is not a decision output).
++    for (const key of [
++      "schema", "status", "version", "installedVersion", "installedSource",
++      "executionBoundary", "pluginRoot", "handoff",
++    ]) {
++      assert.deepEqual(afterOther[key], beforeOther[key], `field ${key} must stay identical`);
++    }
++    assert.deepEqual(afterOther.nextAction, beforeOther.nextAction);
++    assert.deepEqual(afterOther.rulesetSource, beforeOther.rulesetSource);
++  } finally {
++    rmSync(gitRoot, { recursive: true, force: true });
++  }
++});
++
++test("PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved descriptors never trigger the warning", () => {
++  const gitRoot = buildConcurrencyRepoFixture();
++  try {
++    const mine = startSessionDescriptor(gitRoot, {
++      sessionId: "session-this-one-negative",
++      ownerNonce: "owner-nonce-mine-0000000002",
++    });
++
++    // not-live: a syntactically valid ownerRuntime whose pid has no running
++    // process -- inspectSessionOwnerRuntime's status is derived purely from
++    // process.kill(pid, 0) at inspection time, so this does not require ever
++    // having run a real process at that pid.
++    const notLive = startSessionDescriptor(gitRoot, {
++      sessionId: "session-not-live",
++      ownerNonce: "owner-nonce-not-live-00000001",
++    });
++    const notLiveDescriptor = JSON.parse(readFileSync(notLive.path, "utf8"));
++    notLiveDescriptor.ownerRuntime = { schema: "pipeline.session-owner-runtime.v1", pid: 999999999, processStartId: "1" };
++    writeFileSync(notLive.path, `${JSON.stringify(notLiveDescriptor, null, 2)}\n`, { mode: 0o600 });
++
++    // reused: a real still-live pid (this test process), but a recorded
++    // processStartId that no longer matches -- same technique as
++    // worktree-lifecycle.test.mjs's own "D0 session owner runtime status" check.
++    const reused = startSessionDescriptor(gitRoot, {
++      sessionId: "session-reused",
++      ownerNonce: "owner-nonce-reused-000000001",
++    });
++    const reusedDescriptor = JSON.parse(readFileSync(reused.path, "utf8"));
++    reusedDescriptor.ownerRuntime.processStartId = `${Number(reusedDescriptor.ownerRuntime.processStartId) + 1}`;
++    writeFileSync(reused.path, `${JSON.stringify(reusedDescriptor, null, 2)}\n`, { mode: 0o600 });
++
++    // unavailable: registered with a pid that never resolves to a running process.
++    startSessionDescriptor(gitRoot, {
++      sessionId: "session-unavailable",
++      ownerNonce: "owner-nonce-unavailable-0000001",
++      ownerPid: -1,
++    });
++
++    // unobserved: a legacy v1 descriptor, deliberately never guessed dead.
++    const legacy = startSessionDescriptor(gitRoot, {
++      sessionId: "session-unobserved",
++      ownerNonce: "owner-nonce-unobserved-0000001",
++    });
++    const legacyDescriptor = JSON.parse(readFileSync(legacy.path, "utf8"));
++    delete legacyDescriptor.ownerRuntime;
++    legacyDescriptor.schema = "pipeline.session-descriptor.v1";
++    writeFileSync(legacy.path, `${JSON.stringify(legacyDescriptor, null, 2)}\n`, { mode: 0o600 });
++
++    const result = preflight({
++      env: {},
++      pluginList: pluginList(),
++      read: () => manifest,
++      cwd: gitRoot,
++      currentSessionId: mine.sessionId,
++    });
++    assert.equal(result.concurrentSessionWarning, null,
++      "not-live/reused/unavailable/unobserved descriptors must never be treated as a live concurrent session");
++    assert.equal(result.status, "ready");
++  } finally {
++    rmSync(gitRoot, { recursive: true, force: true });
++  }
++});
++
++test("PHX-WP-AAC01-MULTISESSION: a repository root with no registered descriptors at all never warns and never throws", () => {
++  const gitRoot = buildConcurrencyRepoFixture();
++  try {
++    const result = preflight({
++      env: {},
++      pluginList: pluginList(),
++      read: () => manifest,
++      cwd: gitRoot,
++    });
++    assert.equal(result.concurrentSessionWarning, null);
++    assert.equal(result.status, "ready");
++  } finally {
++    rmSync(gitRoot, { recursive: true, force: true });
++  }
++});
++
++test("PHX-WP-AAC01-MULTISESSION: an unresolvable cwd (no repository at all) degrades to no warning, never throws", () => {
++  const result = preflight({
++    env: {},
++    pluginList: pluginList(),
++    read: () => manifest,
++    cwd: "/projects/does-not-exist-as-a-repository",
++  });
++  assert.equal(result.concurrentSessionWarning, null);
++  assert.equal(result.status, "ready");
++});
