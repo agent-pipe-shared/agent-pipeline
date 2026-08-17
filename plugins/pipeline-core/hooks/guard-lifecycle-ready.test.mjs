@@ -3598,7 +3598,13 @@ test("GSSHELL-STAGE-1: staging and committing a gate-strength file is admitted, 
       "git restore pipeline.user.yaml",
       "git restore --source=HEAD pipeline.user.yaml",
       "git stash pop pipeline.user.yaml",
-      "git apply pipeline.user.yaml.patch",
+      // NVA-LCGUARD-4 gap 1: was "git apply pipeline.user.yaml.patch" -- a DIFFERENT,
+      // unrelated file that merely had the protected name as a prefix of its own longer
+      // name. The gate-strength shell rule now requires an exact/path-boundary match
+      // (see the dedicated NVA-LCGUARD-4 gap 1 test below), so that derivative filename
+      // is correctly no longer swept in here; this line keeps testing the same thing the
+      // test intends -- `git apply` naming the real protected file stays refused.
+      "git apply pipeline.user.yaml",
       "git reset --hard -- pipeline.user.yaml",
       "git clean -fd pipeline.user.yaml",
       "git rm pipeline.user.yaml",
@@ -3607,6 +3613,55 @@ test("GSSHELL-STAGE-1: staging and committing a gate-strength file is admitted, 
       "printf x > pipeline.user.yaml",
     ]) {
       assert.match(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL|GUARD-/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
+/**
+ * NVA-LCGUARD-4 gap 1 (backlog: 2026-08-17-two-guards-block-an-unrelated-file-via-substring-
+ * name-matching.md, part A). `gateStrengthShellRefusal()` matched a protected basename as a
+ * raw substring anywhere in the command text, so a file that only shares the protected name
+ * as a PREFIX of its own longer, unrelated name -- a backup copy such as
+ * `pipeline.user.yaml.bak` -- was refused as if it were the real protected file. Fixed to
+ * require the needle to appear as a whole filename/path segment (bounded on both sides by
+ * anything that could not itself continue the same filename token), not a raw `.includes()`.
+ *
+ * Both directions, for the same reason GSSHELL-STAGE-1 above checks both: an admission-only
+ * test would pass just as happily on a rule that had stopped refusing the real file too.
+ */
+test("NVA-LCGUARD-4 gap 1: a backup-style filename sharing a protected name as a substring is admitted, while the real protected file stays refused", () => {
+  const readiness = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+  mkdirSync(SCRATCH_ROOT, { recursive: true });
+  const path = mkdtempSync(join(SCRATCH_ROOT, "guard-lifecycle-gsshell-bak-"));
+  // The rule only defends a repository the Pipeline governs, so the fixture must carry the
+  // marker -- see GSSHELL-STAGE-1 above for why an unmarked fixture would pass vacuously.
+  writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const run = (command) => evaluateLifecycleReadyGuard(bash(command), {
+    projectDir: path,
+    requireProjectOnboardingReadyFn() { return readiness; },
+  });
+  try {
+    assert.match(run("sed -i s/a/b/ pipeline.user.yaml").stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+      "fixture check: the rule must actually be active here");
+    for (const command of [
+      "rm project/pipeline.user.yaml.bak",
+      "rm project\\pipeline.user.yaml.bak",
+      "sed -i s/a/b/ pipeline.user.yaml.bak",
+      "cp pipeline.user.yaml.bak restored.yaml",
+    ]) {
+      assert.doesNotMatch(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
+    }
+    for (const command of [
+      // the real protected file itself, by its bare name and by an absolute-looking path --
+      // this positive case must stay refused; the fix narrows the match, it does not remove it.
+      "sed -i s/a/b/ pipeline.user.yaml",
+      "rm project/pipeline.user.yaml",
+      "rm project\\pipeline.user.yaml",
+      "cp other.yaml pipeline.user.yaml",
+    ]) {
+      assert.match(run(command).stderr, /GUARD-GATE-STRENGTH-SHELL/u, command);
     }
   } finally {
     rmSync(path, { recursive: true, force: true });

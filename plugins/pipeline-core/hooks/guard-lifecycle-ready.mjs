@@ -499,6 +499,21 @@ function isGateStrengthSafeGitCommand(command, root) {
   return GATE_STRENGTH_SHELL_SAFE_GIT_VERBS.has(verb);
 }
 
+// NVA-LCGUARD-4 gap 1 (backlog: 2026-08-17-two-guards-block-an-unrelated-file-via-substring-
+// name-matching.md, part A). A raw `haystack.includes(needle)` matches a protected basename
+// as a substring of an UNRELATED, differently-named file -- `pipeline.user.yaml.bak` is not
+// `pipeline.user.yaml`, but the old check could not tell the difference. This requires the
+// needle to occur as a whole filename/path segment: bounded on both sides by anything that
+// could not itself continue the SAME filename token (i.e. not an ASCII letter, digit, `.`,
+// `-`, or `_`), or by the start/end of the string. `pipeline.user.yaml.bak` fails (the `.`
+// right after `yaml` continues the token); `project/pipeline.user.yaml` and
+// `pipeline.user.yaml` alone both still match (bounded by `/`, the string edges, or nothing
+// filename-shaped at all).
+function matchesProtectedBasename(haystack, needle) {
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  return new RegExp(`(?<![a-z0-9._-])${escaped}(?![a-z0-9._-])`, "u").test(haystack);
+}
+
 function gateStrengthShellRefusal(command, root, dependencies = {}) {
   if (typeof command !== "string" || command === "") return null;
   if (isReadOnlyDiagnosticCommand(command, root)) return null;
@@ -515,7 +530,7 @@ function gateStrengthShellRefusal(command, root, dependencies = {}) {
   // a rule that would break bootstrap.
   const needles = GATE_STRENGTH_PATHS.map((rule) => basename(rule.path));
   const haystack = command.replace(/\\/gu, "/").toLowerCase();
-  const hit = needles.find((needle) => haystack.includes(needle.replace(/\\/gu, "/").toLowerCase()));
+  const hit = needles.find((needle) => matchesProtectedBasename(haystack, needle.replace(/\\/gu, "/").toLowerCase()));
   if (hit === undefined) return null;
   return verdict(
     2,
