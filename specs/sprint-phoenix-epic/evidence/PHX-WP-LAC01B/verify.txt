@@ -1,0 +1,27 @@
+# PHX-WP-LAC01B verify — 2026-08-17T07:43:31.165Z
+
+## node plugins/pipeline-core/lib/control-execution-lifecycle-event.test.mjs
+exit=0
+control-execution-lifecycle-event: ok
+
+## node plugins/pipeline-core/lib/lifecycle-governance-events.test.mjs
+exit=0
+ℹ pass 7
+ℹ fail 0
+
+## node plugins/pipeline-core/lib/control-execution-exchange.test.mjs
+exit=0
+control-execution-exchange: ok
+
+## node plugins/pipeline-core/scripts/pipeline-state-lifecycle-event.test.mjs
+exit=0
+pipeline-state-lifecycle-event: ok
+
+## node harness/scripts/pipeline-state.test.mjs
+exit=1
+504/506 cases passed.
+Failures:
+  - PS54af status reports the live Phoenix package's real current state
+  - PS54ag plan previews the live Phoenix transition from its real current state
+
+suites=5 failed=1

@@ -4,7 +4,7 @@ Status: design
 
 Date: 2026-08-09 (class table and per-criterion rows CORRECTED 2026-08-17 — see note below)
 
-Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260817d.md](../evidence/acceptance-evidence-map-20260817d.md)
+Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260817e.md](../evidence/acceptance-evidence-map-20260817e.md)
 
 **CORRECTION, 2026-08-17.** This document's original "48 of 157" claim (below) had gone stale:
 between 2026-08-09 and 2026-08-16, real work landed on 22 of those 48 rows — 20 flipped to
@@ -18,7 +18,7 @@ against current code/tests (not against this document's prose), confirming the g
 state and additionally catching one the generator itself had missed (E-AC-08, closed by commit
 `8956d770` the same night, verified independently by re-running its test file: 7/7 pass). The
 class table and per-criterion tables below are corrected to match. **Current authoritative
-snapshot:** [`../evidence/acceptance-evidence-map-20260817d.md`](../evidence/acceptance-evidence-map-20260817d.md).
+snapshot:** [`../evidence/acceptance-evidence-map-20260817e.md`](../evidence/acceptance-evidence-map-20260817e.md).
 
 **UPDATE, same day (PHX-WP-POAMEND, commit `e9054995`).** Four PO-decided amendments landed in
 one docs-only commit: A-AC-14 (accept 12/13, closing it — moved out of Class P entirely, verdict
@@ -226,7 +226,7 @@ the P route the same day too (PHX-WP-LAC08, commit `20014aab`: the undistinguish
 originally named no longer exists), not as a Class D member either; E-AC-20 (Class S) landed
 2026-08-10. Full per-row evidence for every `implemented` criterion, including
 these, is in
-[`../evidence/acceptance-evidence-map-20260817d.md`](../evidence/acceptance-evidence-map-20260817d.md)
+[`../evidence/acceptance-evidence-map-20260817e.md`](../evidence/acceptance-evidence-map-20260817e.md)
 — not repeated here, since this document's job is the OPEN set.
 
 ### Class B — an absent capability (13)
@@ -240,7 +240,7 @@ these, is in
 | A-AC-10 | partial | WP-A | the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists |
 | EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file (reconfirmed 2026-08-17 by independent re-verification, zero hits for "unpublished"/"Nova"/"Cyborg"/"Nightwing") |
 | H-AC-08 | partial | WP-HAC08 | `legacy-import-observation` kind is representable, drift-tested. Still no production caller: CONFIRMED ABSENT that any code path imports/migrates a legacy record at all |
-| L-AC-01 | partial | WP-L | UPDATE 2026-08-17 (PHX-WP-LAC01, commit `fd57d390`): first real producer landed — `continuity-cas` now durably persists a schema-valid `dispatch`-kind lifecycle event via a new translator, independently re-verified (unit + call-site + 506/506 gated regression + e2e readback). 1 of 9 named kinds done; `candidate-invalidation` recommended next (the translator already refuses invalidated exchanges by name). Registering the new call-site suite into `harness/scripts/verify.mjs` is blocked by the same installed-plugin TP-3 gap as the other four parked reds |
+| L-AC-01 | partial | WP-L | UPDATE 2026-08-17 (PHX-WP-LAC01, commit `fd57d390`): first real producer landed — `continuity-cas` now durably persists a schema-valid `dispatch`-kind lifecycle event via a new translator, independently re-verified (unit + call-site + 506/506 gated regression + e2e readback). UPDATE 2026-08-17 (PHX-WP-LAC01B, commit `8e4be420`): second real producer landed — `continuity-integrate-final` now durably persists a `status`-kind event via a sibling translator, independently re-verified (unit + call-site tests green, gated regression 504/506 — the 2 failures are the same pre-existing FTP-ARTIFACT-2 acceptance.md-digest-staleness cause, confirmed pre-existing by re-running the identical suite at the prior commit). Honest count: **2 of 9** — NOT status+cancellation as hoped: the real continuity outcome vocabulary only ever observes succeeded/failed, so cancellation stays unreached despite the projection covering it. `candidate-invalidation` also confirmed to have no real caller (invalidation is always constructed `{state:"valid"}`; zero non-test producers of an invalidated state anywhere). Remaining 7 kinds all need a source vocabulary to exist before a producer can — a capability gap now, not a translator-authoring gap. Registering the new call-site suites into `harness/scripts/verify.mjs` is blocked by the same installed-plugin TP-3 gap as the other four parked reds |
 | P-AC-06 | partial | WP-P | missing, misplaced, illegally-mutable, stale and truncated each pinned. legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it |
 | P-AC-09 | partial | WP-P | RETRACTS "no carrier" (2026-08-17): `computeBackfillRange` (organization-policy-activation.mjs) already covers the preview half, shared with P-AC-03. Narrower remainder: `activateOrganizationPolicy`'s `authorize()` is one generic activation grant, not a distinct "explicit backfill consent" scoped to the identified historical range, and no code exports/backfills the historical events themselves |
 | R-AC-08 | partial | WP-R | a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent — no such state exists, only prospective values inside recoverability |
