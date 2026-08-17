@@ -2631,6 +2631,117 @@ export function verifyHumanGuardOverrideAudit({ rootDir, spawn = spawnSync } = {
   };
 }
 
+// ---------------------------------------------------------------------------------
+// NVA-SIGENTRY-1: resolves an HGO signature-mode intent digest back to the recorded
+// request behind it, so `po-human-approval.mjs sign-intent` can show what it is about
+// to authorize instead of falling into "no recorded request resolves for this digest"
+// for every HGO selection (backlog/items/2026-08-08-the-signing-ceremony-is-designed-
+// for-the-verifier-not-the-signer.md finding 7; ADR-0061 Decision 4). Mirrors
+// `describeGuardMaintenanceWindowRequest()`'s (lib/guard-maintenance-window.mjs) return
+// shape closely enough that `sign-intent`'s existing `record.resolved ? record.lines :
+// [...]` branch needs no restructuring -- only a second resolver attempt when the GMW
+// describer itself does not resolve. Never fabricates: every displayed value is read
+// from a stored request that RE-DERIVES, through the exact same
+// `buildHumanGuardOverrideSignatureIntent()` recipe the verifier uses, to the digest
+// about to be signed. A request whose stored bytes no longer re-derive to any digest --
+// edited, or simply superseded since -- stops matching; it never starts describing a
+// lie. Mirrors the enumerate-then-validate loop shape `consumeHumanGuardOverride()`
+// already uses over `paths.capabilities` (readdirSync + filter + sort + a per-entry
+// try/catch that skips what it cannot use), over `paths.requests` instead.
+// ---------------------------------------------------------------------------------
+const HGO_SUMMARY_MAX_LINES = 8;
+const HGO_SUMMARY_MAX_LINE_CHARS = 240;
+const HGO_SUMMARY_MAX_RATIONALE_CHARS = 160;
+const HGO_SUMMARY_MAX_PATHS = 8;
+
+function hgoDisplayText(value, limit) {
+  const flat = (typeof value === "string" ? value : "").replace(/\p{C}/gu, " ").replace(/\s+/gu, " ").trim();
+  return flat.length <= limit
+    ? { text: flat, truncated: false, length: flat.length }
+    : { text: `${flat.slice(0, limit)}...`, truncated: true, length: flat.length };
+}
+
+function hgoDisplayTimestamp(value) {
+  try {
+    const iso = new Date(value).toISOString();
+    return typeof iso === "string" ? iso : String(value);
+  } catch { return String(value); }
+}
+
+function hgoClipLines(lines) {
+  return lines.slice(0, HGO_SUMMARY_MAX_LINES).map((line) => {
+    const flat = String(line).replace(/\p{C}/gu, " ");
+    return flat.length <= HGO_SUMMARY_MAX_LINE_CHARS ? flat : `${flat.slice(0, HGO_SUMMARY_MAX_LINE_CHARS - 3)}...`;
+  });
+}
+
+function unresolvedHumanGuardOverrideSelection(code) {
+  return { resolved: false, code, lines: [] };
+}
+
+/**
+ * Resolves the HGO signature-mode request recorded in this repository for
+ * `intentSha256` and renders a bounded, purely-read summary of it -- the eligible
+ * paths, the denying guard's rationale, and the expiry, exactly the three things
+ * `prepared.decisionPreview`/`planned.preview` already carry (ADR-0059's own
+ * "the eligible paths, the denying guard's rationale, and the expiry are all already
+ * in the prepared selection's decisionPreview").
+ *
+ * Enumerates every stored `requestSha256` under `paths.requests` (the same store
+ * `recordHumanGuardDenial()` writes to) and, for each, recomputes its selection
+ * (fixed `HGO_SIGNATURE_REASON`, exactly as the signed path always uses) and intent
+ * digest via `buildHumanGuardOverrideSignatureIntent()` -- the SAME shared helper
+ * `authorizeHumanGuardOverrideBySignature()` gates arming on. Only a request whose
+ * recomputed digest equals `intentSha256` exactly is ever returned; a request this
+ * repository cannot currently plan/prepare (expired, wrong root, author-repair without
+ * a selected root, `global-plugin-install` mode) is skipped, never guessed at.
+ */
+export function describeHumanGuardOverrideSelection({ rootDir, pluginRoot, intentSha256, scriptPath, spawn = spawnSync } = {}) {
+  try {
+    if (!SHA256.test(intentSha256 ?? "")) return unresolvedHumanGuardOverrideSelection("HGO-RECORD-DIGEST-INVALID");
+    let repo;
+    try { repo = topology(rootDir, spawn); } catch { return unresolvedHumanGuardOverrideSelection("HGO-RECORD-REPOSITORY-UNAVAILABLE"); }
+    const paths = storage(repo.common);
+    let files;
+    try { files = readdirSync(paths.requests).filter((name) => name.endsWith(".json")).sort(); }
+    catch { return unresolvedHumanGuardOverrideSelection("HGO-RECORD-ABSENT"); }
+    const nowMs = Date.now();
+    for (const name of files) {
+      const requestSha256 = name.slice(0, -5);
+      if (!SHA256.test(requestSha256)) continue;
+      try {
+        const planned = planHumanGuardOverride({ rootDir, pluginRoot, requestSha256, nowMs, spawn, scriptPath, authorSourceRoot: null });
+        const prepared = prepareHumanGuardOverrideAuthorization({
+          rootDir, pluginRoot, requestSha256, planSha256: planned.planSha256, reason: HGO_SIGNATURE_REASON, nowMs, spawn, scriptPath, authorSourceRoot: null,
+        });
+        const intent = buildHumanGuardOverrideSignatureIntent({ prepared, planned });
+        if (intent.sha256 !== intentSha256) continue;
+
+        const pathsTotal = planned.eligiblePaths.length;
+        const eligiblePaths = planned.eligiblePaths.slice(0, HGO_SUMMARY_MAX_PATHS).map((path) => hgoDisplayText(path, 200).text);
+        const pathsNote = pathsTotal > eligiblePaths.length ? ` [showing ${eligiblePaths.length} of ${pathsTotal}]` : "";
+        const rationale = (planned.preview?.guardRationale ?? []).map(({ guard, rationale: text }) => {
+          const rendered = hgoDisplayText(text, HGO_SUMMARY_MAX_RATIONALE_CHARS);
+          return `${hgoDisplayText(guard, 64).text}: "${rendered.text}"${rendered.truncated ? " [truncated]" : ""}`;
+        }).join("; ");
+        const expiresAt = hgoDisplayTimestamp(planned.expiresAt);
+
+        return {
+          resolved: true,
+          code: "HGO-RECORD-RESOLVED",
+          lines: hgoClipLines([
+            `recorded request: ${REQUEST_SCHEMA} (tool ${hgoDisplayText(planned.toolName, 32).text}, class ${hgoDisplayText(planned.commandClass, 64).text})`,
+            `eligible paths this override would admit: ${eligiblePaths.join(", ")}${pathsNote}`,
+            `denying guard rationale: ${rationale || "(none recorded)"}`,
+            `window expires at (signed, absolute): ${expiresAt}`,
+          ]),
+        };
+      } catch { continue; }
+    }
+    return unresolvedHumanGuardOverrideSelection("HGO-RECORD-DIGEST-MISMATCH");
+  } catch { return unresolvedHumanGuardOverrideSelection("HGO-RECORD-UNREADABLE"); }
+}
+
 export const humanGuardOverrideInternals = {
   canonical,
   sha,

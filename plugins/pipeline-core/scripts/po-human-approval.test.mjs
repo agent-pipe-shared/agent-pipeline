@@ -32,14 +32,20 @@ import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { authorizeCriticalPushCommand, outside, parseHumanArgs, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
-import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
+import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import {
+  HGO_SIGNATURE_REASON,
+  planHumanGuardOverride,
+  prepareHumanGuardOverrideAuthorization,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 // Namespace import ON PURPOSE (same reason as in lib/guard-maintenance-window.test.mjs):
@@ -831,6 +837,109 @@ function prepareWindow(dirs, { scopeRuleIds = ["GS-6", "TP-1"], reason = WINDOW_
     livePluginRoot: dirs.plugin,
   });
 }
+
+/**
+ * NVA-SIGENTRY-1: `sign-intent` resolving an HGO signature-mode selection, the second
+ * half of the closed blind-signature gap (backlog/items/2026-08-08-the-signing-
+ * ceremony-is-designed-for-the-verifier-not-the-signer.md finding 7).
+ *
+ * PLUGIN_ROOT here must be THIS checkout's own real `plugins/pipeline-core` directory
+ * (never a synthetic fixture directory the way `windowFixture()`'s `plugin` root is for
+ * GMW) -- `sign-intent`'s production code resolves its own `PLUGIN_ROOT` from
+ * `import.meta.url` the same way `guard-human-override.mjs` does, so a fixture-recorded
+ * HGO request must use the identical real plugin identity for pluginIdentity() to match
+ * when `sign-intent` itself later re-plans the same request.
+ */
+const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const HGO_SIGNATURE_INTENT_PLAN_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-plan.v1").digest("hex");
+const HGO_SIGNATURE_INTENT_SPEC_SHA256 = createHash("sha256").update("pipeline.human-guard-override-signature-spec.v1").digest("hex");
+
+/** A real git repository committing signature mode, the topology an HGO request binds. */
+function hgoFixtureDirs() {
+  const repoRoot = mkdtempSync(join(tmpdir(), "po-hgo-repo-"));
+  execFileSync("git", ["init", "-q"], { cwd: repoRoot });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: repoRoot });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: repoRoot });
+  writeFileSync(join(repoRoot, "README.md"), "# fixture\n");
+  writeFileSync(join(repoRoot, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+  execFileSync("git", ["add", "-A"], { cwd: repoRoot });
+  execFileSync("git", ["commit", "-q", "-m", "init"], { cwd: repoRoot });
+  return { repoRoot, directory: mkdtempSync(join(tmpdir(), "po-hgo-external-")) };
+}
+
+/** denial -> plan -> prepare-authorization (fixed HGO_SIGNATURE_REASON) -> the independently-reconstructed intent digest sign-intent must resolve, mirroring lib/human-guard-override.test.mjs's prepareSignedArming() shape without calling into any of this module's own new exports. */
+function armHgoRequest(repoRoot, toolInput) {
+  const denials = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }];
+  const recorded = recordHumanGuardDenial({ rootDir: repoRoot, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials });
+  assert.equal(recorded.status, "planned", `HGO fixture denial not plannable: ${JSON.stringify(recorded)}`);
+  const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+  const plan = planHumanGuardOverride({ rootDir: repoRoot, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, scriptPath });
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    rootDir: repoRoot, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, reason: HGO_SIGNATURE_REASON, scriptPath,
+  });
+  const intent = createPoApprovalIntent({
+    kind: "guard-override",
+    featureId: "human-guard-override",
+    planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
+    specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+    candidate: { commit: plan.repository.head, tree: plan.repository.tree },
+    policyRevision: "human-guard-override-signature-v1",
+    subjectSha256: prepared.selectionSha256,
+    decision: "authorize",
+  });
+  return { requestSha256: recorded.requestSha256, planSha256: plan.planSha256, intent };
+}
+
+test("NVA-SIGENTRY-1: sign-intent resolves an HGO signature-mode intent digest and shows its eligible paths, denying rationale and expiry", () => {
+  const dirs = hgoFixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const armed = armHgoRequest(dirs.repoRoot, { file_path: "notes.md", content: "hgo sign-intent\n" });
+    const prompts = [];
+    const result = runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", armed.intent.sha256],
+      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.intentSha256, armed.intent.sha256);
+    assert.equal(prompts.length, 1, "still exactly one human confirmation (ADR-0061 Decision 1)");
+    const [prompt] = prompts;
+    assert.ok(prompt.includes(armed.intent.sha256), "the digest being signed must still be named");
+    assert.ok(prompt.includes("notes.md"), "the eligible path must be shown");
+    assert.ok(prompt.includes("GUARD-LIFECYCLE-NOT-READY"), "the denying guard's rationale must be shown");
+    assert.match(prompt, /expires at/iu, "the recorded expiry must be shown");
+    assert.doesNotMatch(prompt, /no recorded request/iu, "must not fall into the cannot-describe fallback");
+
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    assert.equal(proof.intentSha256, armed.intent.sha256, "the signature still covers the digest, nothing the summary said");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-SIGENTRY-1: a digest resolving to neither a GMW request nor an HGO request still falls into the honest fallback, unchanged", () => {
+  const dirs = hgoFixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    // A real, resolvable HGO request IS stored -- proving the new resolver is additive
+    // (it enumerates a non-empty store) rather than the GMW-only-fallback case already
+    // covered elsewhere, where nothing is stored at all.
+    armHgoRequest(dirs.repoRoot, { file_path: "notes.md", content: "hgo present but unrelated\n" });
+    const unrelated = createHash("sha256").update("neither gmw nor hgo resolves this").digest("hex");
+    const prompts = [];
+    runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", unrelated],
+      { readConfirmation: (prompt) => { prompts.push(prompt); return "approve"; } },
+    );
+    const [prompt] = prompts;
+    assert.ok(prompt.includes(unrelated), "the digest is still named");
+    assert.match(prompt, /no recorded request/iu, "the absence of a record must be stated explicitly");
+    assert.equal(prompt.includes("notes.md"), false, "the unrelated stored HGO request's path must never be shown");
+    assert.match(prompt, /guard-lift\/guard-override/u, "the generic consequence class stays stated when nothing better is known");
+  } finally {
+    cleanup(dirs);
+  }
+});
 
 test("sign-intent states the reason, scope and expiry of the request recorded behind the digest", () => {
   const dirs = windowFixture();

@@ -26,11 +26,20 @@ import { approvalRequestFromExternalJson, observeCleanCandidate, run as runAppro
 import { readPublicRepositoryFile, verifyThreatModelApprovalRequest } from "../lib/threat-model-approval-request.mjs";
 import { CRITICAL_ACTION_KINDS, criticalActionSubjectSha256, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { describeGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
+import { describeHumanGuardOverrideSelection } from "../lib/human-guard-override.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { MACHINE_PLANE_SCHEMA, readMachinePlane, writeMachinePlane } from "../lib/machine-plane.mjs";
 import { boundedOpaqueCopyCommand, renderProjectOnboardingAction } from "../lib/project-onboarding-v3.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
+
+// NVA-SIGENTRY-1: the same resolved-plugin-root derivation guard-human-override.mjs
+// already uses (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`) -- needed
+// here only so `sign-intent` can call describeHumanGuardOverrideSelection(), which
+// needs a `pluginRoot` to re-plan/re-prepare a candidate HGO request the same way the
+// signature-mode ceremony itself does.
+const SCRIPT = fileURLToPath(import.meta.url);
+const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
@@ -871,8 +880,21 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     // re-derives to this digest — the command says exactly that and shows nothing else.
     // The signature covers the digest either way; the summary is disclosure, never
     // authority.
-    const describe = dependencies.describeIntentRecord ?? describeGuardMaintenanceWindowRequest;
-    const record = describe({ rootDir: repository, intentSha256 });
+    //
+    // NVA-SIGENTRY-1: GMW is tried first -- the pre-existing, cheaper, common-case
+    // resolver -- and an HGO signature-mode selection is tried only when GMW itself
+    // does not resolve, closing the same blind-signature gap for the HGO ceremony
+    // specifically (backlog/items/2026-08-08-the-signing-ceremony-is-designed-for-the-
+    // verifier-not-the-signer.md finding 7). Both resolvers share the identical
+    // never-fabricate contract, so trying a second one after the first fails closed
+    // only WIDENS what can be disclosed, never what gets signed; when both fail closed
+    // the honest fallback below is unchanged.
+    const describeGmw = dependencies.describeIntentRecord ?? describeGuardMaintenanceWindowRequest;
+    const describeHgo = dependencies.describeHgoIntentRecord ?? describeHumanGuardOverrideSelection;
+    let record = describeGmw({ rootDir: repository, intentSha256 });
+    if (!record.resolved) {
+      record = describeHgo({ rootDir: repository, pluginRoot: PLUGIN_ROOT, intentSha256, scriptPath: SCRIPT });
+    }
     requireExplicitConfirmation([
       `intent sha256: ${intentSha256}`,
       ...(record.resolved ? record.lines : [

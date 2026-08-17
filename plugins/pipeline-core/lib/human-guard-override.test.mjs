@@ -28,6 +28,7 @@ import {
   authorizeHumanGuardOverrideBySignature,
   buildHumanGuardOverrideSignatureIntent,
   consumeHumanGuardOverride,
+  describeHumanGuardOverrideSelection,
   HGO_SIGNATURE_REASON,
   HumanGuardOverrideError,
   humanGuardOverrideInternals,
@@ -239,6 +240,72 @@ test("NVA-SIGENTRY-1: buildHumanGuardOverrideSignatureIntent() produces the same
       scriptPath,
     });
     assert.equal(armed.status, "armed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// NVA-SIGENTRY-1 DoD check 5: describeHumanGuardOverrideSelection() must never resolve
+// to the first/only stored request found -- it must find the ONE whose recomputed
+// digest actually equals the given intentSha256, even with multiple pending denials
+// stored in the same repository at once.
+test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() resolves the exact matching stored request, never the wrong one among several", () => {
+  const root = fixtureSignature();
+  try {
+    // describeHumanGuardOverrideSelection() re-plans/re-prepares using its OWN real
+    // Date.now() (it accepts no injectable nowMs, exactly like
+    // describeGuardMaintenanceWindowRequest()), so the fixture must use real,
+    // current timestamps too -- an artificial epoch-relative nowMs (as most of this
+    // suite's OTHER fixtures use, self-consistently, for the request/plan/authorize
+    // calls they alone drive) would already read as expired against real wall-clock
+    // time and never resolve.
+    const base = Date.now();
+    const first = prepareSignedArming(root, {
+      toolName: "Write", toolInput: { file_path: "first-file.md", content: "first\n" }, denials: denial, nowMs: base,
+    });
+    const second = prepareSignedArming(root, {
+      toolName: "Write", toolInput: { file_path: "second-file.md", content: "second\n" }, denials: denial, nowMs: base + 10,
+    });
+    assert.notEqual(first.intent.sha256, second.intent.sha256);
+
+    const resolvedSecond = describeHumanGuardOverrideSelection({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: second.intent.sha256, scriptPath: second.scriptPath,
+    });
+    assert.equal(resolvedSecond.resolved, true);
+    assert.equal(resolvedSecond.code, "HGO-RECORD-RESOLVED");
+    const secondText = resolvedSecond.lines.join("\n");
+    assert.ok(secondText.includes("second-file.md"), "must show the SECOND request's own eligible path");
+    assert.equal(secondText.includes("first-file.md"), false, "must never show the first request's path for the second digest");
+
+    const resolvedFirst = describeHumanGuardOverrideSelection({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: first.intent.sha256, scriptPath: first.scriptPath,
+    });
+    assert.equal(resolvedFirst.resolved, true);
+    const firstText = resolvedFirst.lines.join("\n");
+    assert.ok(firstText.includes("first-file.md"), "must show the FIRST request's own eligible path");
+    assert.equal(firstText.includes("second-file.md"), false, "must never show the second request's path for the first digest");
+
+    // The recorded denial's rationale and expiry are disclosed too (ADR-0059's "eligible
+    // paths / denying guard's rationale / expiry").
+    assert.ok(secondText.includes("GUARD-LIFECYCLE-NOT-READY"));
+    assert.match(secondText, /expires at/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// NVA-SIGENTRY-1 DoD check 4: a digest resolving to no stored request at all -- neither
+// GMW nor HGO -- must fall through unresolved, unchanged; this proves the new resolver
+// is additive rather than a wider "always resolves something" behaviour.
+test("NVA-SIGENTRY-1: describeHumanGuardOverrideSelection() stays unresolved for a digest that matches no stored request", () => {
+  const root = fixtureSignature();
+  try {
+    prepareSignedArming(root, { toolName: "Write", toolInput: { file_path: "notes.md", content: "unrelated\n" }, denials: denial });
+    const unrelated = createHash("sha256").update("some other intent entirely").digest("hex");
+    const record = describeHumanGuardOverrideSelection({ rootDir: root, pluginRoot: PLUGIN_ROOT, intentSha256: unrelated, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs") });
+    assert.equal(record.resolved, false);
+    assert.equal(record.code, "HGO-RECORD-DIGEST-MISMATCH");
+    assert.deepEqual(record.lines, []);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
