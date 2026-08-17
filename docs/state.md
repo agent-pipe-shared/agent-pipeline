@@ -7,7 +7,68 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again: 22/157 open, three Class-B dispatches in flight, Nova branch-divergence resolved (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (3): 20/157 open, three Class-B dispatches landed and independently verified (READ THIS FIRST)
+
+**Since the checkpoint below:** the three parallel Class-B dispatches it left in flight (P-AC-09,
+A-AC-10, H-AC-08) all completed. Each was independently re-verified before acceptance — full diff
+read, tests re-run at the exact candidate commit from the synced `.git/phx-verify` worktree — using
+a fork per dispatch to keep the raw verification output out of the main session's context. Live
+count now **20 of 157 open** (`../evidence/acceptance-evidence-map-20260817i.md`). Class B: **9**.
+Class P: **11**.
+
+- **P-AC-09 closed** (commit `6b9a656e`, docs commit `4419fec2`, `implemented`): both remaining gaps
+  built. `activateOrganizationPolicy` now requires a distinct
+  `backfillGranted`/`backfillDecisionId`/`backfillSubjectSha256` consent, digest-bound to the plan's
+  own backfill preview, refused by name (`OPA-BACKFILL-CONSENT`) when a backfill-implying activation
+  supplies only the ordinary activation authority. New module
+  `organization-policy-backfill-export.mjs` exports a consented `backfillRange` by reusing the real
+  pipeline (`queryPortableGovernanceStream` → `projectGovernanceEvent` → `enqueueGovernanceExport` →
+  `deliverGovernanceExportBatch`), not a parallel mechanism. Independently re-verified: the refusal
+  test re-confirms the prior policy stays active rather than silently permitting activation; the
+  end-to-end export test uses real appended events and asserts a real delivered disposition, not a
+  mock; the disclosed test-fixture deviation (two pre-existing suites' `authorize` stubs extended
+  with the new consent fields) touches no assertion beyond satisfying the stricter contract. Full
+  affected regression set re-run: 80/80 pass.
+- **A-AC-10 closed** (commit `8800f8d4`, docs commit `5beb9ccc`, `implemented`): the missing
+  per-event-class fail-open/fail-closed policy is built. `JOURNALING_UNAVAILABLE_DISPOSITIONS`
+  (`agent-decision-journal.mjs`) is a closed, frozen table total over all 7 `EVENT_CLASSES`, checked
+  complete at import (`ADJ-JOURNALING-POLICY-INCOMPLETE` on drift). `resolveJournalingUnavailability()`
+  exposes a typed, observable `pipeline.agent-journaling-gap.v1` gap record on both the fail-open and
+  fail-closed paths. Independently re-verified: R-AC-10's existing
+  `acknowledgeNonMaterialOfferWithoutJournal` confirmed byte-for-byte unchanged via a zero-context
+  diff against the pre-commit version; the new path's fail-open set is a proven strict subset of that
+  exception. `agent-decision-journal-tests` 49/49, `external-command-offer-tests` 39/39, both re-run.
+- **H-AC-08 reclassified Class B → Class P** (no code change, clean `NO CARRIER` self-stop, docs
+  commit `dafe23ea`): the dispatch found a real legacy-record source artifact
+  (`project/guard-override.log.jsonl`, git-tracked, 5 pre-Phoenix override records) — correcting the
+  prior "no legacy source exists" framing — but correctly did not build a producer: that file is the
+  guard's live token-consumption ledger, not a dormant record awaiting migration, and the one real
+  legacy-import activity in this repo (`migrate-backlog-state.mjs`) is permanently closed and
+  semantically refuses the records H-AC-08 would import.
+  `design/agent-decision-journal-production-producer.md` sec.5 already rules building a producer here
+  the same "caller built to satisfy a criterion" anti-pattern reverted once before (`cc43a182`), and
+  names it a PO amendment decision deliberately not taken by a dispatch — same shape as H-AC-09's own
+  reclassification. Open PO question now: with a real source known but no import need, does H-AC-08
+  amend (H-AC-11/PX0-AC-13 style) or stay open with this corrected reason recorded.
+- Small tidy commit `8e4355dd` folded in both dispatches' `dispatch-record.json` `report` fields,
+  which are written after their own bundled commit per convention and were left dirty in the worktree.
+- One process note caught mid-session: a fork asked to verify PAC09 initially returned only "reported
+  above" with no retrievable content — apparently because the same fork process, having inherited both
+  the PAC09 and AAC10 verification prompts in its context (both `Agent` calls were sent in one
+  message), attempted to also do the AAC10 half and hit "a forked worker cannot spawn nested agents"
+  for that half, then summarized tersely instead of restating its own PAC09 findings. Recovered by
+  dispatching a second fork to redo the PAC09 verification from scratch (full PASS, matches the
+  landed commit). No conclusion changed, but: future parallel independent-verification forks should
+  probably go in separate messages, or the prompt should explicitly forbid attempting the sibling's
+  task.
+- Nova branch-divergence topic (GMW-ANCHORS-INVALID / `scratch/gmw-anchors-fixture-fix.patch`) is
+  unchanged from the entry below — still `TP-2`/`author-repair-required`-blocked, still
+  Phoenix-branch-specific, still waiting on a human with author-repair rights.
+- **Next:** continue Class B (9 remain: A-AC-01, A-AC-03, R-AC-08, R-AC-09, V-AC-02, EPIC-AC-02,
+  L-AC-01's remaining triggers; A-AC-05 stays explicitly PO-deferred per the session's earlier
+  decision). No dispatches currently in flight.
+
+## CHECKPOINT — 2026-08-17, continued again: 22/157 open, three Class-B dispatches in flight, Nova branch-divergence resolved
 
 **Since the checkpoint below:** two more measurement corrections landed (no new capability, proof-based
 closures), one more real Class-B capability landed and independently re-verified, and a significant
