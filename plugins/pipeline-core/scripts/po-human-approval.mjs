@@ -220,7 +220,17 @@ const text = (value) => typeof value === "string" && value.trim() !== "";
 export function outside(repoRoot, path, platform = process.platform) {
   const api = platform === "win32" ? win32Path : posixPath;
   const root = api.resolve(repoRoot); const target = api.resolve(path);
-  const rel = api.relative(root, target).split("\\").join("/");
+  const raw = api.relative(root, target);
+  // NVA-WINPATH-2 (Critic round-1 F1): the backslash-to-forward-slash normalization
+  // below is a win32-only concern (path.relative() on win32 returns backslash-
+  // separated output). On POSIX a backslash is an ORDINARY filename character, never
+  // a path separator -- normalizing it unconditionally rewrote a legal POSIX name
+  // like `..\keys` into `../keys`, which then misclassified a directory that is
+  // actually INSIDE the repository as "outside": a fail-open regression in the exact
+  // check that keeps private Ed25519 signing-key material out of the repository
+  // working tree. Scoping the normalization to win32 keeps the same-drive fix intact
+  // there while leaving POSIX relative-path strings untouched.
+  const rel = platform === "win32" ? raw.split("\\").join("/") : raw;
   return rel === "" ? false : rel === ".." || rel.startsWith("../") || api.isAbsolute(rel);
 }
 function fail(message) { throw new Error(message); }

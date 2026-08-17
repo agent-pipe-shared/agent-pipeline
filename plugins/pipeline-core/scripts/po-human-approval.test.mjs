@@ -1849,6 +1849,19 @@ test("NVA-WINPATH-1: outside() behavior on POSIX hosts is unchanged by the platf
     assert.equal(outside(dirs.repoRoot, join(dirs.repoRoot, "sub"), "linux"), false);
     assert.equal(outside(dirs.repoRoot, dirs.repoRoot, "linux"), false);
     assert.equal(outside(dirs.repoRoot, "/some/other/absolute/dir", "linux"), true);
+    // NVA-WINPATH-2 (Critic round-1 F1, backlog/items/2026-08-17-po-human-approval-outside-
+    // check-uses-a-posix-only-separator-on-windows.md): a backslash is an ORDINARY filename
+    // character on POSIX, never a path separator -- a directory literally named `..\keys`
+    // directly under the repo root is a genuine child of the repo, not outside it. The
+    // pre-fix code unconditionally normalized backslashes to forward slashes on BOTH the
+    // win32 AND posix branches, so this legal POSIX name was rewritten to `../keys` and then
+    // misclassified as "outside" -- a fail-open regression in the exact check that keeps
+    // private Ed25519 signing-key material out of the repository working tree. This is the
+    // property the test's own name claims ("unchanged by the platform-selection fix") but,
+    // before this assertion, never actually exercised.
+    const backslashNamedChild = `${dirs.repoRoot}/..\\keys`;
+    assert.equal(outside(dirs.repoRoot, backslashNamedChild, "linux"), false,
+      "a POSIX directory literally named '..\\keys' is a child of the repo root, not outside it");
   } finally {
     cleanup(dirs);
   }
