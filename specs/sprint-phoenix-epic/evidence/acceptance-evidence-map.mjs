@@ -1065,6 +1065,41 @@ const DELTA = {
   // design/class-b-multi-dispatch-plan.md. Verdict stays partial.
   'H-AC-12': ['partial', 'WP-H-AC12'],
 
+  // H-AC-12 UPDATE 2026-08-17 (PHX-WP-HAC12, commit `ae13b68b`, independently
+  // re-verified). guard-push.mjs and pipeline-state.mjs (`approve-push`/
+  // `approve-deploy`) wired: an opt-in `decisionReference` check
+  // (`Object.hasOwn`-gated, byte-for-byte unchanged when absent), dual-
+  // evaluated against the legacy record verdict, fails closed on
+  // disagreement, carries `MIGRATION_COMPAT` owner+expiry -- mirrors
+  // guard-devplan.mjs's/change-control.mjs's existing wiring exactly. 6/6 +
+  // 11/11 new tests pass; the gated `pipeline-state.test.mjs` full re-run
+  // (504/506) confirmed independently: the two reds (`PS54af`/`PS54ag`) are
+  // pre-existing, unrelated live-repo-state assertions (this project's own
+  // current phase != `draft`), not caused by this change.
+  //
+  // Substantive caveat, not a disclosed footnote: these two readers'
+  // `resolveReference` callback validates the decision reference's
+  // *structural self-consistency* (shape, candidate commit+tree,
+  // repository fingerprint) but never checks `decisionId`/`decisionDigest`/
+  // `eventDigest` against an actual ledger -- unlike Git-guard override
+  // consumption's `invokeGovernanceAuthority`, which IS a thin wrapper over
+  // the real checkpoint-verified human-governance ledger. So H-AC-12's own
+  // "reference AND VALIDATE the canonical decision ID" clause is only
+  // partially met for guard-push.mjs/pipeline-state.mjs: satisfied in the
+  // same weaker sense change-control.mjs already was, not in the stronger
+  // sense Git-guard override consumption would require. Currently inert
+  // (nothing today writes a decisionReference for any push/deploy
+  // approval), tracked under the same MIGRATION_COMPAT expiry rather than
+  // exploitable now.
+  //
+  // Closed-reader count: guard-devplan.mjs, change-control.mjs (formally,
+  // via PHX-WP-POAMEND's acceptance.md amendment), guard-push.mjs,
+  // pipeline-state.mjs -- 4 of 6 named readers now have SOME wiring, with
+  // the ledger-validation caveat above on the last two. Git-guard override
+  // consumption (the one reader with the actual stronger canonical-ledger
+  // case available) remains fully untouched. Verdict stays partial.
+  'H-AC-12': ['partial', 'WP-HAC12B'],
+
   // R-AC-04: an optional requiredCleanup field on validateCommandOfferEvent
   // (agent-decision-journal.mjs -- the real edit surface; external-command-
   // offer.mjs only consumes it) records WHAT cleanup/readback is required
@@ -1344,7 +1379,7 @@ const POINTERS = {
   'H-AC-09': 'NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target. RECLASSIFIED Class S -> Class P 2026-08-09 (PO-confirmed): the clause\'s own subject -- authorizing guarded work IN another repository -- is exactly the capability CLAUDE.md\'s Sprint-0 hard rule currently forbids outright ("Read-only toward the three project repos ... never a write ... until an explicitly approved Phase-4 migration"). There is no design to scope: building a cross-repository binding mechanism for a write capability this repo is not yet authorized to exercise would be building ahead of its own governing policy, not closing a gap. CLOSES 2026-08-17 (PO amendment, acceptance.md, append-only, no code change): confirmed no Phase-4 migration roadmap exists anywhere in this repo, so the WHEN-antecedent cannot fire under current policy -- vacuously and permanently satisfied unless/until a future Phase-4 migration reopens it',
   'H-AC-10': 'five named assertions covering scope, reason, expiry, constraints, follow-up review, no standing bypass',
   'H-AC-11': 'portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4). UPDATE 2026-08-17 (PHX-WP-POAMEND, commit e9054995): O-4 decided by acceptance.md amendment -- the clause is scoped to the restricted machine-local decision record (design/gmw-hgo-evidence-intake-into-the-human-ledger.md §3.4), not a producer\'s own enforcement material, which this intake path never creates. Verdict STAYS partial: the restricted profile is structurally separate and tested (GES-RESTRICTED-ROOT/-IN-REPOSITORY/-KEY, agent-decision-journal.test.mjs:422-426), but no intake path yet produces such a record at all -- design §9 places that in a later increment (D-1), not built here',
-  'H-AC-12': 'guard-devplan/change-control-tests (WP-H-AC12): the shared dual-evaluation primitive (decision-reference-dual-evaluation.mjs) closes guard-devplan.mjs and change-control.mjs. Release planning and deploy/override consumption: PO decided 2026-08-11 the existing alternate mechanisms (release-version-plan.mjs content-hash decisionId; critical-action-authorization.mjs Ed25519 proof) satisfy intent. UPDATE 2026-08-17 (PHX-WP-POAMEND, commit e9054995): that decision now landed as an acceptance.md amendment, closing release planning and deploy approval/consumption specifically -- 2 of 6 named readers. Verdict STAYS partial: guard-push.mjs, pipeline-state.mjs (TP-5/GMW-blocked), and Git-guard override consumption (guard-git.mjs Phoenix override -- read, not yet verified/dispositioned) remain open, unaffected by this amendment; the migration dual-evaluation/shared-owner/expiry sentence is also untouched. 40/40 + 33/33 + 10/10 + 3/3 tests pass',
+  'H-AC-12': 'guard-devplan/change-control-tests (WP-H-AC12): the shared dual-evaluation primitive (decision-reference-dual-evaluation.mjs) closes guard-devplan.mjs and change-control.mjs. Release planning and deploy/override consumption: PO decided 2026-08-11 the existing alternate mechanisms (release-version-plan.mjs content-hash decisionId; critical-action-authorization.mjs Ed25519 proof) satisfy intent. UPDATE 2026-08-17 (PHX-WP-POAMEND, commit e9054995): that decision now landed as an acceptance.md amendment, closing release planning and deploy approval/consumption specifically -- 2 of 6 named readers. UPDATE 2026-08-17 (PHX-WP-HAC12, commit ae13b68b, independently re-verified): guard-push.mjs and pipeline-state.mjs (approve-push/approve-deploy) now wired with the same opt-in, fail-closed, MIGRATION_COMPAT-tracked dual-evaluation pattern -- 6/6 + 11/11 new tests pass, gated pipeline-state.test.mjs 504/506 with the 2 reds independently confirmed pre-existing and unrelated (live repo-phase assertions, not caused by this change). Caveat: these two readers validate the reference\'s structural self-consistency (shape/candidate/tree/fingerprint) but not decisionId/decisionDigest/eventDigest against an actual ledger -- the same weaker sense change-control.mjs already satisfied, not the stronger sense Git-guard override consumption\'s governance-authority.mjs wrapper would provide; currently inert since nothing yet writes a decisionReference for push/deploy. Verdict STAYS partial: Git-guard override consumption (guard-git.mjs Phoenix override, the one reader where the actual canonical-ledger mechanism is already available) remains fully untouched; the migration dual-evaluation/shared-owner/expiry sentence for guard-push.mjs/pipeline-state.mjs also stays a genuine open interpretive question. 40/40 + 33/33 + 10/10 + 3/3 + 6/6 + 11/11 tests pass',
   'H-AC-13': 'human-governance-ledger-tests + store admission: prohibited content rejected before any temporary file exists',
   'H-AC-14': 'docs/governance-events.md (PHX-WP-DOC-1 + PHX-WP-DOC-3): all eight named parts present -- migration/retention/recovery/operator-guidance and schema/taxonomy/authority-trust-model were already solid, and a dedicated "Human ledger: threat model" section now covers eight scenarios each tied to an HGL-* code and, where one exists, an H-AC-15 test',
   'H-AC-15': 'human-governance-ledger-tests (PHX-WP-H): all thirteen named scenarios pinned (grant/consumption/expiry/redaction pre-existing; denial/revocation/correction/retry/concurrency/interruption/tampering/stale-candidate/cross-repository-binding new and break-proofed)',
