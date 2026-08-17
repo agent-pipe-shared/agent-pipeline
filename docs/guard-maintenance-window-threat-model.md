@@ -45,8 +45,41 @@ below assumes it holds and is written to catch a change that would break it.
   claims to name.
 - The never-liftable kernel: `hooks/guard-gate-strength.mjs`, the GMW
   verifier module, `hooks/hooks.json`, `lib/tool-write-target.mjs`,
-  `hooks/guard-command-grammar.mjs`, `hooks/guard-lifecycle-ready.mjs`, and
-  `project/critical-human-proof.json` (the trust anchor).
+  `hooks/guard-command-grammar.mjs`, `hooks/guard-lifecycle-ready.mjs`,
+  `project/critical-human-proof.json` (the trust anchor), and
+  `lib/critical-human-proof-policy.mjs`/`lib/po-approval-proof.mjs` (the two
+  modules that verify a window and every push/deploy/publication/
+  release-preflight proof). The kernel must be closed under import, not just
+  these entries' own bytes — a valid window could otherwise reach the same
+  code through one first-party import hop, exactly the recursive hole this
+  list exists to close. NVA-A7FIX-2 replaced the hand-walked, twice-incomplete
+  version of that closure with a test-enforced one
+  (`guard-maintenance-window-kernel-closure.test.mjs`, GMWKC01): every path
+  below is imported, directly or transitively, by one of the entries above,
+  and the test fails on any future edit that adds an import without extending
+  this list to match. All paths are repo-relative under
+  `plugins/pipeline-core/`: `lib/codex-host-layout.mjs`,
+  `lib/codex-onboarding-app-server.mjs`,
+  `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
+  `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,
+  `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
+  `lib/critical-action-approval-request.mjs`, `lib/document-hooks.mjs`,
+  `lib/entrypoint.mjs`, `lib/gate-estimate.mjs`, `lib/git-cmd.mjs`,
+  `lib/human-guard-override.mjs`, `lib/human-role-labels.mjs`,
+  `lib/machine-plane.mjs`, `lib/manifest.mjs`, `lib/onboarding-continuity.mjs`,
+  `lib/plan-spec-state-v2.mjs`, `lib/po-gate-authority.mjs`,
+  `lib/po-gate-profile-publisher.mjs`, `lib/project-authority.mjs`,
+  `lib/project-onboarding-ready-gate.mjs`, `lib/project-onboarding-v3.mjs`,
+  `lib/recovery-preview-attestation.mjs`,
+  `lib/runner-native-continuation.mjs`,
+  `lib/runner-profile-migration-v2.mjs`,
+  `lib/runner-profile-migration-v3.mjs`, `lib/runner-profiles-v2.mjs`,
+  `lib/runner-profiles-v3.mjs`, `lib/runtime-projection-v2.mjs`,
+  `lib/runtime-projection-v3.mjs`, `lib/schema-lite.mjs`,
+  `lib/session-cleanup-recovery.mjs`, `lib/source-observation.mjs`,
+  `lib/windows-private-state.mjs`, `lib/worktree-lifecycle.mjs`,
+  `lib/yaml-lite.mjs`, `scripts/codex-app-server-health.mjs`,
+  `scripts/continuity-status.mjs`, and `scripts/v3-bootstrap-authority.mjs`.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

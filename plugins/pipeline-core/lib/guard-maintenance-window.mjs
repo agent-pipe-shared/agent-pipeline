@@ -134,6 +134,60 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // omitted.
   "plugins/pipeline-core/lib/critical-human-proof-policy.mjs",
   "plugins/pipeline-core/lib/po-approval-proof.mjs",
+  // NVA-A7FIX-2 (fixing Critic F-2 against the F2 fix above, which itself only closed
+  // the FIRST import hop): the full transitive closure of every entry above's own
+  // first-party relative imports, computed and enforced by
+  // guard-maintenance-window-kernel-closure.test.mjs (GMWKC01) rather than hand-walked
+  // -- every entry below is imported, directly or transitively, by one of the entries
+  // above. This list is intentionally large: `guard-lifecycle-ready.mjs` alone pulls in
+  // most of the onboarding/continuity/runner-profile machinery through
+  // `project-onboarding-v3.mjs`, and every one of those modules is code a valid GS-6
+  // window could otherwise use to corrupt what "session readiness" or "a verified
+  // window" means. GMWKC01 fails on ANY future edit that adds an import to a kernel
+  // file without extending this list to match, so this enumeration can no longer drift
+  // from the code the way the seven-entry (then nine-entry) hand-typed list already had
+  // twice.
+  "plugins/pipeline-core/lib/codex-host-layout.mjs",
+  "plugins/pipeline-core/lib/codex-onboarding-app-server.mjs",
+  "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs",
+  "plugins/pipeline-core/lib/codex-onboarding-runtime.mjs",
+  "plugins/pipeline-core/lib/continuity-host-adapter.mjs",
+  "plugins/pipeline-core/lib/continuity-state.mjs",
+  "plugins/pipeline-core/lib/continuity-status.mjs",
+  "plugins/pipeline-core/lib/critic-export-policy.mjs",
+  "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
+  "plugins/pipeline-core/lib/document-hooks.mjs",
+  "plugins/pipeline-core/lib/entrypoint.mjs",
+  "plugins/pipeline-core/lib/gate-estimate.mjs",
+  "plugins/pipeline-core/lib/git-cmd.mjs",
+  "plugins/pipeline-core/lib/human-guard-override.mjs",
+  "plugins/pipeline-core/lib/human-role-labels.mjs",
+  "plugins/pipeline-core/lib/machine-plane.mjs",
+  "plugins/pipeline-core/lib/manifest.mjs",
+  "plugins/pipeline-core/lib/onboarding-continuity.mjs",
+  "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
+  "plugins/pipeline-core/lib/po-gate-authority.mjs",
+  "plugins/pipeline-core/lib/po-gate-profile-publisher.mjs",
+  "plugins/pipeline-core/lib/project-authority.mjs",
+  "plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs",
+  "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+  "plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
+  "plugins/pipeline-core/lib/runner-native-continuation.mjs",
+  "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
+  "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
+  "plugins/pipeline-core/lib/runner-profiles-v2.mjs",
+  "plugins/pipeline-core/lib/runner-profiles-v3.mjs",
+  "plugins/pipeline-core/lib/runtime-projection-v2.mjs",
+  "plugins/pipeline-core/lib/runtime-projection-v3.mjs",
+  "plugins/pipeline-core/lib/schema-lite.mjs",
+  "plugins/pipeline-core/lib/session-cleanup-recovery.mjs",
+  "plugins/pipeline-core/lib/source-observation.mjs",
+  "plugins/pipeline-core/lib/windows-private-state.mjs",
+  "plugins/pipeline-core/lib/worktree-lifecycle.mjs",
+  "plugins/pipeline-core/lib/yaml-lite.mjs",
+  "plugins/pipeline-core/scripts/codex-app-server-health.mjs",
+  "plugins/pipeline-core/scripts/continuity-status.mjs",
+  "plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever

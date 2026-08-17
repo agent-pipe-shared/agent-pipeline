@@ -81,15 +81,27 @@ cannot today for a push in `signature` mode.
    ever eligible for a window. A signed request naming any other rule ID is
    rejected before verification is even attempted.
 
-3. **A hardcoded, permanently non-liftable kernel.** Guard scripts are re-read
-   on every invocation, so a window covering the file that verifies windows
-   would let the first edit disable its own expiry check. `guard-gate-strength.mjs`,
-   the new window-verifier module, `hooks/hooks.json`, `lib/tool-write-target.mjs`,
-   `hooks/guard-command-grammar.mjs`, `hooks/guard-lifecycle-ready.mjs`, and the
-   file carrying the trust anchor (`project/critical-human-proof.json`, already
-   GS-2) are excluded from every window's effective scope regardless of what a
-   signed payload claims — checked before any window lookup happens at all, not
-   merely by convention.
+3. **A hardcoded, permanently non-liftable kernel, closed under import and
+   test-enforced.** Guard scripts are re-read on every invocation, so a window
+   covering the file that verifies windows would let the first edit disable
+   its own expiry check. `guard-gate-strength.mjs`, the new window-verifier
+   module, `hooks/hooks.json`, `lib/tool-write-target.mjs`,
+   `hooks/guard-command-grammar.mjs`, `hooks/guard-lifecycle-ready.mjs`, the
+   file carrying the trust anchor (`project/critical-human-proof.json`,
+   already GS-2), and `lib/critical-human-proof-policy.mjs`/
+   `lib/po-approval-proof.mjs` (the two modules that verify a window and every
+   push/deploy/publication/release-preflight proof) are excluded from every
+   window's effective scope regardless of what a signed payload claims —
+   checked before any window lookup happens at all, not merely by convention.
+   The kernel must also be closed under first-party IMPORT, not just these
+   entries' own bytes, or a window could reach the same code through one
+   import hop. NVA-A7FIX-2 replaced a hand-walked version of that closure
+   (twice found incomplete by Critic review) with a static invariant test,
+   `guard-maintenance-window-kernel-closure.test.mjs`, that fails on any
+   future edit adding an import to a kernel file without extending
+   `NEVER_LIFTABLE_KERNEL_PATHS` to match; the full, current, test-enforced
+   enumeration is listed in `docs/guard-maintenance-window-threat-model.md`'s
+   "Protected assets" section rather than duplicated a third time here.
 
 4. **Bounded TTL, enforced in code, fail-closed on a malformed clock.** The
    verifier clamps effective expiry to `min(signedExpiresAt, openedAt + MAX_TTL)`
