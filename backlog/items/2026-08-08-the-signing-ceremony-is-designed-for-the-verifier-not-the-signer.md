@@ -179,7 +179,18 @@ and a convenience wrapper could easily lose:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, stays open in current backlog — not deferred.
+  Same reasoning as the sibling item
+  `2026-08-08-the-signed-guard-override-has-no-command-that-emits-the-digest-to-sign.md`:
+  this is the human-approval/maintenance-window ceremony this repository's
+  own `gates.push_approval: signature` posture requires, not a hypothetical
+  external-adopter path. The PO's own direction (single entry point first,
+  §"Direction" above) is the right shape for whoever picks this up.
+- **Rationale:** substantial (8 findings + a PO-articulated redesign), too
+  large to fix inside a triage pass, but real and self-relevant — not a
+  candidate for quiet deferral to a later Sprint given it sits in this
+  repo's own configured push path.
+- **Assignment (if accepted):** unassigned; pair with the sibling item
+  above before this repository's own push-approval ceremony is next walked
+  for real.
+- **Date:** 2026-08-17

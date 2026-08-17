@@ -101,7 +101,18 @@ which would remove the need for this ceremony to run at all in the push case.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, stays open in current backlog — not deferred.
+  `signature` is this repository's own configured `gates.push_approval`
+  value (ADR-0056; see CLAUDE.md's Push policy section), so this gap sits
+  directly in the ceremony this checkout will itself need to walk for its
+  own eventual push, not only in a hypothetical external adopter's path.
+- **Rationale:** the item's own "why this matters now" argument (first
+  external tester in `signature` mode hits this) applies equally to this
+  repository's own next push; not urgent enough to interrupt today's
+  backlog-triage pass, but should not be deferred to a later Sprint either.
+  Same ceremony family as `2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md`
+  — worth designing/fixing together rather than separately.
+- **Assignment (if accepted):** unassigned; surface both this item and its
+  sibling before this repository's own push-approval ceremony is next
+  walked for real.
+- **Date:** 2026-08-17
