@@ -33,7 +33,7 @@ function artifactRows(model, sourceHref) {
   }).join("");
 }
 function v1ToV2(model) {
-  return { schema: "pipeline.evidence-view-model.v2", authority: model.authority, source: { manifest: null, manifestSha256: null, topology: "legacy" }, feature: { id: null, lifecycleState: "unavailable" }, candidate: { state: "fact", ...model.candidate }, status: model.status, sharing: "private", exportStatus: { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null, failureCount: null, quarantineCount: null, integrityGaps: null }, gateEstimate: ABSENT_ESTIMATE, artifacts: model.artifacts.map((artifact, index) => ({ id: `artifact-${index + 1}`, ...artifact, sourcePath: artifact.path, valueClass: "fact", lifecycleState: "not-applicable" })), notices: [{ valueClass: "legacy", code: "EVM-V1", message: "Legacy explicit model; source topology was supplied by its caller." }] };
+  return { schema: "pipeline.evidence-view-model.v2", authority: model.authority, source: { manifest: null, manifestSha256: null, topology: "legacy" }, feature: { id: null, lifecycleState: "unavailable" }, candidate: { state: "fact", ...model.candidate }, status: model.status, sharing: "private", exportStatus: { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null, failureCount: null, quarantineCount: null, integrityGaps: null, recoveryState: null }, gateEstimate: ABSENT_ESTIMATE, artifacts: model.artifacts.map((artifact, index) => ({ id: `artifact-${index + 1}`, ...artifact, sourcePath: artifact.path, valueClass: "fact", lifecycleState: "not-applicable" })), notices: [{ valueClass: "legacy", code: "EVM-V1", message: "Legacy explicit model; source topology was supplied by its caller." }] };
 }
 // V-AC-02: every value in this block comes from the caller-supplied delivery
 // observation, which evidence-view-model.mjs validates for shape only (no
@@ -43,7 +43,7 @@ function v1ToV2(model) {
 // class, the convention this renderer uses for every status-ish value
 // (topology, report status, artifact integrity state).
 function exportBlock(model) {
-  const observed = model.exportStatus ?? { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null, failureCount: null, quarantineCount: null, integrityGaps: null };
+  const observed = model.exportStatus ?? { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null, failureCount: null, quarantineCount: null, integrityGaps: null, recoveryState: null };
   const detail = observed.receipt === null ? "No delivery receipt is available." : `Batch ${esc(observed.receipt.batchId)}: ${esc(observed.receipt.acknowledgementClass)} / ${esc(observed.receipt.terminalDisposition)}.`;
   // The same caller-supplied, shape-validated-only premise as every other
   // field in this block (see the V-AC-02 comment above): present values are
@@ -54,7 +54,13 @@ function exportBlock(model) {
   const gapsText = gapsObserved ? (observed.integrityGaps.length === 0 ? "none" : observed.integrityGaps.join(", ")) : "unavailable";
   const failureObserved = observed.failureCount !== null && observed.failureCount !== undefined;
   const quarantineObserved = observed.quarantineCount !== null && observed.quarantineCount !== undefined;
-  return `<dl><dt>State</dt><dd>${value(observed.state, observed.state)}</dd><dt>Destination profile</dt><dd>${value(observed.destinationProfile ?? "unavailable", observed.destinationProfile ? "assumption" : "unavailable")}</dd><dt>Cursor</dt><dd>${value(observed.cursor ?? "unavailable", observed.cursor === null ? "unavailable" : "assumption")}</dd><dt>Lag</dt><dd>${value(observed.lag ?? "unavailable", observed.lag === null ? "unavailable" : "assumption")}</dd><dt>Failure count</dt><dd>${value(failureObserved ? observed.failureCount : "unavailable", failureObserved ? "assumption" : "unavailable")}</dd><dt>Quarantine count</dt><dd>${value(quarantineObserved ? observed.quarantineCount : "unavailable", quarantineObserved ? "assumption" : "unavailable")}</dd><dt>Integrity gaps</dt><dd>${value(gapsText, gapsObserved ? "assumption" : "unavailable")}</dd><dt>Receipt</dt><dd>${detail}</dd></dl><p>${value("non-authoritative transport observation", "fact")}</p>`;
+  // E-AC-19: recovery state follows the same discipline as every sibling
+  // field in this block -- present is `assumption`, absent stays
+  // `unavailable`. When observed and not blocked, the text is explicitly
+  // "not blocked" rather than an empty guidance list.
+  const recoveryObserved = observed.recoveryState !== null && observed.recoveryState !== undefined;
+  const recoveryText = recoveryObserved ? (observed.recoveryState.blocked ? `blocked: ${observed.recoveryState.guidance.join("; ")}` : "not blocked") : "unavailable";
+  return `<dl><dt>State</dt><dd>${value(observed.state, observed.state)}</dd><dt>Destination profile</dt><dd>${value(observed.destinationProfile ?? "unavailable", observed.destinationProfile ? "assumption" : "unavailable")}</dd><dt>Cursor</dt><dd>${value(observed.cursor ?? "unavailable", observed.cursor === null ? "unavailable" : "assumption")}</dd><dt>Lag</dt><dd>${value(observed.lag ?? "unavailable", observed.lag === null ? "unavailable" : "assumption")}</dd><dt>Failure count</dt><dd>${value(failureObserved ? observed.failureCount : "unavailable", failureObserved ? "assumption" : "unavailable")}</dd><dt>Quarantine count</dt><dd>${value(quarantineObserved ? observed.quarantineCount : "unavailable", quarantineObserved ? "assumption" : "unavailable")}</dd><dt>Integrity gaps</dt><dd>${value(gapsText, gapsObserved ? "assumption" : "unavailable")}</dd><dt>Recovery state</dt><dd>${value(recoveryText, recoveryObserved ? "assumption" : "unavailable")}</dd><dt>Receipt</dt><dd>${detail}</dd></dl><p>${value("non-authoritative transport observation", "fact")}</p>`;
 }
 
 // V-AC-02: `estimate` is its own visible class. A gate estimate is a projected

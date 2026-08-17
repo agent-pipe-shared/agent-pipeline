@@ -47,7 +47,7 @@ function publicPath(path, index, sharing) { return sharing === "redacted" ? `art
 function notice(valueClass, code, message) { return frozen({ valueClass, code, message }); }
 function unavailableCandidate() { return frozen({ state: "unavailable", commit: null, tree: null }); }
 function boundCandidate(value) { return frozen({ state: "fact", commit: value.commit, tree: value.tree }); }
-function unavailableExportStatus() { return frozen({ state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null, failureCount: null, quarantineCount: null, integrityGaps: null }); }
+function unavailableExportStatus() { return frozen({ state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null, failureCount: null, quarantineCount: null, integrityGaps: null, recoveryState: null }); }
 // E-AC-19: failure/quarantine counts and integrity gaps are additional
 // shape-validated-only observations, admitted or refused exactly like the
 // rest of this block (schema on shape alone, no digest, no canonical source
@@ -59,10 +59,23 @@ function unavailableExportStatus() { return frozen({ state: "unavailable", desti
 // two are never conflated.
 function nonNegativeCountOrNull(count) { return count === null || (Number.isSafeInteger(count) && count >= 0); }
 function integrityGapsOrNull(gaps) { return gaps === null || (Array.isArray(gaps) && gaps.every((gap) => typeof gap === "string" && CODE.test(gap))); }
+// E-AC-19: recovery state is the sixth item the acceptance criterion names.
+// `null` means "not observed" (mirroring every other absent-vs-observed
+// field in this block); an observed value is closed to exactly `{blocked,
+// guidance}`. `blocked: true` always carries at least one non-empty guidance
+// string (a blocked destination always has real recovery text -- see
+// evaluateGovernanceExportBoundaryGate); `blocked: false` always carries
+// `guidance: null` (nothing to recover from, never a fabricated empty list).
+function recoveryStateOrNull(value) {
+  if (value === null) return true;
+  if (!exact(value, ["blocked", "guidance"]) || typeof value.blocked !== "boolean") return false;
+  if (value.blocked) return Array.isArray(value.guidance) && value.guidance.length > 0 && value.guidance.every((entry) => typeof entry === "string" && entry !== "");
+  return value.guidance === null;
+}
 function exportStatus(value) {
   if (value === null || value === undefined) return unavailableExportStatus();
-  if (!exact(value, ["schema", "destinationProfile", "state", "cursor", "lag", "receipt", "failureCount", "quarantineCount", "integrityGaps"]) || value.schema !== "pipeline.governance-export-view-status.v1" || typeof value.destinationProfile !== "string" || value.destinationProfile === "" || !EXPORT_STATES.has(value.state) || !Number.isSafeInteger(value.cursor) || value.cursor < 0 || !Number.isSafeInteger(value.lag) || value.lag < 0 || !(value.receipt === null || exact(value.receipt, ["batchId", "acknowledgementClass", "terminalDisposition"])) || !nonNegativeCountOrNull(value.failureCount) || !nonNegativeCountOrNull(value.quarantineCount) || !integrityGapsOrNull(value.integrityGaps)) fail("EVM-EXPORT");
-  return frozen({ state: value.state, destinationProfile: value.destinationProfile, cursor: value.cursor, lag: value.lag, receipt: value.receipt === null ? null : frozen({ ...value.receipt }), failureCount: value.failureCount, quarantineCount: value.quarantineCount, integrityGaps: value.integrityGaps === null ? null : frozen([...value.integrityGaps]) });
+  if (!exact(value, ["schema", "destinationProfile", "state", "cursor", "lag", "receipt", "failureCount", "quarantineCount", "integrityGaps", "recoveryState"]) || value.schema !== "pipeline.governance-export-view-status.v1" || typeof value.destinationProfile !== "string" || value.destinationProfile === "" || !EXPORT_STATES.has(value.state) || !Number.isSafeInteger(value.cursor) || value.cursor < 0 || !Number.isSafeInteger(value.lag) || value.lag < 0 || !(value.receipt === null || exact(value.receipt, ["batchId", "acknowledgementClass", "terminalDisposition"])) || !nonNegativeCountOrNull(value.failureCount) || !nonNegativeCountOrNull(value.quarantineCount) || !integrityGapsOrNull(value.integrityGaps) || !recoveryStateOrNull(value.recoveryState)) fail("EVM-EXPORT");
+  return frozen({ state: value.state, destinationProfile: value.destinationProfile, cursor: value.cursor, lag: value.lag, receipt: value.receipt === null ? null : frozen({ ...value.receipt }), failureCount: value.failureCount, quarantineCount: value.quarantineCount, integrityGaps: value.integrityGaps === null ? null : frozen([...value.integrityGaps]), recoveryState: value.recoveryState === null ? null : frozen({ ...value.recoveryState, guidance: value.recoveryState.guidance === null ? null : frozen([...value.recoveryState.guidance]) }) });
 }
 
 function absentGateEstimate(code) { return frozen({ state: "not-applicable", featureId: null, gate: null, rangeMinutes: null, source: null, code }); }
