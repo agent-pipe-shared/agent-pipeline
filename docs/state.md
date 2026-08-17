@@ -7,7 +7,57 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again (9): lifecycleEvents built and landed, a real dispatch-caused regression caught by independent re-verification and fixed (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (10): checkpoint 9's A-AC-05 claim corrected, conflictPolicy dispatched — P-AC-11's last open dimension (READ THIS FIRST)
+
+**Correction to checkpoint (9):** its "A-AC-05 (producer dispatch not yet fired, bundle with A-AC-01)"
+line was WRONG — carried over stale from an earlier compacted summary, not re-checked against the
+live repo before writing. `git log --grep` and `merge-base --is-ancestor` confirm the A-AC-05 producer
+(`63dac0b4`, `PHX-WP-AAC05-ADVISORY-TRANSLATOR`) already landed and was independently re-verified
+EARLIER in this same overall session, well before checkpoint 7. `agent-decision-journal.mjs` already
+has the `revalidationTrigger` field A-AC-01 needed too. What's actually still missing for both, per the
+evidence map's own live pointers (not re-litigated here, just confirmed still accurate by inspection):
+`advisory-coordinator.mjs`/`advisory-host-bridge.mjs` have NO caller of the A-AC-05 translator
+(`advisory-decision-event.mjs`) — confirmed by grep, zero references — and that wiring was explicitly
+deferred as "a separate decision" (threading `repositoryRoot`/fingerprint/capture-policy through a
+synchronous, git-unaware call path) by the dispatch that built the translator itself. A-AC-01's
+sequencing enforcement at `main-session-route.mjs`'s `reconcileMainSessionRoute` has not been
+independently confirmed built or missing this session — genuinely open, not investigated yet.
+**Lesson: a carried-over conversation summary is not a substitute for checking live repo state before
+writing a checkpoint's next-steps section — this cost one wasted turn of the queue ordering, caught
+only because a Stop-hook pushed back on insufficient breadth of progress.**
+
+**PO decision, `conflictPolicy` (P-AC-11's last open dimension):** brought a 3-option brief
+(build / satisfied-by-construction / drop) via `AskUserQuestion`; PO chose **build it** —
+`require-reconciliation` maps a revision/ownership conflict to `status: "reconciliation-required"`
+(reusing the adapter's own existing status value) instead of today's unconditional `status:
+"conflict"`; `reject` (or undeclared) keeps today's exact behavior, matching `CONFLICT_POLICY_RANK`'s
+existing "reject is stricter" ordering. Dispatched as `PHX-WP-PAC11-CONFLICTPOLICY`
+(`goldfish-implementor`, sonnet/medium — no design latitude left, fully specified — no model
+override), tool budget raised to 60 given the `lifecycleEvents` dispatch's two budget exhaustions on
+similar-scope work, and the briefing explicitly calls out both process failures from that dispatch
+(committing before verify.mjs finishes; splitting one logical edit across an uncommitted remainder) as
+things to avoid. Not yet landed as of this checkpoint.
+
+**Remaining open (11 of 157, unchanged in count):** Class B — P-AC-11 (`conflictPolicy` dispatched, in
+flight), H-AC-12 (Git-guard override reader, needs a TP-5 window), A-AC-01 (sequencing enforcement at
+`reconcileMainSessionRoute` genuinely uninvestigated), A-AC-05 (production wiring of the already-built
+translator into `advisory-coordinator.mjs`/`advisory-host-bridge.mjs`, deferred pending its own design
+decision), L-AC-01 (5 buildable kinds need a source vocabulary to exist first, plus the separate
+candidate-invalidation capability), EPIC-AC-02 (TP-3 window + dispatch). Class P — H-AC-11 (dispatch 1b
+CLI wiring), PX0-AC-13 (8-member action-family build), EPIC-AC-01/03/04/05 (end-of-epic ceremony,
+bundled with H-AC-11's spec §6.1 amendment).
+
+**Next steps:** wait for `PHX-WP-PAC11-CONFLICTPOLICY`'s notification, independently re-verify per the
+established practice (sync `.git/phx-verify`, re-run the full `verify.mjs` gate regardless of how
+finished the report looks, check `dispatch-record.json`'s `outcome` field, diff against the
+pre-dispatch baseline suite-by-suite rather than trusting a remembered tracked list), update the
+evidence map, commit. Then A-AC-01's `reconcileMainSessionRoute` sequencing needs actual investigation
+(not assumed done) before any further A-AC-01/A-AC-05 dispatch. All future dispatches: no `model`
+override. All chat/AskUserQuestion text in German.
+
+---
+
+## CHECKPOINT — 2026-08-17, continued again (9): lifecycleEvents built and landed, a real dispatch-caused regression caught by independent re-verification and fixed
 
 **Since checkpoint (8):** `PHX-WP-PAC11-LIFECYCLEEVENTS` (goldfish-deep, sonnet/xhigh, no model override)
 exhausted its tool budget TWICE before finishing — first stopping mid-work with 5 files of fully
