@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f5cb8943a79e11d8466d0760f9d3cbc3e640f246371b5a988d733a9551c2b403"
+    "transitionHead": "11f3ae2903dccecbd7cdbba120cfba8e74685ee57b6d2745ba4d6ef789de2a51"
   },
   "counts": {
-    "open": 110,
+    "open": 111,
     "in_progress": 22,
     "closed": 103
   },
@@ -682,6 +682,14 @@
       "owner": "pipeline",
       "created": "2026-08-12",
       "source": "NVA-BL-42-FIX dispatch, 2026-08-12, while fixing the single stale critic.md pin this item's sibling (NVA-BL-42) named. The fix measured all 9 pins against their baseline-creation commit and found 5 non-matching, not the 1 originally believed."
+    },
+    {
+      "id": "pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Elephant investigation, 2026-08-17, after the PO resynced this host's local marketplace copy and reloaded the plugin: 4 of the 5 previously-documented 'human-guard-override-tests marketplace-staleness' failures did NOT clear, while a 5th (F1 CRITIC-REMEDY-09) did. Investigated why -- root cause is different from what every prior record this session (including the consolidated Critic review's F-0) attributed it to."
     },
     {
       "id": "pipeline.fresh-repo-onboarding-never-asks-for-git-identity",
