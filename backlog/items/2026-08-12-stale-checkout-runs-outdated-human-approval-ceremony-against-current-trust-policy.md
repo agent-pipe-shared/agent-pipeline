@@ -86,7 +86,14 @@ capacity:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged. Not fixed this session (a live push ceremony was already in
-progress in a different, currently blocked context when this was reported;
-filed rather than actioned, per the PO's own explicit instruction to record
-it for later).
+- **Decision:** accepted, deferred to Sprint Nightwing ("Product experience:
+  onboarding, configuration, documentation and low-friction adoption" —
+  ADR-0043's 2026-08-17 amendment). This is an error-message/diagnosability
+  improvement for a self-resolving version-skew condition, not an
+  architecture or security gap.
+- **Rationale:** the triggering Phoenix instance self-resolves once that
+  branch merges past ADR-0061; the structural gap (any stale checkout
+  against an upgraded shared `--directory`) is real but low-frequency and
+  not currently blocking any active work in this repository.
+- **Assignment (if accepted):** next available Nightwing slot, unassigned.
+- **Date:** 2026-08-17

@@ -136,3 +136,10 @@ future dispatch should scope that work using this exact finding (the
 `governed` precondition on `!existsSync(<any GOVERNANCE_MARKERS path>)` at
 `guard-lifecycle-ready.mjs:1797-1804` is the precise code location the new
 mechanism must intercept ahead of, or fold into).
+
+### Sprint deferral (2026-08-17)
+
+Deferred to Sprint Alfred ("Agent-first architecture, mechanical governance,
+measurable rigor, and control integrity" — ADR-0043's 2026-08-17
+amendment), matching this item's own 2026-08-12 Assignment note ("not
+urgent — one historical incident, no repeat observed").

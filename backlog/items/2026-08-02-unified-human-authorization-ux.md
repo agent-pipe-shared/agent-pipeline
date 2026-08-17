@@ -95,3 +95,12 @@ introduced.
   adoption-enforcement check, Passkey/WebAuthn/other adapters,
   cross-platform conformance) unassigned.
 - **Date:** 2026-08-06
+
+### Sprint deferral (2026-08-17)
+
+Remaining scope deferred to Sprint Alfred ("Agent-first architecture,
+mechanical governance, measurable rigor, and control integrity" —
+ADR-0043's 2026-08-17 amendment). PRD-approval migration and the adoption-
+enforcement check are exactly Alfred's "mechanical governance" scope; not
+needed near-term — push/deploy (the gates this session actually exercises)
+are already migrated.

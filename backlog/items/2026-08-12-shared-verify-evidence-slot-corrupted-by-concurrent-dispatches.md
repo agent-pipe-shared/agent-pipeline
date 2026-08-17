@@ -73,7 +73,18 @@ Not designed here. Candidates worth considering, not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Alfred ("Agent-first
+  architecture, mechanical governance, measurable rigor, and control
+  integrity" — ADR-0043's 2026-08-17 amendment). Candidate 1 (per-run
+  evidence files, `verify-latest.json` as a pointer updated only by whichever
+  run finishes last) is the recommended direction to pick up when Alfred
+  starts; candidates 2/3 are session-discipline mitigations already partly
+  in effect (this session runs its own dispatches sequentially rather than
+  concurrently on one checkout for exactly this reason).
+- **Rationale:** real and reproduced three times independently, but not
+  currently blocking — this session's own practice already avoids the
+  triggering condition (concurrent closing-verify runs on a shared
+  checkout), and the fix is infrastructure hardening rather than a live
+  defect in front of anyone today.
+- **Assignment (if accepted):** next available Alfred slot, unassigned.
+- **Date:** 2026-08-17

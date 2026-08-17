@@ -133,3 +133,12 @@ the listing above is itself a sample, of a 1MB output that was truncated.
   rather than re-deriving the prefix list. Not dispatched this session —
   genuinely large, better sized by the PO/next session than assumed here.
 - **Date:** 2026-08-11
+
+### Sprint deferral (2026-08-17)
+
+Point 2 (the large per-suite cleanup sweep) deferred to Sprint Alfred
+("Agent-first architecture, mechanical governance, measurable rigor, and
+control integrity" — ADR-0043's 2026-08-17 amendment). Not needed near-term
+on this machine specifically (a reboot resets `/tmp` between sessions in
+this environment), but genuinely large and matches Alfred's mechanical-
+governance scope well.

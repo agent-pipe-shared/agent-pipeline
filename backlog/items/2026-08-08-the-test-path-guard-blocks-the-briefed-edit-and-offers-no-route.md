@@ -118,3 +118,12 @@ Constraints any design must hold:
   which situation) are the acceptance bar for this specific component of that
   combined design.
 - **Date:** 2026-08-11
+
+### Sprint deferral (2026-08-17)
+
+Deferred to Sprint Alfred ("Agent-first architecture, mechanical governance,
+measurable rigor, and control integrity" — ADR-0043's 2026-08-17
+amendment) — SECURITY/GUARDRAIL-class design work, matches Alfred's scope
+directly. The two same-day workarounds it produced (docs/pending-verify-
+registrations.md handovers) remain a live cost until this lands, but the
+work itself is a deliberate cross-cutting design, not a same-session patch.

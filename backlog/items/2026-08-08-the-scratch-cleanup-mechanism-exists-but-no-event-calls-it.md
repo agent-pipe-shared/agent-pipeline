@@ -195,3 +195,12 @@ wiring is live in `pipeline-start-preflight.mjs`.
 **Status:** left `open` — points 1-3 above are real remaining work,
 tracked together rather than re-splitting into new items since they share
 one dispatch's context.
+
+### Sprint deferral (2026-08-17)
+
+Points 1-3 deferred to Sprint Alfred ("Agent-first architecture, mechanical
+governance, measurable rigor, and control integrity" — ADR-0043's
+2026-08-17 amendment) — session-identity plumbing and a push-gate advisory
+are architecture/control-integrity work, not current-blocking. Not needed
+near-term: the unconditional `scratch/` write exemption (the part that
+actually unblocked sessions) already landed.

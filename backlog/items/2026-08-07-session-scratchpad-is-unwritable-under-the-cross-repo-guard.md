@@ -171,3 +171,13 @@ passing. Candidates for a deliberate decision, explicitly not a commitment:
   it as the working location, no cleanup descriptor binds it — all still to
   build.
 - **Date:** 2026-08-11
+
+### Sprint deferral (2026-08-17)
+
+Deferred to Sprint Alfred ("Agent-first architecture, mechanical governance,
+measurable rigor, and control integrity" — ADR-0043's 2026-08-17
+amendment). Not needed near-term: candidate 2's de facto behavior (every
+dispatch already using this repo's own `scratch/`) already works in
+practice; the remaining sub-questions (collision-free per-dispatch naming,
+rewriting `roles/critic.md`'s isolation clause) are hardening, not a live
+blocker.
