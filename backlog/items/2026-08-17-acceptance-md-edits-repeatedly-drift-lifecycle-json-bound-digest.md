@@ -62,6 +62,6 @@ process).
   not urgent enough to redesign the manifest-binding rule same-session
   alongside unrelated Phoenix acceptance work, and changing which artifact
   classes get byte-bound is itself a design decision with its own review bar.
-- **Assignment (if accepted):** a future increment; owner `pipeline`, no
-  expiry set.
+- **Assignment (if accepted):** before `sprint_phoenix` is next pushed to
+  `origin`; owner `pipeline`, no calendar expiry.
 - **Date:** 2026-08-17
