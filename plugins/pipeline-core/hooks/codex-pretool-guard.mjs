@@ -23,6 +23,7 @@ import {
   rememberNativeHookFailure,
 } from "../lib/native-hook-failure-memory.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
+import { normalizeGlobalGitOptions, stripQuotedSegments } from "../lib/git-cmd.mjs";
 
 // Same pure, no-I/O reuse pattern as scripts/repair-map.mjs: the secret-eligibility
 // screen lives once in eligibility() and is never reimplemented here (GF-060, F2).
@@ -252,10 +253,19 @@ if (["Edit", "Write"].includes(toolName) && (typeof filePath !== "string" || fil
 }
 const hookSessionId = nativeHookSessionId(input);
 
+// Share the SAME push-detection normalization guard-push.mjs already relies on
+// (lib/git-cmd.mjs) instead of a second, independently hand-maintained regex that
+// can drift from it (F1, NVA-A7FIX-1). Pipeline order mirrors guard-push.mjs's own
+// (guard-push.mjs:259-260): strip quoted segments, lowercase, then fold away every
+// recognized git global option (`-C`, `--git-dir=`, repeated `-C` overrides, etc.)
+// so the push regex below no longer has to anticipate every global-option shape
+// itself.
+const normalizedForPushDetection = normalizeGlobalGitOptions(stripQuotedSegments(command).toLowerCase());
+
 const guardNames = toolName === "Bash"
   ? [
     ...( /\bgit(?:\.exe)?\b/iu.test(command) ? ["guard-git.mjs"] : []),
-    ...( /\bgit(?:\.exe)?(?:\s+-C\s+\S+)?\s+push\b/iu.test(command) ? ["guard-push.mjs"] : []),
+    ...( /\bgit(?:\.exe)?\s+push\b/iu.test(normalizedForPushDetection) ? ["guard-push.mjs"] : []),
     // The lifecycle tool validates its own typed arguments and plan digest.  Do
     // not make a bootstrap command depend on a second heavyweight hook process:
     // on Codex's nested sandbox that process can exhaust the hook's outer budget.

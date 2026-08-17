@@ -193,6 +193,50 @@ check("multiple Bash guard denials are aggregated into one Codex decision", () =
   assert.match(output.permissionDecisionReason, /guard-push/);
 });
 
+// F1 (NVA-A7FIX-1, Nova A Slice A7 comprehensive gate Critic review): the adapter's
+// own guard-push.mjs spawn-decision regex used to be a SECOND, hand-maintained
+// approximation of "is this a push", narrower than guard-push.mjs's own detector
+// (which normalizes through lib/git-cmd.mjs's normalizeGlobalGitOptions before
+// testing). `git --git-dir=.git --work-tree=. push origin main` and a repeated `-C`
+// override both matched guard-push.mjs's own detector but NOT the adapter's old
+// regex, so on Codex this exact shape reached the shell with the push gate never
+// evaluated at all. The fix shares the SAME normalization primitive both files rely
+// on instead of a second regex that can drift from it.
+check("F1: codex adapter recognizes every push shape guard-push.mjs itself recognizes, via shared normalization", () => {
+  const root = fixture();
+  // guard-push.mjs's own comment (guard-push.mjs:328-335) names these two forms as
+  // exactly what its whole-string, normalized detector catches that a positional
+  // detector cannot -- the regression basis for this fix.
+  for (const command of [
+    "git --git-dir=.git --work-tree=. push origin main",
+    "git -C repo -C nested push origin main",
+  ]) {
+    const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+    assert.equal(output.permissionDecision, "deny", command);
+    // guard-push.mjs's own denial text always names itself ("BLOCKED (guard-push,
+    // ..."); this string appearing in the aggregated reason is proof guard-push.mjs
+    // was actually spawned and evaluated the command, not merely that SOME guard
+    // denied it (guard-git.mjs is also spawned for any `git` command, but is
+    // documented not to block a plain push).
+    assert.match(output.permissionDecisionReason, /guard-push/, command);
+  }
+});
+
+// Negative case for the same fix: a command that merely CONTAINS the substring
+// "push" -- or is a `git` command at all -- must not be misclassified as a push by
+// the new normalized detector. `git status` and `git commit -m "push later"` are
+// both fully allowed today (no push gate applies); the fixed detector must keep
+// allowing them, proving the shared-normalization fix narrows to real pushes and
+// does not silently widen scope to any command whose text merely mentions "push".
+check("F1: the shared-normalization fix does not widen push detection to non-push commands", () => {
+  const root = fixture();
+  for (const command of ["git status", 'git commit -m "push later"']) {
+    const result = run({ tool_name: "Bash", tool_input: { command } }, root);
+    assert.equal(result.status, 0, `${command}\n${result.stderr}`);
+    assert.equal(result.stdout, "", command);
+  }
+});
+
 check("bounded rg-to-rg search filtering remains read-only without an override loop", () => {
   const root = fixture();
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
