@@ -2119,6 +2119,46 @@ export const PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS = [
   { reason: null, code: "po_authority_rebind_unavailable", message: "the PRD and specification authority differ but no closed rebind action could be validated", repair: "retain both authority documents and repair the typed PO rebind planner; do not edit Pipeline State manually", offersPlannerRetry: true },
 ];
 
+/**
+ * Propose (never gate) the design-to-implementation handover once the plan
+ * lifecycle is genuinely `approved` -- backlog:
+ * 2026-08-08-no-design-to-implementation-handover-exists.md, PO decision
+ * 2026-08-17, Q2 "Option A": the operator stays in control, implementation
+ * work must remain possible whether or not this proposal is acted on. This
+ * only ever adds a `nextAction` to an otherwise-unchanged `status: "ready"`
+ * result; it never changes that status, and the separate `guard-devplan.mjs`
+ * lifecycle check (unaffected by this function) is what actually keeps
+ * implementation writes refused until `set-phase --phase implementation`
+ * genuinely runs.
+ *
+ * Reuses `persistedPoAuthority`'s exact safe-read (symlink/hardlink/before-
+ * after identity checks) and its own `derivePlanLifecycle` projection, the
+ * same one `pipeline-state.mjs` and `nextActionSection()` use, rather than
+ * re-deriving lifecycle status from scratch. `lifecycleStatus === "approved"`
+ * only ever occurs when `activeFeature.phase !== "implementation"` (i.e.
+ * still `"design"`, the only other valid phase) AND a current, digest-bound
+ * PO approval exists -- exactly the precondition this backlog item's own Q1
+ * dependency (2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md,
+ * resolved 2026-08-11) made reachable.
+ *
+ * Deliberately calls `persistedPoAuthority` directly rather than through the
+ * `fs.observePersistedPoAuthority` override `observePoAuthorityRebind` uses:
+ * that hook's single-argument shape and its `{status:"absent"}` test stub
+ * both belong to the PO-rebind concern specifically. Reusing it here would
+ * silently couple two unrelated observations under one override.
+ */
+function designToImplementationHandoverAction(root, fs) {
+  const authority = persistedPoAuthority(root, fs);
+  if (authority.status !== "observed" || authority.lifecycleStatus !== "approved") return null;
+  return commandAction(
+    [PO_AUTHORITY_REBIND_WRITER, "set-phase", "--phase", "implementation"],
+    true,
+    true,
+    SCHEMA,
+    ["ready"],
+  );
+}
+
 function readyLifecycleResult({ root, runner, intent, repository, runtime, continuity = emptyContinuity() }, fs) {
   requireRunner(runner, "readyLifecycleResult");
   // The fresh protected-mount transition is not a ready-state claim.  Its
@@ -2375,6 +2415,7 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
     runtime,
     continuity,
     appServer,
+    nextAction: designToImplementationHandoverAction(root, fs),
     diagnostics: [],
   });
 }

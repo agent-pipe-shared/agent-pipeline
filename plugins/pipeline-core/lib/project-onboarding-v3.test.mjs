@@ -2989,6 +2989,110 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
   } finally { dispose(path); }
 });
 
+// backlog: 2026-08-08-no-design-to-implementation-handover-exists.md, PO
+// decision 2026-08-17 (Q2, "Option A"). Before this fix, V4 inspection at
+// `ready` returned `nextAction: null` even once the plan lifecycle reached
+// `approved` -- the lifecycle stopped exactly at its most consequential
+// handover, with nothing telling the operator or an automated caller what
+// came next. This is a PROPOSAL, never a gate: `guard-devplan.mjs` (exercised
+// directly above) is the sole mechanism that actually refuses implementation
+// writes, and it is completely unaffected by whether this proposal exists or
+// is ever acted on -- both halves are asserted below.
+test("V4 inspection proposes set-phase --phase implementation once the plan is approved, and only then", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const localDeps = { ...fakeDeps, initializePoGateProfileReceipt: initializeActualPoGateProfileReceipt };
+    const barrier = initializeRestartRequiredRoot(path, localDeps);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Ship one gated feature", localDeps);
+
+    mkdirSync(join(path, "specs", "handover"), { recursive: true });
+    const prdPath = "specs/handover/prd_handover.md";
+    const specPath = "specs/handover/spec.md";
+    const designInputPath = "specs/handover/design-input.md";
+    writeFileSync(join(path, specPath), "# Handover technical specification\n");
+    const specSha256 = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, prdPath), [
+      "<!-- po-language: en -->",
+      `<!-- technical-spec-sha256: ${specSha256} -->`,
+      "",
+      "# Handover product requirements",
+      "",
+    ].join("\n"));
+    writeFileSync(join(path, designInputPath), "# Handover design input\n");
+    const promotion = {
+      rootDir: path, profile: "feature", featureId: "handover-work", planPath: prdPath,
+      prdPath, specPath, designInputPath, runner: "codex", deps: localDeps,
+    };
+    const planned = planProjectOnboardingKickoffPromotionV4(promotion);
+    const promoted = applyProjectOnboardingKickoffPromotionV4({ runner: "codex", ...promotion, planSha256: planned.planSha256, activate: true });
+    assert.equal(promoted.status, "ready");
+
+    const inspect = () => inspectProjectOnboardingV3({ runner: "codex", rootDir: path, intent: "bootstrap", deps: localDeps });
+
+    // Draft (freshly promoted, not yet submitted): unapproved, unchanged from
+    // today -- never propose the transition prematurely.
+    const draft = inspect();
+    assert.equal(draft.status, "ready");
+    assert.equal(draft.nextAction, null);
+
+    const state = (argv) => {
+      const stderr = [];
+      const code = pipelineStateRun(argv, {
+        dir: path,
+        now: () => "2026-08-01T12:00:00.000Z",
+        writeError: (value) => stderr.push(String(value)),
+      });
+      return { code, stderr: stderr.join("") };
+    };
+    const submitted = state(["submit-plan", "--by", "po", "--profile", "feature"]);
+    assert.equal(submitted.code, 0, submitted.stderr);
+
+    // Awaiting-approval: still not approved, still unchanged.
+    const awaiting = inspect();
+    assert.equal(awaiting.status, "ready");
+    assert.equal(awaiting.nextAction, null);
+
+    const approved = state(["approve-plan", "--by", "po"]);
+    assert.equal(approved.code, 0, approved.stderr);
+
+    // Approved, but still phase "design": the proposal appears.
+    const readyForHandover = inspect();
+    assert.equal(readyForHandover.status, "ready");
+    assert.equal(readyForHandover.nextAction?.kind, "command");
+    assert.equal(readyForHandover.nextAction.executable, "node");
+    assert.deepEqual(readyForHandover.nextAction.argv, [PIPELINE_STATE_SCRIPT, "set-phase", "--phase", "implementation"]);
+    assert.equal(readyForHandover.nextAction.mutation, true);
+    assert.equal(readyForHandover.nextAction.requiresConfirmation, true);
+    assert.equal(readyForHandover.nextAction.expected.schema, "pipeline.project-onboarding.v4");
+    assert.deepEqual(readyForHandover.nextAction.expected.statuses, ["ready"]);
+
+    // The proposal is never a gate: an implementation write is still refused
+    // before it is acted on -- the same guard-devplan check as the sibling
+    // dev-plan-gate test, run here to prove the two mechanisms are independent.
+    const attemptWrite = (target) => spawnSync(
+      process.execPath,
+      [fileURLToPath(new URL("../hooks/guard-devplan.mjs", import.meta.url))],
+      {
+        cwd: path,
+        encoding: "utf8",
+        input: JSON.stringify({ tool_name: "Write", tool_input: { file_path: target } }),
+        env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+      },
+    );
+    assert.equal(attemptWrite("src/index.html").status, 2, "the proposal alone must not admit implementation writes");
+
+    const phased = state(["set-phase", "--phase", "implementation"]);
+    assert.equal(phased.code, 0, phased.stderr);
+
+    // Implementing: the handover is done, the proposal is gone again.
+    const implementing = inspect();
+    assert.equal(implementing.status, "ready");
+    assert.equal(implementing.nextAction, null);
+  } finally { dispose(path); }
+});
+
 // PUSHSEED-2. The same standard as the dev-plan test above, for the gate the
 // 2026-08-09 seed switches on: the push the guard refuses must be admitted once
 // the shipped commands have been run, and every one of those commands must be
