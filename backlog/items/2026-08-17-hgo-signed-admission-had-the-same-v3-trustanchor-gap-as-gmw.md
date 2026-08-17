@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-17
 closed_at: 2026-08-17
 closure_repository: self
-closure_commit: 989cb236
+closure_commit: 989cb236d627e5717e853bec5a55d4d461fce5f8
 closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-v3-trustanchors-gmw-hgo-fix-closure.md
 source: "Reported by the PO on 2026-08-17, relaying a diagnosis independently made and verified in a downstream consumer-project session; confirmed live in this repository, whose own project/critical-human-proof.json is already on the v3 schema."
 ---

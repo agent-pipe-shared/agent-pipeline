@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-17
 closed_at: 2026-08-17
 closure_repository: self
-closure_commit: ba562481
+closure_commit: ba56248120d58612353cc0dbe85e0fa6f84d1a70
 closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-po-human-approval-windows-posix-separator-fix-closure.md
 source: "Reported by the PO on 2026-08-17, relaying a real Windows/Codex session transcript from a downstream consumer project's `po-human-approval.mjs setup` run. Root cause independently diagnosed in this repository from the transcript's symptoms."
 ---

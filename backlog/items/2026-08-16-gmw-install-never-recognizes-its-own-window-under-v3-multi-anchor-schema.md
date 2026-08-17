@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-16
 closed_at: 2026-08-17
 closure_repository: self
-closure_commit: 04a663d9
+closure_commit: 04a663d940c1d5441a77e9d1aa1f073cd3a800b2
 closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-v3-trustanchors-gmw-hgo-fix-closure.md
 source: "Live GMW ceremony during the Nova A AFK-session bootstrap, this session (2026-08-16) -- guard-maintenance-window.mjs install wrote a well-formed, correctly-signed window record, but the immediate re-read (and every subsequent status/guard check) reported absent."
 ---

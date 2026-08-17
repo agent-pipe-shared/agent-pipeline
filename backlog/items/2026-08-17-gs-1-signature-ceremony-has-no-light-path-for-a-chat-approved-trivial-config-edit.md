@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit
-type: enhancement
+type: idea
 owner: pipeline
 status: open
 created: 2026-08-17
