@@ -7356,6 +7356,10 @@ The PO's Stop-hook pushed back correctly on the previous section's decision not 
 
 **The full ADR-0065 Tier-B cross-candidate-reuse thread is now genuinely, completely closed.** `1f414443` (real bug, real fix, real regression test) → Critic FAIL (F-1 blocker: silently activated a PO-reserved decision) → `423f38e6`+`09a9035c` (safe-default opt-in, zero touch to the protected file, plus a repeated-and-fixed consumer-safe-paths slip) → Critic PASS. ADR-0065 candidates (a) and (b) are both accepted, implemented, Critic-passed, and — uniquely among this session's work — actually caught and corrected a real defect in already-shipped, already-once-Critic-passed code, which is exactly what the comprehensive Slice A7 gate review this whole thread grew out of was for.
 
+**New local 0.5.5 candidate stamped: `1e5f00ec`, tree `5e3b2c4b70b17eab6670a6b9818296e96169cd49`.** Verify 269/269 exit 0 (security-scan included), `binding: "exact"`, clean quiescent tree. Adds the entire ADR-0065 Tier-B cross-candidate-reuse thread on top of `9980abec`: the comprehensive Slice A7 gate review that found it, both rounds of fix-and-Critic-re-review, and the backlog cross-reference. Same PO scope as every candidate this exceptionally long AFK block: local test candidate, not a release, no push approval prepared or recorded.
+
+**What remains open, unchanged from the last full accounting:** `NVA-A8-5` (PO-run pilot, textually cannot be closed any other way) is still the one genuine remaining blocker for a valid Nova A E1 receipt. The A7 gate ceremony's own comprehensive Critic review is still only partial (7 of ~40 named files/artifacts examined before its coordinator-directed stop) — worth a proper continuation at some point, though it already paid for itself by surfacing the real tier-fix bug. ADR-0065 candidate (c), `#98` R4, the two deferred architectural items, the marketplace refresh, and the GMW-reconcile item are all unchanged from their prior status. No push.
+
 ## Re-entry
 
 1. Maintainers start with [`CLAUDE.md`](../CLAUDE.md).
