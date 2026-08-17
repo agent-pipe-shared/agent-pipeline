@@ -62,7 +62,13 @@ line, not a time-triggered item; does not block CYB-A0's closure.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Alfred.
+- **Rationale:** matches Alfred's scope ("mechanical governance, measurable
+  rigor, and control integrity") — a small, mechanical robustness hardening
+  with no live impact today (the item's own Impact assessment: availability-
+  only, fail-closed downstream, currently unreachable — no in-repo consumer
+  threads `usedAcknowledgementIds` across calls). Not worth a same-session
+  fix or a dedicated dispatch ahead of Alfred.
+- **Assignment (if accepted):** next available Alfred slot — a small,
+  mechanical, additive fix per the item's own Proposal (snapshot the id once).
+- **Date:** 2026-08-17
