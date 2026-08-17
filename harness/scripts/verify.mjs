@@ -550,6 +550,13 @@ const TEST_SUITES = [
   { name: "verify-suite-registration-tests", file: join(scriptDir, "check-verify-suite-registration.test.mjs") },
   { name: "verify-suite-registration-check", file: join(scriptDir, "check-verify-suite-registration.mjs") },
   { name: "self-application-attestation-gate-tests", file: join(libDir, "self-application-attestation-gate.test.mjs") },
+  { name: "pipeline-state-decision-reference-tests", file: join(scriptDir, "pipeline-state-decision-reference.test.mjs") },
+  { name: "guard-push-decision-reference-tests", file: join(hooksDir, "guard-push-decision-reference.test.mjs") },
+  { name: "control-execution-lifecycle-event-tests", file: join(libDir, "control-execution-lifecycle-event.test.mjs") },
+  { name: "governance-export-view-status-tests", file: join(libDir, "governance-export-view-status.test.mjs") },
+  { name: "guard-authority-ledger-intake-tests", file: join(libDir, "guard-authority-ledger-intake.test.mjs") },
+  { name: "guard-handoff-offer-tests", file: join(libDir, "guard-handoff-offer.test.mjs") },
+  { name: "pipeline-state-lifecycle-event-tests", file: join(pluginScriptsDir, "pipeline-state-lifecycle-event.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
