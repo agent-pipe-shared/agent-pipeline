@@ -234,6 +234,10 @@ export const ALLOWLIST = Object.freeze([
     reason: "Class B: source comment citing roles/goldfish.md and harness/definition-of-done.md, not an operator-facing message.",
   },
   {
+    filePattern: /^plugins\/pipeline-core\/scripts\/check-suite-registration\.mjs$/u,
+    reason: "Class B: source comments (module docstring / inline) citing this repository's own harness/scripts/verify.mjs layout -- the script's entire purpose is checking that file's TEST_SUITES registration, not an operator-facing message a consumer would read.",
+  },
+  {
     filePattern: /^plugins\/pipeline-core\/hooks\/hooks\.json$/u,
     reason: "Class B: the `$comment` metadata field documents hook wiring for a maintainer, citing `node setup.mjs`. Not an operator-facing message; setup.mjs's own consumer-reachability is tracked by a separate backlog item (2026-08-08-an-installing-consumer-is-never-asked-any-setup-decision.md), not this check.",
   },
