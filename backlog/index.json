@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ee29ef8804ccccc199cde267b255e35128889edd2388b23483f3219d71c23a7b"
+    "transitionHead": "18d88e8ce6a5efc913c6e817ace922d985a4b3ac8b56f19af6984c33b99234b7"
   },
   "counts": {
-    "open": 104,
+    "open": 105,
     "in_progress": 22,
     "closed": 96
   },
@@ -962,6 +962,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
+    },
+    {
+      "id": "pipeline.human-guard-override-shares-the-po-human-approval-posix-normalization-bug",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Independently flagged twice this session as an out-of-scope disclosure: once by the round-1 Critic reviewing d2e2fc4c (NVA-WINPATH-1), once by the NVA-WINPATH-2 goldfish-deep dispatch that fixed the sibling bug. Neither investigated it (explicitly out of scope for both); confirmed directly against this repository's source before filing."
     },
     {
       "id": "pipeline.installing-consumer-is-never-asked-any-setup-decision",

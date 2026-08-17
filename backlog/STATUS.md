@@ -105,6 +105,7 @@
 | pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.human-guard-override-shares-the-po-human-approval-posix-normalization-bug | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.kickoff-apply-action-drops-runner | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift | closed | defect | pipeline | 2026-08-09 | — |
@@ -230,6 +231,6 @@
 
 ## Counts
 
-- open: 104
+- open: 105
 - in_progress: 22
 - closed: 96
