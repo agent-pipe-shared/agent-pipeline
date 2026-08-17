@@ -67,7 +67,15 @@ briefed for.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, remains open in current backlog. Re-verified
+  2026-08-17: `plugins/pipeline-core/lib/multi-cli-benchmark.mjs` still has
+  no `workloadDigests` field or equivalent; `BENCHMARK_FIXTURES` is
+  unchanged. Still unresolved, still minor per the Critic's own scoping
+  (mitigated by the existing candidate commit/tree binding).
+- **Rationale:** Nova-A-specific tooling (`multi-cli-benchmark.mjs`), not a
+  match for Alfred/Nightwing/Batman's confirmed scopes; a real schema
+  decision, not urgent enough to interrupt current work, and explicitly
+  does not require re-running the existing sealed benchmark record.
+- **Assignment (if accepted):** unassigned; direction is fully specified in
+  this item's own Direction section.
+- **Date:** 2026-08-17

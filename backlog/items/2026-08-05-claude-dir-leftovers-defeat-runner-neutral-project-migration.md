@@ -185,3 +185,15 @@ angle rather than the migration-completeness angle).
   dispatch (uniform doc-sync edit following the `896a7a0` pattern), not
   assigned this session.
 - **Date:** 2026-08-06
+
+### Re-verification, 2026-08-17 — unchanged, still open
+
+Confirmed still hardcoded to `.claude/pipeline.json`/`.claude/pipeline.yaml`,
+none touched by any later commit: `plugins/pipeline-core/skills/close-block/SKILL.md:83,98,180`,
+`plugins/pipeline-core/agents/goldfish-mechanic.md:11`, `SETUP.md:303,361`,
+`PIPELINE_FLOW.md:9,243`. The fail-closed drift check
+(`check-authority-tier-agreement.mjs`) remains registered in `verify.mjs` and
+keeps this from being a live divergence risk in the meantime — only the
+documentation repointing itself is still outstanding. Kept open,
+current-scope, still exactly the `goldfish-mechanic`-sized task the prior
+Triage entry scoped it as.

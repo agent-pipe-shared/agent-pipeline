@@ -54,7 +54,13 @@ has not arrived yet would guess at the seams.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Rationale:** the PO's own original framing already names this an
+  efficiency pass to do once several files are ready for modularisation
+  together, not urgent. Matches Sprint Nightwing's confirmed scope
+  (product experience / onboarding surface) — the bootstrap skill is
+  exactly that surface.
+- **Assignment (if accepted):** next available Nightwing slot, bundled with
+  any other bootstrap-skill-text work landing in that window (e.g. the
+  sibling item on live-rejection-only constraints).
+- **Date:** 2026-08-17

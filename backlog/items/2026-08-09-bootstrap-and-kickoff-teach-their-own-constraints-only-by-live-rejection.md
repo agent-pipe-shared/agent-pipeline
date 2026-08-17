@@ -63,7 +63,12 @@ violation) is the one exception: a lint/guidance note rather than a doc gap.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Rationale:** matches Sprint Nightwing's confirmed scope exactly —
+  onboarding/documentation-completeness gaps in the bootstrap and kickoff
+  skill text (`docs/adr/0043-post-go-live-sprint-model.md`'s 2026-08-17
+  amendment). None of the six causes are code defects; all are
+  documentation gaps around already-correct enforcement, matching Nightwing
+  issue `#61` closely.
+- **Assignment (if accepted):** next available Nightwing slot.
+- **Date:** 2026-08-17
