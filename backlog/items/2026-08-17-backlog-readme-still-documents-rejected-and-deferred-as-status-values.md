@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: ea3c18184f228c1e44b1f8cb156f73fc14b9a97c
+closure_evidence: backlog/README.md
 source: "Elephant self-caught, 2026-08-17, while independently verifying NVA-MICRO-1's fix to backlog/README.md's duplicate-merge convention (2026-08-17-merged-into-frontmatter-key-documented-but-unsupported.md)."
 ---
 
@@ -49,3 +53,15 @@ convention step 3 now documents), not a distinct status value.
 - **Assignment:** unassigned; goldfish-mechanic-sized once the real
   reject/defer convention is confirmed against source.
 - **Date:** 2026-08-17
+
+### Closed 2026-08-18 (overnight AFK block, NVA-MICRO-4)
+
+Confirmed first (per the item's own Proposal): grepped
+`reconcile-backlog-ledger.mjs`'s status enum (`open`/`in_progress`/`closed`
+only) and a real worked example
+(`backlog/items/2026-08-07-adr-0047-numbering-collision.md`: `status: open`,
+`Decision: deferred — owned by the Phoenix sprint`). Step 2 rewritten to
+document the real pattern: reject closes the item (`status: closed`,
+rationale in Triage "Decision:" prose, same as step 3's duplicate-merge
+convention); defer keeps `status: open` with the condition stated in
+Triage prose, citing the ADR-0047 item as a worked example.

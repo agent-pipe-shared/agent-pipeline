@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: 3263567469b09cb1983f8763e417760cbd35574c
+closure_evidence: PIPELINE_FLOW.md
 source: "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift"
 due: 2026-09-05
 ---
@@ -197,3 +201,20 @@ keeps this from being a live divergence risk in the meantime — only the
 documentation repointing itself is still outstanding. Kept open,
 current-scope, still exactly the `goldfish-mechanic`-sized task the prior
 Triage entry scoped it as.
+
+### Closed 2026-08-18 (overnight AFK block, NVA-MICRO-4)
+
+All 8 remaining occurrences reworded to tier-neutral wording, mirroring the
+`896a7a0` pattern: `plugins/pipeline-core/skills/close-block/SKILL.md`
+(3 sites, shifted to lines 83/98/187-188 by then), `goldfish-mechanic.md`
+(1 site), `SETUP.md` (2 sites — the prose at :303, and the runnable
+`cp` example at :361, retargeted to `project/pipeline.json` per
+`project-authority.mjs`'s `NEUTRAL_CALIBRATION` constant), `PIPELINE_FLOW.md`
+(1 site, English section at :9). Deliberately not touched:
+`PIPELINE_FLOW.md:243`, confirmed below the `DE-REFERENCE-BELOW` marker
+(non-authoritative German reference, CLAUDE.md's bilingual-doc convention).
+Independently re-verified: diffs reviewed against both established
+reference patterns (`guardrails/git.md:81` prose-reference,
+`templates/CLAUDE.project.md`'s canonical named-listing per `896a7a0`) and
+the `NEUTRAL_CALIBRATION` constant confirmed live in
+`plugins/pipeline-core/lib/project-authority.mjs:35`.

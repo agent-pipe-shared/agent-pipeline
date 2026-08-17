@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "cfe66f4a7dd05eb5e3c97369c3d499557d358f9ea508916019275a4196713a58"
+    "transitionHead": "39fe353e347b82dfefa831b285c7130698c526837d23cfda3cf6cf3f3af5deb4"
   },
   "counts": {
-    "open": 93,
+    "open": 91,
     "in_progress": 22,
-    "closed": 137
+    "closed": 139
   },
   "items": [
     {
@@ -255,11 +255,15 @@
     },
     {
       "id": "pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Elephant self-caught, 2026-08-17, while independently verifying NVA-MICRO-1's fix to backlog/README.md's duplicate-merge convention (2026-08-17-merged-into-frontmatter-key-documented-but-unsupported.md)."
+      "source": "Elephant self-caught, 2026-08-17, while independently verifying NVA-MICRO-1's fix to backlog/README.md's duplicate-merge convention (2026-08-17-merged-into-frontmatter-key-documented-but-unsupported.md).",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "ea3c18184f228c1e44b1f8cb156f73fc14b9a97c",
+      "closureEvidence": "backlog/README.md"
     },
     {
       "id": "pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code",
@@ -332,11 +336,15 @@
     },
     {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-05",
-      "source": "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift"
+      "source": "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "3263567469b09cb1983f8763e417760cbd35574c",
+      "closureEvidence": "PIPELINE_FLOW.md"
     },
     {
       "id": "pipeline.claude-greenfield-run-happy-path-findings",

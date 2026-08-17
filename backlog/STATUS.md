@@ -29,7 +29,7 @@
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-baseline-migration-commit-unreachable | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | open | workflow-improvement | pipeline | 2026-08-11 | — |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
@@ -37,7 +37,7 @@
 | pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.briefing-model-field-contradicts-agent-definition | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.canonical-worktree-lifecycle | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | open | defect | pipeline | 2026-08-05 | — |
+| pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-greenfield-run-happy-path-findings | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | open | idea | pipeline | 2026-08-05 | — |
 | pipeline.close-spec-retention-and-consent | closed | workflow-improvement | pipeline | 2026-07-21 | — |
@@ -260,6 +260,6 @@
 
 ## Counts
 
-- open: 93
+- open: 91
 - in_progress: 22
-- closed: 137
+- closed: 139
