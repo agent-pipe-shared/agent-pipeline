@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4165f5c0afa752536119a3f67dcff1c5b80f050e7b93c3fb98bd960bd01d81d6"
+    "transitionHead": "06d168d115936eaf613256372b8fff7368ab885530968f06171fd780de05316c"
   },
   "counts": {
-    "open": 100,
+    "open": 99,
     "in_progress": 22,
-    "closed": 123
+    "closed": 124
   },
   "items": [
     {
@@ -2467,11 +2467,15 @@
     },
     {
       "id": "pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed."
+      "source": "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "bf8f7b93b11edcf7957c0d013978d9b6e892cb0b",
+      "closureEvidence": "backlog/items/2026-08-17-worktree-hygiene-flags-onboardings-own-generated-files-as-dirty.md"
     },
     {
       "id": "pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify",

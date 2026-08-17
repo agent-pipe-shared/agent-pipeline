@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: bf8f7b93b11edcf7957c0d013978d9b6e892cb0b
+closure_evidence: backlog/items/2026-08-17-worktree-hygiene-flags-onboardings-own-generated-files-as-dirty.md
 created: 2026-08-17
 source: "Second, independent Codex happy-path test (PO, project 'Rune_Test1_Codex_055_50' / 'ruinen-browsergame', 2026-08-17), relayed as an AI-authored forensic report and independently re-verified against this checkout's own current source and the raw rollout transcripts before being filed."
 ---
@@ -55,3 +59,18 @@ for-our-own-scaffolding state from an actually dirty one.
   code, no in-task design latitude beyond the allowlist itself), plus
   Critic review before considered done.
 - **Date:** 2026-08-17
+
+## Closure (2026-08-17)
+
+Fixed via goldfish-deep dispatch NVA-HYGFIX-1. `checkSessionHygiene()` now
+classifies each dirty path individually against the onboarding flow's known
+generated-file set before appending `current-worktree-dirty`; a genuinely
+foreign dirty path still trips the reason exactly as before. Independently
+re-verified: `node --test plugins/pipeline-core/lib/worktree-lifecycle.test.mjs`
+— 33/33 pass, including new `D0-07 hygiene ignores dirty state made only of
+onboarding-generated paths` and `D0-07 hygiene still flags
+current-worktree-dirty when a genuinely foreign path is dirty`. Commit
+`bf8f7b93b11edcf7957c0d013978d9b6e892cb0b`.
+
+Still needs the Critic review noted in Assignment above before being
+considered fully done — not yet scheduled.
