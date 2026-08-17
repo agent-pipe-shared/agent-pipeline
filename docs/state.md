@@ -15,6 +15,16 @@ indefinitely. Ran a batch of `AskUserQuestion` decisions against the 15 open cri
 real blocker, not one-by-one), closed what was now unblocked, landed H-AC-11's first code
 increment, and queued the rest. Open count **12 of 157** (was 15).
 
+**Priority-class breakdown (A, D, S, B, per the standing "A/D/S/B" sequencing directive), checked
+explicitly against the evidence map's own `CLOSURE` table so this is verifiable, not asserted:**
+Class A (`assert`) and Class D (`doc`) and Class S (`seam`) are **all still empty** among the 12
+open criteria — confirmed by grepping every open criterion's `CLOSURE` tag, not carried over from
+memory. The 12 split exactly 6/6: **Class B** (`build`) — P-AC-11, H-AC-12, A-AC-01, A-AC-05,
+L-AC-01, EPIC-AC-02. **Class P** (`po`, PO-only, not closeable by writing code) — H-AC-11,
+PX0-AC-13, EPIC-AC-01, EPIC-AC-03, EPIC-AC-04, EPIC-AC-05. This round's work (P-AC-11 dimensions,
+H-AC-12, A-AC-01/05, L-AC-01, EPIC-AC-02) is Class B work; H-AC-11/PX0-AC-13's Class-P halves
+already got their PO decisions and are now dispatchable Class-B-shaped follow-on work themselves.
+
 - **PO decisions this round** (all via `AskUserQuestion`, German going forward per PO request
   mid-round — a feedback memory now covers this):
   - P-AC-11 `previewRequired` → satisfied by construction (amended, closed).
