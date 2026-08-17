@@ -94,3 +94,9 @@ capacity:
   or an explicit decision on whether a merge commit on this repo's own main
   branch is a supported event) before briefing — not yet written.
 - **Date:** 2026-08-17
+
+### PO decision, 2026-08-17
+
+Direction 1 (synthetic single-parent test fixture): the test file builds its
+own single-parent fixture commit instead of depending on this repository's
+real live HEAD shape. Dispatched.

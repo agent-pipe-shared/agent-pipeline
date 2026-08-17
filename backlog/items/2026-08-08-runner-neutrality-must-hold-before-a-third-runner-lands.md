@@ -126,3 +126,12 @@ this item links to.) This item stays open as the runner-neutrality
 *precondition* tracker, distinct from `#69`'s own AGY-implementation scope,
 per the PO's 2026-08-12 decision above. Directions 1–3 remain queued,
 unassigned, future-sprint prep.
+
+### PO decision, 2026-08-17
+
+Confirmed `sprint:NONE` on `#69` is correct — the PO expects to work AGY
+as a side task, not gated behind Alfred's own sequencing. Consequence for
+this item: directions 1-3 should not be assumed safely deferred until
+Alfred merely because AGY is "later" — AGY could start at any point ahead
+of Alfred. Not escalated to an active dispatch this session (no AGY start
+date given); flag again if AGY work is scheduled before Alfred lands.

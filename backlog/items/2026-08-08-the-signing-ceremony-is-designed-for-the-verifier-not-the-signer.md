@@ -194,3 +194,11 @@ and a convenience wrapper could easily lose:
   above before this repository's own push-approval ceremony is next walked
   for real.
 - **Date:** 2026-08-17
+
+### PO decision, 2026-08-17
+
+Build now, together with the sibling item
+`2026-08-08-the-signed-guard-override-has-no-command-that-emits-the-digest-to-sign.md`,
+per this item's own "Direction" section (single entry point first; then
+disclosure fixes 2/3/8; then finding 6's separate store-robustness fix) —
+before this repository's own next push. Dispatched.

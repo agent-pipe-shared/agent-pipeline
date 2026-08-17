@@ -116,3 +116,10 @@ which would remove the need for this ceremony to run at all in the push case.
   sibling before this repository's own push-approval ceremony is next
   walked for real.
 - **Date:** 2026-08-17
+
+### PO decision, 2026-08-17
+
+Build now, together with the sibling item
+`2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md`,
+as one consolidated single-entry-point ceremony (per that item's own
+"Direction" section) — before this repository's own next push. Dispatched.

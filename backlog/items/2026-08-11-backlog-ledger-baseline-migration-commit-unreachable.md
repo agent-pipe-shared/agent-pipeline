@@ -114,3 +114,10 @@ requiring a judgment call beyond direct verification.
   a new ledger event under a contract this session did not author). Left for
   explicit PO/maintainer review rather than picked between unilaterally.
 - **Date:** 2026-08-11
+
+### PO decision, 2026-08-17
+
+Option 1 (accept and document): a fixed, one-time-checked allowlist of the
+38 known-unreachable legacy evidence-commit triples
+(commit/actor/evidence.kind), so `check-backlog-state.mjs` stops re-flagging
+them as fresh drift every run. No new ledger event. Dispatched.

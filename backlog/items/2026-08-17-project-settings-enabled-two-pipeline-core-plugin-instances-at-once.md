@@ -93,3 +93,11 @@ self-application repo. **Left open for a PO decision** — not a code fix.
 - **Assignment (if accepted):** this AFK block; final resolution pending
   PO input.
 - **Date:** 2026-08-17
+
+### PO decision, 2026-08-17
+
+Option A: a host-local, untracked workaround
+(`.claude/settings.local.json` on this machine) rather than any change to
+the tracked file. Documenting this combined-purpose case in
+`docs/claude-local-plugin-development.md` so it does not have to be
+re-derived on the next machine setup. Dispatched (docs only).

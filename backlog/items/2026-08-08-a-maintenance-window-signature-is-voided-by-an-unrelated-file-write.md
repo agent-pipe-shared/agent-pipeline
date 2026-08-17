@@ -142,3 +142,12 @@ also unnecessarily strict for the AFK scenario (extend the idempotency to
 tolerate a commit, provided the same safety properties hold), or is
 binding to the exact candidate commit intentional and should stay strict
 even at the cost of re-signing during active dispatch waves?
+
+### PO decision, 2026-08-17
+
+Option A: extend the idempotency to tolerate an intervening commit, using
+the same scope/expiry/reason/feature-bound analysis that already made the
+file-write case safe (`23d93b0a`, `64450b35`) — the new commit must remain
+within the already-authorized scope. This is a security-tier change
+(MP-07) and needs the same careful design/Critic treatment as the original
+fix. Dispatched.

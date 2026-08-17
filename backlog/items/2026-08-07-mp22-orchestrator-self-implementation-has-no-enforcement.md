@@ -217,3 +217,8 @@ cross-cutting (it governs how the orchestrator behaves in every sprint, not
 only Alfred's own scope), so deferring it delays a real, still-active
 governance hole rather than parking unrelated feature work — worth a
 conscious PO call, not just this triage pass's default.
+
+### PO decision, 2026-08-17
+
+Confirmed: stays at Alfred, not pulled forward. Accepted as a conscious
+restricted risk until then.

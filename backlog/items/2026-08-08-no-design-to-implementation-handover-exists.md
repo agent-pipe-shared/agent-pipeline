@@ -95,3 +95,10 @@ Not designed here. What has to be decided:
   PO confirmation before building, not just an inference from an adjacent
   decision.
 - **Date:** 2026-08-11
+
+### PO decision, 2026-08-17
+
+Q2 confirmed: Option A, a proposal (not a blocking gate) — consistent with
+the mp22 decision (incentive over new enforcement surface). `nextAction`
+proposes `set-phase --phase implementation` once the plan gate is cleared;
+the operator stays in control. Dispatched.
