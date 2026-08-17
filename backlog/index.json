@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1817ea7dd4d7d3f7b972efecf30c28048d58a12bf911c13fd589120f7d40826b"
+    "transitionHead": "23c3d127e1cd73867523e2644928d1fee83f126aa1ae9aa8726990912990c71e"
   },
   "counts": {
-    "open": 98,
+    "open": 96,
     "in_progress": 22,
-    "closed": 118
+    "closed": 120
   },
   "items": [
     {
@@ -219,11 +219,15 @@
     },
     {
       "id": "pipeline.backlog-ledger-baseline-migration-commit-unreachable",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-11",
-      "source": "Full Verify's backlog-state-check, recurring throughout the 2026-08-11 AFK block, finally investigated directly on Stop-hook challenge."
+      "source": "Full Verify's backlog-state-check, recurring throughout the 2026-08-11 AFK block, finally investigated directly on Stop-hook challenge.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "d16c734572d141ed19bc6a695d24278930b07dac",
+      "closureEvidence": "backlog/items/2026-08-11-backlog-ledger-baseline-migration-commit-unreachable.md"
     },
     {
       "id": "pipeline.backlog-ledger-closure-reason-misleading",
@@ -356,11 +360,15 @@
     },
     {
       "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Discovered running harness/scripts/verify.mjs against the NOVA-GMW-1 merge commit 8bc5ceb (first real merge commit into this repository's live main-branch history), 2026-08-07."
+      "source": "Discovered running harness/scripts/verify.mjs against the NOVA-GMW-1 merge commit 8bc5ceb (first real merge commit into this repository's live main-branch history), 2026-08-07.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "05e6f1fe9ffa254841373bdc7a801aec9f1bffe8",
+      "closureEvidence": "backlog/items/2026-08-07-codex-critic-isolation-fixture-rejects-merge-commit-head.md"
     },
     {
       "id": "pipeline.codex-plugin-validator-host-parity",

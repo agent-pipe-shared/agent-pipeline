@@ -26,7 +26,7 @@
 | pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-gate-verdict-need-not-survive-checkout | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
-| pipeline.backlog-ledger-baseline-migration-commit-unreachable | open | defect | pipeline | 2026-08-11 | — |
+| pipeline.backlog-ledger-baseline-migration-commit-unreachable | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | open | workflow-improvement | pipeline | 2026-08-11 | — |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | 2026-08-08 | — |
@@ -40,7 +40,7 @@
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | open | idea | pipeline | 2026-08-05 | — |
 | pipeline.close-spec-retention-and-consent | closed | workflow-improvement | pipeline | 2026-07-21 | — |
 | pipeline.closed-input-channel-review-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | open | idea | pipeline | 2026-08-09 | — |
@@ -246,6 +246,6 @@
 
 ## Counts
 
-- open: 98
+- open: 96
 - in_progress: 22
-- closed: 118
+- closed: 120
