@@ -563,6 +563,12 @@
       "member": "advisory-coordinator-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-decision-event-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "advisory-decision-event-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1215,6 +1221,18 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "entrypoint-reachability-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:epic-ac02-publication-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "epic-ac02-publication-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:epic-ac02-publication-check-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "epic-ac02-publication-check-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:error-register-check",
@@ -2895,6 +2913,7 @@
         "verify-phase:harness/scripts/verify.mjs:advisor-capability-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:advisor-consult-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-decision-event-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
@@ -3429,6 +3448,8 @@
       "benefit": "The integration contract rebases only the explicitly selected first merge-ready Sprint and requires bounded impact review for protected or overlapping baseline advances.",
       "status": "shipped",
       "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:epic-ac02-publication-check",
+        "verify-phase:harness/scripts/verify.mjs:epic-ac02-publication-check-tests",
         "verify-phase:harness/scripts/verify.mjs:parallel-sprint-integration-tests"
       ],
       "runners": [
@@ -3455,10 +3476,12 @@
         "pipeline-core plugin"
       ],
       "productionEvidence": [
-        "plugins/pipeline-core/lib/parallel-sprint-integration.mjs"
+        "plugins/pipeline-core/lib/parallel-sprint-integration.mjs",
+        "plugins/pipeline-core/scripts/check-epic-ac02-publication.mjs"
       ],
       "testEvidence": [
-        "plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs"
+        "plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs",
+        "plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs"
       ],
       "targets": [
         {
