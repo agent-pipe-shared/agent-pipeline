@@ -1029,6 +1029,185 @@ try {
     assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
   });
 
+  // ---- NVA-GMWFIX-3 (PO decision, 2026-08-17, Option A): tolerate an intervening
+  // commit whose own changed files stay entirely within the window's own already-
+  // signed scope -- the same idempotency reasoning that already made an unrelated FILE
+  // write safe (GMW19/NVA-BL-73), extended to an actual COMMIT landing between prepare
+  // and install. `livePluginRoot` is nested INSIDE the git repository for these checks
+  // (unlike the disjoint `pluginRootFixture()` used elsewhere in this suite) because a
+  // commit inside `root` can only ever touch GS-6 scope when the live plugin root is
+  // physically part of the same repository -- exactly the self-hosted layout this
+  // defect was filed from (AFK Goldfish dispatches editing this very repository's own
+  // plugins/pipeline-core tree).
+  function nestedPluginFixture(root) {
+    const plugin = join(root, "plugins", "pipeline-core");
+    mkdirSync(join(plugin, "hooks"), { recursive: true });
+    writeFileSync(join(plugin, "hooks", "guard-example.mjs"), "// example\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "plugin scaffold"], { cwd: root });
+    return plugin;
+  }
+
+  check("GMW33 install now tolerates a new commit landing between prepare and install, PROVIDED its only changed file is inside the window's own already-signed GS-6 scope", () => {
+    const root = repoFixture("gmw-tolerate-commit-");
+    const plugin = nestedPluginFixture(root);
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "in-scope commit must not void the signature", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const preparedCommit = request.intent.value.candidate.commit;
+
+    // A genuine new commit lands on HEAD, touching ONLY a file inside the window's own
+    // signed GS-6 scope (the live plugin root).
+    writeFileSync(join(plugin, "hooks", "guard-example.mjs"), "// example, updated by a briefed dispatch\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "in-scope plugin edit"], { cwd: root });
+    const newCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    assert.notEqual(newCommit, preparedCommit, "the fixture must really have moved to a new commit, or this test proves nothing");
+
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+    });
+    assert.equal(installed.status, "active", "an intervening commit entirely within the window's own signed scope must not void the signature");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "active");
+  });
+
+  check("GMW34 install still refuses an intervening commit that ALSO touches a file OUTSIDE the window's own scope -- the tolerance must not weaken this", () => {
+    const root = repoFixture("gmw-outofscope-commit-");
+    const plugin = nestedPluginFixture(root);
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "mixed-scope commit must still refuse", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    // Changes both an in-scope plugin file AND an out-of-scope repository file, in the
+    // SAME commit -- one out-of-scope file must be enough to void the whole commit.
+    writeFileSync(join(plugin, "hooks", "guard-example.mjs"), "// in-scope edit\n");
+    writeFileSync(join(root, "README.md"), "# fixture, out-of-scope edit\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "mixed scope"], { cwd: root });
+
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "a commit touching even one out-of-scope file must still refuse");
+    assert.equal(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent", "a refused install must leave no window record behind");
+  });
+
+  check("GMW35 install refuses when a MERGE commit lands between prepare and install, even when every file it touches is inside scope -- fails closed rather than trusting a multi-parent commit", () => {
+    const root = repoFixture("gmw-merge-commit-");
+    const plugin = nestedPluginFixture(root);
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "merge commit must still refuse", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const mainBranch = execFileSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+
+    execFileSync("git", ["checkout", "-q", "-b", "side"], { cwd: root });
+    writeFileSync(join(plugin, "hooks", "side-file.mjs"), "// side branch, in scope\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "side branch edit"], { cwd: root });
+
+    execFileSync("git", ["checkout", "-q", mainBranch], { cwd: root });
+    writeFileSync(join(plugin, "hooks", "main-file.mjs"), "// main branch, in scope\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "main branch edit"], { cwd: root });
+    execFileSync("git", ["merge", "-q", "--no-ff", "-m", "merge side into main", "side"], { cwd: root });
+
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "a merge commit anywhere in the intervening range must still refuse");
+    assert.equal(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
+  });
+
+  check("GMW36 install refuses when the tolerance check's own git invocation fails, never admitting on an unusable range", () => {
+    const root = repoFixture("gmw-tolerance-git-fail-");
+    const plugin = nestedPluginFixture(root);
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "tolerance check git failure", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    writeFileSync(join(plugin, "hooks", "guard-example.mjs"), "// in-scope edit\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "in-scope plugin edit"], { cwd: root });
+
+    const brokenMergeBase = (command, args, options) => {
+      if (command === "git" && args[0] === "merge-base") return { status: 1, stdout: "", stderr: "simulated failure", error: null };
+      return spawnSync(command, args, options);
+    };
+
+    let error;
+    try {
+      installGuardMaintenanceWindow({
+        rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin, spawn: brokenMergeBase,
+      });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "a failed tolerance-check git invocation must refuse install, not admit it");
+    assert.equal(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
+  });
+
+  check("GMW37 install refuses an intervening commit that RENAMES a file within scope -- fails closed rather than trusting rename detection, even though both halves are individually in-scope", () => {
+    const root = repoFixture("gmw-rename-commit-");
+    const plugin = nestedPluginFixture(root);
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "rename must still refuse", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    execFileSync(
+      "git",
+      ["mv", "plugins/pipeline-core/hooks/guard-example.mjs", "plugins/pipeline-core/hooks/guard-example-renamed.mjs"],
+      { cwd: root },
+    );
+    execFileSync("git", ["commit", "-q", "-m", "rename in-scope file"], { cwd: root });
+
+    let error;
+    try {
+      installGuardMaintenanceWindow({ rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin });
+    } catch (caught) { error = caught; }
+    assert.ok(error instanceof GuardMaintenanceWindowError, "a rename between prepare and install must still refuse");
+    assert.equal(error.code, "GMW-CANDIDATE-COMMIT-MISMATCH");
+    assert.equal(currentGuardMaintenanceWindow({ rootDir: root }).status, "absent");
+  });
+
+  check("GMW38 install tolerates an intervening commit whose only changed file matches the window's own signed TP-* scope, reusing guard-testpath.mjs's own protectedTestPaths config rather than a new mapping", () => {
+    const root = repoFixture("gmw-tolerate-tp-commit-");
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(
+      join(root, ".claude", "guard-config.json"),
+      JSON.stringify({ protectedTestPaths: [{ id: "TP-9", pattern: "special-protected\\.mjs$" }] }),
+    );
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "add guard-config"], { cwd: root });
+
+    // Disjoint from `root`: only GS-6 could ever cover it, and GS-6 is not in this
+    // window's scope, so this fixture proves the TP-9 path alone carries the tolerance.
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["TP-9"], ttlSeconds: 300, reason: "in-scope TP-9 commit must not void the signature", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+
+    writeFileSync(join(root, "special-protected.mjs"), "// protected test file\n");
+    execFileSync("git", ["add", "-A"], { cwd: root });
+    execFileSync("git", ["commit", "-q", "-m", "add TP-9-matching file"], { cwd: root });
+
+    const installed = installGuardMaintenanceWindow({
+      rootDir: root, request, trustPolicy, proof: proofFor(intent), livePluginRoot: plugin,
+    });
+    assert.equal(installed.status, "active", "a commit whose only changed file matches the window's own signed TP-9 pattern must not void the signature");
+  });
+
   console.log(`\nguard-maintenance-window: ${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });

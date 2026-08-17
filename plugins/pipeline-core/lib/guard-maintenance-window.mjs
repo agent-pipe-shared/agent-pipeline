@@ -65,6 +65,7 @@ import { spawnSync } from "node:child_process";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
 import { readCriticalHumanProofPolicy, verifyAgainstTrustAnchors } from "./critical-human-proof-policy.mjs";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+import { LEGACY_GUARD_CONFIG, NEUTRAL_GUARD_CONFIG, resolveProjectAuthorityPaths } from "./project-authority.mjs";
 
 export class GuardMaintenanceWindowError extends Error {
   constructor(code, message) {
@@ -525,6 +526,123 @@ export function prepareGuardMaintenanceWindowRequest({
   return { intent, subject, request, reused: false };
 }
 
+// ---------------------------------------------------------------------------------
+// NVA-GMWFIX-3 (PO decision, 2026-08-17, Option A): commit-landing tolerance. Extends
+// the file-write idempotency (GMW19/NVA-BL-73) to an actual COMMIT landing between
+// prepare and install, PROVIDED every file it touches is provably inside the window's
+// own already-signed scope. Positive, narrow proof only -- absence of a counter-example
+// is never treated as proof of membership -- and fails closed on any uncertainty at all.
+// ---------------------------------------------------------------------------------
+
+/**
+ * Mirrors guard-testpath.mjs's own `protectedTestPaths` loader (same config field,
+ * same explicit-`id`-else-`TP-<n>` convention, same case-insensitive regex) -- reused
+ * rather than reinvented, because a commit-scope check that used a DIFFERENT notion of
+ * "what TP-3 protects" than the guard that actually enforces TP-3 would be worse than
+ * no check at all. Any config read/parse/entry failure yields an EMPTY map, never a
+ * partial guess: an id this cannot resolve a pattern for can never be proven in-scope
+ * below -- fail-closed here, unlike guard-testpath.mjs's own WARN-and-continue posture,
+ * because here an unresolved id must block the tolerance rather than silently pass one.
+ */
+function loadProtectedTestPatterns(rootDir) {
+  const patterns = new Map();
+  let configPath;
+  try {
+    const authority = resolveProjectAuthorityPaths({ rootDir });
+    const guardConfigRelPath = authority.status === "ready"
+      ? authority.guardConfig
+      : (existsSync(join(rootDir, NEUTRAL_GUARD_CONFIG)) ? NEUTRAL_GUARD_CONFIG : LEGACY_GUARD_CONFIG);
+    configPath = join(rootDir, guardConfigRelPath);
+  } catch { return patterns; }
+  let raw;
+  try { raw = readFileSync(configPath, "utf8"); } catch { return patterns; }
+  try {
+    const cfg = JSON.parse(raw);
+    const list = Array.isArray(cfg?.protectedTestPaths) ? cfg.protectedTestPaths : [];
+    for (const [i, entry] of list.entries()) {
+      if (typeof entry?.pattern !== "string" || entry.pattern === "") continue;
+      const id = typeof entry?.id === "string" && entry.id !== "" ? entry.id : `TP-${i + 1}`;
+      try { patterns.set(id, new RegExp(entry.pattern, "i")); } catch { /* invalid regex: id stays unresolved */ }
+    }
+  } catch { /* unparsable config -> empty map */ }
+  return patterns;
+}
+
+/**
+ * True only when `absolutePath`/`repoRelativePath` is provably inside AT LEAST ONE
+ * rule this window's OWN `scopeRuleIds` actually grants: GS-6 means "under
+ * `livePluginRoot`" (the same anchor `isNeverLiftableKernelPath` above already uses
+ * via `normalizeRepoRelativePath`); a `TP-<n>` id means "matches that id's own
+ * configured pattern" via `testPatterns`. A rule id this cannot resolve a pattern for
+ * contributes nothing -- absence of a pattern is never treated as an unbounded match.
+ */
+function pathWithinScope(absolutePath, repoRelativePath, { scopeRuleIds, livePluginRoot, testPatterns }) {
+  if (scopeRuleIds.includes("GS-6") && normalizeRepoRelativePath(livePluginRoot, absolutePath) !== null) return true;
+  for (const ruleId of scopeRuleIds) {
+    if (ruleId === "GS-6") continue;
+    const pattern = testPatterns.get(ruleId);
+    if (pattern && pattern.test(repoRelativePath)) return true;
+  }
+  return false;
+}
+
+/**
+ * True only when EVERY changed file across every commit strictly between
+ * `candidateCommit` (exclusive) and `currentCommit` (inclusive) is provably inside the
+ * window's own already-signed `scopeRuleIds`. This is a POSITIVE, narrow proof:
+ * absence of a counter-example is never treated as proof of membership. Fails closed
+ * -- returns `false` -- on ANY uncertainty at all: `candidateCommit` not a strict,
+ * linear ancestor of `currentCommit` (a rebase, a reset, a rewritten history); a merge
+ * or root commit anywhere in the range; a diff this cannot cleanly classify (rename
+ * detection is forced ON with `-M` specifically so a rename can never masquerade as an
+ * ordinary add+delete pair -- any status other than plain `A`/`M`/`D` fails closed,
+ * renames included, deliberately, even when both halves of the rename are themselves
+ * in-scope); an empty/malformed diff; or any git invocation that does not succeed the
+ * way this function expects. Never trusts anything about the new commit besides what
+ * `git` itself reports here (no commit message, no author, no other metadata read). A
+ * caught exception anywhere in here IS "does not qualify" -- this function's only
+ * contract with its caller is a boolean, and the caller's own strict, pre-existing
+ * refusal is what stands whenever this returns `false`.
+ */
+function intervenedCommitsStayWithinScope({ root, spawn, candidateCommit, currentCommit, scopeRuleIds, livePluginRoot, rootDir }) {
+  try {
+    if (typeof candidateCommit !== "string" || candidateCommit === "") return false;
+    const spawnGit = (args) => spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
+
+    const ancestor = spawnGit(["merge-base", "--is-ancestor", candidateCommit, currentCommit]);
+    if (ancestor?.error || ancestor?.status !== 0) return false; // not a strict ancestor, or uncertain
+
+    const revList = spawnGit(["rev-list", "--parents", "--reverse", `${candidateCommit}..${currentCommit}`]);
+    if (revList?.error || revList?.status !== 0) return false;
+    const lines = String(revList.stdout ?? "").split("\n").map((line) => line.trim()).filter((line) => line !== "");
+    if (lines.length === 0) return false; // inconsistent with the caller's own currentCommit !== candidateCommit check
+
+    const testPatterns = loadProtectedTestPatterns(rootDir);
+
+    for (const line of lines) {
+      const hashes = line.split(/\s+/u);
+      const commit = hashes[0];
+      const parents = hashes.slice(1);
+      if (parents.length !== 1) return false; // merge commit or root commit: fail closed
+
+      const diff = spawnGit(["diff", "--name-status", "-M", parents[0], commit]);
+      if (diff?.error || diff?.status !== 0) return false;
+      const diffLines = String(diff.stdout ?? "").split("\n").map((entry) => entry.trim()).filter((entry) => entry !== "");
+      if (diffLines.length === 0) return false; // empty/malformed diff: fail closed
+
+      for (const diffLine of diffLines) {
+        const fields = diffLine.split("\t");
+        if (fields.length !== 2 || (fields[0] !== "A" && fields[0] !== "M" && fields[0] !== "D")) return false;
+        const repoRelativePath = fields[1];
+        if (typeof repoRelativePath !== "string" || repoRelativePath === "") return false;
+        const absolutePath = resolve(root, repoRelativePath);
+        if (!pathWithinScope(absolutePath, repoRelativePath, { scopeRuleIds, livePluginRoot, testPatterns })) return false;
+      }
+    }
+    return true;
+  } catch { return false; }
+}
+
 /** Agent-safe: verify-and-place only. Cannot succeed without a genuine proof. */
 export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, proof, livePluginRoot, nowMs = Date.now(), spawn = spawnSync } = {}) {
   if (!validRequest(request)) fail("GMW-REQUEST-INVALID", "window request is malformed");
@@ -558,11 +676,34 @@ export function installGuardMaintenanceWindow({ rootDir, request, trustPolicy, p
   const candidate = request.intent.value?.candidate ?? {};
   const currentCommit = git(repo.root, ["rev-parse", "HEAD"], spawn);
   if (currentCommit !== candidate.commit) {
-    fail("GMW-CANDIDATE-COMMIT-MISMATCH", "current HEAD commit does not match the signed candidate commit");
-  }
-  const currentTree = git(repo.root, ["rev-parse", "HEAD^{tree}"], spawn);
-  if (currentTree !== candidate.tree) {
-    fail("GMW-CANDIDATE-TREE-MISMATCH", "current HEAD tree does not match the signed candidate tree");
+    // NVA-GMWFIX-3 (PO decision, 2026-08-17, Option A): a commit landing between
+    // prepare and install no longer unconditionally voids the signature, PROVIDED it
+    // (or a short chain of them) stays entirely within the window's OWN already-signed
+    // scope -- the same file-write idempotency reasoning NVA-BL-73/23d93b0a/64450b35
+    // already established for an unrelated write, extended here to an actual commit.
+    // `intervenedCommitsStayWithinScope` is a POSITIVE, narrow proof: any uncertainty
+    // at all (a merge commit, a rename, an unparseable diff, a rewritten history) falls
+    // straight through to the strict refusal below, exactly as this guard behaved
+    // before this fix existed. When tolerated, the tree check below is skipped
+    // entirely and deliberately: the tree necessarily moved along with the tolerated
+    // commit(s), so comparing it against the OLD signed candidate.tree would just
+    // reintroduce the same refusal through the back door.
+    const tolerated = intervenedCommitsStayWithinScope({
+      root: repo.root, spawn, candidateCommit: candidate.commit, currentCommit,
+      scopeRuleIds: request.subject.scopeRuleIds, livePluginRoot, rootDir: repo.root,
+    });
+    if (!tolerated) {
+      fail("GMW-CANDIDATE-COMMIT-MISMATCH", "current HEAD commit does not match the signed candidate commit");
+    }
+  } else {
+    // Unchanged commit: the defense-in-depth tree check still applies here, exactly as
+    // before this fix -- it guards against a hand-built request that tells the truth
+    // about the commit and lies about the tree (GMW23), a shape the tolerance path
+    // above is never reached for.
+    const currentTree = git(repo.root, ["rev-parse", "HEAD^{tree}"], spawn);
+    if (currentTree !== candidate.tree) {
+      fail("GMW-CANDIDATE-TREE-MISMATCH", "current HEAD tree does not match the signed candidate tree");
+    }
   }
   // The live-plugin tree hash is OBSERVED and RECORDED here, never an admission
   // precondition (CEREMONY-1 defect B). It used to be compared for equality against the
