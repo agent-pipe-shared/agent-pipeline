@@ -7391,7 +7391,9 @@ The Stop-hook correctly pushed back on treating the tier-fix thread's closure as
 
 **Housekeeping note, not yet acted on:** `git worktree list` showed two OTHER stale worktrees (`agent-a2b2a34b84f687185`, `agent-ae0bcdcb0ead6ecec`) left over from prior sessions, beyond the one this block created and cleaned up. Not inspected or removed this pass — flag for a future session before assuming they're safe to discard (uncommitted work unknown).
 
-**Current HEAD: `c1b5a762`. No push. No other PO-requiring action**, per the standing AFK mandate — everything above is either landed-and-verified or filed-and-deferred with an explicit owner/rationale.
+**Mandatory Critic reviews for both this block's real fixes were still outstanding at this point — caught before treating either as done, dispatched now.** Two independent dispatches: (1) round 2 of the `NVA-A7FIX-1`/`NVA-A7FIX-2` thread, reviewing `4736d913..ad512e80` against the round-1 report's three findings (F-1/F-2/F-3) via the fix-verification input contract, diff snapshot at `evidence/reviewed-diff-4736d913-ad512e80.patch`; (2) first review of `NVA-HGOFIX-1` (`954e12da`), diff snapshot at `evidence/reviewed-diff-954e12da.patch` (partial — `.mjs` file only; the Critic re-derives the full diff via `git show` itself). Both A/G/S-class, opus at max, both **in flight — results not yet known** at the point this paragraph was written. Per the 2-round Critic cap: if either FAILs, self-verify the rework rather than a 3rd dispatch on that thread.
+
+**Current HEAD: `c1b5a762`. No push. No other PO-requiring action**, per the standing AFK mandate — everything above is either landed-and-verified or filed-and-deferred with an explicit owner/rationale, except the two Critic reviews just dispatched.
 
 ## Re-entry
 
