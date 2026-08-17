@@ -1365,6 +1365,32 @@ function sanctionedOnboardingArgs(rawArgs, root) {
     && exactRoot(args, root, 1)
     && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
     && args[5] === "--activate" && args.length === 6) return true;
+  // NVA-LCGUARD-1 (backlog: 2026-08-17-lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote.md).
+  // lib/project-onboarding-v3.mjs:470 constructs exactly this command as the plan's own
+  // applyAction -- the very next step after a successful plan-partial-authority -- and
+  // this allowlist had no apply-partial-authority branch at all, so it was 100%
+  // unreachable. --profile is the CLI's own closed enum (scripts/project-onboarding-v3.mjs
+  // usage text); --source is checked loosely (non-empty, not flag-shaped), the same
+  // convention as every other free-text value field admitted by this function.
+  if (args[0] === "apply-partial-authority"
+    && exactRoot(args, root, 1)
+    && args[3] === "--profile" && ["epic", "feature", "mini"].includes(args[4])
+    && args[5] === "--source" && typeof args[6] === "string" && args[6] !== "" && !args[6].startsWith("--")
+    && args[7] === "--plan-sha256" && HEX.test(args[8] ?? "")
+    && args[9] === "--activate" && args.length === 10) return true;
+  // lib/project-onboarding-v3.mjs:4198 and :4111 construct exactly these two commands --
+  // the documented onboarding-recovery.md path for portable-seed-required when an existing
+  // remote+branch is supplied. Only these two adopt-remote subcommands are ever admitted;
+  // --remote/--ref are checked loosely (non-empty, not flag-shaped) like --source above --
+  // a stricter refs/heads/-prefixed --ref format is an explicitly open, deliberately
+  // deferred design question, not decided here.
+  if (args[0] === "adopt-remote" && ["plan", "apply"].includes(args[1])
+    && exactRoot(args, root, 2)
+    && args[4] === "--remote" && typeof args[5] === "string" && args[5] !== "" && !args[5].startsWith("--")
+    && args[6] === "--ref" && typeof args[7] === "string" && args[7] !== "" && !args[7].startsWith("--")
+    && ((args[1] === "plan" && args.length === 8)
+      || (args[1] === "apply" && args[8] === "--plan-sha256" && HEX.test(args[9] ?? "")
+        && args[10] === "--activate" && args.length === 11))) return true;
   // The apply half of the same defect the plan* branch above already closed. `plan-runtime
   // --intent session` returns `initialize-runtime --root <root> --plan-sha256 <hex>
   // --activate --runner <runner> --intent session` (lib/project-onboarding-v3.mjs:3608-3627

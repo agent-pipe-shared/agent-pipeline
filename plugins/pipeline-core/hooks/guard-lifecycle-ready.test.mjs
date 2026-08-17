@@ -1454,6 +1454,99 @@ test("GUARDALLOW-1: plan-partial-authority is admitted with the same shape as it
 });
 
 /**
+ * NVA-LCGUARD-1 (backlog:
+ * 2026-08-17-lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote.md).
+ * `apply-partial-authority` is the mutating apply half of `plan-partial-authority`,
+ * constructed verbatim as the plan's own `applyAction` (lib/project-onboarding-v3.mjs:470):
+ * `--root <root> --profile <epic|feature|mini> --source <value> --plan-sha256 <hex>
+ * --activate`. The allowlist had no branch for it at all, so it was 100% unreachable -- the
+ * very next step after a successful plan-partial-authority refused by its own guard.
+ */
+test("NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shape and no wider one", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    for (const profile of ["epic", "feature", "mini"]) {
+      const command = `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile ${profile} --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`;
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    }
+    for (const command of [
+      // invalid --profile enum value
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile bogus --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`,
+      // malformed / short / non-hex --plan-sha256
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${"a".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${"g".repeat(64)} --activate`,
+      // missing --activate (shorter argv)
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha}`,
+      // wrong order: --source before --profile
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --source canonical-fresh-v3 --profile epic --plan-sha256 ${sha} --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha} --activate --extra flag`,
+      // missing --source pair entirely
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --plan-sha256 ${sha} --activate`,
+      // empty --source value
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source '' --plan-sha256 ${sha} --activate`,
+      // flag-shaped --source value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source --bogus --plan-sha256 ${sha} --activate`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root /tmp/other --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`,
+      // plan-partial-authority stays refused for this wider shape too (regression pin)
+      `node '${ONBOARDING_SCRIPT}' plan-partial-authority --root '${path}' --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * NVA-LCGUARD-1 (same backlog item). `adopt-remote plan`/`adopt-remote apply` are
+ * constructed verbatim by lib/project-onboarding-v3.mjs:4198 and :4111 as the documented
+ * onboarding-recovery.md path for portable-seed-required when an existing remote+branch is
+ * supplied. The allowlist had no adopt-remote handling at all, so the entire recovery path
+ * was 100% unreachable for any not-ready project. --remote/--ref are checked loosely
+ * (non-empty, not flag-shaped) -- a stricter refs/heads/-prefixed --ref format is an
+ * explicitly deferred design question, not this fix's call.
+ */
+test("NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and no third subcommand", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    const planCommand = `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref main`;
+    assert.equal(isSanctionedLifecycleCommand(planCommand, path), true, planCommand);
+    const applyCommand = `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(applyCommand, path), true, applyCommand);
+    for (const command of [
+      // wrong length: extra trailing arg on plan
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref main --extra flag`,
+      // wrong length: missing --activate on apply (shorter argv)
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${sha}`,
+      // missing --activate, wrong trailing word instead (same length as apply)
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${sha} --bypass`,
+      // wrong order: --ref before --remote
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --ref main --remote origin`,
+      // malformed / non-hex --plan-sha256 on apply
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${"a".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${"g".repeat(64)} --activate`,
+      // empty --remote / --ref value
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote '' --ref main`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref ''`,
+      // flag-shaped --remote value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote --ref --ref main`,
+      // an unlisted third adopt-remote subcommand
+      `node '${ONBOARDING_SCRIPT}' adopt-remote status --root '${path}' --remote origin --ref main`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root /tmp/other --remote origin --ref main`,
+      // the plan subcommand does not smuggle in the apply tail
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref main --plan-sha256 ${sha} --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
  * GUARDFIX-1 (A). The apply half of the same defect the test above closed for the plan half.
  *
  * `plan-runtime --intent session` returns, verbatim, the argv built at
