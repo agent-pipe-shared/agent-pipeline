@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-17
 source: "Delta Critic re-review of the P-AC-11 fix range (289287e7, c7eb2297), finding F-A (blocker), 2026-08-17."
 due: 2026-09-15
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 6919b55bd7d2b68255ab7ed1d820adec63dea369
+closure_evidence: backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md
 ---
 
 # P-AC-11's `lifecycleEvents` dimension still has no owner or expiry anywhere in the repository
