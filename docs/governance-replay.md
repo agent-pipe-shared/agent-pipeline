@@ -91,6 +91,17 @@ justified only by competitor or provider parity.
 - `correlation.workerId` — ties the event to the worker/agent instance that
   produced it; needed for the "correlation topology of package, worker and
   attempt" the viewer renders (above).
+- `correlation.correlationId` — the orchestrator-assigned identifier for this
+  specific dispatch invocation, distinct from `workerId` (which agent) and
+  `attemptId` (which retry); needed so a caller holding only the
+  orchestrator's own correlation token — without knowing the internal
+  package/dispatch/attempt identity — can still find every event for that
+  invocation.
+- `correlation.queueRevision` — the feature package's own queue revision at
+  the moment the event was observed; binds the event to a specific queue
+  state snapshot, the same candidate-binding discipline `candidate.commit`/
+  `.tree` apply to code state (below) — needed to detect whether the queue
+  was reordered or mutated after this event, not just whether the code was.
 - `candidate.commit` / `candidate.tree` — binds the event to an exact code
   state so a lifecycle event is anchored to a specific, git-verifiable
   candidate rather than a moving target — the same candidate-binding
