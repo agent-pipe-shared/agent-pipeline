@@ -45,7 +45,13 @@ calibration-configured alternate path if option (a) is chosen.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, stays open, current scope (not deferred).
+- **Rationale:** re-verified 2026-08-17: `syncStateMdNextAction` in
+  `plugins/pipeline-core/lib/onboarding-continuity.mjs` still hardcodes
+  `docs/state.md`, the gap is real and unchanged. Contained, well-scoped
+  defect (thread the existing `calibration.handover` resolution already
+  used elsewhere in the same file, or document the boundary) — not
+  architecture/design-latitude work.
+- **Assignment (if accepted):** candidate for a goldfish-implementor
+  dispatch once direction (a) vs (b) is picked — not yet dispatched.
+- **Date:** 2026-08-17

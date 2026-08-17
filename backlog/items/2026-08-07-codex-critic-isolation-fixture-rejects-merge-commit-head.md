@@ -77,11 +77,20 @@ capacity:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged. Not fixed in this session: `buildExactFixture` and its test
-suite are guardrail/security-isolation-tier code (Codex sandbox critic
-isolation), which per this repository's own dispatch discipline needs a
-properly briefed Goldfish-deep + Critic round, not a same-session Elephant
-patch. `harness/scripts/verify.mjs`'s overall exit code for candidate
-`8bc5ceb` is `1` because of this gap alone (plus the separately-reconciled
-backlog-ledger drift, now fixed) -- every GMW-relevant suite in that same run
-passed cleanly; this finding is unrelated to NOVA-GMW-1's own correctness.
+- **Decision:** accepted, stays open, current scope (not deferred to a
+  later sprint). Re-verified 2026-08-17: `buildExactFixture`'s single-parent
+  requirement (`plugins/pipeline-core/scripts/codex-critic-isolation.mjs:1816`)
+  is unchanged since filing; the gap is real and current.
+- **Rationale:** `verify.mjs` fails outright (exit 1) the next time this
+  repository's own HEAD is a merge commit — a real, currently-live risk to
+  the Nova A candidate-freeze ceremony if any merge lands before this is
+  fixed. Guardrail/security-isolation-tier code (MP-07) needs a properly
+  briefed goldfish-deep + Critic round per this repo's dispatch discipline,
+  not a same-session Elephant patch or a deferral to a future sprint.
+- **Assignment (if accepted):** needs a goldfish-deep dispatch with a
+  concrete design choice from this item's own three candidate directions
+  (synthetic single-parent test fixture; or confirm/extend the single-parent
+  requirement as a deliberate production property with dual-shape coverage;
+  or an explicit decision on whether a merge commit on this repo's own main
+  branch is a supported event) before briefing — not yet written.
+- **Date:** 2026-08-17

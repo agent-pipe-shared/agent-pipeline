@@ -60,7 +60,16 @@ Not designed here. Two questions for whoever picks this up:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, stays open, current scope (not deferred).
+- **Rationale:** small, well-scoped, and the fix pattern (the
+  `commandIsSafe` secret-screen from lines 522-564) already exists and is
+  directly reusable — not architecture/design-latitude work, just closing a
+  second site to match a pattern already accepted at the first. Not urgent
+  enough to interrupt in-flight work, but cheap enough not to defer to a
+  future sprint either.
+- **Assignment (if accepted):** candidate for a goldfish-implementor
+  dispatch (extract `commandIsSafe` into a shared helper both branches call,
+  apply the same `command`/`copyCommand` disclosure to
+  `crossRepositoryOnlyDenial`) once question 1 (deliberate asymmetry vs.
+  oversight) is answered — not yet dispatched.
+- **Date:** 2026-08-17

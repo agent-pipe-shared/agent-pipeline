@@ -111,3 +111,21 @@ proper spec for it rather than a quick patch.
   bounded, e.g. recently-hit guard denials and their resolutions, not
   unbounded raw content).
 - **Date:** 2026-08-12
+
+### Re-triaged 2026-08-17 — the queued work was never actually implemented
+
+- **Decision:** accepted, stays open, current scope (not deferred). A
+  repo-wide search for any mandatory-transcript-read mechanism (bootstrap or
+  first-ready hook reading a prior Codex rollout file) found nothing —
+  neither the "write side more comprehensive" nor the "read becomes
+  mandatory at first bootstrap/ready" direction from the 2026-08-12
+  re-triage has landed. The "queued for this session" assignment from
+  2026-08-12 did not execute.
+- **Rationale:** correcting the record rather than leaving a stale
+  "queued" status that implies work in flight. The PO's own retest found
+  this still broken as of 2026-08-12; nothing since changes that.
+- **Assignment (if accepted):** unassigned, needs a real design +
+  implementation dispatch respecting the constraints already recorded
+  above — genuinely current work, not later-sprint scope, given the PO's
+  explicit "still broken" signal.
+- **Date:** 2026-08-17
