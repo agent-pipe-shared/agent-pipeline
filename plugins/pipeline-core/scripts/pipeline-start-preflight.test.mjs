@@ -3,16 +3,18 @@
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 
 import { validateRulesetSource } from "../lib/ruleset-source.mjs";
+import { startSessionDescriptor } from "../lib/worktree-lifecycle.mjs";
 import {
   installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
   normalBootstrapPayloadReceipt, pipelineStartPreflightExitCode, freshnessHostActionForPreflight, SCHEMA,
+  CONCURRENT_SESSION_WARNING_SCHEMA,
 } from "./pipeline-start-preflight.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
@@ -106,11 +108,12 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
     cwd,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "bootstrapPayload", "executionBoundary", "handoff", "installedSource", "installedVersion",
-    "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "version",
+    "bootstrapPayload", "concurrentSessionWarning", "executionBoundary", "handoff", "installedSource",
+    "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "version",
   ]);
   assert.equal(result.schema, SCHEMA);
   assert.equal(result.status, "ready");
+  assert.equal(result.concurrentSessionWarning, null);
   assert.equal(result.version, "0.4.5+test");
   assert.equal(result.installedVersion, "0.4.5+test");
   assert.equal(result.installedSource, "remote");
@@ -778,4 +781,168 @@ test("PX0-AC-08(c): the previously-dangling freshnessHostActionForPreflight read
     actionB.preflightSha256,
     "if rulesetSource were still dangling/undefined, these two otherwise-identical preflights would bind the same digest",
   );
+});
+
+// ---- same-repo concurrent-session warning (PHX-WP-AAC01-MULTISESSION) ----
+
+/**
+ * A minimal real git checkout, independent of the plugin-identity/self-
+ * application fixtures above -- used purely as the physical repository root
+ * for session-descriptor registration/inspection. `cwd` for these tests is
+ * this fixture root, decoupled from `scriptUrl`/`observe` (which stay on
+ * this actual repo's own real self-application checkout, as in every other
+ * test in this file).
+ */
+function buildConcurrencyRepoFixture() {
+  const gitRoot = realpathSync(mkdtempSync(join(tmpdir(), "pipeline-start-preflight-concurrency-")));
+  const git = (args) => execFileSync("git", args, { cwd: gitRoot, stdio: ["ignore", "pipe", "pipe"] });
+  git(["init", "--quiet", "--initial-branch=main"]);
+  git(["config", "user.email", "fixture@example.invalid"]);
+  git(["config", "user.name", "fixture"]);
+  writeFileSync(join(gitRoot, "README.md"), "fixture\n");
+  git(["add", "-A"]);
+  git(["commit", "--quiet", "-m", "fixture"]);
+  return gitRoot;
+}
+
+test("PHX-WP-AAC01-MULTISESSION: another session's LIVE descriptor surfaces a typed same-repo warning; status/nextAction never change", () => {
+  const gitRoot = buildConcurrencyRepoFixture();
+  try {
+    const mine = startSessionDescriptor(gitRoot, {
+      sessionId: "session-this-one",
+      ownerNonce: "owner-nonce-mine-0000000001",
+    });
+    const preflightOptions = {
+      env: {},
+      pluginList: pluginList(),
+      read: () => manifest,
+      cwd: gitRoot,
+      currentSessionId: mine.sessionId,
+    };
+
+    const beforeOther = preflight(preflightOptions);
+    assert.equal(beforeOther.concurrentSessionWarning, null, "only this session's own descriptor is registered so far");
+    assert.equal(beforeOther.status, "ready");
+
+    const other = startSessionDescriptor(gitRoot, {
+      sessionId: "session-another-live",
+      ownerNonce: "owner-nonce-other-0000000001",
+    });
+    const afterOther = preflight(preflightOptions);
+    assert.deepEqual(afterOther.concurrentSessionWarning, {
+      schema: CONCURRENT_SESSION_WARNING_SCHEMA,
+      sessionId: other.sessionId,
+      descriptorSha256: other.descriptorSha256,
+      status: "live",
+    });
+    assert.equal(JSON.stringify(afterOther.concurrentSessionWarning).includes(other.ownerNonce), false,
+      "the warning must never leak the other session's owner nonce");
+
+    // The warning is informational only: every other decision field of the
+    // preflight result stays identical between the warning-absent and the
+    // warning-present run (bootstrapPayload's own size/digest measurement is
+    // deliberately excluded from this comparison -- it mechanically reflects
+    // the serialized size of the whole payload, including this new field's
+    // value, by design; that is not a decision output).
+    for (const key of [
+      "schema", "status", "version", "installedVersion", "installedSource",
+      "executionBoundary", "pluginRoot", "handoff",
+    ]) {
+      assert.deepEqual(afterOther[key], beforeOther[key], `field ${key} must stay identical`);
+    }
+    assert.deepEqual(afterOther.nextAction, beforeOther.nextAction);
+    assert.deepEqual(afterOther.rulesetSource, beforeOther.rulesetSource);
+  } finally {
+    rmSync(gitRoot, { recursive: true, force: true });
+  }
+});
+
+test("PHX-WP-AAC01-MULTISESSION: not-live, reused, unavailable, and unobserved descriptors never trigger the warning", () => {
+  const gitRoot = buildConcurrencyRepoFixture();
+  try {
+    const mine = startSessionDescriptor(gitRoot, {
+      sessionId: "session-this-one-negative",
+      ownerNonce: "owner-nonce-mine-0000000002",
+    });
+
+    // not-live: a syntactically valid ownerRuntime whose pid has no running
+    // process -- inspectSessionOwnerRuntime's status is derived purely from
+    // process.kill(pid, 0) at inspection time, so this does not require ever
+    // having run a real process at that pid.
+    const notLive = startSessionDescriptor(gitRoot, {
+      sessionId: "session-not-live",
+      ownerNonce: "owner-nonce-not-live-00000001",
+    });
+    const notLiveDescriptor = JSON.parse(readFileSync(notLive.path, "utf8"));
+    notLiveDescriptor.ownerRuntime = { schema: "pipeline.session-owner-runtime.v1", pid: 999999999, processStartId: "1" };
+    writeFileSync(notLive.path, `${JSON.stringify(notLiveDescriptor, null, 2)}\n`, { mode: 0o600 });
+
+    // reused: a real still-live pid (this test process), but a recorded
+    // processStartId that no longer matches -- same technique as
+    // worktree-lifecycle.test.mjs's own "D0 session owner runtime status" check.
+    const reused = startSessionDescriptor(gitRoot, {
+      sessionId: "session-reused",
+      ownerNonce: "owner-nonce-reused-000000001",
+    });
+    const reusedDescriptor = JSON.parse(readFileSync(reused.path, "utf8"));
+    reusedDescriptor.ownerRuntime.processStartId = `${Number(reusedDescriptor.ownerRuntime.processStartId) + 1}`;
+    writeFileSync(reused.path, `${JSON.stringify(reusedDescriptor, null, 2)}\n`, { mode: 0o600 });
+
+    // unavailable: registered with a pid that never resolves to a running process.
+    startSessionDescriptor(gitRoot, {
+      sessionId: "session-unavailable",
+      ownerNonce: "owner-nonce-unavailable-0000001",
+      ownerPid: -1,
+    });
+
+    // unobserved: a legacy v1 descriptor, deliberately never guessed dead.
+    const legacy = startSessionDescriptor(gitRoot, {
+      sessionId: "session-unobserved",
+      ownerNonce: "owner-nonce-unobserved-0000001",
+    });
+    const legacyDescriptor = JSON.parse(readFileSync(legacy.path, "utf8"));
+    delete legacyDescriptor.ownerRuntime;
+    legacyDescriptor.schema = "pipeline.session-descriptor.v1";
+    writeFileSync(legacy.path, `${JSON.stringify(legacyDescriptor, null, 2)}\n`, { mode: 0o600 });
+
+    const result = preflight({
+      env: {},
+      pluginList: pluginList(),
+      read: () => manifest,
+      cwd: gitRoot,
+      currentSessionId: mine.sessionId,
+    });
+    assert.equal(result.concurrentSessionWarning, null,
+      "not-live/reused/unavailable/unobserved descriptors must never be treated as a live concurrent session");
+    assert.equal(result.status, "ready");
+  } finally {
+    rmSync(gitRoot, { recursive: true, force: true });
+  }
+});
+
+test("PHX-WP-AAC01-MULTISESSION: a repository root with no registered descriptors at all never warns and never throws", () => {
+  const gitRoot = buildConcurrencyRepoFixture();
+  try {
+    const result = preflight({
+      env: {},
+      pluginList: pluginList(),
+      read: () => manifest,
+      cwd: gitRoot,
+    });
+    assert.equal(result.concurrentSessionWarning, null);
+    assert.equal(result.status, "ready");
+  } finally {
+    rmSync(gitRoot, { recursive: true, force: true });
+  }
+});
+
+test("PHX-WP-AAC01-MULTISESSION: an unresolvable cwd (no repository at all) degrades to no warning, never throws", () => {
+  const result = preflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    cwd: "/projects/does-not-exist-as-a-repository",
+  });
+  assert.equal(result.concurrentSessionWarning, null);
+  assert.equal(result.status, "ready");
 });

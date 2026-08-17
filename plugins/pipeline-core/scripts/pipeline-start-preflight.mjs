@@ -17,9 +17,14 @@ import {
   evaluateSelfApplicationAttestation,
   pluginRootHasSelfApplicationGit,
 } from "../lib/self-application-attestation-gate.mjs";
+import {
+  inspectSessionOwnerRuntime,
+  listActiveSessionDescriptors,
+} from "../lib/worktree-lifecycle.mjs";
 import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
+export const CONCURRENT_SESSION_WARNING_SCHEMA = "pipeline.concurrent-session-warning.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
 const LOCAL_PLUGIN_ID = "pipeline-core@agent-pipeline-local";
 const NORMAL_BOOTSTRAP_CHECKS = Object.freeze([
@@ -218,6 +223,64 @@ export function freshnessHostActionForPreflight(preflight) {
   });
 }
 
+/**
+ * Best-effort, read-only scan for another LIVE session already registered
+ * under the SAME physical repository root as `startPath` -- the cheap,
+ * PO-requested mitigation for A-AC-01's ordering-ambiguity risk, which only
+ * matters when two agent sessions genuinely operate concurrently in the same
+ * local checkout (a different branch/worktree/clone resolves to a different
+ * physical repository root and is out of scope here, already handled
+ * elsewhere). This never fails/blocks bootstrap: every uncertain outcome --
+ * no repository at `startPath`, no descriptors registered, a malformed
+ * descriptor, any read error -- degrades to `null`, never a thrown error and
+ * never a false positive.
+ *
+ * Only a REAL, currently-running owner process (`inspectSessionOwnerRuntime`
+ * status "live") on a session other than `currentSessionId` counts. A
+ * stale/orphaned descriptor ("not-live"/"reused") or an inconclusive read
+ * ("unavailable"/"unobserved") is never treated as a positive warning --
+ * exactly the false-positive class the PO explicitly does not want (a stale
+ * descriptor or a human reading in a second terminal must never warn).
+ *
+ * The returned object exposes nothing beyond what `inspectSessionOwnerRuntime`
+ * already exposes for that other session (sessionId, descriptorSha256,
+ * status) -- no nonce, no PID, no process-start identity, no conversation
+ * data (see that function's own docstring for the same guarantee).
+ */
+export function observeConcurrentSessionWarning({
+  startPath,
+  currentSessionId = null,
+  listDescriptors = listActiveSessionDescriptors,
+  inspectOwner = inspectSessionOwnerRuntime,
+} = {}) {
+  let descriptors;
+  try {
+    descriptors = listDescriptors(startPath);
+  } catch {
+    return null;
+  }
+  for (const descriptor of descriptors) {
+    if (descriptor.sessionId === currentSessionId) continue;
+    let owner;
+    try {
+      owner = inspectOwner(startPath, descriptor.sessionId, {
+        expectedDescriptorSha256: descriptor.descriptorSha256,
+      });
+    } catch {
+      continue;
+    }
+    if (owner.status === "live") {
+      return {
+        schema: CONCURRENT_SESSION_WARNING_SCHEMA,
+        sessionId: owner.sessionId,
+        descriptorSha256: owner.descriptorSha256,
+        status: owner.status,
+      };
+    }
+  }
+  return null;
+}
+
 export function observePipelineStartPreflight({
   env = process.env,
   pluginList,
@@ -226,6 +289,13 @@ export function observePipelineStartPreflight({
   cwd = process.cwd(),
   knownMarketplaces = readClaudeKnownMarketplaces,
   observe,
+  // PHX-WP-AAC01-MULTISESSION: identifies which already-registered session
+  // descriptor (if any) is "this" call's own, so it is excluded from the
+  // concurrent-session scan below. Undefined/null for every production
+  // caller today (ordinary bootstrap does not yet register a descriptor of
+  // its own -- see the module-level open-follow-up note at the bottom of
+  // this file); callers that DO register one may pass its sessionId here.
+  currentSessionId = null,
 } = {}) {
   const pluginRoot = resolve(dirname(fileURLToPath(scriptUrl)), "..");
   // CLAUDECODE is set by every Claude Code session (main and subagent); its
@@ -352,6 +422,11 @@ export function observePipelineStartPreflight({
       installedIdentity: installedIdentityForSource,
     };
   }
+  // PHX-WP-AAC01-MULTISESSION: informational only. Computed unconditionally
+  // (observeConcurrentSessionWarning never throws) and never influences
+  // `status`/`nextAction`/any other field above -- see that function's own
+  // docstring for the exact false-positive-avoidance contract.
+  const concurrentSessionWarning = observeConcurrentSessionWarning({ startPath: cwd, currentSessionId });
   const result = {
     schema: SCHEMA,
     status,
@@ -362,6 +437,7 @@ export function observePipelineStartPreflight({
     pluginRoot,
     rulesetSource,
     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
+    concurrentSessionWarning,
     nextAction: status === "ready"
       ? {
           kind: "command",
@@ -409,6 +485,25 @@ export function observePipelineStartPreflight({
     bootstrapPayload: normalBootstrapPayloadReceipt(result),
   };
 }
+
+// PHX-WP-AAC01-MULTISESSION -- OPEN FOLLOW-UP, documented honestly rather
+// than silently left unaddressed: this file only reads already-registered
+// session descriptors (`observeConcurrentSessionWarning`, above); it does
+// NOT register one of its own for an ordinary Elephant/Claude/Codex
+// bootstrap. `startSessionDescriptor` today has exactly one caller in the
+// whole codebase (`codex-onboarding-capabilities.mjs`'s narrow onboarding
+// capability probe, which registers and immediately retires within the same
+// call -- it never leaves a lasting descriptor). Registering one here would
+// require a real end-of-session retirement hook to avoid leaking an orphan
+// descriptor per bootstrap; this preflight library file, invoked once at
+// the START of bootstrap, has no such hook reachable from itself alone, and
+// none was invented under time pressure (see this task's dispatch report).
+// Net effect today: the warning field is real, wired, and exercised
+// end-to-end by this task's own tests (which register descriptors directly
+// via `startSessionDescriptor`), but stays structurally dormant in ordinary
+// production use until a follow-up task adds (a) descriptor registration at
+// a real bootstrap entry point and (b) its matching retirement at a real
+// session-end hook.
 
 export function pipelineStartPreflightExitCode(result) {
   return result?.status === "ready" || result?.status === "plugin-refresh-required" ? 0 : 2;
