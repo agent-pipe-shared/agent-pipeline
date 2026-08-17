@@ -73,3 +73,19 @@ the already-tested per-suite declared-input mechanism in
 full reasoning, evidence citations and an open PO question (cross-candidate
 reuse for push/release-bound runs) in the ADR. `proposed`, not accepted —
 awaiting PO review like ADR-0064.
+
+### Update, 2026-08-17 (continued) — ADR-0065 accepted and candidate (a) implemented, Critic-passed
+
+The PO returned and approved both proposed ADRs ("okay Freigabe für meine
+Entscheidungen erteilt setze alles um"). `docs/adr/0065-...md` is now
+`accepted`. Candidate (a) of its own Follow-up (break the three whole-tree
+coupling sites in `verify-journal.mjs`/`verify-resume.mjs`, behaviour
+provably unchanged) landed (`3580b41f`), independently re-verified with a
+real double full `verify.mjs` run proving same-candidate reuse still works,
+and passed a mandatory T1 Critic review together with ADR-0064's
+implementation. Candidate (b) (Tier-B runtime-enforced narrowing, piloted on
+one small non-spawning suite) is dispatched and in flight as
+`NVA-ADR65B-1`. Candidate (c) (bulk narrowing of further suites) remains
+not started. This item still stays open until (b) and (c) both land and this
+gate's own binding is demonstrably cheap in the general case, not just for
+one pilot suite.

@@ -70,3 +70,17 @@ by an operator running `cp -a` + `claude plugin update` outside any agent
 session — full diagnosis in `docs/state.md`'s 2026-08-17 entry). Next PO
 action, whenever they're back: run that two-command refresh; the remaining
 `verify.mjs` line is then a same-day dispatch.
+
+### Update, 2026-08-17 (continued) — part 2 has its own accepted ADR now, candidate (a) implemented and Critic-passed
+
+`docs/adr/0065-a-voided-gate-is-re-earned-from-declared-inputs.md` is
+`accepted` and is, in its own words, "literally part 2 of" this item
+("declare per-suite inputs"). Candidate (a) of its Follow-up (finish the
+existing declared-input mechanism rather than building a second one) landed
+(`3580b41f`), independently re-verified with a real double full `verify.mjs`
+run, Critic-passed. Candidate (b) (runtime-enforced Tier-B narrowing,
+piloted on one small non-spawning suite) is in flight as `NVA-ADR65B-1`;
+candidate (c) (narrow further suites, ordered by the `durationMs` part 1
+above now records) is not started. Part 3 (selective-vs-full tiering) stays
+explicitly out of scope of ADR-0065 and still needs its own PO-visible
+decision, per this item's own original Triage above. Part 4 not assessed.
