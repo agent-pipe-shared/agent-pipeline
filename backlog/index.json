@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f254969dadcfe7ae2081bd33aa4a2f692bc80a4846c90baf5f25049b8709f6ff"
+    "transitionHead": "70dece4128a61448d1c2bdd05b114ff76798cb7b3d4d3ee519ff3abd0d65cd3d"
   },
   "counts": {
-    "open": 97,
+    "open": 98,
     "in_progress": 22,
     "closed": 127
   },
@@ -2261,6 +2261,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Elephant, 2026-08-08, GF-057. Third confirmed instance across two blocks; each one verified at a line before filing. The first (GF-056) was walked around with a shell write, the second and third were reported and stopped."
+    },
+    {
+      "id": "pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "PO, 2026-08-17, mid-candidate-stamp: 'wundere mich warum die pipeline immer noch so viel tmp nutzt obwohl wir dafür eigentlich scratch erfunden haben' — asked after this session's local /tmp filled to 100% inode usage (1,038,060 of 1,048,576) and started making `git` itself fail with ENOSPC, blocking work until the PO manually remounted tmpfs with a higher inode count and cleared stale entries."
     },
     {
       "id": "pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source",
