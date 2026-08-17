@@ -7,7 +7,84 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued: PO's 7 decisions executed, 24/157 open, Verify red bucket root-caused (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again: 22/157 open, three Class-B dispatches in flight, Nova branch-divergence resolved (READ THIS FIRST)
+
+**Since the checkpoint below:** two more measurement corrections landed (no new capability, proof-based
+closures), one more real Class-B capability landed and independently re-verified, and a significant
+false alarm about a cross-session data-staleness was investigated and resolved. Live count now
+**22 of 157 open** (`../evidence/acceptance-evidence-map-20260817f.md`). Class B: 12. Class P: 10.
+
+- **R-AC-13 corrected to `implemented`** (commit `6391f8db`, no code change): re-read all 11 required
+  fixture classes in `external-command-offer.test.mjs` (36/36 pass) — the prior "9 of 11" count wrongly
+  excluded `approval-without-run`/`duplicate/retry` because their fixtures pin delegated/unreachable
+  behavior rather than a success path; the criterion says "provide fixtures for", not "prevent", and both
+  fixtures exist. Also removed two stale orphaned table rows (pre-amendment H-AC-09/H-AC-11 text)
+  accidentally left trailing at the end of `closure-plan.md`.
+- **PHX-WP-LAC01B landed and independently re-verified** (commit `8e4be420`, docs commit `bb2e683a`):
+  L-AC-01's second real producer — `continuity-integrate-final` now emits a `status`-kind event, sharing
+  one projection body with the `dispatch` kind. Read the full diff, re-ran the translator unit test, the
+  call-site suite, and the gated 506-case regression at the exact candidate: 504/506, confirmed the 2
+  failures (PS54af/PS54ag) are the same pre-existing `FTP-ARTIFACT-2` cause, not a regression (re-ran the
+  identical suite at the prior commit to be sure). Honest count: **2 of 9**, not 2-via-cancellation as
+  hoped — the real continuity outcome vocabulary only observes succeeded/failed, so cancellation stays
+  unreached despite the projection covering it for source-vocabulary completeness. `candidate-invalidation`
+  confirmed to have no real caller either (invalidation is always constructed `{state:"valid"}`). Also
+  finalized two dispatch-record.json files that were left uncommitted/mid-write by their own dispatches
+  (PHX-WP-LAC01B itself, and a stray completed-but-uncommitted PHX-WP-LAC08 report).
+- **P-AC-06 amendment landed** (commit `7d31593c`): a PO decision from 2026-08-11
+  (`design/p-ac-06-clause-disposition-proposal.md`) — strike/treat-as-satisfied the "legacy" and
+  "orphaned" trigger words — was drafted and ready but never landed because staging it exposed the SAME
+  `FTP-ARTIFACT-2` blocker POAMEND/LAC08 already accepted tonight, not a new one specific to this edit.
+  Landed append-only (adapted from the proposal's own draft, which edited the enumeration directly, to
+  match this session's stricter convention). Independently re-verified both proofs before landing:
+  `packageRelative` genuinely confines every artifact path to `specs/${id}/`; the nova-a/nova-b asymmetry
+  re-confirmed live (10 `nova-b` paths listed in `specs/sprint-nova-epic/lifecycle.json`, 0 `nova-a`
+  paths, both directories real and populated). **P-AC-06 closes: `implemented`.**
+
+**Three Class-B dispatches running in the background, not yet returned as of this checkpoint** — check
+their status first on resume, do not re-dispatch:
+- **PHX-WP-PAC09** (agentId `a5cb5a2e66abfc04f`): P-AC-09's two real gaps — a distinct explicit
+  backfill-consent signal on `activateOrganizationPolicy`, and a real export/delivery path that actually
+  acts on `computeBackfillRange`'s preview (confirmed zero hits today in
+  `governance-export-adapter.mjs`/`-delivery.mjs`).
+- **PHX-WP-AAC10** (agentId `a808226c6991eee28`): A-AC-10's explicit per-event-class fail-open/fail-closed
+  policy table for unavailable journaling, plus a "gap exposed" observable signal — investigation-first,
+  must not change R-AC-10's already-tested exception-path outcomes.
+- **PHX-WP-HAC08** (agentId `a8d3a1b2d293c5442`): find a real legacy-record source to import as
+  `legacy-import-observation`, or self-stop with a clean NO CARRIER finding (same shape as L-AC-01's
+  `candidate-invalidation` negative finding) — explicitly permitted and expected as a valid outcome.
+
+Once each returns: independently re-verify (read the diff, re-run the tests at the exact candidate, run
+the gated regression if `pipeline-state.mjs`/other TP-5 files were touched) before updating
+`acceptance-evidence-map.mjs`/`closure-plan.md`, same discipline as every prior dispatch tonight.
+
+**Significant false alarm, investigated and resolved: Nova is NOT seeing stale data, we are on different
+branches.** Nova reported being unable to reproduce the `guard-testpath-tests`/`gate-strength-guard-tests`
+regression from the prior checkpoint (`GMW-ANCHORS-INVALID`), both suites green on Nova's HEAD `8af4a67f`,
+and reported commit `11783228` absent from their repo — asked whether this session is on stale/non-rebased
+data. Investigated with git directly rather than guessing: `11783228` is a real commit object in this
+repo (`git cat-file -t` confirms); this session's `HEAD` merge-bases exactly onto `origin/sprint_phoenix`
+(no divergence from the pushed truth); a fresh `git fetch origin` shows Nova's branch is
+`feat/sprint-nova-codex-v046` (NOT `sprint_phoenix`), sharing a common ancestor `2740041d` with this
+branch but diverged since; `11783228` is confirmed NOT an ancestor of Nova's branch AND NOT an ancestor
+of `origin/sprint_phoenix` either (it is a local-only commit on whatever checkout produced it, consistent
+with the signature-gated push policy meaning nothing has reached origin tonight). **Conclusion: both
+sessions are internally consistent; the regression is real and specific to `sprint_phoenix`'s own local
+history, landed by an earlier PHX-prefixed dispatch (not this session, not Nova) — Nova structurally
+cannot see it because that commit never reached Nova's branch or origin.** No session restart needed on
+either side; a restart would not change which branch/commits are on disk. The PO confirmed the fix
+(`scratch/gmw-anchors-fixture-fix.patch`, still un-appliable by this session per the `TP-2`/
+`author-repair-required` finding from the prior checkpoint) should stay scoped to `sprint_phoenix` only,
+which it already was — nothing to change there.
+
+Push/installed-plugin-gap guidance from the checkpoint below is UNCHANGED: still do not attempt the push,
+still do not touch `guard-maintenance-window.mjs`/its two broken test-fixture call sites (author-repair
+route, not agent-executable, and the commit that broke them is this branch's own unpushed history, not
+something to "fix" blindly per Nova's other question).
+
+---
+
+## CHECKPOINT — 2026-08-17, continued: PO's 7 decisions executed, 24/157 open, Verify red bucket root-caused
 
 **Since the checkpoint below:** the PO gave all 7 pending decisions in one message (A-AC-14→B,
 L-AC-08→A "fold into status", H-AC-09 clarified/leans A, H-AC-11→A, H-AC-12→A, PX0-AC-13→B,
