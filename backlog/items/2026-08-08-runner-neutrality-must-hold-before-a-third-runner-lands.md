@@ -112,3 +112,17 @@ preference is recorded.
   not dispatched this session. Direction 4 blocked on the PO's pointer to
   the existing issue.
 - **Date:** 2026-08-12
+
+### Direction 4 resolved, 2026-08-17
+
+Found via `gh issue list --search AGY --state all`: GitHub Issue
+[`#69`](https://github.com/agent-pipe-shared/agent-pipeline/issues/69),
+"[P0] Implement direct AGY Antigravity runner after Nova Alpha", carries
+label `sprint:NONE` ("Item not planned in any sprint so far") — exactly the
+PO's description. (Issue `#15`, "Add an Antigravity CLI runner with Gemini
+models after Sentinel", is an older, `sprint:nova`-labeled issue on the same
+topic; `#69`'s "after Nova Alpha" framing is the current one and is what
+this item links to.) This item stays open as the runner-neutrality
+*precondition* tracker, distinct from `#69`'s own AGY-implementation scope,
+per the PO's 2026-08-12 decision above. Directions 1–3 remain queued,
+unassigned, future-sprint prep.
