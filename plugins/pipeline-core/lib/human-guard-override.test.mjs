@@ -1409,14 +1409,111 @@ test("a tampered one-action capability cannot be consumed", () => {
     const value = JSON.parse(readFileSync(capability, "utf8"));
     value.toolInputSha256 = "f".repeat(64);
     writeFileSync(capability, `${JSON.stringify(value)}\n`, { mode: 0o600 });
-    assert.deepEqual(consumeHumanGuardOverride({
+    // NVA-SIGDISCLOSE-1 Finding 6: the tampered record is still never consumed (the
+    // security property this test's own name asserts) -- but with only ONE capability in
+    // the store, the loop now SKIPS the unvalidatable record and RECORDS which one and
+    // why (`skippedInvalidRecords`), falling through to the ordinary "nothing usable
+    // found" result, rather than reporting a whole-store `{status:"invalid"}` that names
+    // no record at all. See "a tampered capability among several never poisons the
+    // others" below for the multi-record case this finding actually targets.
+    const result = consumeHumanGuardOverride({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
       toolName: "Write",
       toolInput,
       denials: denial,
       nowMs: 4000,
-    }), { status: "invalid", code: "HGO-CAPABILITY" });
+    });
+    assert.notEqual(result.status, "consumed", "a tampered capability must never be consumed");
+    assert.deepEqual(result, {
+      status: "absent",
+      skippedInvalidRecords: [{ planSha256: plan.planSha256, code: "HGO-CAPABILITY" }],
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-SIGDISCLOSE-1 Finding 6: a tampered capability among several never poisons the others -- the valid, armed one still consumes", () => {
+  const root = fixture();
+  try {
+    const goodInput = { file_path: "good.md", content: "good\n" };
+    const badInput = { file_path: "bad.md", content: "bad\n" };
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    function arm(toolInput, nowMs, reason) {
+      const request = recordHumanGuardDenial({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs,
+      });
+      const plan = planHumanGuardOverride({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: nowMs + 100, scriptPath,
+      });
+      const prepared = prepareHumanGuardOverrideAuthorization({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+        planSha256: plan.planSha256, reason, nowMs: nowMs + 200, scriptPath,
+      });
+      authorizeHumanGuardOverride({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+        planSha256: plan.planSha256, selectionSha256: prepared.selectionSha256, reason,
+        reasonSha256: prepared.reasonSha256, activate: true, nowMs: nowMs + 300, scriptPath,
+      });
+      return plan.planSha256;
+    }
+    // planSha256 values are content-addressed digests, not sequential -- the enumeration
+    // loop's own readdirSync().sort() decides which of these two is visited first, not the
+    // order they were armed in. Corrupt whichever ACTUALLY sorts first (determined here,
+    // not assumed) so this test exercises the ordering finding 6 names -- a bad record
+    // encountered before a good one -- regardless of how the two digests happen to compare.
+    const inputByPlan = new Map();
+    const planA = arm(badInput, 1000, "F6 candidate A"); inputByPlan.set(planA, badInput);
+    const planB = arm(goodInput, 5000, "F6 candidate B"); inputByPlan.set(planB, goodInput);
+    const [firstPlanSha256, secondPlanSha256] = [planA, planB].sort();
+
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const badPath = join(common, "agent-pipeline", "human-guard-overrides", "capabilities", `${firstPlanSha256}.json`);
+    const badValue = JSON.parse(readFileSync(badPath, "utf8"));
+    badValue.schema = "pipeline.human-guard-override-capability.v1"; // stale/unsupported schema version
+    writeFileSync(badPath, `${JSON.stringify(badValue)}\n`, { mode: 0o600 });
+
+    const result = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput: inputByPlan.get(secondPlanSha256), denials: denial, nowMs: 9000,
+    });
+    assert.equal(result.status, "consumed", "the valid, armed capability that sorts AFTER the corrupted one must still be usable");
+    assert.equal(result.planSha256, secondPlanSha256);
+    assert.deepEqual(result.skippedInvalidRecords, [{ planSha256: firstPlanSha256, code: "HGO-CAPABILITY" }], "the skipped record must be named, not silently dropped");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-SIGDISCLOSE-1 Finding 6: a record that IS validated but is a legitimate non-match (wrong tool input) is still refused exactly as before -- no security regression", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "legit non-match\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const plan = planHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2000, scriptPath,
+    });
+    const reason = "F6 legitimate non-match regression guard";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      planSha256: plan.planSha256, reason, nowMs: 2500, scriptPath,
+    });
+    authorizeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+      planSha256: plan.planSha256, selectionSha256: prepared.selectionSha256, reason,
+      reasonSha256: prepared.reasonSha256, activate: true, nowMs: 3000, scriptPath,
+    });
+    // A DIFFERENT, unrelated tool call -- the armed capability is well-formed and valid,
+    // it simply does not match. This must fall straight through to "absent", carrying no
+    // skippedInvalidRecords at all: a legitimate non-match is not a validation failure.
+    const result = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "unrelated.md", content: "unrelated\n" }, denials: denial, nowMs: 4000,
+    });
+    assert.deepEqual(result, { status: "absent" });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

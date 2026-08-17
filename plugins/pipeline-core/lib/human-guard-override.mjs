@@ -2529,6 +2529,17 @@ export function consumeHumanGuardOverride({
   })).sort((left, right) => `${left.guard}:${left.sha256}`.localeCompare(`${right.guard}:${right.sha256}`));
   const files = [];
   let replanRequired = false;
+  // NVA-SIGDISCLOSE-1 Finding 6: a capability file this process cannot read or validate
+  // at all (unreadable, malformed JSON, a stale/wrong schema version, a bad MAC) is
+  // SKIPPED and RECORDED here, never treated as a whole-store failure. Before this fix,
+  // the very first unreadable/invalid record aborted the entire enumeration with
+  // `return`, hiding every other, otherwise-valid armed capability that happened to sort
+  // after it -- a single leftover v1 file could silence a perfectly good v2 one. A record
+  // that IS read and validated successfully but simply does not match this call (wrong
+  // tool, wrong input, expired, drifted, wrong denials) is untouched by this change and
+  // stays exactly as strict as before: only a record this process cannot even validate
+  // is now skipped rather than poisoning the whole store.
+  const skippedInvalidRecords = [];
   try {
     files.push(...readdirSync(paths.capabilities).filter((name) => name.endsWith(".json")).sort());
   } catch { return { status: "absent" }; }
@@ -2538,7 +2549,10 @@ export function consumeHumanGuardOverride({
     const path = capabilityPath(paths, planSha256);
     let capability;
     try { capability = validatedCapability(paths, path); }
-    catch { return { status: "invalid", code: "HGO-CAPABILITY" }; }
+    catch (error) {
+      skippedInvalidRecords.push({ planSha256, code: error?.code ?? "HGO-CAPABILITY" });
+      continue;
+    }
     if (capability.status !== "armed" || capability.toolName !== toolName
       || capability.toolInputSha256 !== toolInputSha256
       || canonical(capability.denials) !== canonical(denialDigests)) continue;
@@ -2607,15 +2621,19 @@ export function consumeHumanGuardOverride({
         mode: capability.mode,
         authorSourceRoot: capability.authorSourceRoot,
       });
-      return { status: "consumed", planSha256, requestSha256: capability.requestSha256 };
+      return {
+        status: "consumed", planSha256, requestSha256: capability.requestSha256,
+        ...(skippedInvalidRecords.length ? { skippedInvalidRecords } : {}),
+      };
     } finally {
       if (lockFd !== undefined) closeSync(lockFd);
       try { unlinkSync(lock); } catch {}
     }
   }
-  return replanRequired
-    ? { status: "replan", code: "HGO-EXPIRED" }
-    : { status: "absent" };
+  return {
+    ...(replanRequired ? { status: "replan", code: "HGO-EXPIRED" } : { status: "absent" }),
+    ...(skippedInvalidRecords.length ? { skippedInvalidRecords } : {}),
+  };
 }
 
 export function verifyHumanGuardOverrideAudit({ rootDir, spawn = spawnSync } = {}) {
