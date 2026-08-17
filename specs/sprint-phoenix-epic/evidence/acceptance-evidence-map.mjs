@@ -944,6 +944,22 @@ const DELTA = {
   // would be redundant. Narrowed, not fully closed. 41/41 + 30/30 tests pass.
   'R-AC-09': ['partial', 'WP-R-AC09'],
 
+  // R-AC-09 CLOSED 2026-08-17 (PHX-WP-RAC09, commit 5c05a117, independently
+  // re-verified): the prior "duplicate detection lives at the store layer"
+  // reasoning was WRONG, not just narrow -- the idempotencyKey mechanism
+  // answers a different identity question (envelope retry-safety) than this
+  // criterion asks (replay integrity of the lifecycle eventId offers/outcomes
+  // actually correlate through). Two records could carry one lifecycle
+  // eventId under two different idempotencyKeys, both land, both replay
+  // valid. Built `projectCommandOfferReplay` (unconditional -- no caller
+  // opt-in needed) detecting a shared lifecycle eventId or unlinked
+  // offer-evidence duplicate and rendering replay invalid, never successful;
+  // proven with real appended records, not synthetic assertions. All six
+  // trigger words (missing, stale, duplicated, substituted, cross-repository,
+  // contradictory) now close. 41/41 tests pass, independently re-run;
+  // pre-existing R-AC-09/R-AC-10/R-AC-13 cases confirmed byte-identical.
+  'R-AC-09': ['implemented', 'WP-RAC09'],
+
   // R-AC-11: recordPrivateHandoffCommitment (external-command-offer.mjs)
   // stores a private-only handoff detail via a caller-supplied `put`
   // wiring to the EXISTING restricted-machine-local store
@@ -1194,6 +1210,18 @@ const DELTA = {
   'P-AC-09': ['partial', 'STALE4'],
   'EPIC-AC-02': ['not-started', 'STALE4'],
 
+  // EPIC-AC-02 not-started -> partial 2026-08-17 (PHX-WP-EPICAC02, commit
+  // 77d2d8d5, independently re-verified): checkUnpublishedSiblingSprintConsumption
+  // (parallel-sprint-integration.mjs) is a real, tested, non-invented gate --
+  // caller-supplied git observations in, a digest-sealed fail-closed verdict
+  // out, never calls git itself. Its test suite is already registered as a
+  // blocking suite in verify.mjs:405 (a failure there already fails Phoenix
+  // verification today). Stays partial, not implemented: nothing in verify.mjs
+  // yet calls this gate against LIVE specs/*/lifecycle.json manifests + real
+  // git observations -- that wiring needs a verify.mjs line and TP-3 forbids
+  // an agent from adding it directly. 25/25 checks pass, independently re-run.
+  'EPIC-AC-02': ['partial', 'WP-EPIC'],
+
   // P-AC-09 CLOSED 2026-08-17 (PHX-WP-PAC09, commit 6b9a656e, independently
   // re-verified): activateOrganizationPolicy now demands a second, distinct
   // consent grant -- backfillGranted/backfillDecisionId (must differ from the
@@ -1346,7 +1374,7 @@ const POINTERS = {
   'P-AC-13': 'docs/organization-policy-packs.md + docs/audit-bundles.md (PHX-WP-DOC-2): threat model, pack/schema/activation policy, bundle policy, and compatibility/migration/versioning policy all present and grounded -- the compatibility section honestly states no pack-schema migration mechanism exists (only v1 is accepted; revision is a content digest, not a version number)',
 
   'V-AC-01': 'evidence-view-model-tests: offline report with source links and a candidate-bound receipt',
-  'V-AC-02': 'evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid, not-applicable, and now human decision (PHX-WP-V + WP-V-AC02, break-proofed) -- seven of nine. `approved` is the sole feature-package lifecycle state gated behind PO-specific authority (feature-package-topology.mjs:171), labelled distinctly in the renderer. estimate and assumption remain unpinned: investigated, confirmed no field anywhere represents an approximate or unverified-premise value -- disclosed, not fabricated',
+  'V-AC-02': 'evidence-view-renderer-tests: fact, unknown, unavailable, redacted, invalid, not-applicable, and now human decision (PHX-WP-V + WP-V-AC02, break-proofed) -- seven of nine. `approved` is the sole feature-package lifecycle state gated behind PO-specific authority (feature-package-topology.mjs:171), labelled distinctly in the renderer. UPDATE 2026-08-17 (PHX-WP-VAC02, commit 8325f2d0, independently re-verified): `assumption` now genuinely labelled -- the caller-supplied governance-export delivery observation (`exportStatus`\'s destinationProfile/cursor/lag) was previously mislabelled `fact` despite carrying no digest or canonical-source binding (unlike artifact values, which are re-hashed against their bytes); a new `EVM-EXPORT-ASSUMED` notice and distinct `.value-assumption` CSS rule now mark it correctly. Eight of nine. `estimate` stays unpinned, confirmed absent by design rather than missed: the one real estimate in this repo (`pipeline.gate-estimate.v1`, lib/gate-estimate.mjs) belongs to a different report (continuity-status.mjs) entirely and has zero path into the Evidence Viewer today -- wiring it in needs new input plumbing, not a labelling change. 21/21 tests pass, independently re-run',
   'V-AC-03': 'evidence-view-model-tests: claims linked to canonical source record and exact candidate',
   'V-AC-04': 'evidence-view-model-tests: invalid topology yields an invalid view with no candidate or artifact leak',
   'V-AC-05': 'evidence-view-renderer-tests: deterministic redacted projection withholding artifact paths',
@@ -1416,7 +1444,7 @@ const POINTERS = {
   'R-AC-06': 'external-command-offer-tests: user execution stays unobserved; completion admitted only with bounded evidence',
   'R-AC-07': 'external-command-offer-tests: failed, partial, cancelled, mismatch and unknown outcomes retained distinctly',
   'R-AC-08': 'external-command-offer-tests (PHX-WP-R): a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent -- no such state exists at all, only prospective values inside recoverability',
-  'R-AC-09': 'agent-decision-journal/external-command-offer-tests (PHX-WP-R + WP-R-AC09): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful), AND occurredAtEpochMs now closes the stale clause. Duplicate detection remains at the store layer by design (idempotencyKey, governance-event-store.mjs), not re-built here -- deliberate, not absent. 41/41 + 30/30 tests pass',
+  'R-AC-09': 'agent-decision-journal/external-command-offer-tests (PHX-WP-R + WP-R-AC09): missing offer link, contradictory outcome evidence, and cross-repository/cross-scope substitution all fail closed (never successful), AND occurredAtEpochMs now closes the stale clause. 41/41 + 30/30 tests pass. CLOSES 2026-08-17 (PHX-WP-RAC09, commit 5c05a117, independently re-verified): the "duplicate detection lives at the store layer" reasoning was corrected, not just narrowed -- governance-event-store.mjs\'s idempotencyKey covers a DIFFERENT identity (envelope retry-safety), not the lifecycle eventId offers/outcomes actually correlate through, so two records under different idempotency keys but the same lifecycle eventId could both land and both replay valid. `projectCommandOfferReplay` (unconditional) now detects a shared lifecycle eventId or an unlinked duplicate offer-evidence record and renders replay invalid -- proven with real appended records. governance-event-store.mjs itself untouched; the fix needed nothing from it. All six trigger words now close. 41/41 tests pass, independently re-run; pre-existing cases confirmed byte-identical to their pre-commit versions',
   'R-AC-10': 'fail-closed on the append is pinned; the policy-defined typed non-material exception is absent',
   'R-AC-11': 'external-command-offer/agent-decision-journal-tests (PHX-WP-R + WP-R-AC11): a mandatory public-safe typed omission is pinned, AND recordPrivateHandoffCommitment now wires this module to the existing restricted-machine-local store via a caller-supplied put callback, exposing only a commitment digest + receipt id. 44/44 + 36/36 tests pass',
   'R-AC-12': 'external-command-offer-tests (PHX-WP-R-AC12): the motivating Phoenix bootstrap trajectory is now encoded end to end -- a rejected guard-bypass attempt, an attended local repair through the sanctioned non-authoritative channel, an unchanged public-privacy boundary, a verified readback, and digest-only targets that never embed a machine-specific value',
@@ -1433,7 +1461,7 @@ const POINTERS = {
   'A-AC-03': 'reconfirmed 2026-08-11: NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption (direct grep of "A-AC-03" and "material assumption"/"invalidat*"/"revalidat*" across plugins/pipeline-core/{lib,scripts} finds nothing beyond unrelated Cyborg control-waiver revalidationTrigger fields; agent-decision-journal.mjs validates event shape only, no cascade logic)',
   'A-AC-09': 'RETRACTS "no code enforces or measures it" -- governance-event-store.mjs\'s captureDecision:"sampled-out" path (assertMandatoryCaptureNotSkipped, landed 2026-08-10 commit 90283a0c for A-AC-07, never credited here) lets a caller avoid durably persisting a non-mandatory agent-origin event -- exactly the "avoid producing... telemetry" behavior for non-material activity this criterion names. Tested: governance-event-store.test.mjs "A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can" and "...only the policy-selected agent stream may ever be sampled out" (both pass). Partial only: nothing computes "routine/low-impact" itself (the caller decides captureDecision), and no independent Critic PASS exists for this candidate',
   'P-AC-09': 'RETRACTS the "no export-backfill preview... exists" half -- organization-policy-activation.mjs\'s computeBackfillRange/backfillRange preview field (already credited to P-AC-03 as implemented, WP-P-AC01-AC03) is real and tested (organization-policy-activation.test.mjs "P-AC-03 computes newlyRequiredArtifacts, externalEffects, and backfillRange deterministically from the transition", 4/4 pass). CLOSES 2026-08-17 (PHX-WP-PAC09, commit 6b9a656e, independently re-verified): the remaining two gaps are built. activateOrganizationPolicy now requires a distinct backfillGranted/backfillDecisionId/backfillSubjectSha256 consent, exact-key-bound to a digest over the plan\'s own preview, refused by name (OPA-BACKFILL-CONSENT) when a backfill-implying activation supplies only the ordinary activation authority -- proven by a refusal test that re-confirms the prior policy stays active. organization-policy-backfill-export.mjs exports a consented backfillRange by reusing the real pipeline (queryPortableGovernanceStream -> projectGovernanceEvent -> enqueueGovernanceExport -> deliverGovernanceExportBatch), proven end-to-end with real appended events and a real delivered disposition, not a mock. 80/80 across the full affected regression set, independently re-run at the exact commit',
-  'EPIC-AC-02': 'reconfirmed 2026-08-11: NO CARRIER: planParallelSprintIntegration (plugins/pipeline-core/lib/parallel-sprint-integration.mjs) still has no concept of "unpublished" (direct grep for "unpublished"/"Nova"/"Cyborg"/"Nightwing" in the file: zero hits) and is still imported only from its own test file (grep for the import across plugins/pipeline-core and harness: only parallel-sprint-integration.test.mjs)',
+  'EPIC-AC-02': 'reconfirmed 2026-08-11: NO CARRIER: planParallelSprintIntegration (plugins/pipeline-core/lib/parallel-sprint-integration.mjs) still has no concept of "unpublished" (direct grep for "unpublished"/"Nova"/"Cyborg"/"Nightwing" in the file: zero hits) and is still imported only from its own test file (grep for the import across plugins/pipeline-core and harness: only parallel-sprint-integration.test.mjs). UPDATE 2026-08-17 (PHX-WP-EPICAC02, commit 77d2d8d5, independently re-verified): `checkUnpublishedSiblingSprintConsumption` built -- a feature-package manifest binds exactly one commit identity (`candidate.commit`); "consumes" means that commit or its ancestry carries a commit belonging to Nova/Cyborg/Nightwing, "unpublished" means `git merge-base --is-ancestor` against that epic\'s published tip fails or was never observed. The gate never calls git itself (caller-supplied observations only, confirmed: zero git invocations in the function), returns a digest-sealed fail-closed verdict, and its test suite is already registered as blocking in verify.mjs:405. Stays `partial`: no live verify.mjs check yet calls this gate against real specs/*/lifecycle.json manifests -- that registration line is TP-3-protected and deliberately left for the file\'s own owner. 25/25 checks pass, independently re-run',
 };
 
 // --- closure classification -------------------------------------------------
