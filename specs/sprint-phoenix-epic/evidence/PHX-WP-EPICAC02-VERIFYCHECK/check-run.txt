@@ -1,0 +1,7 @@
+$ node plugins/pipeline-core/scripts/check-epic-ac02-publication.mjs
+epic-ac02-publication: 3 package(s) checked, 0 failed
+exit code: 0
+
+$ node plugins/pipeline-core/scripts/check-epic-ac02-publication.test.mjs
+epic-ac02-publication-check: 6 passed, 0 failed
+exit code: 0
