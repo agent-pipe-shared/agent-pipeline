@@ -61,7 +61,15 @@ is a foundational, widely-shared library file — same rigor as `894261d`.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, confirmed still live — remains current-scope, not
+  deferred.
+- **Rationale:** re-verified against current source,
+  `plugins/pipeline-core/lib/runtime-projection-v2.mjs:72-73` — the eager
+  module-scope `FROZEN_OWNED_KEYS`/`FROZEN_OWNED_KEYS_CANONICAL_JSON` load
+  is unchanged; the same fail-open pattern F4 fixed in v3 (`894261d`) is
+  still present here, and `runtime-projection-v3.mjs` still imports this
+  module. Security-relevant (fail-closed admission hooks depend on this
+  import chain), not a candidate for deferral.
+- **Assignment (if accepted):** unassigned — apply the same lazy/memoized
+  accessor fix pattern used in `894261d`, per this item's own Proposal.
+- **Date:** 2026-08-17

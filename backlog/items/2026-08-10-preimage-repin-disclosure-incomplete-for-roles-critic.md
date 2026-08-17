@@ -69,3 +69,17 @@ so the gap is tracked rather than rediscovered by the next person who reads
 the test's output and stops at the first line.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted, unassigned — confirmed still live: `roles/critic.md`
+  hashes to `8d7919f9440ba334b87888534adf9ca7bf8fef35c7e361d97d98450e19e7b783`
+  today, the pin at
+  `codex-isolated-critic-protected-preimage.v1.json:38-39` still reads
+  `7bdcc71d1c4a0a4663101c193f63db8620928e46e55c1f677f9a7d1cd0286bf3` — neither
+  proposed fix (re-pin; collect-all-mismatches test loop) has landed.
+- **Rationale:** a real, small, mechanical two-part fix, correctly
+  unregistered in `verify.mjs` (per the item's own text) so it blocks nothing
+  today — not urgent enough for this docs-only triage pass to fix directly.
+- **Assignment (if accepted):** a small goldfish-mechanic/implementor task —
+  re-pin the hash, change the test's assertion loop to accumulate mismatches
+  instead of failing on the first one.
+- **Date:** 2026-08-17

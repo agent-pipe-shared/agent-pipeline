@@ -50,7 +50,15 @@ not yet have it.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, confirmed still live — remains current-scope, not
+  deferred.
+- **Rationale:** re-verified against current source,
+  `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:1934-1959` — the
+  `restartRequired` branch still falls straight from
+  `isRestartResumeHintInputWrite`/`isRestartResumeHintCapture` to the
+  generic `GUARD-LIFECYCLE-NOT-READY` block with no narrow-margin diagnostic
+  naming the exact required path first. The gap described is unfixed.
+- **Assignment (if accepted):** unassigned — a bounded guard-message
+  improvement (name `project/.resume-hint-input.json` directly for a
+  near-miss write before any external-operator escalation).
+- **Date:** 2026-08-17
