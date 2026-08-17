@@ -10,13 +10,14 @@ import { fileURLToPath } from "node:url";
 
 import { ReleasePreflightCliError, buildReleasePreflight } from "./release-preflight-cli.mjs";
 import { criticalActionSubjectSha256, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { canonical as canonicalPoApprovalProof } from "../lib/po-approval-proof.mjs";
 
 const POLICY = "c".repeat(64);
 const CLI_PATH = fileURLToPath(new URL("./release-preflight-cli.mjs", import.meta.url));
 const roots = [];
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
-function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "approved", dirty = false } = {}) {
+function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "approved", dirty = false, waiveReleasePreflight = true } = {}) {
   const base = mkdtempSync(join(tmpdir(), "release-preflight-cli-"));
   roots.push(base);
   const git = (...args) => {
@@ -52,7 +53,9 @@ function fixture({ version = "1.2.3", manifestVersion = null, consentStatus = "a
   // scenario as a SEPARATE, still-valid path (as opposed to the new proof-verified
   // path) needs one recorded, so this is the RIGHT fix for a test whose own purpose is
   // downstream repository-observation/reducer behavior, not "how was approval reached".
-  if (consentStatus === "approved") {
+  // `waiveReleasePreflight: false` is the one deliberate exception -- it lets a test
+  // reach `resolveHandSuppliedConsent`'s OWN refusal branch instead of pre-satisfying it.
+  if (consentStatus === "approved" && waiveReleasePreflight) {
     write("project/critical-human-proof.json", {
       schema: "pipeline.critical-human-proof-policy.v2",
       requiredKinds: ["release-preflight"],
@@ -335,6 +338,14 @@ try {
     assert.equal(record.consent.status, "expired");
     assert.equal(record.consent.decisionId, request.approvalIntent.sha256);
     assert.equal(record.consent.evaluatedAt, expiresAt);
+    // Finding 3 (ADR-0064 Decision 5 comment): `authoritySha256` here must be the
+    // CONCRETE digest `po-approval-proof.mjs`'s own exported `canonical` produces for
+    // this exact proof -- the identical formula `verifyPoApprovalProof` uses internally
+    // for `proofSha256` -- not merely a hex-shaped string. Computed independently here
+    // (never by re-importing the CLI's own call), so this closes the "same value
+    // verification would have produced" claim rather than assuming it.
+    const expectedAuthoritySha256 = createHash("sha256").update(canonicalPoApprovalProof(proof)).digest("hex");
+    assert.equal(record.consent.authoritySha256, expectedAuthoritySha256);
   });
 
   check("RPC17 an edited subject preimage -- any field the subject digest covers -- is caught, not silently accepted", () => {
@@ -391,6 +402,20 @@ try {
     }), (error) => {
       assert.ok(error instanceof ReleasePreflightCliError, error?.message);
       assert.equal(error.code, "RPC-INPUT", error.message);
+      return true;
+    });
+  });
+
+  // ADR-0064 Decision 6 (Finding 1): the tightening itself, exercised directly -- every
+  // OTHER test that reaches an "approved" hand-supplied consent pre-writes the waiver
+  // (via `fixture()`'s default `waiveReleasePreflight: true`), so none of them can
+  // reach `resolveHandSuppliedConsent`'s own refusal branch. This one deliberately
+  // withholds the waiver.
+  check("RPC20 a hand-supplied --consent claiming \"approved\" without a recorded release-preflight waiver is refused", () => {
+    const context = fixture({ consentStatus: "approved", waiveReleasePreflight: false });
+    assert.throws(() => build(context), (error) => {
+      assert.ok(error instanceof ReleasePreflightCliError, error?.message);
+      assert.equal(error.code, "RPC-CONSENT-UNWAIVED", error.message);
       return true;
     });
   });
