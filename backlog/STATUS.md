@@ -98,6 +98,7 @@
 | pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | open | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
@@ -110,7 +111,7 @@
 | pipeline.ledger-event-403-has-a-short-hash-evidence-commit | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
-| pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | open | defect | pipeline | 2026-08-16 | — |
+| pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.long-dispatches-truncate-before-emitting-their-report | open | defect | pipeline | 2026-08-08 | — |
@@ -146,6 +147,7 @@
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | open | defect | pipeline | 2026-08-10 | — |
@@ -201,6 +203,7 @@
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.temp-directories-leak-until-the-filesystem-refuses-every-write | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.two-manifest-literals-bypass-the-single-seed-owner | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
@@ -222,6 +225,6 @@
 
 ## Counts
 
-- open: 99
+- open: 101
 - in_progress: 22
-- closed: 93
+- closed: 94

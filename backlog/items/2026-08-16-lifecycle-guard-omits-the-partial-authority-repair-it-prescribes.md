@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: bf8803ed8383edaa7cc1c46ffc6d071c21d8f53e
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-partial-authority-repair-closure.md
 source: "Reported by the PO on 2026-08-16 from a consumer project running the 0.5.5 local candidate installed from the Windows local marketplace root. That session followed the bootstrap ritual, was told by the tooling to run the repair, and had it refused by the guard."
 ---
 
@@ -63,3 +67,25 @@ Two candidates, not a commitment:
 - **Rationale:** smallest possible change, third recurrence of the identical repair pattern (2026-08-08, 2026-08-09), guardrail-class code so it goes through goldfish-deep + worktree isolation + mandatory Design-tier Critic escalation (MP-07) rather than a same-session edit.
 - **Assignment (if accepted):** Nova A AFK-session closeout, folded into the next local 0.5.5 candidate.
 - **Date:** 2026-08-16
+
+## Closure, 2026-08-17
+
+Fixed by `15cf0e58` (direction 1, missing allowlist entry). Round-1 Critic
+review of that commit returned FAIL: Finding A (minor, stale line-number
+citations) and Finding B (major, governance checklist item 8 — the deferred
+direction-2 systemic fix carried no owner/expiry date). Both fixed by
+`NVA-CRITICFIX-1` (`a27a2ce8`, `bf8803ed`; the direction-2 follow-up owner/due
+date now lives in
+`backlog/items/2026-08-16-guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table.md`).
+Round-2 Critic review of `a27a2ce8..bf8803ed` returned **PASS**: both
+findings confirmed resolved, no new blocker (two new minor, non-blocking
+findings noted — a ledger evidence-commit pointer naming the wrong commit,
+and an inaccurate "per TEMPLATE.md convention" attribution in the dispatch
+record's own report text — filed as governance/audit-trail accuracy notes,
+not reopened here). Independently re-confirmed by the Elephant:
+`node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`
+green (89/89); the allowlist fix is present in this checkout's source and
+was already independently confirmed live by the PO's own relayed report
+(2026-08-17) — the one remaining gap is that the locally-installed
+marketplace copy on that machine has not yet been refreshed with this fix,
+a separate, already-tracked, PO-gated action.
