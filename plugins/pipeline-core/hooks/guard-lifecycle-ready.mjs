@@ -2243,6 +2243,14 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
         code, reason, "command", root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) {
+        // Intentional `[]`, not the GUARD-PARSE-UNSUPPORTED omission (backlog:
+        // grammar-refusal-does-not-say-which-part-failed): every command reaching this
+        // branch is `parsed.parseStatus === "accepted"` with an operator or redirect
+        // present, so it contains at least one of `|&<>()` -- and
+        // retryActionsForDeniedCommand() returns [] unconditionally on the first such
+        // character it scans (its per-part policy only ever recovers `;`/newline-joined
+        // segments). Measured empirically across `&&`, `|`, `>`, `2>&1`, `| tee`: [] in
+        // every case. Calling it here would be dead code, not a fix.
         return withLifts(lifts, blocked(
           code, null, [], route.overrideGuidance, rejectedGrammarElement(code, input.tool_input.command, parsed),
         ));
