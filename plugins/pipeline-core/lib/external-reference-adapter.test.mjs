@@ -369,6 +369,34 @@ test("WP-PAC11-LIFECYCLEEVENTS does not throw a raw TypeError when a hand-built 
   assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-lifecycle-event");
 });
 
+// WP-PAC11-CONFLICTPOLICY: conflictPolicy (P-AC-11 "conflict policy") gates
+// which status a revision/ownership conflict on a governed write produces. A
+// declared "require-reconciliation" is the only branch that changes anything;
+// undeclared and declared "reject" both collapse to today's unconditional
+// status: "conflict" (the strictest, backward-compatible default).
+test("WP-PAC11-CONFLICTPOLICY returns reconciliation-required for a governed write when the effective policy declares conflictPolicy require-reconciliation", async () => {
+  const scoped = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, conflictPolicy: "require-reconciliation", packIds: ["security-baseline"] }]);
+  const raced = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-9", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: scoped });
+  assert.equal(raced.status, "reconciliation-required"); assert.equal(raced.reason, "policy-conflict-reconciliation"); assert.equal(raced.plan, null);
+});
+test("WP-PAC11-CONFLICTPOLICY leaves a declared conflictPolicy reject on today's unconditional conflict status, same as undeclared", async () => {
+  const rejectPolicy = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, conflictPolicy: "reject", packIds: ["security-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-9", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: rejectPolicy });
+  assert.equal(rejected.status, "conflict"); assert.equal(rejected.reason, "revision-or-ownership");
+  const undeclared = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, packIds: ["security-baseline"] }]);
+  const undeclaredResult = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-9", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: undeclared });
+  assert.equal(undeclaredResult.status, "conflict"); assert.equal(undeclaredResult.reason, "revision-or-ownership");
+});
+// F4-style defensive posture: a hand-built policy declaring conflictPolicy as
+// a non-string runtime shape must never be mistaken for "require-reconciliation";
+// the strict `===` comparison already falls through to the strictest,
+// backward-compatible default without any extra coercion needed.
+test("F4 does not treat a hand-built policy's non-string conflictPolicy shape as require-reconciliation", async () => {
+  const oddShape = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, conflictPolicy: ["require-reconciliation"], packIds: ["security-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-9", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: oddShape });
+  assert.equal(rejected.status, "conflict"); assert.equal(rejected.reason, "revision-or-ownership");
+});
+
 test("X-AC-11 never consults organization policy for an ungoverned reference, even when one is supplied", async () => {
   const invalidPolicy = { not: "a valid effective policy" };
   const withPolicy = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: invalidPolicy });

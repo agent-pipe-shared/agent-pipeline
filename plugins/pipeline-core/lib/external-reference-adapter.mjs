@@ -138,7 +138,19 @@ export async function planExternalReferenceWrite({ reference, capabilities, desi
   }
   let target; try { target = await inspect(frozen({ adapterProfile: ref.adapterProfile, objectId: ref.objectId })); } catch { return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "external-unreachable", plan: null }); }
   if (!validateTarget(target, ref)) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "invalid-inspection", plan: null });
-  if (target.revision !== ref.externalRevision || target.state !== "fresh" || desired.changes.some((change) => change.ownership !== "pipeline-owned")) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "conflict", reason: "revision-or-ownership", plan: null });
+  // WP-PAC11-CONFLICTPOLICY: conflictPolicy (P-AC-11 "conflict policy") gates
+  // which status a revision/ownership conflict on a governed write produces.
+  // `entry` is undefined for an ungoverned reference (documentClass === null)
+  // and stays null in that case, same as the ownedSections/lifecycleEvents
+  // gates above; a declared "require-reconciliation" is the only branch that
+  // changes anything -- undeclared and declared "reject" both collapse to
+  // today's unconditional status: "conflict" (the strictest, backward-
+  // compatible default), matching CONFLICT_POLICY_RANK's ranking in
+  // organization-policy.mjs where "reject" is strictly stricter.
+  if (target.revision !== ref.externalRevision || target.state !== "fresh" || desired.changes.some((change) => change.ownership !== "pipeline-owned")) {
+    if (entry !== null && entry.conflictPolicy === "require-reconciliation") return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "policy-conflict-reconciliation", plan: null });
+    return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "conflict", reason: "revision-or-ownership", plan: null });
+  }
   const proposed = await preview(frozen({ objectId: ref.objectId, revision: target.revision, requestId: desired.requestId, changes: desired.changes.map((change) => frozen({ ...change })) })); if (!exact(proposed, ["previewDigest"]) || !SHA.test(proposed.previewDigest)) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "invalid-preview", plan: null });
   const plan = frozen({ schema: "pipeline.external-reference-write-intent.v1", reference: ref, pipelineArtifactIdentity: binding.identity, requestId: desired.requestId, expectedRevision: target.revision, changes: frozen(desired.changes.map((change) => frozen({ ...change }))), previewDigest: proposed.previewDigest });
   return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "preview", reason: null, plan: frozen({ ...plan, planSha256: canonicalSha256(plan) }) });

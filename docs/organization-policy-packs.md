@@ -96,14 +96,12 @@ packs meets the failure at activation, where a wrong diagnosis is expensive:
 Intersection never widens permission and OR never downgrades it, so no combination of
 packs can resolve to something more permissive than its strictest contributor.
 
-**One of these five is declared but not yet consumed by any decision path.** Only
-`conflictPolicy` still validates and merges without changing any behaviour;
-`mode`, `approvalRequired`, `targetBinding` and `ownedSections` scope a real
-permission decision, plus `previewRequired` as of the PO's 2026-08-17 amendment
-below and `lifecycleEvents` as of the PO's 2026-08-17 amendment further below.
-`conflictPolicy`'s gap is tracked, with its own reasons, in
-`backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md` —
-declaring it today is not an error, but it is also not enforcement.
+**None of these five is declared but unconsumed anymore.** `mode`,
+`approvalRequired`, `targetBinding` and `ownedSections` scope a real
+permission decision, plus `previewRequired` as of the PO's 2026-08-17
+amendment below, `lifecycleEvents` as of the PO's 2026-08-17 amendment
+further below, and `conflictPolicy` as of the PO's 2026-08-17 amendment at
+the end of this list — the last of the five to close.
 
 **`previewRequired` (PO amendment, 2026-08-17):** satisfied by construction, not by
 enforcement — `external-reference-adapter.mjs`'s `preview()` runs unconditionally on
@@ -142,6 +140,25 @@ that maps to zero live states, is a real restriction; an undeclared key
 stays neutral — the same declared-vs-undeclared precedent `ownedSections`
 already established. See `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11
 amendment for the full reasoning.
+
+**`conflictPolicy` (PO amendment, 2026-08-17): built, not left inert.**
+`planExternalReferenceWrite` now consults the effective policy's
+document-class entry `conflictPolicy` at the site of its existing
+unconditional revision/ownership conflict check. A declared
+`require-reconciliation` returns `status: "reconciliation-required", reason:
+"policy-conflict-reconciliation"` — the adapter's existing status value,
+already used for `external-unreachable`/`invalid-inspection`/
+`invalid-preview`, with a new `reason` value following the same `policy-...`
+convention as `policy-owned-sections`/`policy-lifecycle-event`/
+`policy-mode-mismatch`/`policy-approval-required`. A declared `reject`, or an
+undeclared `conflictPolicy` key, both keep today's exact unconditional
+behavior (`status: "conflict", reason: "revision-or-ownership"`) — the same
+declared-vs-undeclared precedent every other dimension follows, except here
+undeclared and `reject` collapse to the SAME branch (matching
+`CONFLICT_POLICY_RANK`, where `reject` is strictly stricter than
+`require-reconciliation`): there are only two effective branches, not three.
+See `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11 amendment for the
+full reasoning.
 
 Activation is a separate, transactional step from resolution
 (`organization-policy-activation.mjs`). `planOrganizationPolicyActivation`

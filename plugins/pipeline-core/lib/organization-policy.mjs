@@ -65,8 +65,14 @@ export const LIFECYCLE_EVENTS = new Set(["proposed", "active", "completed", "sup
 // conflictPolicy reuses this exact vocabulary root from
 // external-reference-adapter.mjs's own existing write-plan statuses
 // ("rejected", "reconciliation-required") rather than inventing parallel
-// terms; it is a declared disposition only -- this dispatch does not wire it
-// into adapter behavior (out of this file's scope).
+// terms. WP-PAC11-CONFLICTPOLICY (2026-08-17): it is no longer declared but
+// unenforced -- planExternalReferenceWrite's conflict branch now consults
+// the effective entry's conflictPolicy (a declared "require-reconciliation"
+// returns status: "reconciliation-required"; undeclared or "reject" both
+// keep today's unconditional status: "conflict") -- this file still only
+// validates and merges the value, the enforcement decision correctly lives
+// one layer up in the adapter, same split lifecycleEvents already
+// established.
 const CONFLICT_POLICIES = new Set(["reject", "require-reconciliation"]);
 // WP-P-AC01: provenance, dependencies, and signaturePolicy are OPTIONAL
 // pack-level fields, following the exact precedent targetBinding set above:

@@ -688,6 +688,30 @@ architecture prose or an implementation briefing.
   question under this criterion, not resolved by this amendment (see
   backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md's
   Triage section).
+
+  **Amendment (PO, 2026-08-17), `conflictPolicy` dimension only.** Built, not
+  left declared-but-inert: `plugins/pipeline-core/lib/external-reference-
+  adapter.mjs`'s `planExternalReferenceWrite` now consults the effective
+  policy's document-class entry `conflictPolicy` at the same site the
+  unconditional revision/ownership conflict check already occupied. A
+  declared `require-reconciliation` returns `status: "reconciliation-required",
+  reason: "policy-conflict-reconciliation"` — the adapter's existing status
+  value, already used for `external-unreachable`/`invalid-inspection`/
+  `invalid-preview`, extended with a new `reason` value following the same
+  `policy-...` convention as `policy-owned-sections`/`policy-lifecycle-event`/
+  `policy-mode-mismatch`/`policy-approval-required`. A declared `reject`, OR
+  an undeclared `conflictPolicy` key, both keep today's exact unconditional
+  behavior (`status: "conflict", reason: "revision-or-ownership"`) — this is
+  the declared-vs-undeclared precedent every other P-AC-11 scoping dimension
+  already follows, with the one difference that here undeclared and `reject`
+  resolve to the SAME (strictest, backward-compatible) branch, matching
+  `organization-policy.mjs`'s `CONFLICT_POLICY_RANK` where `reject` (rank 1)
+  is strictly stricter than `require-reconciliation` (rank 0): there are only
+  two effective branches, not three. This closes the last remaining open
+  dimension of this criterion's "scope permission by ... conflict policy"
+  clause (see
+  backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md's
+  Triage section for the prior open-question record).
 - **P-AC-12:** WHEN a bundle is verified offline, THE SYSTEM SHALL validate its
   manifest, artifact digests, event-chain references, topology, optional
   signature profile, and declared omissions and SHALL visibly reject
