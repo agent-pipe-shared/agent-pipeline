@@ -116,7 +116,7 @@
 | pipeline.ledger-drift-classification-has-no-reachability-cutoff | open | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-event-403-has-a-short-hash-evidence-commit | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | open | defect | pipeline | 2026-08-11 | — |
-| pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | open | defect | pipeline | 2026-08-06 | — |
@@ -235,6 +235,6 @@
 
 ## Counts
 
-- open: 108
+- open: 107
 - in_progress: 22
-- closed: 97
+- closed: 98

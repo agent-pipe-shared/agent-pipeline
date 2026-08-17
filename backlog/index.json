@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "18935a037798b080622e5498c4052986a3df41adafb849639275c4320ced8465"
+    "transitionHead": "9b184d098c46671e7eb995150aa13a4100cda4d260a18bc521441f76afd35aac"
   },
   "counts": {
-    "open": 108,
+    "open": 107,
     "in_progress": 22,
-    "closed": 97
+    "closed": 98
   },
   "items": [
     {
@@ -1061,11 +1061,15 @@
     },
     {
       "id": "pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Reported by the PO on 2026-08-17, relaying a live-blocking audit from a downstream consumer-project session (Windows, D:\\Dev\\Web\\Toolbox) doing onboarding recovery against a vendored copy of this plugin. Independently confirmed against this repository's own source before filing."
+      "source": "Reported by the PO on 2026-08-17, relaying a live-blocking audit from a downstream consumer-project session (Windows, D:\\Dev\\Web\\Toolbox) doing onboarding recovery against a vendored copy of this plugin. Independently confirmed against this repository's own source before filing.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "2d28722138a8a378f9ec93a60247caea5536adbf",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-lifecycle-guard-partial-authority-adopt-remote-closure.md"
     },
     {
       "id": "pipeline.lifecycle-guard-does-not-know-the-human-signing-commands",

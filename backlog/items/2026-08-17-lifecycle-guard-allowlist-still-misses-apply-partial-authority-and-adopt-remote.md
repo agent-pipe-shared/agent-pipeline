@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 2d28722138a8a378f9ec93a60247caea5536adbf
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-lifecycle-guard-partial-authority-adopt-remote-closure.md
 source: "Reported by the PO on 2026-08-17, relaying a live-blocking audit from a downstream consumer-project session (Windows, D:\\Dev\\Web\\Toolbox) doing onboarding recovery against a vendored copy of this plugin. Independently confirmed against this repository's own source before filing."
 ---
 
@@ -122,3 +126,16 @@ an open design question for whoever implements this, not resolved here.
 - **Assignment (if accepted):** next available dispatch slot in this AFK
   block, scoped to gaps 2 and 3 only.
 - **Date:** 2026-08-17
+
+## Closure (2026-08-17)
+
+Closed after two Critic rounds (round 1 FAIL: evidence gap + precision;
+round 2 FAIL: F-A gate-state red-Verify violation + F-B minor `--ref`
+residual) and one round of Elephant self-verification per the two-round
+Critic cap. See
+`specs/sprint-nova-epic/evidence/backlog/2026-08-17-lifecycle-guard-partial-authority-adopt-remote-closure.md`
+for the full timeline, including the unrelated `backlog-state-check` root
+cause found and fixed while chasing F-A, and the F-B `--ref` fix
+(`2d287221`). Both accepted gaps (2, 3) are fixed and independently
+re-verified; the reviewed code itself was never faulted by either Critic
+round.
