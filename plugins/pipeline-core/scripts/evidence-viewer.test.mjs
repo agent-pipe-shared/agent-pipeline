@@ -27,6 +27,71 @@ test("renders a supplied local export observation without turning it into author
   await main(["build", "--root", input.root, "--manifest", input.manifest, "--output", "export.html", "--export-status-file", "export-status.json"]);
   const html = readFileSync(join(input.root, "export.html"), "utf8"); assert.match(html, /Governance export observation/); assert.match(html, /retryable-failure/); assert.match(html, /non-authoritative transport observation/);
 });
+// V-AC-02: the CLI is the viewer's only path to a gate estimate. It loads an
+// operator-supplied `{activeFeature, observation, evidence}` context, reads
+// `gateEstimate` from the live State under the checkout root, and hands
+// projectGateEstimate's result to the model, which renders it as its own
+// `estimate` class. The CLI writes nothing and computes no range of its own.
+const GATE_EVIDENCE_SHA = digest("estimate-evidence");
+const ACTIVE_FEATURE = { id: "viewer-cli", planPath: "specs/viewer-cli/plan.md", phase: "design" };
+function gateEstimateFixture({ withState = true } = {}) {
+  const input = fixture();
+  writeFileSync(join(input.root, "gate-estimate-context.json"), JSON.stringify({
+    activeFeature: ACTIVE_FEATURE,
+    observation: { ok: true, objectFormat: "sha1", sourceOid: "c".repeat(40) },
+    evidence: {
+      ok: true, path: "estimate-evidence.json", sha256: GATE_EVIDENCE_SHA,
+      value: { schema: "pipeline.gate-estimate-evidence.v1", featureId: "viewer-cli", gate: "prd", observedAt: "2026-08-17T00:00:00.000Z", basis: [{ kind: "verify-run", reference: "evidence/verify.txt", digest: digest("verify") }], note: "coordinator-observed range" },
+    },
+  }));
+  if (withState) {
+    mkdirSync(join(input.root, ".claude"), { recursive: true });
+    writeFileSync(join(input.root, ".claude", "pipeline-state.json"), JSON.stringify({
+      activeFeature: ACTIVE_FEATURE,
+      gateEstimate: { schema: "pipeline.gate-estimate.v1", id: "estimate-1", featureId: "viewer-cli", gate: "prd", objectFormat: "sha1", sourceOid: "c".repeat(40), evidence: { path: "estimate-evidence.json", sha256: GATE_EVIDENCE_SHA }, rangeMinutes: { min: 45, max: 120 }, recordedBy: "coordinator", recordedAt: "2026-08-17T00:00:00.000Z" },
+    }));
+  }
+  return input;
+}
+test("V-AC-02 renders the live gate estimate as an estimate when the supplied context resolves", async () => {
+  const input = gateEstimateFixture();
+  await main(["build", "--root", input.root, "--manifest", input.manifest, "--output", "estimate.html", "--gate-estimate-context-file", "gate-estimate-context.json"]);
+  const html = readFileSync(join(input.root, "estimate.html"), "utf8");
+  assert.match(html, /Projected gate estimate/);
+  assert.match(html, /data-value-class="estimate">prd</);
+  assert.match(html, /data-value-class="estimate">45-120</);
+  assert.match(html, /data-value-class="estimate">estimate<\/span> <code>EVM-GATE-ESTIMATE<\/code>/);
+  // An estimate never becomes the report's own success claim.
+  assert.match(html, /data-value-class="unknown">unknown</);
+  assert.doesNotMatch(html, /data-value-class="fact">45-120</);
+});
+test("V-AC-02 reports an unresolvable gate estimate as unavailable instead of inventing one", async () => {
+  const input = gateEstimateFixture({ withState: false });
+  const receipt = await main(["build", "--root", input.root, "--manifest", input.manifest, "--output", "no-state.html", "--gate-estimate-context-file", "gate-estimate-context.json"]);
+  const html = readFileSync(join(input.root, "no-state.html"), "utf8");
+  assert.equal(receipt.status, "unknown");
+  assert.match(html, /data-value-class="unavailable">unavailable</);
+  assert.match(html, /CS-ETA-RECORD/);
+  assert.doesNotMatch(html, /data-value-class="estimate"/);
+  assert.doesNotMatch(html, /45-120/);
+});
+test("a missing, malformed, or escaping gate-estimate context is refused, and an absent flag stays not-applicable", async () => {
+  const input = gateEstimateFixture();
+  writeFileSync(join(input.root, "broken-context.json"), "{ not json");
+  for (const [file, output] of [["absent-context.json", "a.html"], ["broken-context.json", "b.html"], ["../outside.json", "c.html"]]) {
+    await assert.rejects(
+      () => main(["build", "--root", input.root, "--manifest", input.manifest, "--output", output, "--gate-estimate-context-file", file]),
+      (error) => error.code === "EVC-GATE-ESTIMATE",
+      file,
+    );
+  }
+  assert.equal(existsSync(join(input.root, "a.html")), false);
+  await assert.rejects(() => main(["build", "--root", input.root, "--manifest", input.manifest, "--output", "d.html", "--gate-estimate-context-file"]), (error) => error.code === "EVC-ARGUMENT");
+  await main(["build", "--root", input.root, "--manifest", input.manifest, "--output", "plain.html"]);
+  const plain = readFileSync(join(input.root, "plain.html"), "utf8");
+  assert.match(plain, /data-value-class="not-applicable">not-applicable</);
+  assert.doesNotMatch(plain, /data-value-class="estimate"/);
+});
 // V-AC-07: modifying the generated viewer file must never alter canonical
 // authority. This renderer/CLI pair emits no client-side script (see the
 // `doesNotMatch(html, /<script/)` assertion in evidence-view-renderer.test.mjs),

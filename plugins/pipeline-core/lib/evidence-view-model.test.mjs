@@ -106,3 +106,60 @@ test("V-AC-02 declares the supplied delivery observation as an assumption, and o
   assert.equal(unsupplied.notices.some((entry) => entry.valueClass === "assumption"), false);
   assert.equal(unsupplied.exportStatus.state, "unavailable");
 });
+// V-AC-02: `estimate` is a distinct class from both `fact` and `assumption`.
+// The gate estimate is a coordinator-recorded projected range surfaced through
+// projectGateEstimate (lib/gate-estimate.mjs); this model re-hashes nothing
+// about it, so it is not a fact, and it is a statement about the future rather
+// than a premise the report leans on, so it is not an assumption either. The
+// three states it can reach are pinned here: known (resolved and correlated),
+// unavailable (wanted but not obtainable, including an estimate belonging to
+// another feature), and not-applicable (nothing to estimate at all).
+const gateObservation = (overrides = {}) => ({
+  schema: "pipeline.gate-estimate-view-observation.v1", featureId: "viewer-fixture", gate: "prd", state: "known",
+  rangeMinutes: { min: 30, max: 90 }, source: { path: "specs/viewer-fixture/estimate.json", sha256: hash("estimate") }, code: "CS-ETA-KNOWN", ...overrides,
+});
+const unresolved = (code) => gateObservation({ state: "unknown", rangeMinutes: null, source: null, code });
+test("V-AC-02 labels a correlated gate projection as an estimate and separates unavailable from not-applicable", () => {
+  const fixture = packageFixture();
+  const build = (gateEstimateObservation) => buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, gateEstimateObservation });
+  const known = build(gateObservation());
+  assert.equal(known.gateEstimate.state, "known");
+  assert.equal(known.gateEstimate.gate, "prd");
+  assert.deepEqual({ ...known.gateEstimate.rangeMinutes }, { min: 30, max: 90 });
+  assert.equal(known.gateEstimate.source.sha256, hash("estimate"));
+  const declared = known.notices.filter((entry) => entry.valueClass === "estimate");
+  assert.equal(declared.length, 1);
+  assert.equal(declared[0].code, "EVM-GATE-ESTIMATE");
+  // An estimate never upgrades the report's own claim, and never becomes a fact.
+  assert.equal(known.status, "unknown");
+  assert.equal(known.notices.some((entry) => entry.valueClass === "assumption"), false);
+  // Wanted but not obtainable: the projection's own refusal code is carried through.
+  const drifted = build(unresolved("CS-ETA-EVIDENCE-DRIFT"));
+  assert.equal(drifted.gateEstimate.state, "unavailable");
+  assert.equal(drifted.gateEstimate.code, "CS-ETA-EVIDENCE-DRIFT");
+  assert.equal(drifted.gateEstimate.rangeMinutes, null);
+  // Another feature's estimate is refused, not correlated by an invented rule.
+  const foreign = build(gateObservation({ featureId: "other-feature" }));
+  assert.equal(foreign.gateEstimate.state, "unavailable");
+  assert.equal(foreign.gateEstimate.code, "EVM-ESTIMATE-FEATURE");
+  // Nothing to estimate: no context supplied at all, no active feature, no next gate.
+  assert.equal(build(undefined).gateEstimate.state, "not-applicable");
+  assert.equal(build(undefined).gateEstimate.code, "EVM-ESTIMATE-ABSENT");
+  assert.equal(build(undefined).notices.some((entry) => entry.code.startsWith("EVM-GATE-ESTIMATE")), false);
+  for (const code of ["CS-ETA-FEATURE", "CS-ETA-NO-NEXT-GATE"]) {
+    const inactive = build({ ...unresolved(code), featureId: null, gate: null });
+    assert.equal(inactive.gateEstimate.state, "not-applicable", code);
+    assert.equal(inactive.gateEstimate.code, code);
+    assert.ok(inactive.notices.some((entry) => entry.valueClass === "not-applicable" && entry.code === "EVM-GATE-ESTIMATE-UNRESOLVED"), code);
+  }
+  // A malformed observation is refused outright rather than silently downgraded.
+  for (const broken of [gateObservation({ rangeMinutes: { min: 30 } }), gateObservation({ gate: "release" }), gateObservation({ code: "not a code" }), gateObservation({ state: "unknown" }), gateObservation({ extra: true })]) {
+    assert.throws(() => build(broken), (error) => error.code === "EVM-ESTIMATE");
+  }
+  // An invalid package has no verified feature to bind an estimate to.
+  const corrupt = packageFixture({ corrupt: true });
+  const invalid = buildEvidenceViewModelFromFeaturePackage({ rootDir: corrupt.root, manifestPath: corrupt.manifest, gateEstimateObservation: gateObservation() });
+  assert.equal(invalid.status, "invalid");
+  assert.equal(invalid.gateEstimate.state, "unavailable");
+  assert.equal(invalid.gateEstimate.code, "EVM-ESTIMATE-FEATURE");
+});

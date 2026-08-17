@@ -28,14 +28,13 @@ test("V-AC-09 includes tampered, misplaced, orphaned, and legacy-layout viewer-c
   assert.match(legacyHtml, /data-value-class="legacy">legacy<\/span> <code>EVM-V1<\/code>: Legacy explicit model; source topology was supplied by its caller\./);
 });
 // V-AC-02: only the value classes this model/renderer pair actually produce
-// are pinned. `estimate` is still produced nowhere in evidence-view-model.mjs,
-// evidence-view-renderer.mjs, or evidence-viewer.mjs: this repo's one real
-// estimate is the coordinator gate ETA (`pipeline.gate-estimate.v1`,
-// `rangeMinutes` in lib/gate-estimate.mjs, projected by projectGateEstimate and
-// surfaced by continuity-status.mjs), and the viewer has no input path to it, so
-// it is reported absent rather than asserted here. `human decision` and
-// `assumption` ARE now produced -- see the "approved lifecycle state" test below
-// and the delivery-observation test at the end of this file.
+// are pinned. `human decision`, `assumption` and `estimate` are all produced
+// now -- see the "approved lifecycle state" test below, the
+// delivery-observation test, and the gate-estimate test at the end of this
+// file. The estimate reaches the viewer through evidence-viewer.mjs's
+// `--gate-estimate-context-file`, which projects this repo's coordinator gate
+// ETA (`pipeline.gate-estimate.v1`, `rangeMinutes` in lib/gate-estimate.mjs,
+// projected by projectGateEstimate) against the live State.
 test("V-AC-02 labels fact, unknown, unavailable, redacted, invalid, and not-applicable value classes visibly", () => {
   const model = {
     schema: "pipeline.evidence-view-model.v2",
@@ -135,4 +134,35 @@ test("V-AC-02 labels supplied delivery-observation values as assumptions, keeps 
   assert.match(html, /\.value-assumption\{/);
   const absent = renderEvidenceView({ ...base, exportStatus: { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null }, notices: [] });
   assert.doesNotMatch(absent, /data-value-class="assumption"/);
+});
+// V-AC-02: `estimate` is rendered as its own visible class, distinct from both
+// `fact` and `assumption`. A resolved projection shows the gate and the range
+// under that class; an unresolved or inapplicable one shows only its own state
+// word under the matching state-named class, so no number is ever displayed
+// that a reader could mistake for a committed schedule.
+test("V-AC-02 labels a resolved gate projection as an estimate and unresolved ones by their own state", () => {
+  const base = { schema: "pipeline.evidence-view-model.v2", authority: "non-authoritative", source: { topology: "valid" }, feature: { id: "f", lifecycleState: "completed" }, candidate: { state: "fact", commit: "a".repeat(40), tree: "b".repeat(40) }, status: "unknown", sharing: "private", exportStatus: { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null }, artifacts: [], notices: [] };
+  const known = renderEvidenceView({ ...base, gateEstimate: { state: "known", featureId: "f", gate: "security", rangeMinutes: { min: 30, max: 90 }, source: { path: "specs/f/estimate.json", sha256: "d".repeat(64) }, code: "CS-ETA-KNOWN" }, notices: [{ valueClass: "estimate", code: "EVM-GATE-ESTIMATE", message: "projected range" }] });
+  assert.match(known, /Projected gate estimate/);
+  assert.match(known, /data-value-class="estimate">security</);
+  assert.match(known, /data-value-class="estimate">30-90</);
+  assert.match(known, /data-value-class="estimate">estimate<\/span> <code>EVM-GATE-ESTIMATE<\/code>/);
+  assert.match(known, /specs\/f\/estimate\.json/);
+  assert.doesNotMatch(known, /data-value-class="fact">30-90</);
+  assert.doesNotMatch(known, /data-value-class="assumption"/);
+  const unavailable = renderEvidenceView({ ...base, gateEstimate: { state: "unavailable", featureId: "f", gate: "security", rangeMinutes: null, source: null, code: "CS-ETA-EVIDENCE-DRIFT" } });
+  assert.match(unavailable, /data-value-class="unavailable">unavailable</);
+  assert.match(unavailable, /CS-ETA-EVIDENCE-DRIFT/);
+  assert.doesNotMatch(unavailable, /data-value-class="estimate"/);
+  assert.doesNotMatch(unavailable, />security</);
+  const inapplicable = renderEvidenceView({ ...base, gateEstimate: { state: "not-applicable", featureId: null, gate: null, rangeMinutes: null, source: null, code: "CS-ETA-FEATURE" } });
+  assert.match(inapplicable, /data-value-class="not-applicable">not-applicable</);
+  assert.doesNotMatch(inapplicable, /data-value-class="estimate"/);
+  // A model without the field at all still renders the section, never a blank
+  // or a fabricated range.
+  const legacy = renderEvidenceView(buildEvidenceViewModel({ candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, status: "pass", artifacts: [] }));
+  assert.match(legacy, /Projected gate estimate/);
+  assert.match(legacy, /data-value-class="not-applicable">not-applicable</);
+  assert.match(legacy, /<a href="#estimate">Estimate<\/a>/);
+  assert.match(legacy, /<section id="estimate" aria-labelledby="estimate-title">/);
 });

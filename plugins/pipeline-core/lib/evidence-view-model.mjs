@@ -17,6 +17,18 @@ const VIEW_STATUSES = new Set(["pass", "fail", "unknown", "tampered", "misplaced
 const ARTIFACT_STATES = new Set(["verified", "unknown", "tampered", "misplaced", "orphaned", "legacy", "invalid", "unavailable"]);
 const PACKAGE_STATES = new Set(["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
 const EXPORT_STATES = new Set(["unavailable", "pending", "delivered", "retryable-failure", "quarantined"]);
+const CODE = /^[A-Z][A-Z0-9-]{1,63}$/u;
+// The closed gate vocabulary `gate-estimate.mjs` itself stores and projects
+// (`validStoredGateEstimate`), mirrored rather than re-derived: this module
+// imports no writer and computes no estimate of its own.
+const GATE_NAMES = new Set(["prd", "security", "merge"]);
+const GATE_OBSERVATION_STATES = new Set(["known", "unknown"]);
+// "Nothing to estimate" and "could not be computed" are different answers and
+// get different classes. `projectGateEstimate` returns CS-ETA-FEATURE when no
+// active feature exists and CS-ETA-NO-NEXT-GATE when the active phase has no
+// following gate -- both mean the estimate does not apply. Every other unknown
+// code is a value the report wanted and failed to obtain: unavailable.
+const GATE_NOT_APPLICABLE = new Set(["CS-ETA-FEATURE", "CS-ETA-NO-NEXT-GATE"]);
 
 function fail(code) { const error = new Error("Evidence view input is invalid."); error.code = code; throw error; }
 function record(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -42,6 +54,39 @@ function exportStatus(value) {
   return frozen({ state: value.state, destinationProfile: value.destinationProfile, cursor: value.cursor, lag: value.lag, receipt: value.receipt === null ? null : frozen({ ...value.receipt }) });
 }
 
+function absentGateEstimate(code) { return frozen({ state: "not-applicable", featureId: null, gate: null, rangeMinutes: null, source: null, code }); }
+function unresolvedGateEstimate(featureId, gate, code) { return frozen({ state: "unavailable", featureId, gate, rangeMinutes: null, source: null, code }); }
+/**
+ * Project a caller-supplied `projectGateEstimate` result into a distinctly
+ * classed view value. An estimate is a projected range, never an observed
+ * fact and never a commitment, so a resolved one is labelled `estimate`; an
+ * unresolvable one stays `unavailable` and an inapplicable one
+ * `not-applicable`.
+ */
+function gateEstimate(value, featureId) {
+  if (value === null || value === undefined) return absentGateEstimate("EVM-ESTIMATE-ABSENT");
+  if (!exact(value, ["schema", "featureId", "gate", "state", "rangeMinutes", "source", "code"])
+    || value.schema !== "pipeline.gate-estimate-view-observation.v1"
+    || !(value.featureId === null || (typeof value.featureId === "string" && value.featureId !== "" && value.featureId.length <= 240))
+    || !(value.gate === null || GATE_NAMES.has(value.gate))
+    || !GATE_OBSERVATION_STATES.has(value.state) || !CODE.test(value.code)) fail("EVM-ESTIMATE");
+  if (value.state === "unknown") {
+    if (value.rangeMinutes !== null || value.source !== null) fail("EVM-ESTIMATE");
+    if (GATE_NOT_APPLICABLE.has(value.code)) return absentGateEstimate(value.code);
+  } else if (value.featureId === null || value.gate === null
+    || !exact(value.rangeMinutes, ["min", "max"]) || !Number.isSafeInteger(value.rangeMinutes.min) || value.rangeMinutes.min < 0
+    || !Number.isSafeInteger(value.rangeMinutes.max) || value.rangeMinutes.max < value.rangeMinutes.min
+    || !exact(value.source, ["path", "sha256"]) || typeof value.source.path !== "string" || value.source.path === ""
+    || value.source.path.length > 240 || !SHA.test(value.source.sha256)) fail("EVM-ESTIMATE");
+  // The estimate is rendered only against the exact feature this report
+  // projects. No prefix, alias, namespace, or fallback match: a differing or
+  // unverifiable id is refused as unavailable rather than correlated by a
+  // match rule this module would have to invent.
+  if (typeof featureId !== "string" || featureId === "" || value.featureId !== featureId) return unresolvedGateEstimate(value.featureId, value.gate, "EVM-ESTIMATE-FEATURE");
+  if (value.state !== "known") return unresolvedGateEstimate(featureId, value.gate, value.code);
+  return frozen({ state: "known", featureId, gate: value.gate, rangeMinutes: frozen({ min: value.rangeMinutes.min, max: value.rangeMinutes.max }), source: frozen({ path: value.source.path, sha256: value.source.sha256 }), code: value.code });
+}
+
 /** Backwards-compatible pure builder for explicitly supplied, already validated facts. */
 export function buildEvidenceViewModel(input) {
   if (!exact(input, ["candidate", "status", "artifacts"]) || !candidate(input.candidate) || !VIEW_STATUSES.has(input.status) || !Array.isArray(input.artifacts)) fail("EVM-INPUT");
@@ -61,10 +106,15 @@ export function buildEvidenceViewModel(input) {
  * Build a canonical package projection. Invalid topology produces an explicit
  * invalid view instead of a deceptive success or a partially trusted report.
  */
-export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd(), manifestPath, sharing = "private", exportObservation = null } = {}) {
+export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd(), manifestPath, sharing = "private", exportObservation = null, gateEstimateObservation = null } = {}) {
   if (typeof rootDir !== "string" || typeof manifestPath !== "string" || !["private", "redacted"].includes(sharing)) fail("EVM-REQUEST");
   const observedExport = exportStatus(exportObservation);
   const suppliedExport = exportObservation !== null && exportObservation !== undefined;
+  // Shape is refused up front, exactly like the delivery observation. Without a
+  // validated manifest there is no feature id to correlate against, so the
+  // invalid views below carry the uncorrelated result and never an estimate.
+  const uncorrelatedEstimate = gateEstimate(gateEstimateObservation, null);
+  const suppliedEstimate = gateEstimateObservation !== null && gateEstimateObservation !== undefined;
   const root = resolve(rootDir);
   const checked = validateFeaturePackage(root, manifestPath);
   if (!checked.ok || !checked.receipt) {
@@ -77,13 +127,14 @@ export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd
       status: "invalid",
       sharing,
       exportStatus: observedExport,
+      gateEstimate: uncorrelatedEstimate,
       artifacts: frozen([]),
       notices: frozen([notice("invalid", "EVM-TOPOLOGY", "Canonical package validation failed; no approval or pass claim is rendered.")]),
     });
   }
   let manifest;
   try { manifest = JSON.parse(readFileSync(join(root, checked.receipt.manifest), "utf8")); }
-  catch { return frozen({ schema: "pipeline.evidence-view-model.v2", authority: "non-authoritative", source: frozen({ manifest: null, manifestSha256: null, topology: "invalid" }), feature: frozen({ id: null, lifecycleState: "unavailable" }), candidate: unavailableCandidate(), status: "invalid", sharing, exportStatus: observedExport, artifacts: frozen([]), notices: frozen([notice("invalid", "EVM-MANIFEST", "Canonical manifest became unavailable after validation.")]) }); }
+  catch { return frozen({ schema: "pipeline.evidence-view-model.v2", authority: "non-authoritative", source: frozen({ manifest: null, manifestSha256: null, topology: "invalid" }), feature: frozen({ id: null, lifecycleState: "unavailable" }), candidate: unavailableCandidate(), status: "invalid", sharing, exportStatus: observedExport, gateEstimate: uncorrelatedEstimate, artifacts: frozen([]), notices: frozen([notice("invalid", "EVM-MANIFEST", "Canonical manifest became unavailable after validation.")]) }); }
   const hasCandidate = candidate(manifest.candidate);
   const artifacts = manifest.artifacts.map((artifact, index) => frozen({
     id: `artifact-${index + 1}`,
@@ -107,6 +158,18 @@ export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd
   // cannot check is an assumption, so it is declared as one rather than
   // presented as an observed fact.
   if (suppliedExport) notices.push(notice("assumption", "EVM-EXPORT-ASSUMED", "Delivery observation values are a supplied premise: shape-validated only, with no digest, canonical source record, or exact-candidate binding, so they are labelled assumption rather than fact."));
+  // V-AC-02: a gate estimate is a projected range recorded by the coordinator,
+  // not something this report observed and not a commitment anyone owes. It is
+  // therefore its own value class -- neither `fact` (nothing here is
+  // digest-bound by this projection) nor `assumption` (it is a declared
+  // projection about the future, not a premise the report relies on) -- and it
+  // is rendered only when it correlates to this exact feature package.
+  const projectedEstimate = gateEstimate(gateEstimateObservation, manifest.feature.id);
+  if (suppliedEstimate) {
+    notices.push(projectedEstimate.state === "known"
+      ? notice("estimate", "EVM-GATE-ESTIMATE", "Time to the next gate is an estimate projected from a coordinator-recorded range; it is not an observed fact, a completion claim, or an approval.")
+      : notice(projectedEstimate.state, "EVM-GATE-ESTIMATE-UNRESOLVED", `No gate estimate is rendered for this report (${projectedEstimate.code}).`));
+  }
   return frozen({
     schema: "pipeline.evidence-view-model.v2",
     authority: "non-authoritative",
@@ -116,6 +179,7 @@ export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd
     status: statusForPackage(manifest.state, hasCandidate),
     sharing,
     exportStatus: observedExport,
+    gateEstimate: projectedEstimate,
     artifacts: frozen(artifacts),
     notices: frozen(notices),
   });
