@@ -6,4 +6,14 @@ const intent = createPoApprovalIntent({ kind: "threat-model", featureId: "cyb-4"
 const pair = generateKeyPairSync("ed25519"); const publicKey = pair.publicKey.export({ type: "spki", format: "pem" }); const trustPolicy = { keyReference: "local-device-key", publicKeySha256: createHash("sha256").update(publicKey).digest("hex") }; const proof = { schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: trustPolicy.keyReference, publicKey, signatureBase64: sign(null, Buffer.from(intent.sha256), pair.privateKey).toString("base64") };
 assert.equal(verifyPoApprovalProof({ intent, trustPolicy, proof }).verified, true); assert.equal(verifyPoApprovalProof({ intent: { ...intent, sha256: "0".repeat(64) }, trustPolicy, proof }).verified, false); assert.equal(verifyPoApprovalProof({ intent, trustPolicy: { ...trustPolicy, keyReference: "other" }, proof }).verified, false); assert.equal(verifyPoApprovalProof({ intent, trustPolicy, proof: { ...proof, signatureBase64: sign(null, Buffer.from("wrong"), pair.privateKey).toString("base64") } }).verified, false);
 const override = createPoApprovalIntent({ kind: "manual-override", featureId: "nova-7", planSha256: "f".repeat(64), specSha256: "a".repeat(64), candidate: { commit: "b".repeat(40), tree: "c".repeat(40) }, policyRevision: "policy-v2", subjectSha256: "d".repeat(64), decision: "allow-once" });
-assert.equal(override.value.kind, "manual-override"); console.log("5 PO approval proof checks passed");
+assert.equal(override.value.kind, "manual-override");
+// NVA-SIGDISCLOSE-1 Finding 2: PO-APPROVAL-TRUST-MISMATCH must name the two digests it
+// just compared -- both already computed at that point -- never just the bare code.
+const wrongTrustPolicy = { ...trustPolicy, publicKeySha256: "0".repeat(64) };
+const mismatch = verifyPoApprovalProof({ intent, trustPolicy: wrongTrustPolicy, proof });
+assert.equal(mismatch.verified, false); assert.equal(mismatch.code, "PO-APPROVAL-TRUST-MISMATCH");
+assert.equal(mismatch.observedPublicKeySha256, createHash("sha256").update(publicKey).digest("hex"), "the observed digest must be the one actually computed from proof.publicKey");
+assert.equal(mismatch.expectedPublicKeySha256, "0".repeat(64), "the expected digest must be the trust policy's own publicKeySha256");
+assert.notEqual(mismatch.observedPublicKeySha256, mismatch.expectedPublicKeySha256, "the two disclosed digests must be distinct in the mismatch case");
+assert.ok(!("publicKey" in mismatch) && !JSON.stringify(mismatch).includes(publicKey), "raw key material must never be echoed back, only its sha256 digest");
+console.log("6 PO approval proof checks passed");

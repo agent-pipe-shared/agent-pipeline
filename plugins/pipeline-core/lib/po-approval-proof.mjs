@@ -36,7 +36,8 @@ export function createPoApprovalIntent({ kind, featureId, planSha256, specSha256
  */
 export function verifyPoApprovalProof({ intent, trustPolicy, proof } = {}) {
   if (!intent || !SHA.test(intent.sha256 ?? "") || !trustPolicy || !proof || !own(trustPolicy, ["keyReference", "publicKeySha256"]) || !text(trustPolicy.keyReference) || !SHA.test(trustPolicy.publicKeySha256) || !own(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"]) || proof.schema !== PO_APPROVAL_PROOF_SCHEMA || proof.intentSha256 !== intent.sha256 || proof.keyReference !== trustPolicy.keyReference || !text(proof.publicKey) || !text(proof.signatureBase64)) return { verified: false, code: "PO-APPROVAL-PROOF-INVALID" };
-  if (createHash("sha256").update(proof.publicKey).digest("hex") !== trustPolicy.publicKeySha256) return { verified: false, code: "PO-APPROVAL-TRUST-MISMATCH" };
+  const observedPublicKeySha256 = createHash("sha256").update(proof.publicKey).digest("hex");
+  if (observedPublicKeySha256 !== trustPolicy.publicKeySha256) return { verified: false, code: "PO-APPROVAL-TRUST-MISMATCH", observedPublicKeySha256, expectedPublicKeySha256: trustPolicy.publicKeySha256 };
   let signature; try { signature = Buffer.from(proof.signatureBase64, "base64"); } catch { return { verified: false, code: "PO-APPROVAL-PROOF-INVALID" }; }
   if (signature.length === 0) return { verified: false, code: "PO-APPROVAL-PROOF-INVALID" };
   try { return verify(null, Buffer.from(intent.sha256, "utf8"), proof.publicKey, signature) ? { verified: true, code: "PO-APPROVAL-PROOF-VERIFIED", proofSha256: createHash("sha256").update(canonical(proof)).digest("hex") } : { verified: false, code: "PO-APPROVAL-PROOF-MISMATCH" }; } catch { return { verified: false, code: "PO-APPROVAL-PROOF-INVALID" }; }
