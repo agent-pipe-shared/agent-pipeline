@@ -64,6 +64,30 @@ test("candidate, implementation, input, environment and policy drift are typed",
   assert.equal(plan(artifacts, logs, { policySha256: B }).reasons[0].code, "verify-policy-drift");
 });
 
+test("ADR-0065: candidate-drift no longer gates the content checks, but stays exactly as strict", () => {
+  const alpha = receipt(suites[0]);
+  const artifacts = { alpha };
+  const logs = { alpha: log("alpha") };
+  // A candidate change that ALSO changes the suite's declared inputs (the realistic case, since
+  // Tier A's declared-tree digest is a function of the candidate tree) is now reported as
+  // declared-input-drift -- the content check fires before candidate-drift is even reached,
+  // proving candidate-drift no longer pre-empts it. The suite is still invalidated either way.
+  const bothDrifted = plan(artifacts, logs, {
+    candidate: { commit: "3".repeat(40), tree: "4".repeat(40) },
+    suites: [suite("alpha", { inputs: input("alpha.test.mjs", B) }), suites[1]],
+  });
+  assert.equal(bothDrifted.reasons[0].code, "declared-input-drift");
+  assert.deepEqual(bothDrifted.rerun, ["alpha", "beta"]);
+  // The one case content checks cannot see on their own -- a differing commit whose tree and every
+  // other declared input are byte-identical -- still invalidates via the demoted candidate-drift
+  // check, which stays reachable, just lower in the chain. This is the exact scenario the negative
+  // control's own commit-vs-tree distinction rests on: the verdict (rerun, never reused) is
+  // unchanged from before the reorder.
+  const commitOnly = plan(artifacts, logs, { candidate: { commit: "3".repeat(40), tree: candidate.tree } });
+  assert.equal(commitOnly.reasons[0].code, "candidate-drift");
+  assert.deepEqual(commitOnly.rerun, ["alpha", "beta"]);
+});
+
 test("targeted invalidation propagates only through declared deterministic dependents", () => {
   const gamma = suite("gamma");
   const current = [suites[0], suites[1], gamma];

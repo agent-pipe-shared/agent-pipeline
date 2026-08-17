@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { digestJson } from "../lib/verify-resume.mjs";
-import { createVerifyRun, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
+import { compileVerifySuites, createVerifyRun, runVerifyJournal, sealVerifyCleanupRegistration, verifySuiteArtifactName } from "./verify-journal.mjs";
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "verify-journal-"));
@@ -154,6 +154,53 @@ test("a completed receipt owned by a currently live exact writer is never reused
     const next = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-after-live", spawn, registerRun });
     assert.equal(calls, 2);
     assert.deepEqual(next.plan.reusable, []);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ADR-0065: compileVerifySuites declares the repository root plus suite-dependencies, not a bare candidate-tree", () => {
+  const f = fixture();
+  try {
+    const [registration] = compileVerifySuites({ repoRoot: f.root, suites: [{ name: "fixture-suite", file: f.suiteFile, dependsOn: [] }], candidateTree: candidate.tree });
+    assert.deepEqual(registration.inputs.nonFiles.map((entry) => entry.kind), ["declared-tree:root", "suite-arguments", "suite-dependencies"]);
+    assert.equal(registration.inputs.nonFiles.every((entry) => entry.path === null), true);
+    // Same declaration recompiled from scratch digests identically (deterministic, no coupling to
+    // any other suite in the registration list).
+    const [same] = compileVerifySuites({ repoRoot: f.root, suites: [{ name: "fixture-suite", file: f.suiteFile, dependsOn: [] }], candidateTree: candidate.tree });
+    assert.equal(digestJson(same.inputs), digestJson(registration.inputs));
+    // A different dependsOn list changes only this suite's own inputs digest -- the mechanism
+    // suite-dependencies exists to restore now that policySha256 no longer covers it.
+    const [withDependency] = compileVerifySuites({ repoRoot: f.root, suites: [{ name: "fixture-suite", file: f.suiteFile, dependsOn: ["other-suite"] }], candidateTree: candidate.tree });
+    assert.notEqual(digestJson(withDependency.inputs), digestJson(registration.inputs));
+    // A different candidate tree changes the declared-tree:root digest -- the suite still
+    // declares the whole repository root, so any tree movement is still caught.
+    const [otherCandidate] = compileVerifySuites({ repoRoot: f.root, suites: [{ name: "fixture-suite", file: f.suiteFile, dependsOn: [] }], candidateTree: "9".repeat(40) });
+    assert.notEqual(digestJson(otherCandidate.inputs), digestJson(registration.inputs));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("ADR-0065: policySha256 no longer couples unrelated suites, and suite-dependencies restores its own dependsOn check", () => {
+  const f = fixture();
+  const secondFile = join(f.root, "second.test.mjs");
+  writeFileSync(secondFile, "process.stdout.write('second complete log\\n')\n", { mode: 0o600 });
+  const suitesA = [{ name: "fixture-suite", file: f.suiteFile, dependsOn: [] }, { name: "second-suite", file: secondFile, dependsOn: [] }];
+  const suitesB = [{ name: "fixture-suite", file: f.suiteFile, dependsOn: [] }, { name: "second-suite", file: secondFile, dependsOn: ["fixture-suite"] }];
+  let calls = 0;
+  const spawn = () => { calls += 1; return spawnPass(); };
+  try {
+    runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: suitesA, policyInputs: { harness: "test" }, runId: "verify-one", spawn, registerRun });
+    assert.equal(calls, 2);
+    // second-suite's OWN registration changed (it now declares a dependsOn); fixture-suite's
+    // registration is byte-identical to run one. Before this change, the old policySha256 --
+    // digestJson({..., suites: registrations, ...}) -- covered every suite's registration, so
+    // second-suite's change would have flipped policySha256 and invalidated fixture-suite too via
+    // verify-policy-drift, even though nothing about fixture-suite itself moved. That coupling is
+    // gone: fixture-suite is still reusable, and second-suite is invalidated by its OWN
+    // declared-input-drift (via the new suite-dependencies input), never by verify-policy-drift.
+    const next = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: suitesB, policyInputs: { harness: "test" }, runId: "verify-two", spawn, registerRun });
+    assert.equal(calls, 3);
+    assert.deepEqual(next.plan.reusable, ["fixture-suite"]);
+    assert.deepEqual(next.plan.rerun, ["second-suite"]);
+    assert.equal(next.plan.reasons.find((entry) => entry.suite === "second-suite").code, "declared-input-drift");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

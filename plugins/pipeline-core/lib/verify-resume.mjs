@@ -58,15 +58,26 @@ export function sealVerifySuiteReceipt(fields) {
   return Object.freeze(receipt);
 }
 
+// ADR-0065 coupling (1): candidate-drift is demoted from a pre-emptive check to one that no
+// longer gates the content checks -- it moved below implementationSha256/inputs/
+// environmentContractSha256 instead of running before all three. This is not a weakening: for
+// every suite that still declares the repository root (Tier A, the only tier this candidate
+// ships), a candidate whose tree differs at all changes the "declared-tree:root" digest inside
+// `inputs`, so declared-input-drift fires first and the suite is invalidated exactly as before --
+// only the *reported reason* changes, never the verdict. The one case content checks cannot catch
+// on their own is a candidate whose commit differs but whose tree is byte-identical (e.g. a
+// metadata-only amend); candidate-drift, still present just lower in the chain, is the fallback
+// that keeps that edge case invalidated too, so the verdict stays exactly as strict as today's for
+// every case, not merely the common one.
 function firstDrift(suite, receipt, context) {
   const valid = validateVerifySuiteReceipt(receipt);
   if (!valid.ok) return "corrupt-receipt";
   if (receipt.exitCode !== 0) return "not-successful";
   if (receipt.suite !== suite.id) return "suite-identity-drift";
-  if (receipt.candidate.commit !== context.candidate.commit || receipt.candidate.tree !== context.candidate.tree) return "candidate-drift";
   if (receipt.implementationSha256 !== suite.implementationSha256) return "suite-implementation-drift";
   if (digestJson(receipt.inputs) !== digestJson(suite.inputs)) return "declared-input-drift";
   if (receipt.environmentContractSha256 !== suite.environmentContractSha256) return "environment-contract-drift";
+  if (receipt.candidate.commit !== context.candidate.commit || receipt.candidate.tree !== context.candidate.tree) return "candidate-drift";
   if (receipt.policySha256 !== context.policySha256) return "verify-policy-drift";
   const log = context.logs?.[suite.id];
   if (!logRef(log)) return "missing-log";

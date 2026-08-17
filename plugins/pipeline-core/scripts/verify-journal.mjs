@@ -322,14 +322,24 @@ export function compileVerifySuites({ repoRoot, suites, candidateTree, environme
     const rel = relative(repoRoot, absolute).split(sep).join("/");
     if (rel === "" || rel === ".." || rel.startsWith("../") || !regularPhysicalFile(absolute)) throw new Error(`VERIFY-SUITE-INPUT-UNSAFE:${suite.name}`);
     const implementationSha256 = sha(readFileSync(absolute));
+    const dependsOn = [...(suite.dependsOn ?? [])].sort();
+    // Tier A (ADR-0065 Decision 2): every suite still declares the repository root via
+    // "declared-tree:root", so behaviour stays provably unchanged -- any candidate whose tree
+    // differs at all produces a different sha256 here and the suite still re-runs. Narrowing a
+    // specific suite to a real subtree (a distinct "declared-tree:<slug>" per the ADR's own
+    // shape) is candidate (c)'s job, not this change's. "suite-dependencies" is new: it restores
+    // the one check that dropping `suites: registrations` from policySha256 (below) would
+    // otherwise silently lose -- a suite's OWN dependsOn list changing now invalidates its OWN
+    // receipt via declared-input-drift instead of via the removed whole-policy digest.
     const inputs = {
       files: [{ path: rel, fileSha256: implementationSha256 }],
       nonFiles: [
-        { kind: "candidate-tree", path: null, sha256: sha(candidateTree) },
+        { kind: "declared-tree:root", path: null, sha256: sha(candidateTree) },
         { kind: "suite-arguments", path: null, sha256: digestJson(suite.args ?? []) },
+        { kind: "suite-dependencies", path: null, sha256: digestJson(dependsOn) },
       ].sort((a, b) => a.kind.localeCompare(b.kind)),
     };
-    return { id: suite.name, implementationSha256, inputs, environmentContractSha256, dependsOn: [...(suite.dependsOn ?? [])].sort() };
+    return { id: suite.name, implementationSha256, inputs, environmentContractSha256, dependsOn };
   });
 }
 
@@ -392,7 +402,13 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
 
 export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnSync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}` }) {
   const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree });
-  const policySha256 = digestJson({ schema: "pipeline.verify-policy.v1", maxLogBytes: MAX_LOG_BYTES, suites: registrations, policyInputs });
+  // ADR-0065 coupling (3): this digest no longer covers `suites: registrations`, so one suite's
+  // registration changing no longer invalidates every OTHER suite's receipt via
+  // verify-policy-drift. Everything that term contributed per-suite is already checked per-suite
+  // by firstDrift (id/implementationSha256/inputs/environmentContractSha256), and dependsOn --
+  // the one field nothing else compared -- is now carried as the "suite-dependencies" non-file
+  // input inside `inputs` itself (see compileVerifySuites above), so that check is not lost.
+  const policySha256 = digestJson({ schema: "pipeline.verify-policy.v1", maxLogBytes: MAX_LOG_BYTES, policyInputs });
   const common = assertPhysicalDirectory(realpathSync(gitCommonDir));
   const runPath = join(common, "agent-pipeline", "verify", "runs", runId);
   const automaticRegistration = typeof registerRun === "function" ? null : registerBoundVerifyRun({ repoRoot, runId, runPath });
