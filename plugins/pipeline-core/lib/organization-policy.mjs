@@ -37,26 +37,30 @@ export const OWNED_SECTION_REF = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u;
 // verbatim (acceptance.md V-AC-08: "proposed, active, completed, superseded,
 // abandoned, or retained") rather than inventing a parallel one.
 //
-// F2 fix: this vocabulary is NOT disjoint from feature-package-topology.mjs's
+// F2 fix (resolved further by WP-PAC11-LIFECYCLEEVENTS, 2026-08-17): this
+// vocabulary is NOT disjoint from feature-package-topology.mjs's
 // FEATURE_STATES -- four values are shared verbatim (completed, superseded,
 // abandoned, retained; pinned in organization-policy.test.mjs so neither
-// claim can drift silently again). The true reason external-reference-
-// adapter.mjs still does not enforce lifecycleEvents against an artifact's
-// binding.identity.lifecycleState is that the two vocabularies describe two
-// different lifecycle AUTHORITIES, not one shared authority with gaps:
-// LIFECYCLE_EVENTS is the epic's own V-AC-08 publication-event vocabulary
-// (WHEN, in the epic's governance process, a publication event happens),
-// while FEATURE_STATES is a feature package's OWN build/implementation
-// lifecycle (plan-spec-state-v2.mjs's draft through implementing, plus
-// verifying). Mapping every one of those build-phase states (draft,
-// awaiting-approval, approved, implementing, verifying -- none of which
-// lifecycleEvents can even represent) onto a publication-event decision is a
-// product policy call this file has no authority to invent; wiring it in
-// without that call would silently re-create F1's same unreachable-value
-// defect one level up. lifecycleEvents therefore stays declared-but-
-// unenforced here, the same posture this file already gives previewRequired
-// and conflictPolicy, until a dispatch with that authority defines the
-// mapping (tracked as a checklist gap, not resolved by this comment).
+// claim can drift silently again). LIFECYCLE_EVENTS is the epic's own
+// V-AC-08 publication-event vocabulary (WHEN, in the epic's governance
+// process, a publication event happens), while FEATURE_STATES is a feature
+// package's OWN build/implementation lifecycle (plan-spec-state-v2.mjs's
+// draft through implementing, plus verifying) -- two different lifecycle
+// AUTHORITIES, not one shared authority with gaps. That distinction no
+// longer blocks enforcement: external-reference-adapter.mjs now carries a
+// total, closed FEATURE_STATE_TO_LIFECYCLE_EVENT mapping (PO-granted bounded
+// latitude, 2026-08-17; see
+// backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md)
+// translating every one of the five remaining build-phase states onto
+// proposed/active, and enforces lifecycleEvents against
+// binding.identity.lifecycleState inside planExternalReferenceWrite the same
+// way ownedSections is enforced there, sitting after binding resolves
+// because only binding carries the lifecycleState this dimension needs.
+// lifecycleEvents is therefore no longer declared-but-unenforced: this file
+// still only validates and merges it -- the mapping and the enforcement
+// decision correctly live one layer up, in the adapter that already holds
+// the artifact's resolved identity -- but the checklist gap this comment
+// used to name is now closed, not merely renamed.
 export const LIFECYCLE_EVENTS = new Set(["proposed", "active", "completed", "superseded", "abandoned", "retained"]);
 // conflictPolicy reuses this exact vocabulary root from
 // external-reference-adapter.mjs's own existing write-plan statuses

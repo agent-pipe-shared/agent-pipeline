@@ -659,6 +659,35 @@ architecture prose or an implementation briefing.
   not resolved by this amendment (see
   backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md's
   Triage section).
+
+  **Amendment (PO, 2026-08-17), `lifecycleEvents` dimension only.** Built, not
+  left declared-but-inert: `plugins/pipeline-core/lib/external-reference-
+  adapter.mjs`'s `planExternalReferenceWrite` now wires `lifecycleEvents` into
+  the same decision path `ownedSections` already uses, gating a governed write
+  on the artifact's own `binding.identity.lifecycleState` after binding
+  resolves (unlike `ownedSections`, this dimension needs the resolved
+  identity, not just `desired.changes`, so it sits after that point rather
+  than beside it). Four of `LIFECYCLE_EVENTS`' six values
+  (`completed`, `superseded`, `abandoned`, `retained`) are verbatim identical
+  to `feature-package-topology.mjs`'s `FEATURE_STATES` and map 1:1 with no
+  judgment call needed. `proposed` and `active` have no identically-named
+  `FEATURE_STATES` counterpart; the PO delegated a bounded mapping decision
+  for the five remaining build-phase states to the implementing dispatch
+  (`FEATURE_STATE_TO_LIFECYCLE_EVENT`, `external-reference-adapter.mjs`):
+  `proposed` covers the states before a build is committed to (`draft`,
+  `awaiting-approval`); `active` covers the states of a build actually
+  underway toward publication (`approved`, `implementing`, `verifying`). The
+  mapping is total (every `FEATURE_STATES` value is covered by exactly one
+  `LIFECYCLE_EVENTS` value, pinned by a dedicated test) so no artifact write
+  can land on an unrepresentable state — the same defect class F1 originally
+  left open one level up in `ownedSections`, not reproduced here. A declared
+  `lifecycleEvents` list, even one that maps to zero live states for a given
+  policy, is a real restriction; an undeclared key stays neutral, the same
+  declared-vs-undeclared precedent already governing every other P-AC-11
+  scoping dimension. `conflictPolicy` remains the sole remaining open
+  question under this criterion, not resolved by this amendment (see
+  backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md's
+  Triage section).
 - **P-AC-12:** WHEN a bundle is verified offline, THE SYSTEM SHALL validate its
   manifest, artifact digests, event-chain references, topology, optional
   signature profile, and declared omissions and SHALL visibly reject

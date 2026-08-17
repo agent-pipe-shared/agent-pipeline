@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import { dirname, join } from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { applyExternalReferenceWrite, bindCanonicalArtifactIdentity, planExternalReferenceWrite, reconcileExternalReference, validateExternalAdapterCapabilities, validateExternalReference } from "./external-reference-adapter.mjs";
-import { resolveCanonicalArtifactIdentity } from "./feature-package-topology.mjs";
+import { applyExternalReferenceWrite, bindCanonicalArtifactIdentity, FEATURE_STATE_TO_LIFECYCLE_EVENT, planExternalReferenceWrite, reconcileExternalReference, validateExternalAdapterCapabilities, validateExternalReference } from "./external-reference-adapter.mjs";
+import { FEATURE_STATES, resolveCanonicalArtifactIdentity } from "./feature-package-topology.mjs";
 import { canonicalSha256 } from "./governance-event.mjs";
+import { LIFECYCLE_EVENTS } from "./organization-policy.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
@@ -308,6 +309,66 @@ test("F4 does not throw a raw TypeError when a hand-built policy declares ownedS
   const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: nullOwned });
   assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-owned-sections");
 });
+// WP-PAC11-LIFECYCLEEVENTS: FEATURE_STATE_TO_LIFECYCLE_EVENT must be total
+// and every mapped value must be a real LIFECYCLE_EVENTS member -- an
+// unmapped or out-of-vocabulary state would reproduce F1's original
+// unrepresentable-value trap one level up.
+test("WP-PAC11-LIFECYCLEEVENTS FEATURE_STATE_TO_LIFECYCLE_EVENT totally and unambiguously covers every FEATURE_STATES value", () => {
+  assert.equal(Object.keys(FEATURE_STATE_TO_LIFECYCLE_EVENT).length, FEATURE_STATES.length);
+  for (const state of FEATURE_STATES) {
+    assert.ok(Object.hasOwn(FEATURE_STATE_TO_LIFECYCLE_EVENT, state), `unmapped state: ${state}`);
+    assert.ok(LIFECYCLE_EVENTS.has(FEATURE_STATE_TO_LIFECYCLE_EVENT[state]), `mapped to a non-LIFECYCLE_EVENTS value: ${state}`);
+  }
+});
+
+// WP-PAC11-LIFECYCLEEVENTS: lifecycleEvents (P-AC-11 "lifecycle event") scopes
+// which of the artifact's own build-phase lifecycle states (translated
+// through FEATURE_STATE_TO_LIFECYCLE_EVENT) the policy permits a governed
+// write for. The default fixture identity's lifecycleState is "implementing",
+// which maps to "active".
+test("WP-PAC11-LIFECYCLEEVENTS rejects a governed write when the artifact's mapped lifecycle event is not in the declared lifecycleEvents", async () => {
+  const scoped = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, lifecycleEvents: ["proposed"], packIds: ["security-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: scoped });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-lifecycle-event"); assert.equal(rejected.plan, null);
+});
+test("WP-PAC11-LIFECYCLEEVENTS admits a governed write when the artifact's mapped lifecycle event is in the declared lifecycleEvents", async () => {
+  const scoped = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, lifecycleEvents: ["active", "completed"], packIds: ["security-baseline"] }]);
+  const planned = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: scoped });
+  assert.equal(planned.status, "preview"); assert.equal(planned.reason, null); assert.ok(planned.plan);
+});
+test("WP-PAC11-LIFECYCLEEVENTS leaves an undeclared lifecycleEvents neutral, unlike a declared-but-empty one which blocks every mapped state", async () => {
+  const undeclared = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, packIds: ["security-baseline"] }]);
+  const unaffected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: undeclared });
+  assert.equal(unaffected.status, "preview");
+  const emptied = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, lifecycleEvents: [], packIds: ["security-baseline"] }]);
+  const blocked = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: emptied });
+  assert.equal(blocked.status, "rejected"); assert.equal(blocked.reason, "policy-lifecycle-event");
+});
+// A declared lifecycleEvents list can also map to zero LIVE states for a
+// class that only ever governs an artifact in one build phase -- that is
+// still a real restriction (declared-vs-undeclared precedent), never a
+// silent no-op, per the briefed end-state.
+test("WP-PAC11-LIFECYCLEEVENTS a declared lifecycleEvents mapping to zero live states is still a real restriction, not a silent no-op", async () => {
+  const draftIdentity = async () => ({ schema: "pipeline.canonical-artifact-identity.v1", status: "resolved", identity: identity({ lifecycleState: "draft" }), findings: [] });
+  const scoped = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, lifecycleEvents: ["completed"], packIds: ["security-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity: draftIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: scoped });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-lifecycle-event");
+});
+// F4-style defensive posture: a hand-built policy declaring lifecycleEvents
+// with a non-array runtime shape must never degrade into a substring test or
+// throw a raw TypeError; it is treated as the strictest declared value
+// (empty), which rejects every mapped state.
+test("WP-PAC11-LIFECYCLEEVENTS does not throw a raw TypeError when a hand-built policy declares lifecycleEvents as a bare string", async () => {
+  const stringEvents = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, lifecycleEvents: "active", packIds: ["security-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: stringEvents });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-lifecycle-event");
+});
+test("WP-PAC11-LIFECYCLEEVENTS does not throw a raw TypeError when a hand-built policy declares lifecycleEvents as null", async () => {
+  const nullEvents = organizationPolicy([{ class: "security", mode: "controlled-publication", approvalRequired: false, lifecycleEvents: null, packIds: ["security-baseline"] }]);
+  const rejected = await planExternalReferenceWrite({ resolveIdentity, reference: governedReference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: nullEvents });
+  assert.equal(rejected.status, "rejected"); assert.equal(rejected.reason, "policy-lifecycle-event");
+});
+
 test("X-AC-11 never consults organization policy for an ungoverned reference, even when one is supplied", async () => {
   const invalidPolicy = { not: "a valid effective policy" };
   const withPolicy = await planExternalReferenceWrite({ resolveIdentity, reference: reference(), capabilities, desired, inspect: async () => ({ objectId: "issue-42", revision: "rev-1", state: "fresh" }), preview: async () => ({ previewDigest: "c".repeat(64) }), organizationPolicy: invalidPolicy });

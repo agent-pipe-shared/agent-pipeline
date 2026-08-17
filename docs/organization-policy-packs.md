@@ -96,16 +96,14 @@ packs meets the failure at activation, where a wrong diagnosis is expensive:
 Intersection never widens permission and OR never downgrades it, so no combination of
 packs can resolve to something more permissive than its strictest contributor.
 
-**Two of these five are declared but not yet consumed by any decision path.** Only
-`mode`, `approvalRequired`, `targetBinding` and `ownedSections` currently scope a real
-permission decision, plus `previewRequired` as of the PO's 2026-08-17 amendment below;
-`lifecycleEvents` and `conflictPolicy` validate and merge but change no
-behaviour anywhere. `conflictPolicy`'s gap is tracked, with its
-per-dimension reasons, in
-`backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md`; `lifecycleEvents`'
-own gap (that item explicitly disclaims covering it) is tracked separately in
-`backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md` —
-declaring one of the two today is not an error, but it is also not enforcement.
+**One of these five is declared but not yet consumed by any decision path.** Only
+`conflictPolicy` still validates and merges without changing any behaviour;
+`mode`, `approvalRequired`, `targetBinding` and `ownedSections` scope a real
+permission decision, plus `previewRequired` as of the PO's 2026-08-17 amendment
+below and `lifecycleEvents` as of the PO's 2026-08-17 amendment further below.
+`conflictPolicy`'s gap is tracked, with its own reasons, in
+`backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md` —
+declaring it today is not an error, but it is also not enforcement.
 
 **`previewRequired` (PO amendment, 2026-08-17):** satisfied by construction, not by
 enforcement — `external-reference-adapter.mjs`'s `preview()` runs unconditionally on
@@ -119,10 +117,31 @@ bridge exists between `identity.retention`'s `[active,retain,archive]` values (a
 different field, in `external-reference-adapter.mjs`) and this schema's three
 categorical commitments (`retain-indefinitely`, `retain-until-superseded`,
 `retain-per-external-schedule`), so the dimension is removed from `documentClasses`
-entirely rather than left declared-but-inert like `lifecycleEvents` and
-`conflictPolicy`. A pack that still declares `retention` on a `documentClasses` entry
+entirely rather than left declared-but-inert like `conflictPolicy`. A pack that still
+declares `retention` on a `documentClasses` entry
 now fails the closed-key check the same way any other unknown key does. See
 `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11 amendment for the full reasoning.
+
+**`lifecycleEvents` (PO amendment, 2026-08-17): built, not left inert.**
+`external-reference-adapter.mjs` now carries a total, closed
+`FEATURE_STATE_TO_LIFECYCLE_EVENT` mapping and enforces `lifecycleEvents`
+against the artifact's `binding.identity.lifecycleState` inside
+`planExternalReferenceWrite`, the same way `ownedSections` is enforced there —
+sitting after binding resolves, since only binding carries the lifecycle
+state this dimension needs. Four of `LIFECYCLE_EVENTS`' six values map 1:1
+onto an identically-named `FEATURE_STATES` value (`completed`, `superseded`,
+`abandoned`, `retained`); the remaining two (`proposed`, `active`) have no
+identically-named counterpart, so the five build-phase `FEATURE_STATES`
+values that are not part of that overlap (`draft`, `awaiting-approval`,
+`approved`, `implementing`, `verifying`) are split onto them by a
+PO-granted, disclosed mapping decision: `proposed` covers the states before
+a build is committed to (`draft`, `awaiting-approval`); `active` covers the
+states of a build actually underway toward publication (`approved`,
+`implementing`, `verifying`). A declared `lifecycleEvents` list, even one
+that maps to zero live states, is a real restriction; an undeclared key
+stays neutral — the same declared-vs-undeclared precedent `ownedSections`
+already established. See `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11
+amendment for the full reasoning.
 
 Activation is a separate, transactional step from resolution
 (`organization-policy-activation.mjs`). `planOrganizationPolicyActivation`

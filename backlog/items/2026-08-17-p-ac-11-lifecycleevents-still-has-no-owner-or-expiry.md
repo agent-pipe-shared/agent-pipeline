@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "Delta Critic re-review of the P-AC-11 fix range (289287e7, c7eb2297), finding F-A (blocker), 2026-08-17."
 due: 2026-09-15
@@ -103,3 +103,25 @@ already-approved build, not a fresh architecture question.
 - **Assignment (if accepted):** `pipeline`, next Goldfish dispatch cycle (bounded mapping-choice
   latitude granted per above).
 - **Date:** 2026-08-17.
+
+## Resolution — implemented, 2026-08-17
+
+Built as decided in the Triage section above.
+`plugins/pipeline-core/lib/external-reference-adapter.mjs` now carries a
+total, closed `FEATURE_STATE_TO_LIFECYCLE_EVENT` mapping (four of nine
+`FEATURE_STATES` values by the pre-existing identical-name overlap with
+`LIFECYCLE_EVENTS`; the remaining five build-phase states split onto
+`proposed`/`active` by the PO-granted bounded mapping choice: `proposed` =
+`draft`, `awaiting-approval`; `active` = `approved`, `implementing`,
+`verifying`), and `planExternalReferenceWrite` enforces `lifecycleEvents`
+against `binding.identity.lifecycleState` the same way `ownedSections` is
+enforced, sitting after binding resolves since only the resolved identity
+carries the lifecycle state this dimension needs. Pinned by a dedicated
+total-coverage test plus admit/reject/neutral/defensive-shape tests
+mirroring `ownedSections`' own suite (`external-reference-adapter.test.mjs`).
+`docs/organization-policy-packs.md` and
+`specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11 criterion amended
+accordingly; `organization-policy.mjs`'s stale comment corrected. Landed in
+this commit (`PHX-WP-PAC11-LIFECYCLEEVENTS`, goldfish); full reasoning in
+`specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11 `lifecycleEvents`
+amendment.

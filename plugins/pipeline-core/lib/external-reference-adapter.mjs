@@ -5,6 +5,37 @@ import { canonicalSha256 } from "./governance-event.mjs";
 
 export const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$/u; const SHA = /^[a-f0-9]{64}$/u;
 const CLASSES = new Set(["issue-tracker", "knowledge-base", "document-store", "forge"]); const DOCUMENT_CLASSES = new Set(["architecture", "operations", "security", "privacy", "continuity", "recovery", "release", "change-management"]); const RELATIONS = new Set(["tracks", "specifies", "implements", "documents", "mirrors", "reviews", "evidences", "releases", "supersedes", "relates-to", "evidence-for", "published-from"]); const DIRECTIONS = new Set(["pipeline-to-external", "external-observation-only", "independent"]); const MODES = new Set(["reference-only", "projection", "controlled-publication"]); const OWNERSHIP = new Set(["pipeline-owned", "external-owned", "projection-only", "independently-maintained", "unsupported"]); const FRESHNESS = new Set(["fresh", "stale", "deleted", "moved", "merged", "duplicated", "inaccessible", "out-of-order"]); const OPERATIONS = new Set(["inspect", "preview", "apply", "readback", "reconcile"]);
+// WP-PAC11-LIFECYCLEEVENTS: a total, closed mapping from every
+// feature-package-topology.mjs FEATURE_STATES value onto exactly one
+// organization-policy.mjs LIFECYCLE_EVENTS value, closing the gap F2 left
+// open (backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md).
+// Four of nine states share an identically-named LIFECYCLE_EVENTS value
+// (completed, superseded, abandoned, retained -- the F2-pinned overlap) and
+// map to it 1:1, no judgment call needed. The remaining five build-phase
+// states have no identically-named counterpart and are split here by
+// PO-granted bounded latitude (this dispatch, 2026-08-17) along the line
+// "has the epic committed to a build yet":
+//  - proposed: draft, awaiting-approval -- states before a build is
+//    committed to (no candidate has been approved yet).
+//  - active: approved, implementing, verifying -- states of a build
+//    actually underway toward publication (approved through the last
+//    pre-completion state).
+// This mapping is TOTAL by construction (every FEATURE_STATES value is a
+// key, every value is a member of LIFECYCLE_EVENTS) -- an unmapped or
+// ambiguous state would reproduce F1's original unrepresentable-value trap
+// one level up; pinned by a test that iterates FEATURE_STATES and asserts
+// exactly this.
+export const FEATURE_STATE_TO_LIFECYCLE_EVENT = Object.freeze({
+  draft: "proposed",
+  "awaiting-approval": "proposed",
+  approved: "active",
+  implementing: "active",
+  verifying: "active",
+  completed: "completed",
+  superseded: "superseded",
+  abandoned: "abandoned",
+  retained: "retained",
+});
 function fail(code, message = "External reference operation is invalid.") { const error = new Error(message); error.code = code; throw error; }
 function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 function frozen(value) { return Object.freeze(value); }
@@ -59,10 +90,15 @@ export async function planExternalReferenceWrite({ reference, capabilities, desi
   // asserting a parallel authority; a declared class with no policy, no
   // covering pack, a disagreeing mode, or an outstanding approval all fail
   // closed instead of proceeding on the adapter's own say-so.
+  // WP-PAC11-LIFECYCLEEVENTS: `entry` is hoisted out of the block below (it
+  // was previously block-scoped) so the lifecycleEvents gate can read it
+  // after binding resolves -- see that gate's own comment for why it cannot
+  // sit alongside ownedSections above.
+  let entry = null;
   if (ref.pipelineArtifact.documentClass !== null) {
     if (organizationPolicy === undefined || organizationPolicy === null) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-required", plan: null });
     const documentClasses = Array.isArray(organizationPolicy?.documentClasses) ? organizationPolicy.documentClasses : [];
-    const entry = documentClasses.find((candidate) => candidate?.class === ref.pipelineArtifact.documentClass);
+    entry = documentClasses.find((candidate) => candidate?.class === ref.pipelineArtifact.documentClass);
     if (!entry) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-uncovered-class", plan: null });
     if (entry.mode !== ref.mode) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-mode-mismatch", plan: null });
     if (entry.approvalRequired === true) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-approval-required", plan: null });
@@ -86,6 +122,20 @@ export async function planExternalReferenceWrite({ reference, capabilities, desi
   // an unresolvable or ambiguous artifact never reaches the provider at all.
   const binding = await bindCanonicalArtifactIdentity({ reference: ref, resolveIdentity });
   if (binding.status !== "bound") return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "canonical-identity", plan: null });
+  // WP-PAC11-LIFECYCLEEVENTS: lifecycleEvents (P-AC-11 "lifecycle event")
+  // scopes which of the artifact's own build-phase lifecycle states (via
+  // FEATURE_STATE_TO_LIFECYCLE_EVENT above) the policy permits a governed
+  // write for. Unlike ownedSections, this needs binding.identity.lifecycleState,
+  // which does not exist until binding resolves, so this gate sits here
+  // instead of alongside ownedSections above. Same declared-vs-undeclared
+  // precedent (a declared list, even one that maps to zero live states, is a
+  // real restriction; an undeclared key is neutral) and the same F4
+  // defensive non-array-shape posture as ownedSections.
+  if (entry !== null && Object.hasOwn(entry, "lifecycleEvents")) {
+    const lifecycleEvents = Array.isArray(entry.lifecycleEvents) ? entry.lifecycleEvents : [];
+    const mappedEvent = FEATURE_STATE_TO_LIFECYCLE_EVENT[binding.identity.lifecycleState];
+    if (!lifecycleEvents.includes(mappedEvent)) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "rejected", reason: "policy-lifecycle-event", plan: null });
+  }
   let target; try { target = await inspect(frozen({ adapterProfile: ref.adapterProfile, objectId: ref.objectId })); } catch { return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "external-unreachable", plan: null }); }
   if (!validateTarget(target, ref)) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "reconciliation-required", reason: "invalid-inspection", plan: null });
   if (target.revision !== ref.externalRevision || target.state !== "fresh" || desired.changes.some((change) => change.ownership !== "pipeline-owned")) return frozen({ schema: "pipeline.external-reference-write-plan.v1", status: "conflict", reason: "revision-or-ownership", plan: null });
