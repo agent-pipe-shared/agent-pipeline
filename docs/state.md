@@ -7,7 +7,105 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, closure-plan.md corrected (48→26 open), L-AC-01 producer dispatched, push still blocked on the same installed-plugin gap (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued: PO's 7 decisions executed, 24/157 open, Verify red bucket root-caused (READ THIS FIRST)
+
+**Since the checkpoint below:** the PO gave all 7 pending decisions in one message (A-AC-14→B,
+L-AC-08→A "fold into status", H-AC-09 clarified/leans A, H-AC-11→A, H-AC-12→A, PX0-AC-13→B,
+EPIC-AC-04→B, "rest ausführen wie beschrieben"). Executed, each independently re-verified before
+accepting (same discipline as L-AC-01/E-AC-08):
+
+- **PHX-WP-POAMEND** (commit `e9054995`): 4 amendments landed append-only. Independently
+  re-checked every factual claim against source (not the report's prose): `decomposition`
+  genuinely absent from every `agent-decision-journal.mjs` enum; `release-version-plan.mjs`'s
+  `decisionId`/`critical-action-authorization.mjs`'s Ed25519 proof exist exactly as described;
+  `ruleset-freshness.mjs`'s CLI never threads `networkPreflight`/`hostTransport`
+  (`selectHostTransport(undefined, undefined)` → `null`); the `GES-RESTRICTED-*` test citation is
+  real. Only **A-AC-14 flips verdict** (partial → implemented, 12/13 accepted as closed scope) —
+  H-AC-11/H-AC-12/PX0-AC-13 stay `partial` on purpose, each amendment is a scoping decision, not
+  new evidence (H-AC-11's own dispatch report says so explicitly). Evidence-map/closure-plan
+  updated, commit `9b0c4e31`.
+- **PHX-WP-LAC08** (commits `20014aab`/`b4f059f9`): the undistinguishable `cancellation`
+  lifecycle-event kind removed (not re-documented) from both hand-duplicated `KINDS` Sets and the
+  renderer's classification map; L-AC-01 amended append-only for the encoding change (stays
+  `partial`, 1/9 producers). **L-AC-08 closes: `implemented`.** 20/20 affected tests independently
+  re-run at the exact candidate. One residual duplicate the dispatch correctly flagged rather than
+  fixed: `governance/schemas/lifecycle-governance-event.schema.json:11` still lists `cancellation`
+  in a third hand-duplicated copy — filed as `backlog/items/2026-08-17-published-lifecycle-event-schema-still-enumerates-cancellation.md`.
+  Evidence-map/closure-plan updated, commit `79d43d64`.
+- **H-AC-09:** answered the PO's question in chat — "Phase-4 migration" is a forward-referenced
+  placeholder with no elaborated technical roadmap anywhere in the repo (confirmed by a repo-wide
+  search: CLAUDE.md, operating-model.md, every ADR, an empty `templates/roadmap.md`). It names a
+  future PO-approved threshold moving a project from read-only to write-authorized, not a defined
+  plan. PO leaned A (ratify) pending this; no further action taken, still Class P/PO-only.
+- **EPIC-AC-03 investigated, found NOT agent-executable:** the "sanctioned authority revision"
+  route is `plugins/pipeline-core/scripts/phoenix-authority-revision.mjs`, a proof-gated wrapper
+  around `pipeline-state.mjs`'s `continuity-authority-revision-plan`/`-apply` — both branches call
+  `phoenix-authority-approval.mjs verify` first, which needs an external Ed25519 proof directory.
+  Structurally the same shape as push-approval's signature gate. closure-plan.md's Class P row
+  updated with this finding; an agent could draft the Spec §7 proposal content, not sign it.
+
+**Live count: 24 of 157 open** (`../evidence/acceptance-evidence-map-20260817c.md`). Class B: 14
+(unchanged this round). Class P: 10 (was 12 this morning).
+
+**Installed-plugin gap: partially moving, live, mid-session — do not chase it further tonight.**
+The marketplace plugin bumped TWICE just during this turn-block (`0.5.5+...a50e259` →
+`0.5.5+...d2e2fc4`, both today) — confirms Nova is actively iterating, exactly as the PO said.
+Ran the full gate (`node harness/scripts/verify.mjs`) from the synced `.git/phx-verify` worktree
+at `9b0c4e31` to check for real (not assumed) progress. Root-caused every red directly (GL-08),
+not from exit codes:
+- **Confirmed FIXED:** `critical-human-proof-policy-tests` — the exact suite the 2026-08-16
+  checkpoint named as "waiting on the 0.5.5 v3-lib candidate" — is now green (`exitCode: 0`).
+  First hard evidence the plugin fix is real, not just a version bump.
+- **Unchanged, still red, still the same known bucket:** `artifact-topology-check`,
+  `threat-model-tests`, `pipeline-state-tests` (its 2 cases, PS54af/PS54ag — confirmed by re-run,
+  same `FTP-ARTIFACT-2` cause docs/state.md already documents: every `acceptance.md` edit
+  (tonight added 2 more) stales the Phoenix package manifest's pinned digest;
+  `feature-package-reconcile` needs its own separate PO signature, `gates.reconcile_approval` —
+  not agent-executable), `external-reference-adapter-tests`, `guard-testpath-override-tests`,
+  `verify-suite-registration-check`.
+- **NEW since the last full-gate checkpoint, root-caused, NOT mine, NOT touched:**
+  `guard-testpath-tests` and `gate-strength-guard-tests` (1 case, GST20) both crash/fail on
+  `GMW-ANCHORS-INVALID: anchors must be an array...` from `installGuardMaintenanceWindow`. Traced
+  to commit `11783228` ("fix(pipeline-core): fail closed when a guard-maintenance-window install
+  gets no anchor set", dispatch `PHX-WP-GMW-ANCHORS-FAILCLOSED`, landed 2026-08-16 22:46 — **not
+  from this session**, almost certainly Nova/PO's parallel session): it correctly hardened
+  `guard-maintenance-window.mjs` and updated its OWN test file's 12 install call sites from the
+  old `trustPolicy` shorthand to `anchors: [trustPolicy]`, but missed two OTHER test files that
+  also call `installGuardMaintenanceWindow` as part of their own fixture setup
+  (`guard-testpath.test.mjs:209`, `guard-gate-strength.test.mjs`'s GST20) — both still pass the
+  stale shape and now hit the new fail-closed refusal. A real, well-scoped, mechanical fix (mirror
+  the same `anchors: [x]` edit into these two fixtures) — **not attempted**: both files are
+  TP-3/TP-5-protected, and the commit that broke them came from the other session actively working
+  this exact area right now. Fixing it here risks a conflict with in-flight work on the same
+  files. Left for the PO/Nova to close, or for a future session once that parallel work settles.
+- **`doc-contract-tests`/`doc-contract-check`, confirmed PRE-EXISTING, not a regression:** both
+  fail identically (`missing reference definition` at line 86) against the ALREADY-COMMITTED
+  `acceptance-evidence-map-20260817.md` (created earlier this session, before this checkpoint) and
+  against tonight's new snapshots — same line, same cause in both. Root cause: PX0-AC-05's
+  long-standing pointer prose contains a regex literal, `[a-z][a-z0-9-]{0,63}`, that the doc
+  linter misparses as an unresolved markdown reference-style link. Pre-existing content I didn't
+  write; not fixed tonight (out of scope, low urgency — a linter false positive, not a real
+  documentation gap).
+
+**Net: Verify is not green tonight, and the reason keeps splitting into two unrelated buckets** —
+(1) the `FTP-ARTIFACT-2`/TP-3/TP-5 signature-gated bucket, structurally unavailable to an agent
+regardless of the plugin fix, and (2) genuinely new, agent-fixable-in-principle drift
+(`guard-testpath-tests`/`gate-strength-guard-tests`) that is deliberately left alone tonight
+because another live session owns that exact code path right now. **Do not attempt the push. Do
+not touch `guard-testpath.test.mjs`/`guard-gate-strength.test.mjs`/`guard-maintenance-window.mjs`
+this session** — Nova/the PO's parallel session is actively iterating there.
+
+**Next steps, in priority order (A/D/S already empty — Class B, then Class P):** continue through
+`closure-plan.md`'s Class B table (14 items, L-AC-01 already has its first producer — the natural
+next step there is wiring `candidate-invalidation`, the translator's own next-recommended kind,
+per PHX-WP-LAC01's report). Remaining "pure execution" Class-P items from "rest ausführen wie
+beschrieben": PX0-AC-05 and P-AC-11 are both structurally PO-only (same signature-gate shape as
+EPIC-AC-03); EPIC-AC-01 (independent closure-status determination for 8 issues) and EPIC-AC-05
+(auto-clears once the table is empty) remain queued, not yet started this round.
+
+---
+
+## CHECKPOINT — 2026-08-17, closure-plan.md corrected (48→26 open), L-AC-01 producer dispatched, push still blocked on the same installed-plugin gap
 
 **Trigger.** PO returned, granted "Architektur Themen" approval, asked what was needed to
 finalize the push, then set the standing goal `/goal "Phoenix offene Punkte weiter final
