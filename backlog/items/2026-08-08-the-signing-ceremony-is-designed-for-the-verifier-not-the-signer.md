@@ -243,3 +243,33 @@ remains a reasonable next dispatch, now unblocked (NVA-SIGENTRY-1's
 concurrent `po-human-approval.mjs` edits are committed, no more collision
 risk); finding 1 lives in `guard-maintenance-window.mjs`, independent of
 that file.
+
+### Progress, 2026-08-17 (later the same day) — NVA-SIGDISCLOSE-1 landed, only Direction step 1 remains
+
+Dispatched and independently re-verified (132/137 pass across the five
+touched suites; the 5 failures are pre-existing `HGO-EXTERNAL-MARKETPLACE`
+local-marketplace-mirror staleness, unrelated to this diff, reproduced
+identically with the diff stashed out). Commits `80987a38` (finding 1),
+`eaf513d0` (finding 2), `40158b1e` (findings 3 and 4 together — the
+humanName-vs-key-mismatch message split, matching the `FIXTURE-2` pattern
+this same file already used ten lines away, plus the `--repo-root` usage
+message from finding 8), `43dc244c` (finding 6 — a record the process
+cannot validate is now skipped and named in a new `skippedInvalidRecords`
+field, rather than poisoning the whole store; the security property that a
+tampered/unvalidatable record is never consumed is unchanged and now
+covered by two additional regression tests).
+
+**Finding 5 did not reproduce**: commit `dd1eb9ee` (predating this
+dispatch, unrelated) had already fixed the branch this finding described;
+`setup`'s three pre-existing GF-112 tests prove `setup --human-name` is the
+real, working repair path today. No change made — this is a real disclosure
+that the finding is stale, not silent scope-cutting.
+
+**Findings 1, 2, 3, 4, 5, 6, 7, 8 are now all closed or confirmed
+non-reproducing.** Only **Direction step 1 — the single unified entry-point
+script** the PO's own conclusion (above) actually asked for — remains
+undone. This item stays open for that piece alone; it is a real build (a
+new orchestrating script, not a message fix) and was explicitly out of
+scope for both NVA-SIGENTRY-1 and NVA-SIGDISCLOSE-1.
+
+- **Date:** 2026-08-17
