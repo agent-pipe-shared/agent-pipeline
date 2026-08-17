@@ -184,25 +184,22 @@ or `status: "rejected", reason: "capability"` if the adapter lacks the
 paths import external state as a Pipeline transition, approval, or release
 authority (existing "Reconciliation observation" section above).
 
-**KNOWN GAP — unreachable/offline external system is not a typed outcome.**
-Both `planExternalReferenceWrite` (`external-reference-adapter.mjs:61`) and
-`reconcileExternalReference` (`external-reference-adapter.mjs:72`) call
-`await inspect(...)` with no surrounding `try`/`catch`. If the adapter's
-`inspect` implementation throws — the expected behavior for a network
-timeout, DNS failure, or otherwise offline/unreachable external system —
-that exception propagates uncaught out of both functions instead of
-resolving to a typed `reconciliation-required` (or a dedicated
-"unavailable") result. This is a direct shortfall against **X-AC-14** ("IF
-an external system is offline or unavailable, THEN THE SYSTEM SHALL
-preserve canonical local operation and authority and expose the external
-observation/reconciliation gap"): canonical local operation is not disturbed
-by the throw, but the "exposed gap" is an uncaught exception, not a typed,
-handleable result. This gap is filed as backlog item
-`pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system`.
-Until it is fixed, any caller of `planExternalReferenceWrite` or
-`reconcileExternalReference` must wrap the call in its own `try`/`catch` to
-recover from an offline destination; do not assume a typed result is always
-returned.
+**Unreachable/offline external system.** Both `planExternalReferenceWrite`
+(`external-reference-adapter.mjs:139`) and `reconcileExternalReference`
+(`external-reference-adapter.mjs:163`) wrap their `await inspect(...)` call
+in `try`/`catch`: if the adapter's `inspect` implementation throws — a
+network timeout, DNS failure, or otherwise offline/unreachable external
+system — the catch resolves to a typed `status: "reconciliation-required",
+reason: "external-unreachable"` result rather than letting the exception
+propagate. This satisfies **X-AC-14** ("IF an external system is offline or
+unavailable, THEN THE SYSTEM SHALL preserve canonical local operation and
+authority and expose the external observation/reconciliation gap"):
+canonical local operation is undisturbed and the gap is exposed as a typed,
+handleable result, not an uncaught exception. The formerly-tracked gap
+(backlog item
+`pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system`)
+is closed; no caller-side `try`/`catch` is required to recover from an
+offline destination.
 
 ## Conformance suite
 
