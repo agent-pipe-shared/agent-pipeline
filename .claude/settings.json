@@ -9,7 +9,7 @@
     ]
   },
   "enabledPlugins": {
-    "pipeline-core@agent-pipeline": true
+    "pipeline-core@agent-pipeline-local": true
   },
   "extraKnownMarketplaces": {
     "agent-pipeline": {
