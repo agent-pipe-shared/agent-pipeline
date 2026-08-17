@@ -7,6 +7,24 @@
 
 ---
 
+## CHECKPOINT — 2026-08-17, continued again (20): E-AC-19 model+renderer layer built, caught and fixed a real self-caused regression (READ THIS FIRST)
+
+**E-AC-19 progressed (model+renderer layer, verdict deliberately stays partial).** `PHX-WP-EAC19` extended `exportStatus`'s closed shape (`evidence-view-model.mjs`) with `failureCount`/`quarantineCount` (non-negative integer when observed, explicit `null` when not) and `integrityGaps` (`null` = not observed, `[]` = checked-none-found, the same K-AC-09 discipline used elsewhere), and rendered all three in `exportBlock` (`evidence-view-renderer.mjs`). The dispatch's own commit message is honest about scope: verdict stays `partial` — no live producer wires real counts/gaps from `governance-export-outbox.mjs` yet, and the criterion's 6th named item ("recovery state") still has no dedicated field. This dispatch's chat report got truncated mid-write (known failure class) but the commit (`c7c7040b`) and its `dispatch-record.json` (`outcome: "success"`, running log) were both genuine and complete — independently re-verified directly: read the diff myself, re-ran both test files myself (11/11 + 11/11), confirmed the evidence-map edit and snapshot totals.
+
+**Caught and fixed a real regression the dispatch's own scope boundary caused.** Full Verify at the dispatch's commit surfaced a genuinely NEW red suite, `evidence-viewer-tests` — not part of the known baseline. Root cause: `exportStatus`'s shape is now stricter (3 new required keys), but `plugins/pipeline-core/scripts/evidence-viewer.test.mjs` (in `scripts/`, not `lib/` — outside this dispatch's deliberately scoped file list) has its own fixture supplying the OLD 6-key shape, which now fails `EVM-EXPORT`. This is a genuine gap in how *I* scoped the dispatch's context files, not a mistake by the goldfish, which correctly stayed inside its briefed lane. Fixed directly (a one-line, mechanical fixture update — add the 3 new fields as `null` — not new production logic): commit `a2924832`. Re-verified: `evidence-viewer.test.mjs` 7/7 pass; full Verify back to exactly the known 5 reds.
+
+**Full Verify + security-scan re-run at `a2924832` (final candidate this checkpoint):** exactly the 5 known reds, Security CLEAN. Both dispatched via `run_in_background` throughout to conserve context. Evidence copied back to the primary tree's `evidence/` (gitignored).
+
+**Totals unchanged: 147 implemented / 9 partial / 1 constraint = 157, 10 open** (E-AC-19 stays partial, as intended by the dispatch's own honest scoping).
+
+**Lesson for future dispatches touching a shared closed-shape schema:** when scoping a dispatch that tightens a schema's `exact()`/required-key shape, the context-files list must include EVERY real (even test-only) caller of that shape across the whole repo, not just the files "owning" the model — a `grep` for the schema's name/id string across the full tree before finalizing scope would have caught this before dispatch rather than after.
+
+**Context remains severely overdue for `/compact`** — flagged repeatedly across many prior checkpoints, not yet run. Nothing is at risk (everything material is persisted here), but this is well past the point where continuing in the same window is prudent.
+
+**Next steps:** E-AC-08 and C-AC-13 remain from the EPIC-AC-04 audit (E-AC-08 needs a design decision on cross-state cursor-rollback representability; C-AC-13 needs a real content-authorship pass). R-AC-06's flagged PO decision (checkpoint 19) also remains open. All future dispatches: no `model` override; scope every dispatch touching a shared schema by grep-checking ALL real callers first (see lesson above). All chat/AskUserQuestion text in German.
+
+---
+
 ## CHECKPOINT — 2026-08-17, continued again (19): R-AC-06 producer dispatched and landed, verdict deliberately left partial (real architecture gap flagged for PO); context severely overdue for /compact (READ THIS FIRST)
 
 **R-AC-06 producer built and independently re-verified.** `PHX-WP-RAC06` (goldfish-implementor, template-built briefing per the guard-dispatch check that correctly rejected an earlier freehand attempt) built `recordCommandUserAcknowledgement` (`external-command-offer.mjs`) — appends a schema-valid event for `acknowledged`/`authorized`/`copied`, anchored to the prior `offered` event via `sameOffer`, following the file's existing append/duplicate discipline exactly. Independently re-verified by the Elephant: read the new function directly (matches the claimed shape), re-ran `node --test external-command-offer.test.mjs` myself — 50/50 pass, exit 0 — and confirmed `COMMAND_STATES` (`agent-decision-journal.mjs`) was left untouched, `displayed`/`generated`/`asserted` still absent as claimed. Commit `ddcda3f6`.
