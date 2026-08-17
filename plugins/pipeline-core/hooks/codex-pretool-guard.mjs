@@ -198,6 +198,26 @@ try {
     fields: { name: error?.name, code: error?.code },
   });
 }
+// Same pure, no-I/O secret screen `eligibility()` already provides
+// (lib/human-guard-override.mjs), shared by every external-operator guidance
+// site in this file that discloses the literal command: never reimplement
+// the secret detection, and never let the two sites drift on when disclosure
+// is safe (GF-059/GF-064; backlog:
+// cross-repository-boundary-guidance-still-omits-the-literal-command).
+// Fails closed (`command`/`copyCommand` both null) on anything unexpected
+// from the probe itself, matching every sibling external-operator route.
+function commandDisclosureFields(root, tool, toolInput, rawCommand) {
+  let secretBearing = true;
+  try {
+    const probe = eligibility(root, tool, toolInput ?? {});
+    secretBearing = probe.eligible === false && probe.code === "HGO-NONOVERRIDABLE-SECRET";
+  } catch { /* fail closed: secretBearing stays true, disclosure stays hash-only */ }
+  const commandIsSafe = tool === "Bash" && !secretBearing;
+  return {
+    command: commandIsSafe ? rawCommand : null,
+    copyCommand: commandIsSafe ? boundedOpaqueCopyCommand(rawCommand) : null,
+  };
+}
 const lifecycleGoverned = [
   ".agent-pipeline/core.lock.json",
   "pipeline.user.yaml",
@@ -396,7 +416,12 @@ if (denials.length > 0) {
           kind: "external-operator",
           executionBoundary: "separate-session-rooted-at-plugin-cache",
           invocation: "user-copy-only",
-          action: { toolName, toolInputSha256, repositoryRoot: projectRoot },
+          action: {
+            toolName,
+            toolInputSha256,
+            repositoryRoot: projectRoot,
+            ...commandDisclosureFields(projectRoot, toolName, input?.tool_input, command),
+          },
           reason: "the Codex plugin cache is outside this repository's physical authority boundary",
         },
       }),

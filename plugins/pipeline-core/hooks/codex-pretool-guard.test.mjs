@@ -509,6 +509,43 @@ check("local plugin-cache installation returns one external boundary without an 
   }
 });
 
+// backlog: cross-repository-boundary-guidance-still-omits-the-literal-command. The
+// crossRepositoryOnlyDenial branch used to emit only `toolInputSha256` -- a hash a human
+// attending the real terminal cannot act on -- unconditionally, not even behind the same
+// `commandIsSafe` gate the sibling host-boundary route (GF-064) already applies. These two
+// checks mirror that sibling's GF-064 pairing for this second site.
+check("a safe Bash cross-repository-boundary denial carries the literal command and a copyCommand", () => {
+  const command = "codex plugin add pipeline-core@agent-pipeline-local";
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: { command },
+  }, join(pluginRoot, "..", "..")));
+  assert.equal(output.permissionDecision, "deny");
+  const route = guardRecoveryRoute(output.permissionDecisionReason);
+  assert.equal(route.code, "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY");
+  assert.equal(route.nextAction.action.command, command);
+  assert.ok(route.nextAction.action.copyCommand, "copyCommand field is missing");
+  assert.equal(route.nextAction.action.copyCommand.maxColumns, 72);
+});
+
+check("a secret-bearing Bash cross-repository-boundary denial never carries the secret verbatim", () => {
+  const secret = "ghp_FAKEFAKEFAKEFAKE1234567890AB";
+  const command = `codex plugin remove ${secret}`;
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: { command },
+  }, hostBoundaryFixture()));
+  assert.equal(output.permissionDecision, "deny");
+  assert.doesNotMatch(output.permissionDecisionReason, /ghp_FAKEFAKEFAKEFAKE/u,
+    "the secret-bearing Bash command leaked verbatim into the denial reason");
+  const route = guardRecoveryRoute(output.permissionDecisionReason);
+  assert.equal(route.code, "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY");
+  assert.equal(route.nextAction.action.command, null,
+    "command must be suppressed when the eligibility secret screen flags the command");
+  assert.equal(route.nextAction.action.copyCommand, null,
+    "copyCommand must be suppressed exactly like command, never a bypass around the secret screen");
+});
+
 check("override persistence failure remains a sanitized fail-closed denial", () => {
   const root = fixture();
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
