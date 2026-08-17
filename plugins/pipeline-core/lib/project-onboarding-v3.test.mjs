@@ -4521,7 +4521,7 @@ test("an invalid generated manifest is never accepted as a current fresh authori
           "--runner",
       "codex",
     ]);
-    const disposition = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const disposition = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     assert.equal(disposition.status, "unrepairable");
     assertDiagnostic(disposition, "canonical_manifest_requires_owner_repair");
   } finally { dispose(path); }
@@ -4536,7 +4536,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
     const invalid = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
     assert.equal(invalid.status, "runtime-initialization-required");
 
-    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     assert.equal(plan.status, "ready", JSON.stringify(plan));
     assert.equal(plan.target.path, ".claude/pipeline.yaml");
     assert.equal(plan.target.preservation, "absent-target-only");
@@ -4589,7 +4589,7 @@ test("manifest repair never claims ready when post-publication durability is una
   try {
     initializeRuntimeProjectionRoot(path);
     unlinkSync(join(path, ".claude", "pipeline.yaml"));
-    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
       planSha256: plan.planSha256,
@@ -4617,7 +4617,7 @@ test("manifest repair rejects non-UTF-8 unowned bytes without rewriting them", (
       Buffer.from("\n", "utf8"),
     ]);
     writeFileSync(manifestPath, original);
-    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     assert.equal(plan.status, "unrepairable");
     assertDiagnostic(plan, "manifest_unowned_bytes_unpreservable");
     assert.equal(readFileSync(manifestPath).compare(original), 0);
@@ -4631,7 +4631,7 @@ test("manifest repair rejects source drift before publication and leaves the man
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     const sourcePath = join(path, "pipeline.user.yaml");
     unlinkSync(manifestPath);
-    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     let injected = false;
     const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
@@ -4663,7 +4663,7 @@ test("manifest repair stays inside its pinned parent when the pathname becomes a
     const parent = join(path, ".claude");
     const displaced = join(path, ".claude-displaced");
     unlinkSync(join(parent, "pipeline.yaml"));
-    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     let injected = false;
     const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
@@ -4697,7 +4697,7 @@ test("manifest repair quarantines a publication-boundary source race", () => {
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     const sourcePath = join(path, "pipeline.user.yaml");
     unlinkSync(manifestPath);
-    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     let injected = false;
     const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
@@ -4728,7 +4728,7 @@ test("manifest repair retains its publication binding through final durability r
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     const sourcePath = join(path, "pipeline.user.yaml");
     unlinkSync(manifestPath);
-    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     let syncs = 0;
     const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
@@ -4757,7 +4757,7 @@ test("manifest repair atomically preserves a target that appears at publication"
     initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     unlinkSync(manifestPath);
-    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     let injected = false;
     const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
@@ -4786,7 +4786,7 @@ test("manifest repair never quarantines a foreign post-publication target", () =
     initializeRuntimeProjectionRoot(path);
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     unlinkSync(manifestPath);
-    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     let injected = false;
     const result = applyProjectOnboardingManifestRepairV4({ runner: "codex",
       rootDir: path,
@@ -4845,6 +4845,31 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
     assert.equal(unsupportedPlan.category, "unsupported-source-transition");
     assertDiagnostic(unsupportedPlan, "source_runner_transition_unsupported");
   } finally { dispose(invalid); dispose(unsupported); }
+});
+
+test("manifest repair admits a Claude-default, Claude-invoked V3 source (NVA-MANIFESTRUNNER-1)", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+    unlinkSync(join(path, ".claude", "pipeline.yaml"));
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "claude" });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+  } finally { dispose(path); }
+});
+
+test("source recovery planner admits a Claude-default, Claude-invoked current V3 source (NVA-MANIFESTRUNNER-1)", () => {
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ runner: "claude", rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const plan = planProjectOnboardingSourceRecoveryV4({ rootDir: path, deps: fakeDeps, runner: "claude" });
+    // Before the fix, `selectedRunnerIsCodex` unconditionally flagged this
+    // source as unsupported (it required `default === "codex"`), even though
+    // the source is genuinely current for the invoking Claude session.
+    assert.equal(plan.status, "unrepairable");
+    assert.equal(plan.category, "current-authority");
+    assertDiagnostic(plan, "source_is_current");
+  } finally { dispose(path); }
 });
 
 test("owned runtime drift and invalid V3 sources stay in closed lifecycle classifications", () => {

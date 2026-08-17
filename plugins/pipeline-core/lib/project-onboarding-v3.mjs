@@ -2517,15 +2517,6 @@ function sourceEnablesCodex(root, fs) {
   } catch { return false; }
 }
 
-function selectedRunnerIsCodex(root, fs) {
-  try {
-    const parsed = parseYaml(fs.readFileSync(safePath(root, SOURCE, fs), "utf8"));
-    return parsed?.runners?.default === "codex"
-      && Array.isArray(parsed.runners.enabled)
-      && parsed.runners.enabled.includes("codex");
-  } catch { return false; }
-}
-
 /**
  * General, runner-aware form of `sourceEnablesCodex`. Used only where the
  * caller's own invoking runner (not always "codex") controls admission; the
@@ -2666,7 +2657,10 @@ export function planProjectOnboardingSourceRecoveryV4({
       )],
     });
   }
-  if (!selectedRunnerIsCodex(root, fs)) {
+  // Admission is bound to the invoking session's own runner (ADR-0051), not
+  // always Codex: a V3 source that enables only Claude is a valid authority
+  // for a Claude Code session. `selectedRunnerIsCodex` is superseded here.
+  if (!sourceEnablesRunner(root, fs, runner)) {
     return sourceRecoveryResult({
       status: "unrepairable",
       root,
@@ -2769,7 +2763,10 @@ export function planProjectOnboardingManifestRepairV4({
     });
   }
   const inspection = inspectRunnerProfileMigrationV3({ rootDir: root, deps: fs });
-  if (inspection.status !== "ready" || inspection.sourceKind !== "v3" || !selectedRunnerIsCodex(root, fs)) {
+  // Admission is bound to the invoking session's own runner (ADR-0051), not
+  // always Codex: a V3 source that enables only Claude is a valid authority
+  // for a Claude Code session. `selectedRunnerIsCodex` is superseded here.
+  if (inspection.status !== "ready" || inspection.sourceKind !== "v3" || !sourceEnablesRunner(root, fs, runner)) {
     return manifestRepairResult({
       status: "unrepairable",
       root,
@@ -2935,7 +2932,7 @@ export function applyProjectOnboardingManifestRepairV4({
   if (activate !== true || !/^[a-f0-9]{64}$/u.test(planSha256 ?? "")) {
     return v4Inspection(rootDir, fs, "onboarding", runner);
   }
-  const plan = planProjectOnboardingManifestRepairV4({ rootDir, deps: fs });
+  const plan = planProjectOnboardingManifestRepairV4({ rootDir, deps: fs, runner });
   const authenticated = AUTHENTICATED_MANIFEST_REPAIRS.get(plan);
   if (plan.status !== "ready"
     || plan.planSha256 !== planSha256
