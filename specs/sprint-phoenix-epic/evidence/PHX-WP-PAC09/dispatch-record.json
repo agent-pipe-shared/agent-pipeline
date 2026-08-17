@@ -3,6 +3,35 @@
   "model": "claude-opus-5[1m]",
   "rulesetSha": "5125f494dd5a0f5315b8ea7f5f19e03ab4e0057e15c7198d5565d7b3d67ca937",
   "dispatcher": "elephant",
-  "outcome": "in-progress",
-  "log": []
+  "outcome": "landed-with-deviation",
+  "commit": "6b9a656e",
+  "log": [
+    { "phase": "bootstrap", "toolUses": 3, "note": "route pre-check: requested claude-opus-5/xhigh, observed claude-opus-5[1m] from this dispatch's runtime prompt; no contradiction." },
+    { "phase": "investigation", "toolUses": 23, "note": "Confirmed both gaps. Export path is queryPortableGovernanceStream -> projectGovernanceEvent -> enqueueGovernanceExport -> deliverGovernanceExportBatch. guard-config TP-3 protects harness/scripts/verify.mjs, so no new suite file could be registered; all new tests joined the already-registered organization-policy-activation.test.mjs." },
+    { "phase": "implementation", "toolUses": 31, "note": "activation: governanceBackfillConsentSubject + backfillConsentSubject + assertAuthority(backfill) + persisted/read-back consent. New module organization-policy-backfill-export.mjs reusing the ordinary export path." },
+    { "phase": "verification", "toolUses": 35, "note": "node --test over 6 suites (activation, organization-policy core, organization-policy CLI, export delivery, export outbox, export adapter): 80 pass / 0 fail, artifact node-test.tap." },
+    { "phase": "commit", "toolUses": 39, "note": "6b9a656e, 5 files, staged by explicit path only." }
+  ],
+  "report": {
+    "result": "landed with one deviation: two pre-existing tests in organization-policy-activation.test.mjs had their authorize stub extended (no assertion weakened, removed or skipped) because the shared pack() fixture previews a backfill on a fresh root and therefore now requires the distinct consent.",
+    "dodChecks": {
+      "refuses-activation-without-distinct-consent": "passed",
+      "real-callable-backfill-export-over-real-store": "passed",
+      "direct-unit-coverage-for-every-new-changed-function": "passed",
+      "node--test-on-every-touched-file-0-failures": "passed",
+      "tp-protected-suite-check": "passed (TP-3 covers harness/scripts/verify.mjs only; not edited)"
+    },
+    "evidence": {
+      "artifact": "specs/sprint-phoenix-epic/evidence/PHX-WP-PAC09/node-test.tap",
+      "command": "node --test --test-reporter=tap --test-reporter-destination=<artifact> --test-reporter=spec --test-reporter-destination=stdout plugins/pipeline-core/lib/organization-policy-activation.test.mjs plugins/pipeline-core/lib/organization-policy.test.mjs plugins/pipeline-core/scripts/organization-policy.test.mjs plugins/pipeline-core/lib/governance-export-delivery.test.mjs plugins/pipeline-core/lib/governance-export-outbox.test.mjs plugins/pipeline-core/lib/governance-export-adapter.test.mjs",
+      "exitCode": 0,
+      "counts": "tests 80, pass 80, fail 0"
+    },
+    "consentShape": "A second, distinct grant on the same authorize callback, present only when the plan previews a backfill: backfillGranted:true + backfillDecisionId (non-empty, must differ from the activation decisionId) + backfillSubjectSha256 bound to canonicalSha256 of {activationId, effectivePolicySha256, classes, fromEpochMs, toEpochMs}. The authority key set is exact, so the ordinary four-key authority is refused by name (OPA-BACKFILL-CONSENT) and an unasked-for consent is refused too (OPA-AUTHORITY).",
+    "exportTrigger": "A new callable module function, exportConsentedOrganizationPolicyBackfill(...), taking the activation receipt that carries the consent. Not automatic at activation (activation must stay a local transaction with no destination dependency, per E-AC-01/E-AC-09), and no CLI surface added.",
+    "openItems": [
+      "This record's report field is written after the commit, so dispatch-record.json is left modified in the worktree; the Elephant decides whether to fold it into its own commit.",
+      "Disclosed interpretation: the portable event envelope carries no organization document-class axis, so the consented classes are audit metadata and the half-open time window selects events."
+    ]
+  }
 }
