@@ -1342,6 +1342,30 @@ try {
     assert.equal(installed.status, "active", "an unmutated, still-matching TP pattern must still be tolerated");
   });
 
+  // ---- NVA-SIGDISCLOSE-1 Finding 1: the confirmation block must disclose the
+  // commit-invalidation condition alongside `candidate commit: <sha>`, not just the
+  // sha itself (backlog: "the signing ceremony is designed for the verifier, not the
+  // signer", finding 1). Purely a disclosure/text check -- GMW-CANDIDATE-COMMIT-MISMATCH's
+  // enforcement logic and the GMWFIX-4 commit-tolerance behavior are unchanged.
+  check("GMW43 (NVA-SIGDISCLOSE-1 F1) the confirmation summary states the commit-invalidation condition next to the candidate commit line", () => {
+    const root = repoFixture("gmw-describe-disclose-");
+    const plugin = pluginRootFixture();
+    const { planSha256, specSha256 } = planSpecShas(root);
+    const { intent } = prepareGuardMaintenanceWindowRequest({
+      rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 600, reason: "F1 disclosure check", featureId: "f",
+      planSha256, specSha256, policyRevision: "gmw-test-v1", livePluginRoot: plugin,
+    });
+    const described = gmw.describeGuardMaintenanceWindowRequest({ rootDir: root, intentSha256: intent.sha256 });
+    assert.equal(described.resolved, true);
+    const candidateIndex = described.lines.findIndex((line) => line.startsWith("candidate commit: "));
+    assert.ok(candidateIndex >= 0, "the candidate commit line must be present");
+    const disclosureIndex = described.lines.findIndex((line) => /invalidat/u.test(line));
+    assert.ok(disclosureIndex >= 0, "a line stating the invalidation condition must be present in the same summary");
+    assert.match(described.lines[disclosureIndex], /commit/iu, "the disclosure line must name the commit as the cause");
+    assert.match(described.lines[disclosureIndex], /install/iu, "the disclosure line must name the install step as the deadline");
+    assert.ok(described.lines.length <= gmw.GMW_SUMMARY_MAX_LINES, "the new line must stay within the stated bound");
+  });
+
   console.log(`\nguard-maintenance-window: ${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });

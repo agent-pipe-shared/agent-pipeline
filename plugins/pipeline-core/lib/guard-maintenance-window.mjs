@@ -1118,6 +1118,7 @@ export function describeGuardMaintenanceWindowRequest({ rootDir, intentSha256, s
         `window expires at (signed, absolute): ${expiresAt}`,
         `candidate commit: ${displayText(candidate.commit, 64).text}`,
         `candidate tree: ${displayText(candidate.tree, 64).text}`,
+        "note: a commit landing after this point, before install, invalidates this signature unless it stays entirely within this window's own already-signed scope",
       ]),
     };
   } catch { return unresolvedRequest("GMW-RECORD-UNREADABLE"); }
