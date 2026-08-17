@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "231c95527e6c96f2d80ba61d8c46907167723b4f765a700c5bd010c80e0fafd4"
+    "transitionHead": "6b9eeaccb32e27b94612649d4ec7158e3d26f4a505977c6a66f1bcc2f6567520"
   },
   "counts": {
-    "open": 93,
+    "open": 94,
     "in_progress": 26,
     "closed": 27
   },
@@ -441,6 +441,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization review of formal review and dispatch retries"
+    },
+    {
+      "id": "pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Found 2026-08-17 while trying to commit a fresh acceptance-evidence-map snapshot: git silently refused to see the new file. Traced to .gitignore's unanchored `evidence/` rule matching specs/sprint-phoenix-epic/evidence/ too, fixed in commit 13811594."
     },
     {
       "id": "pipeline.execution-model-switchback",

@@ -56,6 +56,7 @@
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.epic-file-contract-has-no-drift-check | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.external-reference-adapter-has-no-typed-response-to-an-unreachable-external-system | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.first-verify-run-is-red-with-four-failures | open | defect | pipeline | 2026-08-08 | — |
@@ -154,6 +155,6 @@
 
 ## Counts
 
-- open: 93
+- open: 94
 - in_progress: 26
 - closed: 27
