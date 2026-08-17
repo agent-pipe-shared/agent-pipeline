@@ -7,7 +7,58 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again (8): retention dropped from P-AC-11, lifecycleEvents build dispatched (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (9): lifecycleEvents built and landed, a real dispatch-caused regression caught by independent re-verification and fixed (READ THIS FIRST)
+
+**Since checkpoint (8):** `PHX-WP-PAC11-LIFECYCLEEVENTS` (goldfish-deep, sonnet/xhigh, no model override)
+exhausted its tool budget TWICE before finishing — first stopping mid-work with 5 files of fully
+correct, high-quality uncommitted diff (reviewed file-by-file by the Elephant, one stale
+cross-reference found and fixed directly), resumed via `SendMessage` with a fresh 30-tool budget and
+explicit instructions on exactly what remained; it then committed (`6919b55b`) but again stopped
+before finishing its own declared verify step — its `dispatch-record.json` literally shows
+`"outcome": "in-progress"`, last log entry "About to run full node harness/scripts/verify.mjs".
+
+Independently re-running that full gate (the step the dispatch itself never completed) is what caught
+a REAL regression the diff review alone had missed: the dispatch's backlog-closure edit split across
+two moments — the landed commit flipped the item's `status` to `closed` but left
+`closed_at`/`closure_repository`/`closure_commit`/`closure_evidence` uncommitted, so the committed
+state had a closed item missing its own closure record. `reconcile-backlog-ledger.test.mjs`'s RBL01
+caught this (confirmed absent at the prior candidate `3a1a160f`, present at `6919b55b` — direct
+before/after comparison, not just "verify was red"). Fixed by committing the already-correctly-drafted
+metadata (`f0f92c89`) and running the project's own
+`node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate` to record the ledger
+transition (`80aa72df`, machine-generated diff, not hand-edited). Full verify re-ran clean at `80aa72df`
+— same 9 pre-existing non-green suites as the `3a1a160f` baseline, none new. `external-reference-
+adapter-tests`' one failure (X-AC-10, a live-repository-path resolution test) independently confirmed
+pre-existing/environmental by running it identically at both the pre-dispatch commit and in the live
+tree with zero code changes applied. Evidence map updated (`108223be`); P-AC-11 stays partial —
+`conflictPolicy` is now the SOLE remaining open dimension under that criterion.
+
+**Process lesson, reinforcing the existing "independently re-verify every dispatch" practice:** a
+dispatch's own commit landing is not proof its own verify step ran to completion — check the
+dispatch-record's `outcome` field and its log's last phase before trusting a "done" report, and
+re-run the full gate yourself when that field says anything other than a genuinely finished state.
+This is the second dispatch in a row (after the earlier P-AC-11 Critic saga's evidence-narrowing
+findings) where the FULL verify.mjs gate, run independently by the Elephant rather than trusted from
+the dispatch, is what caught a real defect a plausible-looking diff review alone would have missed.
+
+**Remaining open (11 of 157, unchanged in count — P-AC-11 narrows internally, doesn't close):**
+Class B — P-AC-11 (`conflictPolicy` only now, needs a fuller PO options brief), H-AC-12 (Git-guard
+override reader, needs a TP-5 window), A-AC-01 (pending a final confirmatory pass), A-AC-05
+(producer dispatch not yet fired, bundle with A-AC-01), L-AC-01 (5 buildable kinds plus the separate
+candidate-invalidation capability), EPIC-AC-02 (TP-3 window + dispatch). Class P — H-AC-11 (dispatch
+1b CLI wiring), PX0-AC-13 (8-member action-family build), EPIC-AC-01/03/04/05 (end-of-epic ceremony,
+bundled with H-AC-11's spec §6.1 amendment).
+
+**Next steps:** bring the PO a fuller `conflictPolicy` options brief (P-AC-11's last open dimension),
+or continue down the Class-B queue per checkpoint 8's ordering. All future dispatches: no `model`
+override (configured `sonnet` routing). All chat/AskUserQuestion text in German. Watch dispatch tool
+budgets more carefully — two consecutive exhaustions on one task suggests either the budget (50) is
+too tight for goldfish-deep design-latitude work, or the task should be split smaller; consider raising
+the default budget for `goldfish-deep` dispatches with real design latitude in future briefings.
+
+---
+
+## CHECKPOINT — 2026-08-17, continued again (8): retention dropped from P-AC-11, lifecycleEvents build dispatched
 
 **Since checkpoint (7):** `PHX-WP-PAC11-DROPRETENTION` (goldfish-mechanic, no model override, per the
 token/routing correction) landed as `3ce9434b` — removed the `retention` dimension from
