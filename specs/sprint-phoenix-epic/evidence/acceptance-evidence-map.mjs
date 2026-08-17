@@ -411,6 +411,19 @@ const DELTA = {
   // "SHALL prevent" -- a fixture pinning delegated/unreachable behavior is
   // still a fixture. Prior undercount, not new work.
   'R-AC-13': ['implemented', 'WP-R'],
+  // A-AC-10 CLOSED 2026-08-17 (PHX-WP-AAC10, commit 8800f8d4, independently
+  // re-verified): JOURNALING_UNAVAILABLE_DISPOSITIONS (agent-decision-journal.mjs)
+  // is a closed, frozen table total over all 7 EVENT_CLASSES, checked complete at
+  // import (ADJ-JOURNALING-POLICY-INCOMPLETE on drift), refusing undeclared keys.
+  // resolveJournalingUnavailability() composes strictest-wins and returns a typed
+  // pipeline.agent-journaling-gap.v1 record; acknowledgeOfferUnderJournalingGap()
+  // exposes the same record whichever way the policy fires. R-AC-10's
+  // acknowledgeNonMaterialOfferWithoutJournal confirmed byte-for-byte unchanged
+  // (zero-context diff against the pre-commit version); the new path's fail-open
+  // set is a strict subset of R-AC-10's exception, locked by a 32-case matrix
+  // test. Re-run independently: agent-decision-journal-tests 49/49,
+  // external-command-offer-tests 39/39, both 0 fail.
+  'A-AC-10': ['implemented', 'WP-AAC10'],
   // R-AC-12 CLOSED 2026-08-09 (PHX-WP-R-AC12): the criterion asks only that
   // the motivating trajectory be encoded as a fixture, which is now done --
   // external-command-offer.test.mjs's new R-AC-12 test walks a rejected
@@ -1271,7 +1284,7 @@ const POINTERS = {
   'A-AC-07': 'agent-decision-journal/governance-event-store-tests (WP-A-AC07): all seven named event classes now recognized through existing fields/kinds, no new kind needed; capture-policy.json carries an additive mandatoryEventClasses list; appendPortableGovernanceEvent fails closed (GES-MANDATORY-CAPTURE) rather than silently sampling out a mandatory class, scoped to the policy-selected agent origin only. 38/38 + 28/28 tests pass',
   'A-AC-08': 'NO CARRIER: no detector for missing dispatch provenance; the Dispatch: trailer is convention only',
   'A-AC-09': 'materiality is documented as design intent only; no code enforces or measures it',
-  'A-AC-10': 'the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists',
+  'A-AC-10': 'agent-decision-journal-tests + external-command-offer-tests (PHX-WP-AAC10, commit 8800f8d4): a closed, per-event-class JOURNALING_UNAVAILABLE_DISPOSITIONS table (total over all 7 EVENT_CLASSES, import-time-checked complete) declares fail-open/fail-closed per class instead of one hardcoded global behavior. resolveJournalingUnavailability() exposes a typed, observable pipeline.agent-journaling-gap.v1 gap record on both the fail-open and fail-closed paths. R-AC-10\'s existing acknowledgeNonMaterialOfferWithoutJournal is unchanged (independently confirmed byte-for-byte via a zero-context diff); the new path\'s fail-open set is a proven strict subset of that exception. 49/49 + 39/39 pass, independently re-run',
   'A-AC-11': 'agent-decision-event.schema.json:14 assumptionState enumerates exactly the seven required epistemic states (landed 5d0fc6a)',
   'A-AC-12': 'agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): downstream export/projection policy is independently configurable from capture eligibility and structurally cannot weaken it; the portable path fails closed for any narrower-than-repository-public-safe stream, and the restricted profile is confirmed owner-authenticated and outside the repository',
   'A-AC-13': 'agent-decision-journal-tests (PHX-WP-A + PHX-WP-A2): the duplicate-submission clause is pinned, and agent-kind fixtures now mirror the generic store\'s interrupted/concurrent/out-of-order guarantees directly rather than relying on them by implication',

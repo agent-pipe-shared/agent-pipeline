@@ -77,9 +77,20 @@ amendment decision, deliberately not taken by a dispatch — the same shape as H
 reclassification. **H-AC-08 reclassified Class B → Class P** (stays `partial`, no verdict
 change). Class B: **11** (was 12). Class P: **11** (was 10). Open count unchanged: **22 of 157**.
 
+**UPDATE, 2026-08-17 (PHX-WP-AAC10, commit `8800f8d4`, independently re-verified).** A-AC-10's
+missing per-event-class fail-open/fail-closed policy is built: `JOURNALING_UNAVAILABLE_DISPOSITIONS`
+(`agent-decision-journal.mjs`) is a closed table, total over all 7 `EVENT_CLASSES`, checked
+complete at import; `resolveJournalingUnavailability()` exposes a typed, observable
+`pipeline.agent-journaling-gap.v1` gap record on both directions. R-AC-10's existing exception
+path (`acknowledgeNonMaterialOfferWithoutJournal`) confirmed byte-for-byte unchanged (zero-context
+diff against the pre-commit version); the new path's fail-open set is a proven strict subset.
+`agent-decision-journal-tests` 49/49, `external-command-offer-tests` 39/39, both independently
+re-run at the exact commit. **A-AC-10 closes: `implemented`.** Moves out of Class B entirely (10
+remain, was 11). Open count: **21 of 157** (was 22).
+
 ## What this design is for
 
-The measurement established that **22 of 157** acceptance criteria are not
+The measurement established that **21 of 157** acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart — provided it is regenerated when the verdict data moves, which is the exact
@@ -94,9 +105,9 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 0 | (both prior members, A-AC-14/PX0-AC-03, closed — see below) |
 | D — documentation missing | 0 | (prior member L-AC-08 reclassified to P 2026-08-17, then closed the same day — see below) |
 | S — seam missing | 0 | (prior member E-AC-20 closed 2026-08-10) |
-| B — capability missing | 11 | real implementation plus its tests |
+| B — capability missing | 10 | real implementation plus its tests |
 | P — not code | 11 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **22** | |
+| **total** | **21** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -256,7 +267,7 @@ these, is in
 [`../evidence/acceptance-evidence-map-20260817f.md`](../evidence/acceptance-evidence-map-20260817f.md)
 — not repeated here, since this document's job is the OPEN set.
 
-### Class B — an absent capability (11)
+### Class B — an absent capability (10)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -264,7 +275,6 @@ these, is in
 | A-AC-03 | not-started | WP-A | NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption |
 | A-AC-05 | partial | WP-AAC05 | the observational shape (identity array, dimension/value/provenance/assurance) is pinned on selection/escalation/fallback. Still no production caller: CONFIRMED ABSENT that any code path emits a selection/escalation/fallback event at all — wiring `advisory-decision-event.mjs`'s translator into the real `advisory-coordinator.mjs` flow is real architecture work, deliberately deferred to a session with PO input available (design/agent-decision-identity-scoping.md) |
 | A-AC-09 | partial | WP-A | `assertMandatoryCaptureNotSkipped` (governance-event-store.mjs) lets a caller avoid persisting a non-mandatory event, tested; nothing computes "routine/low-impact" itself — the caller still decides |
-| A-AC-10 | partial | WP-A | the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists |
 | EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file (reconfirmed 2026-08-17 by independent re-verification, zero hits for "unpublished"/"Nova"/"Cyborg"/"Nightwing") |
 | L-AC-01 | partial | WP-L | UPDATE 2026-08-17 (PHX-WP-LAC01, commit `fd57d390`): first real producer landed — `continuity-cas` now durably persists a schema-valid `dispatch`-kind lifecycle event via a new translator, independently re-verified (unit + call-site + 506/506 gated regression + e2e readback). UPDATE 2026-08-17 (PHX-WP-LAC01B, commit `8e4be420`): second real producer landed — `continuity-integrate-final` now durably persists a `status`-kind event via a sibling translator, independently re-verified (unit + call-site tests green, gated regression 504/506 — the 2 failures are the same pre-existing FTP-ARTIFACT-2 acceptance.md-digest-staleness cause, confirmed pre-existing by re-running the identical suite at the prior commit). Honest count: **2 of 9** — NOT status+cancellation as hoped: the real continuity outcome vocabulary only ever observes succeeded/failed, so cancellation stays unreached despite the projection covering it. `candidate-invalidation` also confirmed to have no real caller (invalidation is always constructed `{state:"valid"}`; zero non-test producers of an invalidated state anywhere). Remaining 7 kinds all need a source vocabulary to exist before a producer can — a capability gap now, not a translator-authoring gap. Registering the new call-site suites into `harness/scripts/verify.mjs` is blocked by the same installed-plugin TP-3 gap as the other four parked reds |
 | P-AC-09 | partial | WP-P | RETRACTS "no carrier" (2026-08-17): `computeBackfillRange` (organization-policy-activation.mjs) already covers the preview half, shared with P-AC-03. Narrower remainder: `activateOrganizationPolicy`'s `authorize()` is one generic activation grant, not a distinct "explicit backfill consent" scoped to the identified historical range, and no code exports/backfills the historical events themselves |
@@ -290,7 +300,7 @@ these, is in
 
 ## Sequence, corrected
 
-With Classes A/D/S empty, the sequence collapses to: **Class B first** (11 items, real code, no PO
+With Classes A/D/S empty, the sequence collapses to: **Class B first** (10 items, real code, no PO
 gate — L-AC-01 leads, since it is the one structural gap several other rows describe as their own
 missing half), **Class P last** (11 items, eleven different PO actions, several already queued and
 waiting only on the PO's own terminal or a design answer — not parallelizable with agent work).
