@@ -139,7 +139,7 @@
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.native-windows-verify-red-suite-class | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | open | defect | pipeline | 2026-08-06 | — |
-| pipeline.no-design-to-implementation-handover-exists | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | open | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.no-governed-directory-contract | open | workflow-improvement | pipeline | 2026-08-08 | — |
@@ -246,6 +246,6 @@
 
 ## Counts
 
-- open: 96
+- open: 95
 - in_progress: 22
-- closed: 120
+- closed: 121

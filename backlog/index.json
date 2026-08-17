@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "23c3d127e1cd73867523e2644928d1fee83f126aa1ae9aa8726990912990c71e"
+    "transitionHead": "164f4bb90078ae91861a4f8bbe8afe5ff994e55b39c38527d481975434b16964"
   },
   "counts": {
-    "open": 96,
+    "open": 95,
     "in_progress": 22,
-    "closed": 120
+    "closed": 121
   },
   "items": [
     {
@@ -1329,11 +1329,15 @@
     },
     {
       "id": "pipeline.no-design-to-implementation-handover-exists",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 6 of 12. Located in code by that session."
+      "source": "Greenfield onboarding handover from a parallel Claude session, 2026-08-08, finding 6 of 12. Located in code by that session.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "f11f80b5bb6fec834a5aaa2cda2718b83e216184",
+      "closureEvidence": "backlog/items/2026-08-08-no-design-to-implementation-handover-exists.md"
     },
     {
       "id": "pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects",
