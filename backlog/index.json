@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e0d111b3db0d3a03ba8c06ce81c75a48fb4fc886292f1dad26948266474dc80b"
+    "transitionHead": "58be067542fa927118330a584ffd209351abf703c49e91955a1e2ca12d0bda30"
   },
   "counts": {
-    "open": 97,
+    "open": 98,
     "in_progress": 26,
     "closed": 28
   },
@@ -1246,6 +1246,13 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in plugins/pipeline-core/scripts/po-human-approval.mjs under dispatch PHX-BL4 (2026-08-09)."
+    },
+    {
+      "id": "pipeline.trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17"
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
