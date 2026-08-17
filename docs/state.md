@@ -89,6 +89,60 @@ PO-decision artifact's answers once given and execute the settled ones (mostly c
 amendments/removals per the recommendations); (4) do NOT re-attempt the push until the
 installed-plugin gap is confirmed fixed.
 
+**UPDATE, same session, after the above.** PO answered all 7 decision points from the
+artifact: A-AC-14→B, L-AC-08→A, H-AC-09→A (confirmed: no Phase-4 roadmap exists anywhere
+in-repo, it's a forward-referenced placeholder — explained to PO), H-AC-11→A, H-AC-12→A,
+PX0-AC-13→B, EPIC-AC-04→B ("rest execute as described" for the 5 pure-execution items).
+
+**PHX-WP-LAC01 outcome: SUCCESS, independently re-verified.** Commit `fd57d390` (not the
+thin one-liner summary that first came through — that was a mid-work status line; the
+agent's real final report followed on resume, see the SendMessage exchange this turn).
+Re-verified myself, not accepted from the report: `node --test` on both new test files
+(pass), the e2e evidence script re-run (fresh event confirms), and — critically — the
+**gated** `harness/scripts/pipeline-state.test.mjs` re-run from the synced
+`.git/phx-verify` worktree AT commit `fd57d390` specifically (not a stale worktree
+commit, caught and fixed a first wrong attempt): **506/506, zero FAIL lines.** L-AC-01
+now has 1 of 9 kinds (`dispatch`) with a real, durable producer; `candidate-invalidation`
+recommended next (translator already refuses invalidated exchanges by name). Evidence map
+and closure-plan.md updated to match (commit `3fd7731e`).
+
+**Cross-dependency finding, before touching L-AC-08:** removing the `cancellation` kind
+(L-AC-08's PO-approved fix) is NOT purely a code change — L-AC-01's own acceptance
+criterion text explicitly enumerates "cancellation" as one of its nine required kinds.
+Doing the code fix without amending L-AC-01's text first would make L-AC-01 permanently
+unsatisfiable. **L-AC-08 is deliberately queued AFTER the amendment dispatch below**, to
+avoid a two-dispatch race on the same file (acceptance.md).
+
+**Amendment mechanism clarified — much simpler than first assumed.** `acceptance.md`
+amendments are NOT a signed ceremony; `git log --follow` on the file found two real
+precedents, both plain dispatched commits: `39374ab6` (H-AC-11's first amendment) and
+`22eef567` (PX0-AC-13's). Both just APPEND a `**Amendment (PO, DATE).**` paragraph after
+the existing criterion text — original EARS sentence never deleted/rewritten. Modeled the
+next dispatch on these exactly.
+
+**PHX-WP-POAMEND dispatched** (Goldfish-deep, opus/xhigh, briefing in
+`scratch/dispatch-briefing-po-amendments.md`), landing four amendments in one commit:
+A-AC-14 (accept 12/13, "decomposition" out of scope), H-AC-11 (the O-4 narrowing —
+design doc §9 already has the exact proposed text, scoping the no-join-handle clause to
+the restricted machine-local profile), H-AC-12 (ratifying existing mechanisms —
+`release-version-plan.mjs` content-hash decisionId, `critical-action-authorization.mjs`
+Ed25519 proof — satisfy intent for release-planning/deploy-consumption specifically;
+explicitly NOT the design doc's separate, much bigger "add GMW as a named reader"
+proposal in the same §9, which needs 5 unbuilt files and is out of scope here), PX0-AC-13
+(upgrading clause 1's disposition from "conditional/unbuilt" to "confirmed structurally
+unreachable" per the later PHX-WP-PX0AC13-HOSTDELEGATION/REMOVEATTESTATION findings).
+**Status at this checkpoint: dispatched, result not yet known.**
+
+**Next steps, in order (supersedes the list above):** (1) check PHX-WP-POAMEND's
+outcome, independently re-verify each of the 4 amendment paragraphs against its source
+material before trusting the report (same discipline as L-AC-01); (2) update evidence
+map/closure-plan for whichever of the 4 actually flip verdict; (3) THEN dispatch L-AC-08
+(remove `cancellation` from `lifecycle-governance-events.mjs`'s `KINDS`, from
+`docs/governance-replay.md`'s Traceability section, AND from L-AC-01's acceptance.md
+enumeration — three-file, tightly-coupled change); (4) continue Class B in closure-plan
+order; (5) H-AC-09/EPIC-AC-04 need no further action right now (confirmed-open /
+deferred-timing respectively); (6) still do NOT re-attempt the push.
+
 ---
 
 ## CHECKPOINT — 2026-08-16, four agent-eligible red suites closed; the push chain is blocked on PO key material, not on process
