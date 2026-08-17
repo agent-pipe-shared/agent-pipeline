@@ -232,6 +232,48 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
   }
 });
 
+test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent reports a missing --human-name specifically, distinct from a genuine key mismatch, when the trust-policy record predates --human-name but the key itself is correct", () => {
+  const dirs = fixtureDirs();
+  try {
+    legacyKeyFixture(dirs.directory); // writes {keyReference, publicKeySha256} only, no humanName -- the SAME key sign-intent will use
+    const intentSha256 = createHash("sha256").update("pipeline.sigdisclose-f3-legacy-fixture").digest("hex");
+    const dependencies = { readConfirmation: () => "approve" };
+    const error = thrown(() => runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+      dependencies,
+    ));
+    assert.ok(error, "a legacy-shape (no humanName) authority record must still refuse to sign");
+    assert.match(error.message, /predates --human-name/u, "the message must diagnose the REAL problem (missing --human-name), not a key mismatch");
+    assert.doesNotMatch(error.message, /does not match the local public key/u, "a matching key must never be reported as mismatched");
+    assert.match(error.message, /setup/u, "the message must point at the real repair action");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent still reports a genuine key-digest mismatch as a mismatch, not as a missing --human-name", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory); // writes a NAMED trust-policy.json (humanName: "Test Operator") for one key...
+    const otherPrivateKey = join(dirs.directory, "po-private.pem");
+    // ...but the private key on disk is now regenerated, so it no longer matches the
+    // publicKeySha256 the trust-policy.json record was written against.
+    openssl(["genpkey", "-algorithm", "ED25519", "-out", otherPrivateKey]);
+    openssl(["pkey", "-in", otherPrivateKey, "-pubout", "-out", join(dirs.directory, "po-public.pem")]);
+    const intentSha256 = createHash("sha256").update("pipeline.sigdisclose-f3-mismatch-fixture").digest("hex");
+    const dependencies = { readConfirmation: () => "approve" };
+    const error = thrown(() => runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256],
+      dependencies,
+    ));
+    assert.ok(error, "a key that no longer matches the recorded digest must still refuse to sign");
+    assert.match(error.message, /does not match the local public key/u, "a genuine key-digest mismatch must keep the mismatch message");
+    assert.doesNotMatch(error.message, /predates --human-name/u, "a genuine key mismatch must never be reported as a missing --human-name");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("sign-intent cancels on a mismatched confirmation: OpenSSL is never invoked and no artifact is written", () => {
   const dirs = fixtureDirs();
   try {
@@ -1084,6 +1126,22 @@ test("a relative PIPELINE_PO_APPROVAL_DIRECTORY value fails the same absolute-pa
     const viaEnv = withEnvDirectory("relative/dir", () => parseHumanArgs(["setup", "--repo-root", "/tmp/po-podir1-repo"], { homedirFn: () => home }));
     assert.match(viaEnv.error, /Usage:/u);
     assert.match(viaEnv.error, /must be an absolute path/u);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test("NVA-SIGDISCLOSE-1 Finding 8: a bad --repo-root (e.g. '.') explains the problem and how to fix it, not only the bare usage dump", () => {
+  const home = noMachinePlaneHomeFixture();
+  try {
+    const dot = parseHumanArgs(["setup", "--repo-root", ".", "--directory", "/tmp/po-podir1-flag-dir"], { homedirFn: () => home });
+    assert.match(dot.error, /Usage:/u);
+    assert.match(dot.error, /repository root is required/u, "the error must explain WHAT is wrong, not only dump the usage string");
+    assert.match(dot.error, /--repo-root/u, "the error must name the failing flag");
+    assert.match(dot.error, /absolute path/u, "the error must state the valid way to supply it (an absolute path)");
+
+    const missing = parseHumanArgs(["setup", "--directory", "/tmp/po-podir1-flag-dir"], { homedirFn: () => home });
+    assert.match(missing.error, /repository root is required/u, "an entirely absent --repo-root gets the same explained message");
   } finally {
     rmSync(home, { recursive: true, force: true });
   }

@@ -373,7 +373,9 @@ export function parseHumanArgs(argv, dependencies = {}) {
   if (!text(values.directory) || !isAbsolute(values.directory)) {
     return { error: `${USAGE}\napproval directory is required and must be an absolute path: pass --directory <path>, let this repository remember one (persisted automatically by 'setup --directory'), configure poKeyDirectory in the machine-scoped configuration plane, or set $${PO_APPROVAL_DIRECTORY_ENV} to an absolute path as a fallback (an explicit --directory always overrides this repository's own remembered value, which overrides the machine-scoped plane, which overrides the environment variable).` };
   }
-  if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
+  if (!text(values.repoRoot) || !isAbsolute(values.repoRoot)) {
+    return { error: `${USAGE}\nrepository root is required and must be an absolute path: pass --repo-root <path> naming the repository this ceremony operates on (a relative path such as "." is not accepted).` };
+  }
   // FIXTURE-2: --human-name is validated where the authority directory's state is known
   // (inside the "setup" branch of runHumanApproval), never here. The parser cannot see
   // whether an authority record already exists on disk, and a `setup` that recovers or
@@ -696,8 +698,21 @@ function signIntentIntoProof({ intentSha256, keys, artifacts, io, dependencies }
   finally { rmSync(artifacts.intent, { force: true }); }
   try {
     const authority = json(keys.authority); const publicKey = io.read(keys.publicKey, "utf8");
-    if (!own(authority, ["keyReference", "publicKeySha256", "humanName"]) || !text(authority.keyReference) || !text(authority.humanName)
-      || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
+    // NVA-SIGDISCLOSE-1 Finding 3/4: two different questions, two different messages
+    // (mirrors the FIXTURE-2 split runHumanApproval's own "setup" branch already
+    // performs, below) -- is this the right key (identity: accept BOTH the pre-humanName
+    // legacy shape and the named shape, so a merely-missing humanName can never masquerade
+    // as a key mismatch), and separately, does this record simply predate --human-name
+    // (fixable by `setup --human-name`, not a key problem at all -- see GF-112).
+    const legacyShape = own(authority, ["keyReference", "publicKeySha256"]);
+    const namedShape = own(authority, ["keyReference", "publicKeySha256", "humanName"]);
+    if ((!legacyShape && !namedShape) || !text(authority.keyReference)
+      || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) {
+      fail("external trust policy does not match the local public key");
+    }
+    if (!namedShape || !text(authority.humanName)) {
+      fail('local PO authority record predates --human-name and has no name recorded; run setup again with --human-name "<the human this key\'s approvals will be attributed to>" to add one.');
+    }
     const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: authority.keyReference, publicKey, signatureBase64: Buffer.from(io.read(artifacts.signature)).toString("base64") };
     io.write(artifacts.proof, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
     // SETUP-1: recorded on EVERY approval, independent of whether the project's trust
