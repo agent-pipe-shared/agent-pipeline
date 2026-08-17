@@ -84,10 +84,9 @@ const ADR_PATH = join(REPO_ROOT, "docs", "adr", "0062-production-execution-and-s
 
 /**
  * The fixture exit code used when no flag is passed. 7 is the ORIGINAL literal
- * and stays the default on purpose: it is what the sealed failure-path
- * artifact under specs/sprint-nova-epic/evidence/nova-a/a4/ was produced with,
- * and what the issue-acceptance matrix cites. Changing it would silently
- * invalidate that citation.
+ * and stays the default on purpose: it is what the already-sealed
+ * failure-path evidence artifact this Pipeline's own epic tracking cites was
+ * produced with. Changing it would silently invalidate that citation.
  */
 export const DEFAULT_FIXTURE_EXIT_CODE = 7;
 export const FIXTURE_EXIT_CODE_FLAG = "--fixture-exit-code";
