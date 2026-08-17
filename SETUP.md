@@ -300,7 +300,8 @@ marketplace or cache files.
 ### 1c. Declare the Git lifecycle before delivery
 
 An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
-`.claude/pipeline.json`: onboarding creates a repository but no initial commit,
+the project calibration at its resolved authority tier (`project/pipeline.json`,
+else `.claude/pipeline.json`): onboarding creates a repository but no initial commit,
 remote, or credential binding. Make the initial commit before normal work.
 When the project is intentionally connected to a shared remote, change the
 committed calibration to `repositoryMode: "remote-tracked"`; the session
@@ -358,7 +359,7 @@ For an existing project that is being adopted (not a fresh initializer), copy
 and adapt these templates in the project repository:
 
 ```sh
-cp <pipeline-source>/templates/pipeline.json.example .claude/pipeline.json
+cp <pipeline-source>/templates/pipeline.json.example project/pipeline.json
 cp <pipeline-source>/templates/CLAUDE.project.md CLAUDE.md
 ```
 

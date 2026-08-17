@@ -80,7 +80,7 @@ line and HISTORY entry.
 
 ## Step 0 — Read the project calibration (parametrization)
 
-Read `.claude/pipeline.json` of the current project. Keys starting with `$` are documentation — ignore them. Fields this ritual consumes:
+Read the project calibration at its resolved authority tier (`project/pipeline.json`, else `.claude/pipeline.json`) of the current project. Keys starting with `$` are documentation — ignore them. Fields this ritual consumes:
 
 | Field | Used for | Default when absent |
 |---|---|---|
@@ -95,7 +95,7 @@ Read `.claude/pipeline.json` of the current project. Keys starting with `$` are 
 
 ## Extension-point contract (extend WITHOUT forking)
 
-This skill defines two **named extension points**; the project hangs its own steps there via `ritualExtensions` in `.claude/pipeline.json`:
+This skill defines two **named extension points**; the project hangs its own steps there via `ritualExtensions` in the project calibration at its resolved authority tier (`project/pipeline.json`, else `.claude/pipeline.json`):
 
 - **`close.pre`** — runs as step 1, after the calibration read (step 0), BEFORE any of this ritual's own steps 2–11. **Repo state it sees:** HEAD and the working tree are exactly the state the block/session was in when this skill was invoked — none of the ritual's writes (handover, HISTORY, telemetry, retro item, final commit) exist yet (typical use: changelog sync, generated-docs refresh).
 - **`close.post`** — runs as step 9, AFTER handover/telemetry/retro (steps 5–8), BEFORE the final commit (step 10). **Repo state it sees:** the handover update (step 5), HISTORY entry (step 6), retro item (step 7) and telemetry rows (step 8) are already written to the WORKING TREE, but HEAD is still the PRE-close commit — the final commit has not happened yet (typical use: project hygiene checks whose output should be committed with the close). **Hint for gate authors:** a hook here that reads HEAD's commit date/timestamp as "now" sees yesterday's commit, not this close — use system time (`date` / `Date.now()`), never HEAD's commit date, as the freshness reference.
@@ -184,7 +184,8 @@ before choosing this path over the full ritual above.
 - [ ] **≤ 1 package/dispatch delivered** this block (the close act itself does not count).
 - [ ] **No guardrail/canon diff:** no changes to `docs/operating-model.md`, `roles/*`, `policies/*`,
       any hook (`plugins/pipeline-core/hooks/*`), `.claude/settings.json`, the project's
-      `.claude/pipeline.json`/`pipeline.yaml`, or any ADR.
+      calibration at its resolved authority tier (`project/pipeline.json`/`pipeline.yaml`,
+      else `.claude/pipeline.json`/`pipeline.yaml`), or any ADR.
 - [ ] **Session wall-clock < ~1h** (bootstrap to this close).
 - [ ] **No Critic finding ≥ major open/undisposed.**
 

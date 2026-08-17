@@ -5,8 +5,8 @@
 This is the **one maintained visual guide to the user-facing V3 flow**. It helps
 you choose a route and understand who does what. It is not permission to skip a
 gate or change a project. The active PRD and Spec define the work; the
-[Operating Model](docs/operating-model.md), the project's `pipeline.user.yaml`,
-`.claude/pipeline.yaml`, and `.claude/pipeline.json` define the applicable
+[Operating Model](docs/operating-model.md), the project's `pipeline.user.yaml`
+and the project calibration at its resolved authority tier (`project/pipeline.yaml`/`project/pipeline.json`, else `.claude/pipeline.yaml`/`.claude/pipeline.json`) define the applicable
 contract. If this guide disagrees with one of them, use that source.
 
 ## Start here: one change, one honest route
