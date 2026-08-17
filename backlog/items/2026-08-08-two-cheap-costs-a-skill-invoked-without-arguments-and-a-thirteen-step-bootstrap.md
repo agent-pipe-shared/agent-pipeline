@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.skill-arguments-and-bootstrap-length
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 94293f3288bf747c935b657290b8cfb18b18df4a
+closure_evidence: backlog/items/2026-08-08-two-cheap-costs-a-skill-invoked-without-arguments-and-a-thirteen-step-bootstrap.md
 source: "PO, 2026-08-08, findings D5 and D6 from the Claude greenfield transcript against the 0.5.4 local candidate. The PO's framing for the whole review was token waste: 'das verschwendet total viele token'."
 ---
 
@@ -106,3 +110,12 @@ the adoption path.
   repository-state drift between planning and applying. No code changed
   (accounting only, per Option A). D5 remains tracked separately as Task #65,
   untouched by this entry.
+
+## Closure (2026-08-17)
+
+Both findings this item scoped are now accounted for: D6 is fully delivered
+(`docs/bootstrap-step-accounting.md`, confirmed present, commit
+`94293f3288bf747c935b657290b8cfb18b18df4a`). D5 was never this item's own
+delivery obligation — it was queued separately as Task #65 from the item's
+first Triage entry onward, and stays tracked there rather than here. Nothing
+remains in this item's own scope. Closing.
