@@ -28,11 +28,14 @@ test("V-AC-09 includes tampered, misplaced, orphaned, and legacy-layout viewer-c
   assert.match(legacyHtml, /data-value-class="legacy">legacy<\/span> <code>EVM-V1<\/code>: Legacy explicit model; source topology was supplied by its caller\./);
 });
 // V-AC-02: only the value classes this model/renderer pair actually produce
-// are pinned. `estimate` and `assumption` are not produced anywhere in
-// evidence-view-model.mjs, evidence-view-renderer.mjs, or evidence-viewer.mjs
-// (verified by search; see evidence/phx-wp-v.txt) and are reported absent
-// rather than asserted here. `human decision` IS now produced -- see the
-// "approved lifecycle state" test below -- and is pinned there instead.
+// are pinned. `estimate` is still produced nowhere in evidence-view-model.mjs,
+// evidence-view-renderer.mjs, or evidence-viewer.mjs: this repo's one real
+// estimate is the coordinator gate ETA (`pipeline.gate-estimate.v1`,
+// `rangeMinutes` in lib/gate-estimate.mjs, projected by projectGateEstimate and
+// surfaced by continuity-status.mjs), and the viewer has no input path to it, so
+// it is reported absent rather than asserted here. `human decision` and
+// `assumption` ARE now produced -- see the "approved lifecycle state" test below
+// and the delivery-observation test at the end of this file.
 test("V-AC-02 labels fact, unknown, unavailable, redacted, invalid, and not-applicable value classes visibly", () => {
   const model = {
     schema: "pipeline.evidence-view-model.v2",
@@ -114,4 +117,22 @@ test("V-AC-06 pins representative mobile/desktop snapshot checks via determinist
   assert.match(html, /body\{margin:0 auto;max-width:76rem;padding:1\.25rem\}/);
   assert.match(html, /dl\{display:grid;grid-template-columns:max-content 1fr;gap:\.4rem 1rem\}/);
   assert.match(html, /th,td\{border:1px solid #777;padding:\.55rem;text-align:left;vertical-align:top\}/);
+});
+// V-AC-02: `assumption` is the class for a value the report carries but cannot
+// verify, and the delivery observation is exactly that -- evidence-view-model.mjs
+// admits it on shape alone (no digest, no canonical source record, no
+// exact-candidate binding), unlike the artifacts and the manifest, whose bytes
+// feature-package-topology.mjs re-hashes. Present observation values are labelled
+// assumption, absent ones stay unavailable, and the CSS asset styles the class
+// distinctly.
+test("V-AC-02 labels supplied delivery-observation values as assumptions, keeps absent ones unavailable, and styles the class distinctly", () => {
+  const base = { schema: "pipeline.evidence-view-model.v2", authority: "non-authoritative", source: { topology: "valid" }, feature: { id: "f", lifecycleState: "completed" }, candidate: { state: "fact", commit: "a".repeat(40), tree: "b".repeat(40) }, status: "unknown", sharing: "private", artifacts: [] };
+  const html = renderEvidenceView({ ...base, exportStatus: { state: "delivered", destinationProfile: "audit", cursor: 4, lag: 0, receipt: null }, notices: [{ valueClass: "assumption", code: "EVM-EXPORT-ASSUMED", message: "supplied premise" }] });
+  assert.match(html, /data-value-class="assumption">audit</);
+  assert.match(html, /data-value-class="assumption">4</);
+  assert.match(html, /data-value-class="assumption">0</);
+  assert.match(html, /data-value-class="assumption">assumption<\/span> <code>EVM-EXPORT-ASSUMED<\/code>/);
+  assert.match(html, /\.value-assumption\{/);
+  const absent = renderEvidenceView({ ...base, exportStatus: { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null }, notices: [] });
+  assert.doesNotMatch(absent, /data-value-class="assumption"/);
 });

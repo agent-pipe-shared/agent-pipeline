@@ -34,10 +34,17 @@ function artifactRows(model, sourceHref) {
 function v1ToV2(model) {
   return { schema: "pipeline.evidence-view-model.v2", authority: model.authority, source: { manifest: null, manifestSha256: null, topology: "legacy" }, feature: { id: null, lifecycleState: "unavailable" }, candidate: { state: "fact", ...model.candidate }, status: model.status, sharing: "private", exportStatus: { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null }, artifacts: model.artifacts.map((artifact, index) => ({ id: `artifact-${index + 1}`, ...artifact, sourcePath: artifact.path, valueClass: "fact", lifecycleState: "not-applicable" })), notices: [{ valueClass: "legacy", code: "EVM-V1", message: "Legacy explicit model; source topology was supplied by its caller." }] };
 }
+// V-AC-02: every value in this block comes from the caller-supplied delivery
+// observation, which evidence-view-model.mjs validates for shape only (no
+// digest, no canonical source record, no exact-candidate binding). A present
+// value is therefore a declared, unverified premise -- `assumption` -- while an
+// absent one stays `unavailable`. The state string keeps its own state-named
+// class, the convention this renderer uses for every status-ish value
+// (topology, report status, artifact integrity state).
 function exportBlock(model) {
   const observed = model.exportStatus ?? { state: "unavailable", destinationProfile: null, cursor: null, lag: null, receipt: null };
   const detail = observed.receipt === null ? "No delivery receipt is available." : `Batch ${esc(observed.receipt.batchId)}: ${esc(observed.receipt.acknowledgementClass)} / ${esc(observed.receipt.terminalDisposition)}.`;
-  return `<dl><dt>State</dt><dd>${value(observed.state, observed.state)}</dd><dt>Destination profile</dt><dd>${value(observed.destinationProfile ?? "unavailable", observed.destinationProfile ? "fact" : "unavailable")}</dd><dt>Cursor</dt><dd>${value(observed.cursor ?? "unavailable", observed.cursor === null ? "unavailable" : "fact")}</dd><dt>Lag</dt><dd>${value(observed.lag ?? "unavailable", observed.lag === null ? "unavailable" : "fact")}</dd><dt>Receipt</dt><dd>${detail}</dd></dl><p>${value("non-authoritative transport observation", "fact")}</p>`;
+  return `<dl><dt>State</dt><dd>${value(observed.state, observed.state)}</dd><dt>Destination profile</dt><dd>${value(observed.destinationProfile ?? "unavailable", observed.destinationProfile ? "assumption" : "unavailable")}</dd><dt>Cursor</dt><dd>${value(observed.cursor ?? "unavailable", observed.cursor === null ? "unavailable" : "assumption")}</dd><dt>Lag</dt><dd>${value(observed.lag ?? "unavailable", observed.lag === null ? "unavailable" : "assumption")}</dd><dt>Receipt</dt><dd>${detail}</dd></dl><p>${value("non-authoritative transport observation", "fact")}</p>`;
 }
 
 export function renderEvidenceView(input, { sourceHref = (path) => path } = {}) {

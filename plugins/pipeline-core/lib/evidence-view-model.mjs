@@ -64,6 +64,7 @@ export function buildEvidenceViewModel(input) {
 export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd(), manifestPath, sharing = "private", exportObservation = null } = {}) {
   if (typeof rootDir !== "string" || typeof manifestPath !== "string" || !["private", "redacted"].includes(sharing)) fail("EVM-REQUEST");
   const observedExport = exportStatus(exportObservation);
+  const suppliedExport = exportObservation !== null && exportObservation !== undefined;
   const root = resolve(rootDir);
   const checked = validateFeaturePackage(root, manifestPath);
   if (!checked.ok || !checked.receipt) {
@@ -97,6 +98,15 @@ export function buildEvidenceViewModelFromFeaturePackage({ rootDir = process.cwd
   const notices = [notice("fact", "EVM-NONAUTHORITY", "This report is a derived, non-authoritative projection. It cannot grant, revoke, or alter authority.")];
   if (sharing === "redacted") notices.push(notice("redacted", "EVM-REDACTED", "Artifact paths are replaced deterministically; raw prompts, logs, credentials, private paths, and coordinates are excluded."));
   if (!hasCandidate) notices.push(notice("unavailable", "EVM-CANDIDATE", "No exact candidate binding is available; no derived pass, approval, or release claim is rendered."));
+  // V-AC-02: the delivery observation is the one input this projection cannot
+  // verify. `exportStatus()` above admits it on shape alone -- no digest, no
+  // canonical source record, no exact-candidate binding -- and the CLI reads it
+  // from any operator-chosen JSON path. Every other value rendered as a `fact`
+  // is digest-bound: feature-package-topology.mjs re-hashes each artifact and
+  // the manifest against their own bytes. A premise the report carries but
+  // cannot check is an assumption, so it is declared as one rather than
+  // presented as an observed fact.
+  if (suppliedExport) notices.push(notice("assumption", "EVM-EXPORT-ASSUMED", "Delivery observation values are a supplied premise: shape-validated only, with no digest, canonical source record, or exact-candidate binding, so they are labelled assumption rather than fact."));
   return frozen({
     schema: "pipeline.evidence-view-model.v2",
     authority: "non-authoritative",

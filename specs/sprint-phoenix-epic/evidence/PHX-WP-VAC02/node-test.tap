@@ -1,0 +1,136 @@
+TAP version 13
+# Subtest: renders only candidate-bound non-authoritative explicit evidence
+ok 1 - renders only candidate-bound non-authoritative explicit evidence
+  ---
+  duration_ms: 0.650454
+  type: 'test'
+  ...
+# Subtest: rejects open or unbound explicit viewer input
+ok 2 - rejects open or unbound explicit viewer input
+  ---
+  duration_ms: 0.175451
+  type: 'test'
+  ...
+# Subtest: projects only a valid complete feature package and keeps its success claim unknown
+ok 3 - projects only a valid complete feature package and keeps its success claim unknown
+  ---
+  duration_ms: 2.103332
+  type: 'test'
+  ...
+# Subtest: invalid topology is an invalid view with no candidate or artifact leak
+ok 4 - invalid topology is an invalid view with no candidate or artifact leak
+  ---
+  duration_ms: 0.776004
+  type: 'test'
+  ...
+# Subtest: V-AC-08 represents the exact canonical lifecycle state or a typed unavailable result
+ok 5 - V-AC-08 represents the exact canonical lifecycle state or a typed unavailable result
+  ---
+  duration_ms: 7.32179
+  type: 'test'
+  ...
+# Subtest: redacted package projection is deterministic and withholds artifact paths
+ok 6 - redacted package projection is deterministic and withholds artifact paths
+  ---
+  duration_ms: 0.684264
+  type: 'test'
+  ...
+# Subtest: projects explicitly supplied delivery observation without changing the candidate claim
+ok 7 - projects explicitly supplied delivery observation without changing the candidate claim
+  ---
+  duration_ms: 0.754424
+  type: 'test'
+  ...
+# Subtest: V-AC-02 declares the supplied delivery observation as an assumption, and only when one is supplied
+ok 8 - V-AC-02 declares the supplied delivery observation as an assumption, and only when one is supplied
+  ---
+  duration_ms: 0.968885
+  type: 'test'
+  ...
+# Subtest: renders an offline, accessible static report with candidate before summary
+ok 9 - renders an offline, accessible static report with candidate before summary
+  ---
+  duration_ms: 0.990866
+  type: 'test'
+  ...
+# Subtest: rejects an authority-bearing or unknown view shape
+ok 10 - rejects an authority-bearing or unknown view shape
+  ---
+  duration_ms: 0.215831
+  type: 'test'
+  ...
+# Subtest: renders export lag and receipts as a separate non-authoritative observation
+ok 11 - renders export lag and receipts as a separate non-authoritative observation
+  ---
+  duration_ms: 0.185111
+  type: 'test'
+  ...
+# Subtest: V-AC-09 includes tampered, misplaced, orphaned, and legacy-layout viewer-conformance fixtures with deterministic snapshots
+ok 12 - V-AC-09 includes tampered, misplaced, orphaned, and legacy-layout viewer-conformance fixtures with deterministic snapshots
+  ---
+  duration_ms: 0.282812
+  type: 'test'
+  ...
+# Subtest: V-AC-02 labels fact, unknown, unavailable, redacted, invalid, and not-applicable value classes visibly
+ok 13 - V-AC-02 labels fact, unknown, unavailable, redacted, invalid, and not-applicable value classes visibly
+  ---
+  duration_ms: 0.187421
+  type: 'test'
+  ...
+# Subtest: V-AC-02 labels the approved lifecycle state as a human decision, in the summary and per-artifact rows, with distinct CSS
+ok 14 - V-AC-02 labels the approved lifecycle state as a human decision, in the summary and per-artifact rows, with distinct CSS
+  ---
+  duration_ms: 0.135741
+  type: 'test'
+  ...
+# Subtest: V-AC-06 pins the exact content-security-policy value, the skip-link's keyboard focus target, and landmark/table accessibility structure
+ok 15 - V-AC-06 pins the exact content-security-policy value, the skip-link's keyboard focus target, and landmark/table accessibility structure
+  ---
+  duration_ms: 0.181241
+  type: 'test'
+  ...
+# Subtest: V-AC-06 pins representative mobile/desktop snapshot checks via deterministic CSS string assertions
+ok 16 - V-AC-06 pins representative mobile/desktop snapshot checks via deterministic CSS string assertions
+  ---
+  duration_ms: 0.161641
+  type: 'test'
+  ...
+# Subtest: V-AC-02 labels supplied delivery-observation values as assumptions, keeps absent ones unavailable, and styles the class distinctly
+ok 17 - V-AC-02 labels supplied delivery-observation values as assumptions, keeps absent ones unavailable, and styles the class distinctly
+  ---
+  duration_ms: 0.268202
+  type: 'test'
+  ...
+# Subtest: builds a new offline report with source links and a candidate-bound receipt
+ok 18 - builds a new offline report with source links and a candidate-bound receipt
+  ---
+  duration_ms: 6.032503
+  type: 'test'
+  ...
+# Subtest: creates a redacted report without canonical paths
+ok 19 - creates a redacted report without canonical paths
+  ---
+  duration_ms: 1.982671
+  type: 'test'
+  ...
+# Subtest: renders a supplied local export observation without turning it into authority
+ok 20 - renders a supplied local export observation without turning it into authority
+  ---
+  duration_ms: 2.738125
+  type: 'test'
+  ...
+# Subtest: V-AC-07 leaves canonical authority unchanged when the generated viewer file is modified
+ok 21 - V-AC-07 leaves canonical authority unchanged when the generated viewer file is modified
+  ---
+  duration_ms: 2.593964
+  type: 'test'
+  ...
+1..21
+# tests 21
+# suites 0
+# pass 21
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 64.828796

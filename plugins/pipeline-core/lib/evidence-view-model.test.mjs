@@ -90,3 +90,19 @@ test("projects explicitly supplied delivery observation without changing the can
   assert.equal(model.status, "unknown"); assert.equal(model.exportStatus.state, "retryable-failure"); assert.equal(model.exportStatus.lag, 3);
   assert.throws(() => buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation: { ...exportObservation, receipt: { raw: "forbidden" } } }), (error) => error.code === "EVM-EXPORT");
 });
+// V-AC-02: the delivery observation is the one supplied input this projection
+// validates for shape only -- no digest, no canonical source record, no
+// exact-candidate binding -- so its values are a declared premise, not verified
+// facts like the digest-bound artifacts and manifest. The declaration is made
+// only when an observation was actually supplied.
+test("V-AC-02 declares the supplied delivery observation as an assumption, and only when one is supplied", () => {
+  const fixture = packageFixture();
+  const exportObservation = { schema: "pipeline.governance-export-view-status.v1", destinationProfile: "audit", state: "delivered", cursor: 4, lag: 0, receipt: null };
+  const assumed = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest, exportObservation });
+  const declared = assumed.notices.filter((entry) => entry.valueClass === "assumption");
+  assert.equal(declared.length, 1);
+  assert.equal(declared[0].code, "EVM-EXPORT-ASSUMED");
+  const unsupplied = buildEvidenceViewModelFromFeaturePackage({ rootDir: fixture.root, manifestPath: fixture.manifest });
+  assert.equal(unsupplied.notices.some((entry) => entry.valueClass === "assumption"), false);
+  assert.equal(unsupplied.exportStatus.state, "unavailable");
+});
