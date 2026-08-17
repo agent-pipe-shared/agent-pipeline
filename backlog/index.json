@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "9973a9c2f29e28e786f95c2b9f8763004db58e26ada28f9decb21dd14d33ae56"
+    "transitionHead": "ba90a762f1b50b981c54117fe11645e85a184c0c334843e024e1b728bfcb6efa"
   },
   "counts": {
-    "open": 110,
+    "open": 109,
     "in_progress": 22,
-    "closed": 104
+    "closed": 105
   },
   "items": [
     {
@@ -1153,11 +1153,15 @@
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06"
+      "source": "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "64654077003d35a133a942883d2da146c982dfda",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-local-plugin-install-attestation-closure.md"
     },
     {
       "id": "pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify",

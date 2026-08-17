@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-06
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 64654077003d35a133a942883d2da146c982dfda
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-local-plugin-install-attestation-closure.md
 source: "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06"
 due: 2026-09-06
 ---
@@ -113,3 +117,15 @@ Owner: PO. Due: 2026-09-06.
   design/attestation work on a security-relevant install path, not a
   same-session mechanical fix.
 - **Date:** 2026-08-07
+
+## Closure (2026-08-17)
+
+Implemented exactly per the Proposal: `externalLocalMarketplaceObservation()`
+(NVA-BL-20, extended by `NVA-MKTHASH-1`/`NVA-MKTHASH-2` this session) locates
+the external `agent-pipeline-local` root via the real Codex marketplace
+registry, hashes/validates its manifest and `plugins/pipeline-core` entry
+(symlink-resolves OR content-hash-equals this checkout), and folds the
+result into `statusSha256`. Live-environment confirmation, not just unit
+tests: the "F1 (dispatch CRITIC-REMEDY-09)" test, which exercises this
+host's actual registered marketplace root, now passes. Full closure evidence:
+`specs/sprint-nova-epic/evidence/backlog/2026-08-17-local-plugin-install-attestation-closure.md`.
