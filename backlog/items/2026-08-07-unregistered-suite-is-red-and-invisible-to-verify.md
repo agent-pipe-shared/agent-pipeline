@@ -111,3 +111,23 @@ Not designed here. Candidates, in the order they should be considered:
   are intended before re-pinning) is a prerequisite step inside candidate 3's
   work, not a separate dispatch. Neither started this session.
 - **Date:** 2026-08-11
+
+- **Update, 2026-08-17 — candidate 1 (the detector) shipped, candidate 3 (the
+  actual registration) is still outstanding; item stays `open`.**
+  `plugins/pipeline-core/scripts/check-suite-registration.mjs` was written
+  (`NVA-SUITEREG-1`, `eda26a52`), fixed after a round-1 Critic FAIL (F1 major:
+  fail-closed gap for non-`join()` `file:` shapes and mixed-segment `join()`
+  calls; F2 minor: report arithmetic) in `NVA-SUITEREG-2` (`62554374`,
+  `a783fb25`), and passed a round-2 Critic delta re-review with one minor,
+  non-blocking finding (a dispatch-record test-count claim off by 2,
+  corrected as an additive addendum — see
+  `evidence/dispatch-record-NVA-SUITEREG-2.json`). Closure evidence:
+  `specs/sprint-nova-epic/evidence/backlog/2026-08-17-check-suite-registration-detector-closure.md`.
+  Candidate 3 (registering
+  `codex-isolated-critic-protected-preimage.test.mjs` — and, per the
+  detector's own live run, 84 further genuinely-unaccounted suites beyond the
+  one this item originally named — in `harness/scripts/verify.mjs`, TP-3,
+  requiring a signature/maintenance-window ceremony) is UNCHANGED and still
+  needed before this item can close. Candidate 2 (the stale-pin fix) remains
+  a prerequisite step inside candidate 3's work.
+- **Date:** 2026-08-17

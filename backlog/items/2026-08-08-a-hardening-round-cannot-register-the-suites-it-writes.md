@@ -101,3 +101,14 @@ improved and the mechanism has not.
   item's directions 1/2 stay open, unassigned, for whoever picks up the
   registration-ceremony half.
 - **Date:** 2026-08-11
+
+- **Update, 2026-08-17 — the detector half (this item's own direction 3) has
+  shipped; item stays `open`.** See the sibling item
+  (`2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md`)'s
+  2026-08-17 update for the detector's commits, Critic history, and closure
+  evidence path. This item's directions 1/2 (whether suite registration is
+  the same risk class as editing `verify.mjs`'s logic, and if so making the
+  TP-3 ceremony batchable) remain fully open — the detector makes the gap
+  loud, it does not close the ceremony-cost question this item is actually
+  about.
+- **Date:** 2026-08-17
