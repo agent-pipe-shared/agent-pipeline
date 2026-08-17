@@ -270,22 +270,11 @@ test("P-AC-11 accepts previewRequired, rejects a non-boolean, and unions it so a
   const resolved = resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [strict, lax] });
   assert.equal(resolved.documentClasses.find((entry) => entry.class === "security").previewRequired, true);
 });
-// WP-PAC11: retention is a closed set of categorical commitments with no
-// safe partial order (see organization-policy.mjs's own header comment for
-// why it deliberately excludes a concrete duration) -- it merges exactly
-// like mode/targetBinding: exact match only, a mismatch (including declared
-// vs undeclared) fails closed under OPP-RESOLVE-CONFLICT.
-test("P-AC-11 accepts a closed retention declaration and rejects a non-closed one", () => {
-  const accepted = validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], retention: "retain-indefinitely" }] }), { coreVersion: "0.4.7" });
-  assert.equal(accepted.documentClasses[0].retention, "retain-indefinitely");
-  assert.throws(() => validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], retention: "seven-years" }] }), { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
-});
-test("P-AC-11 refuses to merge a mismatched retention for the same document class instead of choosing one", () => {
-  const indefinite = pack({ documentClasses: [{ ...pack().documentClasses[0], retention: "retain-indefinitely" }] });
-  const untilSuperseded = pack({ packId: "security-retention", revision: "11".repeat(32), documentClasses: [{ ...pack().documentClasses[0], retention: "retain-until-superseded" }] });
-  assert.throws(() => resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [indefinite, untilSuperseded] }), (error) => error.code === "OPP-RESOLVE-CONFLICT");
-  const undeclared = pack({ packId: "security-retention-silent", revision: "12".repeat(32), documentClasses: [pack().documentClasses[0]] });
-  assert.throws(() => resolveEffectiveOrganizationPolicy({ coreVersion: "0.4.7", packs: [indefinite, undeclared] }), (error) => error.code === "OPP-RESOLVE-CONFLICT");
+// PHX-WP-PAC11-DROPRETENTION: retention was dropped as a documentClasses
+// dimension (2026-08-17); a pack still declaring it now fails the closed-key
+// check exactly like any other unrecognized key.
+test("P-AC-11 rejects a documentClasses entry that still declares the removed retention key", () => {
+  assert.throws(() => validateOrganizationPolicyPack(pack({ documentClasses: [{ ...pack().documentClasses[0], retention: "retain-indefinitely" }] }), { coreVersion: "0.4.7" }), (error) => error instanceof OrganizationPolicyError && error.code === "OPP-DOCUMENT");
 });
 // WP-PAC11: conflictPolicy reuses external-reference-adapter.mjs's own
 // existing "rejected"/"reconciliation-required" status vocabulary; it is a

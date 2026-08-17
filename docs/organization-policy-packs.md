@@ -76,7 +76,7 @@ That closed shape has since grown optional keys at both levels, and this section
 was stale on both counts before 2026-08-16. A pack may additionally carry
 `provenance`, `dependencies` and `signaturePolicy`; a `documentClasses` entry may
 additionally carry `targetBinding`, `ownedSections`, `lifecycleEvents`,
-`previewRequired`, `retention` and `conflictPolicy`. Every one of them is optional
+`previewRequired` and `conflictPolicy`. Every one of them is optional
 in the strict sense: an entry declaring none of them validates and resolves exactly
 as it did before they existed, and the closed-key check simply grows by the keys the
 entry itself declares.
@@ -88,7 +88,6 @@ packs meets the failure at activation, where a wrong diagnosis is expensive:
 | key | merge rule across packs declaring the same class |
 |---|---|
 | `targetBinding` | never merged — a mismatch, **including declared against undeclared**, fails `OPP-RESOLVE-CONFLICT` |
-| `retention` | exact match only — a mismatch, **including declared against undeclared**, fails `OPP-RESOLVE-CONFLICT` |
 | `ownedSections` | set intersection; an undeclared side is neutral and yields the declared list |
 | `lifecycleEvents` | set intersection; an undeclared side is neutral |
 | `previewRequired` | logical OR — a later pack can add a required preview, never remove one |
@@ -97,16 +96,16 @@ packs meets the failure at activation, where a wrong diagnosis is expensive:
 Intersection never widens permission and OR never downgrades it, so no combination of
 packs can resolve to something more permissive than its strictest contributor.
 
-**Three of these six are declared but not yet consumed by any decision path.** Only
+**Two of these five are declared but not yet consumed by any decision path.** Only
 `mode`, `approvalRequired`, `targetBinding` and `ownedSections` currently scope a real
 permission decision, plus `previewRequired` as of the PO's 2026-08-17 amendment below;
-`lifecycleEvents`, `retention` and `conflictPolicy` validate and merge but change no
-behaviour anywhere. `retention` and `conflictPolicy`'s gap is tracked, with its
+`lifecycleEvents` and `conflictPolicy` validate and merge but change no
+behaviour anywhere. `conflictPolicy`'s gap is tracked, with its
 per-dimension reasons, in
 `backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md`; `lifecycleEvents`'
 own gap (that item explicitly disclaims covering it) is tracked separately in
 `backlog/items/2026-08-17-p-ac-11-lifecycleevents-still-has-no-owner-or-expiry.md` —
-declaring one of the three today is not an error, but it is also not enforcement.
+declaring one of the two today is not an error, but it is also not enforcement.
 
 **`previewRequired` (PO amendment, 2026-08-17):** satisfied by construction, not by
 enforcement — `external-reference-adapter.mjs`'s `preview()` runs unconditionally on
@@ -114,6 +113,16 @@ every governed write regardless of this field's value, so "scope permission by .
 preview" is already met structurally. The field stays declared for
 forward-compatibility; see `specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11
 amendment for the full reasoning.
+
+**`retention` (PO amendment, 2026-08-17): dropped, not just left inert.** No natural
+bridge exists between `identity.retention`'s `[active,retain,archive]` values (a
+different field, in `external-reference-adapter.mjs`) and this schema's three
+categorical commitments (`retain-indefinitely`, `retain-until-superseded`,
+`retain-per-external-schedule`), so the dimension is removed from `documentClasses`
+entirely rather than left declared-but-inert like `lifecycleEvents` and
+`conflictPolicy`. A pack that still declares `retention` on a `documentClasses` entry
+now fails the closed-key check the same way any other unknown key does. See
+`specs/sprint-phoenix-epic/acceptance.md`'s P-AC-11 amendment for the full reasoning.
 
 Activation is a separate, transactional step from resolution
 (`organization-policy-activation.mjs`). `planOrganizationPolicyActivation`

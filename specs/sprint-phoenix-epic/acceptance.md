@@ -641,6 +641,24 @@ architecture prose or an implementation briefing.
   criterion, not resolved by this amendment (see
   backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md's
   Triage section for their own dispositions).
+
+  **Amendment (PO, 2026-08-17), `retention` dimension only.** The `retention`
+  dimension is dropped, not left declared-but-inert like `lifecycleEvents` and
+  `conflictPolicy`. No bridge exists anywhere in this codebase between
+  `identity.retention`'s `[active,retain,archive]` vocabulary
+  (`external-reference-adapter.mjs`, a different field, left untouched by this
+  amendment) and this criterion's `retention` categorical commitments
+  (`retain-indefinitely`, `retain-until-superseded`,
+  `retain-per-external-schedule`); the two have zero overlap and no mapping
+  between them has ever been defined. A `documentClasses` entry declaring
+  `retention` now fails the same closed-key check as any other unrecognized
+  key. This criterion's list of dimensions to scope permission by is amended
+  to read: document class, target class/binding, mode, owned fields/sections,
+  lifecycle event, preview, approval, conflict policy, and revision readback
+  — `retention` removed. `conflictPolicy` remains a separate open question,
+  not resolved by this amendment (see
+  backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md's
+  Triage section).
 - **P-AC-12:** WHEN a bundle is verified offline, THE SYSTEM SHALL validate its
   manifest, artifact digests, event-chain references, topology, optional
   signature profile, and declared omissions and SHALL visibly reject
