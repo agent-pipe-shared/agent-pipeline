@@ -69,8 +69,36 @@ function frozen(value) {
   return value;
 }
 
-const FROZEN_OWNED_KEYS = frozen(JSON.parse(readFileSync(OWNED_KEYS_PATH, "utf8")));
-const FROZEN_OWNED_KEYS_CANONICAL_JSON = JSON.stringify(stableValue(FROZEN_OWNED_KEYS));
+let frozenOwnedKeysMemo = null;
+
+/**
+ * Resolve the committed owned-key manifest LAZILY, never as a module-scope
+ * side effect, and memoize the result.
+ *
+ * The manifest is a JSON config read from disk.  Reading and freezing it at
+ * module scope meant a missing, unreadable, or malformed
+ * `config/runtime-projection-v2-owned-keys.json` threw out of this module's
+ * top-level scope -- so merely IMPORTING this file crashed, before any
+ * function in any importer could run.  `runtime-projection-v3.mjs` imports
+ * this module, and the fail-closed admission hooks (`hooks/guard-lifecycle-ready.mjs`,
+ * `hooks/codex-pretool-guard.mjs`) import it in turn, so an ES-module-evaluation
+ * throw killed them before `main()` exists: node exits 1, which
+ * `hooks/hooks.json` defines as "allow + config warning".  A config fault
+ * therefore DISARMED a deliberately fail-closed gate.
+ *
+ * Deferring the read keeps importing this module free of disk access.  The
+ * failure now surfaces only inside whichever function actually needs the
+ * manifest, at the moment it is called, on that function's existing failure
+ * path -- exactly where its callers already handle errors.  A failed read is
+ * not memoized, so a repaired manifest is picked up by the next call.
+ */
+function frozenOwnedKeys() {
+  if (frozenOwnedKeysMemo === null) {
+    const manifest = frozen(JSON.parse(readFileSync(OWNED_KEYS_PATH, "utf8")));
+    frozenOwnedKeysMemo = { manifest, json: JSON.stringify(stableValue(manifest)) };
+  }
+  return frozenOwnedKeysMemo;
+}
 
 export const RUNTIME_PROJECTION_V2_OWNED_KEYS_PATH = OWNED_KEYS_PATH;
 
@@ -156,8 +184,12 @@ function validateOwnedKeysManifest(manifest) {
 }
 
 function isCommittedOwnedKeysManifest(manifest) {
+  // The committed manifest is resolved OUTSIDE the guard below: an unreadable
+  // or malformed shipped manifest is a config fault that must surface, not a
+  // caller-supplied manifest that merely fails to compare.
+  const committedJson = frozenOwnedKeys().json;
   try {
-    return JSON.stringify(stableValue(manifest)) === FROZEN_OWNED_KEYS_CANONICAL_JSON;
+    return JSON.stringify(stableValue(manifest)) === committedJson;
   } catch {
     return false;
   }
@@ -531,7 +563,9 @@ export function planRuntimeProjectionV2(intent, {
   source = "pipeline.user.v2",
   baselines = {},
   registry = loadRunnerProfilesV2Registry(),
-  ownedKeyManifest = FROZEN_OWNED_KEYS,
+  // Evaluated at call time, not at definition time: the committed manifest is
+  // read on demand exactly like every other reference below.
+  ownedKeyManifest = frozenOwnedKeys().manifest,
 } = {}) {
   if (!isCommittedOwnedKeysManifest(ownedKeyManifest)) return uncommittedManifestPlan(source);
   const validation = validatePipelineUserV2(intent, { source, registry });
@@ -546,7 +580,7 @@ export function planRuntimeProjectionV2(intent, {
       targets: [],
     };
   }
-  return planFromValidatedIntent(intent, { source, baselines, manifest: FROZEN_OWNED_KEYS });
+  return planFromValidatedIntent(intent, { source, baselines, manifest: frozenOwnedKeys().manifest });
 }
 
 /** Parses a JSON v2 source and returns the same pure read-only plan surface. */
@@ -577,7 +611,7 @@ export function planRuntimeProjectionV2Json(text, options = {}) {
 export function readRuntimeProjectionV2Baselines(rootDir) {
   const root = resolve(rootDir);
   const baselines = {};
-  for (const target of FROZEN_OWNED_KEYS.targets) {
+  for (const target of frozenOwnedKeys().manifest.targets) {
     const path = resolve(root, target.path);
     if (!isPhysicalPathContained(root, path)) {
       throw new Error(`Unsafe owned target path: ${target.path}`);
