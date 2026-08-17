@@ -76,6 +76,35 @@ and hands back the accepted spelling.
 
 The two-command flow below still exists for programmatic use and is unchanged.
 
+### A fourth kind: `release-preflight` (ADR-0064)
+
+`authorize-critical` also accepts `--kind release-preflight` — the release
+gate's consent, produced by the identical three-act ceremony above (copy the
+command, type `approve`, enter the passphrase), never a fourth ritual. The
+only difference from the `push` example: this kind adds an additive,
+kind-agnostic `--subject <repo-relative path>` flag, so the confirmation
+decodes the release version, base commit, lifecycle feature/manifest and
+retention-policy digest instead of showing a bare hash
+([ADR-0064](adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md)
+Decision 4). When `--subject` is supplied, `--subject-sha256` becomes
+optional and derived from it.
+
+```
+node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical \
+  --repo-root <repo> --directory <external-po-dir> --feature-id <id> \
+  --plan <repo-path> --spec <repo-path> \
+  --kind release-preflight --subject <repo-path> --expires-at <ISO-8601>
+```
+
+`--subject` must be a **repository-relative path to a JSON preimage that is
+gitignored but present** — never a tracked file. Building it (the
+release-preflight consent-subject JSON `release-preflight-cli.mjs` itself
+rebuilds and verifies against: `{schema, version, base, lifecycle,
+retentionPolicySha256}`) must not dirty the tree before the human signs, so
+it belongs under `/evidence/` (`.gitignore:39`), the same ignored-but-present
+location every other pre-signature scratch artifact in this flow already
+uses.
+
 ### Layer 2 (superseded as a human step) — prepare the request
 
 ```
