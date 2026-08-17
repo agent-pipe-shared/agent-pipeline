@@ -88,7 +88,17 @@ that no longer exists. Reproducible wherever `po-authority-decision-plan` runs.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Alfred. Re-verified 2026-08-17:
+  both cited literals (`plugins/pipeline-core/scripts/pipeline-state.mjs:4203`,
+  `:4481` — line numbers shifted from the original `:4326`/`:4052` but the
+  same unconditional `status: "unavailable"` object literal is still there,
+  unchanged in substance) are still unresolved.
+- **Rationale:** an authority-decision surface presenting a fake choice is
+  exactly Sprint Alfred's confirmed scope — "control integrity" —
+  (`docs/adr/0043-post-go-live-sprint-model.md`'s 2026-08-17 amendment).
+  Answering the item's own discriminator question first (is the
+  unavailability structural or an unfinished stub) is real investigation
+  work, not urgent for Nova A or Phoenix.
+- **Assignment (if accepted):** next available Alfred slot; answer the
+  discriminator (Direction step 1) before choosing between steps 2 and 3.
+- **Date:** 2026-08-17

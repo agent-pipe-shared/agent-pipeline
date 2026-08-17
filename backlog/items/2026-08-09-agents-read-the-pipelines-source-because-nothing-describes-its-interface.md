@@ -123,7 +123,16 @@ discoverable only by reading its source.** Three cheap moves, in order of return
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Rationale:** matches Sprint Nightwing's confirmed scope exactly —
+  "Product experience: onboarding, configuration, documentation and
+  low-friction adoption" (`docs/adr/0043-post-go-live-sprint-model.md`'s
+  2026-08-17 amendment) — and live Nightwing issue `#61` ("Make fresh Codex
+  onboarding internally consistent and restart-safe") covers closely
+  adjacent ground. This is a substantial discoverability/UX investigation
+  with three concrete candidate moves, not a quick fix; it does not block
+  Nova A or Phoenix's own remaining work.
+- **Assignment (if accepted):** next available Nightwing slot; the three
+  ranked "cheap moves" in this item's own Direction section are the
+  design's starting point.
+- **Date:** 2026-08-17

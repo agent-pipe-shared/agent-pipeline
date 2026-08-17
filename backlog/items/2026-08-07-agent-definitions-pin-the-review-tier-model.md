@@ -100,7 +100,23 @@ Not designed here. Candidates, explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Alfred. Re-verified 2026-08-17:
+  `plugins/pipeline-core/agents/critic.md:4` and
+  `plugins/pipeline-core/agents/goldfish-deep.md:4` both still carry
+  `model: sonnet` — unresolved. The practical dispatch-layer mitigation
+  already in effect (explicit `model`/`effort` overrides named at every
+  Critic/goldfish-deep dispatch this session, per this repo's own
+  "Model discipline" rule) is a workaround, not this item's fix.
+- **Rationale:** this is exactly Sprint Alfred's confirmed scope — "Agent-first
+  architecture, mechanical governance, measurable rigor, and control
+  integrity" (`docs/adr/0043-post-go-live-sprint-model.md`'s 2026-08-17
+  amendment) — and matches live Alfred issues `#104`/`#105`
+  ("measurable default" / "deterministic minimum rigor floor"). Not blocking
+  current Nova/Phoenix work: every T1 A/G/S dispatch this session has set the
+  tool-layer override explicitly, so the silent-inheritance failure mode is
+  currently avoided by discipline, not by design — acceptable to defer, not
+  safe to ignore indefinitely.
+- **Assignment (if accepted):** next available Alfred slot; the four
+  candidate directions in this item's own Proposal are the design's starting
+  point, not a pre-made choice.
+- **Date:** 2026-08-17

@@ -142,3 +142,29 @@ Not designed here. Three questions, and the third is the one that generalises:
   else. Flag back to the PO if a design/implementation dispatch hits this
   fork rather than picking one silently.
 - **Date:** 2026-08-11
+
+### Re-verification, 2026-08-17 — narrowed, not closed
+
+Checked against current source rather than assumed: the ORIGINAL mechanical
+contradiction this item opened with (kickoff promotion writing
+`planPath === specPath` vs. the plan gate demanding a `prd_*.md`-named
+`planPath`) is gone. `promotionInput()`
+(`plugins/pipeline-core/lib/onboarding-continuity.mjs:3984-4012`, commit
+`b64956723`, 2026-08-08 — landed the day after this item was filed, from
+independent contemporaneous work, not a dispatch against this item) now
+explicitly REJECTS `planPath === specPath`
+(`KICKOFF-PROMOTION-PLAN-IS-SPEC`) and requires `planPath === prdPath` with
+`PROMOTION_PRD_BASENAME.test(basename(prdPath))`
+(`KICKOFF-PROMOTION-PLAN-NOT-PRD`) — exactly the `prd_*.md` shape
+`po-gate-authority.mjs:651`'s `PRD_NAME.test(basename(planPath))` requires. A
+freshly promoted feature's `planPath` now satisfies the plan gate mechanically;
+the two components no longer disagree structurally. Remaining, still-real,
+still-unimplemented scope: the PO's own richer 2026-08-11 answer to Q1 ("PRD
+content-sound AND Spec-consistent is the gate") is a semantic/content check
+that does not exist anywhere in code today — only the mechanical path/name
+check does. Q2 (should a gate-less project have zero gates by default) and Q3
+(systematic gate-satisfiability testing, tracked in
+`2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md`) are both
+still open, unchanged. Kept open, current-scope (Nova/Phoenix-adjacent gate
+correctness, not deferred) — narrowed from "gate is unpassable" to "gate is
+passable but not yet checking what the PO decided it should check."
