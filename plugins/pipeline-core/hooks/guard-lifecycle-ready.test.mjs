@@ -1461,6 +1461,10 @@ test("GUARDALLOW-1: plan-partial-authority is admitted with the same shape as it
  * `--root <root> --profile <epic|feature|mini> --source <value> --plan-sha256 <hex>
  * --activate`. The allowlist had no branch for it at all, so it was 100% unreachable -- the
  * very next step after a successful plan-partial-authority refused by its own guard.
+ *
+ * NVA-LCGUARD-2: `--source` is now pinned to the exact literal `canonical-fresh-v3` --
+ * the one value `planProjectPartialAuthorityAdoption` (lib/project-onboarding-v3.mjs:439)
+ * ever lets reach this `applyAction` construction -- not merely checked loosely.
  */
 test("NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shape and no wider one", () => {
   const path = root();
@@ -1489,6 +1493,10 @@ test("NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shap
       `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source '' --plan-sha256 ${sha} --activate`,
       // flag-shaped --source value (smuggled flag instead of a value)
       `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source --bogus --plan-sha256 ${sha} --activate`,
+      // NVA-LCGUARD-2: non-empty, non-flag-shaped --source value that is NOT the one
+      // value planProjectPartialAuthorityAdoption ever lets reach applyAction -- was
+      // previously wrongly admitted by the old loose (non-empty, not flag-shaped) check.
+      `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root '${path}' --profile epic --source some-other-source --plan-sha256 ${sha} --activate`,
       // wrong --root
       `node '${ONBOARDING_SCRIPT}' apply-partial-authority --root /tmp/other --profile epic --source canonical-fresh-v3 --plan-sha256 ${sha} --activate`,
       // plan-partial-authority stays refused for this wider shape too (regression pin)
@@ -1504,42 +1512,52 @@ test("NVA-LCGUARD-1: apply-partial-authority admits exactly the applyAction shap
  * constructed verbatim by lib/project-onboarding-v3.mjs:4198 and :4111 as the documented
  * onboarding-recovery.md path for portable-seed-required when an existing remote+branch is
  * supplied. The allowlist had no adopt-remote handling at all, so the entire recovery path
- * was 100% unreachable for any not-ready project. --remote/--ref are checked loosely
- * (non-empty, not flag-shaped) -- a stricter refs/heads/-prefixed --ref format is an
- * explicitly deferred design question, not this fix's call.
+ * was 100% unreachable for any not-ready project.
+ *
+ * NVA-LCGUARD-2: --remote stays checked loosely (non-empty, not flag-shaped) -- genuinely
+ * caller-chosen at both construction sites. --ref is now pinned to the exact
+ * refs/heads/<branch> format lib/project-onboarding-v3.mjs:3988's REMOTE_REF_RE already
+ * enforces before either command is ever constructed, not merely checked loosely.
  */
 test("NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and no third subcommand", () => {
   const path = root();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const sha = "a".repeat(64);
-    const planCommand = `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref main`;
+    const planCommand = `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/main`;
     assert.equal(isSanctionedLifecycleCommand(planCommand, path), true, planCommand);
-    const applyCommand = `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${sha} --activate`;
+    const applyCommand = `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha} --activate`;
     assert.equal(isSanctionedLifecycleCommand(applyCommand, path), true, applyCommand);
     for (const command of [
       // wrong length: extra trailing arg on plan
-      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref main --extra flag`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/main --extra flag`,
       // wrong length: missing --activate on apply (shorter argv)
-      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${sha}`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha}`,
       // missing --activate, wrong trailing word instead (same length as apply)
-      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${sha} --bypass`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha} --bypass`,
       // wrong order: --ref before --remote
-      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --ref main --remote origin`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --ref refs/heads/main --remote origin`,
       // malformed / non-hex --plan-sha256 on apply
-      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${"a".repeat(63)} --activate`,
-      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref main --plan-sha256 ${"g".repeat(64)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${"a".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote apply --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${"g".repeat(64)} --activate`,
       // empty --remote / --ref value
-      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote '' --ref main`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote '' --ref refs/heads/main`,
       `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref ''`,
       // flag-shaped --remote value (smuggled flag instead of a value)
-      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote --ref --ref main`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote --ref --ref refs/heads/main`,
       // an unlisted third adopt-remote subcommand
-      `node '${ONBOARDING_SCRIPT}' adopt-remote status --root '${path}' --remote origin --ref main`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote status --root '${path}' --remote origin --ref refs/heads/main`,
       // wrong --root
-      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root /tmp/other --remote origin --ref main`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root /tmp/other --remote origin --ref refs/heads/main`,
       // the plan subcommand does not smuggle in the apply tail
-      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref main --plan-sha256 ${sha} --activate`,
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/heads/main --plan-sha256 ${sha} --activate`,
+      // NVA-LCGUARD-2: non-empty, non-flag-shaped --ref value that is NOT refs/heads/-
+      // prefixed -- was previously wrongly admitted by the old loose (non-empty, not
+      // flag-shaped) check. The bare form these positive fixtures used to pass.
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref main`,
+      // NVA-LCGUARD-2: non-empty, non-flag-shaped --ref value with a refs/ prefix that is
+      // NOT refs/heads/ -- also previously wrongly admitted.
+      `node '${ONBOARDING_SCRIPT}' adopt-remote plan --root '${path}' --remote origin --ref refs/tags/v1`,
     ]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
     }

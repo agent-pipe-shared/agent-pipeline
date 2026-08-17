@@ -1370,24 +1370,29 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // applyAction -- the very next step after a successful plan-partial-authority -- and
   // this allowlist had no apply-partial-authority branch at all, so it was 100%
   // unreachable. --profile is the CLI's own closed enum (scripts/project-onboarding-v3.mjs
-  // usage text); --source is checked loosely (non-empty, not flag-shaped), the same
-  // convention as every other free-text value field admitted by this function.
+  // usage text). NVA-LCGUARD-2: --source is pinned to the one value
+  // planProjectPartialAuthorityAdoption (lib/project-onboarding-v3.mjs:439) ever lets reach
+  // the applyAction construction -- PARTIAL_AUTHORITY_SOURCE, "canonical-fresh-v3" -- since
+  // any other source returns selection-required before that command is ever built.
   if (args[0] === "apply-partial-authority"
     && exactRoot(args, root, 1)
     && args[3] === "--profile" && ["epic", "feature", "mini"].includes(args[4])
-    && args[5] === "--source" && typeof args[6] === "string" && args[6] !== "" && !args[6].startsWith("--")
+    && args[5] === "--source" && args[6] === "canonical-fresh-v3"
     && args[7] === "--plan-sha256" && HEX.test(args[8] ?? "")
     && args[9] === "--activate" && args.length === 10) return true;
   // lib/project-onboarding-v3.mjs:4198 and :4111 construct exactly these two commands --
   // the documented onboarding-recovery.md path for portable-seed-required when an existing
   // remote+branch is supplied. Only these two adopt-remote subcommands are ever admitted;
-  // --remote/--ref are checked loosely (non-empty, not flag-shaped) like --source above --
-  // a stricter refs/heads/-prefixed --ref format is an explicitly open, deliberately
-  // deferred design question, not decided here.
+  // --remote is checked loosely (non-empty, not flag-shaped) -- genuinely caller-chosen at
+  // both construction sites. NVA-LCGUARD-2: --ref is pinned to the exact
+  // refs/heads/<branch> format lib/project-onboarding-v3.mjs:3988's REMOTE_REF_RE already
+  // enforces before either adopt-remote command is ever constructed -- this guard now
+  // mirrors that already-enforced format rather than deferring a decision that was already
+  // made.
   if (args[0] === "adopt-remote" && ["plan", "apply"].includes(args[1])
     && exactRoot(args, root, 2)
     && args[4] === "--remote" && typeof args[5] === "string" && args[5] !== "" && !args[5].startsWith("--")
-    && args[6] === "--ref" && typeof args[7] === "string" && args[7] !== "" && !args[7].startsWith("--")
+    && args[6] === "--ref" && /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]*$/u.test(args[7] ?? "")
     && ((args[1] === "plan" && args.length === 8)
       || (args[1] === "apply" && args[8] === "--plan-sha256" && HEX.test(args[9] ?? "")
         && args[10] === "--activate" && args.length === 11))) return true;
