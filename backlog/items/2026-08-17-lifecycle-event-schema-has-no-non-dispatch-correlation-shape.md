@@ -91,8 +91,11 @@ in this epic).
   (validator, ≥5 candidate producer call sites, ≥2 consumers); not safely
   attemptable as a same-session extension without a reviewed design doc,
   the same standard already applied to H-AC-11/PX0-AC-13 in this epic.
-- **Assignment (if accepted):** a future increment, outside Sprint Phoenix's
-  current close-out window; owner `pipeline`, no expiry set (Phoenix's own
-  L-AC-01 stays formally `partial` at 2/9 in the meantime, per the
-  acceptance.md amendment this item is referenced from).
+- **Assignment (if accepted):** **Nova B** (PO decision, 2026-08-17) — the
+  sprint that rebases Phoenix's own work onto it; not an unnamed future
+  increment. Owner `pipeline`, review trigger = Nova B's own planning
+  (Phoenix is already building toward this shape, so a same-night Phoenix
+  extension would likely be redone there anyway). Phoenix's own L-AC-01
+  stays formally `partial` at 2/9 in the meantime, per the acceptance.md
+  amendment this item is referenced from.
 - **Date:** 2026-08-17

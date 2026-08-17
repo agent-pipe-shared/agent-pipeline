@@ -573,6 +573,19 @@ architecture prose or an implementation briefing.
   L-AC-01 stays `partial` at 2 of 9; closing further kinds needs that design
   decided first, the same disposition class already used for H-AC-11's O-4 and
   PX0-AC-13's clause 1.
+
+  **Third amendment (PO, 2026-08-17): named review trigger is Nova B, not an
+  unnamed future increment.** The PO's own preferred disposition: the
+  non-dispatch correlation shape for `verification`/`review`/`gate`/
+  `recovery`/`reconciliation` is real design work Phoenix itself is already
+  building toward, so a same-night extension inside Phoenix would likely be
+  redone anyway. Explicitly deferred to Nova B (the sprint that rebases
+  Phoenix's own work onto it) rather than left as an unnamed future
+  increment — this is the named review trigger EPIC-AC-05's `disposed` state
+  requires. `backlog/items/2026-08-17-lifecycle-event-schema-has-no-non-dispatch-correlation-shape.md`'s
+  triage updated: assignment is Nova B by name, decision stays `deferred`
+  (not rejected — this one really is future work, just concretely targeted
+  rather than open-ended). Verdict unaffected, stays `partial` at 2 of 9.
 - **L-AC-02:** WHEN an event derives from the #10 control/execution exchange,
   THE SYSTEM SHALL retain package, dispatch, attempt, queue, candidate, worker,
   correlation, and invalidation identity.
@@ -1031,6 +1044,18 @@ architecture prose or an implementation briefing.
   (acknowledged/authorized/copied) are real and producer-backed; the other
   3 (displayed/generated/asserted) need that design decided first, the same
   standard already applied to L-AC-01's remaining 7 triggers.
+
+  **Second amendment (PO, 2026-08-17): `displayed`/`generated`/`asserted`
+  permanently dropped from this criterion's scope, not deferred.** The PO
+  decided these three do not get designed and built later — the criterion's
+  trigger list above is narrowed to `acknowledged`, `authorized`, and
+  `copied` only (plus the unconditional negative half). This is a real PO
+  decision (not the Elephant's own earlier self-scoping, which only deferred
+  them); `backlog/items/2026-08-17-command-offer-schema-has-no-displayed-generated-asserted-states.md`'s
+  triage is updated to `rejected`, not `deferred`. **Verdict flips to
+  `implemented`**: everything this narrowed criterion now requires
+  (negative half + acknowledged/authorized/copied, all producer-backed and
+  independently confirmed above) is real and built.
 - **R-AC-07:** WHEN THE PIPELINE initiates execution, THE SYSTEM SHALL append
   `attempted` and may append `observed-completed` or `readback-verified` only
   when bounded evidence supports the respective fact. A user-executed command

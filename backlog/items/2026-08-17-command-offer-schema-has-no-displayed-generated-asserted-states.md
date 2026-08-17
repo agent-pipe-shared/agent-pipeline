@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.command-offer-schema-has-no-displayed-generated-asserted-states
 type: requirement
 owner: pipeline
-status: open
+status: rejected
 created: 2026-08-17
 source: R-AC-06 investigation (PHX-WP-RAC06, 2026-08-17), specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['R-AC-06']
 ---
@@ -75,14 +75,19 @@ disposition class already used in this epic).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** deferred
-- **Rationale:** genuine schema-design work (new state vocabulary members,
-  their transition rules, and their producer) with no existing operational
-  definition to build against; not safely attemptable as a same-session
-  extension without a reviewed design doc, the same standard already
-  applied to L-AC-01/H-AC-11/PX0-AC-13 in this epic.
-- **Assignment (if accepted):** a future increment, outside Sprint
-  Phoenix's current close-out window; owner `pipeline`, no expiry set
+- **Decision:** rejected (PO, 2026-08-17 — supersedes the `deferred`
+  disposition below, which was only the Elephant's own same-session scoping,
+  not a real PO decision)
+- **PO rationale:** these three states are not going to be designed and
+  built later either; drop them from R-AC-06's scope permanently rather
+  than carry an indefinite backlog item for undefined states with no
+  operational meaning.
+- **Original (superseded) rationale:** genuine schema-design work (new
+  state vocabulary members, their transition rules, and their producer)
+  with no existing operational definition to build against; not safely
+  attemptable as a same-session extension without a reviewed design doc,
+  the same standard already applied to L-AC-01/H-AC-11/PX0-AC-13 in this
+  epic.
   (R-AC-06 stays formally scoped to its three producible states in the
   meantime, per the acceptance.md amendment this item is referenced from).
 - **Date:** 2026-08-17
