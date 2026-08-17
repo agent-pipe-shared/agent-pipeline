@@ -296,6 +296,8 @@ import {
   recordCourseDecisionBrief,
   validateContinuityState,
 } from "../lib/continuity-state.mjs";
+import { createControlExecutionExchange } from "../lib/control-execution-exchange.mjs";
+import { buildLifecycleDispatchEvent } from "../lib/control-execution-lifecycle-event.mjs";
 import {
   canonicalJson as canonicalDecisionJson,
   sha256Canonical,
@@ -2125,6 +2127,91 @@ function continuityTransition(sub, base, expectedRevision, request) {
   return clearDecisionSelection(base.continuity, { expectedRevision, receipt: request.receipt }, featureId);
 }
 
+const LIFECYCLE_EVENT_FLAGS = ["lifecycle-event-out", "parent-orchestration-id", "worker-id", "correlation-id"];
+
+/* PHX L-AC-01. A dispatch admission is a material lifecycle event, and this CAS
+ * is the only transaction that installs a `queueHead.dispatch`. So the event is
+ * produced HERE, from the exact continuity state about to be committed, rather
+ * than reconstructed later from a log that would have to guess which revision
+ * admitted which dispatch.
+ *
+ * It is opt-in for one honest reason: worker and correlation identity do not
+ * exist in the continuity state at all -- they live in the coordinator that
+ * dispatched the worker -- and the lifecycle schema requires both. Without them
+ * no truthful event can be built, so an operator that cannot supply them keeps
+ * this command's previous behaviour byte for byte. Asking for the event on a
+ * transition that admits no dispatch is a refusal, not a silent no-op.
+ *
+ * Planning happens BEFORE the state write (a refusal here costs zero mutation);
+ * only the file write happens after, once the admission it describes is durable.
+ */
+function planDispatchLifecycleEvent(sub, dir, previous, next, flags, deps) {
+  const requested = LIFECYCLE_EVENT_FLAGS.filter((flag) => !isBlank(flags[flag]));
+  if (requested.length === 0) return { ok: true, planned: null };
+  if (sub !== "continuity-cas") return { ok: false, code: "PS-LIFECYCLE-EVENT-SCOPE" };
+  if (requested.length !== LIFECYCLE_EVENT_FLAGS.length) return { ok: false, code: "PS-LIFECYCLE-EVENT-ARGUMENTS" };
+  const before = previous?.queueHead?.dispatch ?? null;
+  const dispatch = next?.queueHead?.dispatch ?? null;
+  if (dispatch === null || before !== null) return { ok: false, code: "PS-LIFECYCLE-EVENT-NO-ADMISSION" };
+  const target = boundLifecycleEventTarget(dir, flags["lifecycle-event-out"]);
+  if (!target.ok) return target;
+  const candidate = (deps.gitCandidate ?? defaultGitCandidate)(dir);
+  if (!candidate.ok) return { ok: false, code: "PS-LIFECYCLE-EVENT-CANDIDATE" };
+  try {
+    const exchange = createControlExecutionExchange({
+      continuityState: next,
+      // At admission the worker has produced nothing yet: base and candidate are
+      // the same observed tree. Claiming a distinct candidate here would assert a
+      // commit that does not exist.
+      gitBinding: { baseCommit: candidate.commit, candidateCommit: candidate.commit, candidateTree: candidate.tree },
+      orchestrationAssignment: {
+        parentOrchestrationId: flags["parent-orchestration-id"],
+        workerId: flags["worker-id"],
+        correlationId: flags["correlation-id"],
+      },
+      invalidation: { state: "valid", reasonCode: null, supersededByQueueRevision: null },
+      event: {
+        class: "admission",
+        status: "admitted",
+        observedAt: (deps.now ?? (() => new Date().toISOString()))(),
+        // The evidence is the committed state itself, digested canonically.
+        evidenceSha256: sha256Bytes(canonicalDecisionJson(next)),
+      },
+      extensions: {},
+    });
+    return { ok: true, planned: { path: target.path, event: buildLifecycleDispatchEvent({ exchange }) } };
+  } catch {
+    return { ok: false, code: "PS-LIFECYCLE-EVENT-PROJECTION" };
+  }
+}
+
+/* A lifecycle event is append-only evidence: an existing path is refused, never
+ * overwritten, and the target may not leave the repository root. */
+function boundLifecycleEventTarget(dir, relativePath) {
+  if (isAbsolute(relativePath)) return { ok: false, code: "PS-LIFECYCLE-EVENT-PATH" };
+  let root;
+  try { root = realpathSync(resolve(dir)); } catch { return { ok: false, code: "PS-LIFECYCLE-EVENT-PATH" }; }
+  const path = resolve(root, relativePath);
+  if (!path.startsWith(`${root}${sep}`) || relative(root, path).startsWith(`..${sep}`)) return { ok: false, code: "PS-LIFECYCLE-EVENT-PATH" };
+  try { lstatSync(path); return { ok: false, code: "PS-LIFECYCLE-EVENT-EXISTS" }; } catch { /* absent is the only admissible state */ }
+  return { ok: true, path };
+}
+
+function writeLifecycleEventFile(planned) {
+  let fd;
+  try {
+    mkdirSync(dirname(planned.path), { recursive: true });
+    fd = openSync(planned.path, "wx", 0o600);
+    writeSync(fd, `${JSON.stringify(planned.event, null, 2)}\n`);
+    fsyncSync(fd);
+    return { ok: true };
+  } catch {
+    return { ok: false, code: "PS-LIFECYCLE-EVENT-WRITE" };
+  } finally {
+    if (fd !== undefined) { try { closeSync(fd); } catch { /* the write result already decided the outcome */ } }
+  }
+}
+
 function runContinuityCommand(sub, flags, deps) {
   const dir = deps.dir ?? projectDir();
   const expected = parseExpectedRevision(flags["expected-revision"], sub === "continuity-init");
@@ -2203,6 +2290,11 @@ function runContinuityCommand(sub, flags, deps) {
       console.error(`Error: continuity transition refused (${transition.code}); zero mutation.`);
       return 2;
     }
+    const lifecycle = planDispatchLifecycleEvent(sub, dir, existing.state.continuity ?? null, transition.state, flags, deps);
+    if (!lifecycle.ok) {
+      console.error(`Error: dispatch lifecycle event refused (${lifecycle.code}); zero mutation.`);
+      return 2;
+    }
     if (!transition.mutated) {
       console.log(`${transition.code}: accepted with zero mutation.`);
       return 0;
@@ -2218,6 +2310,14 @@ function runContinuityCommand(sub, flags, deps) {
         console.error(`Error: continuity write refused before commit (${written.code}); zero mutation.`);
       }
       return 2;
+    }
+    if (lifecycle.planned !== null) {
+      const emitted = writeLifecycleEventFile(lifecycle.planned);
+      if (!emitted.ok) {
+        console.error(`Error: continuity state committed at revision ${transition.state.revision}, but the dispatch lifecycle event could not be persisted (${emitted.code}); mutation is NOT reported as zero.`);
+        return 2;
+      }
+      console.log(`PS-LIFECYCLE-EVENT-WRITTEN: dispatch event ${lifecycle.planned.event.eventId} persisted.`);
     }
     console.log(`${transition.code}: continuity revision ${transition.state.revision} written.`);
     return 0;
