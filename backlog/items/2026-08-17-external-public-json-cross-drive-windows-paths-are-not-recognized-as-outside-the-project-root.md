@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: be7a992edf548af3410adab07520b8baad95a5db
+closure_evidence: backlog/items/2026-08-17-external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root.md
 created: 2026-08-17
 source: "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing."
 ---
@@ -72,3 +76,14 @@ similar containment check (this class has recurred at least twice now).
   (`2026-08-08-the-signed-guard-override-has-no-command-that-emits-the-digest-to-sign.md`,
   `2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md`).
 - **Date:** 2026-08-17
+
+## Closure (2026-08-17)
+
+Fixed via goldfish-deep dispatch NVA-WINPATH-3 (truncated mid-verify;
+Elephant reviewed the diff directly, independently re-ran
+`node --test plugins/pipeline-core/scripts/pipeline-state.test.mjs` — 1/1
+pass — and finalized as an Elephant closeout). `externalPathIsOutsideRoot()`
+extracted, mirroring the platform-injectable win32Path/posixPath pattern
+already used by `po-human-approval.mjs`'s `outside()` (NVA-WINPATH-1/2);
+`externalPublicJson()` now uses it instead of the default host-platform
+`relative()`. Commit `be7a992edf548af3410adab07520b8baad95a5db`.

@@ -77,7 +77,7 @@
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.four-critic-preimage-pins-drifted-or-never-valid | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
@@ -253,6 +253,6 @@
 
 ## Counts
 
-- open: 102
+- open: 101
 - in_progress: 22
-- closed: 121
+- closed: 122

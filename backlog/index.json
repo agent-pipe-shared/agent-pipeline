@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e5d714ec37920b2931d71fc199c33bd3bb24dffc4132ac25a7e1db03e53a6b85"
+    "transitionHead": "7a2205ed88eee223d26f26f780278086911d75fc980ecc1f08e4b1f0fee44103"
   },
   "counts": {
-    "open": 102,
+    "open": 101,
     "in_progress": 22,
-    "closed": 121
+    "closed": 122
   },
   "items": [
     {
@@ -713,11 +713,15 @@
     },
     {
       "id": "pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing."
+      "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "be7a992edf548af3410adab07520b8baad95a5db",
+      "closureEvidence": "backlog/items/2026-08-17-external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root.md"
     },
     {
       "id": "pipeline.four-critic-preimage-pins-drifted-or-never-valid",
