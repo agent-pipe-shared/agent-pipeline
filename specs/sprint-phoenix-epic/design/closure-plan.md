@@ -141,9 +141,23 @@ agent-decision-journal-tests pass (49 pre-existing + 2 new); both independently 
 synced candidate. Moves out of Class B entirely (7 remain, was 8). Open count: **16 of 157**
 (was 17).
 
+**UPDATE, 2026-08-17 (Elephant-context investigation, not a dispatch).** A-AC-09
+closes: `implemented`. The prior framing ("nothing computes routine/low-impact
+itself") was the wrong bar: the criterion's THEN-clause is a negative content
+requirement ("avoid producing exhaustive reasoning or token-level telemetry"),
+satisfied unconditionally regardless of whether that classification ever runs.
+Every field across `agent-decision-journal.mjs`'s three closed event shapes is a
+bounded enum, a short ID/CODE-pattern identifier, a SHA-256 digest, a bounded
+integer, or a bounded path pattern — never free text, per the module's own
+explicit source comment (`agent-decision-journal.mjs:60-61`, "never free text,
+which this module admits nowhere"). No event this journal admits can carry
+exhaustive reasoning or token-level telemetry, mandatory or sampled-out,
+material or routine. Moves out of Class B entirely (6 remain, was 7). Open
+count: **15 of 157** (was 16).
+
 ## What this design is for
 
-The measurement established that **16 of 157** acceptance criteria are not
+The measurement established that **15 of 157** acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart — provided it is regenerated when the verdict data moves, which is the exact
@@ -158,9 +172,9 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 0 | (both prior members, A-AC-14/PX0-AC-03, closed — see below) |
 | D — documentation missing | 0 | (prior member L-AC-08 reclassified to P 2026-08-17, then closed the same day — see below) |
 | S — seam missing | 0 | (prior member E-AC-20 closed 2026-08-10) |
-| B — capability missing | 7 | real implementation plus its tests |
+| B — capability missing | 6 | real implementation plus its tests |
 | P — not code | 9 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **16** | |
+| **total** | **15** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -320,14 +334,13 @@ these, is in
 [`../evidence/acceptance-evidence-map-20260817f.md`](../evidence/acceptance-evidence-map-20260817f.md)
 — not repeated here, since this document's job is the OPEN set.
 
-### Class B — an absent capability (7)
+### Class B — an absent capability (6)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | A-AC-01 | partial | WP-A | record shape pinned; nothing enforces recording BEFORE dependent action where policy requires. INVESTIGATED 2026-08-17 (Elephant-context, not a dispatch, per design/agent-decision-journal-production-producer.md sec.6 step 2): the seam is the continuity course-decision machinery (`continuity-select-course`/`continuity-apply-decision`, `applyDecisionSelection`) — the SAME machinery A-AC-05 already names and the PO already deferred. Stays deferred alongside A-AC-05, not independently dispatchable |
 | A-AC-03 | not-started | WP-A | NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption. INVESTIGATED 2026-08-17: same conclusion as A-AC-01 — would hang off the same deferred machinery |
 | A-AC-05 | partial | WP-AAC05 | the observational shape (identity array, dimension/value/provenance/assurance) is pinned on selection/escalation/fallback. Still no production caller: CONFIRMED ABSENT that any code path emits a selection/escalation/fallback event at all — wiring `advisory-decision-event.mjs`'s translator into the real `advisory-coordinator.mjs` flow is real architecture work, deliberately deferred to a session with PO input available (design/agent-decision-identity-scoping.md) |
-| A-AC-09 | partial | WP-A | `assertMandatoryCaptureNotSkipped` (governance-event-store.mjs) lets a caller avoid persisting a non-mandatory event, tested; nothing computes "routine/low-impact" itself — the caller still decides |
 | EPIC-AC-02 | partial | WP-EPIC | UPDATE 2026-08-17 (PHX-WP-EPICAC02, commit `77d2d8d5`, independently re-verified): `checkUnpublishedSiblingSprintConsumption` built — a real, non-invented, caller-observation-driven gate, tested (25/25), already registered as a blocking suite in `verify.mjs:405`. Stays open: no live `verify.mjs` check yet calls it against real `specs/*/lifecycle.json` manifests — that registration line is TP-3-protected |
 | L-AC-01 | partial | WP-L | UPDATE 2026-08-17 (PHX-WP-LAC01, commit `fd57d390`): first real producer landed — `continuity-cas` now durably persists a schema-valid `dispatch`-kind lifecycle event via a new translator, independently re-verified (unit + call-site + 506/506 gated regression + e2e readback). UPDATE 2026-08-17 (PHX-WP-LAC01B, commit `8e4be420`): second real producer landed — `continuity-integrate-final` now durably persists a `status`-kind event via a sibling translator, independently re-verified (unit + call-site tests green, gated regression 504/506 — the 2 failures are the same pre-existing FTP-ARTIFACT-2 acceptance.md-digest-staleness cause, confirmed pre-existing by re-running the identical suite at the prior commit). Honest count: **2 of 9** — NOT status+cancellation as hoped: the real continuity outcome vocabulary only ever observes succeeded/failed, so cancellation stays unreached despite the projection covering it. `candidate-invalidation` also confirmed to have no real caller (invalidation is always constructed `{state:"valid"}`; zero non-test producers of an invalidated state anywhere). Remaining 7 kinds all need a source vocabulary to exist before a producer can — a capability gap now, not a translator-authoring gap. Registering the new call-site suites into `harness/scripts/verify.mjs` is blocked by the same installed-plugin TP-3 gap as the other four parked reds |
 | V-AC-02 | partial | WP-V | eight of nine now labelled. UPDATE 2026-08-17 (PHX-WP-VAC02, commit `8325f2d0`, independently re-verified): `assumption` genuinely labelled — the governance-export delivery observation was previously mislabelled `fact` with no digest/canonical-source binding. `estimate` stays unpinned, confirmed absent by design: the one real estimate in this repo belongs to a different report entirely and has no path into the Evidence Viewer today |

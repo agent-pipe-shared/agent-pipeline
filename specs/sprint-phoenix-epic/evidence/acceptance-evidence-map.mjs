@@ -1258,6 +1258,36 @@ const DELTA = {
   // historical events themselves.
   'A-AC-03': ['not-started', 'STALE4'],
   'A-AC-09': ['partial', 'STALE4'],
+
+  // A-AC-09 CLOSED 2026-08-17 (Elephant-context investigation, not a dispatch --
+  // matching design/agent-decision-journal-production-producer.md sec.6 step 2's
+  // guidance for a pure code-reading question). Prior framing treated the gap as
+  // "nothing computes routine/low-impact classification, the caller decides" --
+  // true but not the actual bar: the criterion's THEN-clause is a negative
+  // content requirement ("avoid producing exhaustive reasoning or token-level
+  // telemetry"), not a classification requirement, and it is satisfied
+  // unconditionally, independent of whether routine/low-impact is ever computed.
+  // Read all three of agent-decision-journal.mjs's validators in full
+  // (validateAgentDecisionEvent, validateCommandOfferEvent,
+  // validateLegacyImportObservationEvent): every field across all three closed
+  // shapes is a bounded enum, a short ID/CODE regex-pattern identifier (max 128
+  // chars), a SHA-256 digest, a bounded integer, or a bounded path pattern --
+  // never free text. The module's own source comment states this as a
+  // deliberate invariant, not an incidental fact: "never free text, which this
+  // module admits nowhere" (agent-decision-journal.mjs:60-61, on
+  // revalidationTrigger, generalizing to every other field on the shape).
+  // Consequently this journal cannot carry exhaustive reasoning or token-level
+  // telemetry for ANY event -- mandatory or sampled-out, material or routine --
+  // so the WHEN-antecedent's classification question is moot: the SHALL holds
+  // by construction, the same shape H-AC-08/H-AC-09's amendments already used
+  // for a vacuously-satisfied antecedent, except here the consequent itself is
+  // unconditionally true rather than the antecedent being unreachable. No
+  // acceptance.md amendment needed (unlike H-AC-08/H-AC-09): this does not
+  // change what the criterion's text requires, only correctly assesses whether
+  // current code already meets it -- the same class of correction as R-AC-09's
+  // 2026-08-17 measurement fix in this same file.
+  'A-AC-09': ['implemented', 'WP-AAC09'],
+
   'P-AC-09': ['partial', 'STALE4'],
   'EPIC-AC-02': ['not-started', 'STALE4'],
 
@@ -1510,7 +1540,7 @@ const POINTERS = {
 
   // --- 2026-08-11 staleness audit (task PHX-WP-DELTA-STALE4) ---
   'A-AC-03': 'reconfirmed 2026-08-11: NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption (direct grep of "A-AC-03" and "material assumption"/"invalidat*"/"revalidat*" across plugins/pipeline-core/{lib,scripts} finds nothing beyond unrelated Cyborg control-waiver revalidationTrigger fields; agent-decision-journal.mjs validates event shape only, no cascade logic). INVESTIGATED 2026-08-17 (Elephant-context, same pass as A-AC-01): same conclusion applies -- a revalidation/invalidation path would need to hang off the same continuity course-decision machinery A-AC-01/A-AC-05 already share, which the PO has already deferred pending a design session. Not dispatched; stays deferred alongside A-AC-01/A-AC-05',
-  'A-AC-09': 'RETRACTS "no code enforces or measures it" -- governance-event-store.mjs\'s captureDecision:"sampled-out" path (assertMandatoryCaptureNotSkipped, landed 2026-08-10 commit 90283a0c for A-AC-07, never credited here) lets a caller avoid durably persisting a non-mandatory agent-origin event -- exactly the "avoid producing... telemetry" behavior for non-material activity this criterion names. Tested: governance-event-store.test.mjs "A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can" and "...only the policy-selected agent stream may ever be sampled out" (both pass). Partial only: nothing computes "routine/low-impact" itself (the caller decides captureDecision), and no independent Critic PASS exists for this candidate',
+  'A-AC-09': 'RETRACTS "no code enforces or measures it" -- governance-event-store.mjs\'s captureDecision:"sampled-out" path (assertMandatoryCaptureNotSkipped, landed 2026-08-10 commit 90283a0c for A-AC-07, never credited here) lets a caller avoid durably persisting a non-mandatory agent-origin event -- exactly the "avoid producing... telemetry" behavior for non-material activity this criterion names. Tested: governance-event-store.test.mjs "A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can" and "...only the policy-selected agent stream may ever be sampled out" (both pass). CLOSES 2026-08-17 (Elephant-context investigation): the remaining "nothing computes routine/low-impact" gap was mis-scoped as the bar to clear. The criterion is a negative content requirement, satisfied unconditionally: every field across agent-decision-journal.mjs\'s three closed event shapes (validateAgentDecisionEvent/validateCommandOfferEvent/validateLegacyImportObservationEvent) is a bounded enum, a short ID/CODE-pattern identifier, a SHA-256 digest, a bounded integer, or a bounded path pattern -- never free text, confirmed by the module\'s own explicit source comment at agent-decision-journal.mjs:60-61 ("never free text, which this module admits nowhere"). No event this journal admits, mandatory or sampled-out, material or routine, can carry exhaustive reasoning or token-level telemetry -- the SHALL holds by construction regardless of whether routine/low-impact classification ever runs',
   'P-AC-09': 'RETRACTS the "no export-backfill preview... exists" half -- organization-policy-activation.mjs\'s computeBackfillRange/backfillRange preview field (already credited to P-AC-03 as implemented, WP-P-AC01-AC03) is real and tested (organization-policy-activation.test.mjs "P-AC-03 computes newlyRequiredArtifacts, externalEffects, and backfillRange deterministically from the transition", 4/4 pass). CLOSES 2026-08-17 (PHX-WP-PAC09, commit 6b9a656e, independently re-verified): the remaining two gaps are built. activateOrganizationPolicy now requires a distinct backfillGranted/backfillDecisionId/backfillSubjectSha256 consent, exact-key-bound to a digest over the plan\'s own preview, refused by name (OPA-BACKFILL-CONSENT) when a backfill-implying activation supplies only the ordinary activation authority -- proven by a refusal test that re-confirms the prior policy stays active. organization-policy-backfill-export.mjs exports a consented backfillRange by reusing the real pipeline (queryPortableGovernanceStream -> projectGovernanceEvent -> enqueueGovernanceExport -> deliverGovernanceExportBatch), proven end-to-end with real appended events and a real delivered disposition, not a mock. 80/80 across the full affected regression set, independently re-run at the exact commit',
   'EPIC-AC-02': 'reconfirmed 2026-08-11: NO CARRIER: planParallelSprintIntegration (plugins/pipeline-core/lib/parallel-sprint-integration.mjs) still has no concept of "unpublished" (direct grep for "unpublished"/"Nova"/"Cyborg"/"Nightwing" in the file: zero hits) and is still imported only from its own test file (grep for the import across plugins/pipeline-core and harness: only parallel-sprint-integration.test.mjs). UPDATE 2026-08-17 (PHX-WP-EPICAC02, commit 77d2d8d5, independently re-verified): `checkUnpublishedSiblingSprintConsumption` built -- a feature-package manifest binds exactly one commit identity (`candidate.commit`); "consumes" means that commit or its ancestry carries a commit belonging to Nova/Cyborg/Nightwing, "unpublished" means `git merge-base --is-ancestor` against that epic\'s published tip fails or was never observed. The gate never calls git itself (caller-supplied observations only, confirmed: zero git invocations in the function), returns a digest-sealed fail-closed verdict, and its test suite is already registered as blocking in verify.mjs:405. Stays `partial`: no live verify.mjs check yet calls this gate against real specs/*/lifecycle.json manifests -- that registration line is TP-3-protected and deliberately left for the file\'s own owner. 25/25 checks pass, independently re-run',
 };
