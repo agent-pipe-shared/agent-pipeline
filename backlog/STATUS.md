@@ -6,6 +6,7 @@
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0047-numbering-collision | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
@@ -221,6 +222,6 @@
 
 ## Counts
 
-- open: 98
+- open: 99
 - in_progress: 22
 - closed: 93

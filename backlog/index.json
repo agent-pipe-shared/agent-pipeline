@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3764382fba5e2445a185a5770c4cf00290dcf412eaa32a12c5d0e5bb296cd464"
+    "transitionHead": "9b2294343362a245c17eca64a3beac2d82a00f77fd90ceffeb1f5daf2d05985c"
   },
   "counts": {
-    "open": 98,
+    "open": 99,
     "in_progress": 22,
     "closed": 93
   },
@@ -18,6 +18,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, live greenfield onboarding with the Claude runner, 2026-08-07: 'der status wird initial falsch gesetzt und es gibt keinen sauberen lauf zum PRD und Freigabe'. The session located both halves in code before reporting."
+    },
+    {
+      "id": "pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Nova A Slice A7 comprehensive gate Critic review (continuation dispatch), 2026-08-17, findings F3 (major) and F4 (minor). Both are documentation/spec-conformance questions deliberately NOT resolved unilaterally by the Elephant, per spec.md's own rule that a contradiction fails closed to the applicable human gate rather than being silently narrowed."
     },
     {
       "id": "pipeline.absent-runner-flag-silently-defaults-to-codex",
