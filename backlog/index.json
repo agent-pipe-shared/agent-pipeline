@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "78df41bb080086770f7928cd5c7a904b35469ada15ffdf48d2da41f7de77b6e8"
+    "transitionHead": "8c274aa4fc68f44d0d2ed35fae693ba95b281d1d939a65c6ad4003566e3e2e57"
   },
   "counts": {
-    "open": 101,
+    "open": 100,
     "in_progress": 22,
-    "closed": 94
+    "closed": 96
   },
   "items": [
     {
@@ -693,11 +693,23 @@
     },
     {
       "id": "pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-16",
-      "source": "Live GMW ceremony during the Nova A AFK-session bootstrap, this session (2026-08-16) -- guard-maintenance-window.mjs install wrote a well-formed, correctly-signed window record, but the immediate re-read (and every subsequent status/guard check) reported absent."
+      "source": "Live GMW ceremony during the Nova A AFK-session bootstrap, this session (2026-08-16) -- guard-maintenance-window.mjs install wrote a well-formed, correctly-signed window record, but the immediate re-read (and every subsequent status/guard check) reported absent.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "04a663d9",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-v3-trustanchors-gmw-hgo-fix-closure.md"
+    },
+    {
+      "id": "pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Critic round-2 review of NVA-A7FIX-2 (4736d913..ad512e80), finding F-B, 2026-08-17."
     },
     {
       "id": "pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs",
@@ -901,11 +913,15 @@
     },
     {
       "id": "pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Reported by the PO on 2026-08-17, relaying a diagnosis independently made and verified in a downstream consumer-project session; confirmed live in this repository, whose own project/critical-human-proof.json is already on the v3 schema."
+      "source": "Reported by the PO on 2026-08-17, relaying a diagnosis independently made and verified in a downstream consumer-project session; confirmed live in this repository, whose own project/critical-human-proof.json is already on the v3 schema.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "989cb236",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-v3-trustanchors-gmw-hgo-fix-closure.md"
     },
     {
       "id": "pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant",

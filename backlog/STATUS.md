@@ -77,7 +77,8 @@
 | pipeline.git-appears-despite-initializes-git-false | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation | closed | defect | pipeline | 2026-08-10 | — |
-| pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | open | defect | pipeline | 2026-08-16 | — |
+| pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | closed | defect | pipeline | 2026-08-16 | — |
+| pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | open | defect | pipeline | 2026-08-08 | — |
@@ -98,7 +99,7 @@
 | pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | open | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | open | defect | pipeline | 2026-08-07 | — |
@@ -225,6 +226,6 @@
 
 ## Counts
 
-- open: 101
+- open: 100
 - in_progress: 22
-- closed: 94
+- closed: 96
