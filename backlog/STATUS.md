@@ -109,6 +109,7 @@
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-authority-dual-state-repair-and-failclosed-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.published-lifecycle-event-schema-still-enumerates-cancellation | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.push-release-flow-unusable-for-third-party-adopters | open | defect | pipeline | 2026-08-07 | — |
@@ -155,6 +156,6 @@
 
 ## Counts
 
-- open: 94
+- open: 95
 - in_progress: 26
 - closed: 27

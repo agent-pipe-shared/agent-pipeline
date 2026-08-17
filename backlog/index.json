@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6b9eeaccb32e27b94612649d4ec7158e3d26f4a505977c6a66f1bcc2f6567520"
+    "transitionHead": "e47c66fad8df8c06aa1d03fef4e26d78a3a2118eb6b8b7dbe6d5394a7a17254e"
   },
   "counts": {
-    "open": 94,
+    "open": 95,
     "in_progress": 26,
     "closed": 27
   },
@@ -904,6 +904,13 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "user-requested feature expansion after the first public observation publication"
+    },
+    {
+      "id": "pipeline.published-lifecycle-event-schema-still-enumerates-cancellation",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17"
     },
     {
       "id": "pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to",

@@ -97,7 +97,14 @@ const VERDICTS = {
   'L-AC-05': ['implemented', 'C'],
   'L-AC-06': ['implemented', 'C'],
   'L-AC-07': ['partial', 'C'],
-  'L-AC-08': ['partial', 'J'],
+  // UPDATE 2026-08-17 (PHX-WP-LAC08, commits 20014aab/b4f059f9): the
+  // undistinguishable `cancellation` kind is removed (no field, pairing rule
+  // or validation ever justified it against `status: "cancelled"`), not
+  // merely re-documented -- the remaining 8 kinds are each traced to a
+  // stated need. 20/20 governance-replay/-view/lifecycle-governance-events
+  // tests pass (independently re-run). acceptance.md L-AC-01 amended
+  // append-only to record the encoding change; L-AC-01 itself stays partial.
+  'L-AC-08': ['implemented', 'J'],
 
   'P-AC-01': ['partial', 'C'],
   'P-AC-02': ['implemented', 'C'],
@@ -1265,7 +1272,7 @@ const POINTERS = {
   'L-AC-05': 'lifecycle-governance-events-tests: candidate invalidation visible, duplicate sequences fail closed',
   'L-AC-06': 'replay rejects extra event data instead of exposing raw lifecycle bodies',
   'L-AC-07': 'governance-replay-core-tests: serial/parallel/retry/cancellation/recovery fixtures replay to identical bounded output on repeat, and a malicious duplicate-sequence fixture is rejected deterministically (PHX-WP-L, break-proofed twice)',
-  'L-AC-08': 'docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed',
+  'L-AC-08': 'docs/governance-replay.md "Traceability" (PHX-WP-DOC-3): 8 of 9 lifecycle-governance-events.mjs kinds traced to a stated user/audit need; the `cancellation` kind is honestly flagged unclear -- no structural distinction from `status: "cancelled"` exists in the code, so no confident justification could be constructed. CLOSES 2026-08-17 (PHX-WP-LAC08, commit 20014aab): `cancellation` removed from both hand-duplicated KINDS sets (lifecycle-governance-events.mjs, governance-replay-view.mjs) and the renderer\'s KIND_RECORD_CLASS map -- the remaining 8 kinds are each traced to a stated need in docs/governance-replay.md, none justified only by parity. One residual duplicate found and left out of scope: governance/schemas/lifecycle-governance-event.schema.json:11 still enumerates `cancellation` in its published kind enum (a third hand-duplicated copy, nothing reads it today) -- filed as its own backlog item, not silently dropped',
 
   'P-AC-01': 'organization-policy-tests (WP-P-AC01-AC03): schema/compatibility/merge pinned, AND provenance/dependencies/signaturePolicy now validated as optional, pack-scoped, closed fields (OPP-PROVENANCE/OPP-DEPENDENCIES/OPP-SIGNATURE), mirroring the targetBinding precedent. 17/17 tests pass',
   'P-AC-02': 'organization-policy-tests: floor weakening, unknown rule, single-owner conflict all rejected',
