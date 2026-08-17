@@ -310,9 +310,9 @@ export function loadVerifyResumeArtifacts({ runsRoot, currentRunId, suites }) {
 }
 
 // ADR-0065 candidate (b): Tier-B narrowing is a lookup keyed by suite name/id, not a suite
-// registration field -- so opting a suite in never needs an edit to harness/scripts/verify.mjs
-// (TP-3-protected, no active Guard Maintenance Window this session; TP-3's pattern is
-// `harness/scripts/verify\.mjs$` alone, so this file and its own test are unaffected). A suite
+// registration field -- so opting a suite in never needs an edit to the top-level Verify entry
+// point (TP-3-protected, no active Guard Maintenance Window this session; its own TP-3 guard
+// pattern matches only that one file, so this file and its own test are unaffected). A suite
 // absent from this table stays Tier A. The default table is overridable via
 // compileVerifySuites/runVerifyJournal's `tierBDeclarations` parameter purely so tests can
 // exercise the mechanism against a synthetic suite without ever touching this production table.
