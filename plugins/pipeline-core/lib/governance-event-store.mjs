@@ -127,9 +127,10 @@ export async function assertRestrictedRoot(repositoryRoot, storeRoot, { create =
   await assertNoSymlinkAncestry(target);
   await assertNoSymlink(target, { directory: true });
   const metadata = await stat(target);
-  if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", "Restricted storage must not grant group or other access.");
-  if (typeof process.getuid === "function" && metadata.uid !== process.getuid()) fail("GES-RESTRICTED-OWNER", "Restricted storage is not owned by this operator.");
   const platform = io.platform ?? process.platform;
+  const posixModeViolation = platform !== "win32" && (metadata.mode & 0o077) !== 0;
+  if (posixModeViolation) fail("GES-RESTRICTED-PERMISSIONS", "Restricted storage must not grant group or other access.");
+  if (platform !== "win32" && typeof process.getuid === "function" && metadata.uid !== process.getuid()) fail("GES-RESTRICTED-OWNER", "Restricted storage is not owned by this operator.");
   if (platform === "win32") {
     const harden = io.harden ?? hardenWindowsPrivateDirectory;
     const assess = io.assess ?? assessWindowsPrivatePath;

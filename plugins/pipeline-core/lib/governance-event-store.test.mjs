@@ -3,7 +3,7 @@
 /** Stateful PHX-1 tests for portable governance event storage. */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -914,4 +914,23 @@ test("PHX-WP-HAC11-WINACL: non-win32 behavior is unaffected by the injectable io
   assert.equal(resolved, restrictedRoot);
   assert.equal(assessCalled, false, "the win32 assurance seam must never be consulted off win32");
   assert.equal(hardenCalled, false, "the win32 assurance seam must never be consulted off win32");
+});
+
+// PHX-WP-HAC11-WINACL-FIX2: the pre-existing POSIX mode/uid checks (lines
+// 130-131) must be skipped entirely on a simulated win32 platform, exactly
+// like private-boundary.mjs and afk-ledger.mjs already skip their own POSIX
+// mode-bit checks on win32 -- real `stat()`-reported mode bits are not real
+// DACL data there. Before the fix, these checks ran unconditionally and could
+// throw GES-RESTRICTED-PERMISSIONS before execution ever reached the win32
+// DACL-assurance branch, making that branch dead code on its own target
+// platform.
+test("PHX-WP-HAC11-WINACL-FIX2: simulated win32 ignores a real nonzero-group/other POSIX mode and relies solely on the DACL-assurance branch", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-winacl-posixmode-"));
+  t.after(() => cleanup(restrictedRoot));
+  // Real POSIX mode with nonzero group bits, deliberately irrelevant on win32:
+  // this is what forces execution through the mode-bit check at line 130.
+  await chmod(restrictedRoot, 0o750);
+  const resolved = await assertRestrictedRoot(root, restrictedRoot, { create: false }, secureWindowsIo());
+  assert.equal(resolved, restrictedRoot);
 });
