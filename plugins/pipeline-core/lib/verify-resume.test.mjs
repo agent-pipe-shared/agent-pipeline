@@ -13,7 +13,12 @@ const B = "b".repeat(64);
 const C = "c".repeat(64);
 const candidate = { commit: "1".repeat(40), tree: "2".repeat(40) };
 const scriptDir = join(dirname(fileURLToPath(import.meta.url)), "..", "scripts");
-const input = (path = "suite.test.mjs", digest = A) => ({ files: [{ path, fileSha256: digest }], nonFiles: [{ kind: "candidate-tree", path: null, sha256: B }] });
+// "declared-tree:root" (not the pre-ADR-0065 "candidate-tree") so these Tier-A fixture suites
+// carry the real production Tier-A marker (ADR-0065 Decision clarification 1/2) -- required for
+// `isTierARegistration` inside firstDrift to classify them correctly; every assertion below is
+// otherwise unchanged from before this rename.
+const input = (path = "suite.test.mjs", digest = A) => ({ files: [{ path, fileSha256: digest }], nonFiles: [{ kind: "declared-tree:root", path: null, sha256: B }] });
+const tierBInput = (path = "tierb.test.mjs", digest = A) => ({ files: [{ path, fileSha256: digest }], nonFiles: [{ kind: "suite-arguments", path: null, sha256: B }] });
 const suite = (id, overrides = {}) => ({ id, implementationSha256: A, inputs: input(`${id}.test.mjs`), environmentContractSha256: B, dependsOn: [], ...overrides });
 const suites = [suite("alpha"), suite("beta", { dependsOn: ["alpha"] })];
 
@@ -86,6 +91,24 @@ test("ADR-0065: candidate-drift no longer gates the content checks, but stays ex
   const commitOnly = plan(artifacts, logs, { candidate: { commit: "3".repeat(40), tree: candidate.tree } });
   assert.equal(commitOnly.reasons[0].code, "candidate-drift");
   assert.deepEqual(commitOnly.rerun, ["alpha", "beta"]);
+});
+
+test("ADR-0065 candidate (b) fix (Critic F1): a Tier-B suite (no declared-tree:* input) skips candidate-drift and is reused across an unrelated candidate change", () => {
+  const tierB = suite("tierb", { inputs: tierBInput() });
+  const sealed = sealVerifySuiteReceipt({ runId: "verify-source", candidate, suite: tierB.id, implementationSha256: tierB.implementationSha256, inputs: tierB.inputs, environmentContractSha256: tierB.environmentContractSha256, policySha256: C, status: "completed", exitCode: 0, log: log("tierb"), startedAt: "2026-08-01T00:00:00.000Z", completedAt: "2026-08-01T00:00:01.000Z" });
+  const unrelatedCandidate = { commit: "3".repeat(40), tree: "4".repeat(40) };
+  // Both commit AND tree differ from the receipt's -- exactly the case that unconditionally fired
+  // candidate-drift before this fix, even though this suite's own declared files never moved.
+  const reused = planVerifyResume({ runId: "verify-next", candidate: unrelatedCandidate, suites: [tierB], receipts: { tierb: sealed }, logs: { tierb: log("tierb") }, policySha256: C });
+  assert.deepEqual(reused.reusable, ["tierb"]);
+  assert.deepEqual(reused.rerun, []);
+  assert.deepEqual(reused.reasons, []);
+  // Skipping candidate-drift never means skipping content checks: the suite's OWN declared file
+  // changing must still invalidate it, via declared-input-drift.
+  const changedTierB = suite("tierb", { inputs: tierBInput("tierb.test.mjs", B) });
+  const invalidated = planVerifyResume({ runId: "verify-next", candidate: unrelatedCandidate, suites: [changedTierB], receipts: { tierb: sealed }, logs: { tierb: log("tierb") }, policySha256: C });
+  assert.equal(invalidated.reasons[0].code, "declared-input-drift");
+  assert.deepEqual(invalidated.rerun, ["tierb"]);
 });
 
 test("targeted invalidation propagates only through declared deterministic dependents", () => {

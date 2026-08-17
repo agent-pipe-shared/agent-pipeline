@@ -308,3 +308,41 @@ test("ADR-0065 candidate (b): a Tier-B suite whose declared reads are actually s
     assert.match(log, /ok true/u);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
+
+// ADR-0065 candidate (b) cross-candidate-reuse regression (Critic finding F1). Before this fix,
+// verify-resume.mjs's firstDrift checked candidate-drift unconditionally for every suite, so a
+// Tier-B suite whose own declared files were untouched was STILL invalidated the moment an
+// unrelated commit changed overall candidate identity -- defeating candidate (b)'s entire purpose.
+// This is the exact scenario the Elephant independently reproduced with a real script before
+// dispatching this fix. Covers both directions: (a) unrelated candidate change, suite's own
+// declared files unchanged -> reused; (b) suite's own declared files changed -> still invalidated.
+test("ADR-0065 candidate (b) regression: a Tier-B suite whose own declared files are unchanged is reused across a candidate whose commit and tree both differ", () => {
+  const f = fixture();
+  const allowedFile = join(f.root, "tierb-cross-allowed.mjs");
+  writeFileSync(allowedFile, "export const allowed = true;\n", { mode: 0o600 });
+  const suiteFile = join(f.root, "tierb-cross.test.mjs");
+  writeFileSync(suiteFile, "import { allowed } from './tierb-cross-allowed.mjs';\nprocess.stdout.write(`ok ${allowed}\\n`);\n", { mode: 0o600 });
+  const tierBDeclarations = { "tierb-cross-suite": { reads: ["tierb-cross-allowed.mjs"] } };
+  const suites = [{ name: "tierb-cross-suite", file: suiteFile, dependsOn: [] }];
+  let calls = 0;
+  const spawn = (...args) => { calls += 1; return spawnSync(...args); };
+  const candidateTwo = { commit: "3".repeat(40), tree: "4".repeat(40) };
+  const candidateThree = { commit: "5".repeat(40), tree: "6".repeat(40) };
+  try {
+    runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites, policyInputs: { harness: "test" }, runId: "verify-tierb-cross-one", spawn, registerRun, tierBDeclarations });
+    assert.equal(calls, 1);
+    // An unrelated commit lands: candidate identity (commit AND tree) moves, but the Tier-B
+    // suite's own declared files (suiteFile, allowedFile) never change.
+    const second = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate: candidateTwo, suites, policyInputs: { harness: "test" }, runId: "verify-tierb-cross-two", spawn, registerRun, tierBDeclarations });
+    assert.equal(calls, 1, "a Tier-B suite whose own declared files are unchanged must be reused, not re-executed, across an unrelated candidate change");
+    assert.equal(second.steps[0].reused, true);
+    assert.deepEqual(second.plan.reusable, ["tierb-cross-suite"]);
+    // Now the suite's OWN declared file changes -- this must still correctly invalidate it, even
+    // though the check that fires is declared-input-drift rather than candidate-drift.
+    writeFileSync(allowedFile, "export const allowed = false;\n", { mode: 0o600 });
+    const third = runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate: candidateThree, suites, policyInputs: { harness: "test" }, runId: "verify-tierb-cross-three", spawn, registerRun, tierBDeclarations });
+    assert.equal(calls, 2);
+    assert.equal(third.steps[0].reused, false);
+    assert.deepEqual(third.plan.rerun, ["tierb-cross-suite"]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
