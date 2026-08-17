@@ -1,0 +1,197 @@
+# ADR-0066: the handover rotates via extraction-then-archive, gated by a hard size cap that fires independently of block closure
+
+> Agent-Pipeline · Sprint Nova · as of 2026-08-17
+
+**Status:** accepted (2026-08-17, PO instruction, chat: *"ja mach das aber nicht
+nur close dazu auch ein hard gate wegen riesen sprints"* — build it, and do not
+gate rotation on block/feature closure alone; add a hard gate, because a single
+sprint/block can grow huge long before it ever closes). **Basis:**
+`backlog/items/2026-08-07-handover-file-has-no-rotation-obligation.md`, whose
+Triage already recorded the PO's 2026-08-12 *"empfehlung"* — accept the
+Elephant's recommended sequencing (candidate 5, one-time extraction, then
+candidate 2, rotate at block/feature boundaries) — which today's instruction
+extends with the hard-cap gate below. **Closes** [ADR-0060](0060-handover-placement-and-rotation.md)
+Decision 5, left explicitly open there. **Extends** [ADR-0012](0012-handover-canonicalization.md)'s
+close-gate precedent (the existing CLAUDE.md length check) to the handover
+file itself.
+
+## Context
+
+[ADR-0060](0060-handover-placement-and-rotation.md) established that mid-task
+findings belong in `docs/state.md` — a fresh session is a Goldfish, and the
+handover is the only artifact the bootstrap mandate guarantees it will read —
+and recorded a retention obligation (Decision 4) while explicitly leaving the
+rotation mechanism undecided (Decision 5), tracked as this ADR's basis item.
+
+The growth this was meant to answer has not stopped. At filing (2026-08-07)
+`docs/state.md` was "over 4,500 lines." The item's 2026-08-17 update measured
+7,574 lines. As of this ADR, direct measurement: **7,633 lines, 787,508
+bytes.** Using this codebase's own established conservative metric
+(`lib/bootstrap-payload-budget.mjs`'s `utf8-byte-upper-bound`, one UTF-8 byte
+as one token unit upper bound — the same metric `pipeline-start-preflight.mjs`
+budgets the entire bootstrap payload against, ceiling `18,000` units), the
+handover file ALONE is now **~44× the ceiling the whole bootstrap payload is
+supposed to respect.** Every session pays this at bootstrap, by mandate,
+before it can do anything else.
+
+The 2026-08-12 Triage on the basis item already answered the "how" in
+principle: start with a one-time extraction pass (lift every durable rule
+embedded in the current file into an ADR/policy/guardrail file — a rotation
+that does not do this first is destructive, per ADR-0060's own Consequences
+warning), then rotate at block/feature boundaries going forward. What that
+Triage did not anticipate, and what today's PO instruction adds, is the
+**"riesen Sprints" problem**: this repository's own current single open
+block (`**Current block:** PO-directed autonomous AFK session (2026-08-11...`)
+has been running for a week and has accreted dozens of dense paragraph-length
+bullets without ever closing — a purely block-boundary-triggered rotation
+does nothing for a block that simply never closes. The mechanism needs a
+second, independent trigger that does not wait for a close event at all.
+
+## Decision
+
+**1. Archive format.** Rotated content moves to `docs/state-archive/`, one
+file per rotation event, named `<ISO-date>--<short-slug>.md`. Each archive
+file is self-contained: a short provenance header (source file, rotation
+date, the block/section title and date range it carries, the rotating
+script's own identity) followed by the rotated content verbatim. Archive
+files are append-only once written — never edited after the fact, matching
+this repository's general append-rather-than-rewrite posture for historical
+record (the backlog ledger's hash chain is the sibling precedent; this ADR
+does not require hash-chaining the archive, since `docs/state.md` is not a
+security-relevant audit trail — a plain immutability convention is
+proportionate).
+
+**2. Live-file structure after rotation.** `docs/state.md` keeps its existing
+header block (Last updated / Project status / Release version+state)
+unchanged, gains a new **"## Archived history"** section — a table of archive
+files, newest first, each row a date range and a one-line summary — and below
+that, only the **still-open block(s)**, verbatim. A fresh session's first read
+therefore costs roughly what the open work costs, not what the project's
+entire history costs; the full history stays one link away, on demand, never
+silently lost.
+
+**3. Two independent rotation triggers — not one.** This is the amendment
+today's instruction adds to the 2026-08-12 plan:
+   - **(a) Block/feature-boundary rotation** (the accepted candidate 2): when
+     a block closes, through `close-block`/`close-feature`, its content is
+     archived as part of that ritual, mirroring how ADR-0012 already gates
+     `CLAUDE.md` length at a close boundary.
+   - **(b) A hard size gate, independent of closure.** A PreToolUse guard on
+     writes to the project's configured handover path refuses any edit that
+     would leave the file's `utf8-byte-upper-bound` measurement AT OR ABOVE a
+     hard cap, UNLESS the edit is itself a net size decrease (a rotation).
+     This is the mechanism that actually bounds a single long-running block:
+     trigger (a) only fires at a close event a "riesen Sprint" may not reach
+     for a long time, exactly the situation this repository is in right now.
+     Below the cap, both triggers are inert and every session behaves exactly
+     as today.
+
+**4. The hard cap.** `HANDOVER_MAX_BYTES = 12,000` (utf8-byte-upper-bound
+units), a new, independently-justified constant — deliberately not a re-use
+of `BOOTSTRAP_PAYLOAD_MAX_BYTES` (18,000), which budgets the entire bootstrap
+payload, of which the handover is meant to be a fraction, not the whole.
+12,000 leaves headroom for the rest of a bootstrap read under the existing
+18,000 ceiling while still being generous enough that a single realistic
+current block does not thrash against it constantly. This number is the
+Elephant's reasoned default, not a PO-specified figure, and is expected to be
+revisited once real rotation cadence is observed (see Follow-up).
+
+**5. Generalized as a Pipeline mechanism, not a Nova-repo-specific one.** Per
+the PO's explicit framing ("einen allgemeinen Mechanismus für alle
+User-Repos"), both the rotation script and the size-gate hook live under
+`plugins/pipeline-core/` (shipped to consumer projects via the plugin), not
+under this repository's own `harness/` (Pipeline-repo-only tooling). Neither
+hardcodes `docs/state.md`: the handover path and the byte cap are read from
+project calibration (`pipeline.json`/`pipeline.yaml`, a `handover.path` /
+`handover.maxBytes`-shaped key), defaulting to `docs/state.md` /
+`12,000` when a project has not configured either — so an unconfigured
+consumer project gets the same protection this repository is adopting for
+itself, not a silent no-op.
+
+**6. The rotation script never guesses at rule-extraction.** Per ADR-0060's
+own warning (a rotation that only deletes destroys embedded rules), the
+rotation script performs a purely mechanical operation — split at a named
+block boundary, write the archive file, rewrite the live file's head and
+index — and refuses to run against a file it has not been told extraction is
+complete for (an explicit `--acknowledge-extraction-done` flag, checked once
+per repository via a small marker file it writes, not re-asked every
+invocation). It never inspects content for "does this look like a durable
+rule" — that judgment stays human/Elephant work, done once, before rotation
+is ever exercised for real on a given file's accumulated history.
+
+**7. The one-time extraction pass over this repository's current 7,633-line
+file is NOT done by this ADR.** It is real, judgment-heavy work — reading
+dense narrative history to find every embedded standing rule and lift it
+into an ADR, policy, or guardrail file — and is tracked as its own follow-up
+(see Follow-up below), unblocked by but not required for the mechanism build
+this ADR authorizes. Until that pass completes, the live `docs/state.md`
+cannot be safely rotated for real; the mechanism can and should still be
+built and tested against synthetic/small fixtures now.
+
+## Consequences
+
+**Positive.** Bootstrap cost for a fresh session is bounded going forward,
+not just in principle (ADR-0060 Decision 4) but by an enforced ceiling
+(Decision 4 above). The "riesen Sprint" failure mode — a single block
+growing unbounded because nothing closes it — is specifically closed by
+trigger (b), which ADR-0060's own Decision 5 discussion did not anticipate.
+The mechanism generalizes to every Pipeline-governed project by construction
+(Decision 5), not as a later port. History is preserved, never deleted
+(Decision 1/2) — the negative Decision-3-judgment risk ADR-0060 flagged
+(sometimes wrongly leaving a rule in the handover) is bounded by Decision 6's
+refusal to rotate before extraction is acknowledged done, not eliminated.
+
+**Negative, and load-bearing.** The hard gate can refuse a legitimate,
+urgent handover write mid-emergency once the file is already at cap — this
+is deliberate (a growing file that can always grow more never gets rotated)
+but is a real friction cost, mitigated only by the always-permitted
+shrinking edit (a rotation is never itself blocked by the cap it exists to
+enforce). The one-time extraction debt (Decision 7) is real, large, and not
+discharged by this ADR — until it lands, this repository's own
+`docs/state.md` sits at ~65× the new cap and the hard gate will refuse
+essentially any further growing edit to it, which is the intended, if
+uncomfortable, forcing function.
+
+## Alternatives considered
+
+**A pure length gate in the close ritual only (candidate 1 alone, no
+independent hard gate).** This was the natural reading of the 2026-08-12
+"empfehlung" before today's instruction. Rejected as insufficient by the PO
+directly: it does nothing between close events, and this repository's own
+current block is the live counterexample — a week-old, still-open block that
+a close-only trigger would have left growing throughout.
+
+**Bound by session count rather than size (candidate 4).** Closest to the
+real cost driver in principle, but needs a session marker the file does not
+currently carry, and does not address the "riesen Sprint" case either (one
+session can itself run long enough to blow past any reasonable per-session
+budget, as this repository's own current block demonstrates). Not pursued;
+may be worth revisiting once the size-based mechanism has real operating
+data.
+
+**Reuse `BOOTSTRAP_PAYLOAD_MAX_BYTES` (18,000) as the handover's own cap.**
+Rejected: that constant budgets the *entire* bootstrap payload, and the
+handover is meant to be one part of it, not consume the whole ceiling by
+itself — reusing it would leave zero headroom for everything else a
+bootstrap read carries.
+
+**Have the rotation script attempt automatic durable-rule detection.**
+Rejected per ADR-0060's own stated risk: a false negative here silently
+destroys a standing rule with no ADR/policy/guardrail home, which is strictly
+worse than requiring an explicit, once-per-repository human/Elephant
+acknowledgment that extraction is complete.
+
+## Follow-up
+
+- Build the rotation script (`plugins/pipeline-core/scripts/handover-rotate.mjs`)
+  and the hard-cap guard hook, both configurable per Decision 5, with tests
+  exercising: below-cap is inert, at/over-cap refuses a growing edit, a
+  shrinking edit is always admitted, block/feature-boundary rotation via
+  `close-block`/`close-feature`, and the `--acknowledge-extraction-done`
+  refusal for a repository that has never run extraction.
+- The one-time extraction pass over this repository's own current
+  `docs/state.md` (Decision 7) — a large, separate, judgment-heavy dispatch;
+  the live file cannot be rotated for real until it completes.
+- Revisit `HANDOVER_MAX_BYTES` (12,000) once real rotation cadence across at
+  least one full block/feature cycle is observed — it is a reasoned default,
+  not a measured one.

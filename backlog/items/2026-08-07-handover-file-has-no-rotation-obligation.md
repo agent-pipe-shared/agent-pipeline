@@ -100,3 +100,24 @@ Candidates, explicitly not a commitment:
   future sprint since it directly affects every session's own bootstrap cost
   now.
 - **Date:** 2026-08-17
+
+### PO decision, 2026-08-17 (later the same day) — mechanism formalized as ADR-0066
+
+PO instruction, chat: *"ja mach das aber nicht nur close dazu auch ein hard
+gate wegen riesen sprints"* — build the rotation mechanism, and extend the
+2026-08-12 plan (candidate 5 then candidate 2) with an independent hard size
+gate, since a single long-running block/sprint (this repository's own
+current open block is the live example — a week old, never closed) grows
+unbounded between close events. Formalized as
+[ADR-0066](../../docs/adr/0066-handover-rotation-extraction-archive-hard-size-gate.md),
+closing [ADR-0060](../../docs/adr/0060-handover-placement-and-rotation.md)
+Decision 5. Live measurement at ADR-authoring time: 7,633 lines, 787,508
+bytes (~44x the entire bootstrap-payload ceiling, `docs/state.md` alone).
+
+**Status stays `open`.** ADR-0066 authorizes and specifies the mechanism; it
+does not itself build the rotation script/guard hook (tracked as its own
+Follow-up dispatch) or run the one-time extraction pass this repository's
+own current file needs before real rotation is safe (ADR-0066 Decision 7,
+also not done here). This item closes only once BOTH the mechanism is built
+and tested AND the extraction pass has landed, or is re-split into two
+items if that turns out cleaner once the mechanism dispatch is scoped.

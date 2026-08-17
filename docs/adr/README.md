@@ -78,6 +78,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0063](0063-repository-directory-contract.md) | Repository directory contract — kinds, one home per kind, ignore anchoring, agent-facing surface, future check, consumer inheritance (lean, Nightwing-pending) | accepted (lean scope, deliberately incomplete) | 2026-08-12 |
 | [0064](0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md) | Release-preflight consent is a fourth critical-action kind, not a fourth ceremony — reuses `po-human-approval.mjs authorize-critical` under ADR-0061 instead of inventing a new mechanism | accepted | 2026-08-17 |
 | [0065](0065-a-voided-gate-is-re-earned-from-declared-inputs.md) | A voided Verify gate is cheaply re-earned from per-suite declared inputs (finishing the existing `verify-resume.mjs` mechanism), not preserved by a coarser commit-diff envelope — Security and push approval stay whole-tree/whole-commit by design | accepted | 2026-08-17 |
+| [0066](0066-handover-rotation-extraction-archive-hard-size-gate.md) | The handover rotates via extraction-then-archive (`docs/state-archive/`), gated by two independent triggers — block/feature-boundary rotation AND a hard size cap that fires even mid-sprint, closing ADR-0060 Decision 5 | accepted | 2026-08-17 |
 
 ### Resubmissions
 
@@ -98,12 +99,13 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0056](0056-push-approval-mode.md) | `deploy` and `publication` have no source-of-truth mode; add one only if an operator asks |
 | [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Build the mechanical R1/R2 checks — a literal-runner-default check first, then a both-shell-rendering check; **Decision 2a** additionally needs the "remove the other runner and see whether the flow completes" check, and the Codex-only onboarding barrier it was written from is still open |
 | [0058](0058-guard-maintenance-window.md) | A dedicated guard against the same-session worktree-merge bypass path is not yet built (see ADR-0058 Consequences/Follow-up) |
-| [0060](0060-handover-placement-and-rotation.md) | Decision 5 open — the concrete handover rotation mechanism is a PO decision |
+| [0060](0060-handover-placement-and-rotation.md) | Decision 5 closed by [0066](0066-handover-rotation-extraction-archive-hard-size-gate.md), 2026-08-17 |
 | [0061](0061-uniform-human-approval-ceremony.md) | Decision 6 open — the one-command ceremony has to be designed (what one approval covers, prepare+sign collapsed, `OVERRIDE <rule-id>` folded in); every gate shipped today is non-conformant until it lands |
 | [0062](0062-production-execution-and-selected-sandbox-launch.md) | Accepted 2026-08-11 — `#12`/`#14`/`#29` implementation dispatches, each Verify/Security/Critic-bound before its matrix row closes |
 | [0063](0063-repository-directory-contract.md) | Nightwing-era sprint — full taxonomy revision; before then, three deferred follow-ups each need their own dispatch (`.gitignore` anchoring audit, `pipeline-start`/dispatch-template wiring, Verify gate assertion) |
 | [0064](0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md) | Accepted 2026-08-17 — dispatch the enum widening, `authorize-critical --subject` addition, and `release-preflight-cli.mjs` wiring, each with its negative corpus, before `#56`/`#98`'s matrix rows can move |
 | [0065](0065-a-voided-gate-is-re-earned-from-declared-inputs.md) | Accepted 2026-08-17 (Decision 8's conservative default, `--no-reuse` for push/release-bound runs, stands absent a more specific PO answer) — three ordered candidates (break the three coupling sites, add Tier-B enforcement + one promoted suite, then narrow further suites by measured `durationMs`), none needing a Guard Maintenance Window |
+| [0066](0066-handover-rotation-extraction-archive-hard-size-gate.md) | Build the rotation script + hard-cap guard hook (Follow-up); the one-time extraction pass over this repository's own `docs/state.md` (Decision 7) is separate, large, judgment-heavy work — the live file cannot be rotated for real until it lands |
 
 ### Conventions
 
