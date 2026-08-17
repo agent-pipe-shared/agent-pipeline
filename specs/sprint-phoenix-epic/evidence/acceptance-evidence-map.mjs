@@ -396,7 +396,15 @@ const DELTA = {
   'R-AC-08': ['partial', 'WP-R'],
   'R-AC-09': ['partial', 'WP-R'],
   'R-AC-11': ['partial', 'WP-R'],
-  'R-AC-13': ['partial', 'WP-R'],
+  // UPDATE 2026-08-17 (Elephant measurement correction, no code change): all
+  // 11 required fixture classes independently re-verified directly against
+  // external-command-offer.test.mjs (36/36 pass) -- the two the prior
+  // pointer text called "structurally unreachable" (approval-without-run,
+  // duplicate/retry) both already carry a dedicated named R-AC-13 test, same
+  // as the other 9; the criterion says "SHALL provide fixtures for", not
+  // "SHALL prevent" -- a fixture pinning delegated/unreachable behavior is
+  // still a fixture. Prior undercount, not new work.
+  'R-AC-13': ['implemented', 'WP-R'],
   // R-AC-12 CLOSED 2026-08-09 (PHX-WP-R-AC12): the criterion asks only that
   // the motivating trajectory be encoded as a fixture, which is now done --
   // external-command-offer.test.mjs's new R-AC-12 test walks a rejected
@@ -1363,7 +1371,7 @@ const POINTERS = {
   'R-AC-10': 'fail-closed on the append is pinned; the policy-defined typed non-material exception is absent',
   'R-AC-11': 'external-command-offer/agent-decision-journal-tests (PHX-WP-R + WP-R-AC11): a mandatory public-safe typed omission is pinned, AND recordPrivateHandoffCommitment now wires this module to the existing restricted-machine-local store via a caller-supplied put callback, exposing only a commitment digest + receipt id. 44/44 + 36/36 tests pass',
   'R-AC-12': 'external-command-offer-tests (PHX-WP-R-AC12): the motivating Phoenix bootstrap trajectory is now encoded end to end -- a rejected guard-bypass attempt, an attended local repair through the sanctioned non-authoritative channel, an unchanged public-privacy boundary, a verified readback, and digest-only targets that never embed a machine-specific value',
-  'R-AC-13': 'external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing',
+  'R-AC-13': 'external-command-offer-tests (PHX-WP-R): 9 of 11 required fixture classes now named (7 pre-existing + secret/malicious command rejection + governed-script identity); approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing. CLOSES 2026-08-17 (Elephant, measurement correction, no code change): re-read all 11 required fixture classes from acceptance.md against the actual test titles in external-command-offer.test.mjs (36/36 pass, independently re-run) -- Pipeline-initiated + user-requested/Pipeline-supplied offers (:12, :28), guard override (:20), failed/partial/cancelled/readback-mismatch (:37), substitution (:41), approval-without-run (:168), duplicate/retry (:175), secret-bearing + malicious-content rejection (:154), governed-script identity (:161) are ALL named. The prior 9/11 count wrongly excluded approval-without-run and duplicate/retry from "named" because their fixtures pin delegated/unreachable behavior rather than a positive success path -- but R-AC-13\'s own text requires providing a fixture, not preventing the scenario; both fixtures exist and pass. 11/11',
 
   'EPIC-AC-01': 'the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues',
   'EPIC-AC-02': 'NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file',

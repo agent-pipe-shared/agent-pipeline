@@ -4,7 +4,7 @@ Status: design
 
 Date: 2026-08-09 (class table and per-criterion rows CORRECTED 2026-08-17 — see note below)
 
-Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260817c.md](../evidence/acceptance-evidence-map-20260817c.md)
+Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260817d.md](../evidence/acceptance-evidence-map-20260817d.md)
 
 **CORRECTION, 2026-08-17.** This document's original "48 of 157" claim (below) had gone stale:
 between 2026-08-09 and 2026-08-16, real work landed on 22 of those 48 rows — 20 flipped to
@@ -18,7 +18,7 @@ against current code/tests (not against this document's prose), confirming the g
 state and additionally catching one the generator itself had missed (E-AC-08, closed by commit
 `8956d770` the same night, verified independently by re-running its test file: 7/7 pass). The
 class table and per-criterion tables below are corrected to match. **Current authoritative
-snapshot:** [`../evidence/acceptance-evidence-map-20260817c.md`](../evidence/acceptance-evidence-map-20260817c.md).
+snapshot:** [`../evidence/acceptance-evidence-map-20260817d.md`](../evidence/acceptance-evidence-map-20260817d.md).
 
 **UPDATE, same day (PHX-WP-POAMEND, commit `e9054995`).** Four PO-decided amendments landed in
 one docs-only commit: A-AC-14 (accept 12/13, closing it — moved out of Class P entirely, verdict
@@ -41,9 +41,18 @@ backlog item: `governance/schemas/lifecycle-governance-event.schema.json:11` sti
 today. 20/20 affected tests pass, independently re-run. Open count: **24 of 157** (was 25).
 Class P: **10** (was 11).
 
+**UPDATE, same day (Elephant, measurement correction, no code change).** R-AC-13 re-read against
+the actual test titles in `external-command-offer.test.mjs` (36/36 pass, independently re-run):
+all 11 required fixture classes are named, not 9 — the prior count excluded
+`approval-without-run` and `duplicate/retry` because their fixtures pin delegated/unreachable
+behavior rather than a positive success path, but R-AC-13's own text requires providing a
+fixture, not preventing the scenario, and both fixtures exist (`external-command-offer.test.mjs:168,175`).
+**R-AC-13 closes: `implemented`.** Moves out of Class B entirely (13 remain, was 14). Open count:
+**23 of 157** (was 24).
+
 ## What this design is for
 
-The measurement established that **24 of 157** acceptance criteria are not
+The measurement established that **23 of 157** acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart — provided it is regenerated when the verdict data moves, which is the exact
@@ -58,9 +67,9 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 0 | (both prior members, A-AC-14/PX0-AC-03, closed — see below) |
 | D — documentation missing | 0 | (prior member L-AC-08 reclassified to P 2026-08-17, then closed the same day — see below) |
 | S — seam missing | 0 | (prior member E-AC-20 closed 2026-08-10) |
-| B — capability missing | 14 | real implementation plus its tests |
+| B — capability missing | 13 | real implementation plus its tests |
 | P — not code | 10 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **24** | |
+| **total** | **23** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -217,10 +226,10 @@ the P route the same day too (PHX-WP-LAC08, commit `20014aab`: the undistinguish
 originally named no longer exists), not as a Class D member either; E-AC-20 (Class S) landed
 2026-08-10. Full per-row evidence for every `implemented` criterion, including
 these, is in
-[`../evidence/acceptance-evidence-map-20260817c.md`](../evidence/acceptance-evidence-map-20260817c.md)
+[`../evidence/acceptance-evidence-map-20260817d.md`](../evidence/acceptance-evidence-map-20260817d.md)
 — not repeated here, since this document's job is the OPEN set.
 
-### Class B — an absent capability (14)
+### Class B — an absent capability (13)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -236,7 +245,6 @@ these, is in
 | P-AC-09 | partial | WP-P | RETRACTS "no carrier" (2026-08-17): `computeBackfillRange` (organization-policy-activation.mjs) already covers the preview half, shared with P-AC-03. Narrower remainder: `activateOrganizationPolicy`'s `authorize()` is one generic activation grant, not a distinct "explicit backfill consent" scoped to the identified historical range, and no code exports/backfills the historical events themselves |
 | R-AC-08 | partial | WP-R | a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent — no such state exists, only prospective values inside recoverability |
 | R-AC-09 | partial | WP-R | missing offer link, contradictory outcome evidence, cross-repository/cross-scope substitution, and now `occurredAtEpochMs` (closed 2026-08-10, commit `8d8996bc`) are pinned. Duplicate detection deliberately not rebuilt here — it lives at the store layer (`idempotencyKey`, governance-event-store.mjs) by design, not an absence |
-| R-AC-13 | partial | WP-R | 9 of 11 required fixture classes now named; approval-without-run and duplicate/retry are confirmed structurally unreachable, each pinned by a dedicated test showing the gap rather than left silently missing |
 | V-AC-02 | partial | WP-V | seven of nine now labelled (fact/unknown/unavailable/redacted/invalid/not-applicable/human-decision, the last closed 2026-08-1x and missed by this document until the 2026-08-17 correction). estimate and assumption remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules |
 
 ### Class P — not closeable by writing code (10)
@@ -256,10 +264,8 @@ these, is in
 
 ## Sequence, corrected
 
-With Classes A/D/S empty, the sequence collapses to: **Class B first** (14 items, real code, no PO
+With Classes A/D/S empty, the sequence collapses to: **Class B first** (13 items, real code, no PO
 gate — L-AC-01 leads, since it is the one structural gap several other rows describe as their own
 missing half), **Class P last** (10 items, ten different PO actions, several already queued and
 waiting only on the PO's own terminal or a design answer — not parallelizable with agent work).
-| H-AC-09 | not-started | WP-PO | NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target. RECLASSIFIED Class S -> Class P 2026-08-09 (PO-confirmed): the clause's own subject -- authorizing guarded work IN another repository -- is exactly the capability CLAUDE.md's Sprint-0 hard rule currently forbids outright ("Read-only toward the three project repos ... never a write ... until an explicitly approved Phase-4 migration"). There is no design to scope: building a cross-repository binding mechanism for a write capability this repo is not yet authorized to exercise would be building ahead of its own governing policy, not closing a gap. Closes only if/when a Phase-4 migration lifts the restriction, or the PO narrows the clause's scope by amendment (the same route H-AC-11 already used) -- either way, not a code task available now |
-| H-AC-11 | partial | WP-PO | portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4) |
 
