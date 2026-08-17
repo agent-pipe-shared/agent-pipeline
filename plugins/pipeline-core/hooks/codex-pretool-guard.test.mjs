@@ -237,6 +237,43 @@ check("F1: the shared-normalization fix does not widen push detection to non-pus
   }
 });
 
+// F1 round 2 (NVA-A7FIX-2, fixing Critic F-1 against the round-1 fix itself): the round-1
+// shared-normalization fix imported ONLY guard-push.mjs's whole-string branch
+// (stripQuotedSegments + normalizeGlobalGitOptions), silently dropping the coverage its
+// OWN cruder old regex happened to provide for guard-push.mjs's other two branches
+// (`directPush`, `shellWrapperPush`): `git.exe -C repo push origin main`,
+// `sh -c "git push origin main"`, `bash -c 'git push'`, `ssh host "git push"` all matched
+// guard-push.mjs's own detector but not the round-1 adapter regex. The fix now calls
+// guard-push.mjs's own single shared `commandIsGitPush` function (all three branches),
+// so codex-pretool-guard.mjs and guard-push.mjs can never independently drift again.
+// A manifest with an active, human-approval-required push gate is required here (unlike
+// the two whole-string-branch cases above, which block via the manifest-independent
+// cross-repository-ambiguity check) so guard-push.mjs's own evaluation actually reaches a
+// blocking decision for the positional/wrapper shapes, proving the guard was truly spawned
+// and evaluated the command rather than merely not crashing.
+check("F1 round 2: codex adapter recognizes the directPush and shellWrapperPush shapes guard-push.mjs itself recognizes", () => {
+  const root = fixture();
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), [
+    "schema: pipeline.manifest.v0",
+    "gates:",
+    "  push:",
+    "    mode: blocking",
+    "    type: human",
+    "    approval: required",
+    "",
+  ].join("\n"));
+  for (const command of [
+    "git.exe -C repo push origin main", // directPush: git.exe -C <dir> push
+    'sh -c "git push origin main"', // shellWrapperPush: sh -c "git push ..."
+    "bash -c 'git push'", // shellWrapperPush: bash -c 'git push'
+    'ssh host "git push"', // shellWrapperPush: ssh host "git push"
+  ]) {
+    const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+    assert.equal(output.permissionDecision, "deny", command);
+    assert.match(output.permissionDecisionReason, /guard-push/, command);
+  }
+});
+
 check("bounded rg-to-rg search filtering remains read-only without an override loop", () => {
   const root = fixture();
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });

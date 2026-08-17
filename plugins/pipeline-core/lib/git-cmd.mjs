@@ -159,3 +159,95 @@ export function refMatchesPattern(ref, pattern) {
   }
   return re.test(ref);
 }
+
+// ---- shared push-command detection --------------------------------------------------
+
+/**
+ * commandIsGitPush(cmd) -- the ONE source of truth for "is this command a git push",
+ * extracted VERBATIM from guard-push.mjs's own three-branch `isPush` computation
+ * (former lines ~239-336: the heredoc-aware whole-string-regex branch tested against
+ * `commandRegion`, the env-skipping positional `directPush` branch, and the
+ * `shellWrapperPush` branch). Every caller that needs to know "will guard-push.mjs
+ * treat this as a push" MUST call this function instead of independently
+ * hand-maintaining a partial reimplementation of it -- a caller that reimplements only
+ * the whole-string branch silently loses detection for shapes like
+ * `git.exe -C repo push origin main`, `sh -c "git push origin main"`,
+ * `bash -c 'git push'`, or `ssh host "git push"` (NVA-A7FIX-1/2, Critic F-1).
+ *
+ * `cmd` is the ALREADY-PREPARED command string a caller hands in -- for guard-push.mjs,
+ * that is its own `commandAfterDocumentedOverridePrefix` output (documented-override-
+ * prefix stripping is guard-push-specific pre-processing that stays there); this
+ * function performs no guard-specific pre-processing of its own and has no knowledge of
+ * that prefix.
+ *
+ * Branch 1 (whole-string): tests `/\bgit\s+push\b/` against the quote-stripped,
+ * lowercased, global-option-normalized command with here-document BODIES removed --
+ * catches forms the positional branches below cannot see, such as
+ * `git --git-dir=<path> push` and repeated `-C` overrides that `normalizeGlobalGitOptions`
+ * folds away. The heredoc-body removal is here so a heredoc's DATA (not command text)
+ * can never be mistaken for a push and can never glue two lines into a false match
+ * either; on unbounded/pathological input it degrades to over-detection (fail-closed),
+ * never under.
+ *
+ * Branch 2 (`directPush`, positional): matches `git`/`git.exe` directly followed by
+ * `push` or `-C <dir> push`, after skipping a leading run of `NAME=value` assignments
+ * and an optional `env` -- so `FOO=bar git push` and `env git push` are still detected
+ * positionally.
+ *
+ * Branch 3 (`shellWrapperPush`, positional): matches a `sh`/`bash`/`zsh`/`dash`/`pwsh`/
+ * `powershell`/`cmd`/`ssh` wrapper whose argument contains `git ... push`.
+ *
+ * Returns `true` if ANY of the three branches match.
+ */
+export function commandIsGitPush(cmd) {
+  if (typeof cmd !== "string" || cmd === "") return false;
+  const stripped = stripQuotedSegments(cmd);
+  const normalized = normalizeGlobalGitOptions(stripped.toLowerCase());
+  const commandRegion = (() => {
+    const opener = /(^|\s)<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/u;
+    let text = normalized;
+    for (let pass = 0; pass < 64; pass += 1) {
+      const match = opener.exec(text);
+      if (match === null) return text;
+      const openerStart = match.index + match[1].length;
+      const afterOpener = match.index + match[0].length;
+      const bodyStart = text.indexOf("\n", afterOpener);
+      if (bodyStart === -1) {
+        // An opener with no body: drop the opener token only.
+        text = `${text.slice(0, openerStart)}\n${text.slice(afterOpener)}`;
+        continue;
+      }
+      const terminator = new RegExp(`\\n[ \\t]*${match[3]}[ \\t]*(?=\\n|$)`, "u");
+      const rest = text.slice(bodyStart);
+      const found = rest.match(terminator);
+      // No terminator line: this is not a here-document. Treating it as one would let
+      // any `<<` delete the remainder of the command -- the arithmetic-shift fail-open.
+      // Strip nothing and detect against the whole command instead.
+      if (found === null) return normalized;
+      text = `${text.slice(0, openerStart)}\n${text.slice(bodyStart + found.index + found[0].length)}`;
+    }
+    // Bounded-scan exhaustion: fall back to the unstripped command. Over-detection is
+    // the safe direction; this is the branch that must never silently open the gate.
+    return normalized;
+  })();
+  const rawDetectionTokens = tokenizeArgv(cmd);
+  // Skip a leading `NAME=value` run and an optional `env`, so `FOO=bar git push` and
+  // `env git push` are still detected POSITIONALLY.
+  const detectionTokens = (() => {
+    let index = 0;
+    while (/^[A-Za-z_][A-Za-z0-9_]*=/u.test(rawDetectionTokens[index] ?? "")) index += 1;
+    if (/^env(?:\.exe)?$/i.test(rawDetectionTokens[index] ?? "")) {
+      index += 1;
+      while (/^[A-Za-z_][A-Za-z0-9_]*=/u.test(rawDetectionTokens[index] ?? "")) index += 1;
+    }
+    return index === 0 ? rawDetectionTokens : rawDetectionTokens.slice(index);
+  })();
+  const directExecutable = /^(?:git|git\.exe)$/i.test(detectionTokens[0] ?? "");
+  const directPush =
+    directExecutable &&
+    (detectionTokens[1]?.toLowerCase() === "push" ||
+      (detectionTokens[1] === "-C" && detectionTokens[2] && detectionTokens[3]?.toLowerCase() === "push"));
+  const shellWrapperPush = /^(?:(?:ba|z|da)?sh|pwsh|powershell|cmd|ssh)(?:\.exe)?$/i.test(detectionTokens[0] ?? "") &&
+    detectionTokens.some((token) => /\bgit(?:\.exe)?(?:\s+-C\s+\S+)?\s+push\b/i.test(token));
+  return /\bgit\s+push\b/.test(commandRegion) || directPush || shellWrapperPush;
+}

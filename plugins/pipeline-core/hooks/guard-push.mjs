@@ -19,16 +19,19 @@
  * NOT DUPLICATED (dedup confirmation, AP1-P3 briefing mandatory step 1): this hook
  * does NOT re-implement any guard-git.mjs deny rule (GG-01..GG-16 force-push/branch-
  * delete/reset --hard/etc.) — those stay guard-git's exclusive territory. This hook
- * only reuses guard-git's SHARED normalization helpers (`stripQuotedSegments`,
+ * reuses guard-git's SHARED normalization helpers (`stripQuotedSegments`,
  * `normalizeGlobalGitOptions` from `../lib/git-cmd.mjs`) so push-command detection
  * can never drift out of sync with guard-git's own understanding of what a "git push"
  * looks like (quoted prose, chained commands, global git options).
  *
- * PUSH DETECTION: `/\bgit\s+push\b/` tested against the quote-stripped, lowercased,
- * global-option-normalized command — no anchors, so it matches "in ANY command
- * segment" without needing an explicit split on `&&`/`;`/`|` (the same effect guard-
- * git.mjs achieves with its own segment-scoped `[^|&;]*` regexes, just for a single
- * "is there a push at all" question rather than per-segment flag matching).
+ * PUSH DETECTION (NVA-A7FIX-2): the full three-branch decision — a heredoc-aware
+ * whole-string `/\bgit\s+push\b/` test against the quote-stripped, lowercased,
+ * global-option-normalized command; a `directPush` positional check; and a
+ * `shellWrapperPush` positional check for `sh`/`bash`/`pwsh`/`ssh`/etc. wrappers — is
+ * the single, shared `commandIsGitPush` function in `../lib/git-cmd.mjs`. This hook and
+ * codex-pretool-guard.mjs both call that ONE function rather than each hand-maintaining
+ * a partial reimplementation of it (Critic F-1: a partial reimplementation silently lost
+ * detection for shapes like `git.exe -C repo push` or `sh -c "git push"`).
  *
  * EXIT SEMANTICS (shared with the guard family): 0 allow · 2 block (stderr reason,
  * mode "blocking") · 1 allow + non-blocking WARN (mode "warn", OR a malformed
@@ -135,7 +138,7 @@ import { spawnSync } from "node:child_process";
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
 import { authorizeRecordedDeploy, authorizeRecordedPush } from "../lib/critical-action-authorization.mjs";
 import { criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
-import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "../lib/git-cmd.mjs";
+import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "../lib/git-cmd.mjs";
 import {
   LEGACY_CALIBRATION,
   LEGACY_MANIFEST,
@@ -255,60 +258,27 @@ function commandAfterDocumentedOverridePrefix(command) {
 const cmd = commandAfterDocumentedOverridePrefix(rawCommand);
 if (!cmd) process.exit(0);
 
-// ---- push detection (shared normalization with guard-git.mjs) ----------------------
-const stripped = stripQuotedSegments(cmd);
-const normalized = normalizeGlobalGitOptions(stripped.toLowerCase());
+// ---- push detection (single shared source of truth, lib/git-cmd.mjs) ---------------
+// The three-branch decision (heredoc-aware whole-string regex + env-skipping
+// positional `directPush` + `shellWrapperPush`) now lives once in
+// `commandIsGitPush` (../lib/git-cmd.mjs) -- see that function's header for the full
+// heredoc-safety property list this preserves verbatim. codex-pretool-guard.mjs calls
+// the SAME function so the two guards' push detection can never independently drift
+// (NVA-A7FIX-2, fixing Critic F-1: a caller that reimplemented only the whole-string
+// branch silently lost detection for shapes like `git.exe -C repo push` or
+// `sh -c "git push"`).
+const isPush = commandIsGitPush(cmd);
+if (!isPush) process.exit(0); // fast path: not a push at all
+
 /**
- * Everything a here-document feeds to a command is DATA, not command text, but it
- * arrives inside the raw command string and survives quote-stripping. Remove each
- * heredoc body so push detection reads the command, not its payload.
- *
- * SAFETY PROPERTIES, each of which a previous version got wrong and shipped fail-OPEN:
- *  - the opener token itself is removed, so the same `<<TAG` can never be re-matched;
- *  - the scan continues past the removal instead of restarting, so it terminates;
- *  - a newline REPLACES every removed region, so `…<<EOF…EOF\ngit push` cannot be
- *    glued into `…git push` without a word boundary and slip past `\bgit\s+push\b`;
- *  - stripping happens ONLY for an opener whose terminator line actually exists. A
- *    `<<` with no terminator is NOT treated as a heredoc and nothing is removed, so a
- *    non-redirection `<<` -- an arithmetic left shift such as `$(( 1 << shift ))` --
- *    cannot swallow the rest of the command. An earlier version claimed the
- *    whitespace-prefix rule prevented this; it does not, because a spaced arithmetic
- *    shift has exactly that shape, and that version shipped fail-OPEN for it;
- *  - the loop is bounded, and on exhaustion the ORIGINAL string is used, so a
- *    pathological input degrades to over-detection (fail-closed), never under.
+ * `detectionTokens` below is a SEPARATE concern from push detection above:
+ * `resolveDeclaredPushProject` and `declaresCrossRepositoryPush` further down reuse it
+ * to resolve WHICH repository a declared push targets and to detect cross-repository
+ * ambiguity, not to decide whether the command is a push at all. Recomputed locally
+ * (same env-skip logic `commandIsGitPush` uses internally, kept separate rather than
+ * exported/shared because it serves this unrelated purpose here).
  */
-const commandRegion = (() => {
-  const opener = /(^|\s)<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\2/u;
-  let text = normalized;
-  for (let pass = 0; pass < 64; pass += 1) {
-    const match = opener.exec(text);
-    if (match === null) return text;
-    const openerStart = match.index + match[1].length;
-    const afterOpener = match.index + match[0].length;
-    const bodyStart = text.indexOf("\n", afterOpener);
-    if (bodyStart === -1) {
-      // An opener with no body: drop the opener token only.
-      text = `${text.slice(0, openerStart)}\n${text.slice(afterOpener)}`;
-      continue;
-    }
-    const terminator = new RegExp(`\\n[ \\t]*${match[3]}[ \\t]*(?=\\n|$)`, "u");
-    const rest = text.slice(bodyStart);
-    const found = rest.match(terminator);
-    // No terminator line: this is not a here-document. Treating it as one would let
-    // any `<<` delete the remainder of the command -- the arithmetic-shift fail-open.
-    // Strip nothing and detect against the whole command instead.
-    if (found === null) return normalized;
-    text = `${text.slice(0, openerStart)}\n${text.slice(bodyStart + found.index + found[0].length)}`;
-  }
-  // Bounded-scan exhaustion: fall back to the unstripped command. Over-detection is
-  // the safe direction; this is the branch that must never silently open the gate.
-  return normalized;
-})();
 const rawDetectionTokens = tokenizeArgv(cmd);
-// Skip a leading `NAME=value` run and an optional `env`, so `FOO=bar git push` and
-// `env git push` are still detected POSITIONALLY.  These were previously caught only
-// by the whole-string substring test removed below; dropping that test without this
-// would have weakened detection rather than narrowed it.
 const detectionTokens = (() => {
   let index = 0;
   while (/^[A-Za-z_][A-Za-z0-9_]*=/u.test(rawDetectionTokens[index] ?? "")) index += 1;
@@ -318,22 +288,6 @@ const detectionTokens = (() => {
   }
   return index === 0 ? rawDetectionTokens : rawDetectionTokens.slice(index);
 })();
-const directExecutable = /^(?:git|git\.exe)$/i.test(detectionTokens[0] ?? "");
-const directPush =
-  directExecutable &&
-  (detectionTokens[1]?.toLowerCase() === "push" ||
-    (detectionTokens[1] === "-C" && detectionTokens[2] && detectionTokens[3]?.toLowerCase() === "push"));
-const shellWrapperPush = /^(?:(?:ba|z|da)?sh|pwsh|powershell|cmd|ssh)(?:\.exe)?$/i.test(detectionTokens[0] ?? "") &&
-  detectionTokens.some((token) => /\bgit(?:\.exe)?(?:\s+-C\s+\S+)?\s+push\b/i.test(token));
-// The whole-string test below is load-bearing: it catches forms the positional
-// detectors cannot see, such as `git --git-dir=<path> push` and repeated `-C`
-// overrides, which `normalizeGlobalGitOptions` folds away for exactly this purpose.
-// It is applied to `commandRegion` rather than the raw normalization so that a
-// heredoc BODY -- data, not command -- can no longer be mistaken for a push. That
-// misclassification made it impossible to commit or document push policy in one
-// command; it was fail-closed, so never unsafe, only obstructive.
-const isPush = /\bgit\s+push\b/.test(commandRegion) || directPush || shellWrapperPush;
-if (!isPush) process.exit(0); // fast path: not a push at all
 
 /**
  * Bind one push invocation to one repository and one source commit.  This is

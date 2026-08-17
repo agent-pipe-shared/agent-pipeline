@@ -23,7 +23,7 @@ import {
   rememberNativeHookFailure,
 } from "../lib/native-hook-failure-memory.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
-import { normalizeGlobalGitOptions, stripQuotedSegments } from "../lib/git-cmd.mjs";
+import { commandIsGitPush } from "../lib/git-cmd.mjs";
 
 // Same pure, no-I/O reuse pattern as scripts/repair-map.mjs: the secret-eligibility
 // screen lives once in eligibility() and is never reimplemented here (GF-060, F2).
@@ -253,19 +253,18 @@ if (["Edit", "Write"].includes(toolName) && (typeof filePath !== "string" || fil
 }
 const hookSessionId = nativeHookSessionId(input);
 
-// Share the SAME push-detection normalization guard-push.mjs already relies on
-// (lib/git-cmd.mjs) instead of a second, independently hand-maintained regex that
-// can drift from it (F1, NVA-A7FIX-1). Pipeline order mirrors guard-push.mjs's own
-// (guard-push.mjs:259-260): strip quoted segments, lowercase, then fold away every
-// recognized git global option (`-C`, `--git-dir=`, repeated `-C` overrides, etc.)
-// so the push regex below no longer has to anticipate every global-option shape
-// itself.
-const normalizedForPushDetection = normalizeGlobalGitOptions(stripQuotedSegments(command).toLowerCase());
-
+// Share the SAME push-detection decision guard-push.mjs itself uses
+// (`commandIsGitPush` in lib/git-cmd.mjs) instead of a second, independently
+// hand-maintained partial reimplementation that can drift from it (Critic F-1,
+// NVA-A7FIX-1): a prior version here tested only the whole-string branch and silently
+// lost detection for shapes like `git.exe -C repo push`, `sh -c "git push"`,
+// `bash -c 'git push'`, and `ssh host "git push"` — all three of guard-push.mjs's own
+// branches (whole-string, `directPush`, `shellWrapperPush`) are now covered identically
+// by both callers (NVA-A7FIX-2).
 const guardNames = toolName === "Bash"
   ? [
     ...( /\bgit(?:\.exe)?\b/iu.test(command) ? ["guard-git.mjs"] : []),
-    ...( /\bgit(?:\.exe)?\s+push\b/iu.test(normalizedForPushDetection) ? ["guard-push.mjs"] : []),
+    ...(commandIsGitPush(command) ? ["guard-push.mjs"] : []),
     // The lifecycle tool validates its own typed arguments and plan digest.  Do
     // not make a bootstrap command depend on a second heavyweight hook process:
     // on Codex's nested sandbox that process can exhaust the hook's outer budget.

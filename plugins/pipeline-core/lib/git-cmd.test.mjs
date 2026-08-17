@@ -10,7 +10,7 @@
  * Run:   node plugins/pipeline-core/lib/git-cmd.test.mjs
  * Exit:  0 = all cases pass · 1 = at least one case failed (failure list on stdout).
  */
-import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "./git-cmd.mjs";
+import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern, commandIsGitPush } from "./git-cmd.mjs";
 
 let pass = 0;
 const failures = [];
@@ -211,6 +211,48 @@ function record(id, ok, detail) {
     "GLOB exact-match-only  a wildcard-free pattern matches only itself",
     refMatchesPattern("refs/tags/v1.0.0", "refs/tags/v1.0.0") === true &&
       refMatchesPattern("refs/tags/v1.0.01", "refs/tags/v1.0.0") === false,
+  );
+}
+
+// ---- commandIsGitPush -------------------------------------------------------------------
+// NVA-A7FIX-2: the exact six-case evidence table from the round-1 Critic report
+// (evidence/critic-report-a7fix1-round1.json, F-1) -- every shape the OLD
+// codex-pretool-guard.mjs partial reimplementation silently lost, now proven detected by
+// the single shared function both guard-push.mjs and codex-pretool-guard.mjs call.
+const PUSH_EVIDENCE_TABLE = [
+  ["git --git-dir=.git --work-tree=. push origin main", true, "whole-string branch: --git-dir=/--work-tree= global options"],
+  ["git -C repo -C nested push origin main", true, "whole-string branch: repeated -C overrides"],
+  ["git.exe -C repo push origin main", true, "directPush branch: git.exe -C <dir> push"],
+  ['sh -c "git push origin main"', true, "shellWrapperPush branch: sh -c \"git push ...\""],
+  ["bash -c 'git push'", true, "shellWrapperPush branch: bash -c 'git push'"],
+  ['ssh host "git push"', true, "shellWrapperPush branch: ssh host \"git push\""],
+];
+for (const [cmd, expected, why] of PUSH_EVIDENCE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(
+    `PUSH-EVIDENCE ${JSON.stringify(cmd)}  ${why}`,
+    out === expected,
+    `cmd=${JSON.stringify(cmd)} expected=${expected} out=${out}`,
+  );
+}
+// Known negative cases (already covered in codex-pretool-guard.test.mjs) -- must NOT
+// trigger, proving the shared function does not over-detect.
+const PUSH_NEGATIVE_TABLE = [
+  ['git commit -m "push later"', "a commit message merely mentioning \"push\" must not trigger"],
+  ["git log --grep=push", "a --grep=push search must not trigger"],
+];
+for (const [cmd, why] of PUSH_NEGATIVE_TABLE) {
+  const out = commandIsGitPush(cmd);
+  record(
+    `PUSH-NEGATIVE ${JSON.stringify(cmd)}  ${why}`,
+    out === false,
+    `cmd=${JSON.stringify(cmd)} out=${out}`,
+  );
+}
+{
+  record(
+    "PUSH-EMPTY  an empty command string is not a push (defensive, matches guard-push.mjs's own early exit)",
+    commandIsGitPush("") === false,
   );
 }
 
