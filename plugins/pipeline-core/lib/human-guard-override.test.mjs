@@ -102,6 +102,32 @@ function fixtureSignature({ trustAnchor = true } = {}) {
   return root;
 }
 
+// NVA-HGOFIX-1 regression fixture: the same signed-admission topology as
+// fixtureSignature(), but committing the v3 `trustAnchors` SET schema instead of the
+// legacy singular `trustAnchor` field. `anchors` is written verbatim -- `[]` reproduces
+// the "committed, but explicitly empty" v3 posture (must still fail closed), and a
+// populated array reproduces the "v3-only, no legacy singular field" posture the bug
+// (reading only `policy.trustAnchor`, permanently `null` once a document is v3) never
+// read at all.
+function fixtureSignatureV3(anchors) {
+  const root = mkdtempSync(join(tmpdir(), "human-guard-override-sig-v3-"));
+  git(root, "init", "-q", "-b", "main");
+  git(root, "config", "user.name", "Fixture");
+  git(root, "config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project", "critical-human-proof.json"), JSON.stringify({
+    schema: "pipeline.critical-human-proof-policy.v3",
+    requiredKinds: ["push"],
+    waivedKinds: [],
+    trustAnchors: anchors,
+  }));
+  git(root, "add", "README.md", "pipeline.user.yaml", "project/critical-human-proof.json");
+  git(root, "commit", "-q", "-m", "fixture");
+  return root;
+}
+
 // One shared Ed25519 test keypair for the whole suite (never a real PO key -- exactly
 // guard-maintenance-window.test.mjs's own `generateKeyPairSync` pattern, the closest
 // precedent for a po-approval-proof.mjs test signer).
@@ -289,6 +315,70 @@ test("ADR-0059 Decision 1: an absent trustAnchor (no trustPolicy given, no commi
       }),
       (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-TRUST-ANCHOR-MISSING",
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// NVA-HGOFIX-1: the signed-admission path used to read ONLY the legacy singular
+// `policy.trustAnchor` field, which is permanently `null` once `critical-human-proof.json`
+// carries the v3 `trustAnchors` SET -- every signed override failed with
+// HGO-TRUST-ANCHOR-MISSING regardless of how correctly it was signed. Same defect class
+// already fixed in guard-maintenance-window.mjs (NVA-GMWFIX-1/NVA-GMWFIX-2).
+test("NVA-HGOFIX-1: a v3-only trustAnchors array (no legacy singular trustAnchor) is honored -- previously failed with HGO-TRUST-ANCHOR-MISSING", () => {
+  const root = fixtureSignatureV3([{ keyReference: SIG_KEY_REFERENCE, publicKeySha256: sigPublicKeySha256 }]);
+  try {
+    const toolInput = { file_path: "notes.md", content: "v3 trust anchors\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    const armed = authorizeHumanGuardOverrideBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4000,
+    });
+    assert.equal(consumed.status, "consumed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// The negative case that proves this fix did NOT adopt verifyAgainstTrustAnchors()'s own
+// "absent/empty anchors accepts any well-formed key" posture: an explicitly empty v3 set,
+// with no legacy singular fallback either, must still fail closed -- HGO is a general
+// override of an arbitrary guard denial (ADR-0059), the same risk class as GMW, not one of
+// the four CRITICAL_ACTION_KINDS ceremonies that posture is deliberate for.
+test("NVA-HGOFIX-1: an EMPTY v3 trustAnchors array with no legacy trustAnchor still fails closed with HGO-TRUST-ANCHOR-MISSING (never the any-well-formed-key posture)", () => {
+  const root = fixtureSignatureV3([]);
+  try {
+    const toolInput = { file_path: "notes.md", content: "v3 empty trust anchors\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    assert.throws(
+      () => authorizeHumanGuardOverrideBySignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-TRUST-ANCHOR-MISSING",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// No regression: the pre-existing legacy-singular-only (v1/v2 schema) case must keep
+// working unchanged under the new anchors-array resolution.
+test("NVA-HGOFIX-1: the pre-existing legacy-singular-only trustAnchor case is unaffected by the v3 resolution fix (no regression)", () => {
+  const root = fixtureSignature();
+  try {
+    const toolInput = { file_path: "notes.md", content: "legacy singular trust anchor\n" };
+    const { scriptPath, recorded, plan, proof } = prepareSignedArming(root, { toolName: "Write", toolInput, denials: denial });
+    const armed = authorizeHumanGuardOverrideBySignature({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256, proof, nowMs: 3000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4000,
+    });
+    assert.equal(consumed.status, "consumed");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

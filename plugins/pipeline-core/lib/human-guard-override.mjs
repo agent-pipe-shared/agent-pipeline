@@ -22,13 +22,14 @@ import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import {
   readCriticalHumanProofPolicy,
   readPushApprovalMode,
+  verifyAgainstTrustAnchors,
 } from "./critical-human-proof-policy.mjs";
 // Dependency-free string helpers ONLY (see git-cmd.mjs's own header). guard-push.mjs owns
 // the normative `parsePushBinding()`, but that file is a HOOK with top-level side effects:
 // importing it to reuse one function would run a guard as a side effect of loading this
 // module. See pushRecoveryTarget() below for the bounded local equivalent.
 import { stripQuotedSegments, tokenizeArgv } from "./git-cmd.mjs";
-import { createPoApprovalIntent, verifyPoApprovalProof } from "./po-approval-proof.mjs";
+import { createPoApprovalIntent } from "./po-approval-proof.mjs";
 import {
   LEGACY_STATE,
   NEUTRAL_STATE,
@@ -2205,14 +2206,38 @@ export function authorizeHumanGuardOverrideBySignature({
       decision: HGO_SIGNATURE_INTENT_DECISION,
     });
   } catch { fail("HGO-SIGNATURE-INTENT-INVALID", "signed authorization intent could not be built from the current repository observation"); }
-  const resolvedTrustPolicy = trustPolicy ?? (() => {
-    const policy = readCriticalHumanProofPolicy(rootDir);
-    if (!policy.ok || policy.trustAnchor === null) {
+  // NVA-HGOFIX-1: this used to read the legacy SINGULAR `policy.trustAnchor` field only,
+  // which is permanently `null` once `critical-human-proof.json` carries the v3
+  // `trustAnchors` SET -- every signed admission failed with HGO-TRUST-ANCHOR-MISSING,
+  // regardless of how correctly it was signed. Same defect class, same fix shape as
+  // guard-maintenance-window.mjs's currentGuardMaintenanceWindow() (NVA-GMWFIX-1/
+  // NVA-GMWFIX-2): a NON-EMPTY v3 set wins whenever the document carries one; an absent OR
+  // EMPTY v3 set falls through to the legacy singular field; and truly nothing configured
+  // is a hard fail here -- unlike verifyAgainstTrustAnchors()'s OWN posture for an
+  // empty/absent anchor set (accept any well-formed key, deliberate for the four
+  // CRITICAL_ACTION_KINDS ceremonies), this call site is the SAME risk class as GMW: a
+  // general override of an arbitrary guard denial (ADR-0059), broader than GMW's
+  // GS-6/TP-*-only scope, not narrower -- so an empty/absent anchor set here must never be
+  // treated as "any key", or the whole override ceremony would become self-serviceable by
+  // an agent.
+  const resolvedTrustAnchors = trustPolicy !== null
+    ? [trustPolicy]
+    : (() => {
+      const policy = readCriticalHumanProofPolicy(rootDir);
+      if (policy.ok && Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0) {
+        return policy.trustAnchors;
+      }
+      if (policy.ok && policy.trustAnchor !== null) return [policy.trustAnchor];
       fail("HGO-TRUST-ANCHOR-MISSING", "project/critical-human-proof.json carries no trustAnchor");
-    }
-    return policy.trustAnchor;
-  })();
-  const verified = verifyPoApprovalProof({ intent, trustPolicy: resolvedTrustPolicy, proof });
+    })();
+  // Defense in depth (belt-and-suspenders with the resolution above): never let an empty
+  // anchor set reach verification, regardless of how `resolvedTrustAnchors` was resolved --
+  // a future code path that resolves it differently must still be unable to pass an empty
+  // set through to verifyAgainstTrustAnchors().
+  if (!Array.isArray(resolvedTrustAnchors) || resolvedTrustAnchors.length === 0) {
+    fail("HGO-TRUST-ANCHOR-MISSING", "project/critical-human-proof.json carries no trustAnchor");
+  }
+  const verified = verifyAgainstTrustAnchors({ intent, anchors: resolvedTrustAnchors, proof });
   if (!verified.verified) fail("HGO-PROOF-INVALID", verified.code ?? "PO-APPROVAL-PROOF-INVALID");
 
   // global-plugin-install is already excluded above, so this is always the ordinary
