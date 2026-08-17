@@ -262,7 +262,7 @@ function rejectedGrammarElement(code, command, parsed) {
 
 function blocked(
   code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = [], overrideGuidance = "", rejectedElement = null,
-  remediation = null,
+  remediation = null, nearMissHint = null,
 ) {
   const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
@@ -309,6 +309,12 @@ function blocked(
         `Pipeline session readiness is ${typedLifecycleStatus}.`,
         "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
       ];
+  // NVA-MICRO-1: a near-miss resume-hint-input write (same file basename, wrong directory)
+  // names the one correct path directly, before this falls through to the generic message
+  // above -- a self-correctable agent error, not a case that needs the external-operator
+  // ceremony. Only ever set by the restart-required near-miss call site below; every other
+  // denial passes no hint and this stays a no-op.
+  if (nearMissHint) guidance.push(nearMissHint);
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
@@ -868,6 +874,29 @@ export function isRestartResumeHintInputWrite(input, root) {
     return applyPatchTargetsResumeHintInput(input?.tool_input?.command, root);
   }
   return false;
+}
+
+// NVA-MICRO-1 (backlog: 2026-08-09-restart-resume-hint-write-misses-the-project-prefix.md):
+// a write that ALREADY missed isRestartResumeHintInputWrite() above (so this is only ever
+// called after that returned false) but names the exact same file BASENAME the admitted path
+// requires -- e.g. `.resume-hint-input.json` written at the repository root instead of under
+// `project/`. That is a narrow, diagnosable margin: a self-correctable agent path error, not a
+// case requiring a human. Deliberately narrow -- a write to a same-named file under a
+// completely unrelated tree still counts (same basename is the only signal this checks,
+// mirroring how little information the guard actually has about "how close" a miss is), but a
+// write whose basename differs entirely (e.g. `project/resume-hint.json`, already covered by
+// this file's own restart-required fixture) is NOT a near miss and falls through unchanged to
+// the generic denial.
+const RESTART_RESUME_HINT_INPUT_BASENAME = basename(RESTART_RESUME_HINT_INPUT_PATH);
+
+function restartResumeHintNearMissWrite(input, root) {
+  const toolName = String(input?.tool_name ?? "");
+  if (!WRITE_TOOLS.includes(toolName)) return false;
+  const filePath = writeTargetPath(input?.tool_input, toolName);
+  if (filePath === "") return false;
+  const resolved = resolve(root, filePath);
+  if (resolved === join(root, RESTART_RESUME_HINT_INPUT_PATH)) return false;
+  return basename(resolved) === RESTART_RESUME_HINT_INPUT_BASENAME;
 }
 
 function simpleWords(command, root, options = {}) {
@@ -2037,6 +2066,17 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && ((toolName === "Bash" && isPartialLifecycleScratchDirCreate(input.tool_input.command, root))
         || isPartialLifecycleIncidentReportWrite(input, root));
     if (partialLifecycleDiagnosisWrite) return verdict(0);
+    // NVA-MICRO-1 (backlog: 2026-08-09-restart-resume-hint-write-misses-the-project-
+    // prefix.md): a restart-required write that already missed the exact admission above
+    // (isRestartResumeHintInputWrite) but names the same basename gets the correct path
+    // spelled out directly in the denial, instead of only the generic message -- named here,
+    // never widening what is actually admitted (verdict(0) is still returned only from the
+    // exact-match branch above).
+    const restartResumeHintNearMissHint = restartRequired && restartResumeHintNearMissWrite(input, root)
+      ? `This write's basename matches the one resume-hint input this gate admits during a `
+        + `restart, but the path is wrong. The only path admitted is exactly `
+        + `${RESTART_RESUME_HINT_INPUT_PATH} (relative to the project root).`
+      : null;
     return toolName === "Bash"
       && (isSanctionedLifecycleCommand(input.tool_input.command, root)
         || isSanctionedGhReadOnlyDiagnostic(input.tool_input.command, root))
@@ -2048,6 +2088,11 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
           && error.intent === "session"
           ? error.lifecycleStatus
           : null,
+        [],
+        "",
+        null,
+        null,
+        restartResumeHintNearMissHint,
       );
   }
   return exactReadyReceipt(receipt) ? verdict(0) : blocked();

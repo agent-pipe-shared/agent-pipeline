@@ -2146,6 +2146,67 @@ test("NVA-LCREADONLY-2: partial denial names the diagnosis lane; other statuses 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// NVA-MICRO-1 (backlog: 2026-08-09-restart-resume-hint-write-misses-the-project-prefix.md):
+// a resume-hint-input write missing exactly the `project/` prefix (same basename, wrong
+// directory) is a narrow, diagnosable margin -- the denial must name the one correct path
+// directly, before falling through to the generic restart-required message, and must NOT
+// escalate to the external-operator ceremony (GUARD-LIFECYCLE-NOT-READY never routes there,
+// unlike the closed-shell-grammar/cross-repo-mutation codes this file's HGO wiring covers).
+// A near miss that is NOT diagnosable this way (a wholly different basename) still falls
+// through to the unchanged generic behaviour.
+test("NVA-MICRO-1: a near-miss resume-hint-input write names the correct path and does not escalate", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+
+    // AC-1: missing exactly the `project/` prefix -- same basename, wrong directory.
+    for (const input of [write(".resume-hint-input.json"), edit(".resume-hint-input.json")]) {
+      const result = evaluateLifecycleReadyGuard(input, restartDeps);
+      assert.equal(result.exitCode, 2, input.tool_name);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_name);
+      assert.match(
+        result.stderr,
+        /The only path admitted is exactly project\/\.resume-hint-input\.json/u,
+        input.tool_name,
+      );
+      // No route to the external-operator ceremony leaks into this denial.
+      assert.doesNotMatch(result.stderr, /HGO-/u, input.tool_name);
+      assert.doesNotMatch(result.stderr, /attended-host-terminal/u, input.tool_name);
+    }
+
+    // AC-2: same basename, a different wrong directory -- still diagnosable, still named.
+    const nestedResult = evaluateLifecycleReadyGuard(write("scratch/.resume-hint-input.json"), restartDeps);
+    assert.equal(nestedResult.exitCode, 2);
+    assert.match(nestedResult.stderr, /The only path admitted is exactly project\/\.resume-hint-input\.json/u);
+
+    // AC-3: a wholly different basename is NOT diagnosable this way -- unchanged generic
+    // two-line message, no leaked mention of the near-miss hint (already exercised by this
+    // file's own restart-required fixture at "restart-required admits only the consumed
+    // bounded resume-hint input and capture", repeated here for the message-content contract).
+    const unrelatedResult = evaluateLifecycleReadyGuard(edit("project/resume-hint.json"), restartDeps);
+    assert.equal(unrelatedResult.exitCode, 2);
+    assert.match(unrelatedResult.stderr, /Pipeline session readiness is restart-required\./u);
+    assert.doesNotMatch(unrelatedResult.stderr, /The only path admitted is exactly/u);
+
+    // AC-4: the exact admitted path itself is unaffected -- still verdict(0), not routed
+    // through the near-miss hint at all.
+    assert.equal(
+      evaluateLifecycleReadyGuard(write("project/.resume-hint-input.json"), restartDeps).exitCode,
+      0,
+    );
+
+    // AC-5: the near-miss hint is restart-required-specific -- a `partial` denial for the
+    // identical near-miss path keeps its own existing message contract, no leaked hint text.
+    const partialResult = evaluateLifecycleReadyGuard(write(".resume-hint-input.json"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(partialResult.exitCode, 2);
+    assert.doesNotMatch(partialResult.stderr, /The only path admitted is exactly/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // GF-078 bug 1: Codex's own write-capable tool is `apply_patch`, whose tool_input carries
 // the whole patch envelope under `command`, never a Claude-shaped `file_path`. Before the
 // fix, isRestartResumeHintInputWrite() gated on WRITE_TOOLS (Edit/Write/NotebookEdit only)
