@@ -5,7 +5,7 @@ type: requirement
 owner: pipeline
 status: rejected
 created: 2026-08-17
-source: R-AC-06 investigation (PHX-WP-RAC06, 2026-08-17), specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['R-AC-06']
+source: "R-AC-06 investigation (PHX-WP-RAC06, 2026-08-17), specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['R-AC-06']"
 ---
 
 # Command-offer schema has no representation for the displayed/generated/asserted states

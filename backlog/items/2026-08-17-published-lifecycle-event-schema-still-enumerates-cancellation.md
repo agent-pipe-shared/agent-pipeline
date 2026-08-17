@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-17
-source: PHX-WP-LAC08 dispatch report (commit 20014aab), Elephant checkpoint docs/state.md 2026-08-17
+source: "PHX-WP-LAC08 dispatch report (commit 20014aab), Elephant checkpoint docs/state.md 2026-08-17"
 ---
 
 # Published lifecycle-event schema still enumerates the removed `cancellation` kind

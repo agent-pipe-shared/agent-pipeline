@@ -3,14 +3,14 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4364e632254afa2b1eaec4c26f0eb6fd480368415a47a91940f79898d22e0341"
+    "transitionHead": "6d902b0183e7033ed96f71723e81bd1048da9b4965f49e0f59e7990d5d26db03"
   },
   "counts": {
-    "open": 99,
+    "open": 98,
     "in_progress": 26,
     "closed": 28,
     "rejected": 1,
-    "deferred": 0
+    "deferred": 1
   },
   "items": [
     {
@@ -42,7 +42,8 @@
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-17"
+      "created": "2026-08-17",
+      "source": "this session's own feature-package-topology digest-binding, hit twice"
     },
     {
       "id": "pipeline.accepted-adrs-drift-from-implementation-undetected",
@@ -302,7 +303,8 @@
       "status": "rejected",
       "type": "requirement",
       "owner": "pipeline",
-      "created": "2026-08-17"
+      "created": "2026-08-17",
+      "source": "R-AC-06 investigation (PHX-WP-RAC06, 2026-08-17), specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['R-AC-06']"
     },
     {
       "id": "pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty",
@@ -640,7 +642,8 @@
       "status": "open",
       "type": "requirement",
       "owner": "pipeline",
-      "created": "2026-08-17"
+      "created": "2026-08-17",
+      "source": "L-AC-01 investigation (PHX-WP-LAC01-REMAINING, 2026-08-17) plus this session's own re-check of validateLifecycleGovernanceEvent and the approve-push call site, specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['L-AC-01']"
     },
     {
       "id": "pipeline.live-plugin-root-undefended-in-the-shell-lane",
@@ -910,10 +913,11 @@
     },
     {
       "id": "pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive",
-      "status": "open",
-      "type": "follow-up",
+      "status": "deferred",
+      "type": "workflow-improvement",
       "owner": "pipeline",
-      "created": "2026-08-17"
+      "created": "2026-08-17",
+      "source": "PHX-WP-HAC11-WINACL's own privacy-review Critic dispatch, self-disclosed"
     },
     {
       "id": "pipeline.private-overlay-activation-bridge",
@@ -952,7 +956,8 @@
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-17"
+      "created": "2026-08-17",
+      "source": "PHX-WP-LAC08 dispatch report (commit 20014aab), Elephant checkpoint docs/state.md 2026-08-17"
     },
     {
       "id": "pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to",
@@ -1268,7 +1273,8 @@
       "status": "open",
       "type": "defect",
       "owner": "pipeline",
-      "created": "2026-08-17"
+      "created": "2026-08-17",
+      "source": "this session's own feature-package-reconcile ceremony for R-AC-06's acceptance.md digest drift"
     },
     {
       "id": "pipeline.unified-human-authorization-ux",

@@ -1,11 +1,11 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive
-type: follow-up
+type: workflow-improvement
 owner: pipeline
-status: open
+status: deferred
 created: 2026-08-17
-source: PHX-WP-HAC11-WINACL's own privacy-review Critic dispatch, self-disclosed
+source: "PHX-WP-HAC11-WINACL's own privacy-review Critic dispatch, self-disclosed"
 ---
 
 # privacy-review Critic dispatch was bounded-cost, not an exhaustive pass — schedule a full sweep before the next real push

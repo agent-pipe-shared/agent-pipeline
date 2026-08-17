@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-17
-source: this session's own feature-package-topology digest-binding, hit twice
+source: "this session's own feature-package-topology digest-binding, hit twice"
 ---
 
 # every acceptance.md edit drifts lifecycle.json's bound digest, needing a PO-signed reconcile

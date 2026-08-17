@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-08-17
-source: this session's own feature-package-reconcile ceremony for R-AC-06's acceptance.md digest drift
+source: "this session's own feature-package-reconcile ceremony for R-AC-06's acceptance.md digest drift"
 ---
 
 # trust-policy.json shape disagreement between po-human-approval.mjs and po-approval-proof.mjs
