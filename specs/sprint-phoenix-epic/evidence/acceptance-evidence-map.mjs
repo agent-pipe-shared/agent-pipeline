@@ -1180,6 +1180,22 @@ const DELTA = {
   'P-AC-09': ['partial', 'STALE4'],
   'EPIC-AC-02': ['not-started', 'STALE4'],
 
+  // P-AC-09 CLOSED 2026-08-17 (PHX-WP-PAC09, commit 6b9a656e, independently
+  // re-verified): activateOrganizationPolicy now demands a second, distinct
+  // consent grant -- backfillGranted/backfillDecisionId (must differ from the
+  // ordinary decisionId)/backfillSubjectSha256 -- exact-key-bound to a digest
+  // computed over the plan's own preview (classes/window/subject), refused by
+  // name (OPA-BACKFILL-CONSENT) when only the ordinary activation authority is
+  // supplied; proven with a real refusal test that re-reads the still-active
+  // prior policy afterward. organization-policy-backfill-export.mjs turns a
+  // consented backfillRange into a real delivery, reusing (not duplicating)
+  // queryPortableGovernanceStream -> projectGovernanceEvent ->
+  // enqueueGovernanceExport -> deliverGovernanceExportBatch; proven end-to-end
+  // with real appended events, real consent, real export digests, and a real
+  // delivered disposition. 80/80 pass across the full affected regression set,
+  // independently re-run at the exact commit; node --check clean on the new file.
+  'P-AC-09': ['implemented', 'WP-PAC09'],
+
   // --- 2026-08-11 P-AC-08 closes (PHX-WP-PAC08-RECONCILE-APPROVAL ->
   // -APPROVAL-LEDGER -> -LOCK-REENTRANCY, three independent Critic rounds) ---
   // All four findings from the FAIL rounds are closed: F3 (2026-08-09, the
@@ -1402,7 +1418,7 @@ const POINTERS = {
   // --- 2026-08-11 staleness audit (task PHX-WP-DELTA-STALE4) ---
   'A-AC-03': 'reconfirmed 2026-08-11: NO CARRIER: no revalidation/invalidation path identifies objects affected by a changed assumption (direct grep of "A-AC-03" and "material assumption"/"invalidat*"/"revalidat*" across plugins/pipeline-core/{lib,scripts} finds nothing beyond unrelated Cyborg control-waiver revalidationTrigger fields; agent-decision-journal.mjs validates event shape only, no cascade logic)',
   'A-AC-09': 'RETRACTS "no code enforces or measures it" -- governance-event-store.mjs\'s captureDecision:"sampled-out" path (assertMandatoryCaptureNotSkipped, landed 2026-08-10 commit 90283a0c for A-AC-07, never credited here) lets a caller avoid durably persisting a non-mandatory agent-origin event -- exactly the "avoid producing... telemetry" behavior for non-material activity this criterion names. Tested: governance-event-store.test.mjs "A-AC-07 a mandatory event class cannot be silently sampled out, while a non-mandatory class still can" and "...only the policy-selected agent stream may ever be sampled out" (both pass). Partial only: nothing computes "routine/low-impact" itself (the caller decides captureDecision), and no independent Critic PASS exists for this candidate',
-  'P-AC-09': 'RETRACTS the "no export-backfill preview... exists" half -- organization-policy-activation.mjs\'s computeBackfillRange/backfillRange preview field (already credited to P-AC-03 as implemented, WP-P-AC01-AC03) is real and tested (organization-policy-activation.test.mjs "P-AC-03 computes newlyRequiredArtifacts, externalEffects, and backfillRange deterministically from the transition", 4/4 pass). Partial only: this is the preview half shared with P-AC-03; activateOrganizationPolicy\'s authorize() is one generic activation grant, not a distinct "explicit backfill consent" scoped to the identified historical range, and no code actually exports/backfills the historical events themselves',
+  'P-AC-09': 'RETRACTS the "no export-backfill preview... exists" half -- organization-policy-activation.mjs\'s computeBackfillRange/backfillRange preview field (already credited to P-AC-03 as implemented, WP-P-AC01-AC03) is real and tested (organization-policy-activation.test.mjs "P-AC-03 computes newlyRequiredArtifacts, externalEffects, and backfillRange deterministically from the transition", 4/4 pass). CLOSES 2026-08-17 (PHX-WP-PAC09, commit 6b9a656e, independently re-verified): the remaining two gaps are built. activateOrganizationPolicy now requires a distinct backfillGranted/backfillDecisionId/backfillSubjectSha256 consent, exact-key-bound to a digest over the plan\'s own preview, refused by name (OPA-BACKFILL-CONSENT) when a backfill-implying activation supplies only the ordinary activation authority -- proven by a refusal test that re-confirms the prior policy stays active. organization-policy-backfill-export.mjs exports a consented backfillRange by reusing the real pipeline (queryPortableGovernanceStream -> projectGovernanceEvent -> enqueueGovernanceExport -> deliverGovernanceExportBatch), proven end-to-end with real appended events and a real delivered disposition, not a mock. 80/80 across the full affected regression set, independently re-run at the exact commit',
   'EPIC-AC-02': 'reconfirmed 2026-08-11: NO CARRIER: planParallelSprintIntegration (plugins/pipeline-core/lib/parallel-sprint-integration.mjs) still has no concept of "unpublished" (direct grep for "unpublished"/"Nova"/"Cyborg"/"Nightwing" in the file: zero hits) and is still imported only from its own test file (grep for the import across plugins/pipeline-core and harness: only parallel-sprint-integration.test.mjs)',
 };
 

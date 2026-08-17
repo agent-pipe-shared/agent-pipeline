@@ -88,9 +88,22 @@ diff against the pre-commit version); the new path's fail-open set is a proven s
 re-run at the exact commit. **A-AC-10 closes: `implemented`.** Moves out of Class B entirely (10
 remain, was 11). Open count: **21 of 157** (was 22).
 
+**UPDATE, 2026-08-17 (PHX-WP-PAC09, commit `6b9a656e`, independently re-verified).** P-AC-09's two
+remaining gaps (preview already covered by P-AC-03) are built. `activateOrganizationPolicy` now
+requires a distinct `backfillGranted`/`backfillDecisionId`/`backfillSubjectSha256` consent,
+digest-bound to the plan's own preview window, refused by name (`OPA-BACKFILL-CONSENT`) when a
+backfill-implying activation supplies only the ordinary activation grant — proven with a refusal
+test that re-confirms the prior policy stays active. New module
+`organization-policy-backfill-export.mjs` exports a consented `backfillRange` by reusing (not
+duplicating) the real pipeline — `queryPortableGovernanceStream` → `projectGovernanceEvent` →
+`enqueueGovernanceExport` → `deliverGovernanceExportBatch` — proven end-to-end with real appended
+events and a real delivered disposition. 80/80 across the full affected regression set,
+independently re-run at the exact commit. **P-AC-09 closes: `implemented`.** Moves out of Class B
+entirely (9 remain, was 10). Open count: **20 of 157** (was 21).
+
 ## What this design is for
 
-The measurement established that **21 of 157** acceptance criteria are not
+The measurement established that **20 of 157** acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart — provided it is regenerated when the verdict data moves, which is the exact
@@ -105,9 +118,9 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 0 | (both prior members, A-AC-14/PX0-AC-03, closed — see below) |
 | D — documentation missing | 0 | (prior member L-AC-08 reclassified to P 2026-08-17, then closed the same day — see below) |
 | S — seam missing | 0 | (prior member E-AC-20 closed 2026-08-10) |
-| B — capability missing | 10 | real implementation plus its tests |
+| B — capability missing | 9 | real implementation plus its tests |
 | P — not code | 11 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **21** | |
+| **total** | **20** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -267,7 +280,7 @@ these, is in
 [`../evidence/acceptance-evidence-map-20260817f.md`](../evidence/acceptance-evidence-map-20260817f.md)
 — not repeated here, since this document's job is the OPEN set.
 
-### Class B — an absent capability (10)
+### Class B — an absent capability (9)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -277,7 +290,6 @@ these, is in
 | A-AC-09 | partial | WP-A | `assertMandatoryCaptureNotSkipped` (governance-event-store.mjs) lets a caller avoid persisting a non-mandatory event, tested; nothing computes "routine/low-impact" itself — the caller still decides |
 | EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file (reconfirmed 2026-08-17 by independent re-verification, zero hits for "unpublished"/"Nova"/"Cyborg"/"Nightwing") |
 | L-AC-01 | partial | WP-L | UPDATE 2026-08-17 (PHX-WP-LAC01, commit `fd57d390`): first real producer landed — `continuity-cas` now durably persists a schema-valid `dispatch`-kind lifecycle event via a new translator, independently re-verified (unit + call-site + 506/506 gated regression + e2e readback). UPDATE 2026-08-17 (PHX-WP-LAC01B, commit `8e4be420`): second real producer landed — `continuity-integrate-final` now durably persists a `status`-kind event via a sibling translator, independently re-verified (unit + call-site tests green, gated regression 504/506 — the 2 failures are the same pre-existing FTP-ARTIFACT-2 acceptance.md-digest-staleness cause, confirmed pre-existing by re-running the identical suite at the prior commit). Honest count: **2 of 9** — NOT status+cancellation as hoped: the real continuity outcome vocabulary only ever observes succeeded/failed, so cancellation stays unreached despite the projection covering it. `candidate-invalidation` also confirmed to have no real caller (invalidation is always constructed `{state:"valid"}`; zero non-test producers of an invalidated state anywhere). Remaining 7 kinds all need a source vocabulary to exist before a producer can — a capability gap now, not a translator-authoring gap. Registering the new call-site suites into `harness/scripts/verify.mjs` is blocked by the same installed-plugin TP-3 gap as the other four parked reds |
-| P-AC-09 | partial | WP-P | RETRACTS "no carrier" (2026-08-17): `computeBackfillRange` (organization-policy-activation.mjs) already covers the preview half, shared with P-AC-03. Narrower remainder: `activateOrganizationPolicy`'s `authorize()` is one generic activation grant, not a distinct "explicit backfill consent" scoped to the identified historical range, and no code exports/backfills the historical events themselves |
 | R-AC-08 | partial | WP-R | a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent — no such state exists, only prospective values inside recoverability |
 | R-AC-09 | partial | WP-R | missing offer link, contradictory outcome evidence, cross-repository/cross-scope substitution, and now `occurredAtEpochMs` (closed 2026-08-10, commit `8d8996bc`) are pinned. Duplicate detection deliberately not rebuilt here — it lives at the store layer (`idempotencyKey`, governance-event-store.mjs) by design, not an absence |
 | V-AC-02 | partial | WP-V | seven of nine now labelled (fact/unknown/unavailable/redacted/invalid/not-applicable/human-decision, the last closed 2026-08-1x and missed by this document until the 2026-08-17 correction). estimate and assumption remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules |
@@ -300,7 +312,7 @@ these, is in
 
 ## Sequence, corrected
 
-With Classes A/D/S empty, the sequence collapses to: **Class B first** (10 items, real code, no PO
+With Classes A/D/S empty, the sequence collapses to: **Class B first** (9 items, real code, no PO
 gate — L-AC-01 leads, since it is the one structural gap several other rows describe as their own
 missing half), **Class P last** (11 items, eleven different PO actions, several already queued and
 waiting only on the PO's own terminal or a design answer — not parallelizable with agent work).
