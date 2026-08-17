@@ -58,8 +58,13 @@ data-minimized action and exits non-successfully; it must not retry in the
 workspace sandbox. A remote timeout without a restricted-boundary request
 remains a typed offline observation, never proof of freshness.
 
-The productive WSL adapter has no durable state, lockfile, repository mutation,
-or fallback executor. It performs one public observation from the fixed host
+The productive WSL adapter has no durable state, lockfile, or fallback
+executor, and no mutation outside one adapter-bound disposable comparison
+repository, with a fixed destination ref and an adapter-observed source OID
+(PO amendment, 2026-08-17: `specs/sprint-phoenix-epic/design/codex-wsl-freshness-host-action-family.md`
+§13 Option A, accepted — the bounded local write is the `fetch` that makes
+Part B's tag/channel comparison possible at all; no version of Part B exists
+without it). It performs one public observation from the fixed host
 directory and returns only a validated public object ID plus the privacy-safe
 host-control identity digest. A platform, trust, or privacy regression therefore
 rolls back the identity-digest pair together with the prior complete PHX-0B host
