@@ -40,28 +40,56 @@ independently-enabled scopes were confirmed by reading
 
 ## Proposal
 
-Point this project's own tracked `enabledPlugins` at
-`pipeline-core@agent-pipeline-local` instead of
-`pipeline-core@agent-pipeline`, so a session opened in this repository
-consistently exercises the same local candidate the PO tests downstream,
-with no duplicate plugin load. The local marketplace's directory `source`
-itself stays out of the tracked `extraKnownMarketplaces` block — it is a
-machine-specific absolute path (CLAUDE.md: no machine-specific absolute
-paths in commits; this repo runs on two machines with different local
-paths) and is already registered per-machine in each machine's own global
-settings.
+**REJECTED by Critic review (round 1, FAIL, blocker F1) — see Triage.**
+The original proposal (point the tracked `enabledPlugins` at
+`pipeline-core@agent-pipeline-local`) is WRONG: per
+`docs/claude-local-plugin-development.md`'s own scope model and
+[ADR-0001](../../docs/adr/0001-distribution-plugin-marketplace.md) D1,
+`agent-pipeline-local` is host-wide `--scope user` state by design ("a
+single `agent-pipeline-local` registration serve[s] any checkout on the
+host"), never the tracked project-scope binding. The tracked file must
+keep resolving under the released selector `pipeline-core@agent-pipeline`
+so a fresh clone or CI runner — with no local marketplace ever
+registered — still loads the guard-hook set rather than silently loading
+nothing while `Bash(git push *)` stays pre-granted.
+
+The actual "2 plugins" symptom is the already-documented interaction of
+running project-scope (`agent-pipeline`, this tracked file) and
+user-scope (`agent-pipeline-local`, this host's global settings)
+*at the same time on the same checkout* —
+`docs/claude-local-plugin-development.md` (§"Reaching the released
+selector from this checkout") already states this combination "should
+not be combined". This repository's own dev/self-application checkout is
+exactly the case where both purposes (a self-describing tracked install
+AND local-candidate testing) are wanted simultaneously, which the
+existing docs don't resolve. Fixing the tracked file cannot fix this —
+it needs either a host-local operational choice (e.g. temporarily
+suppressing one scope's install while doing local-dev testing on this
+checkout) or a documented, explicit exception for the Pipeline's own
+self-application repo. **Left open for a PO decision** — not a code fix.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted — fixed live in the same turn it was reported
-  (commit `917f8a1e`), no dedicated dispatch needed: a one-line
-  `enabledPlugins` value change with no behavioural ambiguity. Not yet
-  closed: MP-07 classifies `permissions/settings` as guardrail-class, so
-  this fix still needs its mandatory Critic review (self-application,
-  ADR-0015) before being folded into the next candidate stamp, same as
-  any other guardrail diff. Close this item once that review passes.
+- **Decision round 1:** accepted a proposal that turned out wrong — fixed
+  live (commit `917f8a1e`), Critic review (self-application, ADR-0015,
+  MP-07 guardrail-class) returned **FAIL** (blocker F1: broke the
+  self-describing project-scope contract for any checkout without a
+  local marketplace registered — a fail-open regression, worse than the
+  symptom being fixed). **Reverted** in commit `c4f39ea4`, restoring the
+  tracked file to `pipeline-core@agent-pipeline`.
+- **Decision round 2:** the tracked-file fix direction is closed —
+  correctly reverted, no further tracked-file change is the right answer
+  here. The remaining question (how to avoid the duplicate load while
+  doing local-dev testing specifically on this checkout) is a host-local
+  workflow choice, deferred to the PO. This item stays **open**, not
+  closed, until the PO decides how they want to handle it (or decides the
+  duplicate load is an acceptable, ignorable side effect of combining
+  both purposes on one checkout).
 - **Rationale:** self-application governance (ADR-0015) applies to this
   repo's own tooling config the same as to any other guardrail-adjacent
-  file.
-- **Assignment (if accepted):** this AFK block.
+  file; the Critic caught a real, more severe regression than the
+  original symptom, and the correct remedy per this repo's own existing
+  documentation is a full revert, not a different `enabledPlugins` value.
+- **Assignment (if accepted):** this AFK block; final resolution pending
+  PO input.
 - **Date:** 2026-08-17
