@@ -25,7 +25,7 @@
     {
       "class": "acceptance",
       "path": "specs/sprint-phoenix-epic/acceptance.md",
-      "sha256": "baa9097bf2a8e60910a33295fabff00cedc7768721ecdee004df2298c7838c4a",
+      "sha256": "8597b8236ef936f90d16fad4b9983a38b039b05bfe52a6c2d14273ea97e05640",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
