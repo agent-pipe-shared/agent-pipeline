@@ -83,8 +83,49 @@ function assertPlan(plan) {
   // closed here exactly like a tampered effectivePolicy already does above.
   if (!Array.isArray(plan.newlyRequiredArtifacts) || plan.newlyRequiredArtifacts.length > 64 || !plan.newlyRequiredArtifacts.every(validPreviewArtifact) || !Array.isArray(plan.externalEffects) || plan.externalEffects.length > 64 || !plan.externalEffects.every(validExternalEffect) || !validBackfillRange(plan.backfillRange)) fail("OPA-PREVIEW");
 }
-function assertAuthority(value, plan) {
-  if (!exact(value, ["granted", "decisionId", "activationId", "effectivePolicySha256"]) || value.granted !== true || typeof value.decisionId !== "string" || !ACTIVATION_ID.test(value.activationId) || value.activationId !== plan.activationId || value.effectivePolicySha256 !== plan.effectivePolicySha256) fail("OPA-AUTHORITY");
+const BASE_AUTHORITY_KEYS = Object.freeze(["granted", "decisionId", "activationId", "effectivePolicySha256"]);
+const BACKFILL_AUTHORITY_KEYS = Object.freeze([...BASE_AUTHORITY_KEYS, "backfillGranted", "backfillDecisionId", "backfillSubjectSha256"]);
+/**
+ * P-AC-09: the exact, canonical subject a human consents to when historical
+ * events would become exportable after this transition. Exported so a consent
+ * resolver -- and, later, the backfill exporter -- can recompute the identical
+ * digest independently instead of trusting a supplied one (the same pattern as
+ * governanceForkDispositionApprovalSubject in governance-event-store.mjs). The
+ * subject binds the activation identity AND the resolved policy digest into
+ * the window, so a consent granted for one activation can never be replayed to
+ * authorize a different one, or the same one with a shifted window.
+ */
+export function governanceBackfillConsentSubject({ activationId, effectivePolicySha256, classes, fromEpochMs, toEpochMs } = {}) {
+  if (typeof activationId !== "string" || !ACTIVATION_ID.test(activationId) || typeof effectivePolicySha256 !== "string" || !SHA.test(effectivePolicySha256)
+    || !Array.isArray(classes) || classes.length === 0 || classes.length > 32 || !classes.every((name, index) => CLASSES.has(name) && (index === 0 || classes[index - 1] < name))
+    || !(fromEpochMs === null || (Number.isSafeInteger(fromEpochMs) && fromEpochMs >= 0))
+    || !Number.isSafeInteger(toEpochMs) || toEpochMs < 0 || (fromEpochMs !== null && toEpochMs < fromEpochMs)) fail("OPA-BACKFILL-SUBJECT", "Backfill consent subject is invalid.");
+  return canonicalSha256({ schema: "pipeline.organization-policy-backfill-consent-subject.v1", activationId, effectivePolicySha256, classes: [...classes], fromEpochMs, toEpochMs });
+}
+// P-AC-09: null whenever this transition previews no backfill -- in that case
+// nothing about the authorize request or the authority shape changes at all.
+// Otherwise this closes the exact window the human is asked about: the plan's
+// own preview range, upper-bounded by this activation's own timestamp (never a
+// caller-supplied bound), plus the canonical subject digest of that window.
+function backfillConsentSubject(plan, nowEpochMs) {
+  if (plan.backfillRange === null) return null;
+  const window = { classes: Object.freeze([...plan.backfillRange.classes]), fromEpochMs: plan.backfillRange.fromEpochMs, toEpochMs: nowEpochMs };
+  return Object.freeze({ ...window, subjectSha256: governanceBackfillConsentSubject({ activationId: plan.activationId, effectivePolicySha256: plan.effectivePolicySha256, ...window }) });
+}
+function assertAuthority(value, plan, backfill) {
+  // P-AC-09: an authority carrying ONLY the ordinary activation grant is
+  // refused by name when a backfill was previewed -- consenting to activate is
+  // structurally not consenting to backfill. The reverse is refused too: an
+  // authority that volunteers backfill consent for a transition that previews
+  // no backfill fails the exact-key check below, so unasked-for authority
+  // never widens what this activation may do.
+  if (backfill !== null && exact(value, BASE_AUTHORITY_KEYS)) fail("OPA-BACKFILL-CONSENT", "This transition previews a backfill range; a distinct explicit backfill consent is required.");
+  if (!exact(value, backfill === null ? BASE_AUTHORITY_KEYS : BACKFILL_AUTHORITY_KEYS) || value.granted !== true || typeof value.decisionId !== "string" || !ACTIVATION_ID.test(value.activationId) || value.activationId !== plan.activationId || value.effectivePolicySha256 !== plan.effectivePolicySha256) fail("OPA-AUTHORITY");
+  // The backfill grant must be its own decision: a separate positive flag, a
+  // decision identifier that is not the activation's own (echoing the same id
+  // back is exactly the "one generic authority" this closes), and the exact
+  // subject digest of the previewed window.
+  if (backfill !== null && (value.backfillGranted !== true || typeof value.backfillDecisionId !== "string" || value.backfillDecisionId === "" || value.backfillDecisionId === value.decisionId || value.backfillSubjectSha256 !== backfill.subjectSha256)) fail("OPA-BACKFILL-CONSENT", "Backfill consent is absent, not distinct from the activation decision, or not bound to the previewed range.");
   // Cyborg integration point: the caller-supplied resolver must additionally
   // bind a Cyborg-verified human-attestation receipt before returning granted.
   // This module never treats this local record or a Git commit as human proof.
@@ -111,11 +152,21 @@ export async function planOrganizationPolicyActivation({ repositoryRoot, coreVer
 export async function activateOrganizationPolicy({ repositoryRoot, plan, authorize, nowEpochMs } = {}) {
   const root = safeRoot(repositoryRoot); assertPlan(plan); if (typeof authorize !== "function" || !Number.isSafeInteger(nowEpochMs) || nowEpochMs < 0) fail("OPA-REQUEST");
   const current = await readActive(root); if ((current?.digest ?? null) !== plan.expectedActiveSha256) fail("OPA-PREIMAGE");
-  const authority = await authorize(Object.freeze({ activationId: plan.activationId, effectivePolicySha256: plan.effectivePolicySha256 })); assertAuthority(authority, plan);
-  const record = Object.freeze({ schema: "pipeline.organization-policy-active.v1", activationId: plan.activationId, humanDecisionId: authority.decisionId, activatedAtEpochMs: nowEpochMs, effectivePolicy: plan.effectivePolicy, effectivePolicySha256: plan.effectivePolicySha256 });
+  // P-AC-09: the resolver is shown the exact preview it must decide on -- the
+  // classes, the closed window, and its canonical subject digest -- not just
+  // the activation identity. Absent a previewed backfill the request object is
+  // byte-identical to the pre-P-AC-09 one.
+  const backfill = backfillConsentSubject(plan, nowEpochMs);
+  const authority = await authorize(Object.freeze({ activationId: plan.activationId, effectivePolicySha256: plan.effectivePolicySha256, ...(backfill === null ? {} : { backfill }) })); assertAuthority(authority, plan, backfill);
+  const consent = backfill === null ? null : Object.freeze({ schema: "pipeline.organization-policy-backfill-consent.v1", backfillDecisionId: authority.backfillDecisionId, classes: backfill.classes, fromEpochMs: backfill.fromEpochMs, toEpochMs: backfill.toEpochMs, subjectSha256: backfill.subjectSha256 });
+  const record = Object.freeze({ schema: "pipeline.organization-policy-active.v1", activationId: plan.activationId, humanDecisionId: authority.decisionId, activatedAtEpochMs: nowEpochMs, effectivePolicy: plan.effectivePolicy, effectivePolicySha256: plan.effectivePolicySha256, ...(consent === null ? {} : { backfillConsent: consent }) });
   const bytes = `${canonicalizeJson(record)}\n`; const target = activePath(root); await mkdir(dirname(target), { recursive: true });
   const existing = await readActive(root); if ((existing?.digest ?? null) !== plan.expectedActiveSha256) fail("OPA-PREIMAGE");
   const temporary = join(dirname(target), `.organization-policy-${plan.activationId}.tmp`); await writeFile(temporary, bytes, { encoding: "utf8", flag: "wx", mode: 0o600 }); await rename(temporary, target);
-  const readback = await readActive(root); if (!readback || readback.value.effectivePolicySha256 !== plan.effectivePolicySha256 || readback.value.humanDecisionId !== authority.decisionId) fail("OPA-READBACK");
-  return Object.freeze({ schema: "pipeline.organization-policy-activation-receipt.v1", status: "activated", activePath: ACTIVE_PATH, activeSha256: readback.digest, activationId: plan.activationId, effectivePolicySha256: plan.effectivePolicySha256, humanDecisionId: authority.decisionId });
+  // P-AC-09: the consent is persisted with the activation and read back exactly
+  // (P-AC-04's readback discipline), so a backfill export that runs later -- in
+  // another process, after a crash -- can still prove which window a human
+  // actually consented to instead of re-deriving an unproven one.
+  const readback = await readActive(root); if (!readback || readback.value.effectivePolicySha256 !== plan.effectivePolicySha256 || readback.value.humanDecisionId !== authority.decisionId || canonicalizeJson(readback.value.backfillConsent ?? null) !== canonicalizeJson(consent)) fail("OPA-READBACK");
+  return Object.freeze({ schema: "pipeline.organization-policy-activation-receipt.v1", status: "activated", activePath: ACTIVE_PATH, activeSha256: readback.digest, activationId: plan.activationId, effectivePolicySha256: plan.effectivePolicySha256, humanDecisionId: authority.decisionId, ...(consent === null ? {} : { backfillConsent: consent }) });
 }

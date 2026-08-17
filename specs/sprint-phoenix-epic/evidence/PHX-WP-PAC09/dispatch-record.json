@@ -1,0 +1,8 @@
+{
+  "taskId": "PHX-WP-PAC09",
+  "model": "claude-opus-5[1m]",
+  "rulesetSha": "5125f494dd5a0f5315b8ea7f5f19e03ab4e0057e15c7198d5565d7b3d67ca937",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "log": []
+}
