@@ -1,0 +1,99 @@
+---
+schema: pipeline.backlog-item.v1
+id: pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote
+type: defect
+owner: pipeline
+status: open
+created: 2026-08-17
+source: "Reported by the PO on 2026-08-17, relaying a live-blocking audit from a downstream consumer-project session (Windows, D:\\Dev\\Web\\Toolbox) doing onboarding recovery against a vendored copy of this plugin. Independently confirmed against this repository's own source before filing."
+---
+
+# `guard-lifecycle-ready.mjs`'s `sanctionedOnboardingArgs()` still misses three real, CLI-constructed command shapes
+
+## Description
+
+`sanctionedOnboardingArgs()` (`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:1333`)
+allowlists the exact argv shapes an agent may pass to
+`project-onboarding-v3.mjs`. `plan-partial-authority` was already added to
+this function (GUARDALLOW-1, backlog
+`2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md`)
+but three real, currently-constructed shapes in the same command family are
+still missing — confirmed by direct source reading, not just the relayed
+report:
+
+1. **`plan-partial-authority --root <root> [--runner <r>] --profile <p> --source <s>`.**
+   `scripts/project-onboarding-v3.mjs:54` documents this shape in its own
+   usage text (`--profile <epic|feature|mini> --source <selection>` as an
+   optional pair), and its parser (`scripts/project-onboarding-v3.mjs:135`)
+   passes `options.profile`/`options.source` through to
+   `planProjectPartialAuthorityAdoption()`. `lib/project-onboarding-v3.mjs:443`
+   explicitly instructs a human/agent to "re-run plan-partial-authority with
+   `--profile` and `--source` `canonical-fresh-v3` after PO selection" — the
+   guard currently only admits the BARE `--root [--intent <value>]` shape
+   (`guard-lifecycle-ready.mjs:1357-1361`), so this diagnostic's own suggested
+   retry is refused.
+2. **`apply-partial-authority --root <root> --profile <p> --source <s> --plan-sha256 <sha> --activate`.**
+   `lib/project-onboarding-v3.mjs:470` constructs exactly this command as the
+   plan's own `applyAction`. `sanctionedOnboardingArgs()` has no
+   `apply-partial-authority` branch at all — this is the very next step after
+   a successful `plan-partial-authority` and is currently 100% unreachable.
+3. **`adopt-remote plan --root <root> --remote <r> --ref <ref>` and
+   `adopt-remote apply --root <root> --remote <r> --ref <ref> --plan-sha256 <sha> --activate`.**
+   `lib/project-onboarding-v3.mjs:4198` and `:4111` construct exactly these
+   two commands. This is the documented `onboarding-recovery.md` path for
+   `portable-seed-required` when an existing remote+branch is supplied.
+   `sanctionedOnboardingArgs()` has no `adopt-remote` handling at all — this
+   entire recovery path is currently 100% unreachable for any not-ready
+   project.
+
+Separately noted (informational, no fix needed): `kickoff promote plan`/
+`kickoff promote apply` is also absent from this allowlist, but per the
+reporting session's own check, the allowlist is bypassed entirely once a
+project reaches `ready` status, so this specific absence is provably
+unreachable — do not add it, or it will read as a plausible fourth bug later.
+
+## Affected artifact
+
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, function
+`sanctionedOnboardingArgs()` (currently lines 1333-1401).
+
+## Proposal
+
+Add three new `if` branches immediately after the existing
+`plan-partial-authority` branch (lines 1357-1363), mirroring its own
+established style (`exactRoot`, closed `--intent` enum, no reordering
+tolerance):
+
+1. Extend (or add a sibling branch for) `plan-partial-authority` to also
+   admit `--profile <epic|feature|mini> --source <value>` after `--root`,
+   with the same optional `--intent <value>` tail already supported.
+2. A new `apply-partial-authority` branch admitting exactly
+   `--root <root> --profile <p> --source <s> --plan-sha256 <hex> --activate`
+   (mirroring the existing `apply-manifest-repair` branch's shape at line
+   1364).
+3. A new `adopt-remote` branch admitting both
+   `adopt-remote plan --root <root> --remote <value> --ref <value>` and
+   `adopt-remote apply --root <root> --remote <value> --ref <value> --plan-sha256 <hex> --activate`.
+
+**Caveat carried from the reporting session, unverified:** the proposed
+`--ref` check is deliberately loose (non-empty, not a flag-shaped string) —
+whether it should instead enforce a stricter `refs/heads/`-prefixed shape is
+an open design question for whoever implements this, not resolved here.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted — all three gaps independently confirmed against
+  this repository's own current source (exact line numbers above,
+  cross-checked against the CLI's own construction sites in
+  `lib/project-onboarding-v3.mjs`), not just trusted from the relayed
+  report. Same defect class and same file as the already-fixed
+  `plan-partial-authority` gap (GUARDALLOW-1) — a guardrail/hook file, so
+  this goes through a `goldfish-deep` dispatch with mandatory Critic review,
+  not a same-session edit.
+- **Rationale:** `guard-lifecycle-ready.mjs` is a hook/guardrail file
+  (MP-07); the pattern (a real CLI-constructed command the allowlist
+  refuses) is identical to the already-fixed sibling gap, and all three new
+  branches have a directly analogous existing branch to mirror.
+- **Assignment (if accepted):** next available dispatch slot in this AFK
+  block.
+- **Date:** 2026-08-17
