@@ -192,6 +192,62 @@ abandoned worktree branch `worktree-agent-a2b2a34b84f687185`
 cause. A corrected rework of (i), fixing F2/F5, is in progress under this
 item; Direction 1–3 stay open regardless of that rework's outcome.
 
+## Second confirmed trigger, 2026-08-17 (independent recurrence, different consumer project)
+
+A second, independent recurrence of this exact failure class — PO's Codex
+happy-path test on an unrelated project ("Rune_Test1_Codex_055_50" /
+"ruinen-browsergame"), relayed as an AI-authored forensic report and
+independently re-verified against this checkout's own current source before
+being recorded here (never trusted from the relay alone). This time the
+precise mechanical trigger IS confirmed, closing this item's own Direction 1
+("confirm or rule out the escalated-exec attestation trigger") with a
+DIFFERENT, more precise cause than the one hypothesized above — the two are
+not mutually exclusive; either can independently produce the same
+`recovery-unavailable`/`SESSION-CLEANUP-PRIVATE-CAS` symptom.
+
+`kickoffPromotionCleanupRecoveryPlanCore()`
+(`plugins/pipeline-core/lib/onboarding-continuity.mjs:5109`) hard-codes
+`state?.continuity?.revision !== 2` as a literal equality check, not a floor
+or range. A kickoff's own `revision` is 0 unless it already resumed once
+after a host-no-background-wakeup binding (which sets it to 1);
+promotion sets `next.continuity.revision = kickoff.revision + 1`. So the
+recovery core is reachable only after a revision-1→2 promotion — i.e. only
+when the kickoff itself had *already* resumed once before being promoted. A
+project's **first, ordinary** kickoff→promotion (revision 0→1) is
+structurally outside what the recovery core accepts. This is not a rare
+misfortune case; it is the single most common path (a brand-new project's
+first promotion) landing outside the only implemented recovery.
+
+In the specific run studied, the proximate mismatch was caused by a private
+cleanup binding created *between* kickoff and promotion (for a separately
+rejected Advisor dispatch attempt, `PORG-NOT-READY`) that `recognisedKickoff`
+never observed because it only reads the private binding from disk when
+`continuity.revision === 1` at kickoff-observation time — so the binding
+landed post-promotion at revision 1, which the `revision !== 2` check then
+rejects. The `plan-human-recovery` → `attended-host-recovery` recommendation
+→ `plan-recovery` → `recovery-unavailable` chain reproduced exactly as this
+item's original 2026-08-09 incident describes (verbatim transcript evidence:
+`plan-recovery` returned `{"schema":
+"pipeline.kickoff-promotion-cleanup-recovery-plan.v1", "status":
+"recovery-unavailable"}`).
+
+This strengthens Direction 2's existing ask (a third, genuinely in-session
+recovery candidate) with a concrete, fixable target: the recovery core's
+revision check needs to accept the revision-0→1 case (or, more precisely,
+derive its expected before/after revision from the promotion's own history
+entry rather than a hardcoded literal), not just the revision-1→2 case it
+currently accepts.
+
+**Not independently reproducible: the `plan-privatization: noop` sub-claim.**
+The forensic report also claimed `plan-privatization` returned `noop` despite
+a demonstrable divergence still being present. Independently checked against
+the transcript: by the time `plan-privatization` ran, the divergence had
+already been resolved by an unrelated hygiene/cleanup step a few turns
+earlier, so `noop` was the correct answer to the question `plan-privatization`
+actually asks (whether public tracked state leaked private data into itself)
+— a different CAS mechanism than the one that produced the original
+mismatch. This sub-claim does not hold up and is not carried forward.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted, stays open, current-scope (not deferred).

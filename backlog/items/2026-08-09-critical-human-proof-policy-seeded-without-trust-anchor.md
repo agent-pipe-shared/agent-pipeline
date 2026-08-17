@@ -84,3 +84,35 @@ Not yet worked out. Two directions worth exploring, not mutually exclusive:
   active gap).
 - **Assignment (if accepted):** next available Alfred slot.
 - **Date:** 2026-08-17
+
+### Additional evidence, 2026-08-17 (broader than push-approval specifically)
+
+A second, independent Codex happy-path test (relayed, then independently
+re-verified against this checkout's own current source — never trusted from
+the relay alone) hit the same missing-trust-anchor wall through a
+DIFFERENT, more general path than `approve-push`: a plain
+`gates.push_approval: "signature"` project whose seeded
+`project/critical-human-proof.json` had no `trustAnchor` at all made the
+GENERAL human-guard-override ceremony (not specifically the push gate)
+structurally unusable — chat-mode was refused as `HGO-SIGNATURE-MODE-REQUIRED`
+(signature mode is configured), and the signature path itself then failed
+with `HGO-TRUST-ANCHOR-MISSING`
+(`plugins/pipeline-core/lib/human-guard-override.mjs:2349-2378`) because
+there was nothing to verify against — a genuine dead end reached mid-session,
+not at `approve-push` specifically.
+
+Confirmed: this hard-fail behavior is itself intentional, documented design
+(the code deliberately never auto-trusts "any well-formed key" — same
+boundary this item already describes). What is confirmed MISSING is any
+bootstrap/onboarding-time check that a `signature`-mode project actually has
+a usable trust anchor before an agent can hit this wall live — zero
+references to `trustAnchor`/`HGO-TRUST-ANCHOR-MISSING` found in either
+`project-onboarding-ready-gate.mjs` or `pipeline-start-preflight.mjs`.
+
+Does not change this item's Alfred assignment or its already-decided
+Direction (trust-on-first-use per key, signature-or-chat gated) — this is
+additional evidence that the same underlying gap is reachable through more
+than one ceremony, and a concrete argument for including an early,
+bootstrap-time "signature mode configured but no anchor present" surfaced
+check as part of whatever Alfred slot picks this up, rather than only fixing
+the `approve-push`-specific path.

@@ -11,6 +11,7 @@
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0047-numbering-collision | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
+| pipeline.advisor-consent-is-requested-before-the-readiness-preflight | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-definitions-pin-the-review-tier-model | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.agent-never-asks-po-for-key-directory-invents-one-instead | closed | defect | pipeline | 2026-08-10 | — |
@@ -157,6 +158,7 @@
 | pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
@@ -195,6 +197,7 @@
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
 | pipeline.reopen-design-invites-the-edit-that-ends-the-session | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.repair-map-crashes-on-a-fresh-repository-with-no-head | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.restart-resume-hint-write-misses-the-project-prefix | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.runner-neutrality-before-third-runner | open | workflow-improvement | pipeline | 2026-08-08 | — |
@@ -245,10 +248,11 @@
 | pipeline.windows-trusted-tool-resolution | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-verify-brittle-test-hygiene | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.windows-verify-reproducibility | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
+| pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify | closed | defect | pipeline | 2026-08-11 | — |
 
 ## Counts
 
-- open: 98
+- open: 102
 - in_progress: 22
 - closed: 121
