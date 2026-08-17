@@ -547,6 +547,32 @@ architecture prose or an implementation briefing.
   L-AC-01 stays `partial` regardless: only 1 of the 9 named triggers has a real
   producer today (see this criterion's evidence-map pointer), and nothing here
   changes that.
+
+  **Amendment for the remaining 7 (PO, 2026-08-17).** `dispatch` and `status`
+  now have real producers (`continuity-cas`, `continuity-integrate-final`,
+  commits `fd57d390`/`8e4be420`) — 2 of 9. The remaining 7 split into two
+  structurally different problems, both confirmed against current source, not
+  inferred: `candidate-invalidation` and the `status-cancellation-variant`
+  case are dispatch-queue concepts with no real state-machine transition yet
+  (`planInvalidation` is read/deleted, never assigned; no cancel-state
+  vocabulary exists) — a missing producer, not a schema gap. `verification`,
+  `review`, `gate`, `recovery`, and `reconciliation` are not dispatch-queue
+  concepts at all: their real call sites (checked directly, e.g. `approve-push`,
+  `pipeline-state.mjs:6870`) carry no `packageId`/`dispatchId`/`attemptId`,
+  because a push approval, a Critic review, or a guard recovery is not a
+  queued worker execution. `validateLifecycleGovernanceEvent`'s closed
+  `correlation` shape (`lifecycle-governance-events.mjs:84`) requires that
+  full dispatch-identity tuple for every kind with no exception, so honestly
+  satisfying these 5 needs either a second, non-dispatch correlation shape or
+  a separate schema for governance-action lifecycle events — real design
+  work, not a same-night fix, and not to be closed by fabricating dispatch
+  identity that does not exist (the caller-invented-to-satisfy-a-criterion
+  anti-pattern already reverted once in this epic, commit `cc43a182`).
+  Tracked as
+  `backlog/items/2026-08-17-lifecycle-event-schema-has-no-non-dispatch-correlation-shape.md`.
+  L-AC-01 stays `partial` at 2 of 9; closing further kinds needs that design
+  decided first, the same disposition class already used for H-AC-11's O-4 and
+  PX0-AC-13's clause 1.
 - **L-AC-02:** WHEN an event derives from the #10 control/execution exchange,
   THE SYSTEM SHALL retain package, dispatch, attempt, queue, candidate, worker,
   correlation, and invalidation identity.
