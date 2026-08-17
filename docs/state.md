@@ -7554,6 +7554,65 @@ F-1 through F-5 fixed in one dispatch, `NVA-MKTHASH-2` (`64654077`) — re-verif
 
 **Immediate next steps:** (1) report the candidate to the PO; resync the local marketplace copy at the PO's convenience to clear F-0 for real. (2) Continue toward Nova A candidate-freeze work, or the next-highest-priority open Windows-hotfix item, per PO steer. (3) Still open, not this window: `dialectFor()`'s OS-vs-shell dialect inference (deferred, needs Codex-shell-reality verification first); the schema-less-manifest fix design; the pre-dispatch model-routing-check gap; the two `NVA-HGOFIX-1` follow-ups; the `project-authority` test-fixture-race follow-up; the dispatch-bootstrap-token-cost investigation.
 
+## 2026-08-17 (continued 14) — Alfred/Nightwing/Batman confirmed as the next three Sprints; a full 108-item backlog triage pass closes 12, defers 34, confirms/updates the rest
+
+The PO confirmed three further planning windows already carrying live GitHub
+Issues and sprint labels: **Alfred** (`sprint:alfred` — agent-first
+architecture, mechanical governance, measurable rigor, control integrity),
+**Nightwing** (`sprint:nightwing` — product experience: onboarding,
+configuration, documentation, low-friction adoption), **Batman**
+(`sprint:batman` — optional capabilities via governed adapters/built-in
+tools; a second, unrelated reuse of the name from the completed ADR-0037
+v0.3 Batman). Order: Alfred, then Nightwing, then Batman, once Phoenix
+(~90%, now closed to new scope) and Nova are live. Recorded as a
+2026-08-17 amendment to [ADR-0043](adr/0043-post-go-live-sprint-model.md)
+(commit `149a1367`).
+
+**Full backlog triage, all 108 items open at session start.** Dispatched as
+six sequential Elephant forks (18 items each, never concurrent — the ledger
+is append-only/hash-chained and cannot be reconciled from parallel
+worktrees), each re-verifying every item against current code rather than
+trusting its own prose, per the PO's explicit instruction. Net result: **12
+closed** (11 from the batches + `ledger-event-403-has-a-short-hash-evidence-
+commit`, closed directly beforehand — its own documented prevention fix had
+already landed in `ef0ec7844`, unrelated to this pass), **34 deferred**
+to Alfred/Nightwing/Batman (recorded in each item's own `## Triage` section,
+per the existing no-Sprint-frontmatter convention), the rest confirmed or
+updated as current-scope open work. **98 open items remain.** One new defect
+filed along the way:
+`managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits` — a
+one-off 2026-07-29 ledger repair pins `managed-onboarding-success-contract.md`'s
+exact file bytes, so even filling in its own empty Triage section hard-fails
+`check-backlog-state.mjs`; that item's edit was reverted to its pinned bytes,
+and its Alfred-deferral decision is recorded in the new defect item instead.
+Ledger reconciled and `check-backlog-state.mjs --write` confirmed clean
+(commits through `43df1cfb`) — only the known, permanently-accepted event-403
+DRIFT remains.
+
+**Flagged for explicit PO attention (not decided by this pass):**
+- `codex-critic-isolation-fixture-rejects-merge-commit-head` — confirmed
+  still broken; real risk to the upcoming Nova A candidate-freeze ceremony
+  if that work ever touches a merge commit.
+- `signed-guard-override-has-no-command-that-emits-the-digest-to-sign` and
+  `signing-ceremony-designed-for-the-verifier-not-the-signer` — both sit
+  directly in this repository's own configured `gates.push_approval:
+  signature` ceremony; kept current-scope rather than deferred to Alfred.
+- `mp22-orchestrator-self-implementation-has-no-enforcement` — deferred to
+  Alfred but flagged as a cross-cutting governance gap worth a conscious
+  look rather than a silent defer.
+- Five items whose own prior Triage already self-flagged a PO decision
+  point (not newly found this pass): `backlog-ledger-baseline-migration-
+  commit-unreachable`, `maintenance-window-signature-voided-by-unrelated-
+  write`, `no-design-to-implementation-handover-exists`, `project-settings-
+  enabled-two-pipeline-core-plugin-instances-at-once`,
+  `runner-neutrality-before-third-runner`.
+
+**Next:** the formal Nova A candidate-freeze/gate-binding ceremony (per
+`specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md`'s
+"Recommended implementation order"), done AFTER this backlog pass rather than
+concurrently with it — same working-tree-race reasoning as sequencing the six
+triage batches themselves.
+
 ## Re-entry
 
 1. Maintainers start with [`CLAUDE.md`](../CLAUDE.md).
