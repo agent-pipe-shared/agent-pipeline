@@ -207,7 +207,7 @@ check("TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", "Edit
       signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), gmwPair.privateKey).toString("base64"),
     };
     installGuardMaintenanceWindow({
-      rootDir: GMW_DIR, request, trustPolicy: { keyReference: "tp-e2e", publicKeySha256: gmwPublicKeySha256 }, proof, livePluginRoot,
+      rootDir: GMW_DIR, request, anchors: [{ keyReference: "tp-e2e", publicKeySha256: gmwPublicKeySha256 }], proof, livePluginRoot,
     });
     return { projectDir: GMW_DIR, stderrIncludes: ["pipeline-guard-maintenance-window", "TP-1 lifted"] };
   })());
