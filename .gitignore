@@ -22,7 +22,7 @@ scratch/
 # Machine-generated verify evidence (QG-03, AC-G4-2): regenerated every
 # `node harness/scripts/verify.mjs` run — a status snapshot, not a durable
 # audit trail (unlike .claude/guard-override.log.jsonl), so it stays out of history.
-evidence/
+/evidence/
 
 # Bounded non-authoritative restart aid. It is local context, never project
 # authority or a deliverable, so it must not dirty a candidate or enter history.
