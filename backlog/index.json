@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3489a25a4e71f5a05ecf6a537b95ebeb546de16acd0a0d091d759abdcab00f1f"
+    "transitionHead": "fee9c982220322d44d3c0ba3e727751c9f9b2b73a5faa6b5b6e472e333bf82b4"
   },
   "counts": {
-    "open": 109,
+    "open": 108,
     "in_progress": 22,
-    "closed": 106
+    "closed": 107
   },
   "items": [
     {
@@ -1105,11 +1105,15 @@
     },
     {
       "id": "pipeline.ledger-event-403-has-a-short-hash-evidence-commit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-12",
-      "source": "Surfaced by the first genuinely clean (exact-binding) full verify.mjs run of the session, 2026-08-12, while triaging its check-backlog-state.mjs failure."
+      "source": "Surfaced by the first genuinely clean (exact-binding) full verify.mjs run of the session, 2026-08-12, while triaging its check-backlog-state.mjs failure.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "ef0ec7844c50f4a2bcc1b02301483f524d59b88d",
+      "closureEvidence": "backlog/items/2026-08-12-ledger-event-403-has-a-short-hash-evidence-commit.md"
     },
     {
       "id": "pipeline.license-check-declared-path-absence-still-reads-as-scanner-error",

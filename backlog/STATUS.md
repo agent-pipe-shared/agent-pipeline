@@ -120,7 +120,7 @@
 | pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.ledger-drift-classification-has-no-reachability-cutoff | open | defect | pipeline | 2026-08-16 | — |
-| pipeline.ledger-event-403-has-a-short-hash-evidence-commit | open | defect | pipeline | 2026-08-12 | — |
+| pipeline.ledger-event-403-has-a-short-hash-evidence-commit | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
@@ -245,6 +245,6 @@
 
 ## Counts
 
-- open: 109
+- open: 108
 - in_progress: 22
-- closed: 106
+- closed: 107

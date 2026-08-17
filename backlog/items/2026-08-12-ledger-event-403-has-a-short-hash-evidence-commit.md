@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ledger-event-403-has-a-short-hash-evidence-commit
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-12
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: ef0ec7844c50f4a2bcc1b02301483f524d59b88d
+closure_evidence: backlog/items/2026-08-12-ledger-event-403-has-a-short-hash-evidence-commit.md
 source: "Surfaced by the first genuinely clean (exact-binding) full verify.mjs run of the session, 2026-08-12, while triaging its check-backlog-state.mjs failure."
 ---
 
@@ -59,7 +63,23 @@ short-hash closure.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** close — the second, independently-worth-doing direction (normalize
+  `closure_commit` to a full OID before it ever reaches the ledger) is already
+  implemented in `resolveClosureCommit()`,
+  `plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs:113-123`, landed
+  in commit `ef0ec7844c50f4a2bcc1b02301483f524d59b88d` (2026-08-16, after event
+  403 was recorded) — its own docstring names this exact item as the incident
+  it prevents. This closes the recurrence risk, which is the part that
+  matters; the first direction (a V2 amendment event correcting the historical
+  event 403 itself) is deliberately NOT built — building an amendment path
+  that reaches `closure_repository: self` for one already-permanent,
+  already-explained historical byte is not worth the design/review cost the
+  first direction's own text already flagged as open. `check-backlog-state.mjs`
+  reports the two DRIFT lines as informational (its own final line still
+  reads "... are valid", exit 0) — confirmed live, 2026-08-17.
+- **Rationale:** the ledger is append-only and hash-chained by design; event
+  403's short form is permanent and already fully explained by this item.
+  Nothing further is actionable without a disproportionate design investment
+  the PO has not asked for.
+- **Assignment (if accepted):** none — no further code change.
+- **Date:** 2026-08-17
