@@ -65,6 +65,18 @@ property — re-verified live: `specs/sprint-nova-epic/lifecycle.json` lists 10 
 `nova-a` paths, both directories real). **P-AC-06 closes: `implemented`.** Moves out of Class B
 entirely (12 remain, was 13). Open count: **22 of 157** (was 23).
 
+**UPDATE, 2026-08-17 (PHX-WP-HAC08 investigation-only dispatch, NO CARRIER — no code change, no
+commit).** Dispatched to find a real legacy-record source or rule one out. It found a real source
+(`project/guard-override.log.jsonl`, git-tracked, 5 pre-Phoenix override records) but correctly
+did not build a producer: that file is the guard's live token-consumption ledger, not a dormant
+record awaiting migration, and the one real legacy-import activity in this repo
+(`migrate-backlog-state.mjs`) is permanently closed and semantically refuses the records H-AC-08
+would import. `design/agent-decision-journal-production-producer.md` sec.5 already rules building
+a producer here the same anti-pattern reverted once before (`cc43a182`) and names this a PO
+amendment decision, deliberately not taken by a dispatch — the same shape as H-AC-09's own
+reclassification. **H-AC-08 reclassified Class B → Class P** (stays `partial`, no verdict
+change). Class B: **11** (was 12). Class P: **11** (was 10). Open count unchanged: **22 of 157**.
+
 ## What this design is for
 
 The measurement established that **22 of 157** acceptance criteria are not
@@ -82,8 +94,8 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 0 | (both prior members, A-AC-14/PX0-AC-03, closed — see below) |
 | D — documentation missing | 0 | (prior member L-AC-08 reclassified to P 2026-08-17, then closed the same day — see below) |
 | S — seam missing | 0 | (prior member E-AC-20 closed 2026-08-10) |
-| B — capability missing | 12 | real implementation plus its tests |
-| P — not code | 10 | a human gate, a sanctioned authority revision, or a proved impossibility |
+| B — capability missing | 11 | real implementation plus its tests |
+| P — not code | 11 | a human gate, a sanctioned authority revision, or a proved impossibility |
 | **total** | **22** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
@@ -244,7 +256,7 @@ these, is in
 [`../evidence/acceptance-evidence-map-20260817f.md`](../evidence/acceptance-evidence-map-20260817f.md)
 — not repeated here, since this document's job is the OPEN set.
 
-### Class B — an absent capability (12)
+### Class B — an absent capability (11)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -254,18 +266,18 @@ these, is in
 | A-AC-09 | partial | WP-A | `assertMandatoryCaptureNotSkipped` (governance-event-store.mjs) lets a caller avoid persisting a non-mandatory event, tested; nothing computes "routine/low-impact" itself — the caller still decides |
 | A-AC-10 | partial | WP-A | the offer path fails closed on unavailable journaling; no per-event-class fail-open/fail-closed policy exists |
 | EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file (reconfirmed 2026-08-17 by independent re-verification, zero hits for "unpublished"/"Nova"/"Cyborg"/"Nightwing") |
-| H-AC-08 | partial | WP-HAC08 | `legacy-import-observation` kind is representable, drift-tested. Still no production caller: CONFIRMED ABSENT that any code path imports/migrates a legacy record at all |
 | L-AC-01 | partial | WP-L | UPDATE 2026-08-17 (PHX-WP-LAC01, commit `fd57d390`): first real producer landed — `continuity-cas` now durably persists a schema-valid `dispatch`-kind lifecycle event via a new translator, independently re-verified (unit + call-site + 506/506 gated regression + e2e readback). UPDATE 2026-08-17 (PHX-WP-LAC01B, commit `8e4be420`): second real producer landed — `continuity-integrate-final` now durably persists a `status`-kind event via a sibling translator, independently re-verified (unit + call-site tests green, gated regression 504/506 — the 2 failures are the same pre-existing FTP-ARTIFACT-2 acceptance.md-digest-staleness cause, confirmed pre-existing by re-running the identical suite at the prior commit). Honest count: **2 of 9** — NOT status+cancellation as hoped: the real continuity outcome vocabulary only ever observes succeeded/failed, so cancellation stays unreached despite the projection covering it. `candidate-invalidation` also confirmed to have no real caller (invalidation is always constructed `{state:"valid"}`; zero non-test producers of an invalidated state anywhere). Remaining 7 kinds all need a source vocabulary to exist before a producer can — a capability gap now, not a translator-authoring gap. Registering the new call-site suites into `harness/scripts/verify.mjs` is blocked by the same installed-plugin TP-3 gap as the other four parked reds |
 | P-AC-09 | partial | WP-P | RETRACTS "no carrier" (2026-08-17): `computeBackfillRange` (organization-policy-activation.mjs) already covers the preview half, shared with P-AC-03. Narrower remainder: `activateOrganizationPolicy`'s `authorize()` is one generic activation grant, not a distinct "explicit backfill consent" scoped to the identified historical range, and no code exports/backfills the historical events themselves |
 | R-AC-08 | partial | WP-R | a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent — no such state exists, only prospective values inside recoverability |
 | R-AC-09 | partial | WP-R | missing offer link, contradictory outcome evidence, cross-repository/cross-scope substitution, and now `occurredAtEpochMs` (closed 2026-08-10, commit `8d8996bc`) are pinned. Duplicate detection deliberately not rebuilt here — it lives at the store layer (`idempotencyKey`, governance-event-store.mjs) by design, not an absence |
 | V-AC-02 | partial | WP-V | seven of nine now labelled (fact/unknown/unavailable/redacted/invalid/not-applicable/human-decision, the last closed 2026-08-1x and missed by this document until the 2026-08-17 correction). estimate and assumption remain unpinned: zero occurrences anywhere in the view-model, renderer or CLI modules |
 
-### Class P — not closeable by writing code (10)
+### Class P — not closeable by writing code (11)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
 | EPIC-AC-01 | partial | WP-PO | the issue-to-criterion mapping exists; no independent closure status exists for any of the eight issues |
+| H-AC-08 | partial | WP-PO | `legacy-import-observation` kind is representable, drift-tested. UPDATE 2026-08-17 (PHX-WP-HAC08, NO CARRIER, no code change): a real source artifact exists (`project/guard-override.log.jsonl`) but no import ACTIVITY does — the live guard ledger needs no re-recording, and the one real legacy-import path (`migrate-backlog-state.mjs`) is permanently closed and semantically refuses these records. Building a producer here would recreate the reverted `cc43a182` anti-pattern (design/agent-decision-journal-production-producer.md sec.5) — a PO amendment decision, same shape as H-AC-09 |
 | EPIC-AC-03 | partial | WP-PO | an outstanding deviation is recorded (the bound Spec section 7 inventory omits six implemented modules) and is not yet repaired through the sanctioned route. INVESTIGATED 2026-08-17: the route is `plugins/pipeline-core/scripts/phoenix-authority-revision.mjs`, a proof-gated wrapper around `pipeline-state.mjs`'s `continuity-authority-revision-plan`/`-apply` — it requires an external Ed25519 proof directory (`phoenix-authority-approval.mjs verify`) before either `plan` or `apply` will run. Not agent-executable without that external signature; an agent can draft the proposal content (the six missing modules for the Spec §7 inventory) so the PO's own action is limited to signing |
 | EPIC-AC-04 | partial | WP-PO | privacy review, an integrated-candidate Critic pass, and explicit PO acceptance remain absent |
 | EPIC-AC-05 | constraint | WP-PO | a prohibition, and it currently bites — auto-clears once the rest of this table is empty |
@@ -278,8 +290,8 @@ these, is in
 
 ## Sequence, corrected
 
-With Classes A/D/S empty, the sequence collapses to: **Class B first** (12 items, real code, no PO
+With Classes A/D/S empty, the sequence collapses to: **Class B first** (11 items, real code, no PO
 gate — L-AC-01 leads, since it is the one structural gap several other rows describe as their own
-missing half), **Class P last** (10 items, ten different PO actions, several already queued and
+missing half), **Class P last** (11 items, eleven different PO actions, several already queued and
 waiting only on the PO's own terminal or a design answer — not parallelizable with agent work).
 

@@ -1253,7 +1253,7 @@ const POINTERS = {
   'H-AC-05': 'human-governance-ledger-tests: detached proof verified without upgrading to human identity; no attribution field admitted',
   'H-AC-06': 'human-governance-ledger-tests: append-only consumption disposition; restricted-store erasure pinned separately',
   'H-AC-07': 'human-governance-ledger-tests: cross-repository decision rejected before mutation',
-  'H-AC-08': 'agent-decision-journal-tests (PHX-WP-HAC08): a third, independent event kind `legacy-import-observation` (closed legacySourceClass/authorityProofStatus/sourceReference shape, non-authoritative by construction via the existing origin==="agent" binding) is now representable, drift-tested. Still no production caller: CONFIRMED ABSENT (repo-wide search) that any code path imports/migrates a legacy record at all',
+  'H-AC-08': 'agent-decision-journal-tests (PHX-WP-HAC08 2026-08-09, commit a657e14): a third, independent event kind `legacy-import-observation` (closed legacySourceClass/authorityProofStatus/sourceReference shape, non-authoritative by construction via the existing origin==="agent" binding) is now representable, drift-tested. UPDATE 2026-08-17 (PHX-WP-HAC08 investigation-only dispatch, evidence/PHX-WP-HAC08/dispatch-record.json, NO CARRIER -- no code change, no commit): the "no production caller" finding is corrected in shape, not reversed. A real source artifact DOES exist for legacySourceClass `guard-override-jsonl-record` -- project/guard-override.log.jsonl, git-tracked, 5 real pre-Phoenix override records (2026-07-23..2026-08-07), authority carried only as free text, no signature/HMAC, would map cleanly to authorityProofStatus:"unprovable". But it is the guard\'s LIVE one-time-token consumption ledger (guard-git.mjs:66), not a dormant record awaiting migration -- nothing needs those entries re-recorded in the governance journal. The one real legacy-import ACTIVITY in this repo, migrate-backlog-state.mjs, is permanently closed (applyBacklogMigration:99 refuses once backlog/transitions.ndjson exists, and it does) and semantically the opposite of an H-AC-08 import: it REFUSES authority-bearing legacy records rather than importing them as observations, and already discharges its own non-closure disclaimer via its own transition schema. RECLASSIFIED Class B -> Class P 2026-08-17: design/agent-decision-journal-production-producer.md sec.5 names building a producer here the same "caller built to satisfy a criterion" anti-pattern already reverted once (cc43a182), and rules this a PO amendment decision deliberately not taken by a dispatch -- the same shape as H-AC-09\'s reclassification. Open PO question: with a real source artifact known but no import need, does H-AC-08 amend (H-AC-11/PX0-AC-13 style) or stay open with this corrected reason recorded',
   'H-AC-09': 'NO CARRIER: external-push-ledger is scoped to single-repo push proofs; nothing binds cross-repository guarded work to one physical target. RECLASSIFIED Class S -> Class P 2026-08-09 (PO-confirmed): the clause\'s own subject -- authorizing guarded work IN another repository -- is exactly the capability CLAUDE.md\'s Sprint-0 hard rule currently forbids outright ("Read-only toward the three project repos ... never a write ... until an explicitly approved Phase-4 migration"). There is no design to scope: building a cross-repository binding mechanism for a write capability this repo is not yet authorized to exercise would be building ahead of its own governing policy, not closing a gap. Closes only if/when a Phase-4 migration lifts the restriction, or the PO narrows the clause\'s scope by amendment (the same route H-AC-11 already used) -- either way, not a code task available now',
   'H-AC-10': 'five named assertions covering scope, reason, expiry, constraints, follow-up review, no standing bypass',
   'H-AC-11': 'portable reconstruction surface pinned; the no-join-handle clause is proved UNSATISFIABLE for the GMW half (acceptance.md amendment, tracked as O-4). UPDATE 2026-08-17 (PHX-WP-POAMEND, commit e9054995): O-4 decided by acceptance.md amendment -- the clause is scoped to the restricted machine-local decision record (design/gmw-hgo-evidence-intake-into-the-human-ledger.md §3.4), not a producer\'s own enforcement material, which this intake path never creates. Verdict STAYS partial: the restricted profile is structurally separate and tested (GES-RESTRICTED-ROOT/-IN-REPOSITORY/-KEY, agent-decision-journal.test.mjs:422-426), but no intake path yet produces such a record at all -- design §9 places that in a later increment (D-1), not built here',
@@ -1427,10 +1427,8 @@ const CLOSURE = {
   'K-AC-08': ['assert', 'WP-K'],
   'K-AC-10': ['build', 'WP-K'],
 
-  // Reclassified seam -> build 2026-08-09 (PHX-WP-HAC08): the design question
-  // (what counts as a legacy record, per issue #30 + spec.md section 10) is
-  // answered and built; what remains is a confirmed-absent caller capability.
-  'H-AC-08': ['build', 'WP-HAC08'],
+  // H-AC-08 moved to the Class P group below 2026-08-17 (PHX-WP-HAC08 investigation) --
+  // see its POINTERS entry. (Was seam -> build 2026-08-09.)
   // H-AC-09 moved to the Class P group below 2026-08-09 (PO-confirmed) -- see its POINTERS entry.
   'H-AC-11': ['po', 'WP-PO'],
   'H-AC-12': ['build', 'WP-H'],
@@ -1505,6 +1503,18 @@ const CLOSURE = {
   'R-AC-12': ['build', 'WP-R'],
   'R-AC-13': ['build', 'WP-R'],
 
+  // Reclassified build -> po 2026-08-17 (PHX-WP-HAC08 investigation-only dispatch,
+  // NO CARRIER, no commit): the corrected finding is not "no legacy source exists" --
+  // a real one does (project/guard-override.log.jsonl, git-tracked, 5 pre-Phoenix
+  // override records with unprovable free-text authority) -- but that no import
+  // ACTIVITY exists for it to feed, and the one real legacy-import path in this repo
+  // (migrate-backlog-state.mjs) is permanently closed (backlog/transitions.ndjson
+  // already exists) and semantically refuses the records H-AC-08 would import.
+  // design/agent-decision-journal-production-producer.md sec.5 rules this the same
+  // "building a caller to satisfy a criterion" anti-pattern already reverted once
+  // (cc43a182) and names it a PO amendment decision, deliberately not taken by a
+  // dispatch -- the same shape as H-AC-09's reclassification below.
+  'H-AC-08': ['po', 'WP-PO'],
   'H-AC-09': ['po', 'WP-PO'],
   'EPIC-AC-01': ['po', 'WP-PO'],
   'EPIC-AC-02': ['build', 'WP-EPIC'],
