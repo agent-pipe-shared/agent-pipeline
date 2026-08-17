@@ -7,7 +7,109 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again (3): 20/157 open, three Class-B dispatches landed and independently verified (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (4): 17/157 open, Class P down to 9, three signature ceremonies staged, H-AC-11 increment 2 approved (READ THIS FIRST)
+
+**Since the checkpoint below:** H-AC-08/H-AC-09 closed via PO amendment; three more Class-B
+dispatches (V-AC-02, EPIC-AC-02, R-AC-09) landed and were independently re-verified; GMW-ANCHORS-INVALID
+was fixed by the PO directly in their own terminal (commit `8271a94e`) and independently re-verified
+(13/13, 30/30); the PO reviewed the full Class-P list and made concrete decisions on H-AC-08, H-AC-09,
+PX0-AC-13 (all via `AskUserQuestion`), and separately decided H-AC-11 increment 2 should be **built now,
+not deferred**. Live count now **17 of 157 open**
+(`../evidence/acceptance-evidence-map-20260817k.md`). Class B: 8. Class P: 9.
+
+- **H-AC-08 and H-AC-09 both closed via PO amendment** (commit `29f29185`, append-only, no code
+  change): both satisfied by construction — their WHEN-antecedents have no live trigger in this
+  repo under current policy (H-AC-08: no legacy-import activity exists anywhere; H-AC-09: Sprint-0's
+  hard rule forbids cross-repository guarded work outright, confirmed no Phase-4 roadmap exists).
+  **Process note (self-caught, PO confirmed):** the H-AC-09 half of this question was already
+  answered in an earlier session (docs/state.md line ~178: "no Phase-4 roadmap exists", leaning
+  Class A) — re-asked it anyway before checking the record first. Harmless here (same answer both
+  times) but a real process gap; saved as memory `feedback_check-state-before-reasking-po`: grep
+  docs/state.md for the criterion ID before firing an `AskUserQuestion`.
+- **V-AC-02 advanced to 8/9** (commit `8325f2d0` + docs `2b5b9d2a`, independently re-verified):
+  `assumption` now genuinely labelled (the governance-export delivery observation was mislabelled
+  `fact` with no digest binding). `estimate` confirmed absent by design — the one real estimate in
+  this repo belongs to a different report (`continuity-status.mjs`) with no path into the viewer.
+- **EPIC-AC-02 advanced to partial** (commit `77d2d8d5` + docs `2b5b9d2a`, independently re-verified):
+  `checkUnpublishedSiblingSprintConsumption` built — real, non-invented, tested (25/25), already
+  registered as a blocking suite in `verify.mjs:405`. Stays open: no live check yet calls it against
+  real manifests (that registration line is TP-3-protected).
+- **R-AC-09 closed** (commit `5c05a117` + docs `2b5b9d2a`, independently re-verified): the prior
+  "duplicate detection lives at the store layer" reasoning was WRONG (idempotencyKey covers a
+  different identity than the lifecycle eventId offers/outcomes correlate through), not just narrow.
+  `projectCommandOfferReplay` closes the real gap, unconditionally. All six trigger words now close.
+- **GMW-ANCHORS-INVALID resolved** (commit `8271a94e`, PO applied directly in their own terminal —
+  `TP-2`/`author-repair-required` blocks this session from that file categorically, confirmed no
+  override route exists at all). Both stale test fixtures migrated from `trustPolicy` shorthand to
+  `anchors: [x]`. Independently re-verified: 13/13, 30/30, both including the real-armed-window cases.
+- **P-AC-11 root-caused further:** the anchor gap is gone from Verify's red set (confirmed by a fresh
+  full `harness/scripts/verify.mjs` run at the current candidate), but Verify is still red for a
+  DIFFERENT, pre-existing reason — `FTP-ARTIFACT-2` (every `acceptance.md` edit stales
+  `specs/sprint-phoenix-epic/lifecycle.json`'s manifest-pinned digest; today's amendments make this
+  worse, not better). Fix is `feature-package-reconcile` under `gates.reconcile_approval`
+  (signature), same shape as push-approval; this exact ceremony has succeeded once before this epic
+  (docs/state.md line ~1080). **Not yet re-run this round — next step.**
+- **H-AC-12 buildable now:** the two remaining readers (`guard-push.mjs`, `pipeline-state.mjs`) are
+  TP-5-protected; the anchor fix confirms a signed GMW window now genuinely lifts TP-5 (same
+  mechanism just proven working). A TP-5-scoped window request is PREPARED and waiting on a
+  signature: intent sha256 `aa11b06884940715d0b090c0d008d6320f9ba05445f64d1975ba309bd53a86cc`,
+  4h TTL, reason "H-AC-12: wire dualEvaluateDecisionReference into guard-push.mjs and
+  pipeline-state.mjs readers". PO can clear it with `po-human-approval.mjs sign-intent --repo-root
+  <repo> --directory <their external dir> --intent-sha256
+  aa11b06884940715d0b090c0d008d6320f9ba05445f64d1975ba309bd53a86cc`, then this session runs
+  `guard-maintenance-window.mjs install --repo-root <repo> --request <the prepared request JSON,
+  not yet persisted to a file — re-run `guard-maintenance-window.mjs prepare` with the same args if
+  the file wasn't saved> --proof <the signed proof file>`. The Git-guard override consumption
+  sub-question (H-AC-12's third named subsystem) is a separate, deliberately-unresolved interpretive
+  question (`specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md:343-362`) — not blocking
+  the two TP-5 readers, not yet put to the PO.
+- **EPIC-AC-03 prep done, PO agreed to defer the ceremony itself to epic close:** six missing
+  Spec §7 modules identified with real creation-commit evidence
+  (`parallel-sprint-integration.mjs`, `organization-policy-backfill-export.mjs`,
+  `control-execution-lifecycle-event.mjs`, `check-artifact-topology.mjs`,
+  `migrate-backlog-state.mjs`, `reconcile-backlog-ledger.mjs` — two of six created *this same
+  session*, so the list is a moving target and re-running the ceremony too early would need redoing).
+  Draft written: `specs/sprint-phoenix-epic/evidence/spec-section7-revision-draft-20260817.md`.
+  **Confirmed structurally required, not just cautious:** `buildAuthorityRevisionPlan`
+  (`pipeline-state.mjs:3531`) itself refuses (`AR-DECISION-SCOPE`) unless
+  `activeFeature.phase === "design"`; `reopen-design` invalidates the currently-approved
+  implementation plan, needing a full re-submit/re-approve cycle afterward — genuinely disruptive,
+  not a formality. PO agreed: defer to epic close.
+- **H-AC-11 increment 2: PO decided BUILD NOW, explicitly rejected deferring** ("wir müssen das
+  bauen .. was soll das aufschieben denn schon wieder bringen?"). Scope, per
+  `design/gmw-hgo-evidence-intake-into-the-human-ledger.md` §5.4/§7: two separable halves.
+  **(a) Real code, no signature needed, dispatchable now:** new payload schema
+  `pipeline.human-decision-attribution.v1` (governance-event.mjs:169-174, ~2-line addition,
+  `origin: "human"` admitted only when `storageProfile === "restricted-machine-local"`), a
+  closed-shape validator module, and the intake path (§7 "the receiving contract": intake sits
+  outside the libraries, deterministic append-intent identifiers, GMW/HGO event sequences at
+  §7.4/§7.5). **NOT YET DISPATCHED — next step, first priority.**
+  **(b) spec.md §6.1 amendment** (the schema-family list is declared closed;
+  `pipeline.human-role-exception-decision.v1` is the precedent for extending it once before) —
+  this is a bound-authority-artifact edit needing the SAME Ed25519 authority-revision ceremony as
+  EPIC-AC-03. Recommended: bundle both into one future reopen-design ceremony at epic close rather
+  than paying the disruption cost twice — not yet confirmed with the PO which way they want this
+  bundled, but the code half (a) does not need to wait for that decision.
+  §9 of the same design doc also bundles several OTHER amendments (H-AC-12 enumeration text,
+  spec.md §7.4 inventory rows for 5+ new files, O-1 identity-registry rows, two kernel-level HGO
+  validator amendments for un-representable/candidate-less decisions) into the same rebind for
+  efficiency — these are NOT required for H-AC-11 alone and were not agreed to be built; scope
+  creep risk if a dispatch is briefed from §9 wholesale instead of just §5.4/§7's H-AC-11-specific
+  slice.
+- Security-scan re-run clean at current HEAD (`2b5b9d2a`) from the synced `.git/phx-verify`
+  worktree, exit 0.
+
+**Next steps, in order:** (1) dispatch H-AC-11 increment 2's code half (schema + validator + intake
+path, §5.4/§7 of the design doc, scoped narrowly — NOT §9's full bundle); (2) once the PO signs the
+prepared H-AC-12 GMW/TP-5 window, install it and wire `guard-push.mjs`/`pipeline-state.mjs`; (3)
+re-run `feature-package-reconcile` for P-AC-11 (signature ceremony, has succeeded once before,
+exact command needs re-deriving from docs/state.md's ~line 1242 precedent); (4) continue remaining
+Class B (A-AC-01/A-AC-03 — Elephant-context investigation per the governing design doc, not a
+dispatch; A-AC-09; R-AC-08; A-AC-05 stays explicitly PO-deferred; L-AC-01's remaining triggers stay
+a PO/architecture question per design/agent-decision-journal-production-producer.md §6); (5) EPIC-AC-03's
+ceremony and the H-AC-11 spec.md §6.1 amendment, bundled, at epic close.
+
+## CHECKPOINT — 2026-08-17, continued again (3): 20/157 open, three Class-B dispatches landed and independently verified
 
 **Since the checkpoint below:** the three parallel Class-B dispatches it left in flight (P-AC-09,
 A-AC-10, H-AC-08) all completed. Each was independently re-verified before acceptance — full diff
