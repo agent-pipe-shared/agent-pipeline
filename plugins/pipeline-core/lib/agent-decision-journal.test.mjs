@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: SUL-1.0
-import assert from "node:assert/strict"; import test from "node:test"; import { AgentDecisionJournalError, EVENT_CLASSES, representedEventClasses, validateAgentDecisionEvent, validateCommandOfferEvent, validateLegacyImportObservationEvent } from "./agent-decision-journal.mjs";
+import assert from "node:assert/strict"; import test from "node:test"; import { AgentDecisionJournalError, EVENT_CLASSES, JOURNALING_UNAVAILABLE_DISPOSITIONS, journalingUnavailableDisposition, representedEventClasses, resolveJournalingUnavailability, validateAgentDecisionEvent, validateCommandOfferEvent, validateLegacyImportObservationEvent } from "./agent-decision-journal.mjs";
 const value=(overrides={})=>({eventId:"agent-1",kind:"assumption",state:"declared",reasonCode:"EVIDENCE_UNAVAILABLE",candidateDigest:"a".repeat(64),relatedHumanDecisionId:null,supersedesEventId:null,...overrides});
 test("accepts a bounded observational agent assumption",()=>assert.equal(Object.isFrozen(validateAgentDecisionEvent(value())),true));
 test("rejects free text, authority-shaped fields, and unbound supersession",()=>{for(const entry of [{...value(),reasonCode:"reason text"},{...value(),approval:true},value({state:"superseded"})])assert.throws(()=>validateAgentDecisionEvent(entry),(error)=>error instanceof AgentDecisionJournalError);});
@@ -30,6 +30,44 @@ test("A-AC-07 recognizes every named event class through an existing field or ki
   assert.equal(securityClasses.has("authority"),true);
   const recoveryOffer=validateCommandOfferEvent(offer({recoverability:"rollback-required"}));
   assert.equal(representedEventClasses(recoveryOffer).has("recovery"),true);
+});
+
+// A-AC-10: the journaling-unavailable policy is an explicit, closed, total
+// table over EVENT_CLASSES -- never an implicit default and never a
+// prototype-chain lookup that could answer for a class nobody declared.
+test("A-AC-10 declares an explicit fail-open/fail-closed disposition for every event class, with no implicit default",()=>{
+  assert.deepEqual(Object.keys(JOURNALING_UNAVAILABLE_DISPOSITIONS).sort(),[...EVENT_CLASSES].sort());
+  assert.equal(Object.isFrozen(JOURNALING_UNAVAILABLE_DISPOSITIONS),true);
+  for(const entry of EVENT_CLASSES)assert.equal(["fail-open","fail-closed"].includes(journalingUnavailableDisposition(entry)),true);
+  assert.deepEqual([...EVENT_CLASSES].filter((entry)=>journalingUnavailableDisposition(entry)==="fail-closed").sort(),["authority","recovery","security","verification-scope"]);
+  for(const undeclared of ["","routine","material","toString","constructor",undefined,null])assert.throws(()=>journalingUnavailableDisposition(undeclared),(error)=>error instanceof AgentDecisionJournalError&&error.code==="ADJ-JOURNALING-POLICY-UNDECLARED");
+});
+
+// A-AC-10's second half: the gap is exposed as a typed record in BOTH
+// directions, naming which classes decided the disposition -- not just an
+// opaque proceed/refuse -- and it can never be mistaken for a journal receipt.
+test("A-AC-10 exposes the journaling gap as a typed record naming which policy fired",()=>{
+  const open=resolveJournalingUnavailability(offer());
+  assert.equal(open.schema,"pipeline.agent-journaling-gap.v1");
+  assert.equal(open.gap,"agent-journaling-unavailable");
+  assert.equal(open.disposition,"fail-open");
+  assert.equal(open.journaled,false);
+  assert.equal(open.authority,"non-authoritative");
+  assert.deepEqual([...open.eventClasses],["candidate","external-side-effect","privacy"]);
+  assert.deepEqual([...open.decidingEventClasses],[]);
+  assert.equal(open.eventId,"offer-1");
+  assert.equal(open.candidateDigest,"a".repeat(64));
+  assert.equal(Object.isFrozen(open),true);
+  assert.equal(Object.isFrozen(open.eventClasses),true);
+  assert.equal(Object.hasOwn(open,"status"),false);
+  assert.notEqual(open.schema,"pipeline.external-command-offer-receipt.v1");
+  const closed=resolveJournalingUnavailability(offer({sideEffectClass:"destructive",recoverability:"rollback-required"}));
+  assert.equal(closed.disposition,"fail-closed");
+  assert.deepEqual([...closed.decidingEventClasses],["recovery","security"]);
+  assert.equal(resolveJournalingUnavailability(offer({relatedHumanDecisionId:"human-1"})).disposition,"fail-closed");
+  assert.equal(resolveJournalingUnavailability(value({kind:"verification-scope"})).disposition,"fail-closed");
+  assert.equal(resolveJournalingUnavailability(value()).disposition,"fail-open");
+  assert.throws(()=>resolveJournalingUnavailability({...offer(),command:"rm -rf"}),(error)=>error instanceof AgentDecisionJournalError);
 });
 // R-AC-04: `requiredCleanup` records WHAT cleanup/readback is required,
 // distinct from (and never folded into) `recoverability`'s own WHETHER

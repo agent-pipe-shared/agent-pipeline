@@ -1,0 +1,39 @@
+{
+  "taskId": "PHX-WP-AAC10",
+  "model": "claude-opus-5[1m] / xhigh",
+  "rulesetSha": "5125f494dd5a0f5315b8ea7f5f19e03ab4e0057e15c7198d5565d7b3d67ca937",
+  "dispatcher": "elephant",
+  "outcome": "landed",
+  "log": [
+    {
+      "phase": "opening-record",
+      "toolUses": 3,
+      "note": "Dispatch record created before substantive work. Route pre-check: requested claude-opus-5/xhigh, observed claude-opus-5[1m] per runtime prompt, consistent."
+    },
+    {
+      "phase": "investigation",
+      "toolUses": 18,
+      "note": "Closed vocabulary found, not invented: EVENT_CLASSES (seven) in agent-decision-journal.mjs, already used by A-AC-07's assertMandatoryCaptureNotSkipped via representedEventClasses. capture-policy.json marks all seven mandatory, so A-AC-07's marking could NOT be reused as the disposition source (it would force every class fail-closed and delete R-AC-10's shipped exception). Dispositions therefore derived from actual journaling-unavailable behavior. sideEffectClass is closed to non-authoritative + the three SECURITY_SIDE_EFFECTS, which is what makes the strict-subset argument provable."
+    },
+    {
+      "phase": "implementation",
+      "toolUses": 26,
+      "note": "Table + resolver placed in agent-decision-journal.mjs (vocabulary owner, dependency-free, already imported by both journaling-unavailable consumers, so no new dependency edge and no cycle). Application seam acknowledgeOfferUnderJournalingGap added to external-command-offer.mjs. R-AC-10's acknowledgeNonMaterialOfferWithoutJournal left byte-for-byte unchanged."
+    },
+    {
+      "phase": "verification",
+      "toolUses": 31,
+      "note": "node --test over the four affected suites (two touched files plus guard-handoff-offer and advisory-decision-event, the other importers of the modified module): 105 tests, 105 pass, 0 fail. All 8 pre-existing R-AC-10 cases in external-command-offer.test.mjs pass unmodified.",
+      "artifact": "specs/sprint-phoenix-epic/evidence/PHX-WP-AAC10/node-test.tap"
+    }
+  ],
+  "dodResults": [
+    { "check": "closed explicit table over every real event class, no implicit default", "result": "passed" },
+    { "check": "no silent behavior change to R-AC-10's tested non-material-exception path", "result": "passed" },
+    { "check": "observable gap signal exists and is tested in both directions", "result": "passed" },
+    { "check": "new unit tests for every new function", "result": "passed" },
+    { "check": "node --test on every touched file, 0 failures", "result": "passed" },
+    { "check": "external-command-offer.test.mjs re-run in full, R-AC-10 cases unmodified", "result": "passed" }
+  ],
+  "report": null
+}

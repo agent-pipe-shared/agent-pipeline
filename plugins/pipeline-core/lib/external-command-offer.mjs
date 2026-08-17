@@ -4,7 +4,7 @@
  * command executor, authority issuer, or raw command store.
  */
 import { createHash } from "node:crypto";
-import { validateCommandOfferEvent } from "./agent-decision-journal.mjs";
+import { resolveJournalingUnavailability, validateCommandOfferEvent } from "./agent-decision-journal.mjs";
 
 function fail(code, message = "External command offer operation is invalid.") { const error = new Error(message); error.code = code; throw error; }
 function exact(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
@@ -105,6 +105,45 @@ export function acknowledgeNonMaterialOfferWithoutJournal({ offer, append } = {}
   if (event.state !== "offered") fail("ECO-OFFER-STATE");
   if (event.sideEffectClass !== "non-authoritative" || event.authorityRequirement !== "not-required") fail("ECO-JOURNAL-EXCEPTION-SCOPE", "The non-material exception is not usable for this offer's sideEffectClass/authorityRequirement.");
   return frozen({ schema: "pipeline.external-command-offer-journal-exception.v1", authority: "non-authoritative", status: "unjournaled-non-material-exception", journaled: false, eventId: event.eventId, candidateDigest: event.candidateDigest });
+}
+
+/**
+ * A-AC-10's application seam for the offer lifecycle: applies the declared
+ * per-event-class fail-open/fail-closed table
+ * (`JOURNALING_UNAVAILABLE_DISPOSITIONS`, agent-decision-journal.mjs) instead
+ * of the single hardcoded global behavior, and exposes the gap in BOTH
+ * directions -- the same typed `pipeline.agent-journaling-gap.v1` record is
+ * returned when the policy fails open and attached as `.gap` to the
+ * `ECO-JOURNALING-FAIL-CLOSED` error when it fails closed. A caller can
+ * therefore always observe WHICH policy fired and that an event went
+ * unrecorded, never just an opaque proceed/throw.
+ *
+ * This sits ALONGSIDE R-AC-10's `acknowledgeNonMaterialOfferWithoutJournal`
+ * rather than wrapping it, and that function is unchanged: R-AC-10 gates on
+ * two fields (`sideEffectClass`/`authorityRequirement`), while this general
+ * path gates on all seven event classes an event actually represents, so it
+ * additionally refuses an offer carrying `relatedHumanDecisionId` (class
+ * `authority`) or a `recoverability` other than `not-applicable` (class
+ * `recovery`). Its fail-open set is therefore a strict SUBSET of the set
+ * R-AC-10 already admits -- this path can never admit something the existing
+ * exception refuses, and it grants no permission that did not already exist.
+ *
+ * Scope matches R-AC-10's deliberately: `offered` only (never an attempt or an
+ * outcome, which must keep failing closed via ECO-APPEND), and only when
+ * journaling is genuinely unavailable -- supplying an `append` is refused
+ * rather than silently ignored.
+ */
+export function acknowledgeOfferUnderJournalingGap({ offer, append } = {}) {
+  if (append !== undefined) fail("ECO-JOURNAL-EXCEPTION-SCOPE", "Journaling is available; use recordCommandOffer instead of the journaling-gap policy path.");
+  const event = validateCommandOfferEvent(offer);
+  if (event.state !== "offered") fail("ECO-OFFER-STATE");
+  const gap = resolveJournalingUnavailability(event);
+  if (gap.disposition === "fail-closed") {
+    const error = new Error("The represented event class's declared journaling-unavailable policy fails closed.");
+    error.code = "ECO-JOURNALING-FAIL-CLOSED"; error.gap = gap;
+    throw error;
+  }
+  return gap;
 }
 
 /**

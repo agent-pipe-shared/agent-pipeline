@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, recordCommandRecoveryDisposition, recordPrivateHandoffCommitment } from "./external-command-offer.mjs";
+import { recordCommandOffer, recordPipelineAttempt, recordCommandOutcome, acknowledgeNonMaterialOfferWithoutJournal, acknowledgeOfferUnderJournalingGap, recordCommandRecoveryDisposition, recordPrivateHandoffCommitment } from "./external-command-offer.mjs";
 
 const SHA = (character) => character.repeat(64);
 function event(overrides = {}) { return { eventId: "offer-1", kind: "command-offer", state: "offered", reasonCode: "EXTERNAL_OPERATION_OFFERED", candidateDigest: SHA("a"), relatedHumanDecisionId: null, supersedesEventId: null, offerOrigin: "pipeline-initiated", operation: { operationClass: "governed-repair", version: "v1", governedArtifactSha256: SHA("b") }, target: { repositoryFingerprint: SHA("c"), scopeDigest: SHA("d") }, sideEffectClass: "non-authoritative", authorityRequirement: "not-required", policyDigest: SHA("e"), redactionPolicyDigest: SHA("f"), executionAssurance: "not-applicable", omissions: ["raw-command", "arguments", "private-coordinates", "unrestricted-output"], offerEventId: null, preEvidenceDigest: null, postEvidenceDigest: null, recoverability: "not-applicable", ...overrides }; }
@@ -289,4 +289,60 @@ test("R-AC-10: the exception receipt is structurally distinct from every journal
   }
   await assert.rejects(recordCommandOutcome({ offer: event(), outcome: exceptionReceipt, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
   await assert.rejects(recordCommandOffer({ offer: exceptionReceipt, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
+});
+
+test("A-AC-10: journaling unavailable applies the represented event class's declared policy and exposes the gap in both directions", () => {
+  const gap = acknowledgeOfferUnderJournalingGap({ offer: event() });
+  assert.equal(gap.schema, "pipeline.agent-journaling-gap.v1");
+  assert.equal(gap.gap, "agent-journaling-unavailable");
+  assert.equal(gap.disposition, "fail-open");
+  assert.equal(gap.journaled, false);
+  assert.deepEqual([...gap.decidingEventClasses], []);
+  assert.equal(gap.eventId, "offer-1");
+  assert.equal(gap.candidateDigest, SHA("a"));
+  for (const [overrides, deciding] of [
+    [{ sideEffectClass: "destructive" }, ["security"]],
+    [{ relatedHumanDecisionId: "decision-1" }, ["authority"]],
+    [{ recoverability: "cleanup-required" }, ["recovery"]],
+    [{ sideEffectClass: "guard-bypass", authorityRequirement: "human-decision-required", relatedHumanDecisionId: "decision-1" }, ["authority", "security"]],
+  ]) {
+    assert.throws(() => acknowledgeOfferUnderJournalingGap({ offer: event(overrides) }), (error) => {
+      assert.equal(error.code, "ECO-JOURNALING-FAIL-CLOSED");
+      assert.equal(error.gap.schema, "pipeline.agent-journaling-gap.v1");
+      assert.equal(error.gap.disposition, "fail-closed");
+      assert.equal(error.gap.journaled, false);
+      assert.deepEqual([...error.gap.decidingEventClasses], deciding);
+      return true;
+    });
+  }
+});
+
+// The safety invariant that lets A-AC-10's general table coexist with
+// R-AC-10's narrow exception: the table can only ever be stricter, so its
+// arrival grants no permission the already-tested exception did not.
+test("A-AC-10: the general policy path is strictly stricter than R-AC-10's non-material exception, never looser", () => {
+  const admits = (fn, offer) => { try { fn({ offer }); return true; } catch { return false; } };
+  let stricterWitnesses = 0;
+  for (const sideEffectClass of ["non-authoritative", "destructive", "guard-bypass", "authority-changing"]) {
+    for (const recoverability of ["not-applicable", "recoverable", "cleanup-required", "rollback-required"]) {
+      for (const relatedHumanDecisionId of [null, "decision-1"]) {
+        const candidate = event({ sideEffectClass, recoverability, relatedHumanDecisionId });
+        const general = admits(acknowledgeOfferUnderJournalingGap, candidate);
+        const exception = admits(acknowledgeNonMaterialOfferWithoutJournal, candidate);
+        if (general) assert.equal(exception, true, `${sideEffectClass}/${recoverability}/${relatedHumanDecisionId}`);
+        if (exception && !general) stricterWitnesses += 1;
+      }
+    }
+  }
+  assert.equal(stricterWitnesses > 0, true);
+});
+
+test("A-AC-10: the journaling-gap path is scoped to a genuinely unavailable journal and the offered state, and its record is never a journal receipt", async () => {
+  assert.throws(() => acknowledgeOfferUnderJournalingGap({ offer: event(), append }), (error) => error.code === "ECO-JOURNAL-EXCEPTION-SCOPE");
+  assert.throws(() => acknowledgeOfferUnderJournalingGap({ offer: follow("attempted") }), (error) => error.code === "ECO-OFFER-STATE");
+  assert.throws(() => acknowledgeOfferUnderJournalingGap({ offer: { ...event(), command: "rm -rf" } }), (error) => error.code === "ADJ-COMMAND-OFFER");
+  const gap = acknowledgeOfferUnderJournalingGap({ offer: event() });
+  assert.notEqual(gap.schema, "pipeline.external-command-offer-receipt.v1");
+  await assert.rejects(recordCommandOffer({ offer: gap, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
+  await assert.rejects(recordCommandOutcome({ offer: event(), outcome: gap, append }), (error) => error.code === "ADJ-COMMAND-OFFER");
 });

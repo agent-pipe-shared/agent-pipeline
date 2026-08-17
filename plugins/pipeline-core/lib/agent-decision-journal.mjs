@@ -220,3 +220,79 @@ export function representedEventClasses(value) {
   }
   return classes;
 }
+
+/**
+ * A-AC-10: the explicit per-event-class fail-open/fail-closed policy that
+ * applies when agent journaling is UNAVAILABLE. Deliberately one closed table
+ * rather than scattered if-statements or a fallback default: every one of the
+ * seven `EVENT_CLASSES` must carry an explicit disposition, and the
+ * module-load check below fails closed if the two sets ever drift, so a newly
+ * added class can never inherit an unstated default.
+ *
+ * This is a DIFFERENT axis from A-AC-07's `mandatoryEventClasses`
+ * (`governance-event-store.mjs`), which today marks all seven mandatory. That
+ * policy governs a discretionary caller choice to sample an event out while
+ * journaling WORKS; this one governs the involuntary case where nothing can be
+ * recorded at all. Reusing A-AC-07's marking here would mark every class
+ * fail-closed and silently delete R-AC-10's already-shipped, already-tested
+ * non-material exception, so the dispositions are derived from this codebase's
+ * ACTUAL journaling-unavailable behavior instead:
+ *
+ *  - `security`, `authority`, `recovery`, `verification-scope` -> fail-closed.
+ *    Exactly the classes whose presence is what makes an event material:
+ *    `security` is a guard-bypass/authority-changing/destructive
+ *    `sideEffectClass`, `authority` is a bound human decision or a
+ *    `human-decision-required` offer, `recovery` is any `recoverability` other
+ *    than `not-applicable`, `verification-scope` is a claim about what was
+ *    checked. `external-command-offer.mjs` already refuses every one of them
+ *    without a journal today; the table states that, it does not invent it.
+ *  - `candidate`, `privacy` -> fail-open. Not a materiality judgment: both are
+ *    represented by EVERY event this module admits (see
+ *    `representedEventClasses`), so they discriminate nothing, and marking
+ *    either fail-closed would collapse the table into "always closed" and
+ *    contradict R-AC-10's existing carve-out. `privacy` separately keeps a
+ *    stronger, policy-independent guarantee elsewhere -- `assertPortablePayload`'s
+ *    unconditional prohibited-identifiability gate, which depends on no
+ *    capture or availability decision.
+ *  - `external-side-effect` -> fail-open, for the same structural reason: every
+ *    `command-offer` represents it, so it cannot be the discriminator. An
+ *    offer's dangerous sub-cases are separately represented by
+ *    `security`/`authority`/`recovery` above, which is precisely the
+ *    distinction R-AC-10's non-material exception already draws.
+ *
+ * Composition is strictest-wins (`resolveJournalingUnavailability`): an event
+ * represents a SET of classes and one fail-closed member closes the whole
+ * event. The resulting fail-open set is a strict SUBSET of what R-AC-10
+ * already admits, never a superset -- this table loosens no existing outcome.
+ */
+export const JOURNALING_UNAVAILABLE_DISPOSITIONS=Object.freeze({security:"fail-closed",privacy:"fail-open",authority:"fail-closed",candidate:"fail-open","external-side-effect":"fail-open",recovery:"fail-closed","verification-scope":"fail-closed"});
+const DISPOSITIONS=new Set(["fail-open","fail-closed"]);
+/** Fails at import, not at first use: an undeclared class must never reach a caller as an implicit default. */
+if(Object.keys(JOURNALING_UNAVAILABLE_DISPOSITIONS).length!==EVENT_CLASSES.size||![...EVENT_CLASSES].every((entry)=>DISPOSITIONS.has(JOURNALING_UNAVAILABLE_DISPOSITIONS[entry])))fail("ADJ-JOURNALING-POLICY-INCOMPLETE");
+
+/** The declared disposition for one event class; an unknown or undeclared class is refused rather than defaulted. */
+export function journalingUnavailableDisposition(eventClass) {
+  if(!EVENT_CLASSES.has(eventClass)||!Object.hasOwn(JOURNALING_UNAVAILABLE_DISPOSITIONS,eventClass))fail("ADJ-JOURNALING-POLICY-UNDECLARED");
+  return JOURNALING_UNAVAILABLE_DISPOSITIONS[eventClass];
+}
+
+/**
+ * A-AC-10's second half -- "expose the gap". Returns a closed, frozen,
+ * public-safe gap record in BOTH directions (a caller that fails closed
+ * attaches this same record to its typed error), never a bare boolean and
+ * never silence, so the caller can observe WHICH policy fired, WHICH classes
+ * decided it, and that an event went unrecorded -- not merely the
+ * proceed/refuse outcome. `decidingEventClasses` is the full sorted list of
+ * fail-closed members rather than a first hit, so the record is deterministic
+ * and does not depend on set iteration order.
+ *
+ * The record is deliberately not a receipt: `schema` is unique to this path,
+ * `journaled` is always false, and it carries no command `status`, so it can
+ * never be read as evidence that anything was journaled or executed.
+ */
+export function resolveJournalingUnavailability(value) {
+  const event=validateAgentDecisionEvent(value);
+  const eventClasses=[...representedEventClasses(event)].sort();
+  const decidingEventClasses=eventClasses.filter((entry)=>journalingUnavailableDisposition(entry)==="fail-closed");
+  return Object.freeze({schema:"pipeline.agent-journaling-gap.v1",authority:"non-authoritative",gap:"agent-journaling-unavailable",journaled:false,disposition:decidingEventClasses.length>0?"fail-closed":"fail-open",eventClasses:Object.freeze(eventClasses),decidingEventClasses:Object.freeze(decidingEventClasses),eventId:event.eventId,candidateDigest:event.candidateDigest});
+}
