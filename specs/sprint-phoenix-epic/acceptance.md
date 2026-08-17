@@ -493,6 +493,37 @@ architecture prose or an implementation briefing.
   event-chain checkpoints, candidate/release identity, and verification
   results, and fail on legacy, missing, orphaned, misplaced, stale, truncated,
   or illegally mutable required artifacts.
+
+  **Amendment for legacy/orphaned (PO, 2026-08-11).** Five of the seven named
+  trigger conditions are pinned and exercised by a registered, green Verify
+  suite (`audit-bundle-core-tests`): missing, misplaced, stale, truncated, and
+  illegally mutable. The remaining two are each satisfied by proof, not by an
+  added check. "Legacy" is proved structurally unreachable as an input to this
+  criterion's own validator: an artifact path is confined to `specs/${id}/` by
+  `packageRelative`'s own check (`feature-package-topology.mjs:34-37`,
+  `FTP-ARTIFACT-N: path must be canonical within specs/${id}/`), and a package
+  only reaches validation with a `lifecycle.json` present — the exact
+  condition `inventoryFeaturePackages` uses to exclude it from the `legacy`
+  classification in the first place. No input this validator ever receives
+  can be legacy, the same rigor H-AC-11's O-4 amendment uses for a proved
+  impossibility. "Orphaned" has no structural predicate the current manifest
+  schema can enforce: which files a manifest lists is a curatorial decision
+  made when it was last edited, not a property the file itself carries —
+  concretely, `specs/sprint-nova-epic/lifecycle.json` lists
+  `evidence/nova-b/*` as tracked artifacts while `evidence/nova-a/*` files of
+  identical shape, same package, same directory depth, are not listed at all,
+  and no predicate over path, name, extension, or directory depth separates
+  the two sets (independently re-verified 2026-08-17: 10 `nova-b` paths
+  listed, 0 `nova-a` paths listed, both directories real and populated). A
+  prior attempt to build a literal "every unlisted file fails" check
+  (`PHX-WP-PAC06-ORPHAN`, commit `fad0aa95`) broke `check-artifact-topology.mjs`
+  against this repository's real packages (107 findings on `sprint-nova-epic`,
+  57 on `sprint-phoenix-epic`, every one a legitimate untracked file) and was
+  reverted (`cc43a182`). A real "orphaned" check needs a baseline/grandfather
+  mechanism the manifest schema does not have today — named as future scope
+  in `design/p-ac-06-clause-disposition-proposal.md`, not attempted here. Full
+  investigation, options considered, and the PO's decision are recorded in
+  that document.
 - **P-AC-07:** WHEN a bundle is signed, THE SYSTEM SHALL use an external key
   interface and declare signature/key/time assurance without implying trusted
   identity, custody, retention, or compliance beyond the evidence.

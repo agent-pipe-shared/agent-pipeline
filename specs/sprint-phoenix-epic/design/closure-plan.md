@@ -4,7 +4,7 @@ Status: design
 
 Date: 2026-08-09 (class table and per-criterion rows CORRECTED 2026-08-17 — see note below)
 
-Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260817e.md](../evidence/acceptance-evidence-map-20260817e.md)
+Parent specification: [../spec.md](../spec.md) · Measurement: [../evidence/acceptance-evidence-map-20260817f.md](../evidence/acceptance-evidence-map-20260817f.md)
 
 **CORRECTION, 2026-08-17.** This document's original "48 of 157" claim (below) had gone stale:
 between 2026-08-09 and 2026-08-16, real work landed on 22 of those 48 rows — 20 flipped to
@@ -18,7 +18,7 @@ against current code/tests (not against this document's prose), confirming the g
 state and additionally catching one the generator itself had missed (E-AC-08, closed by commit
 `8956d770` the same night, verified independently by re-running its test file: 7/7 pass). The
 class table and per-criterion tables below are corrected to match. **Current authoritative
-snapshot:** [`../evidence/acceptance-evidence-map-20260817e.md`](../evidence/acceptance-evidence-map-20260817e.md).
+snapshot:** [`../evidence/acceptance-evidence-map-20260817f.md`](../evidence/acceptance-evidence-map-20260817f.md).
 
 **UPDATE, same day (PHX-WP-POAMEND, commit `e9054995`).** Four PO-decided amendments landed in
 one docs-only commit: A-AC-14 (accept 12/13, closing it — moved out of Class P entirely, verdict
@@ -50,9 +50,24 @@ fixture, not preventing the scenario, and both fixtures exist (`external-command
 **R-AC-13 closes: `implemented`.** Moves out of Class B entirely (13 remain, was 14). Open count:
 **23 of 157** (was 24).
 
+**UPDATE, same day (Elephant, landing a PO decision recorded 2026-08-11).** P-AC-06's two open
+trigger words closed the same way R-AC-13 did — by proof, not new code.
+`design/p-ac-06-clause-disposition-proposal.md` already investigated both, the PO already decided
+(2026-08-11: strike/treat-as-satisfied), and the exact amendment text was drafted and ready; it
+was never landed because staging it exposed the SAME `FTP-ARTIFACT-2` acceptance.md-digest
+blocker this session already accepted twice tonight (POAMEND, LAC08) — not a new one. Landed
+append-only (matching this session's stricter convention rather than the proposal's own
+edit-the-enumeration draft): "legacy" is proved structurally unreachable as an input to this
+criterion's validator (`packageRelative` confines every path; a package only reaches validation
+with a manifest present, which excludes it from the legacy classification by definition);
+"orphaned" has no structural predicate the manifest schema can enforce (curatorial, not a file
+property — re-verified live: `specs/sprint-nova-epic/lifecycle.json` lists 10 `nova-b` paths, 0
+`nova-a` paths, both directories real). **P-AC-06 closes: `implemented`.** Moves out of Class B
+entirely (12 remain, was 13). Open count: **22 of 157** (was 23).
+
 ## What this design is for
 
-The measurement established that **23 of 157** acceptance criteria are not
+The measurement established that **22 of 157** acceptance criteria are not
 `implemented` and that no issue is closeable. It did not say how any of them closes. This
 document does, and it is generated from the same verdict data as the measurement, so the two
 cannot drift apart — provided it is regenerated when the verdict data moves, which is the exact
@@ -67,9 +82,9 @@ one list is what has made the epic look larger and more uniform than it is.
 | A — assertion missing | 0 | (both prior members, A-AC-14/PX0-AC-03, closed — see below) |
 | D — documentation missing | 0 | (prior member L-AC-08 reclassified to P 2026-08-17, then closed the same day — see below) |
 | S — seam missing | 0 | (prior member E-AC-20 closed 2026-08-10) |
-| B — capability missing | 13 | real implementation plus its tests |
+| B — capability missing | 12 | real implementation plus its tests |
 | P — not code | 10 | a human gate, a sanctioned authority revision, or a proved impossibility |
-| **total** | **23** | |
+| **total** | **22** | |
 
 **The distribution is the finding.** The largest class by a wide margin is Class A: criteria
 whose behaviour is built, shipped and green, and which fail only because no assertion names the
@@ -226,10 +241,10 @@ the P route the same day too (PHX-WP-LAC08, commit `20014aab`: the undistinguish
 originally named no longer exists), not as a Class D member either; E-AC-20 (Class S) landed
 2026-08-10. Full per-row evidence for every `implemented` criterion, including
 these, is in
-[`../evidence/acceptance-evidence-map-20260817e.md`](../evidence/acceptance-evidence-map-20260817e.md)
+[`../evidence/acceptance-evidence-map-20260817f.md`](../evidence/acceptance-evidence-map-20260817f.md)
 — not repeated here, since this document's job is the OPEN set.
 
-### Class B — an absent capability (13)
+### Class B — an absent capability (12)
 
 | ID | verdict | package | what closes it |
 |---|---|---|---|
@@ -241,7 +256,6 @@ these, is in
 | EPIC-AC-02 | not-started | WP-EPIC | NO CARRIER: planParallelSprintIntegration has no concept of "unpublished" and is called only from its own test file (reconfirmed 2026-08-17 by independent re-verification, zero hits for "unpublished"/"Nova"/"Cyborg"/"Nightwing") |
 | H-AC-08 | partial | WP-HAC08 | `legacy-import-observation` kind is representable, drift-tested. Still no production caller: CONFIRMED ABSENT that any code path imports/migrates a legacy record at all |
 | L-AC-01 | partial | WP-L | UPDATE 2026-08-17 (PHX-WP-LAC01, commit `fd57d390`): first real producer landed — `continuity-cas` now durably persists a schema-valid `dispatch`-kind lifecycle event via a new translator, independently re-verified (unit + call-site + 506/506 gated regression + e2e readback). UPDATE 2026-08-17 (PHX-WP-LAC01B, commit `8e4be420`): second real producer landed — `continuity-integrate-final` now durably persists a `status`-kind event via a sibling translator, independently re-verified (unit + call-site tests green, gated regression 504/506 — the 2 failures are the same pre-existing FTP-ARTIFACT-2 acceptance.md-digest-staleness cause, confirmed pre-existing by re-running the identical suite at the prior commit). Honest count: **2 of 9** — NOT status+cancellation as hoped: the real continuity outcome vocabulary only ever observes succeeded/failed, so cancellation stays unreached despite the projection covering it. `candidate-invalidation` also confirmed to have no real caller (invalidation is always constructed `{state:"valid"}`; zero non-test producers of an invalidated state anywhere). Remaining 7 kinds all need a source vocabulary to exist before a producer can — a capability gap now, not a translator-authoring gap. Registering the new call-site suites into `harness/scripts/verify.mjs` is blocked by the same installed-plugin TP-3 gap as the other four parked reds |
-| P-AC-06 | partial | WP-P | missing, misplaced, illegally-mutable, stale and truncated each pinned. legacy and orphaned remain unpinned: the legacy classification exists (feature-package-topology.mjs:78) but no rejection path consults it |
 | P-AC-09 | partial | WP-P | RETRACTS "no carrier" (2026-08-17): `computeBackfillRange` (organization-policy-activation.mjs) already covers the preview half, shared with P-AC-03. Narrower remainder: `activateOrganizationPolicy`'s `authorize()` is one generic activation grant, not a distinct "explicit backfill consent" scoped to the identified historical range, and no code exports/backfills the historical events themselves |
 | R-AC-08 | partial | WP-R | a readback lifecycle event appends exactly once and never rewrites the original offer; rollback/cleanup as *occurred* events are absent — no such state exists, only prospective values inside recoverability |
 | R-AC-09 | partial | WP-R | missing offer link, contradictory outcome evidence, cross-repository/cross-scope substitution, and now `occurredAtEpochMs` (closed 2026-08-10, commit `8d8996bc`) are pinned. Duplicate detection deliberately not rebuilt here — it lives at the store layer (`idempotencyKey`, governance-event-store.mjs) by design, not an absence |
@@ -264,7 +278,7 @@ these, is in
 
 ## Sequence, corrected
 
-With Classes A/D/S empty, the sequence collapses to: **Class B first** (13 items, real code, no PO
+With Classes A/D/S empty, the sequence collapses to: **Class B first** (12 items, real code, no PO
 gate — L-AC-01 leads, since it is the one structural gap several other rows describe as their own
 missing half), **Class P last** (10 items, ten different PO actions, several already queued and
 waiting only on the PO's own terminal or a design answer — not parallelizable with agent work).
