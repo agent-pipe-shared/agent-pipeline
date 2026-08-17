@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "18d88e8ce6a5efc913c6e817ace922d985a4b3ac8b56f19af6984c33b99234b7"
+    "transitionHead": "2150c2634013f6d4b744e50338e60831154e4ed2abfde334e1043d4ece2df8ce"
   },
   "counts": {
-    "open": 105,
+    "open": 104,
     "in_progress": 22,
-    "closed": 96
+    "closed": 97
   },
   "items": [
     {
@@ -1423,11 +1423,15 @@
     },
     {
       "id": "pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Reported by the PO on 2026-08-17, relaying a real Windows/Codex session transcript from a downstream consumer project's `po-human-approval.mjs setup` run. Root cause independently diagnosed in this repository from the transcript's symptoms."
+      "source": "Reported by the PO on 2026-08-17, relaying a real Windows/Codex session transcript from a downstream consumer project's `po-human-approval.mjs setup` run. Root cause independently diagnosed in this repository from the transcript's symptoms.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "ba562481",
+      "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-po-human-approval-windows-posix-separator-fix-closure.md"
     },
     {
       "id": "pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide",

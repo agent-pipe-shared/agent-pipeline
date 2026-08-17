@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: ba562481
+closure_evidence: specs/sprint-nova-epic/evidence/backlog/2026-08-17-po-human-approval-windows-posix-separator-fix-closure.md
 source: "Reported by the PO on 2026-08-17, relaying a real Windows/Codex session transcript from a downstream consumer project's `po-human-approval.mjs setup` run. Root cause independently diagnosed in this repository from the transcript's symptoms."
 ---
 
@@ -72,7 +76,7 @@ this class of bug is caught without requiring an actual Windows CI runner.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted — genuine defect with a clear, small, well-localized fix that silently misclassifies a valid external directory as "inside" for the common same-drive-letter case on Windows. Not fixed in this same session pass; filed for a dedicated goldfish-deep dispatch with mandatory Critic review (guardrail/security-adjacent: gates whether a private signing key setup succeeds).
-- **Rationale:** root cause independently confirmed by direct code reading (not just inferred from the transcript); fix is small and low-risk, but this file governs signing-key setup, so it goes through the standard dispatch + Critic discipline rather than a same-session edit.
-- **Assignment (if accepted):** next available dispatch slot in this AFK block, folded into the 0.5.5 candidate.
+- **Decision:** accepted and fixed. Round 1 (`d2e2fc4c`, `NVA-WINPATH-1`) applied the separator-agnostic fix but normalized unconditionally, including on POSIX — Critic round-1 FAIL (F1, major: a POSIX directory literally named `..\<name>` got misclassified after normalization, a fail-open regression). Round 2 (`ba562481`, `NVA-WINPATH-2`) scoped the normalization to the win32 branch only and added a POSIX regression test — Critic round-2 PASS, no findings.
+- **Rationale:** root cause independently confirmed by direct code reading (not just inferred from the transcript); this file governs signing-key setup, so it went through the full dispatch + two-round Critic discipline rather than a same-session edit.
+- **Assignment:** completed this AFK block; folded into the pending 0.5.5 candidate.
 - **Date:** 2026-08-17
