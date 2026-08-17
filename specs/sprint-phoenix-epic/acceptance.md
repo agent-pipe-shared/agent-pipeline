@@ -151,7 +151,13 @@ architecture prose or an implementation briefing.
   amendment above already conditions this clause's closure on. What the
   upgrade settles is the disposition, not the exit: no in-process interim
   can close clause 1, and none should be attempted.
-- **PX0-AC-14:** WHEN source/freshness diagnostics are rendered or persisted,
+
+  **Third amendment (PO, 2026-08-17).** §13's own open question is answered:
+  Option A accepted (docs/phoenix-governance-threat-model.md's operating-rule
+  sentence amended the same day to permit the one bounded local write Part B
+  needs). Clause 1 is now unblocked for implementation — building the
+  out-of-process host adapter design §13 conditioned this clause's closure on
+  is dispatchable; not yet built as of this amendment. WHEN source/freshness diagnostics are rendered or persisted,
   THE SYSTEM SHALL omit tokens, credentials, home paths, cache paths, private
   remotes, SSH key paths, and account coordinates.
 - **PX0-AC-15:** WHEN the ruleset source is private or local, THE SYSTEM SHALL
@@ -396,6 +402,20 @@ architecture prose or an implementation briefing.
 - **A-AC-03:** IF a changed material assumption affects a package, candidate,
   decision, or evidence result, THEN THE SYSTEM SHALL identify the affected
   objects and invoke the governed revalidation/invalidation path.
+
+  **Amendment (PO, 2026-08-17).** No such mechanism exists anywhere in this
+  codebase (confirmed by direct search: no "governed revalidation/invalidation
+  path" of any kind, for any object type, in `plugins/pipeline-core/{lib,scripts}`),
+  and none is planned for this epic. The PO decided against scoping and building
+  a new dependency-graph/cascade subsystem to satisfy this clause — this is a
+  scope decision, not an implementation gap left for a future dispatch.
+  A-AC-03 is descoped from Sprint Phoenix: the criterion's cascade requirement
+  is withdrawn, satisfied by the epic's explicit decision not to build it,
+  the same disposition class as H-AC-08 (`docs/state.md`, commit `29f29185`).
+  Should a future epic need assumption-driven revalidation, this is the
+  starting reference (design/agent-decision-journal-production-producer.md
+  §5's H-AC-08 disposition follows the identical pattern for a sibling
+  criterion).
 - **A-AC-04:** WHEN an agent asks for human authority, THE SYSTEM SHALL correlate
   the request to the human ledger and SHALL NOT self-confirm it.
 - **A-AC-05:** WHEN runner, model, effort, profile, role, adapter, or capability
@@ -605,6 +625,22 @@ architecture prose or an implementation briefing.
   publication, THE SYSTEM SHALL remain provider-neutral and scope permission by
   document class, target class/binding, mode, owned fields/sections, lifecycle
   event, preview, approval, retention, conflict policy, and revision readback.
+
+  **Amendment (PO, 2026-08-17), `preview` dimension only.** The `previewRequired`
+  policy field validates and merges (`organization-policy.mjs`) but gates no
+  decision: `external-reference-adapter.mjs`'s `preview()` already runs
+  unconditionally on every governed write, regardless of the field's value —
+  confirmed by direct source reading, not inferred. The PO decided this is
+  satisfied by construction rather than something to make conditionally
+  configurable (which would be a real, riskier behavior change to a
+  preview-first-by-design adapter): "scope permission by ... preview" is met
+  because preview is never skippable, not because the field enforces it.
+  `previewRequired` stays declared for forward-compatibility (a future policy
+  MAY still declare it; the value is simply always already true in effect).
+  `retention` and `conflictPolicy` are separate open questions under this same
+  criterion, not resolved by this amendment (see
+  backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md's
+  Triage section for their own dispositions).
 - **P-AC-12:** WHEN a bundle is verified offline, THE SYSTEM SHALL validate its
   manifest, artifact digests, event-chain references, topology, optional
   signature profile, and declared omissions and SHALL visibly reject
