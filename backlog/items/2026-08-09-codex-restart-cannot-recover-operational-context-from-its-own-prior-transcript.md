@@ -129,3 +129,32 @@ proper spec for it rather than a quick patch.
   above — genuinely current work, not later-sprint scope, given the PO's
   explicit "still broken" signal.
 - **Date:** 2026-08-17
+
+### Re-triaged 2026-08-17 (second occurrence, same day) — PO reconfirms via a fresh Codex happy-path restart, explicitly scoped to 0.6.0
+
+- **Decision:** accepted, current scope, explicitly targeted for the 0.6.0
+  release — not blocking any in-flight candidate. The PO restarted the
+  happy-path test and observed the exact same write-side gap this item
+  already describes ("codex schreibt immer noch nur kleine teile des inputs
+  vor dem neustart in die kachel und verliert damit wichtige infos für den
+  happy patch"), and restated the 2026-08-12 read-side direction in the same
+  words as a hard requirement going forward: for this class of initial
+  onboarding restart, the resume-hint card must carry a mandatory entry
+  instructing the new session to read the prior session's own JSON
+  transcript, since the parameters a restart needs (language, etc.) are
+  already resolved there.
+- **Rationale:** PO, 2026-08-17, verbatim: "für diese art initialer neustart
+  kommt ab jetzt verpflichtend ein eintrag in diese hint kachel, dass die
+  neue session zwingend das json transkript der alten auslesen soll. Dort
+  sind auch dann immer die notwendigen parameter wie sprache etc schon
+  definiert... Das bitte auch noch aufnehmen (nicht blocking aber kommt in
+  den 0.6.0 mit rein)." This is the same design direction as the 2026-08-12
+  re-triage, now explicitly release-scoped rather than open-ended.
+- **Assignment:** still needs the real design pass the 2026-08-12 re-triage
+  already scoped (constraints unchanged: host/tool-specific rollout path,
+  no reliable predecessor-session identification unless the restart action
+  passes it down, bounded not raw-transcript reading) — queue for a
+  dedicated design+implementation session before 0.6.0 ships, not same-day
+  with the two narrower live-test findings from today (git-identity set
+  timing, signing-ceremony disclosures).
+- **Date:** 2026-08-17
