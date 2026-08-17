@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0bca4c43d135eac0dcba8bbd54423459f3e34eabc787d0208ff3491be1710301"
+    "transitionHead": "94685a4755e4cfa4d642f0c3640a1e747ab74e7c783ff8b49500b98145eb5ea2"
   },
   "counts": {
-    "open": 97,
+    "open": 96,
     "in_progress": 22,
-    "closed": 132
+    "closed": 133
   },
   "items": [
     {
@@ -2033,11 +2033,15 @@
     },
     {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-27",
-      "source": "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)"
+      "source": "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "456b7beb2cb16a567fd4602525d1c6b17c9b0f89",
+      "closureEvidence": "plugins/pipeline-core/lib/runtime-projection-v2.test.mjs"
     },
     {
       "id": "pipeline.scratch-cleanup-mechanism-not-wired-to-any-event",

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.runtime-projection-v2-eager-manifest-load
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-07-27
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 456b7beb2cb16a567fd4602525d1c6b17c9b0f89
+closure_evidence: plugins/pipeline-core/lib/runtime-projection-v2.test.mjs
 source: "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)"
 ---
 
@@ -73,3 +77,19 @@ is a foundational, widely-shared library file — same rigor as `894261d`.
 - **Assignment (if accepted):** unassigned — apply the same lazy/memoized
   accessor fix pattern used in `894261d`, per this item's own Proposal.
 - **Date:** 2026-08-17
+
+### Closed 2026-08-17 (overnight AFK block, NVA-RTPROJ2-1)
+
+Fixed exactly as proposed: `FROZEN_OWNED_KEYS`/`FROZEN_OWNED_KEYS_CANONICAL_JSON`
+replaced with a lazy, memoized `frozenOwnedKeys()` accessor mirroring v3's
+own shape, doc comment, and not-memoized-on-failure property. All four use
+sites updated (comparison, default parameter, `planFromValidatedIntent`
+manifest arg, target iteration) — the default-parameter site confirmed
+safe because JS evaluates default expressions at call time, validated
+against v3's identical site. New subprocess-based load-safety test proves
+import no longer touches disk. Full regression sweep green: 21/21, 23/23,
+plus three more consumer suites (2/2, 15/15, 50/50). No exported symbol
+renamed; confirmed no external consumers of the removed constants.
+Independently re-verified: `node --test
+plugins/pipeline-core/lib/runtime-projection-v2.test.mjs
+plugins/pipeline-core/lib/runtime-projection-v3.test.mjs` both green.
