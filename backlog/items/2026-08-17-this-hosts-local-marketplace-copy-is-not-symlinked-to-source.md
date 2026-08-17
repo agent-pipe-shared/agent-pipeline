@@ -8,7 +8,7 @@ created: 2026-08-17
 source: "Independent full-Verify run on this checkout, 2026-08-17, while landing NVA-A7FIX-2/NVA-HGOFIX-1 -- human-guard-override-tests failed 5 of its cases with HGO-EXTERNAL-MARKETPLACE, unrelated to any commit made this session."
 ---
 
-# On this machine, `~/agent-pipeline-local-marketplace/plugins/pipeline-core` is a real directory, not the symlink/junction ADR-0052 requires
+# `externalLocalMarketplaceObservation()` requires a symlink/junction, but the PO's actual, deliberate workflow rsyncs a real copy instead
 
 ## Description
 
@@ -22,12 +22,15 @@ arrangement). On this machine it is instead a plain, independent directory:
     $ ls -la ~/agent-pipeline-local-marketplace/plugins
     drwxr-xr-x 16 skar667 skar667 4096 Aug 10 10:38 pipeline-core
 
-(no `l` mode bit, no `->` target — a real copy, last synced 2026-08-10, six
-days stale relative to today's commits). `externalRealpath()` therefore
-resolves it to itself, never to `repo.root/plugins/pipeline-core`, and every
-call path through `localPluginInstallSourceObservation()` fails with
+(no `l` mode bit, no `->` target). **The PO has confirmed this is
+deliberate, not drift:** finished candidates are rsync-copied to the local
+marketplace root on purpose, because a symlink arrangement caused problems
+for them in practice. `externalRealpath()` therefore resolves the entry to
+itself, never to `repo.root/plugins/pipeline-core`, and every call path
+through `localPluginInstallSourceObservation()` fails with
 `HGO-EXTERNAL-MARKETPLACE: external local marketplace does not resolve to
-this checkout`.
+this checkout` — for a legitimate, intentional deployment shape, not a
+misconfiguration.
 
 ## Triggering situation
 
@@ -45,32 +48,39 @@ including the three new NVA-HGOFIX-1 regression tests, passes.
 
 ## Affected artifact
 
-Not a code defect — a host-environment configuration gap on this specific
-machine's `~/agent-pipeline-local-marketplace` installation, relative to what
-`plugins/pipeline-core/lib/human-guard-override.mjs`'s NVA-BL-20 code (and
-ADR-0052) expects.
+`plugins/pipeline-core/lib/human-guard-override.mjs`,
+`externalLocalMarketplaceObservation()` (NVA-BL-20) — the check's design
+assumption (symlink/junction only), and by extension ADR-0052's documented
+local-development arrangement, which this proposal would need to extend
+rather than the code alone.
 
 ## Proposal
 
-Outside agent-session reach by design: `human-guard-override.mjs` itself
-refuses agent write access beyond the project root, and rebuilding a Codex
-plugin-registry symlink/junction on the host filesystem is exactly the class
-of action that boundary exists to keep human-attended. The PO needs to
-either (a) re-run whatever local-development onboarding step creates the
-ADR-0052 symlink/junction so `~/agent-pipeline-local-marketplace/plugins/
-pipeline-core` again points at this checkout, or (b) refresh the marketplace
-copy through the project's normal `claude plugin marketplace update`/
-`claude plugin update` flow if a real (non-symlinked) copy is the intended
-mode on this machine and the check should tolerate it -- which would be a
-design question, not assumed here. This is the same underlying
-"marketplace-copy refresh" gap already surfaced independently by a
-downstream consumer-project report the same day (2026-08-17); the two
-reports corroborate each other but describe different specific symptoms (a
-stale hook allowlist there vs. an unlinked entry, timestamped Aug 10, here).
+A code/design fix, not a PO host-side action: `externalLocalMarketplaceObservation()`
+already computes `pluginTreeSha256` (a content hash of this checkout's own
+`plugins/pipeline-core` source tree) for exactly this function's own
+`statusSha256` binding. The same primitive can verify a REAL, rsync-copied
+directory just as strongly as a symlink verifies one — hash the external
+copy's tree with the identical walker and compare against this checkout's
+`pluginTreeSha256`, accepting either a symlink that resolves back to this
+checkout (current behavior, kept) OR a real directory whose content hash
+matches (new). This still refuses a mutated, stale, or unrelated copy
+exactly as today, while accepting the PO's actual deployment shape. Needs a
+design pass before implementation: what "stale" should mean for a hash-equal
+but differently-timestamped copy, and whether ADR-0052 itself should be
+amended to document rsync-copy as a second sanctioned local-development
+shape alongside symlink/junction.
+
+This is the same underlying "marketplace-copy refresh" theme already
+surfaced independently by a downstream consumer-project report the same day
+(2026-08-17) — that report's actual root cause was a stale hook allowlist,
+unrelated to this one, but both point at the same operational reality: a
+finished candidate's code and the installed marketplace copy can drift
+apart, and today's tooling has more than one way to notice that drift.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted as filed -- PO-gated, no agent-session action possible.
-- **Rationale:** `human-guard-override.mjs`'s own out-of-root write refusal is the correct, deliberate boundary (see `specs/sprint-nova-epic/plans/nova-setup-bootstrap.md` §5a) and must not be routed around from inside a session.
-- **Assignment (if accepted):** PO, next time they refresh this machine's local marketplace installation.
+- **Decision:** accepted — reframed after PO clarification (2026-08-17) that the rsync-copy deployment shape is deliberate, not drift. Not fixed in this same session pass: real design work (ADR-0052 amendment question, hash-equality semantics) belongs in a dedicated design/goldfish-deep pass with mandatory Critic review, not a same-session patch to security-relevant marketplace-attestation code.
+- **Rationale:** the check's own severity is correct (fail closed on an unverified external root) — the gap is that it only recognizes one of the PO's two legitimate deployment shapes.
+- **Assignment (if accepted):** next available dedicated design slot.
 - **Date:** 2026-08-17
