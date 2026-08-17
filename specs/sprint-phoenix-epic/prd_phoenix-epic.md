@@ -8,7 +8,7 @@
 > implementation dispatch; push, merge, release, external writes, and final
 > acceptance keep their own gates.
 
-<!-- technical-spec-sha256: f7e32bb764d408ec21d6578d72b4729d8d5931bcf840ebac2198a2d652233d4f -->
+<!-- technical-spec-sha256: badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287 -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md).
 Acceptance criteria are maintained in
