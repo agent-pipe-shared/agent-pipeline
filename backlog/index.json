@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "164f4bb90078ae91861a4f8bbe8afe5ff994e55b39c38527d481975434b16964"
+    "transitionHead": "40b402d22844306b836399d3a225d07488ccc20f9e36f01757a4ac50eebc9b63"
   },
   "counts": {
-    "open": 95,
+    "open": 98,
     "in_progress": 22,
     "closed": 121
   },
@@ -702,6 +702,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing."
     },
     {
       "id": "pipeline.four-critic-preimage-pins-drifted-or-never-valid",
@@ -1537,6 +1545,14 @@
       "closureEvidence": "backlog/evidence/2026-08-09-pipeline-state-f7-test-relocation-closure.md"
     },
     {
+      "id": "pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing. One of three examples from that report; the other two were checked and found already fixed/admitted (see Triage)."
+    },
+    {
       "id": "pipeline.plan-path-guidance-attached-to-unlike-causes",
       "status": "closed",
       "type": "defect",
@@ -2225,6 +2241,14 @@
       "closureRepository": "self",
       "closureCommit": "4a3534ce970962eda367f6eeb523e69ceb84da94",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing."
     },
     {
       "id": "pipeline.two-manifest-literals-bypass-the-single-seed-owner",

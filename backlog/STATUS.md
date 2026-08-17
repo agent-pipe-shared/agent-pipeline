@@ -76,6 +76,7 @@
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.four-critic-preimage-pins-drifted-or-never-valid | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
@@ -159,6 +160,7 @@
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.plugin-package-should-vendor-canon-references-via-build-step | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | closed | defect | pipeline | 2026-08-09 | — |
@@ -225,6 +227,7 @@
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.two-manifest-literals-bypass-the-single-seed-owner | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
@@ -246,6 +249,6 @@
 
 ## Counts
 
-- open: 95
+- open: 98
 - in_progress: 22
 - closed: 121
