@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "985ca2b90ac42f7278ae486a1127f45878a8e269044997ba7e6d9941809a7f37"
+    "transitionHead": "e49692df75859c3e389ed52138a27b9cf1ffe63bdfdb211cfc2ef1fe398d94e1"
   },
   "counts": {
-    "open": 108,
+    "open": 109,
     "in_progress": 22,
     "closed": 101
   },
@@ -1258,6 +1258,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "PO, 2026-08-08: 'uns fehlt da noch eine art adr die die verzeichnisstrukturen besser hart vorgibt und definiert was wo hin gehört - agenten neigen bei jeder neuen session dazu neue strukturen zu erfinden. das muss die pipeline steuern.' Five corroborating instances from that same night are recorded below."
+    },
+    {
+      "id": "pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Live, same-session incident: the Elephant dispatched NVA-VENDORSYNC-1 to goldfish-deep with an explicit `model: opus`/`max` override and a stated MP-05/MP-07 rationale (architecture/guardrail-adjacent). goldfish-deep's actual configured default is sonnet at effort xhigh (plugins/pipeline-core/agents/goldfish-deep.md frontmatter, matching pipeline.user.yaml's models.implement.claude routing). The PO caught the deviation live in chat and asked how to stop this recurring silently across sessions; not investigated or fixed here, filed for future hardening per the PO's own framing (\"das braucht auch später eine Härtung\")."
     },
     {
       "id": "pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed",

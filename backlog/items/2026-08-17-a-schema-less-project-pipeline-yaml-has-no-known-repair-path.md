@@ -42,6 +42,44 @@ not yet ruled out: an older pipeline-core version's generator (before the
 file), a hand-edited file, or a generator path not covered by this
 investigation's search scope.
 
+**UPDATE — the "no repair path" half is now conclusively root-caused; the
+"which generator" half is now moot for fix design.** Traced the full repair
+chain end to end:
+
+- `replaceClaudeTarget()` (`plugins/pipeline-core/lib/runtime-projection-v3.mjs:377-429`)
+  is the byte-preserving renderer that produces the "after" projection
+  `planRunnerProfileMigrationV3` compares against the on-disk file. Its owned
+  spans are enumerated exhaustively by `yamlOwnedSpans()` (`:333-341`):
+  human-facing language, optional `session`, `modelRouting` (required),
+  optional `runnerRoutes`, optional `criticExport`. **`schema:` is not in
+  this list — it is always "unowned" content**, preserved byte-for-byte by
+  the `beforeUnowned !== afterUnowned` invariant check (`:410`) whether
+  present, absent, or malformed.
+- `planRunnerProfileMigrationV3`'s noop classification
+  (`publicTarget()`, `:530-539`) is a plain digest comparison of before vs.
+  this rendered after. For a schema-less file, the renderer's "after" is
+  BYTE-IDENTICAL to "before" (since it never touches `schema:` either way) —
+  so `changed: false`, `status: "noop"` is the CORRECT output of this
+  mechanism, not a bug in the comparison itself. The mechanism simply has no
+  concept of "add a missing key I don't own."
+- `project-authority.mjs`'s `changedTargets()` (`:321-327`) then copies this
+  legacy file into `project/pipeline.yaml` byte-for-byte with no validation
+  (`after: source = image(root, target.legacy)`).
+- `loadManifest()` then permanently rejects the result for the missing
+  `schema:` field, and `planProjectOnboardingManifestRepairV4` throws
+  `canonical_manifest_requires_owner_repair` — with no path back through
+  `plan-manifest-repair` (reports `noop`) or
+  `project-authority-migration.mjs recover` (reports `none`), because
+  neither tool's model includes "seed a required key the byte-preserving
+  renderer was never told to own."
+
+This means **any** legacy `.claude/pipeline.yaml` missing `schema:` — however
+it came to be missing it, whatever wrote it, whatever version — is
+permanently unrepairable by the existing tooling, by construction, not by
+accident. The original "which generator produced this specific file"
+question no longer gates a fix: the fix targets the repair chain's structural
+blind spot, not a specific writer.
+
 ## Triggering situation
 
 A live D:\Dev\HA bootstrap session's `project/pipeline.yaml` (sha256

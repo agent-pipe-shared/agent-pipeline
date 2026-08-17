@@ -137,6 +137,7 @@
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | open | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.no-governed-directory-contract | open | workflow-improvement | pipeline | 2026-08-08 | — |
+| pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing | open | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.no-sanctioned-way-to-start-over | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.nonblocking-interaction-continuity | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -239,6 +240,6 @@
 
 ## Counts
 
-- open: 108
+- open: 109
 - in_progress: 22
 - closed: 101
