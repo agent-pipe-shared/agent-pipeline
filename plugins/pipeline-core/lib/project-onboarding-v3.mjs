@@ -1909,6 +1909,34 @@ function continuityRepairPlanAction(root, runner, intent) {
   );
 }
 
+// Same `collect-input` shape as `collectAuthorIdentityAction()`: the operator-
+// confirmed continuity repair (`onboarding-continuity.mjs`'s
+// `operatorConfirmedContinuity()`) needs a claim this tool can never derive on
+// its own -- which feature a mature project's absent `pipeline-state.json`
+// belongs to, and where its approved PRD and neighbouring Spec live -- so a
+// `status: "operator-authority-required"` repair plan surfaces this ask
+// instead of the flat `nextAction: null` every other unrepairable continuity
+// shape still returns. Field names mirror `operatorAuthority`'s own closed
+// shape (`validateOperatorContinuityAuthority` in onboarding-continuity.mjs)
+// exactly, and the CLI accepts them back as --id/--plan-path/--prd-path/
+// --spec-path/--language.
+function collectOperatorContinuityAuthorityAction() {
+  return {
+    kind: "collect-input",
+    inputs: [
+      { name: "featureId", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 128, singleLine: true, rejectNul: true },
+      { name: "planPath", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 240, singleLine: true, rejectNul: true },
+      { name: "prdPath", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 240, singleLine: true, rejectNul: true },
+      { name: "specPath", encoding: "utf8", trim: true, minBytes: 1, maxBytes: 240, singleLine: true, rejectNul: true },
+      { name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true },
+    ],
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "this project's pipeline-state.json is absent while its configured handover is real; ask the PO once which feature it belongs to, the approved PRD path (repeated as both --plan-path and --prd-path -- the plan IS the PRD), the neighbouring specification path, and the human-facing language (de or en); nothing here is inferred from repository content, and it is independently checked before it is ever adopted -- then rerun plan-repair/apply-repair with --id --plan-path --prd-path --spec-path --language set to those exact values",
+    expected: { schema: SCHEMA, statuses: ["continuity-damaged"] },
+  };
+}
+
 function collectGoalAction() {
   return {
     kind: "collect-input",
@@ -4234,7 +4262,7 @@ export function applyProjectRemoteAdoptionV4({ rootDir = process.cwd(), remote, 
   }
 }
 
-function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner) {
+function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner, operatorAuthority = null) {
   const observed = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "portable") {
     if (!["portable-seed-required", "adoption-required"].includes(observed.status)) return observed;
@@ -4247,7 +4275,21 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner) {
       rootDir,
       repositoryCapability: observed.repository.mode,
       spawn: fs.spawnSync,
+      operatorAuthority,
     });
+    if (plan.status === "operator-authority-required") {
+      // Third repair case (`onboarding-continuity.mjs`'s
+      // `operatorConfirmedContinuity()`): a mature project's
+      // `pipeline-state.json` is absent while its configured handover is real,
+      // and nothing in the repository can name which feature it belongs to.
+      // A real ask-step, not the flat `nextAction: null` every other
+      // unrepairable continuity shape below still returns.
+      return {
+        ...observed,
+        nextAction: collectOperatorContinuityAuthorityAction(),
+        diagnostics: [],
+      };
+    }
     if (plan.status !== "ready") {
       return {
         ...observed,
@@ -4347,7 +4389,7 @@ function withPendingAuthorIdentityAsk(observed, fs) {
   return { ...observed, authorIdentityAction: collectAuthorIdentityAction(missing) };
 }
 
-function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "onboarding", runner) {
+function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "onboarding", runner, operatorAuthority = null) {
   if (!activate || typeof planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(planSha256)) return v4Inspection(rootDir, fs, intent, runner);
   if (operation === "portable") {
     // The apply-side plan must be recomputed under the SAME identity the plan
@@ -4364,6 +4406,7 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
       rootDir,
       repositoryCapability: beforeApply.repository.mode,
       spawn: fs.spawnSync,
+      operatorAuthority,
     });
     if (plan.status !== "ready" || plan.planSha256 !== planSha256) return beforeApply;
     try {
@@ -4372,6 +4415,7 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
         repositoryCapability: beforeApply.repository.mode,
         expectedPlanSha256: planSha256,
         activate: true,
+        operatorAuthority,
         deps: { spawn: fs.spawnSync },
       });
     } catch {
@@ -4485,12 +4529,12 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
   return v4Inspection(rootDir, fs, intent, runner);
 }
 
-export function planProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", intent = "onboarding", runner } = {}) {
-  return planLifecycle(rootDir, deps(overrides), operation, intent, runner);
+export function planProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", intent = "onboarding", runner, operatorAuthority = null } = {}) {
+  return planLifecycle(rootDir, deps(overrides), operation, intent, runner, operatorAuthority);
 }
 
-export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", planSha256, activate = false, intent = "onboarding", runner } = {}) {
-  return applyLifecycle(rootDir, deps(overrides), operation, planSha256, activate, intent, runner);
+export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", planSha256, activate = false, intent = "onboarding", runner, operatorAuthority = null } = {}) {
+  return applyLifecycle(rootDir, deps(overrides), operation, planSha256, activate, intent, runner, operatorAuthority);
 }
 
 // The kickoff entry points inspect on the caller's behalf, so they must inspect

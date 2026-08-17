@@ -4007,9 +4007,19 @@ test("current runtime exposes closed continuity outcomes while required App Serv
       deps: fakeDeps,
       write: (chunk) => { continuityOutput += chunk; },
     }), 1);
-    assert.equal(JSON.parse(continuityOutput).status, "continuity-damaged");
-    assert.equal(JSON.parse(continuityOutput).nextAction, null);
-    assertDiagnostic(JSON.parse(continuityOutput), "continuity_repair_unavailable");
+    const continuityParsed = JSON.parse(continuityOutput);
+    assert.equal(continuityParsed.status, "continuity-damaged");
+    // This exact fixture (a real handover, an absent pipeline-state.json) is
+    // the third repair case: `pipeline-state.json` itself is absent, so the
+    // tool cannot derive which feature it belongs to on its own, and the plan
+    // surfaces a real `collect-input` ask instead of the flat `nextAction:
+    // null` dead end every other unrepairable continuity shape still returns.
+    assert.equal(continuityParsed.nextAction.kind, "collect-input");
+    assert.equal(continuityParsed.nextAction.mutation, false);
+    assert.deepEqual(continuityParsed.nextAction.inputs.map((input) => input.name).sort(),
+      ["featureId", "language", "planPath", "prdPath", "specPath"]);
+    assert.equal(continuityParsed.diagnostics.length, 0,
+      "the ask-step replaces the passive diagnostic entirely");
     const compound = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: pristine,
       intent: "bootstrap",
@@ -4036,6 +4046,69 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     assert.equal(unreadable.continuity.status, "unavailable");
     assert.equal(unreadable.nextAction, null);
   } finally { dispose(pristine); dispose(unavailable); }
+});
+
+// Same third repair case as the fixture above (`pipeline-state.json` absent,
+// a real configured handover), driven through the real CLI end to end: the
+// bare ask, a caller error for a partial claim, and a full plan/apply cycle
+// that threads --id/--plan-path/--prd-path/--spec-path/--language into
+// `applyOnboardingContinuityRepair()`'s `operatorAuthority` argument.
+test("operator-confirmed continuity repair is a real ask-step end to end through the CLI", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    mkdirSync(join(path, "docs"), { recursive: true });
+    writeFileSync(join(path, "docs", "state.md"), "manual handover\n");
+    mkdirSync(join(path, "specs", "mature"), { recursive: true });
+    writeFileSync(join(path, "specs", "mature", "prd_mature.md"), "# Mature PRD\n");
+    writeFileSync(join(path, "specs", "mature", "spec.md"), "# Mature specification\n");
+
+    let bareOutput = "";
+    assert.equal(onboardingCli(["plan-repair", "--root", path, "--runner", "codex"], {
+      deps: fakeDeps,
+      write: (chunk) => { bareOutput += chunk; },
+    }), 1);
+    assert.equal(JSON.parse(bareOutput).nextAction.kind, "collect-input");
+
+    const partial = onboardingCli(
+      ["plan-repair", "--root", path, "--runner", "codex", "--id", "mature-feature"],
+      { deps: fakeDeps, write: () => {} },
+    );
+    assert.equal(partial, 2, "a partial operator claim must be a caller error, never a silent no-op");
+
+    const operatorFlags = [
+      "--id", "mature-feature",
+      "--plan-path", "specs/mature/prd_mature.md",
+      "--prd-path", "specs/mature/prd_mature.md",
+      "--spec-path", "specs/mature/spec.md",
+      "--language", "en",
+    ];
+    let planOutput = "";
+    assert.equal(onboardingCli(["plan-repair", "--root", path, "--runner", "codex", ...operatorFlags], {
+      deps: fakeDeps,
+      write: (chunk) => { planOutput += chunk; },
+    }), 1);
+    const planned = JSON.parse(planOutput);
+    assert.equal(planned.status, "continuity-damaged");
+    assert.equal(planned.nextAction.kind, "command");
+    assert.match(planned.nextAction.argv.join(" "), /apply-repair/u);
+    const digest = planned.nextAction.argv[planned.nextAction.argv.indexOf("--plan-sha256") + 1];
+
+    let applyOutput = "";
+    const applyArgv = ["apply-repair", "--root", path, "--plan-sha256", digest, "--activate", "--runner", "codex", ...operatorFlags];
+    assert.equal(onboardingCli(applyArgv, {
+      deps: fakeDeps,
+      write: (chunk) => { applyOutput += chunk; },
+    }), 0);
+    const applied = JSON.parse(applyOutput);
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.continuity.status, "valid");
+    const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
+    assert.equal(state.activeFeature.id, "mature-feature");
+    assert.equal(state.continuity.authority.prd.path, "specs/mature/prd_mature.md");
+    assert.equal(state.continuity.authority.spec.path, "specs/mature/spec.md");
+  } finally { dispose(path); }
 });
 
 test("closed feature re-entry stays ready through the sanctioned set-feature transition", () => {

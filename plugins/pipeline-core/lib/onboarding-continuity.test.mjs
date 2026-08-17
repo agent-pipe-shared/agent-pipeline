@@ -822,6 +822,116 @@ check("continuity repair rejects authority drift and arbitrary invalid state", (
   assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
 });
 
+check("operator-authority-required repair goes red then green once operator authority is supplied", () => {
+  const root = fixture("repair-operator-authority");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "mature"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "# Existing handover\n");
+  writeFileSync(join(root, "specs", "mature", "prd_mature.md"), "# Mature PRD\n");
+  writeFileSync(join(root, "specs", "mature", "spec.md"), "# Mature specification\n");
+
+  const red = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(red.status, "operator-authority-required");
+
+  const operatorAuthority = {
+    featureId: "mature-feature",
+    planPath: "specs/mature/prd_mature.md",
+    prdPath: "specs/mature/prd_mature.md",
+    specPath: "specs/mature/spec.md",
+    language: "en",
+  };
+  const green = planOnboardingContinuityRepair({ rootDir: root, operatorAuthority });
+  assert.equal(green.status, "ready");
+  assert.equal(green.reason, "adopt-operator-confirmed-authority");
+  assert.equal(green.target.beforeSha256, null);
+  assert.equal(green.target.value.activeFeature.id, "mature-feature");
+  assert.equal(green.target.value.activeFeature.phase, "design");
+  assert.equal(green.target.value.planApproved, false);
+});
+
+check("operator-confirmed repair applies end-to-end to a valid classification", () => {
+  const root = fixture("repair-operator-authority-apply");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "mature"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "# Existing handover\n");
+  writeFileSync(join(root, "specs", "mature", "prd_mature.md"), "# Mature PRD\n");
+  writeFileSync(join(root, "specs", "mature", "spec.md"), "# Mature specification\n");
+
+  const operatorAuthority = {
+    featureId: "mature-feature",
+    planPath: "specs/mature/prd_mature.md",
+    prdPath: "specs/mature/prd_mature.md",
+    specPath: "specs/mature/spec.md",
+    language: "en",
+  };
+  const plan = planOnboardingContinuityRepair({ rootDir: root, operatorAuthority });
+  assert.equal(plan.status, "ready");
+  const applied = applyOnboardingContinuityRepair({
+    rootDir: root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+    operatorAuthority,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.reason, "adopt-operator-confirmed-authority");
+  assert.equal(applied.continuity.status, "valid");
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+  const stateOnDisk = JSON.parse(readFileSync(join(root, ".claude", "pipeline-state.json"), "utf8"));
+  assert.equal(stateOnDisk.activeFeature.id, "mature-feature");
+  assert.equal(stateOnDisk.continuity.authority.prd.path, "specs/mature/prd_mature.md");
+  assert.equal(stateOnDisk.continuity.authority.spec.path, "specs/mature/spec.md");
+});
+
+check("operator-confirmed repair refuses a bad or missing operator-supplied PRD or Spec path", () => {
+  const root = fixture("repair-operator-authority-fail-closed");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "mature"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "# Existing handover\n");
+  writeFileSync(join(root, "specs", "mature", "prd_mature.md"), "# Mature PRD\n");
+  writeFileSync(join(root, "specs", "mature", "spec.md"), "# Mature specification\n");
+
+  const missingSpec = planOnboardingContinuityRepair({
+    rootDir: root,
+    operatorAuthority: {
+      featureId: "mature-feature",
+      planPath: "specs/mature/prd_mature.md",
+      prdPath: "specs/mature/prd_mature.md",
+      specPath: "specs/mature/missing-spec.md",
+      language: "en",
+    },
+  });
+  assert.equal(missingSpec.status, "unsupported");
+  assert.equal(missingSpec.code, "CONTINUITY-REPAIR-UNSUPPORTED");
+
+  const mismatchedPlan = planOnboardingContinuityRepair({
+    rootDir: root,
+    operatorAuthority: {
+      featureId: "mature-feature",
+      planPath: "specs/mature/prd_mature.md",
+      prdPath: "specs/mature/spec.md",
+      specPath: "specs/mature/spec.md",
+      language: "en",
+    },
+  });
+  assert.equal(mismatchedPlan.status, "unsupported");
+  assert.equal(mismatchedPlan.code, "CONTINUITY-REPAIR-OPERATOR-AUTHORITY-INVALID");
+
+  const unsafePath = planOnboardingContinuityRepair({
+    rootDir: root,
+    operatorAuthority: {
+      featureId: "mature-feature",
+      planPath: "../outside.md",
+      prdPath: "../outside.md",
+      specPath: "specs/mature/spec.md",
+      language: "en",
+    },
+  });
+  assert.equal(unsafePath.status, "unsupported");
+  assert.equal(unsafePath.code, "KICKOFF-PATH-UNSAFE");
+
+  assert.equal(existsSync(join(root, ".claude", "pipeline-state.json")), false);
+});
+
 check("completed apply replay is byte-null and returns the identical continuity hashes", () => {
   const root = fixture("replay");
   const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a safe product" });

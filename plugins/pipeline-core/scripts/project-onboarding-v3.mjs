@@ -56,6 +56,7 @@ function usage() {
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> --language <de|en> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> --design-input-path <path> [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <plan-repair|apply-repair> --root <project-dir> [--id <feature-id> --plan-path <path> --prd-path <path> --spec-path <path> --language <de|en>] [--runner claude|codex] [--plan-sha256 <sha256>] [--activate]",
   ].join("\n");
 }
 function parse(args) {
@@ -106,6 +107,16 @@ function parse(args) {
   if (!output.help && !output.root) return { error: "--root is required" };
   if (output.command?.startsWith("adopt-remote-") && (!output.remote || !output.ref)) return { error: "adopt-remote requires --remote and --ref" };
   if (output.command === "adopt-remote-apply" && !output.planSha256) return { error: "adopt-remote apply requires --plan-sha256" };
+  // `plan-repair`/`apply-repair` are the only non-kickoff commands that accept
+  // the operator-confirmed continuity authority claim
+  // (`onboarding-continuity.mjs`'s `operatorConfirmedContinuity()`, surfaced
+  // via `collectOperatorContinuityAuthorityAction()` in project-onboarding-v3.mjs)
+  // -- the third repair case, for a mature project whose `pipeline-state.json`
+  // is absent while its configured handover is real. The five fields are a
+  // closed set (`validateOperatorContinuityAuthority`): all or none, never a
+  // partial claim that would silently resolve to `operatorAuthority: null` and
+  // hand back the flat "operator-authority-required" ask again.
+  const isRepairCommand = output.command === "plan-repair" || output.command === "apply-repair";
   if (output.command?.startsWith("kickoff-promote-")) {
     if (output.goal !== undefined) return { error: "--goal is not valid for kickoff promotion" };
     if (output.language !== undefined) return { error: "--language is not valid for kickoff promotion" };
@@ -113,7 +124,23 @@ function parse(args) {
   } else if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
   else if (output.command?.startsWith("kickoff-") && output.language === undefined) return { error: "kickoff plan/apply requires --language <de|en>" };
   else if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
-  else if (!output.command?.startsWith("kickoff-") && output.language !== undefined) return { error: "--language is only valid for kickoff plan/apply" };
+  else if (!output.command?.startsWith("kickoff-") && !isRepairCommand && output.language !== undefined) return { error: "--language is only valid for kickoff plan/apply" };
+  if (isRepairCommand) {
+    const operatorFields = [output.featureId, output.planPath, output.prdPath, output.specPath, output.language];
+    const suppliedCount = operatorFields.filter((value) => value !== undefined).length;
+    if (suppliedCount > 0 && suppliedCount < operatorFields.length) {
+      return { error: "operator-confirmed continuity repair requires --id --plan-path --prd-path --spec-path --language together, or none of them" };
+    }
+    if (suppliedCount === operatorFields.length) {
+      output.operatorAuthority = {
+        featureId: output.featureId,
+        planPath: output.planPath,
+        prdPath: output.prdPath,
+        specPath: output.specPath,
+        language: output.language,
+      };
+    }
+  }
   if (output.activate && !APPLY_SHAPED_COMMANDS.has(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
 }
@@ -139,7 +166,7 @@ export function main(args = process.argv.slice(2), {
     else if (options.command === "continuity-inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: "onboarding", runner: options.runner });
     else if (options.command === "plan") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "portable", intent: options.intent, runner: options.runner });
     else if (options.command === "plan-runtime") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "runtime", intent: options.intent, runner: options.runner });
-    else if (options.command === "plan-repair") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "repair", intent: options.intent, runner: options.runner });
+    else if (options.command === "plan-repair") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "repair", intent: options.intent, runner: options.runner, operatorAuthority: options.operatorAuthority ?? null });
     else if (options.command === "plan-readback") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "readback", intent: options.intent, runner: options.runner });
     else if (options.command === "plan-source-recovery") output = planProjectOnboardingSourceRecoveryV4({ rootDir: options.root, deps, runner: options.runner, intent: options.intent });
     else if (options.command === "plan-manifest-repair") output = planProjectOnboardingManifestRepairV4({ rootDir: options.root, deps, runner: options.runner, sessionIntent: options.intent });
@@ -192,6 +219,7 @@ export function main(args = process.argv.slice(2), {
         activate: options.activate,
         intent: options.intent,
         runner: options.runner,
+        operatorAuthority: operation === "repair" ? (options.operatorAuthority ?? null) : null,
       });
     }
   } catch (error) {

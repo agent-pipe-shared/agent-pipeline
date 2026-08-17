@@ -686,6 +686,8 @@ function observeDetailed({
         root,
         repositoryCapability,
         calibration,
+        calibrationRelativePath: selectedPaths.calibration,
+        stateRelativePath: selectedPaths.state,
         calibrationSha256: calibrationObservation.sha256,
         handoverPath,
         stateObservation,
@@ -834,6 +836,131 @@ function establishedContinuity(state, observed) {
   };
 }
 
+/**
+ * Validate the operator's own claim -- never derived, only checked -- that a
+ * mature project's absent `pipeline-state.json` belongs to feature `featureId`
+ * whose approved PRD lives at `planPath`/`prdPath` (the two must agree; the same
+ * invariant `promotionInput()` enforces for kickoff promotion, "the approval
+ * subject is the PRD") and whose neighbouring specification lives at `specPath`.
+ * This function performs shape checks only; existence and digest binding are the
+ * caller's job (`repairArtifact()`, exactly as `establishedContinuity()` uses it).
+ */
+function validateOperatorContinuityAuthority(operatorAuthority) {
+  if (!isObject(operatorAuthority)
+    || !exactKeys(operatorAuthority, new Set(["featureId", "planPath", "prdPath", "specPath", "language"]))) {
+    fail("CONTINUITY-REPAIR-OPERATOR-AUTHORITY-INVALID", "operator-confirmed authority is not a closed shape");
+  }
+  const { featureId, planPath, prdPath, specPath, language } = operatorAuthority;
+  if (!SAFE_FEATURE_ID.test(featureId ?? "")) {
+    fail("CONTINUITY-REPAIR-OPERATOR-AUTHORITY-INVALID", "operator-confirmed feature id is invalid");
+  }
+  if (!new Set(["de", "en"]).has(language)) {
+    fail("CONTINUITY-REPAIR-OPERATOR-AUTHORITY-INVALID", "operator-confirmed human-facing language must be de or en");
+  }
+  for (const [value, label] of [[planPath, "plan"], [prdPath, "PRD"], [specPath, "specification"]]) {
+    safeRelativePath(value, `operator-confirmed ${label}`);
+  }
+  if (planPath !== prdPath) {
+    fail("CONTINUITY-REPAIR-OPERATOR-AUTHORITY-INVALID", "operator-confirmed plan path must be exactly the PRD path");
+  }
+  if (planPath === specPath) {
+    fail("CONTINUITY-REPAIR-OPERATOR-AUTHORITY-INVALID", "operator-confirmed plan is the specification, but the approval subject is the PRD");
+  }
+  return { featureId, planPath, specPath, language };
+}
+
+/**
+ * The third repair case: `pipeline-state.json` itself is absent (never the two
+ * cases above, which both require a PRESENT, merely-inconsistent state), while
+ * the project's configured handover is real -- the exact shape of a mature
+ * project mid-migration to V4, or one whose state file was lost outside this
+ * tool's own transactions. Nothing here is inferred from repository content:
+ * every one of featureId/planPath/prdPath/specPath/language is the operator's
+ * own claim, captured by the caller through the `collect-input` ask this
+ * function's caller (`planOnboardingContinuityRepair`) surfaces when
+ * `operatorAuthority` is not yet supplied. Once supplied, the claim is
+ * independently checked -- shape here, existence and digest binding via
+ * `repairArtifact()`, exactly as `establishedContinuity()` checks its own
+ * PO-gate-authority claim -- and finally reproved by the same sanctioned
+ * readback every other repair case above already runs itself through, via the
+ * closing `validateContinuityState`/`projectReadContinuityStatus` pair, before
+ * this proposal is ever returned as a `status: "ready"` plan.
+ */
+function operatorConfirmedContinuity(observed, operatorAuthority) {
+  const input = validateOperatorContinuityAuthority(operatorAuthority);
+  const prd = repairArtifact(observed.root, input.planPath, "operator-confirmed PRD");
+  const spec = repairArtifact(observed.root, input.specPath, "operator-confirmed specification");
+  const continuity = {
+    schema: "pipeline.continuity.v0",
+    featureId: input.featureId,
+    revision: 0,
+    runtime: {
+      humanFacingLanguage: input.language,
+      activeDuty: "Coordinator",
+      sessionCleanup: null,
+    },
+    authority: {
+      prd,
+      spec,
+      result: null,
+    },
+    queueHead: {
+      packageId: "continuity-adoption",
+      actionId: "review-active-feature",
+      nextAction: "review",
+      productRetryCount: 0,
+      environmentRerouteCount: 0,
+      dispatch: null,
+    },
+    blocker: null,
+    acknowledgedFinal: null,
+    resume: {
+      mode: "immediate",
+      sourceRevision: 0,
+      reasonCode: "active-turn",
+    },
+    recovery: null,
+    decisionTxn: null,
+    capacity: {
+      concurrencyLimit: 4,
+      reservedCriticSlots: 1,
+      reservedRecoverySlots: 1,
+      fallbackPolicy: "defer",
+    },
+  };
+  if (!validateContinuityState(continuity, input.featureId).ok) {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", "operator-confirmed continuity adoption is invalid");
+  }
+  // Deliberately re-enters the design phase rather than claiming an existing
+  // PO-approval this operator input never evidenced: `establishedContinuity()`
+  // requires a `planApproval.poGateAuthority` record already present in the
+  // (present) state it repairs, which by construction cannot exist here --
+  // `pipeline-state.json` itself is absent. Asserting `planApproved: true`
+  // without that evidence would be exactly the fabrication this repair case is
+  // forbidden from committing, so the synthesized state mirrors a fresh
+  // kickoff's own resting point (`phase: "design"`, `planApproved: false`)
+  // instead, and leaves re-approval to submit-plan/approve-plan.
+  const state = {
+    schema: "pipeline.state.v0",
+    activeFeature: {
+      id: input.featureId,
+      planPath: input.planPath,
+      phase: "design",
+    },
+    planApproved: false,
+    continuity,
+  };
+  const readback = projectReadContinuityStatus({ status: "ok", state });
+  if (readback.code !== "CS-STATUS-ACTIVE" || readback.continuity.status !== "valid") {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", "operator-confirmed state does not pass sanctioned readback");
+  }
+  return {
+    reason: "adopt-operator-confirmed-authority",
+    state,
+    authority: { prd, spec },
+  };
+}
+
 function normalizedContinuity(state, observed) {
   const current = state.continuity;
   if (!isObject(current)
@@ -877,9 +1004,15 @@ function continuityRepairBinding(plan) {
 }
 
 /**
- * Plan only two bounded repairs:
- * - normalize the invalid resume-on-next-turn/active-turn pair; or
- * - add continuity to an established pre-continuity state carrying PO authority.
+ * Plan three bounded repairs:
+ * - normalize the invalid resume-on-next-turn/active-turn pair;
+ * - add continuity to an established pre-continuity state carrying PO authority; or
+ * - adopt operator-confirmed authority for a mature project whose
+ *   `pipeline-state.json` is absent while its configured handover is real. This
+ *   third case is never resolved automatically: absent `operatorAuthority` yields
+ *   `status: "operator-authority-required"` instead of a plan, so the caller can
+ *   surface a `collect-input` ask rather than the flat "unsupported" dead end
+ *   every other unrepairable shape still returns.
  *
  * Arbitrary malformed state, authority drift, and missing kickoff history are
  * never re-signed by this compatibility path.
@@ -888,17 +1021,23 @@ export function planOnboardingContinuityRepair({
   rootDir,
   repositoryCapability = "local",
   spawn = defaultGitSpawn,
+  operatorAuthority = null,
 } = {}) {
   let observed;
   try {
     observed = observeDetailed({ rootDir, repositoryCapability, spawn });
-    if (observed.continuity.status !== "damaged"
-      || observed.stateObservation?.status !== "present"
-      || observed.handoverObservation?.status !== "present") {
+    if (observed.continuity.status !== "damaged" || observed.handoverObservation?.status !== "present") {
       return { schema: CONTINUITY_REPAIR_PLAN_SCHEMA, status: "unsupported" };
     }
     let proposed;
-    if (observed.projected?.code === "CS-STATUS-CONTINUITY-INVALID") {
+    if (observed.stateObservation?.status === "absent") {
+      if (operatorAuthority === null) {
+        return { schema: CONTINUITY_REPAIR_PLAN_SCHEMA, status: "operator-authority-required" };
+      }
+      proposed = operatorConfirmedContinuity(observed, operatorAuthority);
+    } else if (observed.stateObservation?.status !== "present") {
+      return { schema: CONTINUITY_REPAIR_PLAN_SCHEMA, status: "unsupported" };
+    } else if (observed.projected?.code === "CS-STATUS-CONTINUITY-INVALID") {
       proposed = normalizedContinuity(observed.state, observed);
     } else if (observed.projected?.code === "CS-STATUS-ACTIVE-NO-CONTINUITY"
       && observed.historyObservation.status === "absent") {
@@ -958,13 +1097,14 @@ export function applyOnboardingContinuityRepair({
   repositoryCapability = "local",
   expectedPlanSha256,
   activate = false,
+  operatorAuthority = null,
   deps = {},
 } = {}) {
   if (activate !== true) {
     fail("CONTINUITY-REPAIR-ACTIVATION-REQUIRED", "continuity repair requires explicit activation");
   }
   const spawn = deps.spawn ?? defaultGitSpawn;
-  const plan = planOnboardingContinuityRepair({ rootDir, repositoryCapability, spawn });
+  const plan = planOnboardingContinuityRepair({ rootDir, repositoryCapability, spawn, operatorAuthority });
   if (plan.status !== "ready"
     || !SHA256_RE.test(expectedPlanSha256 ?? "")
     || plan.planSha256 !== expectedPlanSha256
@@ -985,7 +1125,7 @@ export function applyOnboardingContinuityRepair({
   let temporaryRecord;
   let committed = false;
   try {
-    const current = planOnboardingContinuityRepair({ rootDir, repositoryCapability, spawn });
+    const current = planOnboardingContinuityRepair({ rootDir, repositoryCapability, spawn, operatorAuthority });
     if (current.status !== "ready" || current.planSha256 !== plan.planSha256) {
       fail("CONTINUITY-REPAIR-CAS-DRIFT", "continuity repair preimage changed");
     }
@@ -999,7 +1139,16 @@ export function applyOnboardingContinuityRepair({
     );
     const stateBytes = expectedStateBytes(plan.target.value);
     temporaryRecord = writeExclusiveSynced(temporary, stateBytes, 0o600);
-    if (sha256(readPhysicalFile(statePath, "Pipeline machine state")) !== plan.target.beforeSha256) {
+    // `beforeSha256 === null` means the plan itself was built over an ABSENT
+    // state file (the operator-confirmed-authority case): `readPhysicalFile`
+    // would throw ENOENT rather than fail with a typed CONTINUITY-REPAIR code,
+    // so absence is checked directly instead of read-and-hashed. Every other
+    // repair case still always carries a real preimage digest here, unchanged.
+    if (plan.target.beforeSha256 === null) {
+      if (existsSync(statePath)) {
+        fail("CONTINUITY-REPAIR-CAS-DRIFT", "continuity repair state preimage changed");
+      }
+    } else if (sha256(readPhysicalFile(statePath, "Pipeline machine state")) !== plan.target.beforeSha256) {
       fail("CONTINUITY-REPAIR-CAS-DRIFT", "continuity repair state preimage changed");
     }
     renameSync(temporary, statePath);
