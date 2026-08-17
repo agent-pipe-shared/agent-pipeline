@@ -7360,6 +7360,12 @@ The PO's Stop-hook pushed back correctly on the previous section's decision not 
 
 **What remains open, unchanged from the last full accounting:** `NVA-A8-5` (PO-run pilot, textually cannot be closed any other way) is still the one genuine remaining blocker for a valid Nova A E1 receipt. The A7 gate ceremony's own comprehensive Critic review is still only partial (7 of ~40 named files/artifacts examined before its coordinator-directed stop) — worth a proper continuation at some point, though it already paid for itself by surfacing the real tier-fix bug. ADR-0065 candidate (c), `#98` R4, the two deferred architectural items, the marketplace refresh, and the GMW-reconcile item are all unchanged from their prior status. No push.
 
+## 2026-08-17 (continued 6) — continuing the A7 gate review's remaining scope, per the PO's correct pushback
+
+The Stop-hook correctly pushed back on treating the tier-fix thread's closure as "done" for the standing mandate: the comprehensive Slice A7 gate review that found that real bug only examined 7 of ~40 named files/artifacts before its first attempt truncated (own words: "the coordinator directed an early stop at ~35 of 150 tool uses"). Continuing it is the highest-value remaining action — it already paid for itself once.
+
+**Dispatched a continuation covering the disjoint remainder:** the 6 guard hooks (`guard-lifecycle-ready.mjs`, `guard-testpath.mjs`, `guard-git.mjs`, `guard-gate-strength.mjs`, `guard-push.mjs`, `codex-pretool-guard.mjs`), the GMW files, `critical-action-authorization.mjs`, `critical-human-proof-policy.mjs`, `po-human-approval.mjs`, plus `specs/sprint-nova-epic/acceptance.md` and all 16 per-issue evidence artifacts not yet examined. Same file-set-standing-in-for-a-commit-range framing as the first A7 dispatch, since the underlying 838+-commit-range problem is unchanged. **First construction attempt blocked again** by `guard-dispatch.mjs`'s `DISPATCH-CONTAMINATION-CLAIMS-LIST` check — a "does each guard's own documented invariant actually hold on inspection" aside inside hunt category 7 was, correctly, a claims-to-verify list, the identical mistake class from the first A7 dispatch's own two earlier blocks. Stripped back to the unmodified template's own ten hunt categories verbatim, second attempt accepted cleanly. **In flight — result not yet known.**
+
 ## Re-entry
 
 1. Maintainers start with [`CLAUDE.md`](../CLAUDE.md).
