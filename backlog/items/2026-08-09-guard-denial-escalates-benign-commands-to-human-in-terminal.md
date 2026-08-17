@@ -59,7 +59,18 @@ agent-executable path, not as a universal wrapper around every refusal.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Rationale:** matches Nightwing's scope ("product experience: onboarding
+  ... low-friction adoption") — session-ergonomics friction during ordinary
+  agent work (a benign, agent-executable-recoverable denial escalating to a
+  full manual human-in-terminal ceremony). Re-checked current
+  `codex-pretool-guard.mjs`: the `HGO-EXTERNAL-REPOSITORY-OBSERVATION`
+  fallback path (`:571-572`) and the `external-operator-required` escalation
+  it feeds (`:393`, `:482`) still exist unchanged. Root cause (why
+  `guard-human-override.mjs`'s `physicalRoot()`/`topology()` throws
+  `HGO-GIT`/`HGO-ROOT`/`HGO-COMMON-DIR` on the reporting WSL host) was not
+  re-investigated here — it needs the same host/repo combination to
+  reproduce, which this pass did not have. Not blocking current work.
+- **Assignment (if accepted):** next available Nightwing slot — start with
+  the item's own unresolved root-cause question before any fix.
+- **Date:** 2026-08-17

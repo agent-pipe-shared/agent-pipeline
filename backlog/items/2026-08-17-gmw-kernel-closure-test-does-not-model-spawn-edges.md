@@ -63,7 +63,12 @@ Not designed here. Two directions worth weighing when this is picked up:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Alfred.
+- **Rationale:** matches Alfred's scope ("mechanical governance, measurable
+  rigor, and control integrity") precisely — extending a kernel
+  transitive-closure check to a second edge type (process-spawn, alongside
+  the existing static-import walk). The item's own "Why this is minor, not
+  major" section already establishes no demonstrated live exploit path;
+  confirmed not blocking current Nova/Phoenix delivery.
+- **Assignment (if accepted):** next available Alfred slot.
+- **Date:** 2026-08-17

@@ -77,7 +77,23 @@ Not designed here. At minimum:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Alfred. Re-verified live,
+  2026-08-17: `node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs`
+  still fails at the exact assertion this item describes
+  (`harness/review-protocol.md` SHA-256 mismatch, actual
+  `184a5140...` vs expected `624852e5...`), and the suite is still absent
+  from `harness/scripts/verify.mjs` (`grep` for
+  `codex-isolated-critic-protected-preimage` in that file: no match) — both
+  facts unchanged since filing.
+- **Rationale:** matches Alfred's scope ("mechanical governance, measurable
+  rigor, and control integrity") precisely — this is a protected-preimage
+  baseline for the Critic isolation mechanism itself. Real but not
+  near-term-blocking: the drift has existed since baseline creation
+  (`a6cafed5`, 2026-08-01) without being exploited or noticed via any live
+  gate, and the item's own "Direction" already correctly scopes this as
+  investigation-before-fix (distinguishing drifted vs never-valid entries),
+  not a same-session patch.
+- **Assignment (if accepted):** next available Alfred slot — dedicated
+  `goldfish-deep` investigation plus Critic review, per the item's own
+  Direction section.
+- **Date:** 2026-08-17

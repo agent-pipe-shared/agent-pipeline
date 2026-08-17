@@ -56,7 +56,17 @@ seed-through-kickoff sequence. Not reproducible in this repository.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Rationale:** matches Nightwing's scope ("product experience: onboarding
+  ... low-friction adoption") precisely — an onboarding disclosure-accuracy
+  defect. Re-checked current `plan()` logic (`project-onboarding-v3.mjs:3827`,
+  `initializesGit = !hostManaged && (inspected.status === "fresh" ||
+  !inspected.entries.includes(".git"))`) without being able to reproduce the
+  exact reported state combination without a live fresh-directory run — the
+  item's own "not reproducible in this repository" stands. Not blocking
+  current work; the underlying inconsistency (if it still exists) needs a
+  fresh greenfield onboarding run to pin down, which is exactly the kind of
+  hands-on onboarding verification Nightwing's slot is for.
+- **Assignment (if accepted):** next available Nightwing slot — start with a
+  fresh-directory onboarding run per the item's own Direction step 1.
+- **Date:** 2026-08-17
