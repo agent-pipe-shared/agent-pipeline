@@ -20,6 +20,32 @@
  * without fabricating a verifier pass (which this consumer has no real
  * capability to produce). A real failure is an acceptable, honestly reported
  * result (briefing NVA-A1214-EXEC-01, field 3/4).
+ *
+ * USAGE (briefing NVA-A1214-SUCCESS-1). The fixture exit code above used to be
+ * a literal, so selecting any other real outcome meant editing this file:
+ *
+ *   node plugins/pipeline-core/scripts/execution-plane-launch.mjs
+ *   node plugins/pipeline-core/scripts/execution-plane-launch.mjs --fixture-exit-code 0
+ *   node plugins/pipeline-core/scripts/execution-plane-launch.mjs --fixture-exit-code=0
+ *
+ * The flag is purely additive: with NO flag the fixture exit code is still
+ * DEFAULT_FIXTURE_EXIT_CODE (7), so the sealed failure-path evidence that
+ * NVA-A1214-EXEC-01 cites stays reproducible byte-for-byte. An unrecognized
+ * argument or an out-of-range value FAILS CLOSED rather than falling back to
+ * the default -- silently sealing evidence under the wrong exit code is the
+ * one failure this parameter must not be able to cause.
+ *
+ * WHAT --fixture-exit-code 0 ACTUALLY REACHES, stated plainly because it is a
+ * property of the frozen contract and not of this flag: exit code 0 makes the
+ * real worker record "completed", which normalizeRealExecutionOutcome maps to
+ * "succeeded-unverified" (execution-plane-contract.mjs ~L213). That is a real
+ * success-path observation, but it is NOT in that file's TERMINAL set, and
+ * scheduling-lifecycle.mjs's terminal-outcome vocabulary admits only
+ * {"verified"} u TERMINAL_STATE (~L130). Step 5 below therefore rejects it --
+ * correctly. Reaching "verified" needs a real verifier pass this consumer
+ * cannot produce, and asserting one would be exactly the fabrication the
+ * paragraph above refuses. The flag exposes the choice; it does not, and must
+ * not, invent the authority the contract is missing.
  */
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
@@ -28,6 +54,7 @@ import { homedir, uptime } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { createLocalWorkerPool } from "../lib/local-worker-pool.mjs";
 import {
   LOCAL_WORKER_SUPERVISOR_REQUEST_SCHEMA,
@@ -54,6 +81,66 @@ const GIT = realpathSync("/usr/bin/git");
 const NODE = realpathSync(process.execPath);
 const REPO_ROOT = realpathSync(join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".."));
 const ADR_PATH = join(REPO_ROOT, "docs", "adr", "0062-production-execution-and-selected-sandbox-launch.md");
+
+/**
+ * The fixture exit code used when no flag is passed. 7 is the ORIGINAL literal
+ * and stays the default on purpose: it is what the sealed failure-path
+ * artifact under specs/sprint-nova-epic/evidence/nova-a/a4/ was produced with,
+ * and what the issue-acceptance matrix cites. Changing it would silently
+ * invalidate that citation.
+ */
+export const DEFAULT_FIXTURE_EXIT_CODE = 7;
+export const FIXTURE_EXIT_CODE_FLAG = "--fixture-exit-code";
+/** The supervisor's own validated bound for this field (local-worker-supervisor.mjs: safeInteger(fixture.exitCode, 0, 125)). */
+export const FIXTURE_EXIT_CODE_MIN = 0;
+export const FIXTURE_EXIT_CODE_MAX = 125;
+
+/**
+ * The whole CLI surface: one flag, both spellings, everything else refused.
+ *
+ * Deliberately NOT a general argument parser and deliberately not tolerant.
+ * Ignoring an unrecognized argument would mean `--fixture-exitcode 0` (typo)
+ * silently seals an evidence artifact recording exit code 7 while its filename
+ * and the operator's memory both say 0 -- an evidence-integrity failure, not a
+ * usability one. Every rejection names the offending token.
+ *
+ * @param {string[]} argv  arguments AFTER the script path, i.e. process.argv.slice(2)
+ * @returns {number} the selected fixture exit code
+ */
+export function parseFixtureExitCode(argv = process.argv.slice(2)) {
+  if (!Array.isArray(argv)) throw new Error("CLI-ARGV-SHAPE");
+  let raw = null;
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (typeof arg !== "string") throw new Error("CLI-ARGV-SHAPE");
+    if (arg === FIXTURE_EXIT_CODE_FLAG) {
+      if (index + 1 >= argv.length) throw new Error(`CLI-MISSING-VALUE:${FIXTURE_EXIT_CODE_FLAG}`);
+      raw = argv[index + 1];
+      index += 1;
+      continue;
+    }
+    if (arg.startsWith(`${FIXTURE_EXIT_CODE_FLAG}=`)) {
+      raw = arg.slice(FIXTURE_EXIT_CODE_FLAG.length + 1);
+      continue;
+    }
+    throw new Error(`CLI-UNKNOWN-ARGUMENT:${arg}`);
+  }
+  if (raw === null) return DEFAULT_FIXTURE_EXIT_CODE;
+  if (!/^(?:0|[1-9][0-9]*)$/u.test(raw)) throw new Error(`CLI-INVALID-VALUE:${raw}`);
+  const value = Number(raw);
+  if (value < FIXTURE_EXIT_CODE_MIN || value > FIXTURE_EXIT_CODE_MAX) throw new Error(`CLI-OUT-OF-RANGE:${raw}`);
+  return value;
+}
+
+/**
+ * The runner fixture block, unchanged in every field except the one this
+ * dispatch parameterized. Kept as its own function purely so the "no flag
+ * still means exactly the old literal" claim is a unit assertion rather than a
+ * reading of the diff.
+ */
+export function buildRunnerFixture(exitCode) {
+  return { delayMs: 200, exitCode, behavior: "none" };
+}
 
 function git(args, cwd) {
   return execFileSync(GIT, args, {
@@ -102,7 +189,7 @@ function buildFixtureRepo() {
   return { root, sourceRoot: realpathSync(sourceRoot), stateBase, commit, tree };
 }
 
-async function main() {
+async function main({ fixtureExitCode = DEFAULT_FIXTURE_EXIT_CODE } = {}) {
   const fixture = buildFixtureRepo();
   const log = { steps: [] };
   try {
@@ -189,7 +276,7 @@ async function main() {
       supervisor: { subject: "nova-a1214-exec-01", ownerNonce: "supervisor-owner", heartbeatMs: 1_000, orphanAfterMs: 3_000, cleanupLeaseMs: 60_000, recoveryReserve: 1 },
       git: { executable: GIT, executableSha256: sha256File(GIT) },
       pool,
-      runner: { kind: "fixture", executable: NODE, executableSha256: sha256File(NODE), model: null, effort: null, timeoutMs: 5_000, maxOutputBytes: 65_536, fixture: { delayMs: 200, exitCode: 7, behavior: "none" } },
+      runner: { kind: "fixture", executable: NODE, executableSha256: sha256File(NODE), model: null, effort: null, timeoutMs: 5_000, maxOutputBytes: 65_536, fixture: buildRunnerFixture(fixtureExitCode) },
       workers: [worker],
     };
 
@@ -301,7 +388,15 @@ function sealEvidence(outcome) {
   return evidencePath;
 }
 
-const outcome = await main();
-const evidencePath = sealEvidence(outcome);
-process.stdout.write(`${JSON.stringify({ ok: outcome.ok, finalState: outcome.finalExecutionState.state, steps: outcome.log.steps.length, evidencePath })}\n`);
+// Run only as the process entrypoint (lib/entrypoint.mjs, the plugin's one
+// spelling of this check -- symlink-safe). Before this dispatch the run was
+// unconditional at module load, so importing the file for ANY reason spawned a
+// real child process and sealed an evidence artifact; a test could not reach
+// parseFixtureExitCode without that side effect. Invoked as
+// `node execution-plane-launch.mjs` the behaviour is unchanged.
+if (isDirectInvocation(import.meta.url)) {
+  const outcome = await main({ fixtureExitCode: parseFixtureExitCode(process.argv.slice(2)) });
+  const evidencePath = sealEvidence(outcome);
+  process.stdout.write(`${JSON.stringify({ ok: outcome.ok, finalState: outcome.finalExecutionState.state, steps: outcome.log.steps.length, evidencePath })}\n`);
+}
 export { main };
