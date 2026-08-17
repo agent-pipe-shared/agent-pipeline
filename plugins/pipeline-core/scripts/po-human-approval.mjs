@@ -254,6 +254,15 @@ function executeHumanApproval(args, dependencies = {}) {
     command("openssl", ["genpkey", "-algorithm", "ED25519", "-aes-256-cbc", "-out", paths.privateKey], dependencies);
     command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
     const authority = publicKeyPolicy(read(paths.publicKey, "utf8"), args.keyReference); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
+    // Privacy-hygiene nudge (H-AC-11 O-4): fires only on this fresh-key-creation
+    // branch and only when the operator chose a non-default --key-reference; the
+    // GMW/human-ledger design cannot fully decouple this key reference from the
+    // portable record, so a value that uniquely identifies the operator as a
+    // natural person is a real, proven privacy concern here. Advisory only; it
+    // never blocks, fails, or alters the returned result object.
+    if (args.keyReference !== "local-po-key") {
+      process.stdout.write(`NOTE: --key-reference "${args.keyReference}" may uniquely identify you as a natural person; consider a less individually-attributable value (H-AC-11 O-4).\n`);
+    }
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority };
   }
   if (args.command === "prepare" || args.command === "prepare-critical") {

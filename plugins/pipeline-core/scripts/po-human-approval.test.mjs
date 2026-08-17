@@ -84,6 +84,105 @@ function cleanup({ repoRoot, directory }) {
   rmSync(directory, { recursive: true, force: true });
 }
 
+/**
+ * `setup`'s fresh-key-creation branch shells out to a real, interactive
+ * `openssl genpkey -aes-256-cbc` that blocks on a passphrase this test cannot
+ * supply. This fake `spawn` dependency intercepts only that one call and
+ * generates an unencrypted key at the same `-out` path instead (fine for a
+ * test-only key that is discarded with the fixture directory); the following
+ * `pkey -pubout` call needs no passphrase and runs through unmodified.
+ */
+function fakeSetupSpawn(executable, args) {
+  if (executable === "openssl" && args[0] === "genpkey") {
+    const outIndex = args.indexOf("-out");
+    const result = spawnSync("openssl", ["genpkey", "-algorithm", "ED25519", "-out", args[outIndex + 1]], { stdio: "pipe" });
+    return { status: result.status };
+  }
+  const result = spawnSync(executable, args, { stdio: "pipe" });
+  return { status: result.status };
+}
+
+function captureStdout(fn) {
+  const original = process.stdout.write.bind(process.stdout);
+  let captured = "";
+  process.stdout.write = (chunk, ...rest) => { captured += chunk; return original(chunk, ...rest); };
+  try {
+    fn();
+  } finally {
+    process.stdout.write = original;
+  }
+  return captured;
+}
+
+test("setup fresh-key creation with a custom --key-reference prints the H-AC-11 O-4 privacy nudge", () => {
+  const dirs = fixtureDirs();
+  try {
+    const output = captureStdout(() => {
+      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name"], { spawn: fakeSetupSpawn });
+      assert.equal(result.ok, true);
+      assert.equal(result.authority.keyReference, "roa-full-name");
+      assert.equal("recovered" in result, false);
+    });
+    assert.match(output, /--key-reference/u);
+    assert.match(output, /H-AC-11 O-4/u);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("setup fresh-key creation with the default --key-reference (local-po-key) does not print the nudge", () => {
+  const dirs = fixtureDirs();
+  try {
+    const output = captureStdout(() => {
+      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn });
+      assert.equal(result.ok, true);
+      assert.equal(result.authority.keyReference, "local-po-key");
+    });
+    assert.equal(output, "");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("setup's recovered branch (private+public key exist, no authority yet) does not print the nudge even with a custom --key-reference", () => {
+  const dirs = fixtureDirs();
+  try {
+    // First run creates the key pair with the default reference; drop the
+    // authority file it wrote so the next `setup` call takes the "recovered"
+    // branch (privateKey && publicKey && !authority).
+    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn });
+    rmSync(join(dirs.directory, "trust-policy.json"), { force: true });
+    const output = captureStdout(() => {
+      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name"], { spawn: fakeSetupSpawn });
+      assert.equal(result.ok, true);
+      assert.equal(result.recovered, true);
+      assert.equal(result.authority.keyReference, "roa-full-name");
+    });
+    assert.equal(output, "");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("setup's already-exists branch (matching trust policy already present) does not print the nudge even with a custom --key-reference", () => {
+  const dirs = fixtureDirs();
+  try {
+    // First run creates the key pair and an authority bound to a custom
+    // reference; a second `setup` call with the SAME reference must take the
+    // "already exists" branch (all three present, values match).
+    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name"], { spawn: fakeSetupSpawn });
+    const output = captureStdout(() => {
+      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name"], { spawn: fakeSetupSpawn });
+      assert.equal(result.ok, true);
+      assert.equal(result.recovered, false);
+      assert.equal(result.authority.keyReference, "roa-full-name");
+    });
+    assert.equal(output, "");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("sign-intent fails closed before setup (no key material present)", () => {
   const dirs = fixtureDirs();
   try {
