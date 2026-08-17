@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "70dece4128a61448d1c2bdd05b114ff76798cb7b3d4d3ee519ff3abd0d65cd3d"
+    "transitionHead": "1b890c9025f7657b514ec346e5f3ec8b0bcf04d113317be8857b6c7a65c3f394"
   },
   "counts": {
-    "open": 98,
+    "open": 101,
     "in_progress": 22,
     "closed": 127
   },
@@ -776,6 +776,14 @@
       "closureEvidence": "backlog/items/2026-08-10-git-identity-ask-step-unreachable-through-live-cli-path.md"
     },
     {
+      "id": "pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "PO, 2026-08-17, live Codex happy-path restart test: 'ausserdem fragt er zwar früh daten zu git identitäten etc ab aber versucht diese dann vor readiness zu setzen, das sollte er nicht. abfragen ist gut aber nicht das setzen so früh.' (Codex correctly asks early for git identity data, but then tries to SET it before readiness — that should not happen; asking early is fine, setting that early is not.)"
+    },
+    {
       "id": "pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation",
       "status": "closed",
       "type": "defect",
@@ -1441,6 +1449,14 @@
       "source": "PO, 2026-08-16: 'Wichtiger ist aber, dass die pipeline auch im user projekt dafür sorgt das die richtigen tests entstehen und sie anwendet.' Raised while discussing why a hosted project's verify gate can be satisfied without checking anything."
     },
     {
+      "id": "pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Confirmed live on Toolbox post-vendor-sync: observation-governance-bootstrap.mjs --root D:\\Dev\\Web\\Toolbox returns {\"status\":\"failed\",\"sourceCheckout\":true,\"code\":\"OGB-CHECKER-MISSING\"}. Not currently blocking anything (not wired into the PreToolUse guard, only into pipeline-start's own happy-path checklist step)."
+    },
+    {
       "id": "pipeline.observation-intake-document-governance",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2002,6 +2018,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "SCRATCH-1 dispatch, 2026-08-08, reported as its own open item. The PO had asked the question directly the same night: 'hoffe nur es gibt einen Event der die Sachen auch wieder aufräumt'."
+    },
+    {
+      "id": "pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Live-reproduced on that machine: po-gate-profile-repair.mjs apply failed repeatedly with PO-PROFILE-RECEIPT-WRITE-FAILED until the reporting session manually ran hardenWindowsPrivateDirectory('.git/agent-pipeline') from a diagnostic script, which fixed the ACL and let the repair succeed immediately after. Not currently blocking Toolbox (worked around live)."
     },
     {
       "id": "pipeline.security-scan-cross-branch-gitleaks-findings",
