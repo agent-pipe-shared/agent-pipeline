@@ -6,5 +6,8 @@
     "publication"
   ],
   "waivedKinds": [],
-  "trustAnchors": []
+  "trustAnchors": [
+    { "keyReference": "local-po-key", "publicKeySha256": "f28988b21c670c4b958a534e82fef485195ab1abc74df1a41772c9b58c73db14" },
+    { "keyReference": "local-po-key", "publicKeySha256": "2de20a39d0f1c13c15350e428ea0c70be50f8fbca26ec88758a8dcb1a880beee" }
+  ]
 }
