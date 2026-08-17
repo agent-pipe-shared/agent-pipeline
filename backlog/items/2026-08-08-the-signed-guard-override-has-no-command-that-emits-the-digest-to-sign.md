@@ -122,4 +122,13 @@ which would remove the need for this ceremony to run at all in the push case.
 Build now, together with the sibling item
 `2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md`,
 as one consolidated single-entry-point ceremony (per that item's own
-"Direction" section) — before this repository's own next push. Dispatched.
+"Direction" section) — before this repository's own next push.
+
+**Correction, 2026-08-17 (later the same day):** the "Dispatched." note above
+was written prematurely — no dispatch record or commit for it exists.
+Actually dispatched now as `NVA-SIGENTRY-1`, scoped to this item's own core
+ask (extract the shared intent-building recipe, add a CLI command that
+emits the signable digest, teach the signing describer to resolve an HGO
+selection) — the single-entry-point wrapper script and the sibling item's
+disclosure/robustness findings are explicitly out of this dispatch's scope,
+tracked as follow-ups.

@@ -201,4 +201,17 @@ Build now, together with the sibling item
 `2026-08-08-the-signed-guard-override-has-no-command-that-emits-the-digest-to-sign.md`,
 per this item's own "Direction" section (single entry point first; then
 disclosure fixes 2/3/8; then finding 6's separate store-robustness fix) —
-before this repository's own next push. Dispatched.
+before this repository's own next push.
+
+**Correction, 2026-08-17 (later the same day):** the "Dispatched." note above
+was written prematurely — no dispatch record or commit for it exists.
+Dispatch `NVA-SIGENTRY-1` now covers the sibling item's core ask (the
+digest-emission/describer half of "the single entry point"), which
+addresses this item's finding 7 (sign-intent now names the resolved
+request via the describer fix) and lays groundwork for finding 3 (a
+resolvable HGO digest no longer falls into the "cannot describe" branch).
+Findings 1, 2, 5, 6, 8, and the full standalone orchestrating wrapper
+script are NOT covered by NVA-SIGENTRY-1 — still open, tracked as
+follow-ups (a candidate `NVA-SIGDISCLOSE-1` for 2/6/8 plus the humanName
+message split, to run after NVA-SIGENTRY-1 lands to avoid touching
+`po-human-approval.mjs` concurrently).
