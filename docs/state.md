@@ -7,6 +7,22 @@
 
 ---
 
+## CHECKPOINT — 2026-08-17, continued again (19): R-AC-06 producer dispatched and landed, verdict deliberately left partial (real architecture gap flagged for PO); context severely overdue for /compact (READ THIS FIRST)
+
+**R-AC-06 producer built and independently re-verified.** `PHX-WP-RAC06` (goldfish-implementor, template-built briefing per the guard-dispatch check that correctly rejected an earlier freehand attempt) built `recordCommandUserAcknowledgement` (`external-command-offer.mjs`) — appends a schema-valid event for `acknowledged`/`authorized`/`copied`, anchored to the prior `offered` event via `sameOffer`, following the file's existing append/duplicate discipline exactly. Independently re-verified by the Elephant: read the new function directly (matches the claimed shape), re-ran `node --test external-command-offer.test.mjs` myself — 50/50 pass, exit 0 — and confirmed `COMMAND_STATES` (`agent-decision-journal.mjs`) was left untouched, `displayed`/`generated`/`asserted` still absent as claimed. Commit `ddcda3f6`.
+
+**Verdict deliberately stays `partial` — a judgment call worth flagging, not an incomplete dispatch.** The dispatch built the reachable half (acknowledged/authorized/copied) but correctly declined to flip `VERDICTS['R-AC-06']` to `implemented`: R-AC-06's text names 6 states, and 3 (`displayed`/`generated`/`asserted`) have zero schema representation anywhere — confirmed absent, not just unproduced. Flipping to implemented would have overclaimed a criterion whose full text still isn't satisfiable. This is the same disposition class as L-AC-01/PX0-AC-13/H-AC-11: a genuine, disclosed architecture gap needing a PO decision (scope the criterion down via an acceptance.md amendment, or decide the 3 missing states are actually needed and design a schema extension), not a code fix to rush. **PO decision open: how should R-AC-06's remaining 3 states be resolved?**
+
+**Full Verify + security-scan re-run at `ddcda3f6` (dispatched via `run_in_background` throughout this checkpoint to conserve the already-very-large session context):** exactly the same 5 known reds, no regression. Security CLEAN. Evidence copied back to the primary tree's `evidence/` (gitignored).
+
+**Totals unchanged: 147 implemented / 9 partial / 1 constraint = 157, 10 open** (R-AC-06 stays partial, as intended).
+
+**Context is severely overdue for `/compact`** (610k+ at last check, repeatedly flagged to the PO across many turns, not yet run). Everything material is persisted here; nothing is at risk, but this is now well past the point where continuing in the same window is prudent — the next available natural break should be taken.
+
+**Next steps:** the PO decision on R-AC-06's remaining 3 states (flagged above) is the only concrete open question for the newly-touched item; otherwise E-AC-08, E-AC-19, C-AC-13 remain from the EPIC-AC-04 audit (all need real capability/content work, none quick). All future dispatches: no `model` override on the Goldfish/Critic system — this checkpoint's dispatch used the template-enforced default (`claude-sonnet-5`/medium) after an initial freehand attempt was correctly blocked by `guard-dispatch`. All chat/AskUserQuestion text in German.
+
+---
+
 ## CHECKPOINT — 2026-08-17, continued again (18): L-AC-08 CLOSED, the 9th finding fixed (147/157 implemented); context critically overdue for /compact (READ THIS FIRST)
 
 **L-AC-08 closed.** `docs/governance-replay.md`'s Fields section gained real, grounded entries for `correlation.correlationId` and `correlation.queueRevision`, read directly from where each field is actually populated (`pipeline-state.mjs:2232-2234`, `control-execution-lifecycle-event.mjs:163`) rather than guessed — `correlationId` traced to "a caller holding only the orchestrator's own correlation token can still find every event for that invocation," `queueRevision` traced to the same candidate-binding discipline `candidate.commit`/`.tree` already use. All 6 required correlation fields and 8 of 9 kinds now traced. Verdict flips back to `implemented`. Commit `32734cda`. Full Verify + security-scan re-run at that commit (both dispatched via `run_in_background` this checkpoint to keep the already-huge session context from growing further): exactly the same 5 known reds, Security CLEAN, no regression.
