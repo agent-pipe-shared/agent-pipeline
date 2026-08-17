@@ -1,0 +1,37 @@
+{
+  "schema": "pipeline.critic-findings-registry.v1",
+  "sourceReview": "specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md",
+  "sourceCandidate": "8be6c308ffd5330efce855b3686019f58c9965db",
+  "findings": [
+    {
+      "id": "F1",
+      "severity": "major",
+      "gap": "ownedSections items are validated against TARGET_REF (^[a-z][a-z0-9-]{2,63}$) while the compared value, desired.changes[].field, is validated against ID (^[A-Za-z0-9][A-Za-z0-9._:-]{0,255}$) -- any field name with an uppercase letter, dot, underscore, colon or leading digit is unrepresentable in policy and permanently rejected.",
+      "specRef": "P-AC-11"
+    },
+    {
+      "id": "F2",
+      "severity": "major",
+      "gap": "the recorded reason for leaving lifecycleEvents unenforced (\"disjoint vocabularies for different concepts\") is contradicted by the code: LIFECYCLE_EVENTS and FEATURE_STATES share four values verbatim (completed, superseded, abandoned, retained).",
+      "specRef": "P-AC-11, guardrails/global.md GL-08"
+    },
+    {
+      "id": "F3",
+      "severity": "blocker",
+      "gap": "four deliberately deferred P-AC-11 dimensions (lifecycleEvents, previewRequired, retention, conflictPolicy) ship declarable and inert with no owner and no expiry recorded anywhere in the repository.",
+      "specRef": "P-AC-11, governance/examples/policies/checklist.md item 8, guardrails/quality-gates.md QG-06"
+    },
+    {
+      "id": "F4",
+      "severity": "minor",
+      "gap": "the new ownedSections gate calls .includes() on entry.ownedSections with no shape check, unlike planExternalReferenceWrite's other checks which coerce a wrong-shaped value defensively; a string value degrades ownership into a substring test and null throws an untyped TypeError.",
+      "specRef": "P-AC-11"
+    },
+    {
+      "id": "F5",
+      "severity": "minor",
+      "gap": "docs/organization-policy-packs.md's exhaustive merge-algebra enumeration was not updated for the candidate's new hard-fail path and two new merge rules.",
+      "specRef": "P-AC-11"
+    }
+  ]
+}
