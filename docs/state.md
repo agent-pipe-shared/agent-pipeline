@@ -3,7 +3,29 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-17
+**Last updated:** 2026-08-18
+
+---
+
+## CHECKPOINT — 2026-08-18 (29): Class B is now EMPTY — A-AC-01 was a stale `build`-class entry, reclassified `po`; Sprint Phoenix has zero remaining agent-buildable acceptance criteria, only 5 Class-P (PO-gated) items left (READ THIS FIRST)
+
+**In response to a Stop-hook challenge that the prior checkpoint's "nothing further agent-actionable" claim lacked fresh evidence, re-swept from scratch rather than repeating the assertion — and found a real, previously-undiscovered bug.**
+
+`specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`'s `CLOSURE` table (the data source for `--mode closure`, the doc that sequences the epic's remaining work into Class A/D/S/B/P) still listed `A-AC-01` as `['build', 'WP-A']` — an absent capability this session can implement. But its own `POINTERS` entry, already on file from earlier this session, documents the opposite: the design doc's own explicit precondition-not-met guidance ("if no Claude host adapter can supply `pipelineMainSessionRoute`, this step ... should be deferred rather than built") and a prior fresh grep confirming zero real producers exist. That is exactly the `po` class's own definition ("a proved impossibility"), not `build`'s. `H-AC-11` and `L-AC-01` had both already been correctly reclassified `build`→`po` earlier this session (with dated comments marking the change) when their own investigations reached the same kind of conclusion — `A-AC-01` was simply missed.
+
+**Re-confirmed the underlying fact fresh (grep, `plain grep` not `rg` — `rg`'s output was garbling this exact identifier in this session's tool results for an unrelated environment reason, caught and worked around by cross-checking with `Read` and `grep`):** only two files in `plugins/pipeline-core` reference `pipelineMainSessionRoute` at all — the one consumer (`post-compact-reground.mjs:84`, `{}` fallback) and its own test fixture. Zero producers, confirmed again, independent of the citation-correction history already on file for this criterion.
+
+**Fixed:** reclassified `A-AC-01` to `['po', 'WP-A']` (commit `b7eb5b93`), matching the `H-AC-11`/`L-AC-01` precedent exactly (kept its own `WP-A` package id rather than the generic `WP-PO`, same as `L-AC-01` kept `WP-L`). Small, single-file, plain-JS-generator-script edit — legitimately within EL-01's real stage-0 exception this time (unlike this session's earlier `verify.mjs`/backlog-quoting mistake): 1 file, 11 lines, no architecture/schema/public-API/test/guardrail-hook-CI/dependency/security-surface touch, trivially revertable, not itself imported by any registered test (`grep -rl 'acceptance-evidence-map' harness plugins/pipeline-core` — zero hits).
+
+**Regenerated `--mode closure` to confirm the effect, not just assert it:** `node specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs --mode closure --out scratch/closure-check.md` — exactly ONE `### Class` section header now appears in the output: `### Class P — not closeable by writing code (5)`. **Class A, D, S, and B are now all empty.** The 5 remaining Class-P members: `A-AC-01`, `EPIC-AC-04`, `H-AC-11`, `L-AC-01`, `EPIC-AC-05` — every one of them already independently confirmed this session (checkpoints 23-28) to be genuinely PO-decision-gated, external-signature-gated, or a permanent constraint, not agent-actionable.
+
+**What this means concretely: there is no more code to write for Sprint Phoenix's acceptance criteria.** Every criterion is either `implemented`, or blocked on something outside this session's authority (a PO design decision, a PO-signed ceremony, or — for `EPIC-AC-04`'s own Full-Verify-red-suite half — a separate plugin-authoring-repo session for TP-7/OT09). This is a genuine milestone, not a repeated claim: it is the first time this session's own generated tooling, not just prose in a checkpoint, confirms zero Class B/S/D/A items remain.
+
+**Known caveat, not fixed:** the `--mode closure` doc's own hand-written intro prose (the numbered sequencing plan, "4. Class B, the absent capabilities... `L-AC-01` leads") is now stale narrative — it describes a sequencing plan across classes that are now empty, written before `L-AC-01`'s own reclassification earlier this session and never updated. This is literal prose text embedded in the generator script, not CLOSURE-table data, so fixing it is a real editorial rewrite (likely >25 lines), not a mechanical data correction like the fix above — EL-16 territory, a `goldfish-mechanic`/`-implementor` dispatch, not self-executable. Low priority: it gates nothing (no check reads this doc), and the closure design's own **Exit criteria** section (unaffected, still accurate) already states the real invariant. Not dispatched tonight — noted here so it isn't rediscovered as new.
+
+**Full Verify + security-scan not re-run at this exact commit** — the edit touches only a generator script with zero registered-suite dependents (confirmed above), so the known 3-suite baseline from checkpoint 28's fresh re-run (`guard-testpath-override-tests`, `doc-contract-tests`, `doc-contract-check`; security CLEAN) still stands unchanged.
+
+**Next steps:** genuinely nothing further is agent-actionable in Class A/D/S/B — there is nothing left in those classes. The only paths forward: (1) a plugin-authoring-repo session with its own PO authorization for TP-7/OT09; (2) a PO design decision on `A-AC-01`/`H-AC-11`/`L-AC-01`; (3) the PO reachable to run a push-approval ceremony once one of the above lands. The PO is offline. Do not fabricate further scope-searching busywork past this point without new PO input or a new Stop-hook challenge surfacing a concrete, checkable claim to re-verify.
 
 ---
 
