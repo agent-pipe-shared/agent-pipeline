@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "adfe9cb1c984ed01ebd2547b47abab86fc3081400cb443523ff59c463bf46ce1"
+    "transitionHead": "e0d111b3db0d3a03ba8c06ce81c75a48fb4fc886292f1dad26948266474dc80b"
   },
   "counts": {
-    "open": 96,
+    "open": 97,
     "in_progress": 26,
     "closed": 28
   },
@@ -287,6 +287,13 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.command-offer-schema-has-no-displayed-generated-asserted-states",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-17"
     },
     {
       "id": "pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty",

@@ -1007,6 +1007,30 @@ architecture prose or an implementation briefing.
 - **R-AC-06:** WHEN an offer is displayed, acknowledged, authorized, copied,
   generated, or asserted by a user, THE SYSTEM SHALL record only that exact
   state and SHALL NOT label it `executed`, `completed`, or `succeeded`.
+
+  **Amendment (PO, 2026-08-17).** `acknowledged`, `authorized`, and `copied`
+  are real members of the closed command-offer state vocabulary
+  (`COMMAND_STATES`, `agent-decision-journal.mjs`) and now have a real
+  producer (`recordCommandUserAcknowledgement`, `external-command-offer.mjs`,
+  commit `ddcda3f6`) — confirmed independently against source, not assumed.
+  `displayed`, `generated`, and `asserted` are not members of that
+  vocabulary at all; no reachable code path anywhere in this codebase
+  constructs a command-offer event carrying any of the three, and none of
+  them has an existing operational definition to build a producer against
+  (a rendering event? a template-fill event? a user utterance event?
+  undecided). Representing them means either designing new state-vocabulary
+  members plus their own anchor/transition rules and a producer for each —
+  real design work needing its own review — or accepting that this
+  criterion's original wording covers a broader offer-interaction surface
+  than the architecture currently models. Neither is a same-night fix, and
+  neither is attempted here (mirrors the disposition already used for
+  L-AC-01, H-AC-11 O-4, and PX0-AC-13 clause 1 in this epic). Tracked as
+  `backlog/items/2026-08-17-command-offer-schema-has-no-displayed-generated-asserted-states.md`.
+  R-AC-06 stays `partial`: the negative half (never mislabel as
+  executed/completed/succeeded) and 3 of the 6 named positive states
+  (acknowledged/authorized/copied) are real and producer-backed; the other
+  3 (displayed/generated/asserted) need that design decided first, the same
+  standard already applied to L-AC-01's remaining 7 triggers.
 - **R-AC-07:** WHEN THE PIPELINE initiates execution, THE SYSTEM SHALL append
   `attempted` and may append `observed-completed` or `readback-verified` only
   when bounded evidence supports the respective fact. A user-executed command

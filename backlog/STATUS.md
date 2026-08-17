@@ -37,6 +37,7 @@
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.command-offer-schema-has-no-displayed-generated-asserted-states | open | requirement | pipeline | 2026-08-17 | — |
 | pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -158,6 +159,6 @@
 
 ## Counts
 
-- open: 96
+- open: 97
 - in_progress: 26
 - closed: 28
