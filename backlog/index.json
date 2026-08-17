@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "11f3ae2903dccecbd7cdbba120cfba8e74685ee57b6d2745ba4d6ef789de2a51"
+    "transitionHead": "9973a9c2f29e28e786f95c2b9f8763004db58e26ada28f9decb21dd14d33ae56"
   },
   "counts": {
-    "open": 111,
+    "open": 110,
     "in_progress": 22,
-    "closed": 103
+    "closed": 104
   },
   "items": [
     {
@@ -829,11 +829,15 @@
     },
     {
       "id": "pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Relayed by the PO 2026-08-17 from a live Windows (D:\\Dev\\Web\\Toolbox) Claude session's handover, item #2, found while diagnosing the NVA-PAWINACL-1 blocker; independently confirmed against this repository's current source before filing, including both call sites."
+      "source": "Relayed by the PO 2026-08-17 from a live Windows (D:\\Dev\\Web\\Toolbox) Claude session's handover, item #2, found while diagnosing the NVA-PAWINACL-1 blocker; independently confirmed against this repository's current source before filing, including both call sites.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "5e26fa6f",
+      "closureEvidence": "backlog/items/2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell.md"
     },
     {
       "id": "pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal",

@@ -3,10 +3,27 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-17
+closure_repository: self
+closure_commit: 5e26fa6f
+closure_evidence: backlog/items/2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell.md
+merged-into: 2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell.md
 source: "Relayed by the PO 2026-08-17 from a live Windows (D:\\Dev\\Web\\Toolbox) Claude session's handover, item #2, found while diagnosing the NVA-PAWINACL-1 blocker; independently confirmed against this repository's current source before filing, including both call sites."
 ---
+
+**Rejected as a duplicate (found 2026-08-17, later same session):** this
+item and `backlog/items/2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell.md`
+(commit `5e26fa6f`, filed earlier the same day) independently report the
+exact same defect from the exact same underlying Windows Toolbox session
+report. The earlier item is more complete (names all five
+`guard-lifecycle-ready.mjs` call sites, states the two unverified follow-on
+effects explicitly) and is kept as canonical; this one is closed per
+`backlog/README.md`'s duplicate-merge convention ("the newer item points to
+the older one"). No content unique to this item is lost — both cover the
+`process.platform`-vs-actual-shell root cause, the `$PWD` consequence, and
+the explicit Codex-path-unverified caveat.
 
 # `dialectFor()` selects the shell dialect from `process.platform`, not from which shell is actually invoking the command
 
