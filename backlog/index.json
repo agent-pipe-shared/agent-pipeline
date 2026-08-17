@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fee9c982220322d44d3c0ba3e727751c9f9b2b73a5faa6b5b6e472e333bf82b4"
+    "transitionHead": "1817ea7dd4d7d3f7b972efecf30c28048d58a12bf911c13fd589120f7d40826b"
   },
   "counts": {
-    "open": 108,
+    "open": 98,
     "in_progress": 22,
-    "closed": 107
+    "closed": 118
   },
   "items": [
     {
@@ -162,11 +162,15 @@
     },
     {
       "id": "pipeline.approved-not-implementing-is-a-silent-trap",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Reported by the Phoenix session of 2026-08-08, which lost a dispatch round to it and diagnosed it correctly."
+      "source": "Reported by the Phoenix session of 2026-08-08, which lost a dispatch round to it and diagnosed it correctly.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "c01dbf76199e249e2a7873b3558ff58ff2c76653",
+      "closureEvidence": "backlog/items/2026-08-08-approved-but-not-implementing-refuses-every-write-and-asks-for-nothing.md"
     },
     {
       "id": "pipeline.authority-decision-apply-defaults-to-codex",
@@ -271,19 +275,27 @@
     },
     {
       "id": "pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Reported by a Goldfish during the 2026-08-08 hardening block and then reproduced and isolated directly by the Elephant."
+      "source": "Reported by a Goldfish during the 2026-08-08 hardening block and then reproduced and isolated directly by the Elephant.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "2f466462dbe97bc1330e7578bd21af2d958f1488",
+      "closureEvidence": "backlog/items/2026-08-08-a-bounded-diagnostic-outside-the-repo-is-refused-under-the-wrong-reason.md"
     },
     {
       "id": "pipeline.briefing-model-field-contradicts-agent-definition",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Three dispatches in the 2026-08-08 decisions wave were briefed 'claude-opus-5 at xhigh' and ran on claude-sonnet-5. Two of them reported the mismatch themselves; the Elephant's first reading of it was wrong in the opposite direction."
+      "source": "Three dispatches in the 2026-08-08 decisions wave were briefed 'claude-opus-5 at xhigh' and ran on claude-sonnet-5. Two of them reported the mismatch themselves; the Elephant's first reading of it was wrong in the opposite direction.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "e7d729042a1dfdf6439c74959b143eade6d7870c",
+      "closureEvidence": "backlog/items/2026-08-08-a-briefings-model-field-can-contradict-the-agent-it-dispatches.md"
     },
     {
       "id": "pipeline.canonical-worktree-lifecycle",
@@ -304,11 +316,15 @@
     },
     {
       "id": "pipeline.claude-greenfield-run-happy-path-findings",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Command-level analysis of the PO's Claude-with-Pipeline greenfield run of 2026-08-09 (transcript ad321d5e), read from the session log. 50 failing tool results across the run."
+      "source": "Command-level analysis of the PO's Claude-with-Pipeline greenfield run of 2026-08-09 (transcript ad321d5e), read from the session log. 50 failing tool results across the run.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "1174512bc78911af47640faebfd9f025da492492",
+      "closureEvidence": "backlog/items/2026-08-09-what-the-claude-greenfield-run-adds-to-the-happy-path-findings.md"
     },
     {
       "id": "pipeline.claude-has-no-start-time-opt-in-adoption-path",
@@ -590,11 +606,15 @@
     },
     {
       "id": "pipeline.dispatched-agents-return-truncated-mid-step",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day."
+      "source": "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "a6fa43f2fc191ecf76ef7c5b13a02ff64034b24b",
+      "closureEvidence": "backlog/items/2026-08-07-dispatched-agents-return-truncated-mid-step.md"
     },
     {
       "id": "pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync",
@@ -1029,11 +1049,15 @@
     },
     {
       "id": "pipeline.human-authorization-prompts-ignore-the-configured-language-profile",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
+      "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "598a8388a819086a10a649ff696b2a5b925b6fec",
+      "closureEvidence": "backlog/items/2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md"
     },
     {
       "id": "pipeline.human-guard-override-shares-the-po-human-approval-posix-normalization-bug",
@@ -1057,11 +1081,15 @@
     },
     {
       "id": "pipeline.kickoff-apply-action-drops-runner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Observed by the PO; located in the source afterwards."
+      "source": "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Observed by the PO; located in the source afterwards.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "5918d9d6b6d6b0ca72acd19a90cb2cfc6207728d",
+      "closureEvidence": "backlog/items/2026-08-08-kickoff-apply-action-drops-the-runner-the-plan-was-made-for.md"
     },
     {
       "id": "pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift",
@@ -1097,11 +1125,15 @@
     },
     {
       "id": "pipeline.ledger-drift-classification-has-no-reachability-cutoff",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-16",
-      "source": "Self-observed while making the backlog-ledger gate green in the 2026-08-16 candidate; the classification change is the same candidate's work, and the PO agreed to file the weakening it introduces as its own item rather than leave it implicit."
+      "source": "Self-observed while making the backlog-ledger gate green in the 2026-08-16 candidate; the classification change is the same candidate's work, and the PO agreed to file the weakening it introduces as its own item rather than leave it implicit.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "d16c734572d141ed19bc6a695d24278930b07dac",
+      "closureEvidence": "backlog/items/2026-08-16-ledger-drift-classification-has-no-reachability-cutoff.md"
     },
     {
       "id": "pipeline.ledger-event-403-has-a-short-hash-evidence-commit",
@@ -1202,6 +1234,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed live while opening a Guard Maintenance Window for an AFK hardening session, 2026-08-08. The PO had already signed; the install failed."
+    },
+    {
+      "id": "pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "Surfaced by the 2026-08-17 full-backlog triage pass: filling in this item's own Triage section broke check-backlog-state.mjs."
     },
     {
       "id": "pipeline.managed-onboarding-success-contract",
@@ -1498,11 +1538,15 @@
     },
     {
       "id": "pipeline.plugin-package-should-vendor-canon-references-via-build-step",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "PO decision, 2026-08-10, on the plugin-packaging gap confirmed the same day (backlog item / commit tracking the quick copy-fix pending): 'jetzt a) und c) für später festhalten es sauber zu machen' — a direct copy now, this item tracks doing it properly afterward."
+      "source": "PO decision, 2026-08-10, on the plugin-packaging gap confirmed the same day (backlog item / commit tracking the quick copy-fix pending): 'jetzt a) und c) für später festhalten es sauber zu machen' — a direct copy now, this item tracks doing it properly afterward.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "3f3f88524e13bda316165d9fc8df479fded779bf",
+      "closureEvidence": "backlog/items/2026-08-10-plugin-package-should-vendor-canon-references-via-build-step.md"
     },
     {
       "id": "pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority",
@@ -1647,11 +1691,15 @@
     },
     {
       "id": "pipeline.project-reset-does-not-classify-the-proof-policy-artifact",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff."
+      "source": "Critic review (round 2, PASS) of GF-062/GF-065's critical-human-proof.json onboarding fix, scratch/critic-1f03ce024c82/critic-notes.md, deliberately not flagged as a finding of that diff.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "44b7252f081786fc0b8b9faa0e47d59ebfe085fe",
+      "closureEvidence": "backlog/items/2026-08-09-project-reset-does-not-classify-the-proof-policy-artifact.md"
     },
     {
       "id": "pipeline.project-scoped-github-issue-operations",
@@ -2062,11 +2110,15 @@
     },
     {
       "id": "pipeline.skill-arguments-and-bootstrap-length",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, findings D5 and D6 from the Claude greenfield transcript against the 0.5.4 local candidate. The PO's framing for the whole review was token waste: 'das verschwendet total viele token'."
+      "source": "PO, 2026-08-08, findings D5 and D6 from the Claude greenfield transcript against the 0.5.4 local candidate. The PO's framing for the whole review was token waste: 'das verschwendet total viele token'.",
+      "closedAt": "2026-08-17",
+      "closureRepository": "self",
+      "closureCommit": "94293f3288bf747c935b657290b8cfb18b18df4a",
+      "closureEvidence": "backlog/items/2026-08-08-two-cheap-costs-a-skill-invoked-without-arguments-and-a-thirteen-step-bootstrap.md"
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
