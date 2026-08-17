@@ -1655,8 +1655,12 @@ function sanctionedProjectAuthorityMigrationArgs(args, root) {
   if (["inspect", "plan"].includes(args[0])) {
     return exactRoot(args, root, 1) && args.length === 3;
   }
-  if (args[0] === "recover" && exactRoot(args, root, 1) && args.length === 3) return true;
-  return ["apply", "recover"].includes(args[0])
+  // "vendor-sync" mirrors "recover": both admit a bare read-only 3-arg shape AND a
+  // --plan-sha256/--activate 6-arg mutation shape, so neither can use the unconditional
+  // "inspect"/"plan" branch above (that branch returns on length alone, before a longer
+  // apply-shaped vendor-sync/recover invocation ever reaches the mutation check below).
+  if (["recover", "vendor-sync"].includes(args[0]) && exactRoot(args, root, 1) && args.length === 3) return true;
+  return ["apply", "recover", "vendor-sync"].includes(args[0])
     && exactRoot(args, root, 1)
     && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
     && args[5] === "--activate" && args.length === 6;

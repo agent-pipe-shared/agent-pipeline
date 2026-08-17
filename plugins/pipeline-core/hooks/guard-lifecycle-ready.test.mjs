@@ -1036,6 +1036,11 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const profileRepairApply = `node '${PO_PROFILE_REPAIR_SCRIPT}' apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --activate`;
     const authorityMigrationPlan = `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' plan --root '${path}'`;
     const authorityMigrationApply = `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --activate`;
+    // sanctionedProjectAuthorityMigrationArgs() gained "vendor-sync" alongside "plan"/"apply" --
+    // the CLI's own vendor-sync subcommand (project-authority-migration.mjs) uses the identical
+    // two-shape (bare read-only plan vs. --plan-sha256/--activate mutation) pattern.
+    const authorityMigrationVendorSyncPlan = `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' vendor-sync --root '${path}'`;
+    const authorityMigrationVendorSyncApply = `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' vendor-sync --root '${path}' --plan-sha256 ${"d".repeat(64)} --activate`;
     const overridePlan = `node '${HUMAN_OVERRIDE_SCRIPT}' plan --repo '${path}' --request-sha256 ${"f".repeat(64)}`;
     const overridePrepare = `node '${HUMAN_OVERRIDE_SCRIPT}' prepare-authorization --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --reason 'PO attended exact action'`;
     const overrideAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --activate`;
@@ -1043,7 +1048,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
     const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
     const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
-    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
+    for (const command of [inspect, apply, preflight, repairMap, hostPlan, hostApply, kickoffPlan, kickoffApply, onboardingHelp, onboardingHelpShort, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, legacyRevocationRecoveryPlan, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, authorityMigrationVendorSyncPlan, authorityMigrationVendorSyncApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -1105,6 +1110,8 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase release`,
       `node '${PO_PROFILE_REPAIR_SCRIPT}' apply --root '${path}' --activate`,
       `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' apply --root '${path}' --activate`,
+      `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' vendor-sync --root '${path}' --activate`,
+      `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' vendor-sync --root /tmp/other`,
       `${overrideAuthorize} --bypass`,
       `${overridePlan} --author-source-root /tmp/other`,
       `${overrideAuthorAuthorize} --bypass`,
