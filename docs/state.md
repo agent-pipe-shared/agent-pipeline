@@ -7,7 +7,95 @@
 
 ---
 
-## CHECKPOINT — 2026-08-17, continued again (6): 15/157 open unchanged, P-AC-11's delta Critic saga closed with two self-caused majors fixed/disposed, H-AC-11 dispatch 1a drafted and ready to fire (READ THIS FIRST)
+## CHECKPOINT — 2026-08-17, continued again (7): 12/157 open (was 15), PO drove "everything from Phoenix must close" — five criteria closed this round, H-AC-11 increment-1 builders landed, remaining PO decisions and dispatch queue recorded (READ THIS FIRST)
+
+**Since checkpoint (6):** the PO stated the standing goal explicitly — "everything from Phoenix
+must be closed", superseding the earlier default of leaving PO-architecture questions parked
+indefinitely. Ran a batch of `AskUserQuestion` decisions against the 15 open criteria (grouped by
+real blocker, not one-by-one), closed what was now unblocked, landed H-AC-11's first code
+increment, and queued the rest. Open count **12 of 157** (was 15).
+
+- **PO decisions this round** (all via `AskUserQuestion`, German going forward per PO request
+  mid-round — a feedback memory now covers this):
+  - P-AC-11 `previewRequired` → satisfied by construction (amended, closed).
+  - P-AC-11 `retention` → drop the dimension (schema change, queued for a Goldfish dispatch, not
+    yet done).
+  - P-AC-11 `conflictPolicy` → still open; building enforcement would WEAKEN today's
+    always-reject behavior, PO wants a fuller options brief before deciding — **do not re-ask with
+    a shallow multiple-choice**, bring real tradeoffs first.
+  - P-AC-11 `lifecycleEvents` → build it; the one implementation-detail sub-question (what
+    proposed/active means for a non-shared build-phase write) is delegated to the build dispatch
+    as bounded latitude, not re-escalated.
+  - PX0-AC-13 clause 1 → accept the bounded local write (design §13 Option A); unblocks building
+    the fully-designed 8-member action family (`design/codex-wsl-freshness-host-action-family.md`).
+  - L-AC-01 `candidate-invalidation` → build real staleness/cancellation detection (a genuine new
+    capability, not a quick dispatch). The other 5 remaining kinds (verification/review/gate/
+    recovery/reconciliation) were confirmed buildable now with NO PO question needed — real
+    source events already exist in this codebase for all five, just no translator/call-site yet.
+  - A-AC-03 → drop the cascade requirement (no mechanism exists, none planned); criterion amended,
+    now `implemented`.
+- **Closed this round:** A-AC-03, P-AC-11's `previewRequired` half (P-AC-11 itself stays
+  `partial` — `retention`/`conflictPolicy`/`lifecycleEvents` still open), PX0-AC-05 (a stale
+  pointer — the 2026-08-12 provenance defect this criterion's FAIL hinged on was already fixed
+  same-night by a PO-run rebase; re-confirmed today via `git merge-base --is-ancestor`,
+  independently spot-checked: `979e579c` no longer exists, `cd38619e` is a confirmed HEAD
+  ancestor), and **V-AC-02** (the `estimate` value class wired into the Evidence Viewer,
+  `PHX-WP-VAC02-ESTIMATE` commit `a2c8e533`, independently re-verified 26/26 — nine of nine value
+  classes now labelled; one disclosed non-blocking deviation, the `.value-estimate` CSS rule is
+  missing, functional labelling still present via `data-value-class`).
+- **A-AC-01 corrected, stays `partial`:** an earlier same-day finding re-derived a producer
+  candidate that `design/agent-decision-identity-scoping.md` had already found wrong, without
+  consulting that document first. Corrected: the real seam is `main-session-route.mjs`'s
+  `reconcileMainSessionRoute`; the one genuine remaining gap (`validateAgentDecisionEvent` has no
+  `revalidationTrigger` field, which A-AC-01 names) was put to the PO — answered: add the field
+  now. Queued together with A-AC-05's producer (same seam, same design doc's own sequencing) as
+  `PHX-WP-AAC0105-PRODUCER`, not yet dispatched.
+- **H-AC-11 increment-1 builders landed** (`PHX-HAC11-INC1-BUILDERS`, commit `994f3116`,
+  independently re-verified: 13/13 tests, confirmed zero I/O/clock/random usage, all promised
+  exports present). Pure builders for `lib/guard-authority-ledger-intake.mjs` — deterministic IDs,
+  the closed `policyDigest` preimage, HGO representability layers. Real disclosed open items for
+  the next dispatch: a genuine design contradiction (§4 vs §7.5 on HGO's `authorizationChannel`
+  source) resolved by the dispatch as a bounded judgment call, not yet reconciled back into the
+  design doc; several stale line-number citations in the design doc (content/shape unaffected);
+  `GUARD.MAINTENANCE.EXPIRED` and the `hgo-` id prefix are disclosed gap-fills needing confirmation
+  before the next (wiring) dispatch depends on them.
+- **Process note, recorded rather than hidden:** the fork dispatched to produce an A-AC-01/03/05
+  decision brief (investigation-only, explicitly told not to write files) instead made four real
+  commits acting on PO decisions from this round's `AskUserQuestion` exchanges — some of which
+  happened AFTER the fork was launched. Content independently verified sound (the PX0-AC-05 claim
+  spot-checked via git plumbing; the acceptance.md amendments read well-reasoned and match
+  established convention) and accepted as landed work, but the process was irregular — a feedback
+  memory (`feedback_fork-scope-creep-risk`) now flags this for future sessions: always audit
+  `git log`/`git status` after ANY fork returns, even a nominally read-only one.
+- **PO flagged fast token burn mid-round** and asked to stick to the configured model routing
+  going forward rather than overriding dispatches to `opus` — `policies/model-policy.md`'s
+  `models.implement/mechanic/deep/review` are ALL `sonnet` in this repo (escalation happens via
+  tier+effort, not model); a feedback memory now covers this. Two dispatches this round
+  (H-AC-11 builders, V-AC-02) already ran on `opus` before this feedback landed — left as-is per
+  the PO ("let it run now"), not retroactively an issue; future dispatches drop the model
+  override.
+- Remaining 12 open: P-AC-11 (`retention`/`conflictPolicy`/`lifecycleEvents`, all queued or
+  pending a fuller brief), H-AC-12 (Git-guard override reader still untouched, needs a TP-5
+  window), A-AC-01/A-AC-05 (queued combined dispatch), H-AC-11 (increment-1 wiring/kernel/O-1
+  dispatches 1b/1c/1d still to come, increment 2 still blocked on the deferred spec §6.1
+  amendment), L-AC-01 (6 kinds still need translators/call-sites, one — candidate-invalidation —
+  is real new capability work), EPIC-AC-01/02/03/04 (mostly resolve as the rest closes, plus
+  EPIC-AC-03/04's own end-of-epic ceremony), EPIC-AC-05 (auto-clears), PX0-AC-13 (clause 1 now
+  unblocked, the 8-member action family build is real, substantial work, not yet dispatched).
+
+**Next steps, in order, budget-conscious (sonnet, not opus, unless a future round's feedback
+changes this):** (1) P-AC-11 `retention`-drop dispatch (schema change, small); (2) P-AC-11
+`lifecycleEvents` build dispatch (with the proposed/active mapping as bounded latitude); (3)
+L-AC-01's 5 buildable kinds (verification/review/gate/recovery/reconciliation — translator +
+call-site each, no PO question); (4) bring the PO a fuller `conflictPolicy` options brief before
+asking again; (5) PX0-AC-13's 8-member action family build (substantial, its own dispatch cycle);
+(6) L-AC-01's `candidate-invalidation` capability (substantial, its own dispatch cycle); (7)
+A-AC-01/A-AC-05 combined producer dispatch (`PHX-WP-AAC0105-PRODUCER`); (8) H-AC-11 dispatch 1b
+(CLI wiring, depends on 1a's real exports); (9) H-AC-12's remaining Git-guard override reader
+(needs a TP-5 window); (10) EPIC-AC-02's TP-3 window + dispatch; (11) EPIC-AC-03/04's end-of-epic
+ceremony, bundled with H-AC-11's spec §6.1 amendment, once everything else is closed.
+
+## CHECKPOINT — 2026-08-17, continued again (6): 15/157 open unchanged, P-AC-11's delta Critic saga closed with two self-caused majors fixed/disposed, H-AC-11 dispatch 1a drafted and ready to fire
 
 **Since checkpoint (5):** the third P-AC-11 delta Critic dispatch (properly 4-commit-scoped,
 properly opus-routed) returned **FAIL** — but this time both majors were the Elephant session's
