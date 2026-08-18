@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.p-ac-11-four-dimensions-declared-but-inert
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
 source: "Independent Critic review of 0d3d9bcc..8be6c308, finding F3 (blocker), 2026-08-16. Full report: specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md."
 due: 2026-09-15
@@ -105,10 +105,17 @@ PO decided per-dimension via `AskUserQuestion` on 2026-08-17, in response to the
   27/27 tests passing before commit.
 - **`conflictPolicy` — still open, PO wants deeper discussion.** Building real enforcement would
   WEAKEN today's always-reject-on-conflict behavior in some cases (auto-resolve when policy
-  allows) — a genuine behavior-relaxation call, not resolved by a quick multiple-choice. Revisit
-  with a fuller options brief before asking again. **Confirmed still open 2026-08-18**: current
-  source still has one unconditional conflict path (`external-reference-adapter.mjs`), no second
-  path exists yet. This is the ONLY reason this item is not yet closed.
-- **Assignment (if accepted):** `pipeline` — `conflictPolicy` only; the other three dimensions are
-  fully resolved.
-- **Date:** 2026-08-17 (original), corrected 2026-08-18.
+  allows) — a genuine behavior-relaxation call, not resolved by a quick multiple-choice.
+  **Correction (2026-08-18): the above "still open" line was stale the moment it was written.**
+  The PO's `conflictPolicy` amendment landed the *same day* (2026-08-17) as an `acceptance.md`
+  amendment stating explicitly: "This closes the last remaining open dimension of this
+  criterion's 'scope permission by ... conflict policy' clause" — and the code backs it up:
+  `external-reference-adapter.mjs:141-152` now consults `entry.conflictPolicy`, returning a
+  distinct `status: "reconciliation-required", reason: "policy-conflict-reconciliation"` branch
+  for a declared `require-reconciliation`, while `reject`/undeclared keep the prior unconditional
+  `status: "conflict"` behavior — landed by commit `fc034721` ("wire conflictPolicy into the
+  external-reference write conflict decision"), independently re-verified 2026-08-18 by reading
+  the current source directly (not re-trusting either this item's own stale note or the commit
+  message alone). All four dimensions are therefore resolved; closing.
+- **Assignment (if accepted):** `pipeline` — all four dimensions resolved, none remaining.
+- **Date:** 2026-08-17 (original), corrected 2026-08-18, closed 2026-08-18.
