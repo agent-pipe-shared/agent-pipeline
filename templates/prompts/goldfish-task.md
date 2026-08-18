@@ -27,6 +27,18 @@ USAGE (Elephant)
 3. Dispatch as subagent (default: `goldfish-implementor`, effort `medium` per MP-27).
    Deviation from the role default REQUIRES the model justification in field 6.
 4. Writing tasks: worktree per project calibration (`project/pipeline.json`, else `.claude/pipeline.json`).
+   A worktree-isolated dispatch's mandatory first step is a self-check, not
+   just a stop: compare `git rev-parse HEAD` against the exact expected SHA
+   given in field 6; on mismatch, self-heal via
+   `git checkout --detach <exact-expected-sha>` (the worktree shares this
+   repo's object database, so any locally committed SHA is already present —
+   confirmed working, no network, no data loss on a fresh worktree with no
+   work of its own yet), re-verify, then proceed normally. Only STOP (report,
+   no further action) if that checkout itself fails — CLAUDE.md's
+   Environment note has the confirmed root cause
+   (`refs/remotes/origin/HEAD` resolves to a stale default-branch ref) and
+   the full pattern; copy it into field 5/6 of the briefing, do not
+   re-derive it.
 5. Light profile (stage-0 / bounded implementation ONLY): set field 6 `Profile: light` for a
    condensed 3-field report, reference-inlining, no baseline verify. Route mechanical work to
    `goldfish-mechanic`/`low` and bounded implementation to `goldfish-implementor`/`medium`. Use
