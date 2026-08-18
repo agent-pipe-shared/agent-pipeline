@@ -210,7 +210,7 @@ try {
       `process.stdout.write(require("fs").readFileSync(${JSON.stringify(join(HOOKS, "..", "lib", "critical-human-proof-policy.mjs"))}, "utf8"))`],
     { encoding: "utf8" }).stdout);
     assert.match(source, /USER_SOURCE_PATH/u);
-    assert.match(source, /gates\?\.push_approval/u);
+    assert.match(source, /push:\s*"push_approval"/u);
   });
 
   // ---- F3: the allow path, which no test walked until now -------------------------
