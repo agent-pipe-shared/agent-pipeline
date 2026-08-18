@@ -1,0 +1,10 @@
+fix(pipeline-core): read acknowledgementId once in attestRecoveryPreviewDelivery
+
+A caller-supplied acknowledgement object with a non-idempotent
+acknowledgementId getter could pass validation with one value and
+contribute a different value to the returned usedAcknowledgementIds
+postimage, since the property was read three separate times. Snapshot
+it once into a local const and use that local at all three sites.
+
+Dispatch: PHX-WP-RPACK-STABLE-READ (goldfish)
+AI-Assisted: true
