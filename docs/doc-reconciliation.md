@@ -1831,3 +1831,12 @@ Restated per this file's known limitation: `c581a218` is an ancestor of this can
 - ADR-0058: checked, no change needed.
 
 Restated per this file's known limitation: `c6b882d8` is an ancestor of this candidate and was already fully reconciled by the entry immediately above; ADR-0045/0056/0058 are restated verbatim — no commit in this range touches `specs/**` or any ADR-0056/0058-listed path. ADR-0012's only new material is checkpoint 32 itself: a diagnosis-and-handover entry for the last remaining Full Verify red (`guard-testpath-override-tests` OT09), tracing it to a drift between this repo's vendored `plugins/pipeline-core/lib/critical-human-proof-policy.mjs` and the marketplace author source, addressed to a separate plugin-authoring session. Additive checkpoint prose only — read-only investigation (grep/Read against this repo and `~/agent-pipeline-local-marketplace`), no code or config changed by this entry; the canonical-handover decision is untouched.
+
+## Candidate 4b25d4d8bbd054a9cb1ea6e7f8ab665e0b77d5cd — 2026-08-18, range 8a92d377..4b25d4d8, checkpoint 33: the exact post-fix push sequence (5 steps) persisted for next session
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0058: checked, no change needed.
+
+Restated per this file's known limitation: `f1205164` is an ancestor of this candidate and was already fully reconciled by the entry immediately above; ADR-0045/0056/0058 are restated verbatim — no commit in this range touches `specs/**` or any ADR-0056/0058-listed path. ADR-0012's only new material is checkpoint 33: answering the PO's question about what remains after the OT09/TP-7 fix lands with the exact 5-step sequence (Verify, Layer 1b reconciliation, subject-sha256 recompute, Layer 2/3 signing, Layer 4/5 push) rather than the oversimplified "just Verify." Additive checkpoint prose only; no code or config changed.
