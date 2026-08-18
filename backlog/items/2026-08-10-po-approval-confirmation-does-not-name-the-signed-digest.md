@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-10
 source: "Found on 2026-08-10 by the K-AC-05 round-4 (final) Critic review of the fork-disposition approval mechanism (commit 4673ff8a under review), while checking whether a tampered approvalIntent could still reach signing after that round's F2 fix. The Critic scoped it explicitly as a pre-existing defect in the shared signing ceremony, outside the reviewed delta's three changed files, and recommended routing it as its own work package rather than folding it into K-AC-05's exhausted Critic cap. Verified independently by the Elephant against source before filing."
 due: 2026-09-09
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "141550c32f29a5d771f9638a7aaa0823904fb699"
+closure_evidence: "backlog/items/2026-08-10-po-approval-confirmation-does-not-name-the-signed-digest.md"
 ---
 
 # The `approve`/`approve-critical` confirmation summary never shows the digest OpenSSL is about to sign

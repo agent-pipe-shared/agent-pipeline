@@ -7,6 +7,10 @@ status: closed
 source: merge report section 4 findings 1/2/4/5/6/11 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
 due: 2026-09-06
+closed_at: "2026-08-07"
+closure_repository: "self"
+closure_commit: "8b34e1fb3fff85996c8cd550b5e12f327acbff2b"
+closure_evidence: "backlog/items/2026-08-07-ledger-backed-plan-and-push-authority-absent-on-merged-base.md"
 ---
 
 # The PHX-2 Human Governance Decision Ledger has no equivalent on the merged base

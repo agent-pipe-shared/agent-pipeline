@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-07-27
 source: "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-07-27-runtime-projection-v2-eager-manifest-load.md"
 ---
 
 # `runtime-projection-v2.mjs` has the same eager module-scope manifest-load fail-open pattern F4 fixed in v3

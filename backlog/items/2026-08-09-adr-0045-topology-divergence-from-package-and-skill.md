@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "First real run of harness/scripts/check-doc-reconciliation.mjs over the commit range 8dcb1cc..dec2ed4 implicated docs/adr/0045-canonical-artifact-topology.md (Governs: specs/**) because paths under specs/ changed in that range. Reading the ADR against the actual specs/sprint-phoenix-epic/ package it governs then showed two distinct divergences between the decision record and the shipped implementation."
 due: 2026-09-08
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "0252cb01f354d29b1262467d649788505f1e7245"
+closure_evidence: "backlog/items/2026-08-09-adr-0045-topology-divergence-from-package-and-skill.md"
 ---
 
 # ADR-0045's canonical topology diverges from the package it governs, in two independent ways

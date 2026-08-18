@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-06
 source: Phoenix §7 authority revision; approve step failed twice inside an agent session
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "946f715f97f8dbdadca6fab701fcca19a6ebd48a"
+closure_evidence: "backlog/items/2026-08-06-authority-signing-terminal-contract.md"
 ---
 
 # Make the human-only signing step self-documenting and non-interactive-safe

@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 source: "The first end-to-end verify run this repository has completed in some time, obtained after repairing a duplicate suite registration the 0.5.3 merge introduced. 256 of 260 steps pass; four fail. All four are pre-existing and were invisible while the gate could not start."
 due: 2026-09-07
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-08-first-verify-run-is-red-with-four-failures.md"
 ---
 
 # The verify gate is red: four failures, uncovered the moment the gate could run again

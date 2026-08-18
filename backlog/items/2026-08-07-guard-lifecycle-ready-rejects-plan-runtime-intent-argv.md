@@ -8,6 +8,10 @@ created: 2026-08-07
 source: "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
 due: 2026-09-06
 expires: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-07-guard-lifecycle-ready-rejects-plan-runtime-intent-argv.md"
 ---
 
 # `guard-lifecycle-ready.mjs` rejects the Pipeline's own `plan-runtime`/`plan-repair`/etc. `nextAction` whenever `intent` is not `"onboarding"`

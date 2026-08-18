@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-18
 source: "Discovered as a byproduct of the PHX-WP-GOVPROD-REGISTER dispatch (2026-08-18), which registered a different suite and found this one also unregistered while re-running the registration checker."
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "67db3432fe06ccee3a89e5362317c8997a3ed3a0"
+closure_evidence: "backlog/items/2026-08-18-resume-hint-test-unregistered-in-verify-gate.md"
 ---
 
 # plugins/pipeline-core/lib/resume-hint.test.mjs is unregistered in verify.mjs

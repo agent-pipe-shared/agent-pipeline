@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "Finding SL-1 of the PHX-R2-THREATMODEL-rework dispatch (2026-08-07), re-verified independently by the Elephant at source. Security class. NOT executed by either party — confirming it empirically would mean disarming the guard that is enforcing at the time."
 due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "85efcceb95375d062940cb31df2e384caa913c02"
+closure_evidence: "backlog/items/2026-08-07-live-plugin-root-undefended-in-the-shell-lane.md"
 ---
 
 # The live plugin root is defended in the write lane only; the shell lane has no control that reaches it

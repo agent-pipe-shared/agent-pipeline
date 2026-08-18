@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-11
 source: "Independent Critic review, 2026-08-11, commit 3e1a727e (single-commit delta review), Finding 1. specs/sprint-phoenix-epic/evidence/pac08-f1-critic-review-3e1a727e.md"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "170bffbe4c3568f43a68b35d14fec96c968a0d22"
+closure_evidence: "backlog/items/2026-08-11-reconcile-lock-reuse-uses-lexical-not-real-path-comparison.md"
 ---
 
 # `defaultFeaturePackageReconcileApproval`'s lock-reuse check compares `resolve()` paths, not real (symlink-resolved) paths

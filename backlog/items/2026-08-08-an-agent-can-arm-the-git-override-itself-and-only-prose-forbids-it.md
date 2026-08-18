@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 source: "Found on 2026-08-08 by the PHX-RED1 dispatch while diagnosing why plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs is red. The suite is not a broken test: it specifies a human-authority binding that was never built, and diagnosing that surfaced the live hole below. Verified independently at source by the Elephant before filing, not taken from the dispatch report."
 due: 2026-09-07
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "172933448968c7c76b4132bb089fa7391cb997e3"
+closure_evidence: "backlog/items/2026-08-08-an-agent-can-arm-the-git-override-itself-and-only-prose-forbids-it.md"
 ---
 
 # An agent can arm the git override itself, and only prose forbids it

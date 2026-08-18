@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in harness/scripts/verify.mjs and plugins/pipeline-core/hooks/guard-push.mjs under dispatch PHX-BL4 (2026-08-09)."
 due: 2026-09-08
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "0136b29f13c7b70c4c20adf882c1788eab978abe"
+closure_evidence: "backlog/items/2026-08-09-push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to.md"
 ---
 
 # The push gate reads evidence from a location the prescribed run never writes to

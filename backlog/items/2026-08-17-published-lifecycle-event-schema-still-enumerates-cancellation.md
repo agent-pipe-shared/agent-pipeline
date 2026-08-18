@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-17
 source: "PHX-WP-LAC08 dispatch report (commit 20014aab), Elephant checkpoint docs/state.md 2026-08-17"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "da72aacfd3230e4d8e6da37808efccc68ff20071"
+closure_evidence: "backlog/items/2026-08-17-published-lifecycle-event-schema-still-enumerates-cancellation.md"
 ---
 
 # Published lifecycle-event schema still enumerates the removed `cancellation` kind

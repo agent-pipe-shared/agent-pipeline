@@ -8,7 +8,9 @@ created: 2026-08-16
 source: "Found 2026-08-16 by PHX-WP-AAC01-REVALIDATION-TRIGGER while adding revalidationTrigger: RegExp.test() stringifies its argument, so CODE.test(value.reasonCode) alone admits an array like [\"SOME_CODE\"] where a string is required. Fixed for the new field with an added typeof guard; the pre-existing reasonCode instance was left untouched as out of scope."
 due: 2026-09-30
 closed_at: 2026-08-18
-closure_commit: 169e9565
+closure_commit: "169e95654f457df0efc60f33db5a8e5cf8c27dfa"
+closure_repository: "self"
+closure_evidence: "backlog/items/2026-08-16-agent-decision-journal-code-pattern-array-coercion.md"
 ---
 
 # `agent-decision-journal.mjs`'s `CODE.test(...)` checks admit an array via implicit stringification

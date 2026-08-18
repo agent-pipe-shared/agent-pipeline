@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "Found on 2026-08-09 by two determination-first dispatches (PHX-ADR40, PHX-ADR38) sent to restore text the 0.5.2 merge audit reported as lost. Neither restored anything: both found the text had been deliberately superseded, and both surfaced this drift instead. Verified independently at source by the Elephant before filing."
 due: 2026-09-08
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "b85613905f13ed153eeb45f90e07a798354c960d"
+closure_evidence: "backlog/items/2026-08-09-accepted-adrs-contradict-the-implementation-and-nothing-detects-it.md"
 ---
 
 # Accepted ADRs contradict the implementation, and nothing detects it

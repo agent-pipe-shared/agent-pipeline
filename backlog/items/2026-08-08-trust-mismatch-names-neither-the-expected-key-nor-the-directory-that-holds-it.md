@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 source: "Hit live on 2026-08-08 when the PO signed a maintenance-window intent from the wrong one of two same-named key directories. The signature was cryptographically sound; the install refused with a five-word code that named nothing. Diagnosing it took the agent four read-only steps that the tool could have done itself."
 due: 2026-09-07
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-08-trust-mismatch-names-neither-the-expected-key-nor-the-directory-that-holds-it.md"
 ---
 
 # `PO-APPROVAL-TRUST-MISMATCH` names neither the key it expected nor the directory that holds it

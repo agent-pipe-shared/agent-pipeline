@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-07-27
 source: "CYB-A0 round-2 Critic re-review (new-issue N1), found while verifying the fix for round-1 F1-F5 in plugins/pipeline-core/lib/recovery-preview-attestation.mjs"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "97ba659890493597f90b8939fb602d613c67a636"
+closure_evidence: "backlog/items/2026-07-27-recovery-preview-ack-unstable-getter-poisons-replay-ledger.md"
 ---
 
 # `acknowledgementId` read three times without a stable local snapshot

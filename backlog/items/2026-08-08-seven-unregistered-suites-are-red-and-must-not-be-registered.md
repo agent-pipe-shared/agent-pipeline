@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 source: "Filed under phase-plan item R1.2 (gate integrity and residual closure) after the unregistered-suite measurement ran all 109 files. 102 are green and are being registered in batches; these 7 are red and are deliberately excluded from that registration. Machine artifact: specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md"
 due: 2026-09-07
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "17b797fdc172ec1d0a4ff587e16804a3ef9a4bf2"
+closure_evidence: "backlog/items/2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md"
 ---
 
 # Five unregistered suites fail standalone — file them, do not register them

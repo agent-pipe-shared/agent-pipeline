@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-18
 source: "PO ruling, Sprint Phoenix closure sweep, 2026-08-18: A-AC-01's remaining ordering-seam gap (main-session-route.mjs needing a Claude host adapter for pipelineMainSessionRoute) is struck rather than built, because the clean fix for the underlying risk is preventing two sessions from ever operating concurrently against the same repository root (same or different runner) in the first place — see specs/sprint-phoenix-epic/acceptance.md A-AC-01's 2026-08-18 amendment."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "18e5516cf14a9a02fca8cd9bdb6c6ddb1fcf4d78"
+closure_evidence: "backlog/items/2026-08-18-concurrent-session-prevention-supersedes-a-ac-01s-remaining-gap.md"
 ---
 
 # Harden concurrent-session prevention beyond a warning

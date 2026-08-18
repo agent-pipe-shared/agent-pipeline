@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 source: "Found on 2026-08-08 while planning a TP-3/TP-5 window for Phoenix. The Elephant was about to hand the PO a prepare command with two implementation dispatches still in flight; reading install() first showed that every commit those dispatches made would have voided the signature before it could be used. Caught by reading, not by a refusal -- the ceremony gives no warning at prepare time."
 due: 2026-09-07
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "2e22cc023491bba454db7ddecb219aa87a9261b4"
+closure_evidence: "backlog/items/2026-08-08-a-prepared-maintenance-window-dies-at-the-next-commit.md"
 ---
 
 # A prepared maintenance window dies at the next commit, and nothing says so until the signature is already spent

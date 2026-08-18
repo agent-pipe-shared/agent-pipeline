@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-16
 source: "Independent Critic review of 0d3d9bcc..8be6c308, finding F3 (blocker), 2026-08-16. Full report: specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md."
 due: 2026-09-15
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "fc034721cb82e42e8617020cef986648cffd3db8"
+closure_evidence: "backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md"
 ---
 
 # Four P-AC-11 policy dimensions are declarable but inert, with no owner and no expiry

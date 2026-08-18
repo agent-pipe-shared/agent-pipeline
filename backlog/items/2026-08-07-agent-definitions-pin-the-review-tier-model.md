@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 due: 2026-08-21
 source: "Critic round 1 of the 0.5.3 candidate, 2026-08-07 — the Critic reported its own route violation from direct same-dispatch evidence; the cause was found in the shipped agent definitions afterwards."
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "08684e7874b79c04a44601c487f343be0dfaefa5"
+closure_evidence: "backlog/items/2026-08-07-agent-definitions-pin-the-review-tier-model.md"
 ---
 
 # Shipped agent definitions pin the review-tier model, so MP-07's mandatory escalation silently does not happen

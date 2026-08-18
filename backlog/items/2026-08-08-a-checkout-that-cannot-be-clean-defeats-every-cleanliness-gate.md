@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 source: Push gate of 2026-08-08 — two of the four failed attempts trace to this cause; the worktree workaround is currently carried as an instruction in docs/state.md rather than as a fixed mechanism
 due: 2026-09-07
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "615bcd247ccc0f339102d669e5d78cd6e684d874"
+closure_evidence: "backlog/items/2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md"
 ---
 
 # A checkout that structurally cannot be clean defeats every cleanliness-gated tool

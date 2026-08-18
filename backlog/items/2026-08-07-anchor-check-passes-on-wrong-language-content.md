@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "Measured by the PHX-R3-RESCOPE dispatch and re-verified independently by the Elephant. PO decision (APS, 2026-08-07): accepted for implementation."
 due: 2026-09-06
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "41b7c4705de1bde037a9efac4d99a4d5de5426bd"
+closure_evidence: "backlog/items/2026-08-07-anchor-check-passes-on-wrong-language-content.md"
 ---
 
 # The doc-contract anchor check can report green while a link points at German content

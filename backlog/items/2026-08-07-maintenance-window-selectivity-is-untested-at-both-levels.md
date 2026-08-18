@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "Observation from a parallel Phoenix session on the marketplace snapshot that each guard hook carries only one maintenance-window test, sharpened and empirically checked against the live TP-2/TP-6/TP-7 window during the 2026-08-07 Nova session."
 due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "2c227a3d6f90855c7a8eed09bd4e932142925589"
+closure_evidence: "backlog/items/2026-08-07-maintenance-window-selectivity-is-untested-at-both-levels.md"
 ---
 
 # A maintenance window's selectivity holds, and nothing tests it

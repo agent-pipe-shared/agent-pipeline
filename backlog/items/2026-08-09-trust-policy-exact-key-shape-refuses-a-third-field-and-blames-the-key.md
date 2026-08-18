@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in plugins/pipeline-core/scripts/po-human-approval.mjs under dispatch PHX-BL4 (2026-08-09)."
 due: 2026-09-08
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "141550c32f29a5d771f9638a7aaa0823904fb699"
+closure_evidence: "backlog/items/2026-08-09-trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key.md"
 ---
 
 # A trust policy with one unknown extra field cannot sign, and the error blames the key

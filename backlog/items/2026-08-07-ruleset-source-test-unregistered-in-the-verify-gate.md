@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "Measured by the PHX-R1-REWORK-1 dispatch while correcting R1's protection boundary, and re-verified independently by the Elephant. Third occurrence of the same defect class in this feature area."
 due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-07-ruleset-source-test-unregistered-in-the-verify-gate.md"
 ---
 
 # `ruleset-source.test.mjs` exists but is not registered in the verify gate

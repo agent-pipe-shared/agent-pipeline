@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "Adjacent finding by the Elephant while verifying the GMW lift question for the WP2-WP3 Part A residuals (2026-08-07). Verified against the code, not assumed. Recorded rather than fixed because the affected file is a NEVER_LIFTABLE_KERNEL_PATH and cannot be edited in-session."
 due: 2026-09-06
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "e0a87ecee3a643d1e498c390ca8b9ee2730f879d"
+closure_evidence: "backlog/items/2026-08-07-gate-strength-shell-comment-understates-its-own-scope.md"
 ---
 
 # The gate-strength shell lane's scope comment says "five paths (GS-1..GS-5)" while the code covers seven, including product source

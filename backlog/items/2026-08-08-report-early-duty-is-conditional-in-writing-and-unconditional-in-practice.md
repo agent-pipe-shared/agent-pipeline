@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 source: "Elephant self-observation across the Phoenix gate-integrity phase, 2026-08-07/08: six dispatches ended at or past budget, four with no report at all; recorded in docs/state.md before being filed here."
 due: 2026-09-07
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-08-report-early-duty-is-conditional-in-writing-and-unconditional-in-practice.md"
 ---
 
 # The report-early duty is written as conditional and is in practice unconditional

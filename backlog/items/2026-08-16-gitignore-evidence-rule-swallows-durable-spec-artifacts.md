@@ -8,7 +8,9 @@ created: 2026-08-16
 source: "Found 2026-08-16 when two dispatches in one session correctly refused to force-add their dispatch records, and the Critic separately flagged that the evidence artifact it was given sat under scratch/ rather than the calibration's canonical evidence/ location. Verified with git check-ignore before filing."
 due: 2026-09-15
 closed_at: 2026-08-18
-closure_commit: 00350b2d
+closure_commit: "00350b2d4f46f86804f188cb84ceff6c947bfa3d"
+closure_repository: "self"
+closure_evidence: "backlog/items/2026-08-16-gitignore-evidence-rule-swallows-durable-spec-artifacts.md"
 ---
 
 # `.gitignore`'s `evidence/` rule is unanchored, so it also swallows the Spec packages' durable audit artifacts

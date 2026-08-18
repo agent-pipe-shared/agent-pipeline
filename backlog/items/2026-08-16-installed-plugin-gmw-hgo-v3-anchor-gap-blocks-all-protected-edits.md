@@ -10,6 +10,7 @@ due: 2026-08-20
 closed_at: 2026-08-18
 closure_repository: nova
 closure_evidence: "confirmed directly against ~/agent-pipeline-local-marketplace/plugins/pipeline-core/lib/{guard-maintenance-window,human-guard-override}.mjs (NVA-GMWFIX-2 / NVA-HGOFIX-1)"
+closure_commit: "8e8dd393fd7eba110f85ecf5ce69be5f41f6bd6b"
 ---
 
 # The installed plugin's GMW window and HGO override ceremonies cannot clear ANY protected-path edit in this repository, because their trust-anchor read is unpatched for schema v3

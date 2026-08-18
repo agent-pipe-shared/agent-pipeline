@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-11
 source: "Recorded in docs/state.md as F5/F6 (minor) findings from the PX0-AC-05 authority-revision receipt review chain: real, tracked, not yet fixed at the time of that checkpoint, but left without an owner or due date in the handover prose itself. Filed as a proper owned, dated backlog item per QG-06 (a known gap with no due date is a finding, not a mitigation), without altering the docs/state.md checkpoint narrative."
 due: 2026-09-10
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "17d0437d5f70c6449cf924d7f872d4a2fda64515"
+closure_evidence: "backlog/items/2026-08-11-authority-revision-receipt-dedup-and-recovery-integrity-gaps.md"
 ---
 
 # Authority-revision receipt: append-dedup and roll-forward recovery integrity gaps (F5/F6, minor)

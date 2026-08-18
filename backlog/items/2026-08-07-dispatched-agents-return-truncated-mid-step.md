@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 due: 2026-08-21
 source: "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-07-dispatched-agents-return-truncated-mid-step.md"
 ---
 
 # Dispatched Goldfish and Critic agents return truncated mid-step instead of reporting

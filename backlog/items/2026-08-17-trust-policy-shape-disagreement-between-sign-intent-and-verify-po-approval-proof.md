@@ -7,7 +7,9 @@ status: closed
 created: 2026-08-17
 source: "this session's own feature-package-reconcile ceremony for R-AC-06's acceptance.md digest drift"
 closed_at: 2026-08-18
-closure_commit: 4c2f04cb
+closure_commit: "4c2f04cbe1e926f9aaeb0e8a598a28465ab528c4"
+closure_repository: "self"
+closure_evidence: "backlog/items/2026-08-17-trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof.md"
 ---
 
 # trust-policy.json shape disagreement between po-human-approval.mjs and po-approval-proof.mjs

@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 source: "Raised as finding F3 by an independent Critic review on 2026-08-08. A dispatch authored a diff but stopped before committing it; the orchestrator performed the commit act. The resulting trailer is textually identical to one whose dispatch committed its own work, and the deviation was discoverable only from a separate document that git does not bind."
 due: 2026-09-07
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "f5db8aebe00711b57ed3846f2c17689a5d116c64"
+closure_evidence: "backlog/items/2026-08-08-the-commit-trailer-cannot-say-who-performed-the-commit-act.md"
 ---
 
 # The `Dispatch:` trailer cannot distinguish who authored the diff from who performed the commit act

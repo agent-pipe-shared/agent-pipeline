@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "Found via a purpose-written probe script isolating which of twelve candidate strings caused `resume-hint.mjs capture` to fail; confirmed at source (plugins/pipeline-core/lib/resume-hint.mjs) under dispatch PHX-BL2 (2026-08-09)."
 due: 2026-09-08
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "f685a2b560af4a77f486c04cb4aa2bf54f999985"
+closure_evidence: "backlog/items/2026-08-09-resume-hint-opaque-token-rejects-hyphenated-english.md"
 ---
 
 # The resume-hint validator rejects ordinary English as credential-shaped, and fails without saying why

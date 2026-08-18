@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
 due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md"
 ---
 
 # The session scratchpad is unwritable under `GUARD-CROSS-REPO-MUTATION`, which makes a mandatory clause of the Critic contract impossible to satisfy

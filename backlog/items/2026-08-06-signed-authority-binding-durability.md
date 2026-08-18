@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 source: Phoenix §7 authority revision; observed directly during the revision sequence
 created: 2026-08-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "4cd3e93d729a0cff6b4ab708a4c1faf047a947e1"
+closure_evidence: "backlog/items/2026-08-06-signed-authority-binding-durability.md"
 ---
 
 # A signed authority revision must survive the next ordinary submission

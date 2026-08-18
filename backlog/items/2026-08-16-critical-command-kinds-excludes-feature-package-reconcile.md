@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-16
 source: "Found 2026-08-16 while building the PO's feature-package-reconcile signing request for the Phoenix P-AC-11/FTP-ARTIFACT-2 ceremony -- the PO had to manually cp a request file the Elephant built out to the external signing directory, and asked why."
 due: 2026-09-15
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "141550c32f29a5d771f9638a7aaa0823904fb699"
+closure_evidence: "backlog/items/2026-08-16-critical-command-kinds-excludes-feature-package-reconcile.md"
 ---
 
 # `po-human-approval.mjs`'s `CRITICAL_COMMAND_KINDS` excludes `feature-package-reconcile`, forcing a manual copy step that `prepare-critical` should make unnecessary

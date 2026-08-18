@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 source: Product Owner requirement raised at the Phoenix plan-approval gate
 created: 2026-08-06
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "8acfd9361028b400418a8b6035a04eeb827b9e49"
+closure_evidence: "backlog/items/2026-08-06-human-legible-approval-record.md"
 ---
 
 # An approval must say what was approved, in words a human can check

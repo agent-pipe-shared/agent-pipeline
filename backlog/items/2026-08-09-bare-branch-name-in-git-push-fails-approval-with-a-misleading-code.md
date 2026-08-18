@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in plugins/pipeline-core/lib/critical-action-authorization.mjs and plugins/pipeline-core/hooks/guard-push.mjs under dispatch PHX-BL4 (2026-08-09)."
 due: 2026-09-08
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "4e1b9186a5063330931f93455c3185f9d122d68a"
+closure_evidence: "backlog/items/2026-08-09-bare-branch-name-in-git-push-fails-approval-with-a-misleading-code.md"
 ---
 
 # A bare branch name in `git push` fails the approval check with a misleading code

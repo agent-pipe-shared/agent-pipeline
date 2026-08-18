@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 source: "Observed 2026-08-08 while repairing the 38 pre-public-core reachability findings: the repair commit turned the live security scan red, one finding per appended ledger line."
 due: 2026-09-07
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "c8dee9d47692fd5f87a6a3f4cc15a666cc7fb247"
+closure_evidence: "backlog/items/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md"
 ---
 
 # Every append to the transition ledger produces one gitleaks false positive, so the Pipeline's own tamper-evidence mechanism permanently fights its own secret scanner

@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "Observed out-of-diff by the PHX-R1-REWORK-3 Critic (round 4) while deriving the shell lane's governance-marker list from source, offered without severity because it is not a defect of that review object. Independently re-verified from source by the Elephant before filing."
 due: 2026-09-06
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "34a7590746fc0da5979e8272cb0320400fc8c05b"
+closure_evidence: "backlog/items/2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-config-fault.md"
 ---
 
 # Both admission hooks re-arm the disarm-by-config-fault that the library documents having fixed

@@ -8,6 +8,10 @@ created: 2026-08-09
 source: "Elephant pre-Critic-dispatch check on PHX-WP-AAC04 (commit 78006b4), 2026-08-09."
 due: 2026-09-08
 expires: 2026-09-08
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "de7cf0d41cd1dff1c0f878de20834535447c0a37"
+closure_evidence: "backlog/items/2026-08-09-a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote.md"
 ---
 
 # A second dispatch claimed an evidence artifact it never wrote

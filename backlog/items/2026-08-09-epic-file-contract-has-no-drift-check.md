@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "Found while preparing the Spec-amendment branch of a Critic finding, by checking first whether comparable files were already listed in specs/sprint-phoenix-epic/spec.md §7. They were not. The finding that raised it had reviewed a sixteen-commit range and could not see the sprint-long pattern."
 due: 2026-09-08
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "78137b1a4f955e41e47b411246bf34385d09f7e4"
+closure_evidence: "backlog/items/2026-08-09-epic-file-contract-has-no-drift-check.md"
 ---
 
 # The Epic's file contract has no mechanism checking it still matches the tree

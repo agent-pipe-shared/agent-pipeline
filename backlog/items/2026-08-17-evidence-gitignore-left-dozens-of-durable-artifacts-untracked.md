@@ -8,7 +8,9 @@ created: 2026-08-17
 source: "Found 2026-08-17 while trying to commit a fresh acceptance-evidence-map snapshot: git silently refused to see the new file. Traced to .gitignore's unanchored `evidence/` rule matching specs/sprint-phoenix-epic/evidence/ too, fixed in commit 13811594."
 due: 2026-08-24
 closed_at: 2026-08-18
-closure_commit: 00350b2d
+closure_commit: "00350b2d4f46f86804f188cb84ceff6c947bfa3d"
+closure_repository: "self"
+closure_evidence: "backlog/items/2026-08-17-evidence-gitignore-left-dozens-of-durable-artifacts-untracked.md"
 ---
 
 # Fixing the evidence/ gitignore anchor revealed dozens of previously-untracked durable artifacts under specs/sprint-phoenix-epic/evidence/

@@ -8,6 +8,10 @@ created: 2026-08-07
 source: "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07."
 due: 2026-09-06
 expires: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md"
 ---
 
 # Onboarding restart flow always launches Codex, regardless of the active runner

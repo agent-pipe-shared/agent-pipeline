@@ -8,6 +8,10 @@ created: 2026-08-07
 source: "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint."
 due: 2026-09-06
 expires: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "55912293385c595109abffad3442661bb1166956"
+closure_evidence: "backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md"
 ---
 
 # Parallel Goldfish dispatches without worktree isolation race on shared files

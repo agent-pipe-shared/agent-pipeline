@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-07-29
 source: "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "591a2b8b5e48e314910b654bafd5f7c6c48a80cf"
+closure_evidence: "backlog/items/2026-07-29-guard-lifecycle-ready-blocks-claude-memory-writes.md"
 ---
 
 # `guard-lifecycle-ready.mjs` blocks Claude Code's own auto-memory writes in every governed project

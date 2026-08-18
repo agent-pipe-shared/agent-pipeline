@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 due: 2026-08-21
 source: "Critic rounds 1 and 2 of the 0.5.3 candidate, 2026-08-07 — both independently found the same class of violation, round 2 with the sharper spec-ref."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "339f08bd848bec332ba78f602109b83f1ea70360"
+closure_evidence: "backlog/items/2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md"
 ---
 
 # MP-22 / EL-01 forbid orchestrator self-implementation and nothing technically prevents it

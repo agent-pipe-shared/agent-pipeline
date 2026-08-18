@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-07-26
 source: Phoenix close self-retro; specs/sprint-phoenix-epic/RECOVERY.md R-02
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "6a58725b485a0721cd3d7aa55a821f761ae49d43"
+closure_evidence: "backlog/items/2026-07-26-readonly-command-guard-classification.md"
 ---
 
 # Classify design-close operations without weakening plan or root protection

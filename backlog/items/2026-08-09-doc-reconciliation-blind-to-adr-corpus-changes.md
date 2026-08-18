@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-09
 source: "Raised as an unverified observation by an independent review of a commit range; the review explicitly did not build a repro. Confirmed at source under dispatch PHX-BL2 (2026-08-09): read all five `**Governs:**` lines in docs/adr/ and the paths touched by the 2026-08-09 ADR-0047 renumber commit (88a7133)."
 due: 2026-09-08
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "339f08bd848bec332ba78f602109b83f1ea70360"
+closure_evidence: "backlog/items/2026-08-09-doc-reconciliation-blind-to-adr-corpus-changes.md"
 ---
 
 # The reconciliation layer is blind to the event that motivated it

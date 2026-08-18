@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 due: 2026-09-06
 source: "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md"
 ---
 
 # The pre-signature confirmation prompt is English-only and ignores `runtime.humanFacingLanguage`

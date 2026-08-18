@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "Coverage observation made by the PHX-R1-REWORK-2 dispatch while verifying the governance-marker precondition. Outside that briefing's scope, so recorded rather than acted on."
 due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "a2f16a65f816da8609a771df690d051a104e3930"
+closure_evidence: "backlog/items/2026-08-07-no-test-pins-the-ungoverned-path-rule-stand-down.md"
 ---
 
 # No test pins the gate-strength path rules standing down in an ungoverned checkout

@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 due: 2026-09-06
 source: "PO decision and observation during the first live guard-maintenance-window signing on 2026-08-07: the wrong key directory was used twice before the trust mismatch surfaced, and the PO was handed two commands where only the first is theirs."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "71f330db73a9d4554dbe72f63d5de2c337437d35"
+closure_evidence: "backlog/items/2026-08-07-human-approval-ux-directory-clarity-and-single-command.md"
 ---
 
 # The human signs blind: no configured key directory, an opaque digest, and one command too many

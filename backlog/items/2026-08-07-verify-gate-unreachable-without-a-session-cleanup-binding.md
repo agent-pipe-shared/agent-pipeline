@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: Elephant diagnosis while dispositioning Critic finding F1 on PHX-R2-THREATMODEL-rework (2026-08-07). The symptom was already recorded in docs/state.md as an unexplained infra gap; this item records the measured cause.
 due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "d202633c1b545197ed4f6f16dab7254b2bcef811"
+closure_evidence: "backlog/items/2026-08-07-verify-gate-unreachable-without-a-session-cleanup-binding.md"
 ---
 
 # The verify gate aborts at its first step whenever the session has no cleanup binding

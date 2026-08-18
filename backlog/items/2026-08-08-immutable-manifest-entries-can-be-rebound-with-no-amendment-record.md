@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 due: 2026-09-07
 source: "Critic finding F5, Phoenix gate-integrity full review round 1, 2026-08-08: lifecycle.json rebound the sha256 of an entry declared mutability immutable, and the schema has no field that could have carried the reason."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "01d2c3c06780bd4e9553767e0cd56a076c16c377"
+closure_evidence: "backlog/items/2026-08-08-immutable-manifest-entries-can-be-rebound-with-no-amendment-record.md"
 ---
 
 # An `immutable` manifest entry can be rebound to different bytes with no amendment record

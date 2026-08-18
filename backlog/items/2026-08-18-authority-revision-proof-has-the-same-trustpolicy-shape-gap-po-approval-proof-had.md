@@ -7,6 +7,9 @@ status: closed
 created: 2026-08-18
 source: "dispatch PHX-WP-ARPROOF-HUMANNAME; mirrors backlog/items/2026-08-17-trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof.md"
 closed_at: 2026-08-18
+closure_repository: "self"
+closure_commit: "a3d3f3459e60589a99eaed595ef50c4161883a2e"
+closure_evidence: "backlog/items/2026-08-18-authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had.md"
 ---
 
 # authority-revision-proof.mjs has the same trustPolicy shape gap po-approval-proof.mjs had

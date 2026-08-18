@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "Measured by the PHX-R3-RESCOPE dispatch (344 stale citations across 57 files). PO decision (APS, 2026-08-07): accepted for implementation, as the follow-up that makes the defect class non-recurring."
 due: 2026-09-06
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "f028fd531f2d73244a8986327b1ad440ba0a76c5"
+closure_evidence: "backlog/items/2026-08-07-no-check-validates-prose-section-citations.md"
 ---
 
 # Nothing in the repository validates prose `§N` / `§N.M` citations

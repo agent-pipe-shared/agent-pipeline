@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-11
 source: "Converged on during Sprint Phoenix Class B scoping (docs/state.md, 2026-08-11 checkpoint, 'PO said keep going' and following sections; specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md, 'The unifying finding'). PO decision confirmed 2026-08-11 (direct mobile question, 'Journal-Gap'): plan this as its own initiative."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "2e1fc22c3486399987a6e19a87eb8e3e0825d908"
+closure_evidence: "backlog/items/2026-08-11-agent-decision-journal-has-no-production-producer.md"
 ---
 
 # `agent-decision-journal.mjs` has zero production callers — no Elephant/Goldfish/Critic session ever writes one of its events

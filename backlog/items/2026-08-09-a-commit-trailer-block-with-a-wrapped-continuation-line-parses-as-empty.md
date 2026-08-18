@@ -8,6 +8,10 @@ created: 2026-08-09
 source: "Independent Critic FAIL (2026-08-09, F6) on a full-range review of the Phoenix measurement/closure wave."
 due: 2026-09-08
 expires: 2026-09-08
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "a9c0f025e90e74f8748ce7d8459b0d03f12b29d8"
+closure_evidence: "backlog/items/2026-08-09-a-commit-trailer-block-with-a-wrapped-continuation-line-parses-as-empty.md"
 ---
 
 # A commit trailer block with a wrapped continuation line parses as empty

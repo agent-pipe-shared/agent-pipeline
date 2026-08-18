@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-19
 source: "Found by PHX-WP-VERIFYREG-TRIAGE while diagnosing verify-suite-registration-tests, windows-assurance-verify-registration-tests, scoped-verify-registration-tests, and verify-evidence-root-tests failures from a full clean-candidate Verify run, 2026-08-18/19."
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "e61b05924c38b246abee65ef2cb4d91dcee11c77"
+closure_evidence: "backlog/items/2026-08-19-verify-registration-check-fixtures-lack-real-git-topology.md"
 ---
 
 # Several verify-registration check fixtures fail structurally: no real git topology in their test root

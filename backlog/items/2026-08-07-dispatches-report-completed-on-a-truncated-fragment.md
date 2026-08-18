@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: "Observed six times in one Elephant session (2026-08-07) across both Goldfish and Critic dispatches. Recorded with the detection and recovery that worked, because the failure is silent by construction."
 due: 2026-09-06
+closed_at: "2026-08-08"
+closure_repository: "self"
+closure_commit: "88dc3ba6952f226ed4f9caa57bad982cb660a425"
+closure_evidence: "backlog/items/2026-08-07-dispatches-report-completed-on-a-truncated-fragment.md"
 ---
 
 # Dispatches signal "completed" while returning a one-sentence fragment

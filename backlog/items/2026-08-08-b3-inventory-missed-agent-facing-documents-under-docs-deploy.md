@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-08
 due: 2026-09-07
 source: "Critic out-of-scope observation, Phoenix gate-integrity full review round 1, 2026-08-08: docs/deploy/README.md carries live operating-model section citations and appears in neither B3 inventory."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_evidence: "backlog/items/2026-08-08-b3-inventory-missed-agent-facing-documents-under-docs-deploy.md"
 ---
 
 # The B3 citation inventory missed agent-facing documents under `docs/deploy/`

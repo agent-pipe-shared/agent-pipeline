@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-18
 source: "PHX-WP-RECONCILE-LOCK-REALPATH dispatch (2026-08-18), stop condition: harness/scripts/pipeline-state.test.mjs is a TP-5 protected test path"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "2eaf90fe326e13fc552e1966d6c1ca7845dc89a4"
+closure_evidence: "backlog/items/2026-08-18-reconcile-lock-reuse-regression-test-needs-a-tp5-window.md"
 ---
 
 # Add the symlinked-`--root` regression test for the reconcile lock-reuse fix
