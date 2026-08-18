@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "00bd47c1871f9d7c660735aecc2e6eb653e40737"
+closure_evidence: "templates/prompts/goldfish-task.md"
 source: "Recurred twice in one overnight AFK block: NVA-A1214-SUCCESS-1 and NVA-RETRYECON-1 each independently introduced a doc comment naming a Pipeline-source-only path (harness/, specs/sprint-nova-epic/) inside a plugins/pipeline-core/ file, only caught by the next Full Verify run, never by the dispatch's own DoD checks."
 ---
 

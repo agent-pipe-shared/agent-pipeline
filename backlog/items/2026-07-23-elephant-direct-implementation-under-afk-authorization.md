@@ -3,8 +3,12 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.elephant-direct-implementation-under-afk-authorization"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-23"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "00bd47c1871f9d7c660735aecc2e6eb653e40737"
+closure_evidence: "plugins/pipeline-core/skills/close-block/SKILL.md"
 source: "close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)"
 ---
 

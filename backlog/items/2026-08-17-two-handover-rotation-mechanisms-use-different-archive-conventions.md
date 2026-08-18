@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "00bd47c1871f9d7c660735aecc2e6eb653e40737"
+closure_evidence: "plugins/pipeline-core/scripts/handover-rotate.mjs"
 source: "Discovered by dispatch NVA-HANDOVER-ROT-1 while wiring its own new close-block step alongside the pre-existing one; disclosed rather than reconciled unilaterally, per the dispatch's own explicit scope boundary."
 ---
 
