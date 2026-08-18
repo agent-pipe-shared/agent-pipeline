@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
 source: "PO, 2026-08-16, observed live in agent-pipeline-share_phoenix: after po-human-approval.mjs sign-intent succeeded (PO-HUMAN-SIGN-INTENT-READY) and the GMW window was active, the session still asked the PO to manually run two `cp` commands to move scratch/reconcile-request-*.json and scratch/reconcile-proof-*.json into the external PO directory. PO: 'dass man nach der freigabe noch mal was von hand kopieren muss sollte auch nicht sein' (having to manually copy something again after the approval shouldn't be necessary either)."
 ---
@@ -86,4 +86,44 @@ the security adjacency. Not implemented in this pass — needs tests
 (`po-human-approval.mjs` has no dependency-injection seam exercised yet for
 this path) to trust.
 - **Date:** 2026-08-18
+
+## Closure (2026-08-18)
+
+Implemented as direction (b), exactly as scoped: `sign-intent --request`
+reads the digest from a repo-root `scratch/` file and mirrors the
+resulting proof/signer back into `scratch/` next to it — one PO-run
+command instead of a sign plus two manual `cp` steps.
+
+- Dispatch `NVA-SWEEP-F2f` (goldfish-deep), commit `9b36dc147cc9b0c` in
+  its worktree, cherry-picked to `main` as `aaccbfcf`.
+- First Critic round: **FAIL** — one blocker (the new `scratch/` mirror
+  writes did not carry the same symlink/hardlink/regular-file hardening
+  `artifactPath()` already applies to every other write target of this
+  command), one major (the PO-facing doc was not updated), one minor
+  (the `--intent-sha256`/`--request` mutual-exclusion check tested
+  validity instead of presence, silently discarding a malformed digest
+  supplied together with `--request`).
+- Rework dispatch `NVA-SWEEP-F2f-REWORK` (goldfish-deep), commit
+  `8c7a1ac92b111dd` in the same worktree, cherry-picked to `main` as
+  `b273a1a0`: fixed all three findings, added a symlink regression test,
+  documented the route in `docs/po-human-approval.md`. 71/71 tests green
+  on `main` after both cherry-picks.
+- Second Critic round: **PASS**, two non-blocking `minor` findings left
+  as fast-follow, not fixed in this pass (cap: two Critic rounds per
+  candidate before self-verifying rather than dispatching a third):
+  1. The two scratch-mirror symlink/hardlink asserts run right before
+     each write (`po-human-approval.mjs:1038`/`:1040`), i.e. *after*
+     `signIntentIntoProof` — a planted symlink/hardlink there aborts the
+     command post-signature, forcing the PO to redo the whole ceremony.
+     Fix: hoist both asserts to right after the sibling paths are
+     derived (`:981-982`), before the confirmation prompt/signing.
+  2. Two branches added by the rework have no direct test: the signer
+     mirror path's own symlink assert (`:1040`, only the proof path is
+     exercised by the regression test) and the `platform === "win32"`
+     branch of `repoScratchRelativePath()` (unreachable on a POSIX test
+     host; the helper is not exported, unlike `outside()`, which already
+     has the established two-platform `NVA-WINPATH-1` test pattern).
+     Fix: add a signer-path symlink test; export
+     `repoScratchRelativePath` and give it the same explicit-`platform`
+     test treatment.
 
