@@ -141,6 +141,29 @@ export function stripFencedCode(markdown) {
     .join("\n");
 }
 
+/**
+ * Blank inline code spans (single or multiple backticks, e.g. `text` or
+ * ``text``) so link-syntax regexes never read markdown-shaped characters
+ * that only exist as prose inside a code span. Mirrors stripFencedCode's
+ * contract: same line count preserved, only span *content* replaced with
+ * spaces (never removed), so line numbers stay accurate for callers.
+ *
+ * Deliberately line-scoped, not document-scoped: every regex this feeds
+ * (reference-definition, inline-destination, reference-link) already
+ * operates per line, and a document-wide scan risks pairing two unrelated
+ * stray backticks across paragraphs and blanking everything between them —
+ * a false negative far worse than the false positive this fixes. A code
+ * span that legitimately spans a soft line break is not handled; that is
+ * a known, accepted narrowing given the line-oriented design of the rest
+ * of this scanner.
+ */
+export function stripInlineCode(markdown) {
+  return markdown
+    .split("\n")
+    .map((line) => line.replace(/(`+)(.*?)\1/g, (match) => match.replace(/./g, " ")))
+    .join("\n");
+}
+
 function cleanHeading(value) {
   return value
     .replace(/[<>]/g, "")
@@ -277,7 +300,7 @@ function inlineDestinations(line) {
 }
 
 export function extractMarkdownLinks(markdown) {
-  const text = stripFencedCode(markdown);
+  const text = stripInlineCode(stripFencedCode(markdown));
   const lines = text.split("\n");
   const definitions = new Map();
   const links = [];

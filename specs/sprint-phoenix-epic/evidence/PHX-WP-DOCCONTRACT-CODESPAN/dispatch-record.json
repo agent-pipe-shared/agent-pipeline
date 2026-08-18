@@ -1,0 +1,34 @@
+{
+  "taskId": "PHX-WP-DOCCONTRACT-CODESPAN",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "stopped-briefing-contradiction",
+  "log": [
+    {
+      "phase": "bootstrap",
+      "toolUseCount": 3,
+      "note": "Confirmed branch sprint_phoenix and specs/sprint-phoenix-epic/ present. Route pre-check: no direct contradiction found between requested route (claude-sonnet-5/xhigh) and environment-declared model identity (Sonnet 5)."
+    },
+    {
+      "phase": "baseline",
+      "toolUseCount": 9,
+      "note": "Before fix: node --test check-doc-contracts.test.mjs = 32 tests, 30 pass, 2 fail (both real-repo integration tests, 20 findings, all shape 'a-z0-9-: missing reference definition'). Logged to before-test-output.log."
+    },
+    {
+      "phase": "implement",
+      "toolUseCount": 14,
+      "note": "Added stripInlineCode() mirroring stripFencedCode's line-preserving contract; wired into extractMarkdownLinks() as stripInlineCode(stripFencedCode(markdown)). Fixes docs/state.md's 3 backtick-wrapped occurrences exactly as the Goal described them."
+    },
+    {
+      "phase": "discovery-contradiction",
+      "toolUseCount": 20,
+      "note": "CLI re-run after fix: findings dropped from 20 to 17, all 17 remaining are specs/sprint-phoenix-epic/evidence/acceptance-evidence-map-2026*.md:86. Verified with grep (80-char lookback, two separate files) that this occurrence has NO backtick anywhere nearby -- it is bare prose '(/^[a-z][a-z0-9-]{0,63}$/u)' inside parentheses, not an inline code span. This contradicts the briefing's Goal-section description of this exact file class as 'a single-backtick inline code span'. Stop condition triggered: briefing-vs-repo contradiction (field 5) -- fixing this shape would require suppressing bracket-pairs inside bare parenthetical prose, which is not code-span-equivalent and would risk false negatives on genuine reference-style links inside parens elsewhere -- exactly the tension field 5 says to report rather than resolve unilaterally."
+    },
+    {
+      "phase": "regression-tests",
+      "toolUseCount": 25,
+      "note": "Added 4 new tests to check-doc-contracts.test.mjs: stripInlineCode unit test, code-span false-positive suppression, genuine missing-reference outside code span still reported, and a combined-line test proving the suppression is scoped not blanket. After-fix suite: 36 tests, 34 pass, 2 fail (same 2 pre-existing real-repo integration tests, now failing only on the 17 out-of-scope evidence-map findings, docs/state.md findings gone). Logged to after-test-output.log."
+    }
+  ]
+}

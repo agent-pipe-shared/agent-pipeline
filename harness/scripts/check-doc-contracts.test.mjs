@@ -14,6 +14,7 @@ import {
   isExcludedRepoPath,
   stripFencedCode,
   stripHtmlComments,
+  stripInlineCode,
 } from "./check-doc-contracts.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./check-doc-contracts.mjs", import.meta.url));
@@ -152,6 +153,38 @@ test("inline and reference links are extracted while fenced fakes are ignored", 
     "missing.md",
     "angle.md",
   ]);
+});
+
+test("inline code spans are blanked without losing line structure", () => {
+  const spanA = "`[a-z][a-z0-9-]{0,63}`";
+  const spanB = "``two``";
+  const value = `before ${spanA} middle ${spanB} end`;
+  const expected = value.replace(spanA, " ".repeat(spanA.length)).replace(spanB, " ".repeat(spanB.length));
+  assert.equal(stripInlineCode(value), expected);
+  assert.equal(stripInlineCode(value).length, value.length);
+});
+
+test("a regex character class in a single-backtick code span is not read as a reference-style link", () => {
+  const links = extractMarkdownLinks(
+    "the pattern `[a-z][a-z0-9-]{0,63}` matches bounded ID slugs.\n",
+  );
+  assert.deepEqual(
+    links.filter((link) => link.kind === "missing-reference"),
+    [],
+  );
+  assert.deepEqual(links, []);
+});
+
+test("a genuine broken reference-style link outside any code span is still reported missing-reference", () => {
+  const links = extractMarkdownLinks("see [Missing][undefined-ref] for details.\n");
+  assert.deepEqual(links, [{ destination: null, referenceId: "undefined-ref", line: 1, kind: "missing-reference" }]);
+});
+
+test("a code-span look-alike does not suppress a genuine broken reference-style link on the same line", () => {
+  const links = extractMarkdownLinks(
+    "the pattern `[a-z][a-z0-9-]{0,63}` is unrelated to [Missing][undefined-ref] here.\n",
+  );
+  assert.deepEqual(links, [{ destination: null, referenceId: "undefined-ref", line: 1, kind: "missing-reference" }]);
 });
 
 test("minimal repository passes", () => {
