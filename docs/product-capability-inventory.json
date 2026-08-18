@@ -587,6 +587,12 @@
       "member": "advisory-receipt-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:afk-activation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "afk-activation-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:afk-assumption-mode-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -707,6 +713,18 @@
       "member": "audit-bundle-core-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "auth-gate-inventory-drift-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "auth-gate-inventory-drift-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -821,6 +839,12 @@
       "member": "claude-goal-host-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:clean-candidate-run-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "clean-candidate-run-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -903,6 +927,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "codex-isolated-critic-contract-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-protected-preimage-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-isolated-critic-protected-preimage-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-isolation-control-decomposition-tests",
@@ -1241,6 +1271,12 @@
       "member": "epic-ac02-publication-check-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:epic-file-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "epic-file-contract-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:error-register-check",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1475,6 +1511,12 @@
       "member": "guard-dispatch-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-el01-tripwire-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-el01-tripwire-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-gmw-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1491,6 +1533,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "guard-git-phoenix-authority-grant-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-git-phoenix-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
@@ -1521,6 +1569,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "guard-maintenance-window-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-onboarding-consent-lock-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-onboarding-consent-lock-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-decision-reference-tests",
@@ -1871,6 +1925,12 @@
       "member": "observation-governance-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "onboarding-consent-marker-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1949,6 +2009,12 @@
       "member": "phase3-sdlc-coherence-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-authority-approval-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-authority-approval-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2013,6 +2079,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "pipeline-update-channel-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-legacy-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "plan-spec-state-v2-legacy-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-tests",
@@ -2255,6 +2327,12 @@
       "member": "publication-state-authority-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:recovery-bridge-approval-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "recovery-bridge-approval-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2295,6 +2373,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "repository-freshness-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "resume-hint-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
@@ -2481,6 +2565,18 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "sdlc-run-graph-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:section-citation-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "section-citation-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:section-citation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "section-citation-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-capability-plan-builder-tests",
@@ -2741,6 +2837,12 @@
       "member": "validate-manifest-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:verify-evidence-root-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "verify-evidence-root-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2959,6 +3061,7 @@
         "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:afk-assumption-mode-tests",
         "verify-phase:harness/scripts/verify.mjs:afk-capability-worker-tests",
         "verify-phase:harness/scripts/verify.mjs:afk-claude-host-tests",
@@ -2979,6 +3082,8 @@
         "verify-phase:harness/scripts/verify.mjs:async-execution-tests",
         "verify-phase:harness/scripts/verify.mjs:audit-bundle-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:audit-bundle-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-check",
+        "verify-phase:harness/scripts/verify.mjs:auth-gate-inventory-drift-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-revision-proof-tests",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-check",
         "verify-phase:harness/scripts/verify.mjs:authority-tier-agreement-tests",
@@ -2998,6 +3103,7 @@
         "verify-phase:harness/scripts/verify.mjs:check-release-state-consistency-tests",
         "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
         "verify-phase:harness/scripts/verify.mjs:claude-goal-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:clean-candidate-run-tests",
         "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisory-app-server-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
@@ -3012,6 +3118,7 @@
         "verify-phase:harness/scripts/verify.mjs:codex-host-repository-init-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-claims-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-protected-preimage-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-isolation-control-decomposition-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-onboarding-app-server-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-onboarding-capabilities-tests",
@@ -3066,6 +3173,7 @@
         "verify-phase:harness/scripts/verify.mjs:document-identifier-tests",
         "verify-phase:harness/scripts/verify.mjs:document-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:entrypoint-reachability-tests",
+        "verify-phase:harness/scripts/verify.mjs:epic-file-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:error-register-check",
         "verify-phase:harness/scripts/verify.mjs:error-register-tests",
         "verify-phase:harness/scripts/verify.mjs:evidence-view-model-tests",
@@ -3105,14 +3213,17 @@
         "verify-phase:harness/scripts/verify.mjs:guard-authority-ledger-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-el01-tripwire-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-gmw-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-origin-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-authority-grant-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-handoff-offer-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-onboarding-consent-lock-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-decision-reference-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-external-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
@@ -3171,6 +3282,7 @@
         "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-verify-resume-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-runner-identity-tests",
         "verify-phase:harness/scripts/verify.mjs:organization-policy-activation-tests",
@@ -3183,6 +3295,7 @@
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-tests",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-check",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-authority-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
@@ -3193,6 +3306,7 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-reopen-design-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-legacy-tests",
         "verify-phase:harness/scripts/verify.mjs:plan-spec-state-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:po-approval-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:po-approval-proof-tests",
@@ -3233,6 +3347,7 @@
         "verify-phase:harness/scripts/verify.mjs:publication-executor-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-gate-evidence-tests",
         "verify-phase:harness/scripts/verify.mjs:publication-state-authority-tests",
+        "verify-phase:harness/scripts/verify.mjs:recovery-bridge-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:reference-catalog-tests",
         "verify-phase:harness/scripts/verify.mjs:reference-catalog-views-tests",
@@ -3240,6 +3355,7 @@
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:remote-provisional-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
+        "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
         "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
@@ -3271,6 +3387,8 @@
         "verify-phase:harness/scripts/verify.mjs:schema-lite-tests",
         "verify-phase:harness/scripts/verify.mjs:sdlc-efficiency-metrics-tests",
         "verify-phase:harness/scripts/verify.mjs:sdlc-run-graph-tests",
+        "verify-phase:harness/scripts/verify.mjs:section-citation-check",
+        "verify-phase:harness/scripts/verify.mjs:section-citation-tests",
         "verify-phase:harness/scripts/verify.mjs:security-capability-plan-builder-tests",
         "verify-phase:harness/scripts/verify.mjs:security-completeness-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:security-evidence-evaluator-tests",
@@ -3314,6 +3432,7 @@
         "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:verify-evidence-root-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-check",
         "verify-phase:harness/scripts/verify.mjs:verify-suite-registration-tests",
         "verify-phase:harness/scripts/verify.mjs:verify-topology-preflight-tests",
