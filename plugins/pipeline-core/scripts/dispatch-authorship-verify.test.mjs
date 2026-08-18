@@ -353,6 +353,47 @@ test("(l2) readRecordFile itself refuses an unsafe id rather than joining it int
   assert.equal(readRecordFile(EVIDENCE, "NOT-WRITTEN-BY-ANY-TEST"), null, "a safe id that has no record is still a plain null");
 });
 
+// Direction 2 of `2026-08-09-the-dispatch-record-does-not-bind-to-the-commit-it-vouches-for.md`
+// (write-ordering so the record survives truncation the way the commit does). The design
+// appended to that item under the 2026-08-18 wave-2 dispatch NVA-W2-3 recommends a
+// "commit-then-checkpoint" protocol: immediately after each `git commit`, the goldfish writes
+// `commits`, `outcome` (an interim value NOT in `NON_TERMINAL_OUTCOMES`) and
+// `report.changedFiles` into the dispatch record BEFORE composing the prose narrative, so a
+// truncation between the commit and the final report still leaves a record this script can
+// bind. These two tests are the evidence that the pattern needs ZERO changes to this checker
+// (terminality is already a denylist, not an allowlist) and that skipping the outcome half of
+// the checkpoint is not enough on its own.
+test("(n) Direction 2 checkpoint pattern: an interim outcome off the denylist already PASSes with no checker change", () => {
+  writeRecord("DOD-N", {
+    taskId: "DOD-N",
+    outcome: "committed-pending-report",
+    commits: ["n00n555"],
+    report: { changedFiles: ["src/thing.mjs - the change"] },
+  });
+  const verdict = verifyCommit(
+    "n00n555aaa",
+    commit({ message: "feat(x): a thing\n\nDispatch: DOD-N (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }),
+  );
+  assert.equal(verdict.verdict, VERDICT.pass);
+  assert.equal(verdict.classification, "bound");
+  assert.equal(isTerminalOutcome("committed-pending-report"), true, "the denylist never listed this value, so it is terminal by construction");
+});
+
+test("(n2) Direction 2 counter-case: capturing the sha early is not enough while outcome stays on the denylist", () => {
+  writeRecord("DOD-N2", {
+    taskId: "DOD-N2",
+    outcome: "in-progress",
+    commits: ["n22n666"],
+    report: { changedFiles: ["src/thing.mjs - the change"] },
+  });
+  const verdict = verifyCommit(
+    "n22n666bbb",
+    commit({ message: "feat(x): a thing\n\nDispatch: DOD-N2 (goldfish)\nAI-Assisted: true\n", paths: ["src/thing.mjs"] }),
+  );
+  assert.equal(verdict.verdict, VERDICT.fail);
+  assert.equal(verdict.classification, "record-not-terminal", "sha binding alone does not rescue a record whose outcome never left the denylist");
+});
+
 test("the real git-backed readers work against this repository's own HEAD", () => {
   const deps = gitDeps({ evidenceDir: DEFAULT_EVIDENCE_DIR });
   assert.equal(typeof deps.readCommitMessage("HEAD"), "string");
