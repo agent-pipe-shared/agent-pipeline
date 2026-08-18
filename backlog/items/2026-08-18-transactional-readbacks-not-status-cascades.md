@@ -39,10 +39,10 @@ mutating action and one overall readback.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — add a single consolidated read-only `inspect` subcommand (reusing the existing richer-subcommand JSON pattern), paired with a documentation update to the dispatch templates so it's actually adopted. Not the full 14-writer bundle.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation. Coordinate with `per-phase-progress-message-budget` so the new payload stays a tool-result, not echoed into chat.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

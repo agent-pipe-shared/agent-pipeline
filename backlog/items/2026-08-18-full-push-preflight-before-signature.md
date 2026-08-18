@@ -44,10 +44,10 @@ an incorrect evidence path, is rejected before the passphrase prompt.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — minimal preflight extension of `prepare-push-subject` (trust-anchor + evidence-freshness + clean-tree checks), PLUS (per the PO's `phase-aware-bootstrap-readiness` decision, same session) a verify-contract-existence check as the actual hard gate for a missing/broken verify script. Network-dependent remote/branch-existence checks split into a separate follow-up item pending a PO decision on branch-non-existence semantics.
+- **Rationale:** PO 2026-08-18 accepted the analyst's minimal-preflight recommendation, and separately decided (via `phase-aware-bootstrap-readiness`) that THIS is where the verify-existence hard block belongs, rather than at the design→implementation transition.
+- **Assignment (if accepted):** Nova Wave 4 implementation. Also share the trust-anchor detection helper with `po-key-trust-anchor-onboarding` rather than duplicating it (see that item's Triage).
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

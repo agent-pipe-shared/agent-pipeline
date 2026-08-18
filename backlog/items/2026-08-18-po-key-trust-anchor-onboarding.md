@@ -41,10 +41,10 @@ setup and no manual JSON/git step occurs during the feature flow.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — hybrid: one shared detection helper (machine plane → local PO authority → materialization snippet) used by both this item's onboarding-time guidance and `full-push-preflight-before-signature`'s trust-anchor check; the onboarding-time guidance itself is this item's actual deliverable.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation, coordinate the shared helper with `full-push-preflight-before-signature` (ideally one dispatch, to avoid building the helper twice).
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

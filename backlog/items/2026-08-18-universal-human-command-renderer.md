@@ -41,10 +41,10 @@ wrapping.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — minimal fix: route the 3 known ad hoc sites (`guard-lifecycle-ready.mjs`'s `humanOverrideRoute()`, the near-identical duplicate in `guard-testpath.mjs`, `human-guard-override.mjs`) through the existing `boundedOpaqueCopyCommand()` renderer. Systemic enforcement (a structural check preventing a 4th recurrence) registered as a contribution to the already-deferred Sprint Alfred "unified human authorization UX" scope, not built here.
+- **Rationale:** PO 2026-08-18 accepted the analyst's hybrid recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

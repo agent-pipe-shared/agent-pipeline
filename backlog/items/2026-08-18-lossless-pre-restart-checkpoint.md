@@ -45,10 +45,10 @@ already-answered design decisions must not be asked again.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — implemented as part of the full coordinator build for `fresh-repo-onboarding-intake-first-transaction` (PO chose the full-coordinator option there, which subsumes this item's proposal as one step of its six).
+- **Rationale:** PO 2026-08-18 explicitly chose the full-coordinator path for the sibling P0-0 item over the sequenced/minimal-first approach; this item's fix is folded directly into that coordinator's design rather than built standalone. See `fresh-repo-onboarding-intake-first-transaction`'s Triage for the write-permission-during-onboarding carve-out that also applies here.
+- **Assignment (if accepted):** Subsumed into `fresh-repo-onboarding-intake-first-transaction`'s design pass and implementation — close this item as merged once that work lands; do not implement separately.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

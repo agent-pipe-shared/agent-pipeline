@@ -41,10 +41,10 @@ instruction before the push ceremony.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — hybrid: keep GF-09's existing report shape, add a glossary distinction between "implementation complete" and "PO-accepted", one new handover marker value, a hard rule against saying "done" while checks are open, require GF-09's Open-items section to name outstanding review/manual checks by category.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

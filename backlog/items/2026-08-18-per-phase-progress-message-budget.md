@@ -41,10 +41,10 @@ PRD approval, and none between approval and the result.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — new `roles/elephant.md` rule (EL-3x): one start + one completion message per lifecycle phase, exceptions for a real decision/blockage/step >60s; anchor "phase" to `operating-model.md` §4's 8-phase list, treat the 60s threshold as a soft heuristic.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is; triage jointly with `transactional-readbacks-not-status-cascades` since both were flagged as related noise sources.
+- **Assignment (if accepted):** Nova Wave 4 implementation.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

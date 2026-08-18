@@ -55,10 +55,10 @@ HGO, and no continuity repair.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Build the full atomic bootstrap-from-intake coordinator (Option 1 — the item's own literal 6-step proposal). PO explicit override of the analyst's sequencing recommendation (which had leaned toward implementing the two narrower siblings first and deferring this coordinator pending a separate design pass).
+- **Rationale:** PO decision 2026-08-18, made explicitly aware of the tradeoffs (large rearchitecture touching kickoff/promote machinery that already absorbed 4 prior repair-cascade incidents and 15 crash-injection-hardening stages, no back-compat/migration story yet for already-onboarded repos) — accepted the larger, more thorough fix over the safer sequenced/deferred option specifically because it removes the root cause (authority bound before durable capture) rather than a partial mitigation. **Explicit PO carve-out (2026-08-18):** for this coordinator to work at all, WRITE permission for the specific onboarding-scoped files it needs (the intake checkpoint, provisional/staging PRD+spec, provisional calibration/pipeline-state, etc. — the coordinator's own design pass determines the exact file set) MUST be allowed even while the general "readiness" gate (verify contract, etc.) is not yet satisfied — onboarding necessarily happens before readiness exists. This is an intentional, PO-approved exception to the readiness gate for those specific files, not a guardrail gap to close elsewhere; the design pass must treat it as a settled constraint, not an open question, and should name the exact file set explicitly rather than widen the exception past what onboarding actually needs.
+- **Assignment (if accepted):** Nova Wave 4 implementation — needs a dedicated design pass (ADR-weight) before dispatch per the item's own proposal, given the size/risk; not a direct Goldfish dispatch from this Triage alone. Sequence: the design pass covers this item plus its two siblings (lossless-pre-restart-checkpoint, intake-values-restart-resilient-immediately) in one coherent design, since their proposals were near-duplicate steps of this item's own 6-step proposal.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

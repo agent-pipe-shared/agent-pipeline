@@ -41,10 +41,10 @@ commit, a real verify contract must exist.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** PO's own modified design (neither offered option as-is): at the design→implementation transition, downgrade Step 5 (and `enterPlanImplementation()`) to a WARNING only — never a hard stop for a genuinely pre-implementation project. Move the actual hard BLOCK to the push gate instead: a candidate must not be pushable without a runnable verify contract.
+- **Rationale:** PO 2026-08-18 — reasoned that blocking at design→implementation punishes legitimate PRD-only work too early, while push is the point where a missing verify contract is genuinely unacceptable; this ties directly into `full-push-preflight-before-signature`'s new preflight checks (same wave, same session) as the natural enforcement point instead of building a second, separate mechanism.
+- **Assignment (if accepted):** Two-part: (1) small behavior change downgrading `harness/session-bootstrap.md` Step 5 and `enterPlanImplementation()`'s check to a warning at the design→implementation transition; (2) add a verify-contract-existence check to `prepare-push-subject` — this second half is literally `full-push-preflight-before-signature`'s scope, implement together with that item, not as a separate dispatch.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18
