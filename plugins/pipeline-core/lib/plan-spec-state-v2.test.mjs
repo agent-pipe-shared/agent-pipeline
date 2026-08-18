@@ -6,6 +6,7 @@ import test from "node:test";
 
 import { reconcileRunnerNativeContinuation } from "./continuity-state.mjs";
 import {
+  appendPhaseHistory,
   applyLegacyV2RevocationRecovery,
   approveSubmittedPlan,
   derivePlanLifecycle,
@@ -38,6 +39,7 @@ const LATER = "2026-07-30T20:05:00.000Z";
 const REOPENED = "2026-07-30T20:10:00.000Z";
 const RESUBMITTED = "2026-07-30T20:15:00.000Z";
 const REAPPROVED = "2026-07-30T20:20:00.000Z";
+const IMPLEMENTED = "2026-07-30T20:30:00.000Z";
 
 function continuity(overrides = {}) {
   return {
@@ -122,10 +124,12 @@ test("closed lifecycle derives draft, awaiting-approval, approved, and implement
   const implementation = enterPlanImplementation({
     state: accepted,
     expectedStateSha256: sha256CanonicalJson(accepted),
+    at: IMPLEMENTED,
   });
-  assert.equal(implementation.ok, true);
+  assert.equal(implementation.ok, true, JSON.stringify(implementation));
   assert.equal(derivePlanLifecycle(implementation.state).status, "implementing");
-  assert.deepEqual(Object.keys(implementation.state.activeFeature).sort(), ["id", "phase", "planPath"]);
+  assert.deepEqual(Object.keys(implementation.state.activeFeature).sort(), ["id", "phase", "phaseHistory", "planPath"]);
+  assert.deepEqual(implementation.state.activeFeature.phaseHistory, [{ phase: "implementation", at: IMPLEMENTED }]);
 });
 
 test("submission atomically rebinds Continuity authority before approval and implementation", () => {
@@ -148,6 +152,7 @@ test("submission atomically rebinds Continuity authority before approval and imp
     const implementation = enterPlanImplementation({
       state: accepted,
       expectedStateSha256: sha256CanonicalJson(accepted),
+      at: IMPLEMENTED,
     });
     assert.equal(implementation.ok, true, JSON.stringify(implementation));
     assert.deepEqual(implementation.state.continuity, awaiting.continuity);
@@ -293,6 +298,7 @@ test("V2 revocation atomically returns the feature to design and the exact legac
   });
   assert.equal(revocation.ok, true, JSON.stringify(revocation));
   assert.equal(revocation.state.activeFeature.phase, "design");
+  assert.deepEqual(revocation.state.activeFeature.phaseHistory, [{ phase: "design", at: LATER }]);
 
   const legacyMixed = {
     ...revocation.state,
@@ -306,6 +312,10 @@ test("V2 revocation atomically returns the feature to design and the exact legac
   });
   assert.equal(planned.ok, true, JSON.stringify(planned));
   assert.equal(planned.state.activeFeature.phase, "design");
+  assert.deepEqual(planned.state.activeFeature.phaseHistory, [
+    { phase: "design", at: LATER },
+    { phase: "design", at: REOPENED },
+  ]);
   assert.equal(planned.state.planApproval, undefined);
   assert.equal(planned.state.planRevocation, undefined);
   assert.deepEqual(planned.state.continuity, legacyMixed.continuity);
@@ -422,6 +432,7 @@ test("resubmission clears a native continuation bound to the preceding authority
   const implementation = enterPlanImplementation({
     state: accepted,
     expectedStateSha256: sha256CanonicalJson(accepted),
+    at: IMPLEMENTED,
   });
   assert.equal(implementation.ok, true);
   const activated = await reconcileRunnerNativeContinuation({
@@ -518,6 +529,7 @@ test("reopen-design retires a pre-submission V2 approval as a profile-independen
     assert.equal(reopened.replay, false);
     assert.equal(reopened.invalidation, null);
     assert.equal(reopened.state.activeFeature.phase, "design");
+    assert.deepEqual(reopened.state.activeFeature.phaseHistory, [{ phase: "design", at: REOPENED }]);
     assert.equal(reopened.state.planApproved, false);
     assert.equal(Object.hasOwn(reopened.state, "planSubmission"), false);
     assert.equal(Object.hasOwn(reopened.state, "planApproval"), false);
@@ -620,4 +632,86 @@ test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 m
   assert.equal(secondReopen.invalidation.invalidatedAt, secondAt);
   assert.notEqual(secondReopen.invalidation.invalidatedSubmissionSha256, firstReopen.invalidation.invalidatedSubmissionSha256);
   assert.equal(secondReopen.invalidation.invalidatedApprovalSha256, sha256CanonicalJson(successor.planApproval));
+});
+
+test("appendPhaseHistory is purely additive and order-preserving", () => {
+  assert.deepEqual(
+    appendPhaseHistory({ id: "feature", planPath: AUTHORITY.planPath, phase: "design" }, "implementation", NOW),
+    [{ phase: "implementation", at: NOW }],
+  );
+  const withHistory = {
+    id: "feature",
+    planPath: AUTHORITY.planPath,
+    phase: "implementation",
+    phaseHistory: [{ phase: "implementation", at: NOW }],
+  };
+  assert.deepEqual(appendPhaseHistory(withHistory, "design", LATER), [
+    { phase: "implementation", at: NOW },
+    { phase: "design", at: LATER },
+  ]);
+});
+
+test("NVA-W4-02B: phase transitions accumulate phaseHistory, and an activeFeature with no phaseHistory still validates", () => {
+  // Old-shape activeFeature (no `phaseHistory` key at all) predates this
+  // field and must stay a valid draft state forever -- nothing here
+  // backfills or requires history for a feature created before this change.
+  const oldShapeDraft = draft();
+  assert.equal(Object.hasOwn(oldShapeDraft.activeFeature, "phaseHistory"), false);
+  assert.equal(derivePlanLifecycle(oldShapeDraft).status, "draft");
+
+  // Submission/approval never touch activeFeature, so it stays old-shape
+  // right up to the first actual phase transition.
+  const accepted = approved();
+  assert.equal(Object.hasOwn(accepted.activeFeature, "phaseHistory"), false);
+
+  const implementation = enterPlanImplementation({
+    state: accepted,
+    expectedStateSha256: sha256CanonicalJson(accepted),
+    at: IMPLEMENTED,
+  });
+  assert.equal(implementation.ok, true, JSON.stringify(implementation));
+  assert.deepEqual(implementation.state.activeFeature.phaseHistory, [{ phase: "implementation", at: IMPLEMENTED }]);
+  assert.equal(derivePlanLifecycle(implementation.state).status, "implementing");
+
+  // A second transition (reopen back to design) appends rather than replaces.
+  const reopened = reopenPlanDesign({
+    state: implementation.state,
+    expectedStateSha256: sha256CanonicalJson(implementation.state),
+    by: "PO",
+    at: REOPENED,
+  });
+  assert.equal(reopened.ok, true, JSON.stringify(reopened));
+  assert.deepEqual(reopened.state.activeFeature.phaseHistory, [
+    { phase: "implementation", at: IMPLEMENTED },
+    { phase: "design", at: REOPENED },
+  ]);
+  assert.equal(derivePlanLifecycle(reopened.state).status, "draft");
+
+  // A malformed phaseHistory entry (unknown phase) fails the state closed
+  // rather than being silently accepted.
+  const malformedPhase = {
+    ...reopened.state,
+    activeFeature: {
+      ...reopened.state.activeFeature,
+      phaseHistory: [{ phase: "not-a-real-phase", at: REOPENED }],
+    },
+  };
+  assert.equal(derivePlanLifecycle(malformedPhase).ok, false);
+
+  // A malformed phaseHistory entry (non-canonical timestamp) also fails closed.
+  const malformedAt = {
+    ...reopened.state,
+    activeFeature: {
+      ...reopened.state.activeFeature,
+      phaseHistory: [{ phase: "design", at: "not-an-iso-time" }],
+    },
+  };
+  assert.equal(derivePlanLifecycle(malformedAt).ok, false);
+
+  // A phaseHistory that isn't even an array also fails closed.
+  const malformedShape = {
+    ...reopened.state,
+    activeFeature: { ...reopened.state.activeFeature, phaseHistory: "not-an-array" },
+  };
+  assert.equal(derivePlanLifecycle(malformedShape).ok, false);
 });

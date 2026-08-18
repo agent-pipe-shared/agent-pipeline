@@ -74,6 +74,13 @@ const LEGACY_V2_RECOVERY_STATE_KEYS = new Set([
   "deployApprovals",
 ]);
 const ACTIVE_FEATURE_KEYS = ["id", "planPath", "phase"];
+// Purely additive: an activeFeature carrying `phaseHistory` is a superset
+// shape, never a replacement -- a state file written before this field
+// existed has exactly ACTIVE_FEATURE_KEYS and stays valid forever (backward
+// compatibility, NVA-W4-02B). Only a writer that chooses to track history
+// (this module's own transition builders) ever adds the fourth key.
+const ACTIVE_FEATURE_KEYS_WITH_HISTORY = ["id", "planPath", "phase", "phaseHistory"];
+const PHASE_HISTORY_ENTRY_KEYS = ["phase", "at"];
 const SUBMISSION_KEYS = [
   "schema",
   "featureId",
@@ -208,11 +215,37 @@ function validV2Approval(value) {
     && validAuthority(value.poGateAuthority);
 }
 
+function validPhaseHistoryEntry(value) {
+  return hasExactKeys(value, PHASE_HISTORY_ENTRY_KEYS)
+    && PHASES.has(value.phase)
+    && isCanonicalIso(value.at);
+}
+
+function validPhaseHistory(value) {
+  return Array.isArray(value) && value.every(validPhaseHistoryEntry);
+}
+
 function validActiveFeature(value) {
-  return hasExactKeys(value, ACTIVE_FEATURE_KEYS)
+  if (!isPlainObject(value)) return false;
+  const hasHistory = Object.prototype.hasOwnProperty.call(value, "phaseHistory");
+  const keys = hasHistory ? ACTIVE_FEATURE_KEYS_WITH_HISTORY : ACTIVE_FEATURE_KEYS;
+  return hasExactKeys(value, keys)
     && isNonBlankString(value.id)
     && isRepositoryPath(value.planPath)
-    && PHASES.has(value.phase);
+    && PHASES.has(value.phase)
+    && (!hasHistory || validPhaseHistory(value.phaseHistory));
+}
+
+/**
+ * Append one timestamped `{phase, at}` entry to an activeFeature's phase
+ * history. Purely additive and order-preserving: a pre-existing activeFeature
+ * without `phaseHistory` starts a fresh array rather than failing -- there is
+ * no bootstrap requirement to backfill history for a feature created before
+ * this field existed.
+ */
+export function appendPhaseHistory(activeFeature, phase, at) {
+  const priorHistory = Array.isArray(activeFeature?.phaseHistory) ? activeFeature.phaseHistory : [];
+  return [...priorHistory, { phase, at }];
 }
 
 export function validPlanSubmission(value) {
@@ -610,7 +643,11 @@ export function reopenPlanDesign({
     if (legacyV2Approval) {
       const next = {
         ...state,
-        activeFeature: { ...state.activeFeature, phase: "design" },
+        activeFeature: {
+          ...state.activeFeature,
+          phase: "design",
+          phaseHistory: appendPhaseHistory(state.activeFeature, "design", at),
+        },
         planApproved: false,
       };
       delete next.planApproval;
@@ -646,7 +683,11 @@ export function reopenPlanDesign({
     replay: false,
     state: {
       ...state,
-      activeFeature: { ...state.activeFeature, phase: "design" },
+      activeFeature: {
+        ...state.activeFeature,
+        phase: "design",
+        phaseHistory: appendPhaseHistory(state.activeFeature, "design", at),
+      },
       planApproved: false,
       planInvalidation: invalidation,
     },
@@ -654,18 +695,23 @@ export function reopenPlanDesign({
   };
 }
 
-export function enterPlanImplementation({ state, expectedStateSha256 }) {
+export function enterPlanImplementation({ state, expectedStateSha256, at }) {
   const checked = exactTransitionState(state, expectedStateSha256);
   if (!checked.ok) return checked;
   if (checked.lifecycle.status !== "approved" || state.activeFeature.phase !== "design") {
     return fail("PLAN-IMPLEMENTATION-STATE-INVALID");
   }
+  if (!isCanonicalIso(at)) return fail("PLAN-IMPLEMENTATION-REQUEST-INVALID");
   return {
     ok: true,
     replay: false,
     state: {
       ...state,
-      activeFeature: { ...state.activeFeature, phase: "implementation" },
+      activeFeature: {
+        ...state.activeFeature,
+        phase: "implementation",
+        phaseHistory: appendPhaseHistory(state.activeFeature, "implementation", at),
+      },
     },
   };
 }
@@ -737,7 +783,11 @@ function legacyV2RevocationRecoveryPostimage(state, { by, at, preimageSha256 }) 
   const next = {
     ...state,
     planApproved: false,
-    activeFeature: { ...state.activeFeature, phase: "design" },
+    activeFeature: {
+      ...state.activeFeature,
+      phase: "design",
+      phaseHistory: appendPhaseHistory(state.activeFeature, "design", at),
+    },
     planRecovery: {
       schema: LEGACY_V2_REVOCATION_RECOVERY_SCHEMA,
       recoveryClass: LEGACY_V2_REVOCATION_RECOVERY_CLASS,
@@ -926,7 +976,11 @@ export function revokePlanV2({
       ...state,
       planApproved: false,
       planRevocation: revocation,
-      activeFeature: { ...state.activeFeature, phase: "design" },
+      activeFeature: {
+        ...state.activeFeature,
+        phase: "design",
+        phaseHistory: appendPhaseHistory(state.activeFeature, "design", at),
+      },
     },
     revocation,
     planRevocationSha256: sha256CanonicalJson(revocation),
