@@ -1162,6 +1162,11 @@ test("pipeline author repair binds one exact source root and action without Stat
     });
     assert.equal(request.status, "author-repair-required");
     assert.equal(request.candidateSourceRoot, sourceRoot);
+    // NVA-CROSSREPOGUIDANCE-1: the "author-repair-required" branch had the identical
+    // missing-root gap as "planned"; its guidance line names --repo too, so it carries the
+    // bound root as well. Author repair is never cross-repository, so this is the
+    // coordinator's own root -- pinned here so the field cannot silently go missing again.
+    assert.equal(request.root, git(root, "rev-parse", "--path-format=absolute", "--show-toplevel"));
     assert.throws(
       () => planHumanGuardOverride({
         rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
@@ -3144,5 +3149,77 @@ test("NVA-CROSSREPOLEDGER-2b: a symlinked cross-repository target pointing at a 
   } finally {
     rmSync(root, { recursive: true, force: true });
     rmSync(linkHolder, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// NVA-CROSSREPOGUIDANCE-1 (backlog/items/2026-08-18-codex-pretool-guard-cross-repository-
+// recovery-guidance-points-at-the-wrong-repo.md): after NVA-CROSSREPOLEDGER-1 rebound the
+// ledger to the cross-repository TARGET, recordHumanGuardDenial()'s return payload still
+// carried only `requestSha256`. Every guard hook that prints override-ceremony guidance
+// therefore had no correct root to name and fell back to its own `projectRoot` -- which for
+// this class is a repository where the request does not exist. These tests pin the returned
+// `root` as the root the ceremony must actually be run against: not merely equal to some
+// expected string, but the ONLY root planHumanGuardOverride() accepts for that request.
+// ---------------------------------------------------------------------------------
+
+test("NVA-CROSSREPOGUIDANCE-1a: an ordinary in-root denial returns the coordinator's own root, and the ceremony runs against exactly that root", () => {
+  const root = fixture();
+  try {
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const recorded = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "ordinary\n" },
+      denials: denial,
+      nowMs: 1000,
+    });
+    assert.equal(recorded.status, "planned");
+    const plan = planHumanGuardOverride({
+      rootDir: recorded.root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 2000, scriptPath,
+    });
+    assert.equal(plan.root, recorded.root,
+      "the returned root must be the one the ceremony resolves the request under");
+    assert.equal(recorded.root, git(root, "rev-parse", "--path-format=absolute", "--show-toplevel"),
+      "an ordinary in-root denial must still name the coordinator's own root, unchanged");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-CROSSREPOGUIDANCE-1b: a cross-repository denial returns the TARGET root, which is the only root its ceremony can be run against", () => {
+  const root = fixture(); // the coordinating session's own root
+  const target = fixture(); // the guarded command's actual, distinct physical target
+  try {
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const toolInput = { command: `git -C ${target} status` };
+    // recordHumanGuardDenial() is always called with the COORDINATOR's own rootDir --
+    // exactly how every guard hook calls it.
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.equal(recorded.status, "planned");
+    assert.equal(recorded.root, git(target, "rev-parse", "--path-format=absolute", "--show-toplevel"),
+      "a cross-repository denial must name the target repository, not the coordinator");
+    assert.notEqual(recorded.root, root, "naming the coordinator here is exactly the defect under test");
+
+    // The decisive part: the returned root is not a label, it is the only root under which
+    // this request resolves. Guidance naming the coordinator cannot clear the gate at all.
+    const plan = planHumanGuardOverride({
+      rootDir: recorded.root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 2000, scriptPath,
+    });
+    assert.equal(plan.commandClass, "cross-repository-target");
+    assert.equal(plan.root, recorded.root);
+    assert.throws(
+      () => planHumanGuardOverride({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 2000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError,
+      "the coordinator root must not resolve a cross-repository request -- that is why the printed --repo has to be the target",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
   }
 });

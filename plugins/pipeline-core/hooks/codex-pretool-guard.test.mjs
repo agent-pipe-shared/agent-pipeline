@@ -935,5 +935,115 @@ check("GF-094: a non-Bash host-boundary denial never carries a copyCommand field
   assert.equal(route.nextAction.action.copyCommand, null);
 });
 
+// NVA-CROSSREPOGUIDANCE-1 (backlog/items/2026-08-18-codex-pretool-guard-cross-repository-
+// recovery-guidance-points-at-the-wrong-repo.md): NVA-CROSSREPOLEDGER-1 rebound a
+// "cross-repository-target" denial's ledger to the TARGET repository, but this adapter
+// kept printing `--repo <projectRoot>` -- the coordinator -- in every override-ceremony
+// line. A human following the printed guidance literally would point
+// guard-human-override.mjs at a repository where the request does not exist. The ordinary
+// same-repo case cannot show this: there the two roots coincide and the bug is invisible,
+// so the cross-repository case is the one pinned here, end to end, by RUNNING the exact
+// command the adapter printed.
+function guidanceFixture(mode = "chat") {
+  const root = fixture();
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  writeFileSync(join(root, "pipeline.user.yaml"), `schema: "pipeline.user.v3"\ngates:\n  push_approval: "${mode}"\n`);
+  git("add", "README.md", "pipeline.user.yaml");
+  git("commit", "-q", "-m", "fixture");
+  // git reports the real path; the printed guidance is built from the same resolution, so
+  // the fixture compares against that rather than against the mkdtemp spelling.
+  return git("rev-parse", "--path-format=absolute", "--show-toplevel").stdout.trim();
+}
+
+/**
+ * Isolate THIS adapter's own override-ceremony block and read the `plan --repo <root>
+ * --request-sha256 <sha>` pair out of it. A denial reason aggregates the inner denying
+ * guard's text as well, and that guard prints its own separate ceremony block from its own
+ * root variable -- a different code path, untouched here -- so the assertions below must
+ * not accidentally read the inner guard's line instead of the adapter's.
+ */
+function adapterCeremony(reason) {
+  const marker = "Human override available for this exact action (one use; audited; explicit confirmation required):";
+  const index = reason.indexOf(marker);
+  assert.notEqual(index, -1, `no adapter override-ceremony block in: ${reason}`);
+  const block = reason.slice(index);
+  const match = block.match(/plan --repo "([^"]+)" --request-sha256 ([a-f0-9]{64})/u);
+  assert.notEqual(match, null, `no plan guidance line in the adapter block: ${block}`);
+  return { block, repo: match[1], request: match[2] };
+}
+
+check("NVA-CROSSREPOGUIDANCE-1: a cross-repository denial prints the TARGET repo in every ceremony line, and the printed plan command actually resolves there", () => {
+  const root = guidanceFixture(); // the coordinating session's own root
+  const target = guidanceFixture(); // the guarded patch's actual, distinct physical target
+  try {
+    const denied = decision(run({
+      tool_name: "apply_patch",
+      tool_input: {
+        command: `*** Begin Patch\n*** Update File: ${join(target, "README.md")}\n@@\n-fixture\n+patched\n*** End Patch`,
+      },
+    }, root));
+    assert.equal(denied.permissionDecision, "deny");
+    const ceremony = adapterCeremony(denied.permissionDecisionReason);
+
+    // The defect, stated directly: this printed --repo used to be the coordinator.
+    assert.equal(ceremony.repo, target,
+      "the printed ceremony must name the target repository the ledger actually bound to");
+    assert.notEqual(ceremony.repo, root,
+      "naming the coordinator is exactly the defect under test");
+    // Every continuation line, not just the first, has to agree -- they are one ceremony.
+    for (const step of ["prepare-authorization", "authorize"]) {
+      assert.match(ceremony.block, new RegExp(`${step} --repo ${JSON.stringify(target)} `, "u"),
+        `the ${step} step must name the target repository too`);
+    }
+    assert.doesNotMatch(ceremony.block, new RegExp(`--repo ${JSON.stringify(root)}`, "u"),
+      "no line of the adapter's ceremony may name the coordinator for a cross-repository denial");
+
+    // Decisive: run the command the adapter printed, verbatim. It has to succeed against
+    // the printed root and fail against the coordinator -- proving the guidance is
+    // executable, not merely differently worded.
+    const planned = spawnSync(process.execPath, [
+      humanOverrideScript, "plan", "--repo", ceremony.repo, "--request-sha256", ceremony.request,
+    ], { cwd: root, encoding: "utf8", shell: false });
+    assert.equal(planned.status, 0, planned.stderr);
+    const plan = JSON.parse(planned.stdout);
+    assert.equal(plan.commandClass, "cross-repository-target");
+    assert.equal(plan.root, target);
+
+    const misdirected = spawnSync(process.execPath, [
+      humanOverrideScript, "plan", "--repo", root, "--request-sha256", ceremony.request,
+    ], { cwd: root, encoding: "utf8", shell: false });
+    assert.notEqual(misdirected.status, 0,
+      "the coordinator root must not resolve this request -- that is why printing it was a defect");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+check("NVA-CROSSREPOGUIDANCE-1: an ordinary in-root denial still prints the session's own root, unchanged", () => {
+  const root = guidanceFixture();
+  try {
+    const denied = decision(run({
+      tool_name: "Write",
+      tool_input: { file_path: "notes.md", content: "ordinary\n" },
+    }, root));
+    assert.equal(denied.permissionDecision, "deny");
+    const ceremony = adapterCeremony(denied.permissionDecisionReason);
+    assert.equal(ceremony.repo, root,
+      "the ordinary same-repo case must keep naming the session's own root");
+    const planned = spawnSync(process.execPath, [
+      humanOverrideScript, "plan", "--repo", ceremony.repo, "--request-sha256", ceremony.request,
+    ], { cwd: root, encoding: "utf8", shell: false });
+    assert.equal(planned.status, 0, planned.stderr);
+    assert.equal(JSON.parse(planned.stdout).root, root);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 if (process.exitCode) process.exit(process.exitCode);
 process.stdout.write(`1..${passed}\n`);

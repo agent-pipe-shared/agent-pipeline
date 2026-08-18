@@ -2092,13 +2092,24 @@ export function recordHumanGuardDenial({
     policySha256: sha(policy),
     previewSha256: sha(preview),
   });
+  // NVA-CROSSREPOGUIDANCE-1 (backlog/items/2026-08-18-codex-pretool-guard-cross-
+  // repository-recovery-guidance-points-at-the-wrong-repo.md): carry back the root this
+  // denial's ledger was ACTUALLY bound to just above -- `crossRepositoryRoot ?? repo.root`
+  // is already resolved and is the only root under which `requestSha256` can be found
+  // again. Without it a caller printing override-ceremony guidance has nothing but its own
+  // `projectRoot` to name, which for a "cross-repository-target" denial is the wrong
+  // repository: planHumanGuardOverride() reads the request from `storage(topology(--repo))`
+  // and additionally refuses any `request.root !== repo.root` with HGO-EXPIRED, so guidance
+  // naming the coordinator cannot resolve the request at all. Additive return field only --
+  // no persisted schema carries it, so no schema/version bump is involved.
   return eligible.authorCandidate
     ? {
       status: "author-repair-required",
       requestSha256,
+      root: repo.root,
       candidateSourceRoot: eligible.candidateSourceRoot,
     }
-    : { status: "planned", requestSha256 };
+    : { status: "planned", requestSha256, root: repo.root };
 }
 
 export function planHumanGuardOverride({

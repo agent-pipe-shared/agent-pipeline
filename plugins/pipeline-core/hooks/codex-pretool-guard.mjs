@@ -487,6 +487,17 @@ if (denials.length > 0) {
         denials,
         spawn: overrideSpawn,
       });
+      // NVA-CROSSREPOGUIDANCE-1: name the repository the denial's ledger was actually
+      // bound to, which recordHumanGuardDenial() now returns as `planned.root`. For a
+      // "cross-repository-target" command that root is the TARGET repository, not this
+      // coordinating session's `projectRoot`; the request only exists under that root, so
+      // guidance naming `projectRoot` sends the human to a repository where
+      // `guard-human-override.mjs plan` cannot find the request at all. Falls back to
+      // `projectRoot` (the previous behaviour, and the correct value for every ordinary
+      // in-root denial) if the field is ever missing.
+      const overrideRepo = typeof planned.root === "string" && planned.root !== ""
+        ? planned.root
+        : projectRoot;
       if (planned.status === "planned") {
         const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
         // ADR-0059 Decision 4: name the exact next command for the CURRENTLY CONFIGURED
@@ -501,19 +512,19 @@ if (denials.length > 0) {
         const continuation = approvalMode === "chat"
           ? [
             `Then (the human confirms in-session; this is attribution, not proof -- gates.push_approval is "chat"):`,
-            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
-            `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"`,
+            `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
           ].join("\n")
           : [
             `Then, outside this session (gates.push_approval is "${approvalMode}"; presence of a valid, correctly-bound Ed25519 signature IS the authorization -- there is no in-session activate step for this mode):`,
-            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
-            `${process.execPath} ${JSON.stringify(script)} emit-signature-digest --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256>`,
-            `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
+            `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
+            `${process.execPath} ${JSON.stringify(script)} emit-signature-digest --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256>`,
+            `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
           ].join("\n");
         overrideGuidance = [
           "",
           "Human override available for this exact action (one use; audited; explicit confirmation required):",
-          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256}`,
+          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256}`,
           continuation,
         ].join("\n");
       } else if (planned.status === "author-repair-required") {
@@ -521,7 +532,7 @@ if (denials.length > 0) {
         overrideGuidance = [
           "",
           "Pipeline Author Repair is available for this exact source action (one use; audited; explicit confirmation required):",
-          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --author-source-root ${JSON.stringify(planned.candidateSourceRoot)}`,
+          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(overrideRepo)} --request-sha256 ${planned.requestSha256} --author-source-root ${JSON.stringify(planned.candidateSourceRoot)}`,
         ].join("\n");
       } else if (new Set(["narrower-recovery-required", "external-operator-required"]).has(planned.status)) {
         overrideGuidance = [
