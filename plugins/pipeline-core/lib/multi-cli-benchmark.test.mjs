@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { evaluateMultiCliBenchmark, BENCHMARK_CLASSES, BENCHMARK_FIXTURES } from "./multi-cli-benchmark.mjs";
+import { evaluateMultiCliBenchmark, validWorkloadDigests, BENCHMARK_CLASSES, BENCHMARK_FIXTURES, WORKLOAD_DIGESTS } from "./multi-cli-benchmark.mjs";
 const H = "a".repeat(64); const candidate = { commit: "1".repeat(40), tree: "2".repeat(40) };
 const resourceEnvelope = { hostClass: "linux-arm64-ci", bounds: [{ resource: "cpu-ms", unit: "ms", hardLimit: 200 }, { resource: "memory-mb", unit: "mb", hardLimit: 512 }] };
 const observation = (route, repetition, wallMs, monotonicMs, usage = "token") => ({ route, repetition, clock: { source: "monotonic", monotonicMs, wallTime: null, rawSha256: "f".repeat(64) }, outcome: "succeeded", measures: { wallMs, cpuMs: wallMs, concurrency: 1, stages: { orchestrationMs: 1, workspaceMs: 1, verificationMs: 1, reviewMs: 1, retryMs: 0, cleanupMs: 1 }, usage: { input: usage === "unknown" ? null : 1, output: usage === "unknown" ? null : 1, unit: usage }, interventions: 0 }, resourceUse: [{ resource: "cpu-ms", unit: "ms", value: wallMs }, { resource: "memory-mb", unit: "mb", value: 256 }], correctnessSha256: H, evidenceSha256: "b".repeat(64), cleanupOk: true, authorityOk: true });
@@ -58,4 +58,32 @@ check("canonically hashes finite non-integral percent scores", () => {
   assert.equal(Number.isInteger(record.score[0].classImprovementPct), false);
   assert.match(record.recordSha256, /^[a-f0-9]{64}$/u);
 });
-console.log(`${n}/6 checks passed.`);
+check("workloadDigests binds the workload code actually executed (task.mjs per class + feature's sibling lib.mjs), covers real file bytes, and stays additive/optional", () => {
+  assert.equal(WORKLOAD_DIGESTS.length, BENCHMARK_CLASSES.length + 1);
+  assert.deepEqual(WORKLOAD_DIGESTS.map((digest) => digest.class), ["mini", "feature", "feature", "review", "migration", "failure-recovery"]);
+  for (const digest of WORKLOAD_DIGESTS) {
+    const bytes = readFileSync(new URL(`../../../${digest.path}`, import.meta.url));
+    assert.equal(createHash("sha256").update(bytes).digest("hex"), digest.fileSha256, digest.path);
+  }
+  assert.equal(validWorkloadDigests(WORKLOAD_DIGESTS), true);
+  // absent workloadDigests: shape and record are unchanged from every pre-existing caller.
+  const withoutRecord = evaluateMultiCliBenchmark(input());
+  assert.equal(Object.hasOwn(withoutRecord, "workloadDigests"), false);
+  // present and correct: validates, and rides along in the record + its hash.
+  const withDigests = input(); withDigests.workloadDigests = WORKLOAD_DIGESTS.map((d) => ({ ...d }));
+  const withRecord = evaluateMultiCliBenchmark(withDigests);
+  assert.deepEqual(withRecord.workloadDigests, WORKLOAD_DIGESTS.map((d) => ({ ...d })));
+  assert.notEqual(withRecord.recordSha256, withoutRecord.recordSha256);
+  // present and wrong: rejected, mirroring validFixture/validFixtures's strictness.
+  const badHash = input(); badHash.workloadDigests = WORKLOAD_DIGESTS.map((d) => ({ ...d })); badHash.workloadDigests[0].fileSha256 = H;
+  assert.throws(() => evaluateMultiCliBenchmark(badHash), /MCB-BINDING/u);
+  const badClass = input(); badClass.workloadDigests = WORKLOAD_DIGESTS.map((d) => ({ ...d })); badClass.workloadDigests[0].class = "other";
+  assert.throws(() => evaluateMultiCliBenchmark(badClass), /MCB-BINDING/u);
+  const badPath = input(); badPath.workloadDigests = WORKLOAD_DIGESTS.map((d) => ({ ...d })); badPath.workloadDigests[0].path = "other/path.mjs";
+  assert.throws(() => evaluateMultiCliBenchmark(badPath), /MCB-BINDING/u);
+  const shortArray = input(); shortArray.workloadDigests = WORKLOAD_DIGESTS.slice(0, 1).map((d) => ({ ...d }));
+  assert.throws(() => evaluateMultiCliBenchmark(shortArray), /MCB-BINDING/u);
+  const extraKey = input(); extraKey.workloadDigests = WORKLOAD_DIGESTS.map((d) => ({ ...d, extra: 1 }));
+  assert.throws(() => evaluateMultiCliBenchmark(extraKey), /MCB-BINDING/u);
+});
+console.log(`${n}/7 checks passed.`);

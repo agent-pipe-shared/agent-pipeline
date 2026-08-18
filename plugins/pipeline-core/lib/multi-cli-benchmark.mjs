@@ -10,6 +10,21 @@ export const BENCHMARK_FIXTURES = Object.freeze([
   Object.freeze({ class: "migration", path: "plugins/pipeline-core/scripts/fixtures/nova-benchmark/migration.json", fileSha256: "609ea0e957134d14be84562025d808a7f3e386df916a9fe01ca28814f8da4cd3" }),
   Object.freeze({ class: "failure-recovery", path: "plugins/pipeline-core/scripts/fixtures/nova-benchmark/failure-recovery.json", fileSha256: "a34d7f2c91888c47052af37271039d548462fce53e47cbb2327ad94cb644c6fe" }),
 ]);
+// Digests of the workload CODE actually executed by nova-a8-benchmark-runner.mjs's
+// runObservation (each class's fixtures/nova-benchmark/workloads/<class>/task.mjs), plus
+// "feature"'s sibling lib.mjs which task.mjs imports and asserts against -- distinct from
+// BENCHMARK_FIXTURES above, which binds the pre-existing per-class descriptor JSON, not the
+// executed code. Additive and optional (see validWorkloadDigests/evaluateMultiCliBenchmark
+// below): a caller that omits `workloadDigests` from its input is unaffected, so this does not
+// require re-running or invalidating any existing sealed record.
+export const WORKLOAD_DIGESTS = Object.freeze([
+  Object.freeze({ class: "mini", path: "plugins/pipeline-core/scripts/fixtures/nova-benchmark/workloads/mini/task.mjs", fileSha256: "311dc60959adfeb0cffda8a3b3cce4b19e10f45998d033ef67c5e1d54846aa27" }),
+  Object.freeze({ class: "feature", path: "plugins/pipeline-core/scripts/fixtures/nova-benchmark/workloads/feature/task.mjs", fileSha256: "34c8969a28c94454704f128f8f213b2234ddc5dc6cae27b0f20b905def9c4890" }),
+  Object.freeze({ class: "feature", path: "plugins/pipeline-core/scripts/fixtures/nova-benchmark/workloads/feature/lib.mjs", fileSha256: "c7e549051f71c0e5a925710239ca4fe23994bf3785535c4f01c1eee31055e009" }),
+  Object.freeze({ class: "review", path: "plugins/pipeline-core/scripts/fixtures/nova-benchmark/workloads/review/task.mjs", fileSha256: "51a33cc99eb31025d16340f3c41caad4269236129e4d3bbecdb3c9c56731c1df" }),
+  Object.freeze({ class: "migration", path: "plugins/pipeline-core/scripts/fixtures/nova-benchmark/workloads/migration/task.mjs", fileSha256: "001c7ae5ea5246b8b72fb764b26fbe9f099efc767d8e401992244ab99ecf1ad4" }),
+  Object.freeze({ class: "failure-recovery", path: "plugins/pipeline-core/scripts/fixtures/nova-benchmark/workloads/failure-recovery/task.mjs", fileSha256: "98a8ed5aa47baa7c5d9f638c8dde51394aabfe85bdf0566db1145534b5d3e5a0" }),
+]);
 const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -31,6 +46,8 @@ const finitePercent = (numerator, denominator, minimum, maximum) => {
 function validCandidate(value) { return exact(value, ["commit", "tree"]) && OID.test(value.commit) && OID.test(value.tree); }
 function validFixture(value, expected) { return exact(value, ["class", "path", "fileSha256", "seed"]) && value.class === expected.class && value.path === expected.path && value.fileSha256 === expected.fileSha256 && ID.test(value.seed); }
 function validFixtures(value) { return Array.isArray(value) && value.length === BENCHMARK_FIXTURES.length && value.every((fixture, index) => validFixture(fixture, BENCHMARK_FIXTURES[index])); }
+function validWorkloadDigest(value, expected) { return exact(value, ["class", "path", "fileSha256"]) && value.class === expected.class && value.path === expected.path && SHA.test(value.fileSha256) && value.fileSha256 === expected.fileSha256; }
+export function validWorkloadDigests(value) { return Array.isArray(value) && value.length === WORKLOAD_DIGESTS.length && value.every((digest, index) => validWorkloadDigest(digest, WORKLOAD_DIGESTS[index])); }
 function validEnvelope(value) { return exact(value, ["hostClass", "bounds"]) && ID.test(value.hostClass) && Array.isArray(value.bounds) && value.bounds.length <= 256 && sortedUnique(value.bounds, (row) => row.resource) && value.bounds.every((row) => exact(row, ["resource", "unit", "hardLimit"]) && ID.test(row.resource) && ID.test(row.unit) && safe(row.hardLimit)); }
 function validSubjects(value, envelope) { return Array.isArray(value) && value.length === 2 && sortedUnique(value, (row) => row.route) && value.every((row) => exact(row, ["route", "subjectSha256", "hostClass"]) && ID.test(row.route) && SHA.test(row.subjectSha256) && row.hostClass === envelope.hostClass); }
 function validMeasures(value) {
@@ -44,8 +61,15 @@ function validObservation(value, envelope, route, repetition) { return exact(val
 
 /** Evaluates paired benchmark observations while retaining every measured bound. */
 export function evaluateMultiCliBenchmark(input) {
-  if (!exact(input, ["benchmarkId", "candidate", "fixtures", "adapterReportSha256", "subjects", "resourceEnvelope", "baseline", "candidateRoute"])) throw new TypeError("MCB-SHAPE");
+  // workloadDigests is additive and optional: a caller that omits it (every caller predating
+  // this field, including the existing sealed record's producer) keeps its exact() shape
+  // unchanged and is unaffected; a caller that supplies it gets it strictly validated and bound
+  // into the record/recordSha256 below.
+  const hasWorkloadDigests = input !== null && typeof input === "object" && Object.hasOwn(input, "workloadDigests");
+  const shapeKeys = ["benchmarkId", "candidate", "fixtures", "adapterReportSha256", "subjects", "resourceEnvelope", "baseline", "candidateRoute", ...(hasWorkloadDigests ? ["workloadDigests"] : [])];
+  if (!exact(input, shapeKeys)) throw new TypeError("MCB-SHAPE");
   if (!ID.test(input.benchmarkId) || !validCandidate(input.candidate) || !validFixtures(input.fixtures) || !SHA.test(input.adapterReportSha256) || !validEnvelope(input.resourceEnvelope) || !validSubjects(input.subjects, input.resourceEnvelope)) throw new TypeError("MCB-BINDING");
+  if (hasWorkloadDigests && !validWorkloadDigests(input.workloadDigests)) throw new TypeError("MCB-BINDING");
   const routes = [input.baseline, input.candidateRoute];
   if (!routes.every((route) => exact(route, ["routeId", "hostClass", "classes"]) && ID.test(route.routeId) && route.hostClass === input.resourceEnvelope.hostClass && Array.isArray(route.classes) && route.classes.length === BENCHMARK_CLASSES.length) || input.baseline.routeId === input.candidateRoute.routeId || new Set(input.subjects.map((subject) => subject.route)).size !== 2 || !input.subjects.every((subject) => [input.baseline.routeId, input.candidateRoute.routeId].includes(subject.route))) throw new TypeError("MCB-ROUTE");
   const summaries = new Map(); const warmups = []; const observations = []; const lastClock = new Map();
@@ -63,7 +87,7 @@ export function evaluateMultiCliBenchmark(input) {
   if (BENCHMARK_CLASSES.some((taskClass) => summaries.get(`${input.baseline.routeId}:${taskClass}`).medianWallMs === 0)) throw new TypeError("MCB-SCORE");
   const score = BENCHMARK_CLASSES.map((taskClass) => { const baseline = summaries.get(`${input.baseline.routeId}:${taskClass}`); const candidate = summaries.get(`${input.candidateRoute.routeId}:${taskClass}`); return { taskClass, medianWallMs: candidate.medianWallMs, p95WallMs: candidate.p95WallMs, classImprovementPct: finitePercent(baseline.medianWallMs - candidate.medianWallMs, baseline.medianWallMs, Number.NEGATIVE_INFINITY, 100), classRegressionPct: finitePercent(candidate.medianWallMs - baseline.medianWallMs, baseline.medianWallMs, -100, Number.POSITIVE_INFINITY), correctnessEqual: baseline.correctnessSha256 === candidate.correctnessSha256 && baseline.evidenceSha256 === candidate.evidenceSha256, resourceWithinEnvelope: true, interventionsDelta: candidate.interventions - baseline.interventions, usageKnown: baseline.usageKnown && candidate.usageKnown }; });
   const recommend = score.filter((entry) => entry.classImprovementPct >= 10).length >= 3 && score.every((entry) => entry.classRegressionPct <= 5 && entry.p95WallMs <= summaries.get(`${input.baseline.routeId}:${entry.taskClass}`).p95WallMs * 1.1 && entry.interventionsDelta <= 0 && entry.usageKnown && entry.correctnessEqual && entry.resourceWithinEnvelope);
-  const record = { schema: MULTI_CLI_BENCHMARK_SCHEMA, benchmarkId: input.benchmarkId, scoringVersion: "nova-efficiency-v1", candidate: input.candidate, fixture: input.fixtures, adapterReportSha256: input.adapterReportSha256, subjects: input.subjects, resourceEnvelope: input.resourceEnvelope, warmups, repetitions: { warmupExcluded: 1, measured: 5 }, observations, score, recommendation: recommend ? "candidate-route-for-observed-envelope" : "no-recommendation", recordSha256: null };
+  const record = { schema: MULTI_CLI_BENCHMARK_SCHEMA, benchmarkId: input.benchmarkId, scoringVersion: "nova-efficiency-v1", candidate: input.candidate, fixture: input.fixtures, ...(hasWorkloadDigests ? { workloadDigests: input.workloadDigests } : {}), adapterReportSha256: input.adapterReportSha256, subjects: input.subjects, resourceEnvelope: input.resourceEnvelope, warmups, repetitions: { warmupExcluded: 1, measured: 5 }, observations, score, recommendation: recommend ? "candidate-route-for-observed-envelope" : "no-recommendation", recordSha256: null };
   const { recordSha256, ...core } = record; record.recordSha256 = hash(core);
   return Object.freeze(record);
 }
