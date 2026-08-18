@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-authority-decision-prd-candidate-static
 type: defect
 owner: pipeline
-status: open
+status: deferred
 created: 2026-08-08
 source: "Found live on 2026-08-08 while recovering this repository's own PO authority drift, after an edit to the bound PRD reopened the plan gate. Promised as a filing in that recovery and filed here. Observed against plugins/pipeline-core/scripts/pipeline-state.mjs in this tree."
 due: 2026-09-07
@@ -92,7 +92,7 @@ records the same reasoning for `guard-maintenance-window.mjs`).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Defer — real and open, but out of Phoenix's own epic scope
+- **Rationale:** Confirmed still present in both Phoenix and Nova's pipeline-state.mjs (static 'prd'/'unavailable' literal, no git-history walk). The item's own text explicitly states ownership: 'this module belongs to the Nova session ... should not be fixed from a Phoenix session' (two sessions editing one module is a collision already paid for once). Condition to revisit: Nova session, per the item's own explicit scoping.
+- **Assignment (if accepted):** Nova / general pipeline backlog — out of Phoenix's own epic scope
+- **Date:** 2026-08-18

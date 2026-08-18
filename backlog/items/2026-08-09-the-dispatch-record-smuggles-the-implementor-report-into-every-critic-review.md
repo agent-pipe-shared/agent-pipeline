@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatch-record-contaminates-every-critic-review
 type: defect
 owner: pipeline
-status: open
+status: deferred
 created: 2026-08-09
 source: "Found on 2026-08-09 by the third Critic round of the night (review object 19e3793), which reported it as a briefing violation against its own dispatch and disclosed how it handled it. Verified independently at source by the Elephant before filing: templates/prompts/goldfish-task.md defines the record's shape, and every evidence/dispatch-record-*.json in this checkout carries a `report` field."
 due: 2026-09-08
@@ -86,7 +86,7 @@ which is exactly the kind of self-assessment the isolation exists to make unnece
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Defer — real and open, but out of Phoenix's own epic scope
+- **Rationale:** Confirmed still present (templates/prompts/goldfish-task.md:132-138 keeps report-early log and authorship metadata in one dispatch-record.json; critic-review.md:55-60 doesn't exclude the report field). This is Pipeline process/template tooling, not part of Sprint Phoenix's own delivered governance-kernel surface (spec.md sections 4-7). Condition to revisit: a general template-hardening session.
+- **Assignment (if accepted):** Nova / general pipeline backlog — out of Phoenix's own epic scope
+- **Date:** 2026-08-18

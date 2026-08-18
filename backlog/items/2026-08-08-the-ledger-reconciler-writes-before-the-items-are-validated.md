@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.the-ledger-reconciler-writes-before-the-items-are-validated
 type: defect
 owner: pipeline
-status: open
+status: deferred
 created: 2026-08-08
 source: "Observed directly on 2026-08-08 while filing three items: reconcile-backlog-ledger.mjs --activate recorded transitions for two items whose frontmatter does not validate."
 due: 2026-09-07
@@ -76,7 +76,7 @@ malformed fixture, not asserted.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Defer — real and open, but out of Phoenix's own epic scope
+- **Rationale:** Confirmed still present identically in Phoenix and Nova (reconcile-backlog-ledger.mjs readItems() only checks metadata.id, never the fuller validateBacklogItem()). This is backlog-process tooling, not part of Phoenix's own delivered governance-kernel surface. Condition to revisit: a general backlog-tooling hardening session.
+- **Assignment (if accepted):** Nova / general pipeline backlog — out of Phoenix's own epic scope
+- **Date:** 2026-08-18

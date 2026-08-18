@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.managed-onboarding-success-contract
 type: workflow-improvement
 owner: pipeline
-status: open
+status: deferred
 created: 2026-07-25
 source: "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix"
 ---
@@ -38,7 +38,7 @@ valid solely for an explicitly unsupported layout.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Defer — real and open, but out of Phoenix's own epic scope
+- **Rationale:** A process/review-discipline item (workflow-improvement) asking future host-layout onboarding additions to include a disposable-root success-contract test. Phoenix's own spec explicitly excludes onboarding/front-door work as a non-goal (specs/sprint-phoenix-epic/spec.md section 3, line 76). Condition to revisit: the next session doing onboarding/front-door work.
+- **Assignment (if accepted):** Nova / general pipeline backlog — out of Phoenix's own epic scope
+- **Date:** 2026-08-18

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head
 type: defect
 owner: pipeline
-status: open
+status: deferred
 created: 2026-08-07
 source: "Discovered running harness/scripts/verify.mjs against the NOVA-GMW-1 merge commit 8bc5ceb (first real merge commit into this repository's live main-branch history), 2026-08-07."
 due: 2026-09-06
@@ -85,3 +85,8 @@ patch. `harness/scripts/verify.mjs`'s overall exit code for candidate
 `8bc5ceb` is `1` because of this gap alone (plus the separately-reconciled
 backlog-ledger drift, now fixed) -- every GMW-relevant suite in that same run
 passed cleanly; this finding is unrelated to NOVA-GMW-1's own correctness.
+
+- **Decision:** Defer — real and open, but out of Phoenix's own epic scope
+- **Rationale:** Confirmed unfixed identically in Phoenix and Nova (codex-critic-isolation.mjs:1816, single-parent requirement). Guardrail/security-isolation-tier infrastructure code unrelated to any Phoenix-epic acceptance criterion (neither spec.md nor acceptance.md references it) — general pipeline hardening. Condition to revisit: a dedicated Goldfish-deep + Critic round, per the item's own triage note.
+- **Assignment (if accepted):** Nova / general pipeline backlog — out of Phoenix's own epic scope
+- **Date:** 2026-08-18

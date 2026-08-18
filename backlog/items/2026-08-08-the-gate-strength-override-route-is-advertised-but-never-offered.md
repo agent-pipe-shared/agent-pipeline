@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gate-strength-override-route-advertised-not-offered
 type: defect
 owner: pipeline
-status: open
+status: deferred
 created: 2026-08-08
 source: "Found live on 2026-08-08 while preparing the two gate-strength edits Sprint-Phoenix's gate-integrity phase needs (the TP-11 legacy-tier row and the new TP-12 row). Both denials advertise an in-session override and neither offers one. Observed against this tree at commit c425170."
 due: 2026-09-07
@@ -181,7 +181,7 @@ filing, not a repair.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Defer — real and open, but out of Phoenix's own epic scope
+- **Rationale:** Confirmed unfixed in both repos (guard-gate-strength.mjs:248-300 overrideGuidance stays empty for any status besides absent/replan). The item's own Ownership note states explicitly this belongs to Nova's modules ('Owner: PO, for assignment to Nova'). Condition to revisit: Nova session picks it up per its own filing.
+- **Assignment (if accepted):** Nova / general pipeline backlog — out of Phoenix's own epic scope
+- **Date:** 2026-08-18

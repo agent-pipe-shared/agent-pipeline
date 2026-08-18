@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-gate-authority-receipt-readback
 type: defect
 owner: pipeline
-status: open
+status: deferred
 created: 2026-07-25
 source: "Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; reproduced a second time 2026-07-25 (see docs/state.md, \"PO GATE ANSWERED\" entry) — repro confirmed, root cause still not isolated."
 ---
@@ -59,3 +59,10 @@ whether the write-then-read window has an ordering/flush gap around the
 Windows DACL-hardening step. No fix applied yet; this item only records the
 observation for the Windows/sandbox-assurance slice scope decision in
 `docs/state.md`.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Defer — real and open, but out of Phoenix's own epic scope
+- **Rationale:** A Windows-only DACL/timing repro requiring native Windows access to reproduce and isolate — not reproducible from this Linux/WSL checkout, and not part of Phoenix's own epic surface (traces to Sprint Cyborg's windows-sandbox-assurance-slice-scope). Condition to revisit: a native-Windows-equipped session; do not close without a real repro, which would risk silently dropping a previously-reproduced defect.
+- **Assignment (if accepted):** Nova / general pipeline backlog — out of Phoenix's own epic scope
+- **Date:** 2026-08-18
