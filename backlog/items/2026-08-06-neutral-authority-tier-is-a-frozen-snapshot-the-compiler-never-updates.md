@@ -144,3 +144,17 @@ deferred): the tier-agreement check (step 4) makes future drift visible but
 does not prevent it, and this repository is now several candidates past the
 "after 0.5.2" sequencing note without step 3 landing — worth flagging as
 overdue against its own stated sequencing, not just still-open.
+
+### Dispatch confirmation, 2026-08-18
+
+**Decision:** Confirmed queued for dispatch, current scope, not deferred to
+any named future sprint — step 3 of "Proposed fix" (ADR-0054 step 3: make
+`project/*` a compiler write target so the tier the resolver serves is the
+tier the compiler maintains) remains the sole outstanding scope, per the
+2026-08-17 re-verification. Real implementation touching
+`runtime-projection-v3-owned-keys.json` and the V3 compiler's write path,
+needing a Verify run (the tier-agreement check from step 4 is already in
+place to confirm the fix) to trust — not attempted in this read-only triage
+pass. The overdue flag against its own "after 0.5.2" sequencing note stands;
+this entry does not change scope, only reconfirms it for the 0.6.0 pass.
+- **Date:** 2026-08-18

@@ -66,3 +66,24 @@ patch.
 - **Rationale:** touches `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, a guardrail hook — Design-tier model and mandatory Critic escalation apply (MP-07). Changing how the guard's admitted command set is derived (rather than adding one more literal to it) is guardrail-class design work, not proportionate to design and implement inline as part of a citation-and-governance fix.
 - **Assignment (if accepted):** future dedicated design session.
 - **Date:** 2026-08-16
+
+### Dispatch confirmation, 2026-08-18
+
+**Decision:** Confirmed queued for dispatch, current scope, not deferred —
+the 2026-08-16 "future dedicated design round" language did not name a
+specific still-open sprint, so it does not qualify as correctly deferred
+under the 0.6.0 release bar. Bounded scope unchanged from the existing
+Proposal: derive `sanctionedOnboardingArgs()`'s admitted `plan*` set from a
+declared read-only property on the onboarding CLI's own subcommand table,
+never from the `plan` name prefix alone. **New cross-reference to weigh at
+design time:**
+`2026-08-17-plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags.md`'s
+own 2026-08-17/2026-08-18 record found that the guard's current narrow
+admission (only the exact automated `nextAction` shape, not the full
+human-invoked CLI surface) is a deliberate, twice-Critic-reviewed
+defense-in-depth choice, not an oversight — so "derive from the CLI table"
+must preserve that read-only/automated-shape distinction rather than
+mechanically widening admission to everything the CLI table lists as
+read-only. Guardrail-tier code — MP-07 design-tier model plus mandatory
+Critic review apply; not attempted in this read-only triage pass.
+- **Date:** 2026-08-18

@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "PENDING"
+closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1448-1451"
 source: "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing. One of three examples from that report; the other two were checked and found already fixed/admitted (see Triage)."
 ---
 
@@ -110,3 +114,25 @@ decision this session did not make:
    twice-Critic-reviewed decision and needs its own fresh Design-tier Critic
    pass, not a same-tier Goldfish dispatch.
 - **Date:** 2026-08-17
+
+### Closure decision, 2026-08-18
+
+**Decision:** Option 1 — closed as "not a defect, already deliberately
+scoped." No legitimate live-operator need for the wider `--profile`/
+`--source` shape was identified anywhere in this item's own history or in
+the closed sibling item's twice-Critic-reviewed record; the narrower
+admission (only the exact automated `nextAction` shape) is the deliberate,
+reviewed design, not an oversight, and widening it would reverse that
+decision without new evidence that the wider shape is actually needed.
+**No code change was required to close this**, because
+`guard-lifecycle-ready.test.mjs:1448-1451` already carries the exact
+cross-reference comment the 2026-08-17 Correction recommended adding ("the
+guard admits only the exact nextAction shape the inspection actually emits
+-- never the wider human-invoked shape") — the closure evidence this item
+points to is that pre-existing comment plus the closed
+`2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md`
+item's own twice-Critic-reviewed Triage. If a genuine operator need for the
+wider shape surfaces later, it should be filed as a new item carrying that
+evidence, rather than reopening this one — a design decision was made here,
+not a placeholder.
+- **Date:** 2026-08-18

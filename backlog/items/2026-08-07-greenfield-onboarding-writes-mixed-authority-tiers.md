@@ -129,3 +129,17 @@ anything.
 > inside an admissible reference is contamination, and it reached one Critic that
 > way on 2026-08-08. Reference the sections above the Triage, or the item at a
 > pre-triage revision.
+
+### Dispatch confirmation, 2026-08-18
+
+**Decision:** Confirmed queued for dispatch, current scope, not deferred to
+any named future sprint — the "Assignment (if accepted)" two-step plan
+already recorded above (2026-08-08) stands unchanged: (1) enumerate every
+path a fresh greenfield onboarding leaves under `.claude/`, deciding per
+path whether it is runner-owned or authority-owned; (2) decide whether
+day-one legacy-tier manifests should exist at all, and if not, retire the
+`7a99a18` invariant deliberately. Touches the onboarding write path
+(`project-onboarding-v3.mjs`) and an existing guarded invariant — real
+implementation plus a test run required, not attempted in this read-only
+triage pass.
+- **Date:** 2026-08-18

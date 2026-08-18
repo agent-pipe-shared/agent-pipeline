@@ -168,3 +168,22 @@ check does. Q2 (should a gate-less project have zero gates by default) and Q3
 still open, unchanged. Kept open, current-scope (Nova/Phoenix-adjacent gate
 correctness, not deferred) — narrowed from "gate is unpassable" to "gate is
 passable but not yet checking what the PO decided it should check."
+
+### Dispatch decision, 2026-08-18
+
+**Decision:** Queued for dispatch, current scope (Nova/Phoenix-adjacent, not
+deferred to any named future sprint) — bounded to the last open fork the
+2026-08-11/2026-08-17 Triage entries left unresolved: HOW the PO's "PRD
+content-sound AND Spec-consistent" criterion is actually checked. Bounded
+scope for the dispatch: add a mandatory, explicit PO-facing acknowledgement
+step at `approve-plan` time in `po-gate-authority.mjs` — the human affirms
+content-soundness and Spec-consistency at the approval prompt itself (the
+"most likely reading" already flagged in the 2026-08-11 entry, consistent
+with ADR-0061's "human decides, agent acts on it once decided"), rather than
+building an automated heuristic. This is additive to the existing mechanical
+`prd_*.md`/path check, not a replacement of it. Needs a real implementation
+plus a test run to trust (gate-tier code) — not attempted in this read-only
+triage pass. Q2 (gate-less-project defaults) and Q3 (systematic
+gate-satisfiability testing) remain tracked as already noted, out of this
+dispatch's bounded scope.
+- **Date:** 2026-08-18

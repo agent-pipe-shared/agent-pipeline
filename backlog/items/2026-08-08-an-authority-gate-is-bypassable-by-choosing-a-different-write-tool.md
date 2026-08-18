@@ -103,3 +103,18 @@ report it.
   override path for cases neither (a) nor (b) resolves — three components,
   one coherent design, not three separate patches.
 - **Date:** 2026-08-11
+
+### Dispatch confirmation, 2026-08-18
+
+**Decision:** Confirmed queued for dispatch. The 2026-08-11 Triage above
+already records a real, bounded, PO-approved decision (directions 1-3, plus
+the signature-or-chat human-override addition) coordinated with the sibling
+item `2026-08-08-the-test-path-guard-blocks-the-briefed-edit-and-offers-no-route.md`
+(cluster C). Still unassigned and unimplemented as of this date, and not
+deferred to any named future sprint. Touches guardrail/hook code
+(`hooks.json`, `guard-testpath.mjs`) and a human-override ceremony — real
+implementation plus mandatory Critic review required (MP-07, design-tier
+model), not attempted in this read-only triage pass. This entry does not
+change the decision, only reconfirms it is not stale and remains queued for
+the 0.6.0 pass.
+- **Date:** 2026-08-18

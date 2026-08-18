@@ -96,3 +96,20 @@ general `HGO-ELIGIBLE` case, which prints a 3-command
 plan/prepare-authorization/authorize-by-signature sequence). This item stays
 `open`, scoped to part B only, until the PO does something out-of-session to
 lift it or an alternative path is found.
+
+### Confirmation, 2026-08-18
+
+**Decision:** Part B remains blocked on an out-of-session human ceremony,
+confirmed unchanged. `guard-git.test.mjs` is a TP-1 protected test path;
+`repair-map.mjs --help` for `HGO-AUTHOR-ROOT-REQUIRED` reports
+`liftable: author-repair-required`, `by: attended-author-outside-session`,
+`command: (none)` — no in-session-triggerable override exists for this lift
+class. **What the PO needs to do:** run the attended-author repair ceremony
+outside this session to unlock an edit to `guard-git.test.mjs`, after which
+the bounded fix from the existing Proposal applies directly: anchor the
+`secrets\.yaml` pattern in `guard-git.mjs` (`GG-11`, ~line 403) on a
+word/path boundary (e.g. `(?:^|[/\\])secrets\.yaml\b`) so `secrets.yaml`
+still matches but `fakesecrets.yaml` does not, plus the accompanying test
+case the protected path currently blocks. Status stays open; not closeable
+from within a session.
+- **Date:** 2026-08-18
