@@ -294,8 +294,11 @@ if (!isPush) process.exit(0); // fast path: not a push at all
 /**
  * Bind one push invocation to one repository and one source commit.  This is
  * intentionally a small accepted grammar: a guard cannot prove evidence freshness
- * for a shell bundle, an implicit/default refspec, a bulk push, or repository
- * overrides with different git-dir/work-tree semantics.
+ * for a shell bundle, a bulk push, or repository overrides with different
+ * git-dir/work-tree semantics. A colon-less (implicit-destination) refspec IS
+ * accepted, and its destination is resolved below to `refs/heads/<branch>` for
+ * the ordinary/default case only (PHX-WP-GUARDPUSH-REFSPEC-RESOLVE) -- see
+ * `resolveImplicitPushDestination`.
  */
 function parsePushBinding(rawCmd) {
   let singleQuoted = false;
@@ -355,7 +358,7 @@ function parsePushBinding(rawCmd) {
   const [remote, refspec] = positionals;
   const colon = refspec.indexOf(":");
   const source = colon === -1 ? refspec : refspec.slice(0, colon);
-  const destination = colon === -1 ? null : refspec.slice(colon + 1);
+  let destination = colon === -1 ? null : refspec.slice(colon + 1);
   if (!remote || !source || (colon !== -1 && !destination) || source.startsWith("+")) {
     return { ok: false, reason: "push refspec is deleting, forced, or otherwise source-ambiguous" };
   }
@@ -369,7 +372,42 @@ function parsePushBinding(rawCmd) {
   if (rootResult.status !== 0 || !rootResult.stdout?.trim()) {
     return { ok: false, reason: "push repository cannot be resolved to a non-bare worktree" };
   }
-  return { ok: true, projectDir: rootResult.stdout.trim(), source, destination, remote, refspec };
+  const projectDir = rootResult.stdout.trim();
+  if (destination === null) {
+    destination = resolveImplicitPushDestination(projectDir, remote, source);
+  }
+  return { ok: true, projectDir, source, destination, remote, refspec };
+}
+
+/**
+ * PHX-WP-GUARDPUSH-REFSPEC-RESOLVE. Mirrors git's own default push-refspec
+ * resolution, but ONLY for the ordinary/unconfigured case: a bare (colon-less)
+ * branch name pushed to a remote that has no `remote.<name>.push` override
+ * resolves, on an ordinary unconfigured remote, to `refs/heads/<branch>` on
+ * both sides -- so `git push origin <branch>` and
+ * `git push origin <branch>:refs/heads/<branch>` are the same push. This
+ * function does NOT attempt to reproduce git's full remote-refspec-config
+ * resolution: if the remote HAS a configured push refspec (any
+ * `remote.<name>.push` value), or the source is not an ordinary bare branch
+ * name (already a full `refs/...` ref, which resolves to itself with no
+ * guessing needed, or the symbolic ref `HEAD`, whose target depends on the
+ * checkout this guard must not assume), this returns `null` unchanged --
+ * exactly today's behavior -- rather than guess.
+ */
+function resolveImplicitPushDestination(projectDir, remote, source) {
+  if (source.startsWith("refs/")) return source;
+  if (source === "HEAD") return null;
+  const configuredPush = spawnSync(
+    "git", ["-C", projectDir, "config", "--get-all", `remote.${remote}.push`],
+    { encoding: "utf8", timeout: 5000 },
+  );
+  // git config exit codes: 0 = at least one value found (a non-default push refspec IS
+  // configured -- do not guess), 1 = the key is simply absent (the ordinary/default
+  // case this function resolves). Any other status means the lookup itself failed
+  // (e.g. an unreadable config) -- fail closed to "unresolved", same as today.
+  if (configuredPush.status === 0 && configuredPush.stdout?.trim()) return null;
+  if (configuredPush.status !== 1) return null;
+  return `refs/heads/${source}`;
 }
 
 function splitShellSegments(rawCmd) {

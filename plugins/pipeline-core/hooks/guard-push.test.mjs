@@ -519,6 +519,83 @@ const PUSH_WAIVER = {
     stderrIncludes: ["is not externally attested for this exact action"],
   });
 }
+
+// ---- PHX-WP-GUARDPUSH-REFSPEC-RESOLVE: a bare branch name resolves its own implicit
+// destination (refs/heads/<branch>) before authorizeRecordedPush runs, so it is treated
+// identically to the fully-qualified equivalent -- instead of failing with the
+// misleading PUSH-PROOF-INPUT-INVALID a colon-less refspec produced before this fix.
+{
+  // Same fixture shape as PG12w (fully-qualified `main:refs/heads/feature-test` -> ALLOW),
+  // except the push command is the bare branch name and the local branch it names really
+  // exists at the approved commit -- the regression test the DoD asks for: identical
+  // authorizeRecordedPush outcome to the fully-qualified form.
+  const { dir, head } = freshRepo("bare-refspec-resolve");
+  gitAt(dir, "checkout", "-q", "-b", "feature-test");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-18T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "operator decision recorded for this fixture" },
+    } },
+  });
+  check("PG12x allow a bare branch-name push resolved to refs/heads/<branch>",
+    "git push origin feature-test", dir, ALLOW);
+}
+{
+  // A colon-less refspec whose source is already a full ref resolves as identity
+  // (refs/heads/feature-test -> refs/heads/feature-test), not double-prefixed into
+  // refs/heads/refs/heads/feature-test.
+  const { dir, head } = freshRepo("bare-refspec-resolve-full-ref");
+  gitAt(dir, "checkout", "-q", "-b", "feature-test");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeProofPolicy(dir, PUSH_WAIVER);
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: {
+      approvedBy: "po-test", approvedAt: "2026-08-18T06:00:00.000Z", forCommit: head,
+      remote: "origin", destination: "refs/heads/feature-test",
+      criticalProof: null,
+      criticalProofWaiver: { kind: "push", reason: "operator decision recorded for this fixture" },
+    } },
+  });
+  check("PG12x2 allow a colon-less full-ref source resolved as identity",
+    "git push origin refs/heads/feature-test", dir, ALLOW);
+}
+{
+  // The escape valve: a remote with a configured (non-default) push refspec must not be
+  // guessed at -- destination stays null, same PUSH-PROOF-INPUT-INVALID as before this fix.
+  const { dir, head } = freshRepo("bare-refspec-configured-push");
+  gitAt(dir, "checkout", "-q", "-b", "feature-test");
+  gitAt(dir, "config", "--add", "remote.origin.push", "refs/heads/feature-test:refs/heads/elsewhere");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2026-08-18T06:00:00.000Z", forCommit: head } },
+  });
+  check("PG12y block a bare branch push when remote.<name>.push is configured -- unresolved as before",
+    "git push origin feature-test", dir, BLOCK, { stderrIncludes: ["PUSH-PROOF-INPUT-INVALID"] });
+}
+{
+  // HEAD is a symbolic ref, not a bare branch name -- its target depends on the checkout,
+  // so it must stay unresolved rather than being wrapped as the literal `refs/heads/HEAD`.
+  const { dir, head } = freshRepo("bare-refspec-head-unresolved");
+  writeManifest(dir, manifestPush({ approval: "required" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2026-08-18T06:00:00.000Z", forCommit: head } },
+  });
+  check("PG12z block a bare `HEAD` push -- not resolved as refs/heads/HEAD",
+    "git push origin HEAD", dir, BLOCK, { stderrIncludes: ["PUSH-PROOF-INPUT-INVALID"] });
+}
+
 {
   // ADR-0056: the operator-facing control is gates.push_approval in the project's own
   // source of truth. `chat` stands the external signature down; the commit binding and
