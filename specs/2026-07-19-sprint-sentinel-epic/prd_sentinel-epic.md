@@ -158,11 +158,7 @@ open until its upstream, preflight, shadow, T1, and PO gates truly pass.
   worktrees; Primary readback is the local authority.
 - Push guards verify the actual target worktree and exact evidence.
 - Main-session route drift is visible once and never inferred from a subagent.
-- T1 packets include governance paths and fail closed when governance context
-  cannot be derived; the packet schema carries no gate-ETA field, so the
-  original "honest gate ETA or `unknown`" clause is retired as stale
-  (2026-08-18 PO decision — reworded rather than adding a new `gateEta`
-  field).
+- T1 packets include governance paths and an honest gate ETA or `unknown`.
 - Stateful templates require issuer, replay, storage/atomicity, crash states,
   enforcement, pre/post-images, and self-reference audit before readiness.
 - Scoped Verify authority adds only predeclared suites; removal, reordering, or
