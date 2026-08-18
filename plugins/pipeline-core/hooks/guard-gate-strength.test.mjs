@@ -339,6 +339,7 @@ try {
       rootDir: root, scopeRuleIds: ["GS-6"], ttlSeconds: 300, reason: "GST20",
       featureId: "gst20", planSha256: createHash("sha256").update("plan\n").digest("hex"),
       specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "gst20-v1", livePluginRoot,
+      authorshipMode: "goldfish-dispatch",
     });
     const proof = {
       schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "gst-e2e", publicKey,

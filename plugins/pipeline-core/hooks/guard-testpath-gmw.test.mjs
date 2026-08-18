@@ -89,6 +89,7 @@ try {
         rootDir: GMW_DIR, scopeRuleIds: ["TP-1"], ttlSeconds: 300, reason: "TP09",
         featureId: "tp-gmw-e2e", planSha256: createHash("sha256").update("plan\n").digest("hex"),
         specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "tp-gmw-e2e-v1", livePluginRoot,
+        authorshipMode: "goldfish-dispatch",
       });
       const proof = {
         schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "tp-e2e", publicKey: gmwPublicKey,

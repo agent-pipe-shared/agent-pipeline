@@ -201,6 +201,7 @@ check("TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", "Edit
       rootDir: GMW_DIR, scopeRuleIds: ["TP-1"], ttlSeconds: 300, reason: "TP09",
       featureId: "tp-gmw-e2e", planSha256: createHash("sha256").update("plan\n").digest("hex"),
       specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "tp-gmw-e2e-v1", livePluginRoot,
+      authorshipMode: "goldfish-dispatch",
     });
     const proof = {
       schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "tp-e2e", publicKey: gmwPublicKey,
@@ -256,6 +257,7 @@ check("TP14 block  a real armed window scoped to TP-1 does NOT lift a different 
       rootDir: GMW_SEL_DIR, scopeRuleIds: ["TP-1"], ttlSeconds: 300, reason: "TP14",
       featureId: "tp-sel-gmw-e2e", planSha256: createHash("sha256").update("plan\n").digest("hex"),
       specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "tp-sel-gmw-e2e-v1", livePluginRoot,
+      authorshipMode: "goldfish-dispatch",
     });
     const proof = {
       schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "tp-sel-e2e", publicKey: gmwSelPublicKey,
