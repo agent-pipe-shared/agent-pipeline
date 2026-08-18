@@ -1130,7 +1130,13 @@ export function planBacklogItemHashRescopeAmendment(items, events, input) {
   };
   event.entryHash = transitionHash(event);
   const nextEvents = [...events, event];
-  errors.push(...validateTransitionLedger(nextEvents, items));
+  // The gate rejects bad WRITES, not the past: a tolerated pre-existing DRIFT
+  // finding elsewhere in the ledger (see classifyBacklogFindings) must not
+  // block this append. Route through the same classify-then-filter pattern
+  // checkBacklogState uses instead of pushing validateTransitionLedger's raw
+  // output straight into blocking errors.
+  const classified = classifyBacklogFindings(validateTransitionLedger(nextEvents, items), { events: nextEvents });
+  errors.push(...classified.filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.INTEGRITY).map((entry) => entry.finding));
   return { ok: errors.length === 0, errors, items, events: nextEvents, event, projection: errors.length ? null : projectBacklog(items, nextEvents) };
 }
 

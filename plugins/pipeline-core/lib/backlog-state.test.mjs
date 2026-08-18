@@ -1272,6 +1272,51 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
     JSON.stringify(classified));
 }
 
+{
+  // NVA-W3-R4F: planBacklogItemHashRescopeAmendment used to push
+  // validateTransitionLedger's RAW (unclassified) output straight into its
+  // own blocking errors, so a tolerated pre-existing DRIFT finding elsewhere
+  // in the ledger (a malformed-OID event at/below LEDGER_DRIFT_CUTOFF_SEQUENCE
+  // -- the real-world shape of backlog/transitions.ndjson event 403) made a
+  // valid rescope append fail forever. It must route through
+  // classifyBacklogFindings the same way checkBacklogState does.
+  const driftItem = item({ id: "pipeline.drift-example" });
+  const driftEvent = event({
+    id: "pipeline.drift-example",
+    evidence: { kind: "baseline-migration", commit: "181b7730" },
+  });
+  const rescopeItem = item({ id: "pipeline.rescope-example" });
+  const repairEvent = event({
+    sequence: 2,
+    id: "pipeline.rescope-example",
+    from: null,
+    to: "open",
+    evidence: { kind: "missing-initial-ledger-repair", commit: "c".repeat(40), reference: "backlog/items/example.md" },
+    previousHash: driftEvent.entryHash,
+  });
+  const events = [driftEvent, repairEvent];
+  const items = [driftItem, rescopeItem];
+  const preExisting = validateTransitionLedger(events, items);
+  const input = {
+    id: "pipeline.rescope-example",
+    at: "2026-08-18",
+    actor: "nva-w3-r4f",
+    reason: "Regression coverage for the unfiltered-findings bug.",
+    amendsSequence: 2,
+    scope: "pre-triage",
+    itemSha256: "d".repeat(64),
+    rationale: "Cover tolerated pre-existing DRIFT alongside a valid rescope append.",
+  };
+  const planned = planBacklogItemHashRescopeAmendment(items, events, input);
+  check("BS33 (NVA-W3-R4F) a tolerated pre-existing DRIFT finding elsewhere in the ledger does not block a valid item-hash-rescope-amendment",
+    preExisting.some((finding) => finding === "ledger event 1: evidence.commit must be a full lowercase Git commit OID")
+      && planned.ok
+      && planned.errors.length === 0
+      && planned.events.length === 3
+      && planned.event.evidence.kind === "item-hash-rescope-amendment",
+    JSON.stringify({ preExisting, errors: planned.errors }));
+}
+
 for (const root of roots) rmSync(root, { recursive: true, force: true });
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);
