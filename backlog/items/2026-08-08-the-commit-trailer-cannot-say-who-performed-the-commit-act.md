@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 source: "Raised as finding F3 by an independent Critic review on 2026-08-08. A dispatch authored a diff but stopped before committing it; the orchestrator performed the commit act. The resulting trailer is textually identical to one whose dispatch committed its own work, and the deviation was discoverable only from a separate document that git does not bind."
 due: 2026-09-07
@@ -88,4 +88,10 @@ this item describes.
 - **Decision:** accept-open, dispatch-ready.
 - **Rationale:** Re-verified 2026-08-18 — no `Commit-Act:` trailer or equivalent mechanism exists in Phoenix's templates/guardrails/roles, and none exists in the sibling Nova checkout either. The three-part proposed repair (a conditional `Commit-Act:` trailer line; a mechanical dispatch-record-vs-commit consistency check; wording updates to `goldfish-task.md`/`critic-review.md`) is fully specified engineering work, no PO design tradeoff involved.
 - **Assignment (if accepted):** owner `pipeline`; dispatch before the 2026-09-07 due date already carried on this item.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** `templates/prompts/goldfish-task.md:162` — conditional `Commit-Act: orchestrator` trailer added for Elephant-performed commits, plus matching Critic-guidance wording in `templates/prompts/critic-review.md`. Landed as PHX-WP-COMMIT-ACT-TRAILER, commit `f5db8aeb`.
 - **Date:** 2026-08-18

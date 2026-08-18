@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-09-07
 source: "Critic finding F5, Phoenix gate-integrity full review round 1, 2026-08-08: lifecycle.json rebound the sha256 of an entry declared mutability immutable, and the schema has no field that could have carried the reason."
@@ -77,4 +77,10 @@ rather than asserted.
 - **Decision:** accept-open, unfixed in both Phoenix and Nova.
 - **Rationale:** `feature-package-topology.mjs`'s exact-keys check still admits no amendment field, so an `immutable` entry's digest can still be silently rebound with no record, exactly as Critic F5 found. Nova has the identical code (`feature-package-topology.mjs:95`, byte-identical `exact()`/mutability logic) and no equivalent fix, so this is not a duplicate-of-Nova closure.
 - **Assignment (if accepted):** Bounded Goldfish dispatch per this item's own Proposal sketch: add an optional `amendment: {at, reason, previousSha256}` object, require it exactly when an `immutable` entry's digest differs from its previously recorded value, and add the fixture-based acceptance test the item specifies. The item's own text explicitly defers the stricter "immutable digests never change, model renames as retire+add" redesign question to a separate PO decision — do not fold that into this dispatch.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** `plugins/pipeline-core/lib/feature-package-topology.mjs:121-135` — optional `amendment: {at, reason, previousSha256}` object added to the closed artifact-entry key set, required exactly when an `immutable` entry's digest differs from the previously recorded value. Fixture tests confirm an unamended rebind is rejected, a mismatched `previousSha256` is rejected, and a correctly amended rebind passes. Landed commit `01d2c3c0`; independently Critic-verified correct. Note: a later evidence-log-only commit on this same work package (`7d3550b5`) carried a misleading commit message describing the code change it did not itself contain — documented as a mislabeled evidence-log update in `docs/state.md` checkpoint 41, not a code defect; the actual fix in `01d2c3c0` is sound.
 - **Date:** 2026-08-18

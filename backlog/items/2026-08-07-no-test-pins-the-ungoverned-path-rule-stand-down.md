@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-test-pins-the-ungoverned-path-rule-stand-down
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Coverage observation made by the PHX-R1-REWORK-2 dispatch while verifying the governance-marker precondition. Outside that briefing's scope, so recorded rather than acted on."
 due: 2026-09-06
@@ -88,4 +88,10 @@ is a test that would notice if it stopped being.
 - **Decision:** Accepted; stays open.
 - **Rationale:** Re-checked 2026-08-18 from source: `guard-gate-strength.mjs:210-218` still exits 0 for any GS rule when none of the five governance markers (`pipeline.user.yaml`, `project/pipeline.yaml`, `.claude/pipeline.yaml`, `project/guard-config.json`, `.claude/guard-config.json`) exist, and `guard-gate-strength.test.mjs`'s `governed()` fixture still writes markers unconditionally — no case exercises the unmarked branch. Nova's equivalent suite has the same gap, so there is nothing to port; this is Phoenix's own untested branch to close.
 - **Assignment (if accepted):** its own briefed test-change dispatch against the TP-protected suite, registered in `harness/scripts/verify.mjs` if a new file is used; technically bounded, no PO judgment call needed.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** `plugins/pipeline-core/hooks/guard-gate-strength.test.mjs` gained `GST31`: an ungoverned fixture (no marker files) driving every `GATE_STRENGTH_PATHS` rule through both the JS-hook and shell lanes, asserting stand-down (exit 0) rather than refusal. 31/31 cases pass. Landed commit `a2f16a65`. Proposal item 2 (per-marker sufficiency) was deliberately not attempted to protect dispatch tool budget — a reasonable, disclosed scope trim, not a gap large enough to keep this item open.
 - **Date:** 2026-08-18

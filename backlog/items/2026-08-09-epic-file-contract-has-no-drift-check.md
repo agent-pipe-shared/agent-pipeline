@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.epic-file-contract-has-no-drift-check
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Found while preparing the Spec-amendment branch of a Critic finding, by checking first whether comparable files were already listed in specs/sprint-phoenix-epic/spec.md §7. They were not. The finding that raised it had reviewed a sixteen-commit range and could not see the sprint-long pattern."
 due: 2026-09-08
@@ -84,4 +84,10 @@ inventory).
 - **Decision:** ACCEPTED for implementation as an ordinary bounded dispatch. Confirmed still live: no mechanical check anywhere in `harness/scripts/` (Phoenix) or its Nova sibling validates an Epic's declared file inventory (`specs/sprint-phoenix-epic/spec.md` §7) against the tracked tree.
 - **Rationale:** The Proposal is already narrowly scoped and technically unambiguous — verify every path the inventory names exists; report (do not fail) on tracked files under the inventory's covered roots that it does not name. The one question needing a PO judgment call (whether to edit §7 itself to add missing entries) is explicitly out of scope and already dispositioned separately. What remains is a standard new-check-plus-registration task, same shape as the sprint's other drift checks.
 - **Assignment (if accepted):** A Goldfish dispatch to add `harness/scripts/check-epic-file-contract.mjs`, with its own `.test.mjs`, registered in `harness/scripts/verify.mjs`'s `TEST_SUITES` list (TP-3-protected, needs the standard override handling).
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** `harness/scripts/verify.mjs:561` registers `epic-file-contract-tests`; `harness/scripts/check-epic-file-contract.mjs` exists on disk and runs correctly (16/16 tests pass; live run against the real tree correctly exits 2 with 7 genuine pre-existing MISSING-FILE findings from the documented 2026-08-09 ADR renumbering — correct-by-design, not a bug). Landed commits `78137b1a`/`3f9bc6b8`.
 - **Date:** 2026-08-18

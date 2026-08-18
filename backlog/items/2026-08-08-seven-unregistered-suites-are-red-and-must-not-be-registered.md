@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.seven-unregistered-suites-are-red
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 source: "Filed under phase-plan item R1.2 (gate integrity and residual closure) after the unregistered-suite measurement ran all 109 files. 102 are green and are being registered in batches; these 7 are red and are deliberately excluded from that registration. Machine artifact: specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md"
 due: 2026-09-07
@@ -165,4 +165,10 @@ to exactly that one remaining, mechanical, already-scoped step.
 - **Decision:** still_open_dispatch_ready — not closing. Independently re-verified 2026-08-18: all five suites currently pass standalone (`harness/lib/plan-spec-state-v2.test.mjs` 8/8, `harness/scripts/recovery-bridge-approval.test.mjs` 1/1, `plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs` 1/1, `plugins/pipeline-core/scripts/afk-activation.test.mjs` 13/13 — live-run confirmed, `plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs` 4/4), matching this item's own 2026-08-18 Proposal update and the `EXCLUSIONS` entries in `harness/scripts/check-verify-suite-registration.mjs:203-227` (each carries a "GREEN, not red" reason naming its repair commit — except `afk-activation.test.mjs`'s entry at line 218-222, which is stale text still reading "red (R1.2)").
 - **Rationale:** Repair work is done; the only remaining step is registering the five entries in `harness/scripts/verify.mjs`, which is mechanical and needs no PO judgment call — it is blocked purely on TP-3's protected-test-path gate requiring a signed GMW window, the standard prerequisite for any edit to this file.
 - **Assignment (if accepted):** Goldfish, dispatched once a TP-3-scoped GMW window is signed and open; the dispatch should also correct the stale "red" reason text for `afk-activation.test.mjs` in `check-verify-suite-registration.mjs` while it edits the same file's exclusion list.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** All 5 remaining suites (`harness/lib/plan-spec-state-v2.test.mjs`, `harness/scripts/recovery-bridge-approval.test.mjs`, `plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs`, `plugins/pipeline-core/scripts/afk-activation.test.mjs`, `plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs`) are now registered in `harness/scripts/verify.mjs`'s `TEST_SUITES`, and their exclusion entries removed from `harness/scripts/check-verify-suite-registration.mjs`. Landed commit `17b797fd`.
 - **Date:** 2026-08-18

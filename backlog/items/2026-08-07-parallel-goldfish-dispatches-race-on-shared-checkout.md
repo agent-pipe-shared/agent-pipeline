@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.parallel-goldfish-dispatches-race-on-shared-checkout
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint."
 due: 2026-09-06
@@ -195,4 +195,10 @@ into the template rather than left as dispatch-briefing prose.
 - **Decision:** accepted as still open, dispatch-ready — not closed, not deferred.
 - **Rationale:** Re-checked against current Phoenix source. The load-bearing defect (Proposal #4: a Goldfish dispatch may run an unverified `git reset --soft`/history-altering self-correction on a shared checkout, which incident 2 shows can silently discard another dispatch's real, finished commit) is still live: `guardrails/git.md` GG-04 blocks `reset --hard` but not `reset --soft`; neither `templates/prompts/goldfish-task.md` nor `roles/goldfish.md` GF-07 (stop conditions) mentions forbidding unverified reset/history-altering self-correction. Checked the sibling Nova checkout for the same gap: Nova has independently ported Proposal #1 (per-task `dispatch-record-{{TASK_ID}}.json` naming, `templates/prompts/goldfish-task.md:237`, closing incidents 1/3's collision surface) but has NOT implemented Proposal #4 either — so this is not a case of "already solved in Nova, skip it"; the core fix is unbuilt in both repos.
 - **Assignment (if accepted):** Two bounded, independent dispatches, neither requiring a PO design call: (1) add a Proposal #4 forbidden-action/stop-condition to `roles/goldfish.md` GF-07 and mirror it in `templates/prompts/goldfish-task.md` ("never run `git reset`/other history-altering self-correction on a shared checkout without first verifying via `git log`/`git show` that the commit being touched is your own — stop and report the exact SHA instead"); (2) adopt Nova's per-task `dispatch-record-<taskId>.json` naming convention (Proposal #1) in Phoenix's own template, replacing the fixed `dispatch-record.json` name at `templates/prompts/goldfish-task.md:132`.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** `templates/prompts/goldfish-task.md:115` (unverified history-altering self-correction stop condition) and `:133` (per-task `dispatch-record-{{TASK_ID}}.json` naming, replacing the collision-prone fixed filename), mirrored in `roles/goldfish.md:72` (GF-07). Landed commits `55912293`/`562a2a91`.
 - **Date:** 2026-08-18

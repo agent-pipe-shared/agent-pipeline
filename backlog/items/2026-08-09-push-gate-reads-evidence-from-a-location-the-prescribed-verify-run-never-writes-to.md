@@ -121,3 +121,11 @@ is worth a deliberate call, not a default.
 - **Rationale:** Elephant recommendation, adopted: this is the narrower change (one function, one file) versus teaching the gate to trust a self-reported location or hard-code the `.git/phx-verify` path convention.
 - **Assignment:** Dispatch-ready — brief a Goldfish to change `verify.mjs`'s root resolution and add a regression test proving a run from the detached worktree still writes evidence to the project root.
 - **Date:** 2026-08-18
+
+### Triage — 2026-08-18 (sharper finding, still open)
+
+- **Decision:** still open — the PO's Direction 2 decision above needs refinement before dispatch, not reversal.
+- **Rationale:** A goldfish-deep dispatch (PHX-WP-EVIDENCE-ROOT-FIX) attempted this and stopped cleanly before implementing: `verify.mjs`'s `candidateIdentity()` (lines 71-83) uses the SAME `repoRoot` variable, via `cwd: repoRoot`, for its dirty-check that feeds the candidate-preflight gate. If `repoRoot` is redirected wholesale to the primary worktree root as briefed, `candidateIdentity()`'s dirty-check would then always inspect the PRIMARY worktree's status regardless of which worktree invoked `verify.mjs` — and the primary worktree carries permanently-uncommitted tracked operator/state files by this repo's own convention. Every future run from the prescribed clean route (`.git/phx-verify`) would then immediately hit `VERIFY-CANDIDATE-PREFLIGHT` and never again produce a genuine passing evidence result — permanently destroying the exact reason the detached worktree exists, a materially worse outcome than the bug being fixed. The PO's stated success criterion for Direction 2 would technically still hold in this broken state, so it would not have caught the regression.
+- **Refined options:** (a) confirm the full-`repoRoot` redirect is intended and separately re-architect `candidateIdentity()`'s dirty-check to tolerate the primary's permanent-dirty state when invoked from a worktree other than the one whose status is being checked; or (b) narrow the fix so only `evidenceDir`/`evidencePath` and `gitCommonDirectory()`'s bootstrap move to the primary root, while `candidateIdentity()` and any other `repoRoot` consumer stay on the invoking worktree.
+- **Assignment:** needs a PO choice between (a) and (b) before re-dispatch.
+- **Date:** 2026-08-18

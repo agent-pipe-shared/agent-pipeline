@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.governance-product-verify-suites-deregistered
 type: defect
 owner: pipeline
-status: open
+status: closed
 source: merge report section 4 finding 3 and section 7.3 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
 due: 2026-09-06
@@ -58,4 +58,10 @@ delete the dead test file rather than leaving it as silent dead weight).
 - **Decision:** accept-open, mostly resolved but not closed.
 - **Rationale:** Commits `123d09c0` and `63fd8ce9` re-registered the bulk of the ~30 orphaned suites this item names, and `63fd8ce9`'s own commit message asserts `check-verify-suite-registration.mjs` confirmed 0 unregistered at that time. Running that same checker today still fails: `plugins/pipeline-core/scripts/phoenix-authority-approval.test.mjs` is unregistered in `harness/scripts/verify.mjs`'s `TEST_SUITES`. This is a newer/missed suite, not a sign the original ~30 are still orphaned, but the item's acceptance bar (all governance-product suites registered or deliberately retired) is not yet met.
 - **Assignment (if accepted):** Bounded Goldfish dispatch: register `phoenix-authority-approval.test.mjs` in `verify.mjs`'s `TEST_SUITES` (or record a deliberate, dated exclusion in `check-verify-suite-registration.mjs` if intentionally not run), then re-run the checker to confirm 0 unregistered before closing this item.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** The one remaining unregistered suite this item's 2026-08-18 Triage narrowed to, `plugins/pipeline-core/scripts/phoenix-authority-approval.test.mjs`, is now registered in `harness/scripts/verify.mjs`'s `TEST_SUITES`. Landed commit `0b540510`. Note: `check-verify-suite-registration.mjs` still separately flags `plugins/pipeline-core/lib/resume-hint.test.mjs` as unregistered — this is a NEW, different, smaller gap discovered as a byproduct of this fix, filed separately as its own backlog item (see the new item below), not a reason to keep this item open.
 - **Date:** 2026-08-18

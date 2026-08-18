@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.reconcile-lock-reuse-regression-test-needs-a-tp5-window
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "PHX-WP-RECONCILE-LOCK-REALPATH dispatch (2026-08-18), stop condition: harness/scripts/pipeline-state.test.mjs is a TP-5 protected test path"
 ---
@@ -50,4 +50,10 @@ dispatch as a concrete reference rather than designed from scratch.
 - **Decision:** accept-open, dispatch-ready (blocked on a TP-5 signed maintenance window, not on design).
 - **Rationale:** Confirmed the underlying lock-reuse fix (`pipeline-state.mjs:6284-6293`, `realpathSync`-resolved comparison) is landed and correct, and that the drafted regression test is still genuinely missing from `harness/scripts/pipeline-state.test.mjs` (TP-5 protected). The test shape is already fully specified from the dispatch that first drafted it; the only blocker is obtaining the signed TP-5 window, a procedural step, not a design decision.
 - **Assignment (if accepted):** owner `pipeline`; bundle into the next TP-5-touching maintenance window and dispatch the one-test Goldfish task at that point.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** `harness/scripts/pipeline-state.test.mjs` gained the drafted `RGt`/`RGt-2`/`RGt-3` regression test (symlinked `CLAUDE_PROJECT_DIR` proving the `realpathSync`-based lock-reuse fix). Landed commit `2eaf90fe`; full suite passes except the 2 known unrelated FTP-ARTIFACT-2 findings.
 - **Date:** 2026-08-18

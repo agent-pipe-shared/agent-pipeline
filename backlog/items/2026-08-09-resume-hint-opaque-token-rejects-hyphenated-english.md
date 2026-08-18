@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.resume-hint-opaque-token-rejects-hyphenated-english
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Found via a purpose-written probe script isolating which of twelve candidate strings caused `resume-hint.mjs capture` to fail; confirmed at source (plugins/pipeline-core/lib/resume-hint.mjs) under dispatch PHX-BL2 (2026-08-09)."
 due: 2026-09-08
@@ -93,4 +93,10 @@ Two separable proposals, deliberately not one fix:
 - **Decision:** still_open_dispatch_ready. Verified at source: `plugins/pipeline-core/lib/resume-hint.mjs:31-63` is unchanged — `opaqueToken()`, the single undifferentiated `RH-SCHEMA` code, and `buildResumeHint`'s bare `throw new Error(checked.code)` all still reproduce exactly as described. Nova has solved this item's "diagnostic half" only: `opaqueToken()` there is byte-for-byte identical (the false-positive detector is untouched, matching this item's own "do not propose a relaxation without evidence" stance), but `resumeHintContextDetail()` and an updated `buildResumeHint` now turn a bare `RH-SCHEMA` into `RH-SCHEMA: <field> must be ... free of secrets and opaque tokens`, naming the offending field.
 - **Rationale:** The diagnostic half is a low-risk, already-designed fix (Nova's `resumeHintContextDetail` pattern) that can be ported/adapted into Phoenix via an ordinary dispatch with no PO judgment call. The detector half (the actual false-positive heuristic) remains correctly unfixed everywhere and should stay filed exactly as the item's Proposal #2 already prescribes.
 - **Assignment (if accepted):** Goldfish, scoped ONLY to porting the diagnostic-half fix (name the failing field, following Nova's `resumeHintContextDetail` shape) into Phoenix's `resume-hint.mjs`; do not touch `opaqueToken()`'s detection logic in the same dispatch.
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** `plugins/pipeline-core/lib/resume-hint.mjs:68` (`resumeHintContextDetail`) and `:104-115` (`buildResumeHint` names the offending field/rule instead of a bare `RH-SCHEMA`). Landed in two steps: diagnostic-half port (commit `f685a2b5`), then a Critic-found follow-up fix so `buildResumeHint` only invokes context-detail for genuinely context-caused failures (commit `977a78ee`, new regression test `RH-SCHEMA-DIAG-2`). Proposal #2 (the `opaqueToken()` heuristic itself) is deliberately left unfixed by design, not a remaining gap.
 - **Date:** 2026-08-18

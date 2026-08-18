@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.signed-authority-binding-durability
 type: defect
 owner: pipeline
-status: open
+status: closed
 source: Phoenix §7 authority revision; observed directly during the revision sequence
 created: 2026-08-06
 ---
@@ -70,4 +70,10 @@ conflict, and that receipts and bindings can never disagree silently.
 - **Decision:** accept-open, unfixed in both Phoenix and Nova.
 - **Rationale:** `submitPlan()` in `plan-spec-state-v2.mjs` still silently overwrites `continuity.authority` from the gate's derived PRD/Spec pair on every ordinary submission (lines 525-529), with no comparison to the currently recorded binding and no detection of a stale revision receipt. Nova's sibling file has byte-identical logic — same defect, unfixed there too. The fix (fail closed with a typed conflict code when the recorded and derived authority differ, per the item's own Proposal) is technically clear and does not require a PO judgment call.
 - **Assignment (if accepted):** Bounded Goldfish dispatch: make `submitPlan` authority-aware per the item's Proposal, add the regression coverage it specifies (signed revision followed by ordinary submission either preserves the binding or fails with a typed conflict code).
+- **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** `plugins/pipeline-core/lib/plan-spec-state-v2.mjs:514-519` — `submitPlan()` now fail-closes with `PLAN-SUBMIT-AUTHORITY-PRD-CONFLICT`/`PLAN-SUBMIT-AUTHORITY-SPEC-CONFLICT` when `continuity.authority.{prd,spec}.path` differs from the PO-gate-derived pair. Landed as PHX-WP-AUTHORITY-BINDING-DURABILITY, commit `4cd3e93d`, regression-tested (13/13 tests pass).
 - **Date:** 2026-08-18

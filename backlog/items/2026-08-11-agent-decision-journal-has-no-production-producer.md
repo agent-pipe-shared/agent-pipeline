@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agent-decision-journal-no-production-producer
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
 source: "Converged on during Sprint Phoenix Class B scoping (docs/state.md, 2026-08-11 checkpoint, 'PO said keep going' and following sections; specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md, 'The unifying finding'). PO decision confirmed 2026-08-11 (direct mobile question, 'Journal-Gap'): plan this as its own initiative."
 ---
@@ -84,3 +84,9 @@ and building a caller to satisfy a criterion is the anti-pattern `cc43a182`
 already reverted once in this epic.
 
 This item stays `open`: the first producer is scoped but not built.
+
+## Triage — closed 2026-08-18
+
+- **Decision:** closed — resolved.
+- **Rationale:** All three named event-kind producers are resolved: `command-offer` via `plugins/pipeline-core/lib/guard-handoff-offer.mjs`, wired into `plugins/pipeline-core/lib/human-guard-override.mjs:1198-1210` (real production path); `agent-decision` via `plugins/pipeline-core/lib/advisory-decision-event.mjs`, wired into `plugins/pipeline-core/scripts/advisory-host-bridge.mjs:547` (real production path); `legacy-import-observation` deliberately not built per PO Amendment 2026-08-17 recorded in `specs/sprint-phoenix-epic/acceptance.md:256-276` H-AC-08 ('satisfied by construction, not by a live import path').
+- **Date:** 2026-08-18
