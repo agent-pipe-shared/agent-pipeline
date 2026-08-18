@@ -503,6 +503,20 @@ export function submitPlan({
     || continuity.closeTransition != null) {
     return fail("PLAN-SUBMIT-CONTINUITY-BUSY");
   }
+  // A signed continuity-authority revision (recorded via the dedicated
+  // revision path, never via this writer) can rebind continuity.authority to
+  // a document *other* than the one this ordinary, unsigned submission's own
+  // PO-gate view derives. Content-digest drift on the SAME document is the
+  // routine, expected shape of an ordinary resubmission and is never gated
+  // here; a PATH mismatch means the currently recorded binding was moved by
+  // something other than this submission and must never be silently
+  // overwritten -- fail closed and name which side of the binding conflicts.
+  if (continuity.authority.prd.path !== poGateAuthority.planPath) {
+    return fail("PLAN-SUBMIT-AUTHORITY-PRD-CONFLICT");
+  }
+  if (continuity.authority.spec.path !== poGateAuthority.specPath) {
+    return fail("PLAN-SUBMIT-AUTHORITY-SPEC-CONFLICT");
+  }
   const submission = {
     schema: PLAN_SUBMISSION_SCHEMA,
     featureId: state.activeFeature.id,

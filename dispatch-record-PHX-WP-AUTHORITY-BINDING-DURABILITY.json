@@ -1,0 +1,30 @@
+{
+  "taskId": "PHX-WP-AUTHORITY-BINDING-DURABILITY",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "goldfish",
+  "outcome": "success",
+  "log": [
+    {
+      "phase": "bootstrap",
+      "toolUseCount": 2,
+      "note": "Dispatch record opened as first act. Beginning to read uncommitted diff on plan-spec-state-v2.mjs."
+    },
+    {
+      "phase": "cleanup",
+      "toolUseCount": 12,
+      "note": "Confirmed the two PLAN-SUBMIT-AUTHORITY-*-CONFLICT fail-closed checks in submitPlan() were the accepted design and untouched them. Removed extractAuthorityBinding, sameAuthorityBinding, authorityRevisionBindingStatus as dead code (grep confirmed zero remaining references)."
+    },
+    {
+      "phase": "test-coverage",
+      "toolUseCount": 18,
+      "note": "Added one regression test in plan-spec-state-v2.test.mjs covering: (1) signed-revision PRD-path conflict -> PLAN-SUBMIT-AUTHORITY-PRD-CONFLICT, (2) signed-revision Spec-path conflict -> PLAN-SUBMIT-AUTHORITY-SPEC-CONFLICT, (3) ordinary matching-path/content-digest-drift case still succeeds."
+    },
+    {
+      "phase": "verify",
+      "toolUseCount": 21,
+      "note": "node --test plugins/pipeline-core/lib/plan-spec-state-v2.test.mjs via a wrapper script (spawnSync, machine-written log+exit code) at .claude/tmp/verify-PHX-WP-AUTHORITY-BINDING-DURABILITY.log: 13/13 pass, exitCode 0."
+    }
+  ],
+  "report": null
+}
