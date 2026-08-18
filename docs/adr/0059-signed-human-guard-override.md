@@ -231,6 +231,37 @@ cannot reach, with a hand-editing escape hatch beside it. Every rule a human may
 legitimately lift is reachable through the ceremony, or it is genuinely
 unliftable and says so with no escape hatch — never both.
 
+### 7. Clarification, 2026-08-18 (recorded per `backlog/items/2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md` Proposal point 4): `GUARD-CROSS-REPO-MUTATION` also blocks the host-temp session scratchpad, not merely "another repository"
+
+Decision 5's phrase "cross-repository-boundary targets" reads as though this
+class covers only a genuinely different git repository or a worktree of this
+one. It does not stop there: `isProjectWritePath()`'s containment check
+(`guard-lifecycle-ready.mjs`) refuses ANY write target outside this project's
+own realpathed root, full stop — and every session is issued a scratchpad
+directory under the HOST TEMP root, which is outside the project root by
+construction. A plain write there is refused by this exact guard, under this
+exact denial code, with no other repository involved at all. That consequence
+was nowhere stated in this ADR and produced a live contradiction elsewhere in
+the ruleset: `roles/critic.md`'s scratchpad-isolation clause used to name a
+host-temp subdirectory as the working location the Critic contract *requires*,
+which this guard refuses outright — filed and resolved as the backlog item
+named above.
+
+**The resolution taken is not "sign a lift for every scratch write."**
+Decision 6 makes a cross-repository mutation liftable by a signed override in
+principle, but a PO-audited signature ceremony per routine throwaway file
+would be absurd overhead for the volume of temporary material one session
+produces. The practical fix instead moves the *target*, not the guard: every
+session (Elephant, Goldfish, Critic) is briefed to use the project's own
+in-repository `scratch/` directory (gitignored; directory kind defined in
+`docs/adr/0063-repository-directory-contract.md`) for temporary material.
+`scratch/` sits inside the project root, so `isProjectWritePath()` admits a
+write there directly — no override, signed or chat-mode, is invoked for
+routine scratch use at all. `GUARD-CROSS-REPO-MUTATION` and
+`isProjectWritePath()` are unchanged by this clarification; no guard/hook code
+was touched to reach this outcome, matching this item's own explicit decision
+(2026-08-11) to keep the guard as-is.
+
 ## Consequences
 
 **Positive.** One primitive (`po-approval-proof.mjs`), three consumers (push,

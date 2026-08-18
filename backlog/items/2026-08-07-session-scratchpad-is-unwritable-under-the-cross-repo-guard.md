@@ -181,3 +181,89 @@ dispatch already using this repo's own `scratch/`) already works in
 practice; the remaining sub-questions (collision-free per-dispatch naming,
 rewriting `roles/critic.md`'s isolation clause) are hardening, not a live
 blocker.
+
+### Implementation, 2026-08-18 (wave 1, dispatch NVA-W1-10)
+
+Investigated the three sub-items this dispatch was scoped to before touching
+anything, since the repo had moved substantially since the 2026-08-11 triage.
+Two of the three were already fully implemented by prior work on the sibling
+item `pipeline.no-governed-directory-contract` (ADR-0063,
+`docs/adr/0063-repository-directory-contract.md`) and were left untouched:
+
+1. **Onboarding wiring — already done, not touched.** A fresh session's
+   bootstrap (`plugins/pipeline-core/skills/pipeline-start/SKILL.md:41-76`,
+   "Scratch space" section) already tells every role (Elephant, Goldfish,
+   Critic) to use the in-repo `scratch/` directory, never a host-temp path,
+   and points at `bindScratchDescriptor`/`releaseScratchDescriptor`/
+   `retireOrphanScratchDescriptors` in
+   `plugins/pipeline-core/lib/session-cleanup-recovery.mjs` for lifecycle
+   cleanup. `templates/prompts/goldfish-task.md:84-101` carries the same
+   text for every Goldfish dispatch briefing.
+2. **Collision-free per-dispatch naming — already done, not touched.**
+   `roles/critic.md:53` and `templates/prompts/critic-review.md:229-246`
+   both already specify `scratch/<codename>-<random-hex>/` with an ≥8-hex
+   CSPRNG suffix and an atomic bare `mkdir` (no `-p`) as the collision-free
+   convention this item's Proposal asked for, for the Critic use case the
+   Proposal actually names.
+3. **`roles/critic.md` honest rewrite — already done, not touched.** The
+   same lines above already state plainly that the scratch location is the
+   project's own in-repo `scratch/` directory (gitignored, needs no guard
+   exception because it never leaves the project root) — not a host-temp
+   path — and that "gitignored is not invisible" (the Critic reads the
+   working tree and must not read a sibling dispatch's subdirectory as
+   evidence).
+
+**The one genuine gap found and fixed: ADR-0059 never recorded Proposal
+point 4.** Confirmed via grep before this dispatch: zero occurrences of
+"scratch" anywhere in `docs/adr/0059-signed-human-guard-override.md`.
+Decision 5's "cross-repository-boundary targets" phrase reads as though
+`GUARD-CROSS-REPO-MUTATION` protects only a different repository — it also
+refuses the host-temp session scratchpad, and that consequence was nowhere
+stated.
+
+- **`docs/adr/0059-signed-human-guard-override.md:234-258`** — added
+  "### 7. Clarification, 2026-08-18", recording that `isProjectWritePath()`
+  refuses any target outside the project root including the host-temp
+  scratchpad every session is issued, that this produced the exact
+  contradiction this backlog item describes, and that the resolution is not
+  a per-write signed lift (Decision 6 makes that possible in principle, but
+  it would be absurd overhead for routine throwaway files) — instead the
+  *target* moved to the in-repo `scratch/` directory, which
+  `isProjectWritePath()` admits directly with no override at all.
+  `GUARD-CROSS-REPO-MUTATION` and `isProjectWritePath()` are unchanged; no
+  guard/hook code was touched, per this item's own 2026-08-11 decision to
+  keep the guard as-is.
+- **`plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:430-461`** —
+  new test `"a host-temp-style scratchpad path is refused exactly like any
+  other cross-repo target, and ADR-0059 documents that consequence"`. Two
+  halves: (a) behavioral — `isProjectWritePath()` returns `false` and
+  `evaluateLifecycleReadyGuard()` refuses a write into a real `tmpdir()`
+  scratch directory with `GUARD-CROSS-REPO-MUTATION`, proving the guard
+  behavior the ADR now documents is real, not merely written down; (b)
+  content — asserts the ADR text contains the "host-temp session
+  scratchpad" phrase and cross-references this backlog item's filename, so
+  the documentation fix cannot silently regress. This file is not in
+  `.claude/guard-config.json`'s `protectedTestPaths` (TP-1..TP-10), so no
+  protected-test-path ceremony applied. No new standalone `*.test.mjs` file
+  was created, specifically to avoid touching `harness/scripts/verify.mjs`'s
+  suite registration (prohibited by this dispatch's briefing) — the new
+  test was appended to this existing, already-registered suite instead.
+
+**Verification:** `node --test
+plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` — 113/113 pass,
+exit 0 (was 112 tests before this change). `node
+plugins/pipeline-core/scripts/check-suite-registration.mjs` run as a sanity
+check (not part of the DoD): pre-existing 105 unregistered suites unrelated
+to this change; `guard-lifecycle-ready.test.mjs` itself was already
+registered before and after this edit, so no new registration gap was
+introduced.
+
+**Deliberately not changed:** ADR-0059's Decision 5/6 prose otherwise, the
+`docs/adr/README.md` index (no "amended" column exists there and the prior
+2026-08-08 amendment to this same ADR did not update it either — consistent
+precedent), guard/hook source code (prohibited by scope and by this item's
+own 2026-08-11 decision), and the item's own `status:` frontmatter and
+Closure section (both explicitly out of scope for this dispatch — closure is
+decided centrally after Critic review).
+
+Commit SHA and branch reported separately by the dispatching Elephant.
