@@ -6,8 +6,8 @@ owner: "pipeline"
 status: "in_progress"
 created: "2026-07-20"
 source: "Public V3 Foundation stabilization review of formal review and dispatch retries"
-due: "2026-08-03"
-expires: "2026-08-10"
+due: "2026-09-08"
+expires: "2026-09-15"
 ---
 
 # Bound review retries to valid evidence
@@ -72,7 +72,43 @@ interrupted transport.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Renewal (2026-08-18):** expired 2026-08-10 with an empty Triage section,
+  never triaged in the ~4 weeks since filing — the SAME mistake class this
+  session made and corrected for `pipeline.multi-cli-efficiency-pilots`
+  (NVA-A8-5): trusting inherited matrix/known-issues prose over the
+  defining backlog item itself. Its P1 prerequisite
+  (`2026-07-20-recovery-preview-callback-attestation.md`, "the P1 recovery
+  false-success boundary") was ALSO expired and untriaged; found to already
+  be correctly implemented, independently Critic-reviewed (PASS, this
+  session), and closed immediately before this renewal. P2 is therefore
+  genuinely unblocked now, not just nominally.
+- **Decision:** accepted, current scope, narrowed for a first implementation
+  package. Build the retry planner as a new, standalone, independently
+  testable library module — a pure decision function, not yet wired into
+  Verify's or Critic admission's live retry path. This mirrors the pattern
+  already used successfully elsewhere this session (the GMW kernel-closure
+  invariant, the execution-plane real-outcome normalizer): build and prove
+  the mechanism in isolation first; live wiring into the actual Verify/
+  Critic retry call sites is a separate, later, higher-risk follow-up once
+  the module itself is accepted and Critic-reviewed. This item's Proposal
+  is otherwise ALREADY the design: a deterministic function from (prior
+  stage receipts + a new abort event + policy) to a retry plan, per its own
+  acceptance-boundary bullets — no further design decision is needed before
+  a first implementation package can be dispatched.
+- **Rationale:** the acceptance boundary this item already specifies is
+  concrete and testable (receipt binding fields, freshness windows, the
+  transport/execution/orchestration-vs-domain-finding classification, the
+  "retained evidence never becomes a PASS/readiness/release claim by
+  itself" invariant) — building it as an isolated module needs no PO input
+  and carries far less risk than wiring it live into the gates that
+  actually decide Verify/Critic admission on the first pass.
+- **Assignment:** goldfish-deep implementation package, dispatched this
+  session as `NVA-RETRYECON-1` (see `docs/state.md` for the outcome) — a
+  new `plugins/pipeline-core/lib/review-retry-planner.mjs` (name subject to
+  the dispatch's own judgment) implementing the acceptance boundary exactly,
+  with a full regression suite covering every bullet, and a mandatory
+  Critic review before this item can move toward closure. Live wiring into
+  Verify/Critic's actual retry call sites is explicitly OUT of this
+  package's scope — a distinct, later, separately-triaged follow-up once
+  this module itself is accepted.
+- **Date:** 2026-08-18
