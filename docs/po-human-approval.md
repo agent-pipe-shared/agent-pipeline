@@ -178,10 +178,102 @@ attribution string is not a substitute at these three boundaries.
 ## Adapter boundary
 
 This helper is the first adapter for one shared Human-Authorization contract,
-not a CYB-4-only mechanism. The shipped 0.5.0 adapter is the external
-encrypted Ed25519/SSH-style key path above. Passkey/WebAuthn, IAM,
-hardware-key, and password-manager adapters may later produce the same
-detached public proof; they are not bundled in 0.5.0.
+not a CYB-4-only mechanism, and not the only one this contract will ever have.
+The shipped adapter is the external encrypted Ed25519/SSH-style key path
+documented above; it exists to prove the contract, not to close it.
+Passkey/WebAuthn is the next expected **native** adapter — for a desktop
+consumer, built where that consumer lives, not in this repository, which has
+no desktop-app code. IAM, hardware-key, and password-manager adapters may
+follow the same shape. This section is what a conforming adapter — Passkey/
+WebAuthn or otherwise — is written against; it deliberately stops short of
+prescribing a UI, a platform API, or a credential format, because none of
+those are this repository's to decide.
+
+**What a conforming adapter must implement.** Every adapter, regardless of
+its key material or platform, produces a detached `proof` object with exactly
+this shape (the shipped adapter's own output, unchanged):
+
+```json
+{
+  "schema": "pipeline.po-approval-proof.v1",
+  "intentSha256": "<sha256 hex of the approval-intent digest being signed>",
+  "keyReference": "<the label the adapter's own trust-policy entry uses>",
+  "publicKey": "<the adapter's public key, in whatever serialization its own trust policy hashes>",
+  "signatureBase64": "<the signature over the intentSha256 bytes, base64-encoded>"
+}
+```
+
+Three properties are non-negotiable, because the shared contract's callers —
+the critical-action gate, the fork-disposition ceremony, the threat-model
+gate — rely on all three without adapter-specific code of their own:
+
+- **Candidate binding.** The `intentSha256` the adapter signs is not a bare
+  message; it is the digest of an approval-intent object that already
+  embeds the current candidate commit and tree, the action kind, and (for a
+  critical action) the exact subject digest and expiry. An adapter never
+  invents or shortens this digest — it signs exactly the digest the
+  control plane already computed and showed to the human, unmodified. This
+  is what makes a proof for one commit reject silently against any other.
+- **Replay resistance.** Because the signed digest is candidate-bound, a
+  proof captured for one candidate does not verify against a later one — a
+  changed tree or commit forces a new digest, which forces a new signature.
+  An adapter must not cache or reuse a prior signature across a candidate
+  change, and must not accept a pre-computed signature offered by anything
+  other than its own signing step for the exact digest under review.
+- **The no-secret-agent boundary.** No private key material, passphrase,
+  biometric template, hardware-token session, or platform credential
+  handle may cross into agent context, chat transcript, repository content,
+  CI environment, or Pipeline state at any point. The shipped adapter keeps
+  the encrypted private key and its passphrase in an external directory the
+  agent never reads and OpenSSL prompts for locally; a Passkey/WebAuthn
+  adapter keeps the analogous boundary by never exporting the authenticator's
+  private key material out of the platform's own secure enclave/OS
+  credential store — the browser/OS `navigator.credentials` (or platform
+  equivalent) ceremony runs on the human's device and only the resulting
+  assertion, translated into the proof shape above, ever reaches the agent.
+  An adapter that cannot state where its private key material lives and how
+  it stays out of these four surfaces does not conform, independent of
+  cryptographic correctness.
+
+**What the verification surface actually checks — so a conforming adapter's
+proof is accepted without touching the contract.** The consumer-side check
+(`verifyPoApprovalProof` in `plugins/pipeline-core/lib/po-approval-proof.mjs`,
+called from every kind-specific verifier: threat-model, critical-action,
+fork-disposition) is adapter-agnostic on the fields above: it checks the
+proof's `schema` tag, that `proof.intentSha256` equals the digest of the
+rebuilt approval intent (so the proof cannot be replayed against a different
+candidate/action/subject), that `sha256(proof.publicKey)` equals the
+`publicKeySha256` pinned in the repository's own trust policy (so the proof
+cannot substitute a different key than the one this repository was told to
+trust), and finally that `proof.signatureBase64` is a valid signature over the
+`intentSha256` bytes under `proof.publicKey`. None of those four checks name
+Ed25519, OpenSSL, or any other adapter-specific detail — a Passkey/WebAuthn
+adapter that emits the proof shape above, with a public key whose hash
+matches its trust-policy entry and a signature that verifies over the same
+digest bytes, is accepted exactly like the shipped adapter's proof, with no
+change to `verifyPoApprovalProof` or its callers.
+
+**One documented, narrower coupling, not a blocking one.** The signature
+check itself currently calls Node's `crypto.verify(null, ...)` — the `null`
+algorithm form that only Node's crypto library resolves without an explicit
+digest algorithm for EdDSA-family keys (Ed25519/Ed448), which is exactly what
+the shipped adapter's key is. Most WebAuthn/Passkey authenticators issue
+ECDSA (P-256) credentials rather than Ed25519 ones; a future adapter whose
+`publicKey` is such an ECDSA key would need `verifyPoApprovalProof` to pass
+an explicit digest algorithm (or detect one from the key) rather than rely on
+the `null` default, which is a small, well-scoped addition to that one
+function, not a redesign of the contract. An Ed25519-issuing Passkey
+authenticator (WebAuthn permits this credential type) would verify today
+without any change. This document records the boundary precisely so a future
+adapter implementer knows which side of it a code change is required on.
+
+**What every human command below is not.** The setup/approve/authorize
+commands documented above are one adapter's *implementation* of this
+contract, not the contract itself; a Passkey/WebAuthn adapter has its own
+one-time enrollment and its own per-approval user ceremony (a platform
+prompt, not an OpenSSL passphrase entry), and is free to differ from every
+CLI detail above as long as its output satisfies the proof shape and the
+three non-negotiable properties stated here.
 
 ## Remote work and provisional codes
 
