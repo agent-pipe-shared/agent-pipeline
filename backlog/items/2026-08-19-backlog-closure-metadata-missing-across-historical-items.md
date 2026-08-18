@@ -51,3 +51,52 @@ dispatching real work here.
 - **Assignment (if accepted):** Unassigned — needs Elephant-led inventory
   pass first, then a PO decision on remediation approach.
 - **Date:** 2026-08-19
+
+## Progress note — 2026-08-19 (historical reconstruction attempted)
+
+`PHX-WP-BACKLOG-CLOSURE-HISTORICAL-RECONSTRUCTION` (commit `b3c2eaef`) attempted
+real historical reconstruction rather than waiting for a PO policy call, per
+this item's own "genuine historical research... is one legitimate direction"
+proposal. Result: **69 of 79** closed items missing the 4 required fields were
+reconstructed with real, `git cat-file`-verified commit SHAs (no fabrication —
+every value traces to an actual commit). **10 items were deliberately left
+untouched**, because they are not a missing-evidence case at all: their
+frontmatter says `status: closed` but their own final Triage/Decision text
+says the opposite ("stays open", "accept-open", "accept-deferred", "confirmed
+still open") — a genuine status/content contradiction, not a data gap. Adding
+closure metadata to these would misrepresent items that may actually still be
+open. The 10:
+- 2026-08-05-claude-dir-leftovers-defeat-runner-neutral-project-migration.md
+- 2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md
+- 2026-08-05-critical-human-proof-not-wired-to-push-and-prd-gates.md
+- 2026-08-06-local-plugin-install-attestation-does-not-bind-external-marketplace-root.md
+- 2026-08-06-neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates.md
+- 2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md
+- 2026-08-06-restart-launch-is-codex-only-for-every-runner.md
+- 2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md
+- 2026-08-07-onboarding-ready-path-unconditional-restart-barrier-read.md
+- 2026-08-07-part-a-limitation-2-orphaned-by-the-r2-rework.md
+
+One additional item (`2026-08-16-installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits.md`)
+has a `closure_evidence` value that points outside this repository (an
+external marketplace checkout path) rather than a regular repository file —
+`validateBacklogItem` rejects this shape; needs its own small, separate fix
+(point the evidence at an in-repo reference, or accept the out-of-repo
+reference as a distinct, deliberately-allowed shape — a real but narrow
+question).
+
+**`node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate`
+is itself fail-closed and currently BLOCKED** by these same 11 items (the 10
+contradictions + the 1 malformed evidence path) — confirmed by running it
+without `--activate`: it refuses with all 41 findings and writes nothing.
+`backlog-ledger-reconciliation-tests`'s remaining ~97 "status does not match
+its final ledger transition" failures are a downstream symptom of this same
+block, not a separate defect — once the 11 items are resolved, re-running
+`reconcile-backlog-ledger.mjs --activate` should resolve most or all of them
+in one pass.
+
+**Sharper remaining scope:** the PO decision this item still needs is narrow
+now — for each of the 10 contradiction items, should `status` revert to what
+their own Triage text says, or should the Triage text be reconciled to
+confirm `closed` (with real closure metadata then added)? This is a much
+smaller, well-bounded decision than the original "unknown historical scope."
