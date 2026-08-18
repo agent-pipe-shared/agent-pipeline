@@ -88,7 +88,21 @@ function gitCommonDirectory() {
 }
 const startedCandidate = candidateIdentity();
 const command = "node harness/scripts/verify.mjs";
-const evidenceDir = join(repoRoot, "evidence");
+// Evidence must always land at the PRIMARY worktree root (the parent of Git's
+// common directory), never at the invoking worktree's own root: the push gate
+// (guard-push.mjs's resolveEvidenceProject) only ever reads evidence from the
+// primary checkout, but the prescribed clean-candidate route runs THIS script
+// from the detached `.git/phx-verify` worktree -- backlog
+// 2026-08-09-push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to.md
+// (PO Decision, Option B, 2026-08-18). This is deliberately narrower than
+// redirecting `repoRoot` itself: `repoRoot` -- and every one of its other
+// consumers, including candidateIdentity()'s dirty-check above and
+// hooksDir/libDir/pluginScriptsDir below -- keeps resolving against the
+// INVOKING worktree. A full `repoRoot` redirect would make the candidate
+// preflight inspect the PRIMARY worktree instead, which is permanently dirty
+// by this repo's own convention, and would fail the prescribed route forever.
+const primaryRoot = dirname(gitCommonDirectory());
+const evidenceDir = join(primaryRoot, "evidence");
 const evidencePath = join(evidenceDir, "verify-latest.json");
 const verifyStartedAt = new Date().toISOString();
 function writeEvidence(evidence) {
@@ -564,6 +578,7 @@ const TEST_SUITES = [
   { name: "guard-git-phoenix-tests", file: join(hooksDir, "guard-git-phoenix.test.mjs") },
   { name: "afk-activation-tests", file: join(pluginScriptsDir, "afk-activation.test.mjs") },
   { name: "codex-isolated-critic-protected-preimage-tests", file: join(pluginScriptsDir, "codex-isolated-critic-protected-preimage.test.mjs") },
+  { name: "verify-evidence-root-tests", file: join(scriptDir, "verify-evidence-root.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
