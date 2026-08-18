@@ -1765,3 +1765,23 @@ checkpoint 28/29 already state (`guard-testpath-override-tests` — TP-7, no rou
 from this session; `doc-contract-tests`/`doc-contract-check` — pre-existing linter
 false positive, out of scope since 2026-08-16), `security-scan` clean. Confirmed
 independently for this record, not carried over from checkpoint prose.
+
+## Candidate f4711cba0fd1f63594098f678638b3436983f0f9 — 2026-08-18, range 8a92d377..f4711cba, adds only checkpoint 30 (this record's own entry above, `75bd72c2`, and the checkpoint-30 handover append) on top of the `b87ef50d` candidate already reconciled
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0058: checked, no change needed.
+
+**Restated per the known limitation this file's header names.** `b87ef50d` is an
+ancestor of this candidate and was already fully reconciled by the entry
+immediately above; ADR-0045, ADR-0056 and ADR-0058's findings there are restated
+verbatim, not re-derived — nothing in `75bd72c2` (this file only, ungoverned) or
+the checkpoint-30 append changes any of the three.
+
+**ADR-0012** — the only genuinely new material in this narrow range: checkpoint
+30's append to `docs/state.md` (this session's own push-preparation record —
+the re-confirmed Verify baseline, this Layer 1b run, and the computed
+subject-sha256). Additive checkpoint prose only, same as every other entry in
+this file that reconciles ADR-0012; the canonical-handover decision (one
+versioned file, memory mirror-only) is untouched.
