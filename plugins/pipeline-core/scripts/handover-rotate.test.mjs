@@ -647,4 +647,47 @@ const GOVERNANCE_FIXTURE = [
   }
 }
 
+// == NVA-W3-F8: CLI --status --handover-path escaping root is rejected, same containment check as rotateHandover ==
+{
+  const root = fixtureRoot("traversal-status-handover-path");
+  try {
+    const spawned = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", root, "--status", "--section-heading", "Block A", "--handover-path", "../outside-secret-status.md"],
+      { encoding: "utf8" },
+    );
+    assert.equal(spawned.status, 1, "a traversal --handover-path must exit 1 via --status too");
+    assert.ok(
+      /HANDOVER-ROTATION-PATH-ESCAPES-ROOT/.test(spawned.stderr),
+      "the containment check must reject with the same typed error code as rotateHandover",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == NVA-W3-F8: CLI --acknowledge-extraction-done --handover-path escaping root is rejected, same containment check ==
+{
+  const root = fixtureRoot("traversal-acknowledge-handover-path");
+  try {
+    const spawned = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", root, "--acknowledge-extraction-done", "--section-heading", "Block A", "--handover-path", "../outside-secret-ack.md"],
+      { encoding: "utf8" },
+    );
+    assert.equal(spawned.status, 1, "a traversal --handover-path must exit 1 via --acknowledge-extraction-done too");
+    assert.ok(
+      /HANDOVER-ROTATION-PATH-ESCAPES-ROOT/.test(spawned.stderr),
+      "the containment check must reject with the same typed error code as rotateHandover",
+    );
+    assert.equal(
+      existsSync(join(root, ".git", "agent-pipeline", "handover-rotation", "extraction-acknowledged.json")),
+      false,
+      "a traversal rejection must write no marker file",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
 console.log("handover-rotate.test.mjs: all assertions passed");

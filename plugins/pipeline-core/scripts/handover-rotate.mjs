@@ -543,7 +543,9 @@ if (isDirectInvocation(import.meta.url)) {
       // one, lists every CURRENTLY PERSISTED acknowledged section.
       if (args.sectionHeadings.length > 0) {
         const resolvedHandoverPath = args.handoverPath ?? resolveHandoverConfig({ rootDir: root }).path;
-        const liveContent = readFileSync(join(root, resolvedHandoverPath), "utf8");
+        const fullHandoverPath = join(root, resolvedHandoverPath);
+        assertPathWithinRoot(root, fullHandoverPath, "The handover path (--handover-path)");
+        const liveContent = readFileSync(fullHandoverPath, "utf8");
         for (const title of args.sectionHeadings) {
           const section = locateSectionOrThrow(liveContent, title);
           const hash = sectionContentHash(section.lines);
@@ -574,7 +576,9 @@ if (isDirectInvocation(import.meta.url)) {
         process.exit(1);
       }
       const resolvedHandoverPath = args.handoverPath ?? resolveHandoverConfig({ rootDir: root }).path;
-      const liveContent = readFileSync(join(root, resolvedHandoverPath), "utf8");
+      const fullHandoverPath = join(root, resolvedHandoverPath);
+      assertPathWithinRoot(root, fullHandoverPath, "The handover path (--handover-path)");
+      const liveContent = readFileSync(fullHandoverPath, "utf8");
       const entries = recordExtractionAcknowledged(root, { sectionHeadings: args.sectionHeadings, liveContent });
       for (const entry of entries) {
         console.log(`Extraction acknowledgment recorded for "${entry.title}" (content hash ${entry.contentHash.slice(0, 12)}) `
