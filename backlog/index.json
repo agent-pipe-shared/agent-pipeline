@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d5cb9d828d52154310d72c3affd3792bbefd60cebaea137eb97b77e79f21e71f"
+    "transitionHead": "3fec7b160de129d3defb49e911ad041e406e82e079971a2bfb7d3f16bdb36e83"
   },
   "counts": {
-    "open": 91,
+    "open": 92,
     "in_progress": 21,
     "closed": 140
   },
@@ -866,6 +866,14 @@
       "closureRepository": "self",
       "closureCommit": "a6fa43f2fc191ecf76ef7c5b13a02ff64034b24b",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Recurred twice in one overnight AFK block: NVA-A1214-SUCCESS-1 and NVA-RETRYECON-1 each independently introduced a doc comment naming a Pipeline-source-only path (harness/, specs/sprint-nova-epic/) inside a plugins/pipeline-core/ file, only caught by the next Full Verify run, never by the dispatch's own DoD checks."
     },
     {
       "id": "pipeline.grammar-refusal-does-not-say-which-part-failed",
