@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { planFeaturePackageBootstrap, planFeaturePackageTransition, validateFeaturePackage, validateFeatureTopology } from "./feature-package-topology.mjs";
+import { planFeaturePackageBootstrap, planFeaturePackageReconcile, planFeaturePackageTransition, validateFeaturePackage, validateFeatureTopology } from "./feature-package-topology.mjs";
 import { readFileSync } from "node:fs";
 
 const root = mkdtempSync(join(tmpdir(), "feature-topology-"));
@@ -189,3 +189,62 @@ try {
   assert.deepEqual(secondPass.rebinds, []);
   console.log("feature-package-topology: mutable-only auto-rebind boundary, 6 passed, 0 failed");
 } finally { rmSync(autoRebindRoot, { recursive: true, force: true }); }
+
+// PHX-WP-AUTOREBIND-WIRE-WRITEPATH: planFeaturePackageTransition and
+// planFeaturePackageReconcile accept and pass through options.autoRebindMutable
+// to their internal validateFeaturePackage call. Default (no options) is
+// unaffected; an immutable-class drift is never healed by either planner
+// whatever options.autoRebindMutable is set to.
+const wireRoot = mkdtempSync(join(tmpdir(), "feature-topology-autorebind-wire-"));
+try {
+  const id = "wire-feature"; const base = `specs/${id}`;
+  const prd = fileIn(wireRoot, `${base}/prd.md`, "original prd text\n");
+  const acceptance = fileIn(wireRoot, `${base}/acceptance.md`, "original acceptance text\n");
+  const manifest = {
+    schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "draft",
+    artifacts: [
+      { class: "prd", ...prd, authority: true, mutability: "immutable", retention: "active" },
+      { class: "acceptance", ...acceptance, authority: true, mutability: "mutable", retention: "active" },
+    ],
+    candidate: null, supersedes: null,
+  };
+  const manifestPath = `${base}/lifecycle.json`;
+  fileIn(wireRoot, manifestPath, `${JSON.stringify(manifest)}\n`);
+  fileIn(wireRoot, `${base}/acceptance.md`, "amended acceptance text\n");
+
+  // planFeaturePackageTransition: default rejects on the mutable drift; with
+  // options.autoRebindMutable it self-heals and returns a preview.
+  const rejected = planFeaturePackageTransition(wireRoot, manifestPath, "awaiting-approval");
+  assert.equal(rejected.status, "rejected");
+  assert.equal(rejected.reason, "invalid-current-package");
+  const healedPreview = planFeaturePackageTransition(wireRoot, manifestPath, "awaiting-approval", { autoRebindMutable: true });
+  assert.equal(healedPreview.status, "preview");
+  const persistedAfterTransition = JSON.parse(readFileSync(join(wireRoot, manifestPath), "utf8"));
+  const acceptanceAfterTransition = persistedAfterTransition.artifacts.find((a) => a.class === "acceptance");
+  assert.equal(acceptanceAfterTransition.sha256, hash(readFileSync(join(wireRoot, `${base}/acceptance.md`))));
+  assert.match(acceptanceAfterTransition.amendment.reason, /auto-rebind/u);
+
+  // Now drift the immutable prd.md: neither default nor autoRebindMutable ever
+  // heals it -- it still requires the signed reconcile ceremony.
+  fileIn(wireRoot, `${base}/prd.md`, "drifted prd text\n");
+  const stillRejected = planFeaturePackageTransition(wireRoot, manifestPath, "awaiting-approval", { autoRebindMutable: true });
+  assert.equal(stillRejected.status, "rejected");
+  assert.equal(stillRejected.reason, "invalid-current-package");
+  assert.match(stillRejected.findings.join("\n"), /digest does not bind file bytes/u);
+
+  // planFeaturePackageReconcile: with options.autoRebindMutable, a drifted
+  // mutable digest is a no-op to reconcile (already self-healed); the
+  // remaining immutable drift still flows through the reconcile ceremony
+  // requiring "po" authority, unweakened.
+  fileIn(wireRoot, `${base}/acceptance.md`, "twice-amended acceptance text\n");
+  const reconcilePlan = planFeaturePackageReconcile(wireRoot, manifestPath, null, { autoRebindMutable: true });
+  assert.equal(reconcilePlan.status, "reconcile-preview");
+  assert.equal(reconcilePlan.requiredAuthority, "po");
+  assert.equal(reconcilePlan.changes.length, 1);
+  assert.equal(reconcilePlan.changes[0].path, prd.path);
+  const persistedAfterReconcilePlan = JSON.parse(readFileSync(join(wireRoot, manifestPath), "utf8"));
+  const acceptanceAfterReconcilePlan = persistedAfterReconcilePlan.artifacts.find((a) => a.class === "acceptance");
+  assert.equal(acceptanceAfterReconcilePlan.sha256, hash(readFileSync(join(wireRoot, `${base}/acceptance.md`))));
+
+  console.log("feature-package-topology: planFeaturePackageTransition/planFeaturePackageReconcile options.autoRebindMutable passthrough, 9 passed, 0 failed");
+} finally { rmSync(wireRoot, { recursive: true, force: true }); }
