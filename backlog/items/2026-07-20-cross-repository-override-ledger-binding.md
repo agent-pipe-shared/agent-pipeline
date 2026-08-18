@@ -195,3 +195,27 @@ add a regression test with a symlinked cross-repository target pointing
 at a genuinely distinct fixture repository, and produce a
 machine-written verify-output artifact under `evidence/` as this
 dispatch's Trajectory evidence.
+
+### Fix landed (NVA-CROSSREPOLEDGER-2, 2026-08-18) — 2nd Critic review dispatched
+
+`crossRepositoryTargetRoot()` now resolves the full symlink chain via
+`realpathSync` (mirroring `physicalRoot()`'s existing idiom) before
+deciding the discovery probe, and fails closed (`return null`) on any
+resolution failure (dangling link, cycle, unreadable component) instead
+of falling back to `dirname(target)`; header comment corrected to no
+longer claim the discovery step itself "fails closed exactly as any
+other `topology()` caller." Two new regression tests:
+`NVA-CROSSREPOLEDGER-2a` (symlink whose containing directory is itself
+a valid, unrelated repo now correctly binds to the real pointed-at
+target, full plan/authorize/consume round trip) and
+`NVA-CROSSREPOLEDGER-2b` (dangling symlink falls through safely,
+never binding to the repo containing the symlink). Independently
+re-verified: `node --test plugins/pipeline-core/lib/human-guard-override.test.mjs`
+— 69/70 pass, same pre-existing `HGO-EXTERNAL-MARKETPLACE` exception
+the only failure. Commit `6d9e8f83`.
+
+Second, fresh Critic review dispatched (`docs/adr/0059-signed-human-guard-override.md`,
+diff `1404eb28..6d9e8f83`, evidence `evidence/NVA-CROSSREPOLEDGER-2-verify.txt`)
+— not yet returned. Per this session's own cap, a 2nd FAIL here would
+be self-verified by the Elephant directly rather than triggering a 3rd
+Critic dispatch.
