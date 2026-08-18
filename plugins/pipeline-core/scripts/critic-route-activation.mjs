@@ -6,6 +6,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 export const ACTIVATION_SCHEMA = "pipeline.critic-route-activation.v1";
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -184,9 +185,15 @@ function ensurePhysicalDirectory(path) {
   mkdirSync(path, { recursive: true, mode: 0o700 });
   if (realpathSync(path) !== resolve(path) || lstatSync(path).isSymbolicLink()) fail("F5-PERSISTENCE", "activation directory is not physical");
 }
-function assertPrivate(path) {
+function assertPrivate(path, { platform = process.platform, assessWindowsPrivate = assessWindowsPrivatePath } = {}) {
   const stat = lstatSync(path);
-  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0) fail("F5-PERSISTENCE", "activation journal is not a mode-0600 single-link file");
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1) fail("F5-PERSISTENCE", "activation journal is not a mode-0600 single-link file");
+  // Node synthesizes `.mode` on native Windows from the read-only attribute
+  // alone, so a bare mode-bit comparison is meaningless there and fails
+  // closed unconditionally; on win32 this defers to the shared native
+  // DACL/owner assurance instead, mirroring afk-ledger.mjs:336-340.
+  const secure = platform === "win32" ? assessWindowsPrivate(path).status === "secure" : (stat.mode & 0o077) === 0;
+  if (!secure) fail("F5-PERSISTENCE", "activation journal is not a mode-0600 single-link file");
 }
 function writeExclusive(path, bytes) {
   ensurePhysicalDirectory(dirname(path)); const fd = openSync(path, "wx", 0o600);
@@ -196,10 +203,10 @@ function writeExclusive(path, bytes) {
 export const activationFilePersistence = Object.freeze({
   exists: existsSync,
   list(path) { return existsSync(path) ? readdirSync(path) : []; },
-  read(path) { assertPrivate(path); return readFileSync(path); },
+  read(path, io) { assertPrivate(path, io); return readFileSync(path); },
   create(path, bytes) { writeExclusive(path, bytes); },
-  replace(path, expectedSha256, bytes) {
-    if (sha256(this.read(path)) !== expectedSha256) fail("F5-CAS", "activation journal changed before replacement");
+  replace(path, expectedSha256, bytes, io) {
+    if (sha256(this.read(path, io)) !== expectedSha256) fail("F5-CAS", "activation journal changed before replacement");
     const temporary = join(dirname(path), `.journal.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
     writeExclusive(temporary, bytes); renameSync(temporary, path); syncDirectory(dirname(path));
   },
@@ -220,11 +227,11 @@ export function persistNewActivation(commonDir, journal, persistence = activatio
   const raw = Buffer.from(canonicalJson(journal)); persistence.create(paths.journal, raw); return { paths, rawSha256: sha256(raw) };
 }
 
-export function loadPersistedActivation(commonDir, activationId, persistence = activationFilePersistence) {
+export function loadPersistedActivation(commonDir, activationId, persistence = activationFilePersistence, io = {}) {
   const paths = activationPaths(commonDir, activationId);
   const torn = persistence.list(paths.directory).filter((name) => /^\.journal\..+\.tmp$/.test(name));
   if (torn.length) fail("F5-TORN-POSTIMAGE", "activation directory contains an unresolved temporary postimage");
-  const raw = persistence.read(paths.journal); let journal;
+  const raw = persistence.read(paths.journal, io); let journal;
   try { journal = JSON.parse(raw.toString("utf8")); } catch { fail("F5-PERSISTENCE", "activation journal is malformed JSON"); }
   validateActivationJournal(journal); return { journal, paths, rawSha256: sha256(raw) };
 }

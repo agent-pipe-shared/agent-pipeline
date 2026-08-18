@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { approveActivation, bindActivationEvidence, canonicalJson, createActivationJournal, decideRouteApplication, evaluateStrongUnblock, loadPersistedActivation, persistNewActivation, recordApplied, recordVerified, replacePersistedActivation, sha256, suspendActivation, validateActivationJournal } from "./critic-route-activation.mjs";
+import { mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
+import { activationFilePersistence, approveActivation, bindActivationEvidence, canonicalJson, createActivationJournal, decideRouteApplication, evaluateStrongUnblock, loadPersistedActivation, persistNewActivation, recordApplied, recordVerified, replacePersistedActivation, sha256, suspendActivation, validateActivationJournal } from "./critic-route-activation.mjs";
 
 const H = (digit) => digit.repeat(64);
 test("activation schema parses and closes journal, route and evidence vocabulary", () => {
@@ -70,4 +71,35 @@ test("activation journal persistence is mode-0600, CAS-bound and torn-write awar
   assert.throws(() => replacePersistedActivation(root, stored.rawSha256, approveActivation(next, { approvalId: "po-1", approvedAtMs: 102, attributedTo: "PO" }, 102)), { code: "F5-CAS" });
   writeFileSync(join(stored.paths.directory, ".journal.fixture.tmp"), "partial\n", { mode: 0o600 });
   assert.throws(() => loadPersistedActivation(root, initial.activationId), { code: "F5-TORN-POSTIMAGE" });
+});
+
+// Windows: Node synthesizes `.mode` on native Windows from the read-only
+// attribute alone, so the bare `(stat.mode & 0o077)` comparison in
+// assertPrivate() failed closed unconditionally there (backlog/items/
+// 2026-08-18-windows-posix-mode-bit-checks-are-meaningless-on-ntfs.md).
+// These inject `platform`/`assessWindowsPrivate` via loadPersistedActivation's
+// own `io` seam to prove the win32 branch decides the outcome.
+test("win32: a POSIX-insecure activation journal is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged)", (t) => {
+  const root = realpathSync(mkdtempTestScratch("critic-activation-win32-secure-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const stored = persistNewActivation(root, prepared());
+  // Exactly what the old bare `(stat.mode & 0o077) !== 0` comparison would
+  // have failed closed on unconditionally, on every platform.
+  chmodSync(stored.paths.journal, 0o644);
+
+  assert.throws(() => loadPersistedActivation(root, "activation-1"), { code: "F5-PERSISTENCE" });
+
+  const win32 = loadPersistedActivation(root, "activation-1", activationFilePersistence, {
+    platform: "win32", assessWindowsPrivate: () => ({ status: "secure" }),
+  });
+  assert.equal(win32.journal.status, "prepared");
+});
+
+test("win32: an insecure DACL assessment on the activation journal still fails closed", (t) => {
+  const root = realpathSync(mkdtempTestScratch("critic-activation-win32-insecure-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  persistNewActivation(root, prepared());
+  assert.throws(() => loadPersistedActivation(root, "activation-1", activationFilePersistence, {
+    platform: "win32", assessWindowsPrivate: () => ({ status: "insecure" }),
+  }), { code: "F5-PERSISTENCE" });
 });
