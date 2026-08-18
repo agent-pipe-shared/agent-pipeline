@@ -131,3 +131,39 @@ revisited, this is now unambiguously Nova/pipeline-owned. Dispatched
 `NVA-CROSSREPOLEDGER-1` (goldfish-deep, guardrail-tier: touches
 `human-guard-override.mjs`, the ledger-binding kernel this session's own
 GMW work spent all night hardening).
+
+### Implementation landed (NVA-CROSSREPOLEDGER-1, 2026-08-18) — status stays `open`, Critic review dispatched
+
+`recordHumanGuardDenial()`/`consumeHumanGuardOverride()` now re-derive the
+guarded command's actual cross-repository target (via `crossBoundaryTarget()`
+plus a new `crossRepositoryTargetRoot()` git-native discovery helper, never
+throws, returns null when no repo found) and bind `topology()`/`storage()`
+there instead of the coordinator's root. An ordinary in-root command and an
+out-of-root target with no repository of its own (`NOVA-HGOELIG-1..4`) keep
+binding to the coordinator exactly as before — confirmed unaffected.
+`planHumanGuardOverride()` and its downstream (`prepareHumanGuardOverrideAuthorization`/
+`authorizeHumanGuardOverride`/`authorizeHumanGuardOverrideBySignature`/
+`verifyHumanGuardOverrideAudit`) already bound correctly to whatever
+`rootDir` their caller supplies — confirmed via direct calls, no change
+needed there. Four new regression tests (`NVA-CROSSREPOLEDGER-1a..1d`)
+prove: unchanged same-repo binding, correct cross-repo binding of
+evaluation/consumption/ledger-append, no raw command-text/path leakage
+into the coordinator's own ledger, unchanged one-time token semantics,
+and unchanged protected-ref/double-confirmation strength. Independently
+re-verified: `node --test plugins/pipeline-core/lib/human-guard-override.test.mjs`
+— 67/68 pass, the one failure the same pre-existing, separately-tracked
+`HGO-EXTERNAL-MARKETPLACE` host-config exception every other dispatch
+tonight also saw (confirmed identical on unmodified `main` via `git
+stash`). Commit `1404eb28`.
+
+A real, separate finding the dispatch disclosed (not fixed here, filed
+as its own item): `codex-pretool-guard.mjs`'s printed recovery guidance
+still hard-codes `--repo ${projectRoot}`, now stale for cross-repository
+denials specifically — `backlog/items/2026-08-18-codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo.md`.
+
+**Status stays `open`, not `closed`:** this is a SECURITY/GUARDRAIL-class
+change to the override ledger's own binding semantics — the same class
+of change this session's own precedent (the GMW commit-tolerance fix)
+required a Critic review to close, per this repo's self-application rule.
+Critic review dispatched (`docs/adr/0059-signed-human-guard-override.md`,
+diff `f24e4881..1404eb28`) — not yet returned.
