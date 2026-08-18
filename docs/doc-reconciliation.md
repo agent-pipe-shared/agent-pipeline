@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 2f401dc513000227bab0453df8fffb0c67222a26 — 2026-08-18, range 5c3c50d4..2f401dc5, checkpoint 40: PO decided all 7 remaining design items
+
+- ADR-0012: checked, no change needed.
+
+  The only change in this range is a new checkpoint-40 section appended to
+  `docs/state.md` (the canonical handover, ADR-0012's own governed
+  artifact): the PO's decisions on all 7 items collected in checkpoint 39.
+  Purely additive narrative; no handover format or canonicalization rule
+  changed.
+
 ## Candidate 92528ac86ee8906d5b42989288e384c9b882249b — 2026-08-18, range cf816c3f..92528ac8, checkpoint 39: 5 remaining decisions closed, 42-item Workflow triage disposed
 
 - ADR-0012: checked, no change needed.
