@@ -9,9 +9,9 @@
  * stops forcing a broad repeat of stages whose evidence never became stale.
  *
  * STANDALONE BY CONSTRUCTION. This module is the mechanism only. It is
- * deliberately not wired into Verify, Critic admission, `harness/scripts/
- * verify.mjs` or `publication-executor.mjs`; live wiring is a separate, later,
- * separately-triaged package (item Triage, 2026-08-18). Everything here is a
+ * deliberately not wired into Verify, Critic admission, the aggregate Verify
+ * entry point, or `publication-executor.mjs`; live wiring is a separate,
+ * later, separately-triaged package (item Triage, 2026-08-18). Everything here is a
  * pure function of its arguments: no filesystem, no network, no process state,
  * and no ambient clock -- `evaluatedAt` is injected by the caller, which is what
  * makes the freshness-window rule testable without a live policy/clock source.
