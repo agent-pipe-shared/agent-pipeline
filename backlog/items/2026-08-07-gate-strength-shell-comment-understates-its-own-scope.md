@@ -103,9 +103,9 @@ justify its own dispatch.
 No behavior change is proposed. The code is correct as written; only its
 self-description is not.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted; stays open. Re-verified 2026-08-18: the drift is worse than reported, not better.
+- **Rationale:** `guard-lifecycle-ready.mjs:302` still says "five configuration paths (GS-1..GS-5)"; `GATE_STRENGTH_PATHS` (`guard-gate-strength.mjs:51-125`) now has eight entries — GS-1..GS-5, GS-7, GS-8, and a new GS-9 (`self-application-attestation-gate.mjs`) added since this item was filed. The comment has drifted a third time. No behaviour change is needed, only the wording — not a PO judgment call, only blocked by `guard-lifecycle-ready.mjs` being a NEVER_LIFTABLE_KERNEL_PATH.
+- **Assignment (if accepted):** ride along with the next briefed guard-kernel change window that touches this file; a plain comment edit, no design decision.
+- **Date:** 2026-08-18

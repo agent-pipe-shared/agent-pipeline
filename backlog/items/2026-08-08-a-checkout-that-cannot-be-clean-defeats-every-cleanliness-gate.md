@@ -73,9 +73,9 @@ Acceptance test: verify and a critical approval request both run from the primar
 tree with no manual worktree step and no manual artifact copy, and the push guard
 accepts the resulting evidence — demonstrated end to end, not asserted.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted as open; dispatch-ready per the item's own stated preference.
+- **Rationale:** Re-checked 2026-08-18: `po-approval-request.mjs`'s `observeCleanCandidate()` is unchanged and still refuses on the two permanently-dirty runtime files; `worktree-create.mjs` is still only the general-purpose helper, not a single entry point that creates the worktree, runs the cleanliness-gated command, copies the full artifact set back, and cleans up. Nova has the identical `observeCleanCandidate` logic and the same shape of `worktree-create.mjs` — nothing to port. The item already states its preferred design ("The first option is preferred precisely because it keeps the checks strict"), so this does not need a further PO judgment call to start.
+- **Assignment (if accepted):** build the wrapping entry point described in the item's proposal, option 1; no PO design decision required beyond scheduling.
+- **Date:** 2026-08-18

@@ -83,9 +83,9 @@ sibling `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:893-900`.
 No behaviour change is proposed. The code is correct as written; what is missing
 is a test that would notice if it stopped being.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted; stays open.
+- **Rationale:** Re-checked 2026-08-18 from source: `guard-gate-strength.mjs:210-218` still exits 0 for any GS rule when none of the five governance markers (`pipeline.user.yaml`, `project/pipeline.yaml`, `.claude/pipeline.yaml`, `project/guard-config.json`, `.claude/guard-config.json`) exist, and `guard-gate-strength.test.mjs`'s `governed()` fixture still writes markers unconditionally — no case exercises the unmarked branch. Nova's equivalent suite has the same gap, so there is nothing to port; this is Phoenix's own untested branch to close.
+- **Assignment (if accepted):** its own briefed test-change dispatch against the TP-protected suite, registered in `harness/scripts/verify.mjs` if a new file is used; technically bounded, no PO judgment call needed.
+- **Date:** 2026-08-18

@@ -60,8 +60,9 @@ falling back to unguarded implementation, rather than relying on the agent
 correctly re-deriving that Pipeline was still wanted from an unrelated
 instruction.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-Not yet triaged -- the PO submitted this explicitly as "not relevant right
-now, but interesting hardening for the backlog." Left `status: open`,
-untriaged, for a future session with capacity for it.
+- **Decision:** Accepted as open; dispatch-ready when capacity allows. No PO design judgment blocks starting it.
+- **Rationale:** Re-checked 2026-08-18: no marker-file + `PreToolUse` write-lock mechanism exists in Phoenix's `hooks/hooks.json`. Nova only documents the single-consent bootstrap flow in prose (`plugins/pipeline-core/skills/pipeline-start/SKILL.md:80-83`), with no technical lock either — nothing to port. The item's own Proposal already names a concrete, bounded mechanism (a local marker written at consent, cleared only by real `project-onboarding-v3.mjs` completion or an explicit PO override, gating `Write`/`Edit`), so this can go to an ordinary dispatch without further PO design input.
+- **Assignment (if accepted):** unassigned; PO previously flagged this as "not relevant right now, but interesting hardening for the backlog" — still true, priority decision only, not a design decision.
+- **Date:** 2026-08-18
