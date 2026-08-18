@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "39fe353e347b82dfefa831b285c7130698c526837d23cfda3cf6cf3f3af5deb4"
+    "transitionHead": "d5cb9d828d52154310d72c3affd3792bbefd60cebaea137eb97b77e79f21e71f"
   },
   "counts": {
     "open": 91,
-    "in_progress": 22,
-    "closed": 139
+    "in_progress": 21,
+    "closed": 140
   },
   "items": [
     {
@@ -1964,11 +1964,15 @@
     },
     {
       "id": "pipeline.recovery-preview-callback-attestation",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Public V3 Foundation stabilization review of the migration recovery boundary"
+      "source": "Public V3 Foundation stabilization review of the migration recovery boundary",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "6b5157c186038cea33039acdd107b7214efbfc80",
+      "closureEvidence": "plugins/pipeline-core/lib/recovery-preview-attestation.test.mjs"
     },
     {
       "id": "pipeline.regulated-document-hooks",

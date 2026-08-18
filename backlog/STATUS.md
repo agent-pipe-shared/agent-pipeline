@@ -195,7 +195,7 @@
 | pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | open | defect | pipeline | 2026-07-27 | — |
-| pipeline.recovery-preview-callback-attestation | in_progress | defect | pipeline | 2026-07-20 | — |
+| pipeline.recovery-preview-callback-attestation | closed | defect | pipeline | 2026-07-20 | — |
 | pipeline.regulated-document-hooks | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
@@ -261,5 +261,5 @@
 ## Counts
 
 - open: 91
-- in_progress: 22
-- closed: 139
+- in_progress: 21
+- closed: 140

@@ -3,8 +3,12 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.recovery-preview-callback-attestation"
 type: "defect"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-20"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "6b5157c186038cea33039acdd107b7214efbfc80"
+closure_evidence: "plugins/pipeline-core/lib/recovery-preview-attestation.test.mjs"
 source: "Public V3 Foundation stabilization review of the migration recovery boundary"
 due: "2026-07-27"
 expires: "2026-08-03"
@@ -63,7 +67,31 @@ before further implementation or prioritization.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Renewal (2026-08-18):** expired 2026-08-03 with an empty Triage section,
+  never triaged in the ~4 weeks since filing. Found while checking whether
+  this session's earlier NVA-A8-5 mischaracterization (trusting inherited
+  matrix prose instead of a defining backlog item) recurred elsewhere — it
+  had, on this item's own P2 dependent (`evidence-bound-review-retry-economics.md`,
+  see that item's own Triage). Renewed with current evidence rather than
+  left expired.
+- **Decision:** accepted, closed. The implementation this item asked for is
+  real and complete: `plugins/pipeline-core/lib/recovery-preview-attestation.mjs`
+  satisfies every acceptance-boundary bullet in this item's own Proposal
+  (one-invocation-one-acknowledgement; schema/digest/identity matching;
+  every missing/malformed/replayed/mismatched acknowledgement returns a
+  typed non-success, never advances state; no external identity/secret/
+  network/private-receipt authority added). A dedicated Critic review
+  (`69b96e19..6b5157c1`, functional-equivalent-read-only, this session)
+  returned **PASS, no findings** — independently tracing and re-running the
+  regression tests for both hardening fixes landed in `6b5157c1`
+  (`safeId()`/`safeDigest()` type-coercion bypass; the cross-invocation
+  cached-acknowledgement replay vulnerability in
+  `runner-profile-migration-v3.mjs`). This is the "independent review and a
+  sanctioned backlog transition" this item's own Description named as the
+  only thing standing between the candidate and closure.
+- **Rationale:** the code was already correct and tested; what was missing
+  was purely process (the independent-review step, and someone actually
+  reading this item rather than leaving it expired for two weeks while
+  `docs/known-issues.md` kept citing it as open).
+- **Assignment:** closed, no further work.
+- **Date:** 2026-08-18
