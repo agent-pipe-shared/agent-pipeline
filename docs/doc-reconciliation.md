@@ -47,6 +47,18 @@ something to do here without review.
 
 ## Entries
 
+## Candidate df98028da288c9777523c8f1e1e7e8f65ba8afc4 — 2026-08-18, range 0c2267d4..df98028d, checkpoint 38: OT09 investigation persisted (root cause, TP-7 no-override-route finding, reconcile_approval fork risk)
+
+- ADR-0012: checked, no change needed.
+
+  The only change in this range is a new checkpoint-38 section appended to
+  `docs/state.md` (the canonical handover, ADR-0012's own governed artifact):
+  the fresh OT09 re-test result, the `c6bd3a6b` root-cause commit, the
+  empirically-confirmed TP-7 "author-repair-required, no override route"
+  finding, and the note that `reconcile_approval`/`GATE_APPROVAL_MODE_KEYS`
+  may exist only in Phoenix's local fork. Purely additive narrative; no
+  handover format or canonicalization rule changed.
+
 ## Candidate 0c2267d4ac68dfc7b4ee96d8e66bc5953d46c2d7 — 2026-08-18, range 671fbde0..0c2267d4, GMW prepare-warning fix (PHX-WP-GMW-PREPARE-WARNING) evidence tracked
 
 - ADR-0045: checked, no change needed.
