@@ -3043,3 +3043,106 @@ test("NVA-CROSSREPOLEDGER-1d: a cross-repository target whose ledger root cannot
     rmSync(target, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------
+// NVA-CROSSREPOLEDGER-2 (Critic F1 on NVA-CROSSREPOLEDGER-1, commit 1404eb28):
+// crossRepositoryTargetRoot()'s discovery probe used to substitute a symlinked
+// target's OWN CONTAINING DIRECTORY (`dirname(target)`) instead of following the
+// symlink to its real destination, the way a real `git -C <target>` (an OS-level
+// chdir) always does. If that containing directory happened to be a valid git
+// repository of its own, the function silently returned THAT wrong-but-valid root
+// -- nothing failed closed, because a normal, discoverable repository was found --
+// reproducing, for symlinked targets specifically, the exact misbinding class
+// NVA-CROSSREPOLEDGER-1 exists to close. These two tests pin the fix: a symlinked
+// target now resolves through its REAL destination, and a symlink that resolves
+// nowhere is handled explicitly and safely rather than silently mis-bound.
+// ---------------------------------------------------------------------------------
+
+test("NVA-CROSSREPOLEDGER-2a: a symlinked cross-repository target resolves the ledger binding through its REAL target, not the repository containing the symlink", { skip: JUNCTION_SKIP }, () => {
+  const root = fixture(); // the coordinating session's own root
+  const target = fixture(); // the guarded command's actual, distinct physical target
+  // A third, independently valid git repository stands in for "a directory that
+  // happens to sit inside a DIFFERENT valid git repository (plausibly the
+  // coordinator's own)" (Critic F1): before this fix, `dirname(<symlink path>)`
+  // would land HERE, and this repository's own root would be silently (and
+  // wrongly) returned -- the bug never threw, it just found the wrong answer.
+  const linkHolder = fixture();
+  const symlinkPath = join(linkHolder, "link-to-target");
+  symlinkSync(target, symlinkPath, "junction");
+  try {
+    const command = `git -C ${symlinkPath} status`;
+    const toolInput = { command };
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.equal(recorded.status, "planned");
+
+    const targetCommon = git(target, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const linkHolderCommon = git(linkHolder, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const coordinatorCommon = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const requestPath = join(targetCommon, "agent-pipeline", "human-guard-overrides", "requests", `${recorded.requestSha256}.json`);
+    assert.ok(existsSync(requestPath),
+      "the symlinked cross-repository request must be stored under the REAL (pointed-at) target repository's own ledger");
+    // Never the wrong-but-valid repository the symlink merely sits inside...
+    assert.equal(existsSync(join(linkHolderCommon, "agent-pipeline")), false,
+      "no ledger directory may be created under the repository that merely contains the symlink");
+    // ...nor the coordinator's.
+    assert.equal(existsSync(join(coordinatorCommon, "agent-pipeline")), false,
+      "no ledger directory may be created under the coordinator's own checkout for this command");
+
+    // The full round-trip binds correctly too: plan/authorize against the REAL
+    // target, then the coordinator-rooted retry still finds and consumes it there.
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const plan = planHumanGuardOverride({
+      rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 2000, scriptPath,
+    });
+    assert.equal(plan.commandClass, "cross-repository-target");
+    assert.equal(plan.root, target);
+    const reason = "PO attended recovery for the exact symlinked cross-repository command, via chat";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2500, scriptPath,
+    });
+    const armed = authorizeHumanGuardOverride({
+      rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      nowMs: 3000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 4000,
+    });
+    assert.equal(consumed.status, "consumed");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+    rmSync(linkHolder, { recursive: true, force: true });
+  }
+});
+
+test("NVA-CROSSREPOLEDGER-2b: a symlinked cross-repository target pointing at a nonexistent path is handled safely, never binding to the repository containing the symlink", { skip: JUNCTION_SKIP }, () => {
+  const root = fixture();
+  const linkHolder = fixture(); // sits inside a valid, discoverable repository of its own
+  const symlinkPath = join(linkHolder, "link-to-nowhere");
+  symlinkSync(join(linkHolder, "does-not-exist"), symlinkPath, "junction");
+  try {
+    const command = `git -C ${symlinkPath} status`;
+    const toolInput = { command };
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.equal(recorded.status, "planned");
+    // No repository resolves for the dangling symlink, so this falls through to the
+    // existing, unchanged coordinator-rooted behavior -- exactly as an ordinary
+    // out-of-root, non-repository target already does (NOVA-HGOELIG-1..4).
+    const coordinatorCommon = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const requestPath = join(coordinatorCommon, "agent-pipeline", "human-guard-overrides", "requests", `${recorded.requestSha256}.json`);
+    assert.ok(existsSync(requestPath), "a dangling symlink target must fall through to the coordinator's own ledger");
+    const linkHolderCommon = git(linkHolder, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    assert.equal(existsSync(join(linkHolderCommon, "agent-pipeline")), false,
+      "no ledger directory may be created under the repository that merely contains the dangling symlink");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(linkHolder, { recursive: true, force: true });
+  }
+});

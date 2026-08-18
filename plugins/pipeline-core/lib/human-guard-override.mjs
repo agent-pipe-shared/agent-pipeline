@@ -1039,16 +1039,36 @@ function crossBoundaryEligible(paths, target) {
 // fail-closed refusal, since nothing was ever bound to the coordinator incorrectly for
 // this case in the first place). When a repository IS found, the caller's own
 // topology()/storage() calls on the returned root still enforce every existing physical-
-// safety check (a symlinked or otherwise unsafe top-level still fails closed exactly as
-// it would for any other topology() caller), and a target repository whose ledger
-// storage directory cannot be created or written (HGO-STORAGE/HGO-PERMISSIONS/HGO-DACL)
-// still fails the whole call closed -- there is no catch-and-fall-back-to-the-
-// coordinator's-ledger anywhere in this path. Never throws.
+// safety check as a SECOND layer on top of the discovery probe below, and a target
+// repository whose ledger storage directory cannot be created or written
+// (HGO-STORAGE/HGO-PERMISSIONS/HGO-DACL) still fails the whole call closed -- there is
+// no catch-and-fall-back-to-the-coordinator's-ledger anywhere in this path. Never throws.
+//
+// NVA-CROSSREPOLEDGER-2 (Critic F1, this backlog item): `target` itself may be a
+// symlink -- a real `git -C <target>` drives an OS-level chdir, which follows the
+// symlink to its REAL destination, never to the symlink's own containing directory.
+// The probe below therefore resolves the FULL symlink chain first (realpathSync, same
+// idiom physicalRoot() already uses elsewhere in this file) before deciding whether to
+// probe the resolved directory itself or its parent -- exactly mirroring the existing
+// directory-vs-file rule two paragraphs up, just applied to the REAL location instead
+// of the symlink's own. Any resolution failure (a dangling link, a symlink cycle, an
+// unreadable path component) fails closed: this function returns null immediately for
+// that target rather than falling back to the symlink's own containing directory, which
+// is exactly the wrong-but-valid-looking repository a `dirname(target)` substitution
+// could silently return -- the misbinding class this whole fix exists to close.
 function crossRepositoryTargetRoot(target, spawn = spawnSync) {
   let probe = target;
   try {
     const info = lstatSync(target);
-    if (!info.isDirectory() || info.isSymbolicLink()) probe = dirname(target);
+    if (info.isSymbolicLink()) {
+      let resolved;
+      try { resolved = realpathSync(target); } catch { return null; }
+      let resolvedInfo;
+      try { resolvedInfo = lstatSync(resolved); } catch { return null; }
+      probe = resolvedInfo.isDirectory() ? resolved : dirname(resolved);
+    } else if (!info.isDirectory()) {
+      probe = dirname(target);
+    }
   } catch { probe = dirname(target); }
   try { return git(probe, ["rev-parse", "--path-format=absolute", "--show-toplevel"], spawn) || null; }
   catch { return null; }
