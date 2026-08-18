@@ -215,6 +215,8 @@
           "docs/adr/0061-local-supervisor-state-authority.md",
           "docs/adr/0062-governance-event-kernel.md",
           "docs/adr/0063-fork-disposition-approval-proof.md",
+          "docs/adr/0064-handover-rotation-extraction-archive-hard-size-gate.md",
+          "docs/adr/0065-port-authorize-critical-ceremony.md",
           "docs/adr/README.md"
         ]
       },
@@ -239,6 +241,7 @@
         "paths": [
           "docs/codex-isolated-critic-foundation.md",
           "docs/handover-0.5.2-findings.md",
+          "docs/human-authorization-inventory.md",
           "docs/known-issues.md"
         ]
       },
