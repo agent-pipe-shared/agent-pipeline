@@ -5,6 +5,10 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 created: 2026-08-16
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "b273a1a055bae1e29f7489d232d0c83dff05c7ed"
+closure_evidence: "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
 source: "PO, 2026-08-16, observed live in agent-pipeline-share_phoenix: after po-human-approval.mjs sign-intent succeeded (PO-HUMAN-SIGN-INTENT-READY) and the GMW window was active, the session still asked the PO to manually run two `cp` commands to move scratch/reconcile-request-*.json and scratch/reconcile-proof-*.json into the external PO directory. PO: 'dass man nach der freigabe noch mal was von hand kopieren muss sollte auch nicht sein' (having to manually copy something again after the approval shouldn't be necessary either)."
 ---
 

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a9ea21a9ac9475ee15e98f597198866e15f6c1023e76c03a78eb0fcba64d6372"
+    "transitionHead": "69c2efb34ff003db4ac9cd347fa803e1ddea59eef2c109bcd5a64585f070abca"
   },
   "counts": {
-    "open": 81,
+    "open": 92,
     "in_progress": 9,
-    "closed": 164
+    "closed": 165
   },
   "items": [
     {
@@ -66,6 +66,14 @@
       "closureRepository": "self",
       "closureCommit": "bee2f41a3498a65412284f7786d406188288261b",
       "closureEvidence": "backlog/evidence/2026-08-06-third-reconciliation-pass.md"
+    },
+    {
+      "id": "pipeline.adr-0056-conflict-scope-text-narrower-than-code",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, over docs/state.md lines 3489-5929 (the T5 round entry, ~2026-08-06). Finding surfaced by a read-only research fork, verified against current source before filing."
     },
     {
       "id": "pipeline.advisor-consent-is-requested-before-the-readiness-preflight",
@@ -557,6 +565,14 @@
       "closureEvidence": "backlog/evidence/2026-08-10-critic-root-commit-example-closure.md"
     },
     {
+      "id": "pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (2026-08-17 continued entries). Finding surfaced by a read-only research fork."
+    },
+    {
       "id": "pipeline.critic-route-pre-check-not-in-force-in-installed-plugin",
       "status": "open",
       "type": "defect",
@@ -583,6 +599,14 @@
       "owner": "pipeline",
       "created": "2026-08-05",
       "source": "PO question during Sprint Nova session, 2026-08-05: asked whether the ed25519 human-proof mechanism (built for Sprint Cyborg) needed one-time setup before this session's branch push. Investigation found it exists but is not enforced for either of the two human gates it was meant to secure."
+    },
+    {
+      "id": "pipeline.critical-human-proof-policy-lacks-the-reconcile-approval-generalization",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "PO, 2026-08-18, relayed live from the sibling agent-pipeline-share_phoenix session: Phoenix's local `plugins/pipeline-core/lib/critical-human-proof-policy.mjs` was legitimately generalized (ADR-0056's 2026-08-11 Follow-up, PHX-WP-PAC08-RECONCILE-APPROVAL) to a `GATE_APPROVAL_MODE_KEYS` lookup table supporting a second gate (`gates.reconcile_approval`, kind `feature-package-reconcile`), multi-round Critic-reviewed (T2-T5 findings referenced in its own comments). Phoenix's TP-7-protected `guard-testpath-override.test.mjs` OT09 still pins the pre-generalization literal `gates?.push_approval`, which no longer appears in the generalized source, blocking Phoenix's own Verify/push. TP-7 requires the fix at an explicit author source root, which Phoenix's own session cannot self-select or write to. Confirmed by direct read of both repos: neither this repo (Nova) nor the local marketplace copy has the generalization yet -- Nova and marketplace currently agree with each other (both pre-generalization), only Phoenix has moved ahead."
     },
     {
       "id": "pipeline.critical-human-proof-policy-seeded-without-trust-anchor",
@@ -675,6 +699,14 @@
       "closureRepository": "self",
       "closureCommit": "ec8245295fff5fc83a44cccebf2637edfa95fdf3",
       "closureEvidence": "evidence/dispatch-record-NVA-BL-25.json"
+    },
+    {
+      "id": "pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch ('The round's own route violation, and where it came from' entry). Finding surfaced by a read-only research fork."
     },
     {
       "id": "pipeline.dispatched-agents-return-truncated-mid-step",
@@ -885,11 +917,15 @@
     },
     {
       "id": "pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-16",
-      "source": "PO, 2026-08-16, observed live in agent-pipeline-share_phoenix: after po-human-approval.mjs sign-intent succeeded (PO-HUMAN-SIGN-INTENT-READY) and the GMW window was active, the session still asked the PO to manually run two `cp` commands to move scratch/reconcile-request-*.json and scratch/reconcile-proof-*.json into the external PO directory. PO: 'dass man nach der freigabe noch mal was von hand kopieren muss sollte auch nicht sein' (having to manually copy something again after the approval shouldn't be necessary either)."
+      "source": "PO, 2026-08-16, observed live in agent-pipeline-share_phoenix: after po-human-approval.mjs sign-intent succeeded (PO-HUMAN-SIGN-INTENT-READY) and the GMW window was active, the session still asked the PO to manually run two `cp` commands to move scratch/reconcile-request-*.json and scratch/reconcile-proof-*.json into the external PO directory. PO: 'dass man nach der freigabe noch mal was von hand kopieren muss sollte auch nicht sein' (having to manually copy something again after the approval shouldn't be necessary either).",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "b273a1a055bae1e29f7489d232d0c83dff05c7ed",
+      "closureEvidence": "plugins/pipeline-core/scripts/po-human-approval.test.mjs"
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate",
@@ -1116,6 +1152,14 @@
       "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
     },
     {
+      "id": "pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "PO, 2026-08-18, in-session while planning an incremental extraction pass over docs/state.md's oldest sections (ADR-0066 Decision 6/7): the PO read the mechanism's actual behavior back and said 'das macht auch keinen Sinn und sollte angepasst werden' (that doesn't make sense either and should be adjusted)."
+    },
+    {
       "id": "pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible",
       "status": "open",
       "type": "workflow-improvement",
@@ -1202,6 +1246,14 @@
       "closureRepository": "self",
       "closureCommit": "a4aeaca43caea04801cd4809c37beeb475cd9959",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-hgo-posix-normalization-closure.md"
+    },
+    {
+      "id": "pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch ('Correction logged for the record (methodological, not just this session's)' entry). Finding surfaced by a read-only research fork."
     },
     {
       "id": "pipeline.installing-consumer-is-never-asked-any-setup-decision",
@@ -1464,6 +1516,14 @@
       "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
     },
     {
+      "id": "pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (an ADR-0064-registration incident and a matching self-inflicted OG-DOC-UNCLASSIFIED gap hit again this same session on docs/state-archive/...). Finding surfaced by a read-only research fork, corroborated independently by this session's own experience."
+    },
+    {
       "id": "pipeline.no-design-to-implementation-handover-exists",
       "status": "closed",
       "type": "defect",
@@ -1683,6 +1743,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "PO, 2026-08-08, unhappy-path transcript from a fresh Claude session on a greenfield project against the 0.5.4 local candidate. The session edited a bound PRD, lost session readiness, and could not act again until the human ran `sed -i`."
+    },
+    {
+      "id": "pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Elephant, 2026-08-18, live during the OT09 (guard-testpath-override.test.mjs line 213) repair ceremony for the Phoenix reconcile-approval port regression (see backlog/items/2026-08-18-critical-human-proof-policy-lacks-the-reconcile-approval-generalization.md and docs/state.md's 2026-08-18 entry). A full `pipeline-author-repair` signature ceremony was walked end to end with the PO: plan, prepare-authorization, emit-signature-digest, PO sign-intent (succeeded), authorize-by-signature (succeeded, capability armed, status: armed, consumedAt: null, correct authorSourceRoot recorded). Retrying the byte-identical original Edit twice against a confirmed-clean working tree still returned the exact same TP-7/author-repair-required denial as if the capability had never been armed. The capability expired unused (DEFAULT_TTL_MS 30 min) before a root cause was found; OT09 is still red as of this entry."
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
@@ -1960,6 +2028,14 @@
       "closureRepository": "self",
       "closureCommit": "765ca6c1b9cf6482b41b4ad8e53d33fabf1e695f",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, over docs/state.md lines 3489-5929 (the T7 Critic round entry, ~2026-08-06). Finding surfaced by a read-only research fork, verified against current source before filing."
     },
     {
       "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",
@@ -2483,6 +2559,14 @@
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
     },
     {
+      "id": "pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (2026-08-08 Nova GF-054 block). Finding surfaced by a read-only research fork."
+    },
+    {
       "id": "pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching",
       "status": "open",
       "type": "defect",
@@ -2542,6 +2626,14 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Found incidentally during the 0.5.3 candidate work, 2026-08-07, while looking for something else. Re-confirmed by running the suite directly on candidate d4887b7."
+    },
+    {
+      "id": "pipeline.vendored-dispatch-templates-drift-from-canon",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch, preamble narrative (2026-08-11 'NOVA-CLOSING-ALLOWANCE-01' entry). Finding surfaced by a read-only research fork, verified against current source before filing."
     },
     {
       "id": "pipeline.verify-authorship-defaults-to-source-markers-not-behavior",
@@ -2632,6 +2724,14 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "PO, 2026-08-18, relaying a diagnosis from a separate Windows Claude Code session working on an unrelated consumer project ('Toolbox'), which vendors the same `plugins/pipeline-core` source via the marketplace. `project-onboarding-v3.mjs inspect --intent session` was returning `continuity-observation-unavailable` on that Windows machine even though pipeline-state.json/PRD/spec content was independently verified byte-correct (checked via `certutil -hashfile`). Two of the reported hit locations (`lib/onboarding-continuity.mjs:617,625`, `lib/local-supervisor-state.mjs:61,65,69`) were independently spot-checked against this repo's own current source and confirmed to match exactly, including that this exact same file already has correct win32-aware branching elsewhere (onboarding-continuity.mjs:1211,4482) but not at the two reported lines -- corroborating the report rather than taking it on faith."
     },
     {
       "id": "pipeline.windows-private-state-assurance",
