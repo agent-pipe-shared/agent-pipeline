@@ -4,7 +4,7 @@ Status: measurement
 
 Date: 2026-08-09
 
-Parent specification: [../spec.md](../spec.md) · Acceptance matrix: [../acceptance.md](../acceptance.md)
+Parent specification: [../../spec.md](../../spec.md) · Acceptance matrix: [../../acceptance.md](../../acceptance.md)
 
 ## What this document is
 
