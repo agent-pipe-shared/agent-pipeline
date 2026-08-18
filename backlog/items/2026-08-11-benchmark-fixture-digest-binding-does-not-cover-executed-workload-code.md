@@ -79,3 +79,22 @@ briefed for.
 - **Assignment (if accepted):** unassigned; direction is fully specified in
   this item's own Direction section.
 - **Date:** 2026-08-17
+
+### Release-sweep disposition (2026-08-18)
+
+- **Decision:** queued for dispatch — implement the item's own Direction
+  section as scoped: add a `workloadDigests` array alongside `fixtures` in
+  `BENCHMARK_FIXTURES` (additive, keeps existing exact-match validation
+  untouched), a new `validWorkloadDigests()` mirroring `validFixture`/
+  `validFixtures`'s strictness (`exact()`, SHA pattern, sorted/unique), and
+  digest coverage for `feature`'s sibling `lib.mjs` alongside each class's
+  `task.mjs`. Does not require re-running the existing sealed benchmark
+  record.
+- **Rationale:** real schema/code change to contract-like validation code
+  (`multi-cli-benchmark.mjs`) that needs tests to trust — not a same-session
+  doc fix, and not tied to any named still-open future sprint, so it is
+  queued for a dedicated implementation dispatch rather than left
+  unassigned.
+- **Assignment:** next available Nova/pipeline implementation dispatch;
+  scope is fully specified above and in the item's own Direction section.
+- **Date:** 2026-08-18

@@ -110,3 +110,18 @@ starting points for whoever picks this up:
 - **Assignment (if accepted):** Unassigned — a research/forensics-tier
   dispatch once picked up; not started this session.
 - **Date:** 2026-08-11
+
+### Release-sweep disposition (2026-08-18)
+
+- **Decision:** confirmed — queued for dispatch. The 2026-08-11 decision
+  stands unchanged in scope: a dedicated research/forensics-tier dispatch
+  performs the full transcript time-accounting pass (kickoff, plan/design,
+  implementation dispatch, Critic rounds, push) before any of candidates
+  B/C/D from the item's own Proposal are picked up.
+- **Rationale:** this is a real investigative workload (a full transcript
+  time-accounting pass), not a same-session doc fix, and not tied to any
+  named still-open future sprint — queued for dispatch rather than left
+  indefinitely unassigned.
+- **Assignment:** next available research/forensics-tier dispatch; scope is
+  the time-accounting pass specified in the 2026-08-11 Triage entry above.
+- **Date:** 2026-08-18
