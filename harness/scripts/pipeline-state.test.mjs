@@ -24,6 +24,7 @@ import {
   atomicWriteContinuityState,
   continuityLockPath,
   mergeAuthorityRevisionReceipt,
+  reconstructPlanApprovalBriefing,
   releaseContinuityLock,
   run,
   readState,
@@ -4905,6 +4906,124 @@ runFeaturePackageReadTests();
 runFeaturePackageWriteTests();
 runAuthorityRevisionTests();
 runFeaturePackageReconcileTests();
+
+// ---- PHX-WP-HUMANLEGIBLE-APPROVAL: H-AC-11 covering test -- the plan-approval gate's
+// human-legible, closed-vocabulary briefing is derived from bound artifacts, presented
+// at both submit-plan and approve-plan, persisted with the approval, and a reviewer
+// reconstruction fails on a tampered/mismatched persisted briefing while exposing the
+// briefing alongside the digests on a genuine one. ---------------------------------------
+{
+  const dir = freshDir("humanlegible-briefing");
+  const planPath = "specs/humanlegible/prd_hl.md";
+  run(["set-feature", "--id", "hl-feature", "--plan-path", planPath], { dir, now: FIXED_NOW });
+  const initialized = initializeLifecycleContinuity(dir, "hl-feature", planPath);
+  const deps = lifecycleDeps(dir, planPath);
+  const submitted = captureConsole(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps));
+  ok("HL-1 continuity-init exit 0", initialized === 0, `got ${initialized}`);
+  ok("HL-2 submit-plan exit 0", submitted.value === 0, `got ${submitted.value}`);
+  ok("HL-3 submit-plan prints the human-legible briefing (not just digests)", submitted.text.includes("Briefing:") && submitted.text.includes("scope=") && submitted.text.includes("authorizes=") && submitted.text.includes("excludes="), submitted.text);
+
+  const approved = captureConsole(() => run(["approve-plan", "--by", "po-test"], deps));
+  ok("HL-4 approve-plan exit 0", approved.value === 0, `got ${approved.value}`);
+  ok("HL-5 approve-plan's gate presentation shows the briefing too", approved.text.includes("Briefing:") && approved.text.includes("authorizes=") && approved.text.includes("excludes="), approved.text);
+
+  const state = readState(dir).state;
+  const briefing = state.planApprovalBriefing;
+  ok("HL-6 briefing persisted alongside the approval", briefing !== undefined);
+  ok(
+    "HL-7 briefing is a closed, bounded record -- exactly {schema, scope, change, authorizes, excludes}, no free-form field",
+    JSON.stringify(Object.keys(briefing).sort()) === JSON.stringify(["authorizes", "change", "excludes", "schema", "scope"].sort()),
+    JSON.stringify(briefing),
+  );
+  ok(
+    "HL-8 briefing scope is derived from the bound artifacts (plan/spec paths+digests, profile, featureId)",
+    briefing.scope.featureId === "hl-feature"
+      && briefing.scope.planPath === state.planApproval.poGateAuthority.planPath
+      && briefing.scope.planSha256 === state.planApproval.poGateAuthority.planSha256
+      && briefing.scope.specPath === state.planApproval.poGateAuthority.specPath
+      && briefing.scope.specSha256 === state.planApproval.poGateAuthority.specSha256
+      && briefing.scope.profile === "feature",
+    JSON.stringify(briefing.scope),
+  );
+  ok("HL-9 first submission classified as initial-submission with no prior approval", briefing.change.kind === "initial-submission" && briefing.change.previousApprovalSha256 === null);
+  ok(
+    "HL-10 authorizes/excludes are drawn from the fixed closed vocabulary (never free text)",
+    Array.isArray(briefing.authorizes) && briefing.authorizes.every((v) => typeof v === "string")
+      && Array.isArray(briefing.excludes) && briefing.excludes.every((v) => typeof v === "string")
+      && briefing.excludes.includes("push") && briefing.excludes.includes("deploy") && briefing.excludes.includes("publication"),
+    JSON.stringify({ authorizes: briefing.authorizes, excludes: briefing.excludes }),
+  );
+
+  // Reviewer reconstruction on a genuine record: exposes the briefing alongside the digests.
+  const goodReconstruction = reconstructPlanApprovalBriefing(state);
+  ok(
+    "HL-11 reviewer reconstruction succeeds and exposes the briefing alongside the digests",
+    goodReconstruction.ok === true
+      && JSON.stringify(goodReconstruction.briefing) === JSON.stringify(briefing)
+      && goodReconstruction.approvalSha256 === sha256CanonicalJson(state.planApproval)
+      && goodReconstruction.planSha256 === state.planApproval.poGateAuthority.planSha256
+      && goodReconstruction.specSha256 === state.planApproval.poGateAuthority.specSha256,
+    JSON.stringify(goodReconstruction),
+  );
+
+  // A resubmission with a materially different binding (same path, changed content) is
+  // classified as a change against the prior approved binding, not silently as identical.
+  const originalAuthorityValue = deps.poGateAuthority().value;
+  function changedAuthority({ expectedPlanSha256, expectedSpecSha256 } = {}) {
+    const value = {
+      ...originalAuthorityValue,
+      planSha256: createHash("sha256").update(`fixture:${planPath}:v2`).digest("hex"),
+    };
+    return (expectedPlanSha256 === undefined || expectedPlanSha256 === value.planSha256)
+      && (expectedSpecSha256 === undefined || expectedSpecSha256 === value.specSha256)
+      ? { ok: true, code: "PO-GATE-AUTHORITY-VALID", value }
+      : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
+  }
+  const reopened = run(["reopen-design", "--by", "po-test"], deps);
+  const changedDeps = { ...deps, poGateAuthority: changedAuthority };
+  const resubmitted = captureConsole(() => run(["submit-plan", "--by", "coordinator", "--profile", "feature"], changedDeps));
+  ok("HL-12 reopen-design + resubmit with changed content exit 0", reopened === 0 && resubmitted.value === 0, `reopened=${reopened} resubmitted=${resubmitted.value}`);
+  const resubmittedState = readState(dir).state;
+  ok(
+    "HL-13 change classification reports plan-changed against the prior approved binding, with a non-null previousApprovalSha256",
+    resubmittedState.planApprovalBriefing.change.kind === "plan-changed"
+      && resubmittedState.planApprovalBriefing.change.previousApprovalSha256 === sha256CanonicalJson(state.planApproval),
+    JSON.stringify(resubmittedState.planApprovalBriefing.change),
+  );
+
+  // Reviewer reconstruction on a TAMPERED persisted briefing (excludes narrowed after the
+  // fact, still within the closed vocabulary shape) must fail, not silently trust the bytes.
+  const reapproved = run(["approve-plan", "--by", "po-test"], changedDeps);
+  ok("HL-14 fixture re-approves the changed submission", reapproved === 0, `got ${reapproved}`);
+  const genuine = readState(dir).state;
+  const tampered = {
+    ...genuine,
+    planApprovalBriefing: { ...genuine.planApprovalBriefing, excludes: ["push", "deploy"] },
+  };
+  const tamperedReconstruction = reconstructPlanApprovalBriefing(tampered);
+  ok(
+    "HL-15 an approval whose persisted briefing does not match the bound artifacts FAILS reconstruction",
+    tamperedReconstruction.ok === false && tamperedReconstruction.code === "PLAN-APPROVAL-BRIEFING-MISMATCH",
+    JSON.stringify(tamperedReconstruction),
+  );
+
+  // A missing briefing (pre-migration record) fails distinctly rather than crashing.
+  const { planApprovalBriefing: _dropped, ...noBriefing } = genuine;
+  const missingReconstruction = reconstructPlanApprovalBriefing(noBriefing);
+  ok(
+    "HL-16 a persisted approval with no briefing at all fails reconstruction with a distinct code",
+    missingReconstruction.ok === false && missingReconstruction.code === "PLAN-APPROVAL-BRIEFING-INVALID",
+    JSON.stringify(missingReconstruction),
+  );
+
+  // No approval at all: reconstruction refuses cleanly rather than exposing anything.
+  const noApprovalReconstruction = reconstructPlanApprovalBriefing({});
+  ok(
+    "HL-17 reconstruction on a state with no approval refuses with a distinct code",
+    noApprovalReconstruction.ok === false && noApprovalReconstruction.code === "PLAN-APPROVAL-BRIEFING-NO-APPROVAL",
+    JSON.stringify(noApprovalReconstruction),
+  );
+}
 
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {

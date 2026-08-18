@@ -6360,6 +6360,179 @@ function runFeaturePackageWriteCommand(sub, argv, deps) {
 }
 
 /**
+ * PHX-WP-HUMANLEGIBLE-APPROVAL: a closed, bounded vocabulary for the
+ * human-legible briefing presented and persisted at the plan-approval gate
+ * (backlog/items/2026-08-06-human-legible-approval-record.md, PO decision
+ * 2026-08-18: structured/bounded, kept portable -- not free prose, not
+ * confined to the restricted profile). Every field is a repository-relative
+ * path, a sha256 digest, or a value drawn from one of the small fixed enums
+ * below -- never free text -- so the record stays safe under H-AC-13's
+ * portable-ledger prohibition on free-form rationale while still answering,
+ * in words, the three things H-AC-11's gap named: the scope being released,
+ * what changed since the last approved binding, and what this approval does
+ * and does not authorize.
+ *
+ * Persisted as `state.planApprovalBriefing`, a sibling of `planSubmission`/
+ * `planApproval` (not nested inside either): `plan-spec-state-v2.mjs` owns
+ * the closed key sets of those two records and is out of this task's scope,
+ * so the briefing travels alongside them in the same State envelope instead
+ * of inside them. `derivePlanLifecycle`'s structural checks only ever look
+ * at the specific keys they name, so an additional top-level sibling field
+ * changes nothing about its own validation, and `validatePortablePipelineState`
+ * (project-authority.mjs) accepts any top-level field that is not the
+ * machine-local `sessionCleanup` binding.
+ */
+const PLAN_APPROVAL_BRIEFING_SCHEMA = "pipeline.plan-approval-briefing.v1";
+const PLAN_APPROVAL_BRIEFING_KEYS = ["schema", "scope", "change", "authorizes", "excludes"];
+const PLAN_APPROVAL_BRIEFING_SCOPE_KEYS = ["featureId", "planPath", "planSha256", "specPath", "specSha256", "profile"];
+const PLAN_APPROVAL_BRIEFING_CHANGE_KEYS = ["kind", "previousApprovalSha256"];
+const PLAN_APPROVAL_BRIEFING_CHANGE_KINDS = new Set([
+  "initial-submission",
+  "identical-binding",
+  "plan-changed",
+  "spec-changed",
+  "profile-changed",
+  "plan-and-spec-changed",
+  "plan-and-profile-changed",
+  "spec-and-profile-changed",
+  "plan-spec-and-profile-changed",
+]);
+// Fixed, closed content: what a Plan approval ever authorizes and never
+// authorizes in this system does not vary per submission, so these two lists
+// are constants rather than being derived per-record.
+const PLAN_APPROVAL_BRIEFING_AUTHORIZES = Object.freeze(["design-to-implementation-transition"]);
+const PLAN_APPROVAL_BRIEFING_EXCLUDES = Object.freeze([
+  "push", "deploy", "publication", "scope-beyond-bound-plan-and-spec",
+]);
+const PROFILES_ENUM = new Set(["epic", "feature", "mini"]);
+
+function isPlainRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasExactBriefingKeys(value, keys) {
+  return isPlainRecord(value)
+    && Object.keys(value).length === keys.length
+    && keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));
+}
+
+function validPlanApprovalBriefing(value) {
+  return hasExactBriefingKeys(value, PLAN_APPROVAL_BRIEFING_KEYS)
+    && value.schema === PLAN_APPROVAL_BRIEFING_SCHEMA
+    && hasExactBriefingKeys(value.scope, PLAN_APPROVAL_BRIEFING_SCOPE_KEYS)
+    && typeof value.scope.featureId === "string" && value.scope.featureId.length > 0
+    && typeof value.scope.planPath === "string" && value.scope.planPath.length > 0
+    && SHA256_RE.test(value.scope.planSha256)
+    && typeof value.scope.specPath === "string" && value.scope.specPath.length > 0
+    && SHA256_RE.test(value.scope.specSha256)
+    && PROFILES_ENUM.has(value.scope.profile)
+    && hasExactBriefingKeys(value.change, PLAN_APPROVAL_BRIEFING_CHANGE_KEYS)
+    && PLAN_APPROVAL_BRIEFING_CHANGE_KINDS.has(value.change.kind)
+    && (value.change.previousApprovalSha256 === null || SHA256_RE.test(value.change.previousApprovalSha256))
+    && Array.isArray(value.authorizes) && value.authorizes.length > 0
+    && value.authorizes.every((entry) => PLAN_APPROVAL_BRIEFING_AUTHORIZES.includes(entry))
+    && Array.isArray(value.excludes) && value.excludes.length > 0
+    && value.excludes.every((entry) => PLAN_APPROVAL_BRIEFING_EXCLUDES.includes(entry));
+}
+
+/**
+ * The prior approved binding this submission's briefing diffs against, read
+ * from whatever valid current (v4) approval the state still carries at
+ * submit time -- the last binding a PO actually approved, not merely the
+ * last thing submitted. An approval in an older schema shape (no
+ * `profileSha256`) or no approval at all reads as "no prior binding": the
+ * change is then always reported as `initial-submission`, a deliberately
+ * conservative simplification rather than guessing at an unrecorded profile.
+ */
+function priorApprovedBriefingBinding(state) {
+  const approval = state?.planApproval;
+  if (!validCurrentPlanApproval(approval)) return null;
+  return {
+    planSha256: approval.poGateAuthority.planSha256,
+    specSha256: approval.poGateAuthority.specSha256,
+    profileSha256: approval.profileSha256,
+    approvalSha256: sha256CanonicalJson(approval),
+  };
+}
+
+function classifyPlanApprovalBriefingChange(prior, { planSha256, specSha256, profileSha256 }) {
+  if (prior === null) return "initial-submission";
+  const planChanged = prior.planSha256 !== planSha256;
+  const specChanged = prior.specSha256 !== specSha256;
+  const profileChanged = prior.profileSha256 !== profileSha256;
+  if (!planChanged && !specChanged && !profileChanged) return "identical-binding";
+  if (planChanged && specChanged && profileChanged) return "plan-spec-and-profile-changed";
+  if (planChanged && specChanged) return "plan-and-spec-changed";
+  if (planChanged && profileChanged) return "plan-and-profile-changed";
+  if (specChanged && profileChanged) return "spec-and-profile-changed";
+  if (planChanged) return "plan-changed";
+  if (specChanged) return "spec-changed";
+  return "profile-changed";
+}
+
+/** Pure derivation from bound artifacts only -- never from caller/approver-typed text. */
+function derivePlanApprovalBriefing({ state, featureId, planPath, planSha256, specPath, specSha256, profile, profileSha256 }) {
+  const prior = priorApprovedBriefingBinding(state);
+  return {
+    schema: PLAN_APPROVAL_BRIEFING_SCHEMA,
+    scope: { featureId, planPath, planSha256, specPath, specSha256, profile },
+    change: {
+      kind: classifyPlanApprovalBriefingChange(prior, { planSha256, specSha256, profileSha256 }),
+      previousApprovalSha256: prior === null ? null : prior.approvalSha256,
+    },
+    authorizes: [...PLAN_APPROVAL_BRIEFING_AUTHORIZES],
+    excludes: [...PLAN_APPROVAL_BRIEFING_EXCLUDES],
+  };
+}
+
+function summarizePlanApprovalBriefing(briefing) {
+  return `scope=${briefing.scope.planPath}(${briefing.scope.planSha256.slice(0, 12)}...)+${briefing.scope.specPath}(${briefing.scope.specSha256.slice(0, 12)}...) profile=${briefing.scope.profile} change=${briefing.change.kind} authorizes=${briefing.authorizes.join(",")} excludes=${briefing.excludes.join(",")}`;
+}
+
+/**
+ * H-AC-11 reviewer reconstruction: exposes the persisted briefing alongside
+ * the existing digests it must match. Recomputes the closed `scope` (plus
+ * the fixed `authorizes`/`excludes`) from the current bound artifacts
+ * (`planApproval.poGateAuthority` + the matching `planSubmission.profile`)
+ * and fails, rather than trusting the stored bytes, when a persisted
+ * briefing does not match what the bound artifacts actually say. The
+ * point-in-time `change` comparison is not independently recomputable after
+ * the fact (its "prior" state no longer exists once superseded) and is
+ * exposed as recorded, not re-verified here.
+ */
+export function reconstructPlanApprovalBriefing(state) {
+  const approval = state?.planApproval;
+  const submission = state?.planSubmission;
+  const briefing = state?.planApprovalBriefing;
+  if (!validCurrentPlanApproval(approval)) return { ok: false, code: "PLAN-APPROVAL-BRIEFING-NO-APPROVAL" };
+  if (!validPlanSubmission(submission) || approval.submissionSha256 !== sha256CanonicalJson(submission)) {
+    return { ok: false, code: "PLAN-APPROVAL-BRIEFING-SUBMISSION-STALE" };
+  }
+  if (!validPlanApprovalBriefing(briefing)) return { ok: false, code: "PLAN-APPROVAL-BRIEFING-INVALID" };
+  const expectedScope = {
+    featureId: submission.featureId,
+    planPath: approval.poGateAuthority.planPath,
+    planSha256: approval.poGateAuthority.planSha256,
+    specPath: approval.poGateAuthority.specPath,
+    specSha256: approval.poGateAuthority.specSha256,
+    profile: submission.profile,
+  };
+  if (JSON.stringify(briefing.scope) !== JSON.stringify(expectedScope)
+    || JSON.stringify(briefing.authorizes) !== JSON.stringify(PLAN_APPROVAL_BRIEFING_AUTHORIZES)
+    || JSON.stringify(briefing.excludes) !== JSON.stringify(PLAN_APPROVAL_BRIEFING_EXCLUDES)) {
+    return { ok: false, code: "PLAN-APPROVAL-BRIEFING-MISMATCH" };
+  }
+  return {
+    ok: true,
+    briefing,
+    submissionSha256: approval.submissionSha256,
+    approvalSha256: sha256CanonicalJson(approval),
+    planSha256: approval.poGateAuthority.planSha256,
+    specSha256: approval.poGateAuthority.specSha256,
+  };
+}
+
+/**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
  * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
  * touching the real filesystem/clock/git/environment.
@@ -6517,6 +6690,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
       let submittedAt;
+      let submittedBriefing;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           submittedAt = now();
@@ -6529,9 +6703,21 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             by,
             at: submittedAt,
           });
-          return transition.ok
-            ? { ...transition, state: { ...transition.state, updatedAt: submittedAt } }
-            : transition;
+          if (!transition.ok) return transition;
+          // H-AC-11 human-legible briefing (PHX-WP-HUMANLEGIBLE-APPROVAL): derived
+          // here from the just-bound submission plus the prior approved binding,
+          // never from caller-supplied text -- see the closed vocabulary above.
+          submittedBriefing = derivePlanApprovalBriefing({
+            state: observed,
+            featureId: transition.submission.featureId,
+            planPath: transition.submission.planPath,
+            planSha256: transition.submission.planSha256,
+            specPath: transition.submission.specPath,
+            specSha256: transition.submission.specSha256,
+            profile: transition.submission.profile,
+            profileSha256: transition.submission.profileSha256,
+          });
+          return { ...transition, state: { ...transition.state, updatedAt: submittedAt, planApprovalBriefing: submittedBriefing } };
         },
         beforeCommit: () => {
           const nextAuthority = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
@@ -6550,6 +6736,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       console.log(`Plan submitted by "${by}" on ${submittedAt}; lifecycle="awaiting-approval".`);
+      console.log(`Briefing: ${summarizePlanApprovalBriefing(submittedBriefing)}`);
       return 0;
     }
 
@@ -6739,6 +6926,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       console.log(`Plan approved by "${by}" on ${approvedAt}; lifecycle="approved".`);
+      // H-AC-11 human-legible briefing (PHX-WP-HUMANLEGIBLE-APPROVAL): the
+      // gate presentation shows the same closed-vocabulary briefing derived
+      // and persisted at submit-plan time -- never raw digests/paths alone --
+      // so the approver sees, in words, exactly what this approval binds.
+      const approvedBriefing = written.transition?.state?.planApprovalBriefing;
+      console.log(validPlanApprovalBriefing(approvedBriefing)
+        ? `Briefing: ${summarizePlanApprovalBriefing(approvedBriefing)}`
+        : "Briefing: not available (submission predates the human-legible approval briefing).");
       return 0;
     }
 
