@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-08
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "f57375ff"
+closure_commit: "f57375ff77263a2df70bbb3201feb361912f07f6"
 closure_evidence: "docs/state.md"
 due: 2026-08-22
 source: "Two dispatches on 2026-08-08 independently classified the same red checks as pre-existing and unrelated. Both were wrong; a bisect settled it in one step and found the introducing commit."

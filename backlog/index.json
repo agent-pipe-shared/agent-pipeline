@@ -335,7 +335,7 @@
       "tracking": "Sentinel recovery baseline; no completion claim.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "5a7862e9",
+      "closureCommit": "5a7862e98ba83a33e31c030b2768bffa0a051dd3",
       "closureEvidence": "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs"
     },
     {
@@ -391,7 +391,7 @@
       "source": "close retro; bounded privacy correction review",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "f57375ff",
+      "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "plugins/pipeline-core/skills/capture-observation/SKILL.md"
     },
     {
@@ -529,7 +529,7 @@
       "source": "Live greenfield onboarding test, 2026-08-10 (both Claude Code and Codex hit it independently on separate fresh test projects). PO-reported live: onboarding got stuck reporting `repository-control-path-invalid` with no recovery path, right after a Codex restart relaunch.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "f57375ff",
+      "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs"
     },
     {
@@ -621,7 +621,7 @@
       "source": "Public V3 Foundation close residue review",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "6d9e8f83",
+      "closureCommit": "6d9e8f83ff9bf39449f93a265e67e586be7fc709",
       "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
     },
     {
@@ -800,7 +800,7 @@
       "source": "Elephant investigation, 2026-08-17, after the PO resynced this host's local marketplace copy and reloaded the plugin: 4 of the 5 previously-documented 'human-guard-override-tests marketplace-staleness' failures did NOT clear, while a 5th (F1 CRITIC-REMEDY-09) did. Investigated why -- root cause is different from what every prior record this session (including the consolidated Critic review's F-0) attributed it to.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "abf2e580",
+      "closureCommit": "abf2e580e9a3ec422b375dffe4b4f352c9d204c3",
       "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
     },
     {
@@ -844,7 +844,7 @@
       "source": "PO, 2026-08-17, live Codex happy-path restart test: 'ausserdem fragt er zwar früh daten zu git identitäten etc ab aber versucht diese dann vor readiness zu setzen, das sollte er nicht. abfragen ist gut aber nicht das setzen so früh.' (Codex correctly asks early for git identity data, but then tries to SET it before readiness — that should not happen; asking early is fine, setting that early is not.)",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "f57375ff",
+      "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.mjs"
     },
     {
@@ -1364,7 +1364,7 @@
       "source": "Observed live while opening a Guard Maintenance Window for an AFK hardening session, 2026-08-08. The PO had already signed; the install failed.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "e2151461",
+      "closureCommit": "e21514610620cd11b0b846794a61d888e156e9fd",
       "closureEvidence": "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs"
     },
     {
@@ -1537,7 +1537,7 @@
       "tracking": "Sentinel recovery baseline; no completion claim.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "71bfbc1a",
+      "closureCommit": "71bfbc1a0f679d21f0ba1a818697b38f8755770b",
       "closureEvidence": "plugins/pipeline-core/lib/interaction-continuity.test.mjs"
     },
     {
@@ -1557,7 +1557,7 @@
       "source": "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Confirmed live on Toolbox post-vendor-sync: observation-governance-bootstrap.mjs --root D:\\Dev\\Web\\Toolbox returns {\"status\":\"failed\",\"sourceCheckout\":true,\"code\":\"OGB-CHECKER-MISSING\"}. Not currently blocking anything (not wired into the PreToolUse guard, only into pipeline-start's own happy-path checklist step).",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "2fa93ed5",
+      "closureCommit": "2fa93ed59d3824220776072be4a2247bf92a662e",
       "closureEvidence": "plugins/pipeline-core/lib/observation-governance-bootstrap.test.mjs"
     },
     {
@@ -1649,7 +1649,7 @@
       "source": "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "f57375ff",
+      "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "templates/prompts/goldfish-task.md"
     },
     {
@@ -1774,7 +1774,7 @@
       "tracking": "Sentinel recovery baseline; no completion claim.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "21cf1e08",
+      "closureCommit": "21cf1e0838b3a900ba3a272651f2568a2b6df158",
       "closureEvidence": "plugins/pipeline-core/lib/po-gate-authority.test.mjs"
     },
     {
@@ -1830,7 +1830,7 @@
       "source": "Two dispatches on 2026-08-08 independently classified the same red checks as pre-existing and unrelated. Both were wrong; a bisect settled it in one step and found the introducing commit.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "f57375ff",
+      "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "docs/state.md"
     },
     {
@@ -1914,7 +1914,7 @@
       "source": "Caught live by the PO while verifying the 0.5.5 toolbox-refresh candidate: `/reload-plugins` in this repository's own dev session reported \"Reloaded: 2 plugins\" instead of 1.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "f57375ff",
+      "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "docs/claude-local-plugin-development.md"
     },
     {
@@ -2084,7 +2084,7 @@
       "source": "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "f57375ff",
+      "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "plugins/pipeline-core/scripts/release-preflight-cli.mjs"
     },
     {
@@ -2553,7 +2553,7 @@
       "tracking": "Sentinel recovery baseline; no completion claim.",
       "closedAt": "2026-08-18",
       "closureRepository": "self",
-      "closureCommit": "60dc7e34",
+      "closureCommit": "60dc7e34a047febb45775b9d3a32866a5299e0d7",
       "closureEvidence": "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs"
     },
     {

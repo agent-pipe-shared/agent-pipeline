@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-17
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "abf2e580"
+closure_commit: "abf2e580e9a3ec422b375dffe4b4f352c9d204c3"
 closure_evidence: "plugins/pipeline-core/lib/human-guard-override.test.mjs"
 source: "Elephant investigation, 2026-08-17, after the PO resynced this host's local marketplace copy and reloaded the plugin: 4 of the 5 previously-documented 'human-guard-override-tests marketplace-staleness' failures did NOT clear, while a 5th (F1 CRITIC-REMEDY-09) did. Investigated why -- root cause is different from what every prior record this session (including the consolidated Critic review's F-0) attributed it to."
 ---

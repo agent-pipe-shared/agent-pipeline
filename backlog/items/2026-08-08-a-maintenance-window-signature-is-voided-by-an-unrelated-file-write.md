@@ -8,7 +8,7 @@ created: 2026-08-08
 due: 2026-08-22
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "e2151461"
+closure_commit: "e21514610620cd11b0b846794a61d888e156e9fd"
 closure_evidence: "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs"
 source: "Observed live while opening a Guard Maintenance Window for an AFK hardening session, 2026-08-08. The PO had already signed; the install failed."
 ---

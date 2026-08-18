@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-17
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "f57375ff"
+closure_commit: "f57375ff77263a2df70bbb3201feb361912f07f6"
 closure_evidence: "docs/claude-local-plugin-development.md"
 source: "Caught live by the PO while verifying the 0.5.5 toolbox-refresh candidate: `/reload-plugins` in this repository's own dev session reported \"Reloaded: 2 plugins\" instead of 1."
 ---

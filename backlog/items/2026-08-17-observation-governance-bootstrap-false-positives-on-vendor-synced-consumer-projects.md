@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-17
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "2fa93ed5"
+closure_commit: "2fa93ed59d3824220776072be4a2247bf92a662e"
 closure_evidence: "plugins/pipeline-core/lib/observation-governance-bootstrap.test.mjs"
 source: "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Confirmed live on Toolbox post-vendor-sync: observation-governance-bootstrap.mjs --root D:\\Dev\\Web\\Toolbox returns {\"status\":\"failed\",\"sourceCheckout\":true,\"code\":\"OGB-CHECKER-MISSING\"}. Not currently blocking anything (not wired into the PreToolUse guard, only into pipeline-start's own happy-path checklist step)."
 ---

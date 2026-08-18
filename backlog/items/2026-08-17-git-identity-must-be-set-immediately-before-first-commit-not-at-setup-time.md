@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-17
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "f57375ff"
+closure_commit: "f57375ff77263a2df70bbb3201feb361912f07f6"
 closure_evidence: "plugins/pipeline-core/lib/project-onboarding-v3.mjs"
 source: "PO, 2026-08-17, live Codex happy-path restart test: 'ausserdem fragt er zwar früh daten zu git identitäten etc ab aber versucht diese dann vor readiness zu setzen, das sollte er nicht. abfragen ist gut aber nicht das setzen so früh.' (Codex correctly asks early for git identity data, but then tries to SET it before readiness — that should not happen; asking early is fine, setting that early is not.)"
 ---

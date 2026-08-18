@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-10
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "f57375ff"
+closure_commit: "f57375ff77263a2df70bbb3201feb361912f07f6"
 closure_evidence: "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs"
 source: "Live greenfield onboarding test, 2026-08-10 (both Claude Code and Codex hit it independently on separate fresh test projects). PO-reported live: onboarding got stuck reporting `repository-control-path-invalid` with no recovery path, right after a Codex restart relaunch."
 ---

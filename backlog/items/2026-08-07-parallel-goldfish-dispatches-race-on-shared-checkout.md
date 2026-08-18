@@ -10,7 +10,7 @@ due: 2026-09-06
 expires: 2026-09-06
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "f57375ff"
+closure_commit: "f57375ff77263a2df70bbb3201feb361912f07f6"
 closure_evidence: "templates/prompts/goldfish-task.md"
 ---
 
