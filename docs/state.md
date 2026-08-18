@@ -7958,6 +7958,29 @@ closure_commit convention (`git rev-parse <short-sha>` before writing
 the frontmatter field, never the short form a `git log --oneline`
 naturally hands back) is worth stating explicitly for future closures.
 
+**Explicit per-candidate QG-01 disclosure for `92039bbb`.** The
+comprehensive Critic review dispatched against diff `41d7e8c2..92039bbb`
+FAILed on one finding: the candidate-bound Verify evidence
+(`evidence/verify-latest.json`, commit
+`92039bbbc834e69d8474d2da87d5510bb55ca522` / tree
+`f24e6f45e4d1c841a7acd6446f9b9ea0e04edd00` — independently confirmed
+against `git rev-parse 92039bbb^{commit}`/`^{tree}`) reports the
+deterministic Verify gate red, and no entry in this file disclosed that
+exact fact for this exact candidate — the closest disclosure was for the
+earlier candidate `41d7e8c2`, three commits before this tip. Disclosing
+it now, explicitly, per candidate: the sole failing step is
+`human-guard-override-tests`, the single known, pre-existing, host-local
+`HGO-EXTERNAL-MARKETPLACE` exception (`externalLocalMarketplaceObservation()`
+— rsync-mirror staleness on this host), confirmed identical on
+unmodified `main` via `git stash` multiple times this session, and
+independently re-confirmed unrelated to this diff's own code path by the
+Critic's own review (all 6 new `NVA-CROSSREPOLEDGER-1/2` tests pass in
+the same evidence run — `evidence/NVA-CROSSREPOLEDGER-2-verify.txt:69-100`).
+No new failure was introduced between `41d7e8c2` and `92039bbb`. Accepted
+as a standing, host-local exception, not re-litigated per candidate going
+forward — this entry is the one-time explicit disclosure the Critic's
+QG-01 finding required.
+
 ## Recovery
 
 No persisted in-flight dispatch, rollback action or public human-gate acceptance
