@@ -806,6 +806,19 @@ function gateStrengthShellReadOnlyScriptExemption(command, root, dependencies = 
  * of a copyable command. Stated, not hidden; widening HGO's tool eligibility is its own
  * decision, not a side effect of this one.
  */
+/**
+ * GL-09 requires this authority-bearing gate to resolve to its blocking outcome when it
+ * cannot complete its evaluation, verified by a fault-injection test that raises inside the
+ * blocking path (Critic finding, backlog: 2026-08-08-an-authority-gate-is-bypassable-by-
+ * choosing-a-different-write-tool.md). The config-load catch just below is a documented
+ * exception, not a gap: an unreadable guard config carries no rules to enforce (rules.length
+ * === 0 falls through to the same "nothing to check" result the write lane already accepts).
+ * A throw from the CLASSIFIER on a real command is different — it means a command that may
+ * write a protected path could not be evaluated, and GL-09 requires that to block rather than
+ * pass through unseen. Returning a typed fault sentinel here (rather than swallowing to null,
+ * as the pre-fix code did) lets the call site distinguish "no rules loaded" from "the
+ * classifier itself failed" and fail closed only for the latter.
+ */
 function protectedTestPathShellRefusalHit(command, root, dependencies = {}, toolName = "Bash") {
   if (typeof command !== "string" || command === "") return null;
   let rules = [];
@@ -817,15 +830,16 @@ function protectedTestPathShellRefusalHit(command, root, dependencies = {}, tool
   }
   if (rules.length === 0) return null;
   try {
-    return protectedTestPathShellHit({
+    const classify = dependencies.protectedTestPathShellHitFn ?? protectedTestPathShellHit;
+    return classify({
       command,
       rules,
       root,
       toolName,
       platform: dependencies.platform ?? process.platform,
     });
-  } catch {
-    return null;
+  } catch (error) {
+    return { fault: true, error };
   }
 }
 
@@ -844,6 +858,23 @@ function protectedTestPathShellBlocked(hit, overrideGuidance) {
       + "git add/commit/diff/log/show on this path are all admitted. Only a detected write is "
       + "refused.\n"
       + (overrideGuidance ?? ""),
+  );
+}
+
+/** Fail-closed outcome for a classifier fault (GL-09) — see protectedTestPathShellRefusalHit(). */
+function protectedTestPathShellFaultBlocked(error) {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${TESTPATH_SHELL_DENIAL_CODE}-FAULT: the shell classifier for the protected-test-path `
+      + "gate raised while evaluating this command, so whether it writes a protected path "
+      + "could not be determined.\n"
+      + `Error: ${error instanceof Error ? error.message : String(error)}\n`
+      + "Why: this gate is authority-bearing (guardrails/global.md GL-09), which MUST resolve "
+      + "to its blocking outcome rather than pass a command through unseen when it cannot "
+      + "complete its evaluation.\n"
+      + "No override route is offered for a classifier fault -- fix the command shape (or the "
+      + "classifier, if the fault is a real defect) and retry.\n",
   );
 }
 
@@ -2352,6 +2383,9 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     // the gate-strength config is refused on that ground with no lift, and must not be able
     // to reach a lane that offers one.
     const testPathHit = protectedTestPathShellRefusalHit(input.tool_input.command, root, dependencies, toolName);
+    if (testPathHit !== null && testPathHit.fault === true) {
+      return protectedTestPathShellFaultBlocked(testPathHit.error);
+    }
     if (testPathHit !== null) {
       const reason = `${TESTPATH_SHELL_DENIAL_CODE}: ${testPathHit.rule.id}: ${testPathHit.rule.reason}`;
       const route = humanOverrideRoute(

@@ -4590,3 +4590,31 @@ test("TPSHELL-6: literal basenames are derived from the configured patterns, alt
     assert.ok(needles.includes(needle), `alternation pattern yielded no needle for ${needle}: ${needles.join(", ")}`);
   }
 });
+
+/**
+ * TPSHELL-7 (Critic finding, backlog: 2026-08-08-an-authority-gate-is-bypassable-by-choosing-
+ * a-different-write-tool.md). GL-09's own verification clause: "Each authority-bearing gate
+ * carries a fault-injection test that raises inside the blocking path and asserts the block
+ * exit code -- not merely that a catch is present." The pre-fix code caught any classifier
+ * exception and returned null (fail OPEN, admitting the command unseen); this asserts the
+ * fixed behavior fails CLOSED instead, and that a command the classifier genuinely could not
+ * evaluate is never silently admitted alongside a command it could.
+ */
+test("TPSHELL-7: a classifier fault fails closed (GL-09), never silently admits the command", () => {
+  const path = tpShellFixture();
+  try {
+    const command = `cp scratch/fake.mjs ${TPSHELL_TARGET}`;
+    const faulting = () => { throw new Error("synthetic classifier fault"); };
+    const result = evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command } },
+      {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return TPSHELL_READY; },
+        protectedTestPathShellHitFn: faulting,
+      },
+    );
+    assert.equal(result.exitCode, 2, "a classifier fault must block, not admit");
+    assert.match(result.stderr, new RegExp(`${TESTPATH_SHELL_DENIAL_CODE}-FAULT`, "u"));
+    assert.match(result.stderr, /synthetic classifier fault/u, "the fault reason is surfaced, not swallowed silently");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});

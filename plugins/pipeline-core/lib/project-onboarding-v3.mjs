@@ -3960,8 +3960,8 @@ function collectAuthorIdentityAction(missing) {
 /**
  * Ask, once per MACHINE, how a push approval is cleared and where the PO's
  * signing key lives (backlog: installing-consumer-is-never-asked-any-setup-
- * decision.md; design: specs/sprint-nova-epic/plans/nova-setup-bootstrap.md
- * SS3). Every setting an installing consumer needs today resolves silently to
+ * decision.md; design: this repository's own Nova A epic setup-bootstrap
+ * design note, SS3). Every setting an installing consumer needs today resolves silently to
  * its strictest default (`signature`, ADR-0056) with nobody ever telling them
  * a key is required, let alone that one exists. This closes exactly that gap
  * for the two decisions the PO scoped narrow for now -- `gates.push_approval`

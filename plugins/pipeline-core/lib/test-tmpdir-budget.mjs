@@ -17,9 +17,9 @@
  * `scratch/test-tmp/`'s own byte and entry count directly
  * (backlog/items/2026-08-17-test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention.md).
  *
- * WIRING NOTE. `harness/scripts/verify.mjs` is this repo's one canonical
- * verify entry point and is TP-3-protected (self-documented at its own file
- * head); a Goldfish dispatch does not hold the ceremony to edit it. This
+ * WIRING NOTE. This repository's own canonical verify entry point (in its
+ * harness scripts directory) is TP-3-protected (self-documented at its own
+ * file head); a Goldfish dispatch does not hold the ceremony to edit it. This
  * module is written to be registered there exactly like the existing
  * `state-budget-tests`/`state-budget-check` pair
  * (`{ name: "test-tmp-budget-tests", file: join(libDir,

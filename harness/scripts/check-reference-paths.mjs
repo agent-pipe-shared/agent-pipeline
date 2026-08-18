@@ -38,11 +38,15 @@
  * check says so in its own output rather than only here:
  *
  *   1. RECORD surfaces (`specs/`, `backlog/`, `evidence/`,
- *      `docs/spec-archive/`, `docs/state.md`). A record states what was true
- *      when it was written; a past briefing that named a path that has since
- *      moved is CORRECT as a record. Editing one to satisfy a gate falsifies
- *      the record, so the gate must not ask for that edit. 98 of the 152 raw
- *      hits in this repository are of exactly this class.
+ *      `docs/spec-archive/`, `docs/state-archive/`, `docs/state.md`). A
+ *      record states what was true when it was written; a past briefing that
+ *      named a path that has since moved is CORRECT as a record. Editing one
+ *      to satisfy a gate falsifies the record, so the gate must not ask for
+ *      that edit. `docs/state-archive/` carries the exact same property as
+ *      `docs/spec-archive/`: it holds sections rotated out of `docs/state.md`
+ *      by ADR-0066's handover-rotation mechanism, verbatim, not live
+ *      documentation. 98 of the 152 raw hits in this repository are of
+ *      exactly this class.
  *   2. TEST SUITES (`*.test.mjs`). Their path strings are synthetic fixture
  *      names invented under `plugins/pipeline-core/lib/` and
  *      `harness/scripts/` and constructed inside temporary directories, not
@@ -99,7 +103,9 @@ export const ROOT_SEGMENTS = Object.freeze([
 export const SCRIPT_EXTENSIONS = Object.freeze(["mjs", "cjs", "js", "sh", "py", "ts"]);
 
 /** Record surfaces: true-as-written history, never rewritten to satisfy a gate. */
-export const RECORD_PREFIXES = Object.freeze(["specs/", "backlog/", "evidence/", "docs/spec-archive/"]);
+export const RECORD_PREFIXES = Object.freeze([
+  "specs/", "backlog/", "evidence/", "docs/spec-archive/", "docs/state-archive/",
+]);
 export const RECORD_FILES = Object.freeze(["docs/state.md"]);
 export const TEST_SUITE_PATTERN = /\.test\.mjs$/u;
 
@@ -115,7 +121,7 @@ export const ALLOWLIST = Object.freeze([]);
 
 /** What this check cannot see. Printed with every result, not just here. */
 export const LIMITATIONS = Object.freeze([
-  "record surfaces are not scanned (specs/, backlog/, evidence/, docs/spec-archive/, docs/state.md): a record naming a path that has since moved is correct as a record",
+  "record surfaces are not scanned (specs/, backlog/, evidence/, docs/spec-archive/, docs/state-archive/, docs/state.md): a record naming a path that has since moved is correct as a record",
   "test suites (*.test.mjs) are not scanned: their path strings are synthetic fixture data, and a genuinely stale import fails when the suite runs",
   "only script targets are detected (" + SCRIPT_EXTENSIONS.join(", ") + "); .md link targets are check-doc-contracts.mjs's job, and .json/.yml/.toml/directory targets are detected by nothing",
   "a reference written without its repository-root segment (e.g. the shorthand 'scripts/foo.mjs') is not recognised as repo-relative and is skipped",
