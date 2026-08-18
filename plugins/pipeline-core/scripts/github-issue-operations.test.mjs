@@ -5,13 +5,25 @@ import test from "node:test";
 import { createIssueMutationPreview, validateIssueReadback, validateIssueRepository, ISSUE_OPERATIONS_SCHEMA } from "./github-issue-operations.mjs";
 
 const base = { repository: "example-org/example-app", operation: "create", issueNumber: null, fields: { title: "Fix login", body: "Details", labels: ["bug"] } };
+const validUrl = "https://github.com/example-org/example-app/issues/7";
 
 test("target and preview are explicit and serializable", () => {
   assert.equal(validateIssueRepository("example-org/example-app").ok, true);
   const result = createIssueMutationPreview(base);
   assert.equal(result.ok, true);
   assert.equal(result.preview.schema, ISSUE_OPERATIONS_SCHEMA);
-  assert.deepEqual(validateIssueReadback({ preview: result.preview, readback: { repository: "example-org/example-app", issueNumber: 7, title: "Fix login", body: "Details", labels: ["bug"] } }), { ok: true, issueNumber: 7 });
+  assert.deepEqual(validateIssueReadback({ preview: result.preview, readback: { repository: "example-org/example-app", issueNumber: 7, title: "Fix login", body: "Details", labels: ["bug"], url: validUrl } }), { ok: true, issueNumber: 7 });
+});
+
+test("readback requires a stable URL matching the target repository and issue number (regression for the missing check)", () => {
+  const result = createIssueMutationPreview(base);
+  const goodReadback = { repository: base.repository, issueNumber: 7, title: "Fix login", body: "Details", labels: ["bug"] };
+  assert.equal(validateIssueReadback({ preview: result.preview, readback: goodReadback }).code, "GHO-READBACK-URL");
+  assert.equal(validateIssueReadback({ preview: result.preview, readback: { ...goodReadback, url: "" } }).code, "GHO-READBACK-URL");
+  assert.equal(validateIssueReadback({ preview: result.preview, readback: { ...goodReadback, url: "not-a-url" } }).code, "GHO-READBACK-URL");
+  assert.equal(validateIssueReadback({ preview: result.preview, readback: { ...goodReadback, url: "https://github.com/other-org/example-app/issues/7" } }).code, "GHO-READBACK-URL");
+  assert.equal(validateIssueReadback({ preview: result.preview, readback: { ...goodReadback, url: "https://github.com/example-org/example-app/issues/9" } }).code, "GHO-READBACK-URL");
+  assert.deepEqual(validateIssueReadback({ preview: result.preview, readback: { ...goodReadback, url: validUrl } }), { ok: true, issueNumber: 7 });
 });
 
 test("missing, malformed, or unsupported targets and writes fail closed", () => {
@@ -28,7 +40,7 @@ test("edit requires a positive issue number and only approved fields", () => {
 
 test("readback target, issue number, field values, and labels are bound exactly", () => {
   const result = createIssueMutationPreview(base);
-  assert.equal(validateIssueReadback({ preview: result.preview, readback: { repository: "other-org/example-app", issueNumber: 7, title: "Fix login", body: "Details", labels: ["bug"] } }).code, "GHO-READBACK-TARGET");
-  assert.equal(validateIssueReadback({ preview: result.preview, readback: { repository: base.repository, issueNumber: 7, title: "Changed", body: "Details", labels: ["bug"] } }).code, "GHO-READBACK-TITLE");
-  assert.equal(validateIssueReadback({ preview: result.preview, readback: { repository: base.repository, issueNumber: 7, title: "Fix login", body: "Details", labels: ["bug", "extra"] } }).code, "GHO-READBACK-LABELS");
+  assert.equal(validateIssueReadback({ preview: result.preview, readback: { repository: "other-org/example-app", issueNumber: 7, title: "Fix login", body: "Details", labels: ["bug"], url: "https://github.com/other-org/example-app/issues/7" } }).code, "GHO-READBACK-TARGET");
+  assert.equal(validateIssueReadback({ preview: result.preview, readback: { repository: base.repository, issueNumber: 7, title: "Changed", body: "Details", labels: ["bug"], url: validUrl } }).code, "GHO-READBACK-TITLE");
+  assert.equal(validateIssueReadback({ preview: result.preview, readback: { repository: base.repository, issueNumber: 7, title: "Fix login", body: "Details", labels: ["bug", "extra"], url: validUrl } }).code, "GHO-READBACK-LABELS");
 });

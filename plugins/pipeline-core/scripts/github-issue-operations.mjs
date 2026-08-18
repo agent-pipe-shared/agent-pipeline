@@ -68,6 +68,8 @@ export function validateIssueReadback({ preview, readback } = {}) {
   if (readback.repository !== preview.repository) return fail("GHO-READBACK-TARGET");
   if (!(typeof readback.issueNumber === "number" && Number.isSafeInteger(readback.issueNumber) && readback.issueNumber > 0)) return fail("GHO-READBACK-NUMBER");
   if (preview.operation === "edit" && readback.issueNumber !== preview.issueNumber) return fail("GHO-READBACK-NUMBER");
+  const expectedUrl = `https://github.com/${readback.repository}/issues/${readback.issueNumber}`;
+  if (typeof readback.url !== "string" || readback.url.length === 0 || readback.url !== expectedUrl) return fail("GHO-READBACK-URL");
   for (const key of Object.keys(preview.fields)) {
     if (key === "labels") {
       if (!Array.isArray(readback.labels) || JSON.stringify(sortedLabels(readback.labels)) !== JSON.stringify(sortedLabels(preview.fields.labels))) return fail("GHO-READBACK-LABELS");
