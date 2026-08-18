@@ -44,10 +44,17 @@ separable operational happy-path, authorization and Critic corrections, plus
 the following Phoenix-reported recovery defect:
 
 1. The lifecycle guard admits only the exact physical State-writer command
-   `po-authority-rebind-plan` as a read-only recovery while the matching
-   `po_authority_rebind_unavailable` partial condition exists. It does not
-   admit apply, any other writer subcommand, arbitrary Node, Git, shell or
-   lifecycle command.
+   `po-authority-rebind-plan` as a bare, argument-free read-only recovery
+   while the matching `po_authority_rebind_unavailable` partial condition
+   exists. Separately, it admits `po-authority-rebind-apply` only in its
+   exact digest-bound shape (`--plan-sha256 <sha256> --updated-at
+   <ISO-8601> --activate`) — this is not a generic or unconditional apply
+   admission: the State writer independently re-derives the plan from the
+   live PRD/spec/state bytes at apply time and refuses with zero mutation
+   unless the caller's digest exactly matches that live recomputation, so a
+   syntactically valid but stale or fabricated digest can never advance the
+   State. It does not admit apply in any other shape, any other writer
+   subcommand, arbitrary Node, Git, shell or lifecycle command.
 2. Bootstrap preserves a typed, sanitized planner failure class and recovery
    disposition when the planner cannot produce a closed rebind action; it
    never reports that case as a successful recovery or hides it behind an
