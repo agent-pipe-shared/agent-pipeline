@@ -2,7 +2,10 @@
 Thumbs.db
 .DS_Store
 
-# Editors
+# Editors — deliberately unanchored (ADR-0063 point 2, anchoring audit
+# 2026-08-18): no single "the" editor-config directory is a named kind here,
+# and any nested project/fixture may legitimately carry its own .vscode/.idea/,
+# so depth-unbounded matching is the intended behavior, not an oversight.
 .vscode/
 .idea/
 
@@ -22,7 +25,15 @@ Thumbs.db
 # Temp / scratch
 *.log
 *.tmp
-scratch/
+# ANCHORED 2026-08-18 (ADR-0063 point 2, anchoring audit): scratch/'s one
+# stated home is the repo root (docs/adr/0063-repository-directory-contract.md).
+# Onboarding's own consumer-project seed already writes this entry anchored
+# (project-onboarding-v3.mjs PROJECT_IGNORE_SEED, "/scratch/" not "scratch/"),
+# with the exact same one-character omission that once let unanchored
+# `evidence/` swallow `backlog/evidence/` named as the reason why. The source
+# repo that teaches consumers the anchored form must not carry the unanchored
+# one itself.
+/scratch/
 
 # Machine-generated verify evidence (QG-03, AC-G4-2): regenerated every
 # `node harness/scripts/verify.mjs` run — a status snapshot, not a durable
