@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.published-lifecycle-event-schema-still-enumerates-cancellation
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "PHX-WP-LAC08 dispatch report (commit 20014aab), Elephant checkpoint docs/state.md 2026-08-17"
 ---
@@ -50,7 +50,8 @@ exact drift from recurring a fourth time.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept and fix
+- **Rationale:** matches canonical KINDS Set in lifecycle-governance-events.mjs; no code or test reads this schema file today so this is zero runtime risk, pure published-contract drift correction
+- **Assignment (if accepted):** this dispatch (PHX-WP-LAC08-CANCELFIX)
+- **Date:** 2026-08-18
+- **Closure commit:** (recorded post-commit — see commit history for PHX-WP-LAC08-CANCELFIX)

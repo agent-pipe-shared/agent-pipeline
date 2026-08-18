@@ -8,7 +8,7 @@
   "required": ["eventId", "kind", "status", "reasonCode", "correlation", "candidate", "invalidatesEventId", "supersedesEventId"],
   "properties": {
     "eventId": { "$ref": "#/$defs/id" },
-    "kind": { "enum": ["dispatch", "status", "cancellation", "candidate-invalidation", "verification", "review", "gate", "recovery", "reconciliation"] },
+    "kind": { "enum": ["dispatch", "status", "candidate-invalidation", "verification", "review", "gate", "recovery", "reconciliation"] },
     "status": { "enum": ["proposed", "active", "completed", "failed", "cancelled", "unknown", "unavailable", "invalidated"] },
     "reasonCode": { "$ref": "#/$defs/code" },
     "correlation": { "$ref": "#/$defs/correlation" },
