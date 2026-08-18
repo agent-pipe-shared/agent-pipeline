@@ -5,11 +5,18 @@
  *
  * `prepare` writes only public candidate-bound requests and is agent work.
  * `setup` and `approve` are intentionally for a terminal operated by the
- * approving human. The encrypted private key stays outside the checkout and
- * OpenSSL reads its passphrase from that terminal. No password, passphrase,
- * recovery code or private key is accepted as an argument, environment value,
- * stdin payload, repository file, or pipeline state. `verify` is public
- * readback and is agent work again.
+ * approving human. `authorize-critical` is the single human-terminal command
+ * for a critical action (push/deploy/publication/feature-package-reconcile,
+ * ADR-0061 port PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL): it prepares the
+ * request and signs that exact request in one invocation, so a request left
+ * on disk by an earlier, possibly failed preparation can never be the thing
+ * that gets signed. It changes nothing about where key material lives or who
+ * is prompted for the passphrase; `prepare-critical`/`approve-critical` stay
+ * available as the two-step form. The encrypted private key stays outside the
+ * checkout and OpenSSL reads its passphrase from that terminal. No password,
+ * passphrase, recovery code or private key is accepted as an argument,
+ * environment value, stdin payload, repository file, or pipeline state.
+ * `verify` is public readback and is agent work again.
  */
 import { createHash, createPublicKey } from "node:crypto";
 import { spawnSync } from "node:child_process";
@@ -23,7 +30,7 @@ import { GOVERNANCE_FORK_DISPOSITION_APPROVAL, governanceForkDispositionApproval
 import { readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256>";
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 /**
  * `trustPolicy`/`authority` specifically may also carry `humanName` — the
@@ -131,7 +138,7 @@ export function parseHumanArgs(argv) {
     if (!new Set(["directory", "repoRoot", "keyReference", "featureId", "plan", "spec", "model", "kind", "subjectSha256", "expiresAt", "intentSha256", "repositoryFingerprint", "streamId", "sequence"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
-  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "sign-intent", ...FORK_DISPOSITION_COMMANDS]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
+  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent", ...FORK_DISPOSITION_COMMANDS]).has(command) || !text(values.directory) || !isAbsolute(values.directory)
     || !text(values.repoRoot) || !isAbsolute(values.repoRoot)) return { error: USAGE };
   // The fork-locating parameters exist only for the new commands; every
   // pre-existing command rejects them exactly as it rejected any unknown flag
@@ -205,6 +212,29 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
 }
 
 /**
+ * The one construction of a critical request, shared by the agent-facing
+ * `prepare-critical` and the human-facing `authorize-critical`
+ * (PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL, porting origin/main's ADR-0061).
+ * Deliberately a single call site of `createCriticalActionApprovalRequest`
+ * and of the field validation that guards it: a second, independent copy of
+ * either would be a second definition of the binding, and it would agree
+ * right up until the moment it did not.
+ */
+function criticalApprovalRequest({ args, repository, featureId, dependencies }) {
+  if (!text(args.plan) || !text(args.spec) || !SHA.test(args.subjectSha256 ?? "")
+    || !text(args.expiresAt) || !Number.isFinite(Date.parse(args.expiresAt)) || new Date(args.expiresAt).toISOString() !== args.expiresAt) {
+    fail("critical approval request is invalid");
+  }
+  return createCriticalActionApprovalRequest({
+    candidate: (dependencies.observeCandidate ?? observeCleanCandidate)(repository),
+    featureId,
+    planBytes: readPublicRepositoryFile(repository, args.plan),
+    specBytes: readPublicRepositoryFile(repository, args.spec),
+    action: { kind: args.kind, subjectSha256: args.subjectSha256, expiresAt: args.expiresAt },
+  });
+}
+
+/**
  * Everything the command above does once its argv is parsed and accepted.
  *
  * Split out, and deliberately NOT exported, for exactly one reason:
@@ -238,9 +268,9 @@ function executeHumanApproval(args, dependencies = {}) {
     };
   }
   const repository = resolve(args.repoRoot);
-  const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "setup" || args.command === "prepare" || args.command === "prepare-critical" });
+  const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "setup" || args.command === "prepare" || args.command === "prepare-critical" || args.command === "authorize-critical" });
   const critical = args.command.endsWith("-critical");
-  if (critical && args.command === "prepare-critical" && !text(args.featureId)) fail("critical approval requires a feature id");
+  if (critical && (args.command === "prepare-critical" || args.command === "authorize-critical") && !text(args.featureId)) fail("critical approval requires a feature id");
   const featureId = args.featureId ?? "cyb-4";
   if (!/^[a-z][a-z0-9-]{0,63}$/u.test(featureId)) fail("feature id is invalid");
   const suffix = critical ? `-critical-${args.kind}` : (featureId === "cyb-4" ? "" : `-${featureId}`);
@@ -281,19 +311,44 @@ function executeHumanApproval(args, dependencies = {}) {
     }
     return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority };
   }
+  if (args.command === "authorize-critical") {
+    // Fail closed on missing key material before anything is written or
+    // observed: there is no point preparing a request this terminal could
+    // not sign (PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL).
+    if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before authorize-critical");
+    const request = criticalApprovalRequest({ args, repository, featureId, dependencies });
+    // Written before the prompt, and only ever the request built above: any
+    // file already sitting at this path -- including a stale request left by
+    // an earlier, failed prepare-critical -- is overwritten, never read, so a
+    // stale request has no path to a signature. This is the exact failure
+    // mode ADR-0061 (origin/main) exists to remove: a failed prepare-critical
+    // silently signed by a later, decoupled approve-critical.
+    write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
+    const intentSha256 = request.approvalIntent.sha256;
+    requireExplicitConfirmation([
+      `action kind: ${request.action.kind}`,
+      `candidate commit: ${request.candidate.commit}`,
+      `candidate tree: ${request.candidate.tree}`,
+      `action subject sha256: ${request.action.subjectSha256} (the exact destination/subject this approval is bound to)`,
+      `action expires at: ${request.action.expiresAt}`,
+      `feature id: ${featureId}`,
+      `approval intent sha256: ${intentSha256}`,
+      "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
+    ], dependencies);
+    write(paths.intent, intentSha256, { mode: 0o600 });
+    try { command("openssl", ["pkeyutl", "-sign", "-rawin", "-inkey", paths.privateKey, "-in", paths.intent, "-out", paths.signature], dependencies); }
+    finally { rmSync(paths.intent, { force: true }); }
+    try {
+      const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
+      if (!ownTrustPolicy(authority) || !text(authority.keyReference) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
+      const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: authority.keyReference, publicKey, signatureBase64: Buffer.from(read(paths.signature)).toString("base64") };
+      write(paths.proof, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
+    } finally { rmSync(paths.signature, { force: true }); }
+    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256 };
+  }
   if (args.command === "prepare" || args.command === "prepare-critical") {
     if (critical) {
-      if (!text(args.plan) || !text(args.spec) || !SHA.test(args.subjectSha256 ?? "")
-        || !text(args.expiresAt) || !Number.isFinite(Date.parse(args.expiresAt)) || new Date(args.expiresAt).toISOString() !== args.expiresAt) {
-        fail("critical approval request is invalid");
-      }
-      const request = createCriticalActionApprovalRequest({
-        candidate: (dependencies.observeCandidate ?? observeCleanCandidate)(repository),
-        featureId,
-        planBytes: readPublicRepositoryFile(repository, args.plan),
-        specBytes: readPublicRepositoryFile(repository, args.spec),
-        action: { kind: args.kind, subjectSha256: args.subjectSha256, expiresAt: args.expiresAt },
-      });
+      const request = criticalApprovalRequest({ args, repository, featureId, dependencies });
       write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
       return { ok: true, code: "PO-HUMAN-CRITICAL-REQUEST-READY", candidate: request.candidate, intentSha256: request.approvalIntent.sha256, action: request.action };
     }

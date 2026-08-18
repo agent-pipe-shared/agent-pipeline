@@ -44,7 +44,7 @@ import test from "node:test";
 import { parseHumanArgs, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
-import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
+import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest, verifyCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
 import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "../lib/governance-event.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
@@ -738,5 +738,194 @@ test("parseHumanArgs still refuses --kind governance-fork-disposition on the -cr
       "--kind", "governance-fork-disposition", "--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE,
     ]);
     assert.match(parsed.error ?? "", /Usage:/u, `${command} --kind governance-fork-disposition must still be refused`);
+  }
+});
+
+/* ------------------------------------------------------------------------- *
+ * PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL — porting origin/main's ADR-0061
+ * single-command critical-action ceremony (`authorize-critical`), replacing
+ * the two-step `prepare-critical`/`approve-critical` split for the human's
+ * own act. The central proof, mirrored from origin/main's own regression
+ * suite: a request left on disk by an earlier, DIFFERENT preparation (the
+ * "stale request" failure mode that motivated ADR-0061 -- a failed
+ * `prepare-critical` leaving a stale request that `approve-critical` then
+ * silently signs) can never be the thing `authorize-critical` signs, because
+ * it always writes and binds to the request it just built in the same call.
+ * ------------------------------------------------------------------------- */
+
+function criticalRequestArgs(dirs, { kind = "push", subjectSha256 = "a".repeat(64), expiresAt = FAR_FUTURE } = {}) {
+  return [
+    "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+    "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+    "--kind", kind, "--subject-sha256", subjectSha256, "--expires-at", expiresAt,
+  ];
+}
+
+test("authorize-critical fails closed before setup and prepares nothing when key material is absent", () => {
+  const dirs = fixtureDirs();
+  try {
+    writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+    writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+    assert.throws(
+      () => runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs)], {}),
+      /run setup before authorize-critical/u,
+    );
+    assert.equal(existsSync(join(dirs.directory, "request-critical-push.json")), false, "no request may be written before key material is confirmed present");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical requires a feature id, exactly as prepare-critical does", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    assert.throws(
+      () => runHumanApproval([
+        "authorize-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+        "--plan", "plan.md", "--spec", "spec.md",
+        "--kind", "push", "--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE,
+      ], {}),
+      /critical approval requires a feature id/u,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical prepares and signs in ONE invocation, and the resulting proof verifies against the request built in that same invocation", () => {
+  const dirs = fixtureDirs();
+  try {
+    writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+    writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+    const { authority } = keyFixture(dirs.directory);
+    const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
+    const subjectSha256 = "a".repeat(64);
+    const confirmations = [];
+    const dependencies = {
+      observeCandidate: () => observed,
+      readConfirmation: (prompt) => { confirmations.push(prompt); return "approve"; },
+    };
+    const result = runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { subjectSha256 })], dependencies);
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
+    assert.deepEqual(result.candidate, observed);
+    assert.equal(result.action.kind, "push");
+    assert.equal(result.action.subjectSha256, subjectSha256);
+
+    assert.equal(confirmations.length, 1, "authorize-critical must ask for exactly one explicit confirmation before signing");
+    assert.match(confirmations[0], new RegExp(subjectSha256, "u"), "the confirmation must state the exact subject being authorized");
+    assert.match(confirmations[0], /does NOT cover/u, "the confirmation must state the approval's bounds (ADR-0061 Decision 4)");
+
+    const request = JSON.parse(readFileSync(join(dirs.directory, "request-critical-push.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-critical-push.json"), "utf8"));
+    assert.equal(proof.keyReference, authority.keyReference);
+    const verified = verifyCriticalActionApprovalRequest({
+      request, trustPolicy: authority, proof, expectedCandidate: observed, expectedAction: request.action,
+    });
+    assert.equal(verified.verified, true, "the proof produced by authorize-critical must verify against the request it built in the same call");
+
+    // Temp signing artifacts are cleaned up; only the durable request/proof remain.
+    assert.equal(existsSync(join(dirs.directory, "intent-critical-push.txt")), false);
+    assert.equal(existsSync(join(dirs.directory, "signature-critical-push.bin")), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical never signs a stale request left in the external directory: it overwrites it with the request it just built and signs THAT one (the failure mode ADR-0061 removes)", () => {
+  const dirs = fixtureDirs();
+  try {
+    writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+    writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+    const { authority } = keyFixture(dirs.directory);
+    const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
+
+    // Simulate exactly the failure mode ADR-0061's backlog item describes: an
+    // EARLIER, unrelated preparation (a different subject/expiry -- as if for a
+    // different push) left a stale request sitting at the fixed artifact path.
+    const staleSubjectSha256 = "b".repeat(64);
+    const staleRequest = runHumanApproval([
+      "prepare-critical", ...criticalRequestArgs(dirs, { subjectSha256: staleSubjectSha256, expiresAt: "2030-01-01T00:00:00.000Z" }),
+    ], { observeCandidate: () => observed });
+    assert.equal(readFileSync(join(dirs.directory, "request-critical-push.json"), "utf8").includes(staleSubjectSha256), true, "the stale request must actually be on disk before authorize-critical runs");
+
+    // Now authorize-critical runs for the REAL, current subject. It must bind
+    // to and sign ONLY the request it builds in this call -- never the stale
+    // one already sitting at the same path.
+    const currentSubjectSha256 = "c".repeat(64);
+    const confirmations = [];
+    const result = runHumanApproval([
+      "authorize-critical", ...criticalRequestArgs(dirs, { subjectSha256: currentSubjectSha256 }),
+    ], {
+      observeCandidate: () => observed,
+      readConfirmation: (prompt) => { confirmations.push(prompt); return "approve"; },
+    });
+    assert.equal(result.action.subjectSha256, currentSubjectSha256, "the signed action must be the current call's subject, never the stale one");
+    assert.match(confirmations[0], new RegExp(currentSubjectSha256, "u"), "the human must be shown the CURRENT subject, not the stale one");
+    assert.doesNotMatch(confirmations[0], new RegExp(staleSubjectSha256, "u"), "the stale subject must never appear in what the human is asked to confirm");
+
+    const request = JSON.parse(readFileSync(join(dirs.directory, "request-critical-push.json"), "utf8"));
+    assert.equal(request.action.subjectSha256, currentSubjectSha256, "the request file on disk must have been overwritten with the current call's request");
+    assert.notEqual(request.approvalIntent.sha256, staleRequest.intentSha256, "the signed intent digest must differ from the stale request's own digest");
+
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-critical-push.json"), "utf8"));
+    const verifiedCurrent = verifyCriticalActionApprovalRequest({
+      request, trustPolicy: authority, proof, expectedCandidate: observed, expectedAction: request.action,
+    });
+    assert.equal(verifiedCurrent.verified, true, "the proof must verify against the CURRENT request");
+
+    // The decisive negative check: the proof must NOT verify against the stale
+    // subject -- if it did, authorize-critical would have reproduced exactly
+    // the bug ADR-0061 exists to remove (a stale request silently signed).
+    const staleAction = { ...request.action, subjectSha256: staleSubjectSha256 };
+    const verifiedStale = verifyCriticalActionApprovalRequest({
+      request: { ...request, action: staleAction }, trustPolicy: authority, proof, expectedCandidate: observed, expectedAction: staleAction,
+    });
+    assert.equal(verifiedStale.verified, false, "the proof must not verify against the stale request's subject");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof", () => {
+  const dirs = fixtureDirs();
+  try {
+    writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+    writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+    keyFixture(dirs.directory);
+    let spawnCalled = false;
+    const dependencies = {
+      observeCandidate: () => ({ commit: "d".repeat(40), tree: "e".repeat(40) }),
+      readConfirmation: () => "nope",
+      spawn: () => { spawnCalled = true; return { status: 0 }; },
+    };
+    assert.throws(
+      () => runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs)], dependencies),
+      /approval cancelled: explicit confirmation was not given/,
+    );
+    assert.equal(spawnCalled, false, "OpenSSL must never be invoked once confirmation is cancelled");
+    assert.equal(existsSync(join(dirs.directory, "proof-critical-push.json")), false);
+    assert.equal(existsSync(join(dirs.directory, "intent-critical-push.txt")), false);
+    // The request itself IS written before the prompt (it must exist for the
+    // confirmation to describe it), but no signature/proof follows a refusal.
+    assert.equal(existsSync(join(dirs.directory, "request-critical-push.json")), true);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal", () => {
+  const dirs = fixtureDirs();
+  try {
+    writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+    writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+    assert.throws(
+      () => runApprovalGate(["authorize-critical", ...criticalRequestArgs(dirs)], {}),
+      /Usage:/u,
+    );
+    assert.equal(existsSync(join(dirs.directory, "request-critical-push.json")), false, "the public control plane must not be able to reach authorize-critical at all");
+  } finally {
+    cleanup(dirs);
   }
 });

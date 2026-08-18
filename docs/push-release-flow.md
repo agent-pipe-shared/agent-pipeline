@@ -10,9 +10,17 @@
 This repo's own `pipeline.user.yaml` sets `gates.push_approval: signature`
 ([ADR-0056](adr/0056-push-approval-mode.md)) — the strictest of the two
 supported modes. Everything below describes that mode. A repo configured for
-`chat` mode skips layers 2-3 entirely: `pipeline-state.mjs approve-push`
+`chat` mode skips layers 2+3 entirely: `pipeline-state.mjs approve-push`
 takes only `--by --remote --destination`, no proof files, and the human
 clears it by typing a confirmation in-session rather than signing anything.
+
+**2026-08-18 update (PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL):** layers 2 and 3
+below are now collapsed into `authorize-critical`, and layer 5's `OVERRIDE
+GG-03` ritual is unaffected by this port (that layer's own design question is
+still tracked in
+`backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`
+candidates #2-#4 and this port's own forbidden-scope note) — see
+[ADR-0064](adr/0064-port-authorize-critical-ceremony.md).
 
 ## The five layers, in order
 
@@ -55,44 +63,53 @@ lasts one context window; one bound to a commit does not expire. What it buys is
 that nobody can *skip* the question — it cannot establish that the answer was
 given carefully.
 
-### Layer 2 — prepare the request (agent-eligible by design, guard-blocked in practice)
+### Layers 2+3 — prepare and sign the request, in one command (human-only; ADR-0061 port)
+
+> **PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL (2026-08-18):** the old two-step
+> `prepare-critical`/`approve-critical` split described below this note used to
+> be the only path. It had a demonstrated failure mode — a failed
+> `prepare-critical` left a stale request on disk that a later, decoupled
+> `approve-critical` then silently signed, because the two commands never bound
+> to the same in-memory request. `authorize-critical` (ported from
+> origin/main's [ADR-0061](adr/0061-uniform-human-approval-ceremony.md); this
+> repo's own port is recorded in
+> [ADR-0064](adr/0064-port-authorize-critical-ceremony.md)) closes that gap by
+> construction: it builds the request and signs *that exact object* inside one
+> invocation, so nothing already sitting on disk can ever be the thing that
+> gets signed. `prepare-critical`/`approve-critical` still exist in
+> `po-human-approval.mjs` for scripted/two-step use, but this is now the
+> command a session should hand the PO for push/deploy/publication approval.
 
 ```
-node plugins/pipeline-core/scripts/po-approval-gate.mjs prepare-critical \
+node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical \
   --repo-root <repo> --directory <external-po-dir> \
   --feature-id <featureId> \
   --plan <repo-relative-PRD-path> --spec <repo-relative-spec-path> \
   --kind push --subject-sha256 <hash> --expires-at <ISO-8601>
 ```
 
-The script's own docstring frames this as the "public control-plane half" —
-agent work, since it only writes a public candidate-bound request file
-(`request-critical-<kind>.json`) and cannot access a private key. **In
-practice this is agent-blocked anyway**: `<external-po-dir>` is, by design,
-outside the project root (it holds the private key and must never be
-committed), so `guard-lifecycle-ready.mjs`'s cross-repository-mutation check
-refuses the write (`GUARD-CROSS-REPO-MUTATION`) regardless of the script's
-own intent. Until that gap is resolved
-(`backlog/items/2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md`
-is the adjacent, not identical, filed gap — this exact one is not yet filed
-separately as of this writing), **the PO runs this step**, using the exact
-command the agent constructs and hands over — never freehand.
+This is **one PO-run command, not two.** Unlike the old `prepare-critical`
+step, `authorize-critical` is not agent-eligible even in design intent — it
+reads the private key and prompts for the passphrase, so it belongs on the
+approving human's terminal from the start (`po-approval-gate.mjs`, the
+agent-facing control plane, deliberately cannot reach it at all — same as
+`setup`/`approve`/`approve-critical`/`sign-intent`). The agent still
+constructs the exact command and computes `--subject-sha256`; the PO copies
+it, types `approve` at the confirmation prompt (which states the action kind,
+candidate commit/tree, subject digest, feature id and expiry, and explicitly
+what the approval does *not* cover, before asking for the passphrase — ADR-0061
+Decision 4), and enters the OpenSSL passphrase. That is the entire human part.
 
-**Two refusals this step makes with a message that names neither the field nor
-the rule. Both cost a failed attempt on 2026-08-09.**
+**`--repo-root` must be a checkout that is clean including untracked files**
+(`observeCleanCandidate`). In this repository the main checkout can never
+satisfy that: `.claude/settings.json`, `project/pipeline-state.json` and
+`project/resume-hint.json` are tracked and permanently modified. Point
+`--repo-root` at the detached verify worktree instead, after moving it to the
+candidate — that is what it exists for.
 
-1. `--expires-at` is validated by `new Date(x).toISOString() === x`, which
-   always produces milliseconds. `2026-08-16T00:00:00Z` is rejected;
-   `2026-08-16T00:00:00.000Z` is accepted. The output is only
-   `PO-APPROVAL-GATE-FAILED: critical approval request is invalid`, which covers
-   five conditions at once.
-2. `--repo-root` must be a checkout that is clean **including untracked files**
-   (`observeCleanCandidate`). In this repository the main checkout can never
-   satisfy that: `.claude/settings.json`, `project/pipeline-state.json` and
-   `project/resume-hint.json` are tracked and permanently modified. Point
-   `--repo-root` at the detached verify worktree instead, after moving it to the
-   candidate — that is what it exists for. The same applies to layer 3, which
-   observes the candidate a second time.
+**`--expires-at` is normalized, not rejected**, as long as `Date.parse` accepts
+it — pass any parseable ISO-8601 timestamp; the command canonicalizes it to the
+exact round-trip form before computing the digest.
 
 Computing `--subject-sha256` correctly matters: it is
 `criticalActionSubjectSha256({kind, candidate:{commit,tree}, subject})` from
@@ -106,19 +123,6 @@ binding. Compute it by **importing the real function** in a throwaway script
 (`scratch/`, gitignored) — never hand-roll the hash. A wrong hash fails
 closed at verification, it does not silently accept.
 
-### Layer 3 — sign it (human-only, by design — no override exists or should exist)
-
-```
-node plugins/pipeline-core/scripts/po-human-approval.mjs approve-critical \
-  --repo-root <repo> --directory <external-po-dir> --kind push
-```
-
-Reads the private key from `<external-po-dir>` (passphrase-protected,
-`openssl genpkey -algorithm ED25519 -aes-256-cbc`), signs the request, writes
-`proof-critical-<kind>.json`. This step is intentionally human-only in the
-script's own docstring — do not look for a way around it; there is not
-supposed to be one.
-
 **Finding the right external directory:** more than one candidate directory
 may exist on a machine (e.g. one per repo this Pipeline governs). Verify by
 comparing that directory's `po-public.pem` SHA-256 against this repo's own
@@ -126,6 +130,35 @@ committed `project/critical-human-proof.json` → `trustAnchor.publicKeySha256`
 — **never** by filesystem timestamps or guessing from directory naming. A
 mismatch fails closed with `CRITICAL-PROOF-TRUST-ANCHOR-MISMATCH`; treat that
 error as the check, not a surprise.
+
+<details>
+<summary>Superseded — the old two-step form (kept for reference; still callable, no longer the recommended path)</summary>
+
+`prepare-critical` (agent-eligible by design, guard-blocked in practice —
+`<external-po-dir>` sits outside the project root, so
+`guard-lifecycle-ready.mjs`'s cross-repository-mutation check refuses the
+write regardless of the script's own intent) wrote a public,
+candidate-bound `request-critical-<kind>.json`; `approve-critical` then
+separately read *whatever* file was sitting at that path and signed it. The
+two commands never shared state beyond the filesystem, which is exactly what
+made the stale-request failure mode possible: a failed `prepare-critical` left
+the previous run's request on disk, and `approve-critical` signed it without
+noticing the subject had changed. `authorize-critical` above replaces this for
+ordinary use; the two-step form remains for any caller that genuinely needs
+prepare and sign as separate steps (e.g. scripted preparation with signing
+deferred to later).
+
+```
+node plugins/pipeline-core/scripts/po-approval-gate.mjs prepare-critical \
+  --repo-root <repo> --directory <external-po-dir> \
+  --feature-id <featureId> \
+  --plan <repo-relative-PRD-path> --spec <repo-relative-spec-path> \
+  --kind push --subject-sha256 <hash> --expires-at <ISO-8601>
+node plugins/pipeline-core/scripts/po-human-approval.mjs approve-critical \
+  --repo-root <repo> --directory <external-po-dir> --kind push
+```
+
+</details>
 
 ### Layer 4 — consume the proof into pipeline state (agent work)
 
@@ -202,14 +235,14 @@ because it structurally isn't one.
 |---|---|---|
 | 1 | Policy already set in `pipeline.user.yaml` | n/a (config, not a per-push action) |
 | 1b | `check-doc-reconciliation.mjs --base … --candidate …` | Agent |
-| 2 | `prepare-critical` | Agent-eligible by design; **PO in practice** (guard-blocked) |
-| 3 | `approve-critical` | **PO only** (private key, by design) |
+| 2+3 | `authorize-critical` (prepare + sign, one invocation) | **PO only** — one command, `approve`, passphrase. The agent constructs the command and computes `--subject-sha256`. |
 | 4 | `pipeline-state.mjs approve-push` | Agent |
 | 5a | `git push` (non-main, proof valid) | Agent, subject to the harness classifier |
 | 5b | `git push` to `main`/protected (GG-03) | Agent, after PO's literal `OVERRIDE GG-03`, subject to the harness classifier |
 | 6 | `gh release create` (tag + release) | Agent |
 
-Layers 3 and the harness classifier's block are the two points in this flow
-that are not resolvable by the agent under any configuration — everything
-else above them is either config (layer 1) or, per the open finding this
-document is a partial remediation for, a candidate for narrowing.
+Layer 2+3's signature and the harness classifier's block are the two points in
+this flow that are not resolvable by the agent under any configuration —
+everything else above them is either config (layer 1) or, per the open
+finding this document is a partial remediation for, a candidate for
+narrowing.

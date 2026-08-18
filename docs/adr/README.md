@@ -75,6 +75,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0061](0061-local-supervisor-state-authority.md) | Local supervisor state authority (renumbered from the 0047 numbering collision) | accepted | 2026-07-25 |
 | [0062](0062-governance-event-kernel.md) | Governance event kernel uses separate immutable stream records (Phoenix PHX-1; renumbered from the 0047 numbering collision) | accepted | 2026-08-02 |
 | [0063](0063-fork-disposition-approval-proof.md) | Fork disposition requires a PO approval proof, reusing push's signature/chat mode and `po-approval-proof.mjs` rather than a disposition-specific mechanism | accepted | 2026-08-10 |
+| [0064](0064-port-authorize-critical-ceremony.md) | Port origin/main's `authorize-critical` single-command ceremony (ADR-0061) into Phoenix | accepted | 2026-08-18 |
 
 ### Resubmissions
 
