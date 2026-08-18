@@ -25,6 +25,15 @@ import { isDirectInvocation } from "../lib/entrypoint.mjs";
 
 const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication> --subject-sha256 <sha256> --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication> | prepare-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> --expires-at <ISO-8601> | approve-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | verify-fork-disposition --repo-root <repo> --directory <external-dir> --repository-fingerprint <sha256> --stream-id <id> --sequence <n> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256>";
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+/**
+ * `trustPolicy`/`authority` specifically may also carry `humanName` — the
+ * SETUP-1 human-readable label some operators' external `trust-policy.json`
+ * already carries (mirrors `po-approval-proof.mjs`'s `ownTrustPolicy`). It is
+ * never part of what is cryptographically checked here, so its presence must
+ * not fail-close a genuinely valid trust policy; any OTHER unrecognised extra
+ * key still must.
+ */
+const ownTrustPolicy = (value) => own(value, ["keyReference", "publicKeySha256"]) || own(value, ["keyReference", "publicKeySha256", "humanName"]);
 const SHA = /^[a-f0-9]{64}$/u;
 const text = (value) => typeof value === "string" && value.trim() !== "";
 
@@ -101,8 +110,15 @@ const FORK_DISPOSITION_COMMANDS = new Set(["prepare-fork-disposition", "approve-
  *
  * A literal, not a filter over the shared family: a fifth kind must be an
  * explicit decision here too, not an automatic membership.
+ *
+ * `"feature-package-reconcile"` was added 2026-08-18 (PHX-WP-POHUMAN-SIGNING-ERGO):
+ * it is a first-class `CRITICAL_ACTION_KINDS` member with no security concern
+ * analogous to `governance-fork-disposition`'s — it binds a real git candidate
+ * and repository plan/spec bytes exactly like `push`/`deploy`/`publication` do,
+ * so admitting it here closes the manual-copy workaround without reopening the
+ * hole this comment describes.
  */
-const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication"]);
+const CRITICAL_COMMAND_KINDS = Object.freeze(["push", "deploy", "publication", "feature-package-reconcile"]);
 const SEQUENCE = /^[1-9][0-9]{0,14}$/u;
 const isoTimestamp = (value) => text(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 
@@ -247,7 +263,7 @@ function executeHumanApproval(args, dependencies = {}) {
     }
     if (present.privateKey && present.publicKey && present.authority) {
       const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
-      if (!own(authority, ["keyReference", "publicKeySha256"]) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("existing trust policy does not match the local public key");
+      if (!ownTrustPolicy(authority) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("existing trust policy does not match the local public key");
       return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false };
     }
     if (present.privateKey || present.publicKey || present.authority) fail("partial PO authority exists; refusing to overwrite it");
@@ -302,7 +318,7 @@ function executeHumanApproval(args, dependencies = {}) {
     finally { rmSync(manual.intent, { force: true }); }
     try {
       const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
-      if (!own(authority, ["keyReference", "publicKeySha256"]) || !text(authority.keyReference) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
+      if (!ownTrustPolicy(authority) || !text(authority.keyReference) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
       const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: authority.keyReference, publicKey, signatureBase64: Buffer.from(read(manual.signature)).toString("base64") };
       write(manual.proof, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
     } finally { rmSync(manual.signature, { force: true }); }
@@ -315,7 +331,7 @@ function executeHumanApproval(args, dependencies = {}) {
   if (args.command === "approve" || args.command === "approve-critical") {
     if (!exists(paths.privateKey)) fail("private key is unavailable");
     const kind = critical ? request?.action?.kind : request?.approvalIntent?.value?.kind;
-    const summary = [`kind: ${kind}`, `candidate commit: ${request?.candidate?.commit}`];
+    const summary = [`kind: ${kind}`, `intent sha256: ${intentSha256}`, `candidate commit: ${request?.candidate?.commit}`];
     if (critical) {
       summary.push(`action subject sha256: ${request?.action?.subjectSha256}`);
       summary.push(`action expires at: ${request?.action?.expiresAt}`);
@@ -326,7 +342,7 @@ function executeHumanApproval(args, dependencies = {}) {
     finally { rmSync(paths.intent, { force: true }); }
     try {
       const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
-      if (!own(authority, ["keyReference", "publicKeySha256"]) || !text(authority.keyReference) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
+      if (!ownTrustPolicy(authority) || !text(authority.keyReference) || authority.publicKeySha256 !== publicKeyPolicy(publicKey, authority.keyReference).publicKeySha256) fail("external trust policy does not match the local public key");
       const proof = { schema: "pipeline.po-approval-proof.v1", intentSha256, keyReference: authority.keyReference, publicKey, signatureBase64: Buffer.from(read(paths.signature)).toString("base64") };
       write(paths.proof, `${JSON.stringify(proof, null, 2)}\n`, { mode: 0o600 });
     } finally { rmSync(paths.signature, { force: true }); }

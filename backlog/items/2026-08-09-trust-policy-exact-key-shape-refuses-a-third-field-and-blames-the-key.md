@@ -99,3 +99,21 @@ part of the defect.
 - **Rationale:** Phoenix's po-human-approval.mjs still has the exact-key-shape own() check unchanged. Nova solved the underlying problem architecturally: a named third field (humanName) is now first-class in the shape check with dedicated humanNameMismatch/keyReferenceMismatch diagnostics (po-human-approval.mjs:770,875,898-900). Per PO direction (2026-08-18), closed here rather than ported — Nova's fix is the forward path for this specific tooling.
 - **Assignment (if accepted):** n/a — disposed without further work
 - **Date:** 2026-08-18
+
+**REOPENED same day (2026-08-18):** the "just close, don't port" call above
+was wrong for this specific item. This is not general pipeline hardening —
+it is the exact command family (`sign-intent`/`approve`/`approve-critical`)
+this session's own pending push-approval and `feature-package-reconcile`
+ceremonies will invoke, against the PO's actual external `trust-policy.json`
+(already 3-key, `humanName` present per prior sessions' own documented
+workaround in docs/state.md's "Reconcile ceremony" notes). Leaving it
+"closed as superseded" would mean the PO hits this exact failure again on
+their next signing ceremony. Reopening and fixing directly with the
+already-proven `ownTrustPolicy()` pattern (same fix already applied and
+tested in `po-approval-proof.mjs` and `authority-revision-proof.mjs` this
+session) rather than porting Nova's fuller diagnostic-message redesign —
+narrower, lower-risk, sufficient to unblock the PO.
+- **Status:** reopened, dispatched as PHX-WP-POHUMAN-SIGNING-ERGO same day.
+- **Assignment:** this dispatch (PHX-WP-POHUMAN-SIGNING-ERGO) — `ownTrustPolicy()` added to `po-human-approval.mjs` (2-key legacy OR 3-key with `humanName`), swapped into all 3 local `own(authority, ...)` call sites (`setup`, `sign-intent`, `approve`/`approve-critical`).
+- **Date:** 2026-08-18
+- **Closure commit:** this commit (the fix and this closure land in the same commit; the SHA is only assigned once the commit is created and is therefore not self-referenceable in advance — see this dispatch's commit for `plugins/pipeline-core/scripts/po-human-approval.mjs` fix 1).

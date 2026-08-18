@@ -41,7 +41,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
+import { parseHumanArgs, runForkDispositionApproval, runHumanApproval } from "./po-human-approval.mjs";
 import { run as runApprovalGate } from "./po-approval-gate.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA, verifyPoApprovalProof } from "../lib/po-approval-proof.mjs";
 import { CRITICAL_ACTION_KINDS, createCriticalActionApprovalRequest } from "../lib/critical-action-approval-request.mjs";
@@ -547,8 +547,11 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
 
     // Whatever the shared family grows next has to be an explicit decision for
     // these three commands too, not automatic membership — which is exactly how
-    // the fourth kind arrived here unnoticed.
-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication"].includes(entry))) {
+    // the fourth kind arrived here unnoticed. `feature-package-reconcile` was
+    // added to CRITICAL_COMMAND_KINDS deliberately (PHX-WP-POHUMAN-SIGNING-ERGO
+    // fix 2, 2026-08-18) and is exercised by its own positive-path test below,
+    // so it is excluded from this negative loop.
+    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile"].includes(entry))) {
       assert.throws(() => runHumanApproval([
         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
@@ -608,5 +611,132 @@ test("sign-intent cancels on an empty confirmation answer the same way as a mism
     assert.equal(spawnCalled, false);
   } finally {
     cleanup(dirs);
+  }
+});
+
+/* ------------------------------------------------------------------------- *
+ * PHX-WP-POHUMAN-SIGNING-ERGO fix 1 — the 3-key trustPolicy/authority shape
+ * (`{keyReference, publicKeySha256, humanName}`) must pass all three local
+ * `own()`-gated call sites (`setup`'s already-exists branch, `sign-intent`,
+ * `approve`/`approve-critical`), mirroring `po-approval-proof.mjs`'s already-
+ * fixed and tested `ownTrustPolicy()` pattern.
+ * ------------------------------------------------------------------------- */
+
+test("setup's already-exists branch accepts a 3-key trust policy carrying humanName", () => {
+  const dirs = fixtureDirs();
+  try {
+    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn });
+    const authorityPath = join(dirs.directory, "trust-policy.json");
+    const authority = JSON.parse(readFileSync(authorityPath, "utf8"));
+    writeFileSync(authorityPath, `${JSON.stringify({ ...authority, humanName: "Nova the PO" }, null, 2)}\n`);
+    const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn });
+    assert.equal(result.ok, true);
+    assert.equal(result.recovered, false);
+    assert.equal(result.authority.humanName, "Nova the PO");
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("setup's already-exists branch still fails closed on an unrelated extra field (not humanName)", () => {
+  const dirs = fixtureDirs();
+  try {
+    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn });
+    const authorityPath = join(dirs.directory, "trust-policy.json");
+    const authority = JSON.parse(readFileSync(authorityPath, "utf8"));
+    writeFileSync(authorityPath, `${JSON.stringify({ ...authority, unexpectedField: "x" }, null, 2)}\n`);
+    assert.throws(
+      () => runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn }),
+      /existing trust policy does not match the local public key/,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("sign-intent accepts a 3-key trust policy carrying humanName", () => {
+  const dirs = fixtureDirs();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    writeFileSync(join(dirs.directory, "trust-policy.json"), `${JSON.stringify({ ...authority, humanName: "Nova the PO" }, null, 2)}\n`);
+    const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-humanname-fixture").digest("hex");
+    const result = runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], { readConfirmation: () => "approve" });
+    assert.equal(result.ok, true);
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    assert.equal(proof.keyReference, authority.keyReference);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("sign-intent still fails closed on an unrelated extra field (not humanName)", () => {
+  const dirs = fixtureDirs();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    writeFileSync(join(dirs.directory, "trust-policy.json"), `${JSON.stringify({ ...authority, unexpectedField: "x" }, null, 2)}\n`);
+    const intentSha256 = createHash("sha256").update("pipeline.guard-lift-intent-badfield-fixture").digest("hex");
+    assert.throws(
+      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", intentSha256], { readConfirmation: () => "approve" }),
+      /external trust policy does not match the local public key/,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("approve-critical accepts a 3-key trust policy carrying humanName and the confirmation summary names the intent digest (fix 3)", () => {
+  const dirs = fixtureDirs();
+  try {
+    writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+    writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+    const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
+    const subjectSha256 = "a".repeat(64);
+    const prepared = runHumanApproval([
+      "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
+      "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+      "--kind", "push", "--subject-sha256", subjectSha256, "--expires-at", FAR_FUTURE,
+    ], { observeCandidate: () => observed });
+    const { authority } = keyFixture(dirs.directory);
+    writeFileSync(join(dirs.directory, "trust-policy.json"), `${JSON.stringify({ ...authority, humanName: "Nova the PO" }, null, 2)}\n`);
+    const confirmations = [];
+    const result = runHumanApproval([
+      "approve-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--kind", "push",
+    ], { readConfirmation: (prompt) => { confirmations.push(prompt); return "approve"; } });
+    assert.equal(result.ok, true);
+    assert.equal(confirmations.length, 1);
+    assert.match(confirmations[0], new RegExp(`intent sha256: ${prepared.intentSha256}`, "u"), "the confirmation must name the intent digest actually signed");
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-critical-push.json"), "utf8"));
+    assert.equal(proof.keyReference, authority.keyReference);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+/* ------------------------------------------------------------------------- *
+ * PHX-WP-POHUMAN-SIGNING-ERGO fix 2 — `feature-package-reconcile` is now an
+ * accepted `--kind` for the `-critical` trio at the parser level;
+ * `governance-fork-disposition` stays refused (regression guard).
+ * ------------------------------------------------------------------------- */
+
+test("parseHumanArgs accepts --kind feature-package-reconcile on the -critical commands", () => {
+  for (const command of ["prepare-critical", "approve-critical", "verify-critical"]) {
+    const parsed = parseHumanArgs([
+      command, "--repo-root", "/repo", "--directory", "/external",
+      "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+      "--kind", "feature-package-reconcile", "--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE,
+    ]);
+    assert.equal(parsed.error, undefined, `${command} --kind feature-package-reconcile must pass the parser gate`);
+    assert.equal(parsed.kind, "feature-package-reconcile");
+  }
+});
+
+test("parseHumanArgs still refuses --kind governance-fork-disposition on the -critical commands (regression guard)", () => {
+  for (const command of ["prepare-critical", "approve-critical", "verify-critical"]) {
+    const parsed = parseHumanArgs([
+      command, "--repo-root", "/repo", "--directory", "/external",
+      "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
+      "--kind", "governance-fork-disposition", "--subject-sha256", "a".repeat(64), "--expires-at", FAR_FUTURE,
+    ]);
+    assert.match(parsed.error ?? "", /Usage:/u, `${command} --kind governance-fork-disposition must still be refused`);
   }
 });

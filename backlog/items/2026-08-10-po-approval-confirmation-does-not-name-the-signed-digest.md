@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-approval-confirmation-missing-intent-digest
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
 source: "Found on 2026-08-10 by the K-AC-05 round-4 (final) Critic review of the fork-disposition approval mechanism (commit 4673ff8a under review), while checking whether a tampered approvalIntent could still reach signing after that round's F2 fix. The Critic scoped it explicitly as a pre-existing defect in the shared signing ceremony, outside the reviewed delta's three changed files, and recommended routing it as its own work package rather than folding it into K-AC-05's exhausted Critic cap. Verified independently by the Elephant against source before filing."
 due: 2026-09-09
@@ -72,3 +72,11 @@ fork-disposition ones.
 - `docs/adr/0063-fork-disposition-approval-proof.md` — the track whose round-4 Critic review found this.
 - `docs/po-human-approval.md` — the human-facing operating doc for this ceremony; would need updating
   alongside any fix.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Accept and fix.
+- **Rationale:** Added `` `intent sha256: ${intentSha256}` `` to the `approve`/`approve-critical` (and by delegation `approve-fork-disposition`) confirmation `summary` array in `plugins/pipeline-core/scripts/po-human-approval.mjs`, placed right after the `kind:` line, matching the sibling `sign-intent` command's existing digest-naming style. Verified with a test asserting the confirmation prompt matches the intent digest actually signed.
+- **Assignment:** this dispatch (PHX-WP-POHUMAN-SIGNING-ERGO)
+- **Date:** 2026-08-18
+- **Closure commit:** this commit (fix and closure land together; see this dispatch's commit for the `approve`/`approve-critical` summary array).

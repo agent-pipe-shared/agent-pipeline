@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critical-command-kinds-excludes-feature-package-reconcile
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
 source: "Found 2026-08-16 while building the PO's feature-package-reconcile signing request for the Phoenix P-AC-11/FTP-ARTIFACT-2 ceremony -- the PO had to manually cp a request file the Elephant built out to the external signing directory, and asked why."
 due: 2026-09-15
@@ -62,7 +62,8 @@ surface that should recognize it.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accept and fix.
+- **Rationale:** `"feature-package-reconcile"` added as a literal to `CRITICAL_COMMAND_KINDS` (`plugins/pipeline-core/scripts/po-human-approval.mjs`) — the deliberate hand-maintained array grows to `["push", "deploy", "publication", "feature-package-reconcile"]`, `"governance-fork-disposition"` stays excluded (unrelated security concern, untouched). `prepare-critical`/`approve-critical`/`verify-critical` now accept the kind at the parser gate exactly as they do for the three original kinds; verified with a parser-level test (`parseHumanArgs accepts --kind feature-package-reconcile on the -critical commands`) and a regression guard that `governance-fork-disposition` still fails.
+- **Assignment:** this dispatch (PHX-WP-POHUMAN-SIGNING-ERGO)
+- **Date:** 2026-08-18
+- **Closure commit:** this commit (fix and closure land together; see this dispatch's commit for `CRITICAL_COMMAND_KINDS`).
