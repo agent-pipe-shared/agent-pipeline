@@ -37,6 +37,7 @@ import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs"
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { authorizeCriticalPushCommand, parseHumanArgs } from "./po-human-approval.mjs";
 import { projectDir, readState, run as pipelineStateRun } from "./pipeline-state.mjs";
+import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 
 export const USAGE = "Usage: push-prepare.mjs --by <name> --remote <remote> --destination refs/heads/<branch>";
 const REMOTE_RE = /^[A-Za-z0-9._-]{1,80}$/u;
@@ -304,7 +305,7 @@ export function pushPrepareReport(argv, deps = {}) {
   const checks = [];
   checks.push(checkWorkingTreeClean(dir, deps));
   if (headCommit) {
-    checks.push(checkEvidenceFreshness("verify-evidence", "evidence/verify-latest.json", dir, headCommit, deps));
+    checks.push(checkEvidenceFreshness("verify-evidence", VERIFY_EVIDENCE_DEFAULT_PATH, dir, headCommit, deps));
     checks.push(checkEvidenceFreshness("security-evidence", "evidence/security-latest.json", dir, headCommit, deps));
   } else {
     const message = "HEAD commit could not be determined (git rev-parse HEAD failed).";

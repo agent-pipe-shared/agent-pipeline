@@ -40,6 +40,7 @@ import {
   resolveVerifyRemedy,
   segmentsForNodeCommand,
 } from "./push-prepare.mjs";
+import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SCRATCH = join(REPO_ROOT, "scratch");
@@ -358,6 +359,23 @@ test("pushPrepareReport: one unmet precondition -> ready:false, no command lines
   const failing = result.report.checks.find((check) => check.id === "working-tree-clean");
   assert.equal(failing.ok, false);
   assert.ok(failing.remedy);
+});
+
+test("pushPrepareReport: verify-evidence check reads the shared VERIFY_EVIDENCE_DEFAULT_PATH constant", () => {
+  const readPaths = [];
+  const deps = readyDeps({
+    readFile: (path) => {
+      readPaths.push(path);
+      if (path.endsWith("trust-policy.json")) return JSON.stringify({ keyReference: "local-po-key", publicKeySha256: "a".repeat(64), humanName: "Test Human" });
+      if (path.endsWith("verify-latest.json") || path.endsWith("security-latest.json")) return JSON.stringify({ exitCode: 0, commit: HEAD });
+      throw new Error(`unexpected read: ${path}`);
+    },
+  });
+  const result = pushPrepareReport(["--by", "tester", "--remote", "origin", "--destination", "refs/heads/main"], deps);
+  assert.equal(result.ok, true);
+  const verifyCheck = result.report.checks.find((check) => check.id === "verify-evidence");
+  assert.equal(verifyCheck.ok, true);
+  assert.ok(readPaths.some((path) => path.endsWith(VERIFY_EVIDENCE_DEFAULT_PATH)), "expected a read of the shared VERIFY_EVIDENCE_DEFAULT_PATH");
 });
 
 test("pushPrepareReport: bad argv -> {ok:false, error}", () => {
