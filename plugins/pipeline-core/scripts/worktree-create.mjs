@@ -15,6 +15,7 @@ import {
   migrateBranchWorktree,
 } from "../lib/worktree-lifecycle.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 const USAGE = `Usage:
   worktree-create.mjs branch --repo <checkout> --branch <branch> [--runner claude|codex]
@@ -72,16 +73,23 @@ function resolveRunner(flags, env) {
   return env.CLAUDECODE === "1" ? "claude" : "codex";
 }
 
-function ownerNonce(flags, env) {
+function ownerNonce(flags, env, { platform = process.platform, assessWindowsPrivate = assessWindowsPrivatePath } = {}) {
   if (flags["owner-nonce-file"] && env.PIPELINE_SESSION_OWNER_NONCE) {
     throw new Error("Use either --owner-nonce-file or PIPELINE_SESSION_OWNER_NONCE, not both");
   }
   if (flags["owner-nonce-file"]) {
-    const stat = lstatSync(flags["owner-nonce-file"]);
-    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0) {
+    const path = flags["owner-nonce-file"];
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1) {
       throw new Error("--owner-nonce-file must be a mode-0600 single-link regular file");
     }
-    return readFileSync(flags["owner-nonce-file"], "utf8").trimEnd();
+    // Node synthesizes `.mode` on native Windows from the read-only attribute
+    // alone, so a bare mode-bit comparison is meaningless there and fails
+    // closed unconditionally; on win32 this defers to the shared native
+    // DACL/owner assurance instead, mirroring afk-ledger.mjs:336-340.
+    const secure = platform === "win32" ? assessWindowsPrivate(path).status === "secure" : (stat.mode & 0o077) === 0;
+    if (!secure) throw new Error("--owner-nonce-file must be a mode-0600 single-link regular file");
+    return readFileSync(path, "utf8").trimEnd();
   }
   if (env.PIPELINE_SESSION_OWNER_NONCE) return env.PIPELINE_SESSION_OWNER_NONCE;
   throw new Error("Detached worktree creation requires --owner-nonce-file or PIPELINE_SESSION_OWNER_NONCE");
@@ -119,7 +127,10 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
   } else if (command === "detached") {
     result = createDetached(repo, required(flags, "purpose"), required(flags, "oid"), {
       sessionId: required(flags, "session"),
-      ownerNonce: ownerNonce(flags, env),
+      ownerNonce: ownerNonce(flags, env, {
+        platform: dependencies.platform,
+        assessWindowsPrivate: dependencies.assessWindowsPrivate,
+      }),
       resourceId: flags["resource-id"],
     });
   } else {
