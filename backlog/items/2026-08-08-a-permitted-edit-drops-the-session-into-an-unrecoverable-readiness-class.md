@@ -94,3 +94,19 @@ Same protection intent, two mechanisms, and only one of them can tell the agent
   promoted PRD, its Spec, its design input), refusal message names the
   reviewed-planning-change-and-rebind route.
 - **Date:** 2026-08-11
+
+### Triage confirmation (2026-08-18) — queued for dispatch this release
+
+The 2026-08-11 decision above (directions 1 and 2, PO-confirmed) is already
+a real, specific, bounded decision and stands unchanged. It carries no
+reference to any named future sprint and was left "Unassigned" rather than
+queued, so under the 0.6.0 release bar it is picked up now rather than left
+pending. **Disposition: queued for a `goldfish-deep` dispatch**
+(guardrail/write-path code: extend the write-time refusal in the family
+already protecting State paths to also cover currently-bound authority
+documents, refusal names the reviewed-planning-change-and-rebind route, per
+directions 1-2 above; direction 3 stays a hard constraint, directions 4-5
+stay explicitly out of scope). Needs regression tests
+(`project-onboarding-ready-gate` / guard suite) to trust — not implemented
+in this pass.
+- **Date:** 2026-08-18

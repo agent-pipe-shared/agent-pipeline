@@ -67,3 +67,23 @@ Design-tier look (touches a guard boundary) before either is built.
 - **Rationale for deferring rather than building now:** confirming which repo actually contains the friction, and reading the full `sign-intent`/`authorize-critical` PO-run flow closely enough to extend it correctly, is real investigation this session did not complete — proportionate to a dedicated pass, not a rushed inline fix riding on an unrelated dispatch.
 - **Date:** 2026-08-17
 
+### Triage confirmation (2026-08-18) — queued for dispatch this release, not deferred to a named sprint
+
+The 2026-08-17 investigation above already narrowed the fix to a bounded,
+concrete shape (direction b: extend `po-human-approval.mjs`'s own PO-run
+subcommand to read the request / write the proof directly against the
+repo-root `scratch/` path, collapsing the two manual `cp` steps into the
+one-sign-one-run shape `authorize-critical` already achieved). That
+investigation confirmed no guard-boundary change and no ADR are needed.
+Under the 0.6.0 release bar every open item must be decided and, where
+feasible, queued for real work unless correctly deferred to a named,
+still-open future sprint — "a dedicated design round" due 2026-08-30 is not
+such a sprint, so this is queued for dispatch under the current release
+rather than left pending. **Disposition: queued for a `goldfish-deep`
+dispatch** (touches a PO-run signing-adjacent tool) implementing direction
+(b) exactly as scoped above, with a fresh Critic review before merge given
+the security adjacency. Not implemented in this pass — needs tests
+(`po-human-approval.mjs` has no dependency-injection seam exercised yet for
+this path) to trust.
+- **Date:** 2026-08-18
+

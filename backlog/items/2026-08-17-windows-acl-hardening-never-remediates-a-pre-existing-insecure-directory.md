@@ -71,3 +71,35 @@ created.
 - **Assignment:** queued behind the current Windows-hotfix candidate; needs
   a design decision on remediation posture before a goldfish-deep dispatch.
 - **Date:** 2026-08-17
+
+### Triage confirmation (2026-08-18) — remediation posture decided, queued for dispatch
+
+The 2026-08-17 Triage above accepted the defect but left the remediation
+posture ("should the assess-only branch auto-remediate?") as an open design
+question blocking dispatch. Deciding it now, since it is not deferred to any
+named still-open sprint and the 0.6.0 release bar requires a real decision:
+
+- **Remediation posture: auto-remediate uniformly.** When
+  `assessWindowsPrivatePath()` reports an existing directory insecure,
+  `assureWindowsLocalDirectories()` should call
+  `hardenWindowsPrivateDirectory()` on it rather than only failing closed —
+  for every directory in this family, transient or credential-adjacent
+  alike. Rationale: hardening only ever *tightens* an ACL to owner-only; it
+  never loosens access or changes file contents, so there is no
+  credential-exposure argument for treating a long-lived directory
+  differently from a transient one — the asymmetry the original Proposal
+  worried about does not actually exist once the fix is understood as
+  ACL-only. This mirrors the `secureDirectory()` fix already landed for the
+  sibling item (`pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates`,
+  commit `a98bcb98`, NVA-PAWINACL-2) — same remediate-not-just-assess shape.
+- **Ancestor-skip gap: close it.** Walk and assess/remediate every ancestor
+  component above a newly-created directory, not only the immediate
+  `parent` when `created.length > 0` skips the assessment path entirely.
+- **Disposition: queued for a `goldfish-deep` dispatch** (Windows ACL
+  security-adjacent code, `worktree-lifecycle.mjs` /
+  `windows-private-state.mjs`) implementing both points above, with new
+  regression tests. Cannot be live-verified from this Linux/WSL host — the
+  same caveat already recorded on the sibling item applies here: whoever
+  merges it should have it re-run on a real Windows checkout before this is
+  treated as closed.
+- **Date:** 2026-08-18
