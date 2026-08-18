@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.hash-chained-ledger-collides-with-the-secret-scanner
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 source: "Observed 2026-08-08 while repairing the 38 pre-public-core reachability findings: the repair commit turned the live security scan red, one finding per appended ledger line."
 due: 2026-09-07
@@ -146,3 +146,34 @@ commitment, roughly in increasing order of intrusiveness:
   itself asks for. The list's continued unscoped growth is a live,
   measurable cost of leaving this undecided.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18 (PO decision: "nutze eine gute Empfehlung")
+
+- **Decision:** Candidate 1 (per-path rule scoping) — the option the item's
+  own Proposal named as "the only option that scales, because it costs
+  nothing per future append."
+- **Assignment:** `PHX-WP-GITLEAKS-RULE-SCOPE` (goldfish-deep), commit
+  `c8dee9d4`. New `.gitleaks.toml` extends gitleaks' full default ruleset
+  (`useDefault = true`) and adds a path-scoped allowlist disabling ONLY
+  `sentry-access-token`/`generic-api-key` for `backlog/transitions.ndjson`;
+  `gitleaks.mjs` now always passes `--config`, resolved from the adapter
+  module's own on-disk location (never from `rootDir`, the untrusted
+  candidate-tree snapshot — a candidate must never supply its own
+  scanner-config override). Proven empirically with the real gitleaks
+  binary: a ledger-shaped fixture produces no finding; the identical
+  secret-shaped string at a different path still does (the load-bearing
+  proof nothing else was weakened).
+- **Independently re-verified by the Elephant** (not trusted from the
+  dispatch report alone): re-ran `node --test
+  harness/scripts/security-adapters/gitleaks.test.mjs` directly — 13/13
+  pass, exit 0, including the real-binary path-scoping regression test.
+  Confirmed the commit's diff matches the report's description. Confirmed
+  the report's one flagged deviation (test uses
+  `resolveTrustedSystemExecutable` rather than the adapter's own narrower
+  `isInstalled()` PATH-walk) matches the exact same production trust-probe
+  `harness/scripts/security-scan.mjs` itself already uses — not a shortcut.
+- **Residual, accepted:** existing `.gitleaksignore` `content-v1:` entries
+  for this ledger are left in place (historical record, not removed); no
+  new entries will be needed going forward. First attempt at this dispatch
+  exceeded its tool budget before committing and had to be resumed once —
+  disclosed, not silently absorbed.

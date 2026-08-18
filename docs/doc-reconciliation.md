@@ -47,6 +47,19 @@ something to do here without review.
 
 ## Entries
 
+## Candidate c8dee9d47692fd5f87a6a3f4cc15a666cc7fb247 — 2026-08-18, range 0252cb01..c8dee9d4, PHX-WP-GITLEAKS-RULE-SCOPE dispatch evidence
+
+- ADR-0045: checked, no change needed.
+
+  The changed paths are three new evidence files under
+  `specs/sprint-phoenix-epic/evidence/PHX-WP-GITLEAKS-RULE-SCOPE/`
+  (`commit-msg.txt`, `dispatch-record.json`, `gitleaks-test-output.tap`) —
+  the same durable dispatch-evidence class as every prior ADR-0045 entry in
+  this file. No package restructuring; purely additive. (The dispatch's
+  actual code change — `.gitleaks.toml`, `harness/scripts/security-adapters/
+  gitleaks.mjs`, `gitleaks.test.mjs` — sits outside `specs/**` and is not
+  itself governed by this ADR.)
+
 ## Candidate df98028da288c9777523c8f1e1e7e8f65ba8afc4 — 2026-08-18, range 0c2267d4..df98028d, checkpoint 38: OT09 investigation persisted (root cause, TP-7 no-override-route finding, reconcile_approval fork risk)
 
 - ADR-0012: checked, no change needed.
