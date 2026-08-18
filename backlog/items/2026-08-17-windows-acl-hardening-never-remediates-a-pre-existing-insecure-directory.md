@@ -3,10 +3,32 @@ schema: pipeline.backlog-item.v1
 id: pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: b8f28a792dd6eb192a26b109231ceee304260ccb
+closure_evidence: plugins/pipeline-core/lib/worktree-lifecycle.test.mjs
 source: "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; the report's own mechanism claim ('silently skipped') was checked against source and found imprecise -- the real gap is narrower but still real, confirmed by direct code reading."
 ---
+
+## Closure
+
+Independently re-verified 2026-08-18 (NVA-W0-1):
+`worktree-lifecycle.mjs:1028-1029` assesses/remediates every insecure
+ancestor (auto-remediate-uniformly posture and the ancestor-skip-gap fix,
+per this item's own 2026-08-18 Triage decision), landed at commit
+`b8f28a79` ("fix(windows-acl): auto-remediate pre-existing insecure
+directories and close ancestor-skip gap"). `node --test
+plugins/pipeline-core/lib/worktree-lifecycle.test.mjs`: 39/39 pass,
+including the `WT-LOCAL-WINDOWS-ASSURANCE` auto-remediation,
+still-fails-closed-when-unremediable, and ancestor-skip-gap cases named in
+the item's own record. **Caveat, closed with this explicitly attached, not
+silently dropped:** live re-confirmation on a real Windows checkout has not
+been done in this pass and is not further code work, same as the sibling
+item (`securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates`) —
+this closure records that the code and its tests are correct and merged,
+not that a native Windows session has re-run the triggering scenario.
 
 # Windows ACL hardening only auto-remediates newly-created directories; a pre-existing insecure one is only assessed, never fixed
 

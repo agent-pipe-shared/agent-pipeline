@@ -3,11 +3,36 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: c9c271d2ed614ce2b4369fbcf1902faa69d273fa
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 source: "Critic review of commit 15cf0e58, 2026-08-16: governance checklist item 8 requires a named owner and expiry date for the deferred Direction 2 systemic fix named in backlog/items/2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md"
 due: 2026-08-30
 ---
+
+## Closure
+
+Independently re-verified 2026-08-18 (NVA-W0-1):
+`guard-lifecycle-ready.mjs:26` imports `automatedLifecycleArgvCommands` from
+`../scripts/project-onboarding-v3.mjs`; line 138 builds
+`AUTOMATED_LIFECYCLE_ARGV_COMMANDS` from it; the derivation site
+(`:1680`) and its surrounding comment block (`:1661-1679`, tagged
+`GUARDDERIVE-1`) document that the set is keyed on the two declared
+properties `mutates: false` and `automatedArgvShape: "lifecycle"`, never on
+the `plan` name prefix, and that the argv SHAPE admission stays
+deliberately narrow (unchanged, per the twice-Critic-reviewed
+defense-in-depth note this item's own Description cross-references).
+Regression tests confirmed present and passing:
+`GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's
+derivation, and admits exactly that set`, `... keys on the declared
+properties, never on the plan name prefix`, `... every registered
+onboarding subcommand declares both properties explicitly`. `node --test
+plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`: 112/112 pass.
+Landed at commit `c9c271d2` ("refactor(guard-lifecycle-ready): derive the
+plan* allowlist from the onboarding CLI table").
 
 # Derive the guard's admitted read-only `plan*` command set from the onboarding CLI's own table
 
