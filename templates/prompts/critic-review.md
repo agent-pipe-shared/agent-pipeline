@@ -218,10 +218,18 @@ Hunt systematically, in this order:
    path (`roles/elephant.md` — EL-01) = a
    lifecycle-violation finding (EL-01/EL-16), severity at least
    major. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
-   primary trailer evidence; `AI-Assisted: true` records anonymous assistance
-   only. Provider/model co-author data, session URLs/IDs, account identifiers,
-   and other private correlation metadata are prohibited and a finding when
-   present.
+   primary trailer evidence for exactly ONE fact — WHICH work package the diff
+   belongs to (diff authorship) — it does NOT by itself evidence who performed
+   the commit act. A `Commit-Act: orchestrator` trailer line, when present, is
+   the separate signal that the orchestrating (Elephant) session ran the
+   commit itself rather than the dispatched Goldfish (e.g. finishing a
+   truncated dispatch's last step); its ABSENCE alongside a well-formed
+   `Dispatch:` line is consistent with, but not conclusive proof of, the
+   dispatch having performed its own commit act — cross-check against the
+   dispatch record's logged phases where available. `AI-Assisted: true`
+   records anonymous assistance only. Provider/model co-author data, session
+   URLs/IDs, account identifiers, and other private correlation metadata are
+   prohibited and a finding when present.
 4. **Test integrity:** Were tests/checks of the implementation weakened,
    deleted, skipped, or newly tolerant? (Tests are the contract.)
 5. **Edge cases & failure paths:** boundaries, empty/huge inputs, concurrency,
