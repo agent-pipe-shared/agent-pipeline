@@ -3,8 +3,12 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.cross-repository-override-ledger-binding"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-20"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "6d9e8f83"
+closure_evidence: "plugins/pipeline-core/lib/human-guard-override.test.mjs"
 source: "Public V3 Foundation close residue review"
 due: "2026-09-08"
 expires: "2026-09-15"
@@ -230,3 +234,24 @@ refused to issue a verdict rather than review with a gap. Re-dispatched
 immediately with `governance/examples/guidelines` and
 `governance/examples/policies` added — this does not count against the
 2-round FAIL cap, since no review completed.
+
+### 2nd Critic review: PASS — closed
+
+No findings. Independently confirmed: the symlink chain is now resolved
+via `realpathSync` before probing (not `dirname`); `NVA-CROSSREPOLEDGER-2a`/
+`2b` use three genuinely distinct git fixtures and actually ran (not
+skipped) and passed; the fix's own header-comment correction is now
+true (`topology()` really does re-apply its own physical-safety checks
+as the "second layer" claimed); a dangling-symlink `null` return
+correctly falls back to the pre-existing coordinator-ledger behavior,
+never an under-restrictive bypass (GL-09); the checked-in
+`docs/human-guard-override-threat-model.md:89`'s "symlink traversal
+fails closed" row is now actually true rather than aspirational
+(governance checklist item 2 — met, not a gap). One process note, not a
+code finding: the evidence artifact this dispatch supplied
+(`evidence/NVA-CROSSREPOLEDGER-2-verify.txt`) was plain text, not the
+JSON-with-candidate-binding shape the skill's own preflight requires —
+the reviewer worked around it by independently reconstructing the
+evidence from `git diff`/`git show` directly, but future dispatches on
+this item family should produce a proper JSON evidence artifact instead.
+Closed.

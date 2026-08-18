@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e93b557f618a7b93ce2f12a55d7881f9813c8f62c7077427a4de0cb26475c8d3"
+    "transitionHead": "fc3928bb1c2666c9a11bba9dec222f6a3f5e628bdd9818a574436baa74607985"
   },
   "counts": {
     "open": 86,
-    "in_progress": 11,
-    "closed": 157
+    "in_progress": 10,
+    "closed": 158
   },
   "items": [
     {
@@ -614,11 +614,15 @@
     },
     {
       "id": "pipeline.cross-repository-override-ledger-binding",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Public V3 Foundation close residue review"
+      "source": "Public V3 Foundation close residue review",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "6d9e8f83",
+      "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
     },
     {
       "id": "pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary",
