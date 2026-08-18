@@ -988,7 +988,14 @@ function classifyPath(root, candidate) {
 }
 
 /** Builds the eligible() result for a genuine out-of-root escape, one target added to
- * whatever in-root paths were already accumulated by the same command's earlier tokens. */
+ * whatever in-root paths were already accumulated by the same command's earlier tokens.
+ * NVA-CROSSREPOLEDGER-1: `crossBoundaryTarget` carries the exact, single, absolute
+ * escape candidate separately from `paths` (which mixes it with any earlier in-root,
+ * root-RELATIVE entries from the same command) -- record/consume-time ledger binding
+ * needs the raw target on its own, not re-derived by picking "the one absolute entry"
+ * back out of `paths`. This is an ADDITIVE field on the in-memory eligibility() result
+ * only; it is never itself persisted (the request/plan/capability schemas still carry
+ * only `eligiblePaths`, i.e. `paths`, unchanged) and so needs no schema/version bump. */
 function crossBoundaryEligible(paths, target) {
   return {
     eligible: true,
@@ -996,7 +1003,55 @@ function crossBoundaryEligible(paths, target) {
     sourceRoot: null,
     paths: [...new Set([...paths, target])].sort(),
     commandClass: "cross-repository-target",
+    crossBoundaryTarget: target,
   };
+}
+
+// ---------------------------------------------------------------------------------
+// NVA-CROSSREPOLEDGER-1 (backlog/items/2026-07-20-cross-repository-override-ledger-
+// binding.md): recordHumanGuardDenial()/consumeHumanGuardOverride() are the two entry
+// points codex-pretool-guard.mjs calls AUTOMATICALLY, always with `rootDir: projectRoot`
+// -- the coordinating session's own root, never the guarded command's actual
+// cross-repository target (guard-hook call sites, read-only context for this dispatch).
+// Both must independently rebind topology()/storage() to the SAME physical repository a
+// "cross-repository-target" command actually operates on, instead of silently keeping
+// the coordinator's own ledger, which is the exact defect this backlog item names.
+//
+// This is a DELIBERATELY NARROWER question than "is this an escape from root" --
+// crossBoundaryTarget() itself never requires the escaping candidate to be, or even be
+// inside, a git repository at all (its own header: "It is never asked whether the
+// target exists, is a git repository..."), and the existing NOVA-HGOELIG-1..4 tests
+// exercise exactly that: an ordinary scratch-file Write outside any repository, which
+// has no "other repository" to bind to and must keep binding to the coordinator's own
+// root exactly as before. So this function answers "does the target resolve to a
+// physical git repository, and if so which one" using git's OWN repository-discovery
+// algorithm (`git -C <dir-or-its-parent> rev-parse --show-toplevel`) -- the identical
+// discovery a `git -C <target>` invocation, or git locating the repository above a
+// plain file, already performs -- rather than a second, invented notion of "root".
+// `target` may be a directory (a `-C`/`--work-tree`/`--git-dir` argument) or a file/
+// nonexistent path (an Edit/Write file_path, an apply_patch path, or a Bash redirect
+// target); for the latter its containing directory is exactly where git itself would
+// discover from too.
+//
+// Returns the resolved physical top-level, or null when no git repository is found
+// (an ordinary out-of-root, non-repository target: the two call sites below then fall
+// through to their EXISTING, unchanged coordinator-rooted topology() attempt -- never a
+// fail-closed refusal, since nothing was ever bound to the coordinator incorrectly for
+// this case in the first place). When a repository IS found, the caller's own
+// topology()/storage() calls on the returned root still enforce every existing physical-
+// safety check (a symlinked or otherwise unsafe top-level still fails closed exactly as
+// it would for any other topology() caller), and a target repository whose ledger
+// storage directory cannot be created or written (HGO-STORAGE/HGO-PERMISSIONS/HGO-DACL)
+// still fails the whole call closed -- there is no catch-and-fall-back-to-the-
+// coordinator's-ledger anywhere in this path. Never throws.
+function crossRepositoryTargetRoot(target, spawn = spawnSync) {
+  let probe = target;
+  try {
+    const info = lstatSync(target);
+    if (!info.isDirectory() || info.isSymbolicLink()) probe = dirname(target);
+  } catch { probe = dirname(target); }
+  try { return git(probe, ["rev-parse", "--path-format=absolute", "--show-toplevel"], spawn) || null; }
+  catch { return null; }
 }
 
 function authorSourceRoot(repoRoot, candidate) {
@@ -1933,9 +1988,17 @@ export function recordHumanGuardDenial({
   const physicalRootDir = physicalRoot(rootDir);
   const eligible = eligibility(physicalRootDir, toolName, toolInput);
   const isLocalPluginInstall = eligible.eligible && eligible.mode === "global-plugin-install";
+  // NVA-CROSSREPOLEDGER-1: bind command evaluation and ledger append to the guarded
+  // command's actual cross-repository target repository, not this coordinating
+  // session's own root -- see crossRepositoryTargetRoot()'s header. `null` covers both
+  // an ordinary command AND an out-of-root target with no repository of its own; both
+  // fall through unchanged to physicalRootDir exactly as before this fix.
+  const crossRepositoryRoot = eligible.eligible && eligible.commandClass === "cross-repository-target"
+    ? crossRepositoryTargetRoot(eligible.crossBoundaryTarget, spawn)
+    : null;
   const repo = isLocalPluginInstall
     ? controlPathTopology(physicalRootDir)
-    : topology(physicalRootDir, spawn);
+    : topology(crossRepositoryRoot ?? physicalRootDir, spawn);
   const repository = isLocalPluginInstall
     ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
     : repositoryObservation(repo.root, spawn);
@@ -2545,8 +2608,28 @@ export function consumeHumanGuardOverride({
   spawn = spawnSync,
   codexSpawn = spawnSync,
 } = {}) {
+  // NVA-CROSSREPOLEDGER-1: this is the OTHER entry point codex-pretool-guard.mjs calls
+  // automatically with `rootDir: projectRoot`, when the agent retries the exact same
+  // guarded command after obtaining a capability -- see recordHumanGuardDenial()'s
+  // identical rebinding above and crossRepositoryTargetRoot()'s header. Re-derive the
+  // same classification here from `toolName`/`toolInput` (both already parameters of
+  // this function) so a "cross-repository-target" command's TOKEN consumption binds to
+  // the same target repository its denial/plan/authorization were bound to, rather than
+  // to the coordinator's own root. Every failure along the way (an invalid rootDir, a
+  // classification this module cannot complete) resolves to `null` here, never a throw
+  // -- the EXISTING topology(rootDir, spawn) attempt below, and its own existing
+  // fallback chain, is what actually decides whether the operation proceeds, exactly as
+  // before this fix for every other command class.
+  let crossRepositoryRoot = null;
+  try {
+    const physicalRootDir = physicalRoot(rootDir);
+    const eligible = eligibility(physicalRootDir, toolName, toolInput);
+    if (eligible.eligible && eligible.commandClass === "cross-repository-target") {
+      crossRepositoryRoot = crossRepositoryTargetRoot(eligible.crossBoundaryTarget, spawn);
+    }
+  } catch { crossRepositoryRoot = null; }
   let repo;
-  try { repo = topology(rootDir, spawn); }
+  try { repo = topology(crossRepositoryRoot ?? rootDir, spawn); }
   catch {
     try { repo = controlPathTopology(rootDir); }
     catch { return { status: "absent" }; }

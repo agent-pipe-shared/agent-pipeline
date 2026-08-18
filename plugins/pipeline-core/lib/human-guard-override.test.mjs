@@ -2871,3 +2871,175 @@ test("NVA-HGOHEAD-1: a rev-parse HEAD failure that is NOT the unborn-branch shap
     rmSync(root, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------
+// NVA-CROSSREPOLEDGER-1 (backlog/items/2026-07-20-cross-repository-override-ledger-
+// binding.md): codex-pretool-guard.mjs always calls recordHumanGuardDenial() and
+// consumeHumanGuardOverride() with `rootDir: projectRoot` -- the coordinating session's
+// own root -- even when the guarded command's actual target (eligibility()'s
+// "cross-repository-target" class, ADR-0059 Decision 6) is a DIFFERENT physical
+// repository. Before this fix, the ledger (request/audit/capability storage) still
+// bound to the coordinator's own root regardless; these tests pin that it now binds to
+// the SAME physical repository the guarded command actually targets, while an ordinary
+// in-root command, or an out-of-root target with no repository of its own
+// (NOVA-HGOELIG-1..4, unaffected by this fix), keeps binding to the coordinator exactly
+// as before.
+// ---------------------------------------------------------------------------------
+
+test("NVA-CROSSREPOLEDGER-1a: an ordinary in-root command still binds its ledger to the coordinator's own root, unchanged", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "ordinary\n" };
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.equal(recorded.status, "planned");
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const requestPath = join(common, "agent-pipeline", "human-guard-overrides", "requests", `${recorded.requestSha256}.json`);
+    assert.ok(existsSync(requestPath), "the ordinary command's request must still be stored under the coordinator's own ledger");
+    // Never authorized -- this pins only WHERE the ledger lives, not the arming
+    // ceremony, which the rest of the suite already covers exhaustively.
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write", toolInput, denials: denial, nowMs: 4000,
+    });
+    assert.equal(consumed.status, "absent");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("NVA-CROSSREPOLEDGER-1b: a cross-repository `git -C` command binds command evaluation, token consumption and ledger append to the TARGET repository, not the coordinator's", () => {
+  const root = fixture(); // the coordinating session's own root
+  const target = fixture(); // the guarded command's actual, distinct physical target
+  try {
+    const command = `git -C ${target} status`;
+    const toolInput = { command };
+    // recordHumanGuardDenial() is always called with the COORDINATOR's own rootDir.
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
+    });
+    assert.equal(recorded.status, "planned");
+
+    const targetCommon = git(target, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const coordinatorCommon = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const requestPath = join(targetCommon, "agent-pipeline", "human-guard-overrides", "requests", `${recorded.requestSha256}.json`);
+    assert.ok(existsSync(requestPath), "the cross-repository request must be stored under the TARGET repository's own ledger");
+    // DoD 4: no cross-repository command text or coordinates land under the
+    // coordinating checkout's own ledger -- no ledger directory is ever created there.
+    assert.equal(existsSync(join(coordinatorCommon, "agent-pipeline")), false,
+      "no ledger directory may be created under the coordinator's own checkout for this command");
+    const requestBytes = readFileSync(requestPath, "utf8");
+    assert.ok(!requestBytes.includes(root), "the persisted request must never quote the coordinator's own local path");
+
+    // The operator plans/authorizes directly against the TARGET repository's own root
+    // -- exactly the same contract planHumanGuardOverride() has always had for any
+    // repository; no code change was needed there for this to work.
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const plan = planHumanGuardOverride({
+      rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 2000, scriptPath,
+    });
+    assert.equal(plan.commandClass, "cross-repository-target");
+    assert.equal(plan.root, target);
+    const reason = "PO attended recovery for the exact cross-repository command, via chat";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2500, scriptPath,
+    });
+    const armed = authorizeHumanGuardOverride({
+      rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      nowMs: 3000, scriptPath,
+    });
+    assert.equal(armed.status, "armed");
+
+    // consumeHumanGuardOverride() is ALSO always called with the coordinator's own
+    // rootDir -- the agent retries the byte-identical command through the same
+    // coordinator-rooted guard hook that denied it. It must still find and consume the
+    // capability that lives in the TARGET repository's own ledger.
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 4000,
+    });
+    assert.equal(consumed.status, "consumed");
+
+    // DoD 5: one-time semantics are unchanged for the cross-repository class -- a
+    // second retry of the identical command does not consume it again.
+    const second = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 4500,
+    });
+    assert.equal(second.status, "absent", "a consumed cross-repository capability admitted a second run");
+
+    // The full audit trail lives entirely under the TARGET repository's own ledger.
+    const audit = join(targetCommon, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
+    const auditEvents = readFileSync(audit, "utf8").trim().split("\n").map((line) => JSON.parse(line).event);
+    assert.deepEqual(auditEvents.map(({ type }) => type), ["denied", "authorized", "consumed"]);
+    assert.equal(existsSync(join(coordinatorCommon, "agent-pipeline")), false,
+      "no ledger directory was ever created under the coordinator's own checkout for this command");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("NVA-CROSSREPOLEDGER-1c: a cross-repository target capability still requires explicit double-confirmed activation -- no implicit override", () => {
+  const root = fixture();
+  const target = fixture();
+  try {
+    const command = `git -C ${target} status`;
+    const toolInput = { command };
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
+    });
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const plan = planHumanGuardOverride({
+      rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, nowMs: 2000, scriptPath,
+    });
+    const reason = "PO attended recovery, activation omitted on purpose";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+      reason, nowMs: 2500, scriptPath,
+    });
+    // activate is omitted (defaults to false) -- must be refused exactly like the
+    // same-repository class; the cross-repository class gets no implicit pass.
+    assert.throws(
+      () => authorizeHumanGuardOverride({
+        rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
+        selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason),
+        nowMs: 3000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-ACTIVATION",
+    );
+    // Never armed, so a retry of the identical command still finds nothing to consume.
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 3500,
+    });
+    assert.equal(consumed.status, "absent");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
+});
+
+test("NVA-CROSSREPOLEDGER-1d: a cross-repository target whose ledger root cannot be written fails closed before the guarded command runs, never falling back to the coordinator's ledger", () => {
+  const root = fixture();
+  const target = fixture();
+  try {
+    const targetCommon = git(target, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const coordinatorCommon = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    // Pre-create "agent-pipeline" as a FILE (not a directory) inside the target's own
+    // git-common-dir -- storage()'s mkdirSync(..., {recursive:true}) can never create a
+    // directory where a file already sits, regardless of process privilege, so this
+    // portably reproduces "the target ledger root cannot be written".
+    writeFileSync(join(targetCommon, "agent-pipeline"), "not a directory\n");
+    const command = `git -C ${target} status`;
+    const toolInput = { command };
+    assert.throws(() => recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1000,
+    }));
+    // Fail-closed, never a silent fallback: no ledger directory was ever created under
+    // the coordinator's own checkout for this command.
+    assert.equal(existsSync(join(coordinatorCommon, "agent-pipeline")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(target, { recursive: true, force: true });
+  }
+});
