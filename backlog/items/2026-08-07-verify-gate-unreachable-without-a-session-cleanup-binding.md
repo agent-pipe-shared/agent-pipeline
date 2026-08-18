@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-gate-unreachable-without-a-session-cleanup-binding
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: Elephant diagnosis while dispositioning Critic finding F1 on PHX-R2-THREATMODEL-rework (2026-08-07). The symptom was already recorded in docs/state.md as an unexplained infra gap; this item records the measured cause.
 due: 2026-09-06
@@ -112,7 +112,36 @@ substitute for the fix.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close. Both blockers Proposal items 1 and 2 asked about have
+  been answered, not by weakening the preflight/registration check (the thing
+  this item explicitly asked not to do), but by establishing and routinely
+  using the detached-worktree procedure the item itself named as the
+  "documented workaround": run Layers 2/3 (Verify, security-scan) against a
+  clean detached worktree checked out at the exact candidate commit, which
+  gets its own bound session-cleanup independent of the primary checkout's
+  permanently-dirty tracked config, then copy the evidence artifacts back.
+- **Rationale:** Item 1 (why does a session have `sessionCleanup: null`, and
+  is that fixable or a legitimate state) is answered: an ad hoc primary-tree
+  session legitimately has no binding — the fix was never "give every session
+  one," it was "run verify from a session/worktree that does." `docs/state.md`
+  records multiple full, completed Verify runs via exactly this route reaching
+  382/383 suites green (commits `d202633c` and `334f7cf7`), proving the gate
+  is reachable and the evidence-artifact contract this item already vouched
+  for (`binding: "exact"`) holds end to end, not just up to the abort. Item 2
+  (`.claude/settings.json` permanently dirty) is resolved the same way: the
+  primary checkout is allowed to stay dirty by design (3 local-state files,
+  documented convention), and the preflight is satisfied by running against
+  the clean detached worktree instead of by excluding paths from the check —
+  exactly the "small decision with a large effect" the item asked for, just
+  decided as "use a worktree" rather than "carve an exception into the
+  preflight." Re-verified today (2026-08-18) rather than assumed:
+  `git status --porcelain -- .claude/settings.json` is empty in the primary
+  checkout right now. The one remaining Full-Verify red (`guard-testpath-
+  override-tests`, OT09/TP-7, tracked separately in `docs/state.md`) is an
+  unrelated, already-tracked defect in one suite's own logic, not a
+  reachability problem — it is exactly the kind of specific, nameable failure
+  this item's "the gate is unreachable, not skipped" distinction was trying to
+  make visible, and now it is.
+- **Assignment (if accepted):** none — resolved by established procedure, no
+  code change needed under this item.
+- **Date:** 2026-08-18
