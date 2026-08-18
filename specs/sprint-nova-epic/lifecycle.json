@@ -9,7 +9,7 @@
     {
       "class": "prd",
       "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "sha256": "164cadc6d175b6d7105404d1e7d84d197864d8be84a6dd20bd7a97d02dadf110",
+      "sha256": "c3f7469cc7a0d273a637050d379fd9266746fef19f9cd78650ddd75b95d2350f",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "e9f020f746c7fd880cfbdac355316a0d0d12ee0fd12edd3474c38328371bd4a5",
+      "sha256": "f9b1f508cdc8c85764ef2f907f133c22e52176062329d9a9c98987f07c23be21",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
