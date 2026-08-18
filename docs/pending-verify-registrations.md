@@ -1,7 +1,8 @@
 # Pending Verify registrations
 
-> **Status 2026-08-12 (third revision).** **One suite is pending** — see the
-> next section. Everything below that is a worked record, in the past tense.
+> **Status 2026-08-18 (fourth revision).** **Four suites are pending** — see
+> the next section. Everything below that is a worked record, in the past
+> tense.
 >
 > The banner said "Nothing is pending" for most of 2026-08-09 while two suites
 > sat unregistered in the table underneath, added after the batch they were
@@ -18,28 +19,51 @@
 > registered, so the heading was right and its own banner contradicted it. A
 > banner that is not re-derived from `TEST_SUITES` when it is edited is the
 > recurring defect here; this revision was written from a grep of that array.
+>
+> 2026-08-18: two more suites joined the pending set (test-tmpdir-tests,
+> test-tmpdir-budget-tests, below) — re-confirmed the original two
+> (`dispatch-authorship-verify-tests`, `push-prepare-tests`) are still absent
+> from `TEST_SUITES` before adding to this banner, so "four" is a grep result,
+> not an assumption. Only the two new suites are queued in
+> `harness/scripts/apply-pending-protected-edits.mjs`'s `VERIFY_REGISTRATIONS`
+> array (confirmed via its own `--check` dry run: `would-apply: 2
+> registration(s)`) — the original two are a different backlog block's
+> responsibility to queue, not added here as drive-by scope. That script's
+> `VERIFY_ANCHOR` WAS re-pointed to the real current last entry
+> (`resume-hint-tests`) in this edit, since it had gone stale for every
+> pending suite alike; the next batch that adds array entries no longer needs
+> to fix the anchor first.
 
-## PENDING — the dispatch-authorship suite (filed 2026-08-12, block NVA-BL-34)
+## PENDING — four suites, three blocks
 
-Two suites are written, green, and **not** in `harness/scripts/verify.mjs`, so
+Four suites are written, green, and **not** in `harness/scripts/verify.mjs`, so
 they are not run by the gate:
 
 | Suite | Block | What it covers |
 |---|---|---|
 | `plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs` | NVA-BL-34 / NVA-BL-34-FIX | The correspondence rule behind commit authorship: that a `Dispatch: <TASK_ID> (goldfish)` trailer resolves to a dispatch record that is terminal, names the same task id, binds to the commit sha it vouches for, and declares paths covering the diff — plus the fail-closed edges (no trailer, malformed trailer, more than one `Dispatch:` trailer, a task id that is not a safe filename fragment, an Elephant-direct declaration outside the sanctioned `stage-0` form). Behavioural fixtures: every case writes a real `dispatch-record-<TASK_ID>.json` into a temporary evidence directory and resolves it through the script's own reader. |
 | `plugins/pipeline-core/scripts/push-prepare.test.mjs` | NVA-PUSH-PREPARE | The read-only push-readiness report (`push-prepare.mjs`): each precondition (working tree clean, `evidence/verify-latest.json` and `evidence/security-latest.json` freshness matching `guard-push.mjs`'s own `checkEvidenceFreshness` contract, `project/push-threat-model.md` presence, the critical-human-proof posture and — when pinned — local-key membership) reported individually with its own remedy; the F7 rendering assertion (one segment per line, backslash continuation, ≤100 columns); and a D3 hash-equality check that runs the script's `preparePushSubject()` against this repository's real HEAD and separately spawns the real `pipeline-state.mjs prepare-push-subject` CLI, asserting the two `subjectSha256` values are identical. 26 tests. Fixtures are dependency-injected over a temporary directory, except that one D3 test, which is a deliberate read-only smoke test against the real repository. |
+| `plugins/pipeline-core/lib/test-tmpdir.test.mjs` | test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | The sanctioned fixture-tmpdir helper (`test-tmpdir.mjs`, `mkdtempTestScratch`) that redirects new/touched Node test suites off host `/tmp` and onto this repo's own `scratch/test-tmp/` — the near-drop-in swap for `mkdtempSync(join(tmpdir(), prefix))`. 11 tests: real-directory creation, uniqueness, prefix-escape rejection, a `base` override, and idempotent parent reuse. |
+| `plugins/pipeline-core/lib/test-tmpdir-budget.test.mjs` | test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | The size/count budget check for `scratch/test-tmp/` (`test-tmpdir-budget.mjs`), mirroring `bootstrap-payload-budget.mjs`'s measurement pattern: a frozen, schema-tagged measurement with an explicit `withinBudget` boolean, plus a direct-invocation CLI (`node plugins/pipeline-core/lib/test-tmpdir-budget.mjs`) that fails loudly and exits 2 before the next `/tmp`-style host-exhaustion incident. 16 tests, including exact byte/entry counting, both bound-exceeded branches (via a `maxBytes`/`maxEntries` override, not by manufacturing 500 MiB of real fixture content), an unreadable-directory finding, symlink non-traversal, and a CLI smoke test against this repo's real, in-budget `scratch/test-tmp/`. |
 
 Why pending, not registered: the same TP-3 constraint described further down —
 `project/guard-config.json` protects `harness/scripts/verify.mjs`, and the
 override follows this repository's `signature` push-approval mode, which no
 agent session can satisfy. Registration is a PO/operator step
-(`harness/scripts/apply-pending-protected-edits.mjs`, whose `VERIFY_ANCHOR`
-needs re-pointing first — see the note in the 2026-08-09 batch below).
+(`harness/scripts/apply-pending-protected-edits.mjs`). For `test-tmpdir-tests`
+and `test-tmpdir-budget-tests` it is now simply running the tool: both are
+already queued in its `VERIFY_REGISTRATIONS` array. For
+`dispatch-authorship-verify-tests` and `push-prepare-tests` an operator (or a
+future dispatch scoped to that block) still needs to add their array entries
+first, the same shape as the two above.
 
-Until then the suite is run individually and its result recorded with the block:
+Until then each suite is run individually and its result recorded with the
+block, e.g.:
 
 ```
 node --test plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs
+node plugins/pipeline-core/lib/test-tmpdir.test.mjs
+node plugins/pipeline-core/lib/test-tmpdir-budget.test.mjs
 ```
 
 "Not registered" here means "not run by the gate", never "not run". The script

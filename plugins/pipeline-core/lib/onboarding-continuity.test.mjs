@@ -5,14 +5,12 @@ import {
   existsSync,
   lstatSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { basename, dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -26,6 +24,7 @@ import {
   validatePoGateAuthority,
 } from "./po-gate-authority.mjs";
 import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
+import { mkdtempTestScratch } from "./test-tmpdir.mjs";
 
 import {
   KICKOFF_FAULT_STAGES,
@@ -62,7 +61,7 @@ function check(name, fn) {
 }
 
 function fixture(name, { handover, neutral = false } = {}) {
-  const root = mkdtempSync(join(tmpdir(), `onboarding continuity ${name} `));
+  const root = mkdtempTestScratch(`onboarding continuity ${name} `);
   mkdirSync(join(root, ".claude"), { recursive: true });
   if (neutral) {
     mkdirSync(join(root, "project"), { recursive: true });
@@ -425,7 +424,7 @@ check("machine-state symlink is unavailable", () => {
 
 check("project-root symlink is unavailable", () => {
   const actual = fixture("root-symlink-actual");
-  const parent = mkdtempSync(join(tmpdir(), "onboarding continuity root link "));
+  const parent = mkdtempTestScratch("onboarding continuity root link ");
   const linked = join(parent, "linked root");
   symlinkSync(actual, linked);
   assert.equal(classifyOnboardingContinuity({ rootDir: linked }).status, "unavailable");
@@ -2224,7 +2223,7 @@ check("replaceNextActionSection: returns null on non-string input rather than th
 });
 
 check("syncStateMdNextAction: rewrites docs/state.md's Next action section in place", () => {
-  const root = mkdtempSync(join(tmpdir(), "gf090-sync-"));
+  const root = mkdtempTestScratch("gf090-sync-");
   mkdirSync(join(root, "docs"), { recursive: true });
   writeFileSync(join(root, "docs", "state.md"), [
     "# Project state", "", "## Goal", "", "Ship it.", "",
@@ -2240,14 +2239,14 @@ check("syncStateMdNextAction: rewrites docs/state.md's Next action section in pl
 });
 
 check("syncStateMdNextAction: fails closed (no write) when docs/state.md is absent", () => {
-  const root = mkdtempSync(join(tmpdir(), "gf090-sync-absent-"));
+  const root = mkdtempTestScratch("gf090-sync-absent-");
   const result = syncStateMdNextAction(root, nextActionStateFixture());
   assert.equal(result.ok, false);
   assert.ok(!existsSync(join(root, "docs", "state.md")));
 });
 
 check("syncStateMdNextAction: fails closed (no corruption) when no '## Next action' heading exists", () => {
-  const root = mkdtempSync(join(tmpdir(), "gf090-sync-noheading-"));
+  const root = mkdtempTestScratch("gf090-sync-noheading-");
   mkdirSync(join(root, "docs"), { recursive: true });
   const original = "# Project state\n\n## Hand-edited section\n\nsomething else\n";
   writeFileSync(join(root, "docs", "state.md"), original);
@@ -2275,7 +2274,7 @@ check("syncStateMdNextAction: resyncs a calibration-configured handover path, no
 check("syncStateMdNextAction: is a no-op write when the rendered text already matches", () => {
   const state = nextActionStateFixture();
   const section = nextActionSection(state);
-  const root = mkdtempSync(join(tmpdir(), "gf090-sync-noop-"));
+  const root = mkdtempTestScratch("gf090-sync-noop-");
   mkdirSync(join(root, "docs"), { recursive: true });
   writeFileSync(join(root, "docs", "state.md"), `# Project state\n\n${section}`);
   const result = syncStateMdNextAction(root, state);

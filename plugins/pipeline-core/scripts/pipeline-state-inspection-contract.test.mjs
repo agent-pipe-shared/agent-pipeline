@@ -15,13 +15,13 @@
  * it needs its own case here.
  */
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { run, statePath as resolveStatePath } from "./pipeline-state.mjs";
 import { classifyOnboardingContinuity } from "../lib/onboarding-continuity.mjs";
+import { mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
 
 let passed = 0;
 function check(name, fn) {
@@ -36,7 +36,7 @@ function check(name, fn) {
 }
 
 function tempRoot(name) {
-  const root = mkdtempSync(join(tmpdir(), `pipeline-state-inspection-contract ${name} `));
+  const root = mkdtempTestScratch(`pipeline-state-inspection-contract ${name} `);
   mkdirSync(join(root, ".claude"), { recursive: true });
   const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
   assert.equal(git.status, 0, git.stderr);

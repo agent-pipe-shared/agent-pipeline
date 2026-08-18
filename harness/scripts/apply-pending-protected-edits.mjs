@@ -161,14 +161,31 @@ const VERIFY_REGISTRATIONS = [
     line: '  { name: "resume-hint-tests", file: join(libDir, "resume-hint.test.mjs") },',
     file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "resume-hint.test.mjs"),
   },
+  // Added 2026-08-18 (backlog/items/2026-08-17-test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention.md).
+  // Mirrors the already-registered `bootstrap-payload-budget-tests` shape: a
+  // `lib/` module's own co-located test file, one entry, nothing else touched.
+  // See docs/pending-verify-registrations.md for the full pending table.
+  {
+    name: "test-tmpdir-tests",
+    line: '  { name: "test-tmpdir-tests", file: join(libDir, "test-tmpdir.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "test-tmpdir.test.mjs"),
+  },
+  {
+    name: "test-tmpdir-budget-tests",
+    line: '  { name: "test-tmpdir-budget-tests", file: join(libDir, "test-tmpdir-budget.test.mjs") },',
+    file: join(REPO_ROOT, "plugins", "pipeline-core", "lib", "test-tmpdir-budget.test.mjs"),
+  },
 ];
 
 // The terminator moves every time a batch is registered, so this constant is
 // re-pointed with each batch rather than left to fail as a stale anchor. It failed
 // exactly that way after the 2026-08-08 batch: `nova-verify-journal-tests` was no
 // longer the last entry, and the next operator run would have aborted on a missing
-// anchor -- correctly, but with the tool unusable until someone noticed.
-const VERIFY_ANCHOR = '  { name: "reference-path-check", file: join(scriptDir, "check-reference-paths.mjs") },\n];';
+// anchor -- correctly, but with the tool unusable until someone noticed. Re-pointed
+// again 2026-08-18: `reference-path-check` was no longer the last entry either (the
+// 2026-08-09 resume-hint batch landed after it, per docs/pending-verify-registrations.md);
+// confirmed against the real, current `harness/scripts/verify.mjs` before this edit.
+const VERIFY_ANCHOR = '  { name: "resume-hint-tests", file: join(libDir, "resume-hint.test.mjs") },\n];';
 
 function stepVerify({ dryRun }) {
   const original = readFileSync(VERIFY_PATH, "utf8");
