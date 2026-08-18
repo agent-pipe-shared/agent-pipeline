@@ -73,6 +73,7 @@ import {
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
+import { clearConsentMarker } from "./onboarding-consent-marker.mjs";
 
 const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
@@ -3171,8 +3172,28 @@ function v4Inspection(rootDir, fs, intent = "onboarding", runner = "codex") {
   });
 }
 
+/**
+ * PHX-WP-ONBOARDING-CONSENT-LOCK: the onboarding-consent marker's one
+ * genuine-completion call site. `intent === "session"` is the exact intent
+ * guard-lifecycle-ready.mjs's `requireProjectOnboardingReady` uses to gate
+ * real Write/Edit and Bash/PowerShell admission, so a `ready` result here,
+ * for that intent, IS this codebase's own existing definition of "onboarding
+ * actually complete" -- regardless of which apply/recovery path produced it.
+ * Clearing is best-effort and never allowed to affect this function's own
+ * return value: a marker that fails to clear simply stays blocking, which is
+ * safe for the marker's purpose (never a bypass), and inspect() itself must
+ * stay a reliable read no matter what the marker's filesystem state is.
+ */
 export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding", runner = "codex" } = {}) {
-  return v4Inspection(rootDir, deps(overrides), intent, runner);
+  const result = v4Inspection(rootDir, deps(overrides), intent, runner);
+  if (intent === "session" && result?.status === "ready") {
+    try {
+      clearConsentMarker({ rootDir: result.root ?? rootDir, reason: "onboarding-complete" });
+    } catch {
+      // Never let a marker-clear failure surface through inspect()'s contract.
+    }
+  }
+  return result;
 }
 
 export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, runner } = {}) {
