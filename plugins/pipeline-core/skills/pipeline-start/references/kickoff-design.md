@@ -176,7 +176,10 @@ linked source evidence, architecture, component responsibilities,
 interfaces/state/data, operational constraints, test/verification approach,
 and PRD-to-Spec traceability. Favor thorough, comprehensive coverage of the
 material input over brevity — a short initial goal is not a reason for a
-thin PRD/Spec. If the input describes an ordered user flow,
+thin PRD/Spec. When the initial goal is short relative to that coverage
+list, treat the gap as a prompt to ask the user follow-up questions against
+it before drafting, not as license to write a thin PRD from the goal alone.
+If the input describes an ordered user flow,
 state transition, branching, event handoff, or workflow,
 include a valid Mermaid flow/sequence/state diagram wherever it materially
 clarifies that flow (normally the PRD user flow and/or the Spec execution

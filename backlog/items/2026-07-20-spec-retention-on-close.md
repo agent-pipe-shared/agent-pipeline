@@ -92,4 +92,22 @@ report a missing active plan.
   unassigned.
 - **Date:** 2026-08-06
 
+- **Re-triage, 2026-08-18 (0.6.0 release sweep):** criterion 2 is not
+  deferred to any named future sprint and is not superseded by another
+  existing mechanism — it is real, unbuilt code on the Public/Private
+  transfer path, which the repo's own hard rules classify as security-
+  adjacent (transfer authorization) and therefore not safe to hand-fix in a
+  read-only proposal pass. Queued for a follow-up implementation dispatch
+  with this bounded scope: add a `classifyTransfer`-style typed check,
+  invoked at Public/Private transfer time (not only at Verify time), that
+  returns a typed `blocked` result whenever a normative active PRD/Spec/
+  acceptance-matrix file would be omitted from the transfer without both a
+  durable archive destination and an explicit recorded PO disposition; add
+  a regression test proving the blocked path fires (mirroring the existing
+  `check-spec-retention.test.mjs` SR02/SR03 style); wire the check into
+  `close-block/SKILL.md`'s transfer step. Scope stays exactly criterion 2 —
+  criteria 1/3/4/5 stay delivered and are not to be touched or re-verified
+  by that dispatch.
+- **Date:** 2026-08-18
+
 AI-Assisted: true

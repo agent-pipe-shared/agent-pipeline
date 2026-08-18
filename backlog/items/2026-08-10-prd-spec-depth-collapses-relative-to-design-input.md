@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.prd-spec-depth-collapses-relative-to-design-input
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "PENDING"
+closure_evidence: "plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md"
 source: "PO live observation during two greenfield kickoff test sessions on 2026-08-10 (Claude Code test project `Rune-Test1-Claude-054-44`, and two Codex rollout sessions under `~/.codex/sessions/2026/08/10/`, both still in progress at the time this item was filed). The PO states this is not new: the same pattern has been visible across roughly the last 10 kickoff/planning tests and, separately, across effectively all Pipeline GitHub Issues to date (bound PRD/Spec consistently thinner than the Issue that originated the same scope of work)."
 ---
 
@@ -105,3 +109,16 @@ directions, per the PO's dialogue-driven framing above:
   behavioral instruction; currently only a principle, no concrete mechanism
   specified.
 - **Date:** 2026-08-11
+
+- **Closure, 2026-08-18:** implemented the accepted candidate B directly —
+  added one sentence to `kickoff-design.md`'s PRD/Spec coverage paragraph
+  that operationalizes "short goal → ask more" as a concrete behavioral
+  instruction: when the initial goal is short relative to the PRD coverage
+  checklist, that gap is now explicitly named as a prompt to ask the user
+  follow-up questions before drafting, not license to write a thin PRD from
+  the goal alone. This is the exact, narrow fix the 2026-08-11 decision
+  called for (candidate B only) and nothing broader — candidates A and C
+  remain explicitly out of scope, as decided. Verifiable by reading the
+  changed instruction text; no test run needed to trust a wording change to
+  agent-facing prose.
+- **Date:** 2026-08-18

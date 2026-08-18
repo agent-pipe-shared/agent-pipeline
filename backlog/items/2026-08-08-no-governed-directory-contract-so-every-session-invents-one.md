@@ -124,3 +124,26 @@ not supersede it and does not claim to close it.
   `pipeline-start`/dispatch templates, and the Verify gate assertion. None
   of the three is built yet; each needs its own dispatch. This item is not
   closed by the ADR's existence alone.
+
+- **Re-triage, 2026-08-18 (0.6.0 release sweep):** none of the three named
+  follow-ups is deferred to a named future sprint or superseded by another
+  mechanism — all three are real, unbuilt work against ADR-0063's own
+  contract. Queued together for one follow-up implementation dispatch
+  (guardrail/agent-briefing code needing test coverage to trust, not a
+  read-only doc fix):
+  1. **`.gitignore` anchoring audit** — review every ignore rule for
+     anchoring (leading `/`) the same way the `evidence/` line was fixed,
+     across the whole file, not just that one line.
+  2. **Wire the kinds table into agent-facing briefing** — surface
+     ADR-0063's kinds table (or a pointer to it) in the `pipeline-start`
+     skill and the dispatch templates (`templates/prompts/`), since a
+     contract only `docs/` carries is one a Goldfish dispatch will never
+     read.
+  3. **Verify gate assertion** — add the cheapest credible check ADR-0063
+     itself names: a Verify gate asserting no tracked file sits in a
+     directory the contract does not name, and that each ignore rule is
+     anchored.
+  Scope stays exactly these three items already named in the 2026-08-12
+  status update; no re-opening of the six original decision points, which
+  ADR-0063 already resolved.
+- **Date:** 2026-08-18
