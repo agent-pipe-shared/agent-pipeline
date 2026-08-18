@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-18 (full AFK block continues: a systematic sweep — not more one-off luck — for the "unread defining backlog item" mistake class found four more expired/untriaged items; `critic-context-isolation`, `project-scoped-github-issue-operations` (Critic found and `NVA-GHOFIX-1` fixed a real readback-URL gap, re-reviewed to PASS), and `dispatch-provenance` all Critic-PASSed and closed; `cross-repository-override-ledger-binding` confirmed as a real, still-open gap but deliberately left unimplemented pending cross-sprint (Cyborg `CYB-5c`) ownership reconciliation; seven "unread item" catches total this block; fresh local `0.5.5` candidate `41d7e8c2` stamped at 268/269 green with CLEAN security — see "2026-08-18 (overnight AFK block, continued 7)" below, which is now the current block)
+**Last updated:** 2026-08-18 (nine-branch Nova-sweep candidate: all 6 mergeable worktree commits landed on `main`'s working branch, F2f (GMW reconcile manual-copy collapse) Critic-reviewed FAIL→fix→PASS and merged, C2f (PRD-acknowledgement scope fix) implemented but blocked on the same `TP-5`/HGO ceremony wall as OT09 — see "2026-08-18 (six-branch merge, F2f close, C2f block, HGO diagnosis)" below, which is now the current block)
 **Project status:** ACTIVE
 **Release version:** `0.5.4` released
 **Release state:** version `0.5.4` · tag `v0.5.4` · commit `dd1eb9eedeb7ac48860c8ec9745750c9a8367b32` · tree `b6857469bbc84de94c0f917ed64dc59b0eccc8de` · status `published`
@@ -8218,18 +8218,109 @@ not block signing, confirmed live). (2) the PO separately flagged that
 for audit purposes rather than a generic placeholder — may already be
 covered by an existing backlog item; not yet cross-referenced.
 
+## 2026-08-18 (six-branch merge, F2f close, C2f block, HGO diagnosis)
+
+**All 6 mergeable worktree commits landed on this branch, cleanly, zero
+conflicts.** Cherry-picked as new SHAs (originals were in worktrees):
+`98b173f0` (A2, transfer-classification), `95801948` (B2f,
+runtime-projection-v3 neutral-mirror sync), `e3e52183` (D2f, benchmark
+fixture digest binding), `d8fd9a37` (E2f, host-managed-Codex target
+boundary), `b8f28a79` (G2f, Windows ACL auto-remediation — still **not
+live-verified from this Linux/WSL host**, needs a real Windows checkout
+run before being treated as closed), `2b90e547` (I2f, `.gitignore`
+anchoring, ADR-0063 follow-up 1 of 3 only). Combined `node --test` across
+all 9 touched test files: 9/9 green. All 6 source worktrees removed
+(`git worktree remove`).
+
+**F2f (GMW reconcile manual-copy collapse) — Critic-reviewed and merged.**
+First Critic round: FAIL (blocker: the new `scratch/` mirror writes did
+not carry `artifactPath()`'s existing symlink/hardlink/regular-file
+hardening; major: PO doc never updated; minor: mutual-exclusion check
+tested digest validity instead of presence, silently discarding a
+malformed digest supplied together with `--request`). Rework dispatch
+(`NVA-SWEEP-F2f-REWORK`) fixed all three, added symlink regression tests,
+documented the route in `docs/po-human-approval.md`. Second Critic round:
+**PASS**, two non-blocking `minor` findings left as fast-follow (assert
+ordering runs post-signature instead of pre-flight; two new branches lack
+direct test coverage) — full detail in the closure note on
+`backlog/items/2026-08-16-gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs.md`
+(now closed). Both commits (`9b36dc14` original + `8c7a1ac9` rework)
+cherry-picked to this branch as `aaccbfcf`/`b273a1a0`. 71/71 tests green
+on the integrated branch.
+
+**C2f (PRD-acknowledgement scope fix) — implemented, committed in its own
+worktree, but blocked on the same wall as OT09.** The core fix
+(`requireAcknowledgement` threaded into `prdAuthority()`, gated on
+`expectedPlanSha256`/`expectedSpecSha256`) landed and its own suite is
+green (`po-gate-authority.test.mjs` 61/61). But `harness/scripts/
+pipeline-state.test.mjs`'s `seedSubprocessPoGateAuthority` fixture (real
+subprocess `submit-plan`/`approve-plan` path, the one call site of the
+three originally suspected that actually needed the marker — the other
+two, at lines 75 and 450, were investigated and confirmed NOT affected)
+needs the PRD-acknowledgement marker added, and that file is
+`guard-testpath.mjs` `TP-5`-protected with no in-session override. **Not
+merged; worktree `wf_7f39bfec-21b-3` (HEAD `d723d88b`) left as-is.**
+
+**HGO admission bug (blocking both OT09 and now C2f) — diagnosis
+narrowed, not fixed.** A read-only investigation (repo `git status`
+unchanged throughout) built a real repro
+(`scratch/critic-hgo-repro/repro-signature-author-repair.mjs`, gitignored,
+left for reuse) combining signature-mode + `pipeline-author-repair` mode —
+previously untested in combination — and it succeeded end to end when the
+retried tool input is byte-identical to the originally denied one. This
+narrows the live-ceremony failures to the **silent `toolInputSha256`
+match gate** in `consumeHumanGuardOverride()`
+(`human-guard-override.mjs:2689-2691`): any field difference between the
+originally-denied call and the manually retried one silently skips the
+capability with no error, falling through to `{status:"absent"}` —
+indistinguishable from unarmed. Secondary, untested candidate:
+`capability.root !== repo.root` (~line 2714). Separately, and now FULLY
+CONFIRMED (not just suspected): `describeHumanGuardOverrideSelection()`
+hardcodes `authorSourceRoot: null`, which structurally cannot resolve ANY
+`pipeline-author-repair-candidate` request for display — a distinct bug
+from the consumption failure, cosmetic (does not block signing). Full
+diagnosis and proposed minimal fixes are in
+`backlog/items/2026-08-18-pipeline-author-repair-signature-mode-never-actually-admits-the-edit.md`
+(updated, still open). **Recommended next step, revised: add temporary
+scoped instrumentation logging exactly which equality check fails per
+skipped capability file, land it, THEN run one more live ceremony
+attempt** — turns the next attempt into a one-shot diagnosis instead of a
+third blind burn of PO TTL. No live ceremony attempted this pass.
+
+**Two new backlog items filed this window, both still open:**
+`backlog/items/2026-08-18-pipeline-author-repair-signature-mode-never-actually-admits-the-edit.md`
+(above) and
+`backlog/items/2026-08-18-windows-posix-mode-bit-checks-are-meaningless-on-ntfs.md`
+(a PO-relayed Windows/NTFS bug family — `fs.lstatSync(path).mode` is
+synthesized from the read-only attribute alone on native Windows, so any
+exact-equality POSIX mode check fails closed unconditionally; confirmed
+reproduced against a real Windows session vendoring this same
+`plugins/pipeline-core` source, two hit locations independently
+spot-checked against this repo's current source before filing).
+
+**Durable-documentation items landed this window:** CLAUDE.md's new Hard
+Rule against tree mutation while a HEAD/tree-bound PO command is
+outstanding; `plugins/pipeline-core/skills/pipeline-start/references/
+workflow-dispatch.md` (Elephant-only Workflow/Agent orchestration, the
+worktree self-heal briefing text, the ~50-tool-call budget requirement).
+
+**Open, PO-requested, not yet written:** a durable CLAUDE.md/operating-model
+rule that forks/general-purpose dispatches must be explicitly told never
+to invoke Workflow/Agent unless the Elephant authorizes it (see the fork
+incident in the entry above this one).
+
 ## Recovery
 
-Nothing is in flight as of this entry. Two things need action before the
-release bar is met: (1) **6 real, tested, uncommitted-to-main commits**
-sit in worktrees under `.claude/worktrees/wf_7f39bfec-21b-{2,4,5,6,7,9}`
-(`git worktree list` to confirm; C2f's `-3` has an uncommitted diff, not a
-commit) — merge sequentially by hand once the C2f fixture-scope decision
-is made and F2f gets its Critic review; (2) **OT09 is still red**, blocked
-on the `consumeHumanGuardOverride` `pipeline-author-repair` bug described
-above — do not re-attempt the ceremony without first reading that entry
-and filing/checking the bounded backlog item for it, to avoid burning
-another PO passphrase entry on the same unfixed bug. No rollback action or
-public human-gate acceptance is recorded. Use ordinary revert commits
-after publication; do not rewrite shared history. If the checkout shows
-conflicting work, stop and report it before writing.
+Nothing is in flight as of this entry. Before the release bar is met:
+(1) **C2f's worktree** (`wf_7f39bfec-21b-3`, HEAD `d723d88b`) is
+uncommitted-to-main and blocked on the `TP-5` protected-test-path wall —
+do not merge until `harness/scripts/pipeline-state.test.mjs`'s
+`seedSubprocessPoGateAuthority` fixture can be edited (needs the HGO
+ceremony fixed or a PO-run signature ceremony); (2) **OT09 is still
+red**, blocked on the exact same wall — do not re-attempt either ceremony
+without first landing the recommended instrumented-logging step described
+above, to avoid burning another PO passphrase entry on the same unfixed
+bug. No rollback action or public human-gate acceptance is recorded. Use
+ordinary revert commits after publication; do not rewrite shared history.
+If the checkout shows conflicting work, stop and report it before
+writing.
