@@ -6,6 +6,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { planFeaturePackageBootstrap, planFeaturePackageTransition, validateFeaturePackage, validateFeatureTopology } from "./feature-package-topology.mjs";
+import { readFileSync } from "node:fs";
 
 const root = mkdtempSync(join(tmpdir(), "feature-topology-"));
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -119,3 +120,72 @@ try {
   assert.equal(amendedResult.ok, true);
   console.log("feature-package-topology: immutable-entry amendment enforcement, 3 passed, 0 failed");
 } finally { rmSync(amendmentRoot, { recursive: true, force: true }); }
+
+// PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND: a mutable-class artifact's drifted
+// digest is auto-rebound (no PO ceremony, no FTP-ARTIFACT-2), with an
+// on-manifest audit record; an immutable-class artifact's drift is NEVER
+// auto-rebound and still requires the existing signed reconcile path.
+const autoRebindRoot = mkdtempSync(join(tmpdir(), "feature-topology-autorebind-"));
+try {
+  const id = "autorebind-feature"; const base = `specs/${id}`;
+  const acceptance = fileIn(autoRebindRoot, `${base}/acceptance.md`, "original acceptance text\n");
+  const prd = fileIn(autoRebindRoot, `${base}/prd.md`, "original prd text\n");
+  const manifest = {
+    schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "draft",
+    artifacts: [
+      { class: "prd", ...prd, authority: true, mutability: "immutable", retention: "active" },
+      { class: "acceptance", ...acceptance, authority: true, mutability: "mutable", retention: "active" },
+    ],
+    candidate: null, supersedes: null,
+  };
+  const manifestPath = `${base}/lifecycle.json`;
+  fileIn(autoRebindRoot, manifestPath, `${JSON.stringify(manifest)}\n`);
+
+  // Edit BOTH a mutable and an immutable artifact's bytes -- a routine PO
+  // amendment to acceptance.md is exactly the triggering situation this WP
+  // targets, and prd.md stands in for the immutable/authority artifact whose
+  // drift must NOT be auto-rebound alongside it.
+  fileIn(autoRebindRoot, `${base}/acceptance.md`, "amended acceptance text (EPIC-AC-05 disposition)\n");
+  fileIn(autoRebindRoot, `${base}/prd.md`, "drifted prd text\n");
+
+  // Default (no options): unchanged behavior -- both drifts are reported,
+  // nothing is rewritten on disk.
+  const beforeBytes = readFileSync(join(autoRebindRoot, manifestPath), "utf8");
+  const defaultResult = validateFeaturePackage(autoRebindRoot, manifestPath);
+  assert.equal(defaultResult.ok, false);
+  const defaultDigestFindings = defaultResult.findings.filter((f) => /digest does not bind file bytes/u.test(f));
+  assert.equal(defaultDigestFindings.length, 2);
+  assert.deepEqual(defaultResult.rebinds, []);
+  assert.equal(readFileSync(join(autoRebindRoot, manifestPath), "utf8"), beforeBytes);
+
+  // options.autoRebindMutable: the mutable acceptance.md entry is silently no
+  // longer silent -- it is rebound with an audit record and stops producing
+  // FTP-ARTIFACT-2; the immutable prd.md entry is completely unaffected and
+  // still fails FTP-ARTIFACT-2, still requiring the signed reconcile path.
+  const rebindResult = validateFeaturePackage(autoRebindRoot, manifestPath, null, { autoRebindMutable: true });
+  assert.equal(rebindResult.ok, false);
+  const rebindDigestFindings = rebindResult.findings.filter((f) => /digest does not bind file bytes/u.test(f));
+  assert.equal(rebindDigestFindings.length, 1);
+  assert.match(rebindResult.findings.join("\n"), /FTP-ARTIFACT-0: digest does not bind file bytes/u);
+  assert.equal(rebindResult.findings.some((f) => /FTP-ARTIFACT-1: digest does not bind file bytes/u.test(f)), false);
+  assert.equal(rebindResult.rebinds.length, 1);
+  assert.equal(rebindResult.rebinds[0].path, acceptance.path);
+  assert.equal(rebindResult.rebinds[0].from, acceptance.sha256);
+
+  const persisted = JSON.parse(readFileSync(join(autoRebindRoot, manifestPath), "utf8"));
+  const persistedAcceptance = persisted.artifacts.find((a) => a.class === "acceptance");
+  const persistedPrd = persisted.artifacts.find((a) => a.class === "prd");
+  const newAcceptanceSha256 = hash(readFileSync(join(autoRebindRoot, `${base}/acceptance.md`)));
+  assert.equal(persistedAcceptance.sha256, newAcceptanceSha256);
+  assert.notEqual(persistedAcceptance.sha256, acceptance.sha256);
+  assert.equal(persistedAcceptance.amendment.previousSha256, acceptance.sha256);
+  assert.match(persistedAcceptance.amendment.reason, /auto-rebind/u);
+  assert.equal(persistedPrd.sha256, prd.sha256, "immutable entry must be untouched by auto-rebind");
+  assert.equal(Object.prototype.hasOwnProperty.call(persistedPrd, "amendment"), false, "immutable entry gets no auto-rebind amendment");
+
+  // Re-running now (mutable entry already resynced) yields the noop shape:
+  // no further rebinds, and the persisted mutable digest matches current bytes.
+  const secondPass = validateFeaturePackage(autoRebindRoot, manifestPath, null, { autoRebindMutable: true });
+  assert.deepEqual(secondPass.rebinds, []);
+  console.log("feature-package-topology: mutable-only auto-rebind boundary, 6 passed, 0 failed");
+} finally { rmSync(autoRebindRoot, { recursive: true, force: true }); }

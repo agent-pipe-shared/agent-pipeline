@@ -8,7 +8,7 @@
  * checked through this single contract.
  */
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { PLAN_LIFECYCLE_STATUSES } from "./plan-spec-state-v2.mjs";
 
@@ -58,6 +58,29 @@ function walk(root, start) {
   if (existsSync(join(root, start))) visit(join(root, start));
   return files.sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)));
 }
+// ---- PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND: lightweight, non-PO-gated resync ----
+// (backlog: 2026-08-17-acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest.md)
+//
+// Applies ONLY to an entry whose OWN `mutability` is exactly "mutable" -- an
+// artifact's declared class, never `authority` (an acceptance.md entry is
+// routinely both `authority: true` and `mutability: "mutable"`, and is
+// exactly the case this exists for). `immutable` and `append-only` entries
+// are never touched by this helper and keep hitting FTP-ARTIFACT-2, requiring
+// the PO-signed `feature-package-reconcile` ceremony (see
+// `planFeaturePackageReconcile` below) for any digest rebind -- that
+// separation is the entire point, so this check is the one hardcoded
+// class test and is never made configurable.
+function autoRebindMutableArtifact(root, id, artifact) {
+  if (!object(artifact) || artifact.mutability !== "mutable") return null;
+  const rel = packageRelative(id, artifact.path);
+  if (!rel || !canonicalRelative(root, artifact.path)) return null;
+  const file = regularFile(root, artifact.path, [], "FTP-AUTOREBIND");
+  if (!file || !SHA256.test(artifact.sha256 ?? "")) return null;
+  const currentSha256 = digest(readFileSync(join(root, file)));
+  if (currentSha256 === artifact.sha256) return null;
+  return { path: artifact.path, class: artifact.class, from: artifact.sha256, to: currentSha256, at: new Date().toISOString() };
+}
+
 function caseFoldedPackageFiles(root, id) {
   const folded = new Map();
   if (!SAFE_ID.test(id ?? "")) return folded;
@@ -92,8 +115,19 @@ export function inventoryFeaturePackages(rootDir = process.cwd()) {
  * baseline requires a matching `amendment` record on the entry (PHX-WP-MANIFEST-AMENDMENT).
  * When absent, no such baseline exists, so the invariant cannot be enforced and
  * only the amendment record's own shape (if present) is validated.
+ *
+ * `options.autoRebindMutable` (default false, so every existing caller is
+ * unaffected) opts into PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND: before findings
+ * are computed, any artifact whose OWN `mutability` is exactly "mutable" and
+ * whose bound digest no longer matches its current file bytes is rewritten
+ * in place -- sha256 updated, an `amendment` audit record attached (`at`,
+ * `reason`, `previousSha256`) -- and the manifest is persisted with the
+ * rebind(s) applied, so FTP-ARTIFACT-2 never fires for that entry. This is
+ * deliberately NOT gated by a signed ceremony (contrast
+ * `planFeaturePackageReconcile`); `immutable`/`append-only` entries are never
+ * touched here, whatever this flag is set to.
  */
-export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, previousManifest = null) {
+export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, previousManifest = null, options = {}) {
   const root = resolve(rootDir); const findings = [];
   const manifest = regularFile(root, manifestPath, findings, "FTP-MANIFEST");
   if (!manifest) return { ok: false, findings, receipt: null };
@@ -109,6 +143,22 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, pr
   if (!(value?.candidate === null || exact(value?.candidate, ["commit", "tree"]))) findings.push("FTP-CANDIDATE: candidate must be null or a closed commit/tree binding");
   if (value?.candidate !== null && (!OID.test(value.candidate?.commit ?? "") || !OID.test(value.candidate?.tree ?? ""))) findings.push("FTP-CANDIDATE: candidate identity is invalid");
   if (!(value?.supersedes === null || (typeof value?.supersedes === "string" && SAFE_ID.test(value.supersedes)))) findings.push("FTP-SUPERSEDES: relationship must be null or a safe feature id");
+
+  const rebinds = [];
+  if (options?.autoRebindMutable === true && SAFE_ID.test(id ?? "") && Array.isArray(value?.artifacts)) {
+    let mutated = false;
+    const nextArtifacts = value.artifacts.map((artifact) => {
+      const rebind = autoRebindMutableArtifact(root, id, artifact);
+      if (!rebind) return artifact;
+      mutated = true;
+      rebinds.push(rebind);
+      return { ...artifact, sha256: rebind.to, amendment: { at: rebind.at, reason: "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)", previousSha256: rebind.from } };
+    });
+    if (mutated) {
+      value = { ...value, artifacts: nextArtifacts };
+      writeFileSync(join(root, manifest), `${JSON.stringify(value, null, 2)}\n`);
+    }
+  }
 
   const previousByPath = new Map();
   if (Array.isArray(previousManifest?.artifacts)) {
@@ -161,7 +211,7 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, pr
   if (["verifying", "completed"].includes(value?.state) && value?.candidate === null) findings.push("FTP-CANDIDATE: verifying/completed packages require an exact candidate binding");
   if (["superseded", "retained"].includes(value?.state) && value?.supersedes === null) findings.push("FTP-SUPERSEDES: retained/superseded packages require a relationship");
   const receipt = { schema: "pipeline.feature-package-receipt.v1", manifest, manifestSha256: digest(readFileSync(join(root, manifest))), featureId: SAFE_ID.test(id ?? "") ? id : null, state: FEATURE_STATES.includes(value?.state) ? value.state : null, candidate: value?.candidate ?? null, artifactCount: Array.isArray(value?.artifacts) ? value.artifacts.length : 0, findingCount: findings.length };
-  return { ok: findings.length === 0, findings, receipt };
+  return { ok: findings.length === 0, findings, receipt, rebinds };
 }
 
 /** A non-mutating, idempotent transition preview. Application remains a human-gated writer. */
