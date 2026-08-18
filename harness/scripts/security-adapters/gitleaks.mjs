@@ -16,8 +16,15 @@
  * the optional `env` param (defaults to `process.env`) -- this lets a unit test call run()
  * in isolation with a fixture env object, without needing the runner's glue.
  *
- * INVOCATION: `gitleaks detect --source <root> --no-git --report-format json --report-path <tmp>
- * --no-banner --exit-code 0`. `--no-git` makes gitleaks "treat git repo as a regular directory
+ * INVOCATION: `gitleaks detect --source <root> --no-git --config <repo-root>/.gitleaks.toml
+ * --report-format json --report-path <tmp> --no-banner --exit-code 0`. `--config` (PHX-WP-
+ * GITLEAKS-RULE-SCOPE) always points at the fixed, repo-root `.gitleaks.toml` resolved from THIS
+ * MODULE's own on-disk location (see `GITLEAKS_CONFIG_PATH` below), never from `rootDir` -- that
+ * file `[extend]`s gitleaks' full built-in ruleset (`useDefault = true`) and adds a narrow,
+ * path-scoped allowlist that disables ONLY `sentry-access-token`/`generic-api-key` for
+ * `backlog/transitions.ndjson` (the hash-chained ledger's bare-hex-digest false positives --
+ * backlog/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md);
+ * every rule stays fully armed, unchanged, everywhere else. `--no-git` makes gitleaks "treat git repo as a regular directory
  * and scan those files" (its own --help wording): a pure filesystem content scan of <root> with
  * ZERO git object/ref/history traversal. This is the architecturally correct scope, not a
  * workaround -- <root> is already an immutable, identity-verified detached snapshot of ONE exact
@@ -57,8 +64,9 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter as PATH_DELIM, isAbsolute, join as pathJoin, relative, sep } from "node:path";
+import { delimiter as PATH_DELIM, dirname, isAbsolute, join as pathJoin, relative, sep } from "node:path";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 export const name = "gitleaks";
 
@@ -68,6 +76,19 @@ const WIN_EXTS = [".exe", ".cmd", ".bat"];
 const IGNORE_FILE = ".gitleaksignore";
 const CONTENT_AUTHORITY_PREFIX = "content-v1:";
 const MAX_IGNORE_BYTES = 256 * 1024;
+
+// Fixed, repo-relative gitleaks rule config (PHX-WP-GITLEAKS-RULE-SCOPE): a per-path allowlist
+// that disables ONLY `sentry-access-token`/`generic-api-key` for `backlog/transitions.ndjson`
+// (see the config file's own header for the full rationale). Resolved from THIS module's own
+// on-disk location (`import.meta.url`), never from `rootDir` -- `rootDir` is a detached
+// candidate-tree snapshot of the commit under scan (see INVOCATION/--source note above), and the
+// config must NOT be sourced from that untrusted, not-yet-approved tree (the same reasoning
+// security-scan.mjs already applies to a candidate-supplied manifest path -- a candidate commit
+// must never be able to smuggle its own scanner-config override). This adapter file's path is
+// fixed at `harness/scripts/security-adapters/gitleaks.mjs`, three directories below the repo
+// root, so `../../../.gitleaks.toml` from this file's own directory is the repo root's config,
+// regardless of what `rootDir` points at for any given run.
+const GITLEAKS_CONFIG_PATH = pathJoin(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", ".gitleaks.toml");
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");
@@ -268,6 +289,8 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     "--source",
     rootDir,
     "--no-git", // file-content-only scan of the candidate tree; no git history/ref traversal (see header INVOCATION + CAPABILITY_CONTRACT_V2.coverageLimitations)
+    "--config",
+    GITLEAKS_CONFIG_PATH, // repo-fixed rule config -- see GITLEAKS_CONFIG_PATH doc comment above; never resolved from rootDir
     "--report-format",
     "json",
     "--report-path",
@@ -388,7 +411,7 @@ export const CAPABILITY_CONTRACT_V2 = Object.freeze({
   }),
   confidenceNormalization: null,
   coverageLimitations: Object.freeze([
-    "No --config/custom rule-pack flag is passed to `detect` -- this adapter relies on whatever rule set is built into the resolved gitleaks binary itself, not a project-specific config.",
+    "A fixed `--config <repo-root>/.gitleaks.toml` is always passed to `detect` (PHX-WP-GITLEAKS-RULE-SCOPE), resolved from this adapter module's own on-disk location, never from rootDir (the candidate tree must never supply its own scanner-config override). That config extends gitleaks' full built-in default ruleset (`useDefault = true`) unchanged and adds exactly one narrow, path-scoped allowlist: `sentry-access-token` and `generic-api-key` are disabled ONLY for `backlog/transitions.ndjson` (the hash-chained ledger's bare-64-hex-digest false positives); every other rule, and this rule pair on every other path, remains fully armed and unmodified.",
     "`--no-git` is passed to `detect`, so the scan is a pure filesystem content scan of rootDir (gitleaks' own --help wording: \"treat git repo as a regular directory and scan those files\") with ZERO git object/ref/history traversal. rootDir is an immutable, identity-verified single-commit-tree snapshot (security-scan.mjs materializeCandidate, git-detached-worktree.v1), so this is the literal `candidate-tree` coverage the security-evidence schema claims. Historical / deleted-secret / cross-ancestry mining is deliberately NOT performed: it was never a documented capability of this adapter and, because a git worktree shares the main clone's `.git` object database, that default `detect` traversal was the source of cross-branch false positives (backlog 2026-07-25-security-scan-cross-branch-gitleaks-findings).",
     "Single-shot, full scan per invocation -- no --baseline-path or other incremental/diff mechanism; every run() call re-scans the entirety of rootDir from scratch.",
   ]),

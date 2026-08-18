@@ -1,0 +1,38 @@
+# .gitleaks.toml -- path-scoped rule exemption for the hash-chained backlog ledger.
+#
+# Background: backlog/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md
+# (PO-selected "candidate 1"). backlog/transitions.ndjson is a hash-chained, append-only ledger
+# whose lines carry multiple bare 64-hex-character SHA-256 digests (entryHash, previousHash, and
+# for amendment-kind events also referenceSha256/supersedesEntryHash). gitleaks' `sentry-access-token`
+# rule pattern-matches that shape deterministically for amendment events (100% of the time) and
+# `generic-api-key` sporadically for ordinary events (~1.6%), forcing a manually-reviewed
+# .gitleaksignore suppression entry per occurrence, forever.
+#
+# `[extend] useDefault = true` loads gitleaks' full built-in default ruleset unchanged; the
+# `[[rules]]` blocks below are matched to the built-in rules of the SAME id and MERGE an
+# additional path-scoped allowlist onto them -- empirically verified (this task) to leave the
+# rule's own regex/keywords/entropy logic completely untouched for every other path. Only these
+# two rule IDs, and only this one path, are touched. No other rule and no other file in the
+# repository is affected: both rules stay fully armed everywhere else, including a pasted real
+# credential elsewhere in this same file being fully detectable.
+#
+# Path-matching note: gitleaks matches a rule-scoped allowlist's `paths` regex against the
+# file path gitleaks itself reports (empirically the absolute filesystem path of the scanned
+# source tree, not a path relative to `--source`) -- verified by testing a strict
+# `^backlog/transitions\.ndjson$` anchor, which never matched, against the working
+# `.*backlog/transitions\.ndjson$` form used below.
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "sentry-access-token"
+
+[[rules.allowlists]]
+paths = ['''.*backlog/transitions\.ndjson$''']
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+paths = ['''.*backlog/transitions\.ndjson$''']
