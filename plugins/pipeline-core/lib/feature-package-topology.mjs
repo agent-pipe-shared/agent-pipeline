@@ -19,6 +19,8 @@ const ACTIVE_STATES = new Set(["awaiting-approval", "approved", "implementing", 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40,64}$/u;
 const SAFE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
+const AMENDMENT_AT = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)?$/u;
+const ARTIFACT_KEYS = Object.freeze(["class", "path", "sha256", "authority", "mutability", "retention"]);
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return object(value) && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0"); }
@@ -80,8 +82,18 @@ export function inventoryFeaturePackages(rootDir = process.cwd()) {
   return { packages, legacy, unknown };
 }
 
-/** Validate one complete package without treating historical files as authority. */
-export function validateFeaturePackage(rootDir = process.cwd(), manifestPath) {
+/**
+ * Validate one complete package without treating historical files as authority.
+ *
+ * `previousManifest` is an optional prior manifest value (the same shape this
+ * module already treats as a reconcile preimage) supplied by the caller when it
+ * has one available (e.g. from git history). When present, it is the baseline an
+ * `immutable` artifact's digest is compared against: a rebind away from that
+ * baseline requires a matching `amendment` record on the entry (PHX-WP-MANIFEST-AMENDMENT).
+ * When absent, no such baseline exists, so the invariant cannot be enforced and
+ * only the amendment record's own shape (if present) is validated.
+ */
+export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, previousManifest = null) {
   const root = resolve(rootDir); const findings = [];
   const manifest = regularFile(root, manifestPath, findings, "FTP-MANIFEST");
   if (!manifest) return { ok: false, findings, receipt: null };
@@ -98,11 +110,30 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath) {
   if (value?.candidate !== null && (!OID.test(value.candidate?.commit ?? "") || !OID.test(value.candidate?.tree ?? ""))) findings.push("FTP-CANDIDATE: candidate identity is invalid");
   if (!(value?.supersedes === null || (typeof value?.supersedes === "string" && SAFE_ID.test(value.supersedes)))) findings.push("FTP-SUPERSEDES: relationship must be null or a safe feature id");
 
+  const previousByPath = new Map();
+  if (Array.isArray(previousManifest?.artifacts)) {
+    for (const prior of previousManifest.artifacts) if (object(prior) && typeof prior.path === "string") previousByPath.set(prior.path, prior);
+  }
   const seen = new Set(); const folded = new Set(); const classes = new Map();
   const packageFiles = caseFoldedPackageFiles(root, id);
   for (const [index, artifact] of (Array.isArray(value?.artifacts) ? value.artifacts : []).entries()) {
     const label = `FTP-ARTIFACT-${index}`;
-    if (!exact(artifact, ["class", "path", "sha256", "authority", "mutability", "retention"])) { findings.push(`${label}: closed artifact keys are required`); continue; }
+    const hasAmendment = object(artifact) && Object.prototype.hasOwnProperty.call(artifact, "amendment");
+    if (!exact(artifact, hasAmendment ? [...ARTIFACT_KEYS, "amendment"] : ARTIFACT_KEYS)) { findings.push(`${label}: closed artifact keys are required`); continue; }
+    if (hasAmendment) {
+      const amendment = artifact.amendment;
+      if (!exact(amendment, ["at", "reason", "previousSha256"])
+        || typeof amendment.at !== "string" || !AMENDMENT_AT.test(amendment.at)
+        || typeof amendment.reason !== "string" || amendment.reason.trim().length === 0
+        || !SHA256.test(amendment.previousSha256 ?? "")) {
+        findings.push(`${label}: amendment must be a closed {at, reason, previousSha256} record`);
+      }
+    }
+    const previousEntry = previousByPath.get(artifact.path);
+    if (previousEntry && artifact.mutability === "immutable" && SHA256.test(previousEntry.sha256 ?? "") && SHA256.test(artifact.sha256 ?? "") && previousEntry.sha256 !== artifact.sha256) {
+      if (!hasAmendment) findings.push(`${label}: immutable entry rebound without an amendment record`);
+      else if (artifact.amendment?.previousSha256 !== previousEntry.sha256) findings.push(`${label}: amendment.previousSha256 must equal the previously recorded digest`);
+    }
     if (!FEATURE_CLASSES.includes(artifact.class)) findings.push(`${label}: unsupported class`);
     const rel = packageRelative(id, artifact.path);
     if (!rel || !canonicalRelative(root, artifact.path)) findings.push(`${label}: path must be canonical within specs/${id}/`);

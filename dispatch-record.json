@@ -1,12 +1,13 @@
 {
-  "taskId": "PHX-WP-GIT03-TRAILER-CHECK",
+  "taskId": "PHX-WP-MANIFEST-AMENDMENT",
   "model": "claude-sonnet-5",
   "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
   "dispatcher": "goldfish",
   "outcome": "passed",
   "log": [
-    {"phase": "start", "toolUses": 1, "note": "dispatch record created as opening act"},
-    {"phase": "implement", "toolUses": 6, "note": "updated GIT-03 verification line in guardrails/git.md to structural trailer parsing"},
-    {"phase": "verify", "toolUses": 7, "note": "git log -1 --format='%(trailers:only=true,unfold=true)' HEAD exit 0, printed non-empty Dispatch/AI-Assisted trailers"}
+    {"phase": "start", "toolUseCount": 1, "note": "opening dispatch record written"},
+    {"phase": "implementation", "toolUseCount": 6, "note": "added optional amendment key + previousManifest-baseline invariant to validateFeaturePackage in feature-package-topology.mjs"},
+    {"phase": "test", "toolUseCount": 9, "note": "added fixture tests (unamended rebind rejected, mismatched previousSha256 rejected, correctly amended rebind accepted)"},
+    {"phase": "verify", "toolUseCount": 10, "note": "node --test plugins/pipeline-core/lib/feature-package-topology.test.mjs exit 0, all suites passed"}
   ]
 }

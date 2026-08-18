@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { planFeaturePackageBootstrap, planFeaturePackageTransition, validateFeatureTopology } from "./feature-package-topology.mjs";
+import { planFeaturePackageBootstrap, planFeaturePackageTransition, validateFeaturePackage, validateFeatureTopology } from "./feature-package-topology.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "feature-topology-"));
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -71,3 +71,51 @@ try {
   assert.equal(validateFeatureTopology(posixRoot).ok, true);
   console.log("feature-package-topology: forward-slash path regression, 1 passed, 0 failed");
 } finally { rmSync(posixRoot, { recursive: true, force: true }); }
+
+// PHX-WP-MANIFEST-AMENDMENT: an `immutable` entry's digest may only differ
+// from the prior manifest's recorded value in the same write that supplies a
+// matching `amendment` record.
+const amendmentRoot = mkdtempSync(join(tmpdir(), "feature-topology-amendment-"));
+try {
+  const id = "amendment-feature"; const base = `specs/${id}`;
+  const originalSha256 = hash("original evidence\n");
+  const rebound = fileIn(amendmentRoot, `${base}/evidence/candidate.json`, "rebound evidence\n");
+  const previousManifest = {
+    schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "abandoned",
+    artifacts: [{ class: "candidate-evidence", path: rebound.path, sha256: originalSha256, authority: false, mutability: "immutable", retention: "retain" }],
+    candidate: null, supersedes: null,
+  };
+  const manifestPath = `${base}/lifecycle.json`;
+  const unamended = {
+    ...previousManifest,
+    artifacts: [{ class: "candidate-evidence", path: rebound.path, sha256: rebound.sha256, authority: false, mutability: "immutable", retention: "retain" }],
+  };
+  fileIn(amendmentRoot, manifestPath, `${JSON.stringify(unamended)}\n`);
+  const unamendedResult = validateFeaturePackage(amendmentRoot, manifestPath, previousManifest);
+  assert.equal(unamendedResult.ok, false);
+  assert.match(unamendedResult.findings.join("\n"), /immutable entry rebound without an amendment record/u);
+
+  const wrongPrevious = {
+    ...previousManifest,
+    artifacts: [{
+      class: "candidate-evidence", path: rebound.path, sha256: rebound.sha256, authority: false, mutability: "immutable", retention: "retain",
+      amendment: { at: "2026-08-08", reason: "artifact renamed under the epic", previousSha256: "0".repeat(64) },
+    }],
+  };
+  fileIn(amendmentRoot, manifestPath, `${JSON.stringify(wrongPrevious)}\n`);
+  const wrongPreviousResult = validateFeaturePackage(amendmentRoot, manifestPath, previousManifest);
+  assert.equal(wrongPreviousResult.ok, false);
+  assert.match(wrongPreviousResult.findings.join("\n"), /amendment\.previousSha256 must equal the previously recorded digest/u);
+
+  const amended = {
+    ...previousManifest,
+    artifacts: [{
+      class: "candidate-evidence", path: rebound.path, sha256: rebound.sha256, authority: false, mutability: "immutable", retention: "retain",
+      amendment: { at: "2026-08-08", reason: "artifact renamed under the epic", previousSha256: originalSha256 },
+    }],
+  };
+  fileIn(amendmentRoot, manifestPath, `${JSON.stringify(amended)}\n`);
+  const amendedResult = validateFeaturePackage(amendmentRoot, manifestPath, previousManifest);
+  assert.equal(amendedResult.ok, true);
+  console.log("feature-package-topology: immutable-entry amendment enforcement, 3 passed, 0 failed");
+} finally { rmSync(amendmentRoot, { recursive: true, force: true }); }
