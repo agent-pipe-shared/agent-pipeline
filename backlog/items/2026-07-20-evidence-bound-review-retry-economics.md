@@ -112,3 +112,45 @@ interrupted transport.
   package's scope — a distinct, later, separately-triaged follow-up once
   this module itself is accepted.
 - **Date:** 2026-08-18
+
+### `NVA-RETRYECON-1` landed and Critic-PASSed — 2026-08-18
+
+`plugins/pipeline-core/lib/review-retry-planner.mjs` (427 lines) +
+`review-retry-planner.test.mjs` (327 lines, 17/17 passing, one test per
+acceptance-boundary bullet). Implements every acceptance-boundary bullet
+above as a pure, unwired decision function: binding drift on candidate/
+scope/policy/route/assurance/freshness invalidates and propagates through
+declared dependents to a fixpoint; a domain finding always reopens its
+domain; an evidenced infrastructure-only abort (`transport`/`execution`/
+`orchestration`) retries only the aborted stage and retains every other
+still-valid receipt; an unevidenced/unknown cause is representable only as
+`unclassified` and fails closed to a full rerun (closing the exact
+fraud-shaped gap an unevidenced infrastructure claim would otherwise open);
+every per-stage decision is recorded in machine evidence; a retry plan is
+structurally unreadable as a PASS/readiness/release/conformance claim (no
+verdict vocabulary, no boolean `true` field, `claimAuthority` pinned to
+`"none"` and re-validated, no embedded receipt, `isReviewRetryPlan`
+exported so a consumer can positively refuse one). Deliberately more
+conservative than `verify-resume.mjs`'s ADR-0065 Tier-B path: no
+cross-candidate-reuse switch exists or should ever be added here, per this
+item's own acceptance boundary and ADR-0065 Decision 8's own release-bound
+default. Committed `4d23d8c2`.
+
+Independent Critic review (`a3b9acbf..4d23d8c2`, functional-equivalent-
+read-only): **PASS, no findings.** The reviewer independently re-derived
+the exact plan-forgery attack the implementor's own first test run had
+caught (promote a stage from `rerun` to `retained`, patch `cost`, recompute
+the digest) before discovering the test already covered it — confirmed
+the anti-forgery cross-check structurally prevents it. Confirmed no live
+call site references the new module (`grep` across `plugins/pipeline-core`
+and `harness` finds only the module's own test). 17/17 independently
+re-run and byte-matched.
+
+**What remains, for whoever picks this up next:** live wiring into the
+actual Verify/Critic retry call sites (`harness/scripts/verify.mjs`,
+`publication-executor.mjs`, or wherever review-economy retries are
+actually decided today) — a separate, higher-risk follow-up, deliberately
+out of this package's scope, not yet triaged or assigned. The module and
+its test are also not yet registered in `verify.mjs` (by design, since
+nothing calls it yet). Status stays `in_progress` until live wiring is
+designed, triaged, and lands.
