@@ -47,6 +47,14 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 0c2267d4ac68dfc7b4ee96d8e66bc5953d46c2d7 — 2026-08-18, range 671fbde0..0c2267d4, GMW prepare-warning fix (PHX-WP-GMW-PREPARE-WARNING) evidence tracked
+
+- ADR-0045: checked, no change needed.
+
+  The tracked evidence files sit under the existing, already-enumerated
+  `specs/sprint-phoenix-epic/evidence/` location. No new root artifact, no
+  topology change.
+
 ## Candidate c2193f52fa3dd4f448456c4f352ddf67e3b17591 — 2026-08-18, range 2eb52dd2..c2193f52, finalize the PHX-WP-EVIDENCE-PATH-CHECK dispatch-record evidence
 
 - ADR-0045: checked, no change needed.
