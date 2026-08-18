@@ -539,7 +539,11 @@ function protectedAuthorityDocumentWriteOnly(matchedRelativePath) {
       + "unavailable observation rather than as the edit that caused it.\n"
       + "The sanctioned route for a genuine planning change: run `reopen-design --by "
       + "<name>` to release the binding, make the edit, then rebind with `submit-plan "
-      + "--by <name> --profile <epic|feature|mini>` and `approve-plan --by <name>`.\n",
+      + "--by <name> --profile <epic|feature|mini>` and `approve-plan --by <name>`.\n"
+      + "If the only problem is a missing/incorrect PO plan acknowledgement marker on an "
+      + "otherwise-correct bound PRD, the narrower `po-authority-acknowledge-plan` / "
+      + "`po-authority-acknowledge-apply` route (NVA-W4-2B) records the acknowledgement "
+      + "without reopening design or editing the file directly.\n",
   );
 }
 

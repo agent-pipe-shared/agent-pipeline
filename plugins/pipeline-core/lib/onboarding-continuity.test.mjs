@@ -1999,6 +1999,25 @@ check("promotion refuses a PRD whose technical Spec marker disagrees with the ne
     (error) => error?.code === "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISMATCH");
 });
 
+check("promotion refuses a PRD without the PO plan acknowledgement marker (NVA-W4-2B)", () => {
+  const seed = promotionSeed("acknowledgement-marker-missing");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  writeFileSync(path, readFileSync(path, "utf8").split("\n")
+    .filter((line) => !line.startsWith("<!-- po-plan-acknowledged:")).join("\n"));
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING");
+});
+
+check("promotion refuses a PRD carrying more than one PO plan acknowledgement marker, with the same missing-marker code (NVA-W4-2B)", () => {
+  const seed = promotionSeed("acknowledgement-marker-duplicate");
+  const path = promotedArtifact(seed, "prd_promoted.md");
+  const original = readFileSync(path, "utf8");
+  const markerLine = original.split("\n").find((line) => line.startsWith("<!-- po-plan-acknowledged:"));
+  writeFileSync(path, `${markerLine}\n${original}`);
+  assert.throws(() => planOnboardingKickoffPromotion(seed.request),
+    (error) => error?.code === "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING");
+});
+
 check("promotion refuses a PRD carrying no po-language marker, or one whose value is not in the supported set", () => {
   const missing = promotionSeed("language-marker-missing");
   const missingPath = promotedArtifact(missing, "prd_promoted.md");

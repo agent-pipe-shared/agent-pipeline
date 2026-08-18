@@ -65,6 +65,7 @@ import {
   validatePortablePipelineState,
 } from "./project-authority.mjs";
 import {
+  PRD_ACKNOWLEDGEMENT_MARKER,
   PRD_LANGUAGE_MARKER,
   TECHNICAL_SPEC_MARKER,
   validatePoGateLanguageProjection,
@@ -4116,6 +4117,24 @@ function promotionArtifacts(root, input, { checkMarkers = true } = {}) {
         "KICKOFF-PROMOTION-PRD-SPEC-MARKER-MISMATCH",
         "The promoted PRD technical Spec marker does not match the neighboring spec.md; it must read exactly"
           + ` <!-- technical-spec-sha256: ${spec.sha256} -->; the PO plan gate will otherwise refuse it.`,
+      );
+    }
+    // Third marker, same admission-time reasoning as the two above (NVA-W4-2B,
+    // 2026-08-08-a-promotion-freezes-a-prd-the-po-gate-will-reject.md's own
+    // Direction 1/2 extended to the acknowledgement marker added later by
+    // 2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md): a
+    // promoted-but-unacknowledged PRD used to hit PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING
+    // with no sanctioned repair route once bound (po-gate-authority.mjs's own
+    // ACKNOWLEDGEMENT_REPAIR text, before NVA-W4-2B added
+    // po-authority-acknowledge-plan/apply). Refusing here, before anything is
+    // frozen, keeps that dead end from being reachable via promotion.
+    const acknowledgementMarkers = [...prdText.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
+    if (acknowledgementMarkers.length !== 1) {
+      fail(
+        "KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+        "The promoted PRD must carry the PO's plan acknowledgement marker exactly once, as"
+          + " <!-- po-plan-acknowledged: content-sound-and-spec-consistent --> on its own line;"
+          + " the PO plan gate will otherwise refuse it with no sanctioned repair route once bound.",
       );
     }
   }
