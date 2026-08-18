@@ -7,6 +7,88 @@
 
 ---
 
+## CHECKPOINT — 2026-08-18 (30): session resumed after a PC outage; checkpoint 29's baseline re-confirmed fresh, Layer 1b reconciled, the push subject-sha256 computed — PO signing is the one remaining step (READ THIS FIRST)
+
+**Session resumed after the PC lost power mid-session.** Bootstrap ready (V4
+`status: ready`; preflight `plugin-refresh-required` is advisory-only per
+`references/onboarding-recovery.md`, no recovery action needed). PO returned and
+set the goal: close Sprint Phoenix and produce a branch push.
+
+**Re-confirmed checkpoint 29's claim fresh, not carried over:** Full Verify
+re-run in the detached worktree (`.git/phx-verify`) at the then-HEAD `b87ef50d`
+— exactly the same 3-suite known-red baseline (`guard-testpath-override-tests`,
+`doc-contract-tests`, `doc-contract-check`), `security-scan` clean, 383 suites
+total. Matches checkpoint 29's own last-stated baseline exactly.
+
+**Ran push-release-flow.md's Layer 1b (`check-doc-reconciliation.mjs --base
+8a92d377 --candidate b87ef50d`), the step before any signature request is
+prepared.** It failed: 4 ADRs implicated by the range since the last
+reconciliation entry (`ADR-0012`, `ADR-0045`, `ADR-0056`, `ADR-0058`) had no
+record for this candidate. Read each implicated diff directly rather than
+assumed compatible — `ae13b68b`'s H-AC-12 dual-evaluate addition to
+`guard-push.mjs` (opt-in, layered onto the existing clearance record, does not
+touch `gates.push_approval`'s mode selection), `26b1fcf7`'s population of
+`trustAnchors` with the PO's two machine keys (exactly the SET mechanism
+ADR-0056's own 2026-08-16 correction already describes at N=2, not a new
+shape), and the repeated `lifecycle.json` FTP-ARTIFACT-2 digest reconciliations
+(each a fresh PO-signed `feature-package-reconcile` ceremony, read to confirm,
+never a hand edit) — all additive/compatible, none needed amendment. Wrote and
+committed the record (`75bd72c2`, docs-only, one file). Layer 1b now passes
+clean for `8a92d377..b87ef50d`. Full Verify re-run fresh at `75bd72c2` in the
+worktree to confirm the docs-only commit changed nothing (in flight at this
+checkpoint's own writing; same 3-red baseline expected).
+
+**Computed the push `--subject-sha256` by importing the real function**
+(`criticalActionSubjectSha256`, `scratch/compute-push-subject-sha256.mjs`,
+gitignored, run against the clean worktree at `75bd72c2`) rather than
+hand-rolling it, per this file's own documented warning:
+`6f817d184d5d625fe02e73a57623ca51c87a37b44699f4cddd45582197be14a7`, for
+`remote: origin`, `destination: refs/heads/sprint_phoenix`, threat-model digest
+`6a13ff03…` (matches the value already recorded in this repo's own push
+history, e.g. `754b32bd` — confirms the computation).
+
+**Checked `~/agent-pipeline-po-nova` for a reusable proof: none — a
+`proof-critical-push.json`/`request-critical-push.json` pair exists there but
+is stale**, bound to a much earlier candidate (`18cc56d5`) with `expiresAt`
+already in the past. A fresh ceremony is required.
+
+**What's left is exactly Layers 2-3 of `docs/push-release-flow.md`, both
+human-only by design** (Layer 2 is agent-blocked in practice —
+`GUARD-CROSS-REPO-MUTATION` — because the external PO directory sits outside
+the repository root; Layer 3 needs the private key, which never leaves that
+directory). The PO runs, from a real terminal (not through an agent session):
+
+```
+node plugins/pipeline-core/scripts/po-approval-gate.mjs prepare-critical \
+  --repo-root <this-checkout>/.git/phx-verify --directory ~/agent-pipeline-po-nova \
+  --feature-id sprint-phoenix-epic \
+  --plan specs/sprint-phoenix-epic/prd_phoenix-epic.md --spec specs/sprint-phoenix-epic/spec.md \
+  --kind push --subject-sha256 6f817d184d5d625fe02e73a57623ca51c87a37b44699f4cddd45582197be14a7 \
+  --expires-at 2026-08-25T00:00:00.000Z
+
+node plugins/pipeline-core/scripts/po-human-approval.mjs approve-critical \
+  --repo-root <this-checkout>/.git/phx-verify --directory ~/agent-pipeline-po-nova --kind push
+```
+
+Once both land, the agent resumes at Layer 4 (`pipeline-state.mjs approve-push
+--by Human --remote origin --destination refs/heads/sprint_phoenix
+--proof-request/--proof-authority/--proof <paths in ~/agent-pipeline-po-nova>`)
+and Layer 5 (`git push origin sprint_phoenix:refs/heads/sprint_phoenix` — no
+GG-03 double-confirmation needed, `sprint_phoenix` is not `main`/protected).
+
+**Not re-litigated, and not asked again:** the 5 Class-P items' own dispositions
+(A-AC-01/H-AC-11/L-AC-01 deferred by already-recorded design decisions;
+EPIC-AC-05 a permanent constraint) stand as checkpoint 23-29 recorded them. This
+checkpoint's work is push-mechanics only — it does not reopen any of those.
+
+**Next steps:** PO runs the two commands above; once the resulting proof files
+exist, resume at Layer 4/5 and push. If the worktree candidate changes before
+the PO signs (e.g. a later fix), the subject-sha256 must be recomputed for the
+new candidate before Layer 2 — the proof is commit-bound and fails closed on
+mismatch.
+
+---
+
 ## CHECKPOINT — 2026-08-18 (29): Class B is now EMPTY — A-AC-01 was a stale `build`-class entry, reclassified `po`; Sprint Phoenix has zero remaining agent-buildable acceptance criteria, only 5 Class-P (PO-gated) items left (READ THIS FIRST)
 
 **In response to a Stop-hook challenge that the prior checkpoint's "nothing further agent-actionable" claim lacked fresh evidence, re-swept from scratch rather than repeating the assertion — and found a real, previously-undiscovered bug.**
