@@ -137,3 +137,78 @@ record less true rather than more.
   scope as the authorship-control question this item's own primary
   decision already assigned there.
 - **Date:** 2026-08-18
+
+### Implementation, 2026-08-18 (wave 1, dispatch NVA-W1-9)
+
+Direction 1 (the decidable GIT-01 type-vocabulary check) implemented as a pure
+function, per the 2026-08-18 triage's assignment. The authorship-control
+question (direction 2/3) is untouched by this dispatch — out of its scope.
+
+- **`plugins/pipeline-core/lib/commit-message-policy.mjs`** — added
+  `GIT01_COMMIT_TYPES` (line 211, the `guardrails/git.md:16` vocabulary
+  verbatim), `commitTypeFindings(subject)` (line 228, pure: does the trimmed
+  subject start with an admitted type, optional `(scope)`, optional
+  breaking-change `!`, then `: `?) and `commitTypeFindingsForRange(commits)`
+  (line 254, the range-mode entry point — takes an already-enumerated
+  `{sha, subject}[]`, maps `commitTypeFindings` over it, stays pure by
+  leaving range enumeration, i.e. walking `git log`, to whatever wires it in).
+  Findings use the same `{code, detail}` shape as the existing GIT-03 checks
+  in this module (`GIT-01-UNKNOWN-TYPE`, `GIT-01-EMPTY-SUBJECT`).
+- **`plugins/pipeline-core/lib/commit-message-policy.test.mjs`** — added 11
+  regression checks, CMT1–CMT11 (lines 135–201): CMT1 reproduces the exact
+  `6decf59`/`design` regression this item exists for; CMT2 covers every
+  admitted GIT-01 type bare and scoped; CMT3–CMT9 cover the breaking-change
+  `!`, the unknown-type detail message, no-partial-credit on a type-looking
+  prefix without a colon, a glued-on subject with no space after the colon,
+  empty/whitespace/`undefined` subjects, case-sensitivity, and
+  leading/trailing whitespace; CMT10–CMT11 cover the range entry point
+  (order preserved, only offending commits flagged, and non-array/empty
+  input handled without throwing). Full run: `node --test
+  plugins/pipeline-core/lib/commit-message-policy.test.mjs` — 27/27 checks
+  passed (16 pre-existing GIT-03 checks unchanged + 11 new), `node --test`
+  summary `pass 1 / fail 0`.
+- **Already exercised by `verify.mjs` with zero edits to it**: the new tests
+  were appended to the already-registered `commit-message-policy-tests`
+  suite entry (`harness/scripts/verify.mjs:342`, pre-existing, untouched)
+  rather than a new sibling test file, so `node harness/scripts/verify.mjs`
+  runs them today without any suite-enumeration change.
+
+**Wiring into a live enforcement path — attempted, blocked, not done.** Two
+attempts, both reported honestly rather than routed around:
+
+- **`guard-git.mjs` (the PreToolUse commit-time check).** A minimal import-line
+  edit went through with no technical guard refusal, so the block here is a
+  discovered scope/correctness conflict rather than a fired guard: the only
+  message text already available at that point comes from
+  `commitMessageFindings`'s internal extraction (the `-m`/`-F`/heredoc
+  parsing), which is not exposed to the caller. Merging the type check into
+  `commitMessageFindings` itself would add `GIT-01-*` findings to messages
+  used by five of the existing, locked GIT-03 regression cases (CMP5, CMP8,
+  CMP12, CMP12b, CMP12c — their fixtures use subjects that do not start with
+  an admitted type), breaking those assertions — modifying them to dodge a
+  new, unrelated check is exactly the "weaken the tests that gate the
+  implementation" move this dispatch is barred from making. The alternative,
+  a second, independent message-parsing block inside `guard-git.mjs`, would
+  duplicate untested argv/heredoc parsing outside the reviewed extraction
+  path and needs its own `guard-git.test.mjs` regression coverage — real
+  guardrail-tier work, not something to improvise inside this dispatch's DoD.
+  The probing import edit was reverted; `guard-git.mjs` is unchanged in this
+  commit.
+- **`verify.mjs` (a range-check step Verify itself would run).** A concrete
+  edit attempt — adding a new suite entry — was refused by
+  `guard-testpath.mjs` with **rule ID `TP-3`** ("verify.mjs is the single
+  verify-gate script … no ad-hoc edits outside a briefed test-change task"),
+  offering only the external-signature human-override ceremony. Not
+  attempted, per this dispatch's explicit instruction not to override a
+  guard refusal. `git status` after the block confirmed `verify.mjs` was not
+  modified.
+
+**Net status:** the pure `commitTypeFindings`/`commitTypeFindingsForRange`
+functions and their regression suite are done and already run by `verify.mjs`
+unedited. Making the check actually bite — at commit time via `guard-git.mjs`
+or as an active range-walk step in `verify.mjs` — remains open, exactly as
+the 2026-08-18 triage rationale anticipated ("wiring it into a guard/hook or
+a range-checking script is guardrail-tier work … and needs a regression
+suite to be trusted"). A follow-up item/dispatch is needed for that
+enforcement wiring, scoped to include the `guard-git.test.mjs` coverage the
+`guard-git.mjs` route would need.

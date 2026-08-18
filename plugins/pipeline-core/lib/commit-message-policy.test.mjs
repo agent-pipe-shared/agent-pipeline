@@ -8,7 +8,13 @@
  */
 import assert from "node:assert/strict";
 
-import { commitMessageFindings, markerPolicyMode } from "./commit-message-policy.mjs";
+import {
+  commitMessageFindings,
+  commitTypeFindings,
+  commitTypeFindingsForRange,
+  GIT01_COMMIT_TYPES,
+  markerPolicyMode,
+} from "./commit-message-policy.mjs";
 
 let checks = 0;
 const check = (label, fn) => { fn(); checks += 1; process.stdout.write(`ok ${label}\n`); };
@@ -120,6 +126,75 @@ check("CMP14 the marker policy defaults to off on anything unrecognised", () => 
   assert.equal(markerPolicyMode({ commitTrailerPolicy: "nonsense" }), "off");
   assert.equal(markerPolicyMode({ commitTrailerPolicy: "blocking" }), "blocking");
   assert.equal(markerPolicyMode({ commitTrailerPolicy: "warn" }), "warn");
+});
+
+// GIT-01 -- the second gap this test file exists to close. `6decf59` used commit type
+// `design`, which `guardrails/git.md:16` does not admit, and nothing deterministic caught
+// it -- this test file unit-tested GIT-03 only, so CMT1 is that exact regression, verbatim
+// in shape (backlog/items/2026-08-08-orchestrator-authored-production-commits-have-no-deterministic-control.md).
+check("CMT1 the undeclared type that shipped uncaught (`design`) is refused", () => {
+  assert.deepEqual(codes(commitTypeFindings("design(hgo): tighten override binding")), ["GIT-01-UNKNOWN-TYPE"]);
+});
+
+check("CMT2 every admitted GIT-01 type passes, bare and scoped", () => {
+  for (const type of GIT01_COMMIT_TYPES) {
+    assert.deepEqual(commitTypeFindings(`${type}: do a thing`).findings, [], `${type}: bare`);
+    assert.deepEqual(commitTypeFindings(`${type}(scope): do a thing`).findings, [], `${type}: scoped`);
+  }
+});
+
+check("CMT3 a breaking-change `!` is not itself a violation", () => {
+  assert.deepEqual(commitTypeFindings("feat(api)!: drop the v1 endpoint").findings, []);
+});
+
+check("CMT4 an unknown type is refused with the vocabulary in the detail", () => {
+  const result = commitTypeFindings("wip: half-done thing");
+  assert.deepEqual(codes(result), ["GIT-01-UNKNOWN-TYPE"]);
+  for (const type of GIT01_COMMIT_TYPES) assert.ok(result.findings[0].detail.includes(type));
+});
+
+check("CMT5 a type-looking prefix with no colon is not a match (no partial credit)", () => {
+  assert.deepEqual(codes(commitTypeFindings("feature: not actually the admitted type")), ["GIT-01-UNKNOWN-TYPE"]);
+});
+
+check("CMT6 a colon with no space after it does not pass (subject glued on)", () => {
+  assert.deepEqual(codes(commitTypeFindings("feat:no space")), ["GIT-01-UNKNOWN-TYPE"]);
+});
+
+check("CMT7 an empty or whitespace-only subject is its own finding, not a silent pass", () => {
+  assert.deepEqual(codes(commitTypeFindings("")), ["GIT-01-EMPTY-SUBJECT"]);
+  assert.deepEqual(codes(commitTypeFindings("   ")), ["GIT-01-EMPTY-SUBJECT"]);
+  assert.deepEqual(codes(commitTypeFindings(undefined)), ["GIT-01-EMPTY-SUBJECT"]);
+});
+
+check("CMT8 case matters -- GIT-01's vocabulary is lowercase, `Feat:` is not an admitted type", () => {
+  assert.deepEqual(codes(commitTypeFindings("Feat: capitalized type")), ["GIT-01-UNKNOWN-TYPE"]);
+});
+
+check("CMT9 leading/trailing whitespace on the subject does not defeat the check", () => {
+  assert.deepEqual(commitTypeFindings("  fix(x): trim me  ").findings, []);
+});
+
+// CMT10/CMT11 -- the range-mode entry point: pure over an already-enumerated commit set,
+// same order in, same order out, no git invocation of its own.
+check("CMT10 the range entry point flags only the offending commits, in order", () => {
+  const commits = [
+    { sha: "aaa1111", subject: "feat: clean one" },
+    { sha: "bbb2222", subject: "design: the actual GF-056 regression shape" },
+    { sha: "ccc3333", subject: "fix(guard): clean two" },
+  ];
+  const result = commitTypeFindingsForRange(commits);
+  assert.equal(result.length, 3);
+  assert.deepEqual(result.map((r) => r.sha), ["aaa1111", "bbb2222", "ccc3333"]);
+  assert.deepEqual(result[0].findings, []);
+  assert.deepEqual(result[1].findings.map((f) => f.code), ["GIT-01-UNKNOWN-TYPE"]);
+  assert.deepEqual(result[2].findings, []);
+});
+
+check("CMT11 the range entry point on an empty or non-array input is empty, not a throw", () => {
+  assert.deepEqual(commitTypeFindingsForRange([]), []);
+  assert.deepEqual(commitTypeFindingsForRange(undefined), []);
+  assert.deepEqual(commitTypeFindingsForRange(null), []);
 });
 
 process.stdout.write(`\n${checks}/${checks} commit-message policy checks passed\n`);
