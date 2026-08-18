@@ -102,3 +102,54 @@ introduced.
 - **Rationale:** PO's direct choice, going further than the Elephant's staged recommendation (PRD-approval migration first) — the PO wants the complete remaining program scoped and pursued together.
 - **Assignment:** Dispatch-ready — large, multi-session program; needs its own scoping/sequencing pass before implementation dispatch begins (not a single bounded task).
 - **Date:** 2026-08-18
+
+### Scoping pass — 2026-08-18 (Elephant, same-day follow-up)
+
+The remaining program breaks into five separable work packages. Sequencing and
+one resolved contradiction below; this is method/sequencing, not a new PO
+decision, per this repo's own "decide, don't ask" default.
+
+1. **PRD-approval migration — SUPERSEDED, not dispatched.** The same session's
+   `2026-08-05-critical-human-proof-not-wired-to-push-and-prd-gates.md` names
+   this identical gap (`approve-plan` not on the Ed25519 proof contract) and
+   was answered the same day with **Option B: closed** — the existing
+   PO-gate-authority binding is accepted as sufficient, no Ed25519 proof is
+   added to `approve-plan`. That decision directly resolves this item's
+   sub-scope; migrating PRD-approval anyway would contradict a PO decision
+   made hours earlier in the same docket. Marked done-via-supersession, not
+   queued.
+2. **Publication unification — dispatch-ready.** Bring `publication` onto the
+   shared `pipeline.po-approval-proof.v1` contract, same shape as the
+   `push`/`deploy` migration ADR-0056 already did; ADR-0056 itself names this
+   as its own recorded follow-up ("two shapes now exist where one would be
+   better"). Touches `plugins/pipeline-core/scripts/po-human-approval.mjs`
+   and `docs/po-human-approval.md` — the SAME files
+   `PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL` (this round's other dispatch) is
+   actively editing. **Sequenced to dispatch only after that dispatch lands**,
+   not run concurrently.
+3. **Formal gate/intent inventory — dispatch-ready, independent.** A durable
+   artifact enumerating every human intent/gate in the Pipeline and its
+   current authorization mechanism (which are on the shared contract, which
+   are one-off). No file overlap with the rest of this round; can dispatch
+   immediately.
+4. **Adoption-enforcement check — sequenced after #3.** A structural check
+   that refuses a newly-introduced one-off human-approval UX. Needs the
+   inventory (#3) as its own input to know what "the shared contract"
+   currently covers, so it cannot be scoped correctly before #3 lands.
+5. **Passkey/WebAuthn (and other) adapters — scope resolved, not immediately
+   dispatched.** The item's own Proposal assigns this to "desktop
+   applications"; this repository is a CLI-based agent-orchestration
+   Pipeline with no desktop-app code anywhere in it. Decision: this repo's
+   share of the work is defining the **adapter contract/interface** a
+   downstream desktop consumer would implement against (extending
+   `docs/po-human-approval.md`'s existing "Adapter boundary" section) — not
+   building a desktop application, which does not exist in this codebase.
+   Bounded to that scope, it is dispatch-ready; building it as a literal
+   Passkey/WebAuthn implementation would be scope invented beyond what this
+   repository can deliver.
+
+**Next dispatch round:** #3 (inventory) can go out immediately, independent of
+the currently-running workflow. #2 (publication unification) queues behind
+`PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL` landing (file conflict on
+`po-human-approval.mjs`). #4 (adoption check) queues behind #3. #5 (adapter
+contract) is independent and dispatch-ready alongside #3.
