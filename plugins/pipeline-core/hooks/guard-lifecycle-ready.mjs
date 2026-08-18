@@ -37,6 +37,11 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { machinePlaneFilePath } from "../lib/machine-plane.mjs";
+import {
+  loadProtectedTestPathRules,
+  protectedTestPathShellHit,
+  TESTPATH_SHELL_DENIAL_CODE,
+} from "../lib/protected-test-paths.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 import { GATE_STRENGTH_PATHS } from "./guard-gate-strength.mjs";
 import {
@@ -672,6 +677,80 @@ function gateStrengthShellReadOnlyScriptExemption(command, root, dependencies = 
   const resolvedScript = resolve(root, scriptArg);
   return GATE_STRENGTH_SHELL_READ_ONLY_SCRIPTS.some((entry) => resolve(pluginRoot, entry.path) === resolvedScript
     && isPathWithinRealpathedRoot(resolvedScript, pluginRoot, dependencies));
+}
+
+/**
+ * GUARD-TESTPATH-SHELL — the shell lane of the test-path authority gate.
+ *
+ * WHY HERE. `guard-testpath.mjs` is wired for `Edit|Write|NotebookEdit` only, so an agent
+ * that could not clear TP-* simply wrote the same bytes from Bash and reported it as a
+ * deviation (backlog: 2026-08-08-an-authority-gate-is-bypassable-by-choosing-a-different-
+ * write-tool.md). `guardrails/global.md` GL-09 calls this gate authority-bearing, and a gate
+ * whose coverage depends on which tool an agent picks is not one. This file is ALREADY the
+ * `Bash|PowerShell` half of the sibling authority gate (`GUARD-GATE-STRENGTH-SHELL`, one
+ * function up), for exactly the same reason and by exactly the same route, so the test-path
+ * rule joins it here rather than through a new matcher — `hooks.json` needs no change, and
+ * the protected set has one definition (`lib/protected-test-paths.mjs`) read by both lanes.
+ *
+ * WHAT IT REFUSES, and what it deliberately does not. Unlike its gate-strength sibling this
+ * is NOT a name-mention refusal: protected suites are meant to be run, and `node --test
+ * <protected suite>` is the verification command guard-testpath.mjs's own header prescribes.
+ * The classifier detects writes — redirect targets, write-capable executables, git verbs
+ * that rewrite the working tree, and opaque interpreter payloads. Its residual blind spots
+ * (a write performed inside an executed script; a path assembled at runtime) are named in
+ * lib/protected-test-paths.mjs's header rather than implied here.
+ *
+ * OVERRIDE. Unlike GUARD-GATE-STRENGTH-SHELL, which has none, this refusal carries the same
+ * audited human-guard-override the write lane offers — chat- or signature-mode, matching
+ * whatever `gates.push_approval` is actually committed (ADR-0056/ADR-0059). That is a PO
+ * decision recorded in the item's own triage, and it is the half that matters: the reported
+ * bypass happened because the sanctioned route was closed BEFORE the unsanctioned one was
+ * taken, so closing the route without opening a lift would just relocate the same failure.
+ * For `PowerShell` the ceremony is not reachable — `eligibility()` in
+ * lib/human-guard-override.mjs recognises `Bash` among the shell tools and returns
+ * HGO-NONOVERRIDABLE-TOOL otherwise — so that lane renders the typed no-route reason instead
+ * of a copyable command. Stated, not hidden; widening HGO's tool eligibility is its own
+ * decision, not a side effect of this one.
+ */
+function protectedTestPathShellRefusalHit(command, root, dependencies = {}, toolName = "Bash") {
+  if (typeof command !== "string" || command === "") return null;
+  let rules = [];
+  try {
+    const loadFn = dependencies.loadProtectedTestPathRulesFn ?? loadProtectedTestPathRules;
+    rules = loadFn({ rootDir: root }).rules;
+  } catch {
+    return null; // an unreadable guard config blocks nothing here, exactly as in the write lane
+  }
+  if (rules.length === 0) return null;
+  try {
+    return protectedTestPathShellHit({
+      command,
+      rules,
+      root,
+      toolName,
+      platform: dependencies.platform ?? process.platform,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function protectedTestPathShellBlocked(hit, overrideGuidance) {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${TESTPATH_SHELL_DENIAL_CODE}: ${hit.rule.id}: ${hit.rule.reason}\n`
+      + `Detected as a shell write to a protected test path (lane: ${hit.lane}).\n`
+      + "Why: an implementing Goldfish MUST NOT modify, weaken, skip or delete the tests/checks "
+      + "that gate its own implementation (QG-04 / roles/goldfish.md GF-04). A genuine test "
+      + "change is its own, explicitly briefed task, and this gate is authority-bearing "
+      + "(guardrails/global.md GL-09) -- so which write tool you reach for cannot decide "
+      + "whether it applies.\n"
+      + "Reading and RUNNING the suite are unaffected: node --test, node <suite>, cat, rg, "
+      + "git add/commit/diff/log/show on this path are all admitted. Only a detected write is "
+      + "refused.\n"
+      + (overrideGuidance ?? ""),
+  );
 }
 
 function externalPoSigningOnly() {
@@ -2166,9 +2245,27 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   if (toolName === "Bash" && isHumanPoSigningCommand(input.tool_input.command, root)) {
     return externalPoSigningOnly();
   }
+  // Consumed-capability notices raised by the shell-lane test-path check below, carried onto
+  // whatever verdict the remaining checks produce. Declared here rather than folded into
+  // `lifts` further down because that array is created after the PowerShell early return, and
+  // the test-path shell lane covers PowerShell too.
+  const shellLifts = [];
   if (SHELL_TOOLS.includes(toolName)) {
     const gateStrength = gateStrengthShellRefusal(input.tool_input.command, root, dependencies);
     if (gateStrength !== null) return gateStrength;
+    // Second, and only when gate strength had nothing to say: the test-path authority gate's
+    // shell lane. Ordered after its stricter sibling deliberately -- a command that weakens
+    // the gate-strength config is refused on that ground with no lift, and must not be able
+    // to reach a lane that offers one.
+    const testPathHit = protectedTestPathShellRefusalHit(input.tool_input.command, root, dependencies, toolName);
+    if (testPathHit !== null) {
+      const reason = `${TESTPATH_SHELL_DENIAL_CODE}: ${testPathHit.rule.id}: ${testPathHit.rule.reason}`;
+      const route = humanOverrideRoute(
+        TESTPATH_SHELL_DENIAL_CODE, reason, "command", root, toolName, input.tool_input, dependencies,
+      );
+      if (!route.admitted) return protectedTestPathShellBlocked(testPathHit, route.overrideGuidance);
+      shellLifts.push(route.admitted);
+    }
   }
   // PowerShell reaches the gate-strength check above and nothing else, deliberately.
   // Every decision below parses a POSIX command grammar; applying it to PowerShell would
@@ -2181,7 +2278,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   // parser, so a PowerShell command naming one of the five paths is refused even when it
   // only reads. That over-refuses on exactly five filenames and fails closed; a
   // PowerShell-aware read-only classifier is the proper fix.
-  if (toolName === "PowerShell") return verdict(0);
+  if (toolName === "PowerShell") return withLifts(shellLifts, verdict(0));
   // ADR-0059 Decision 6: a consumed cross-repository capability clears ONLY the
   // cross-repository objection. Every later check still runs against the lifted action --
   // the writer-owned State refusal, the closed shell grammar, the LAUNCH_SCRIPT external
@@ -2189,7 +2286,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   // the grammar lift. `lifts` carries the consumption notices so a capability spent on an
   // action a later check refuses is surfaced rather than silently swallowed; it is already
   // irreversibly consumed on disk by then, and there is no "un-consume" available here.
-  const lifts = [];
+  const lifts = [...shellLifts];
   const crossRepoReason = `${CROSS_REPO_DENIAL_CODE}: ${CROSS_REPO_DENIAL_GUIDANCE}`;
   if (WRITE_TOOLS.includes(toolName)) {
     const target = writeTargetPath(input.tool_input, toolName);

@@ -73,11 +73,22 @@
  *     lib/tool-write-target.mjs. The stale sentence contradicted this file's own MATCHING
  *     block and was found by the T2 Critic (C4) — QG-05 asks the blind-spot statement to
  *     be accurate, and one that understates coverage still misleads the next reader.
- *   - Plain shell file writes are not seen either: `hooks.json` routes Bash/PowerShell
- *     tool calls only through `guard-git.mjs` (matcher `Bash|PowerShell`), which does
- *     NOT check test paths — a Bash/PowerShell redirect (`>`, `Set-Content` etc.)
- *     reaching a protected path is unguarded (accepted gap, same tripwire-not-a-sandbox
- *     framing as below).
+ *   - Plain shell file writes WERE not seen either, and that was the accepted gap this
+ *     entry used to record: a Bash/PowerShell redirect (`>`, `Set-Content` etc.) reaching a
+ *     protected path was unguarded, and on 2026-08-08 a briefed dispatch that could not
+ *     clear this gate wrote the same bytes through Bash/Node `fs` and reported it as a
+ *     deviation. `guardrails/global.md` GL-09 classifies this gate as AUTHORITY-BEARING,
+ *     which cannot coexist with coverage that depends on tool choice, so the gap is closed:
+ *     the shell lane is enforced by `guard-lifecycle-ready.mjs` (`GUARD-TESTPATH-SHELL`),
+ *     which is already `Bash|PowerShell`-wired and reads the SAME rules from
+ *     `lib/protected-test-paths.mjs` that this hook reads — one definition, two lanes,
+ *     exactly the arrangement `guard-gate-strength.mjs`/`GUARD-GATE-STRENGTH-SHELL` already
+ *     uses for the sibling authority gate. That lane detects writes rather than name
+ *     mentions (a protected suite is meant to be RUN), carries the same audited
+ *     chat-or-signature human override, and names its own residual blind spots in
+ *     `lib/protected-test-paths.mjs`'s header rather than here.
+ *   - MultiEdit remains uncovered by any lane (accepted gap; add a matcher entry if it is
+ *     ever exploited).
  *   - Task-type awareness (see SCOPE above): the guard still cannot tell whether this
  *     agent is briefed to change tests right now. The audited override answers that with
  *     a human decision per action instead of with inference. There is no hand-editing
@@ -101,7 +112,7 @@
  * .claude/guard-config.json today):
  *   printf '{"tool_input":{"file_path":"plugins/pipeline-core/hooks/guard-git.test.mjs"}}' | node plugins/pipeline-core/hooks/guard-testpath.mjs; echo $?
  */
-import { existsSync, readFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
@@ -112,10 +123,9 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import {
-  LEGACY_GUARD_CONFIG,
-  NEUTRAL_GUARD_CONFIG,
-  resolveProjectAuthorityPaths,
-} from "../lib/project-authority.mjs";
+  loadProtectedTestPathRules,
+  protectedTestPathRuleFor,
+} from "../lib/protected-test-paths.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -134,54 +144,13 @@ try {
 }
 if (!filePath) process.exit(0);
 
-// ---- normalize: backslashes -> forward slashes, matched case-insensitively --------
-const normalizedPath = filePath.replace(/\\/g, "/");
-
 // ---- per-project config (config instead of fork) ----------------------------------
+// The parsing itself now lives in lib/protected-test-paths.mjs so this write lane and the
+// Bash/PowerShell shell lane in guard-lifecycle-ready.mjs cannot drift apart about which
+// paths are protected — the same "one definition of what these paths are" arrangement
+// guard-gate-strength.mjs already has with GATE_STRENGTH_PATHS. Semantics are unchanged.
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const authority = resolveProjectAuthorityPaths({ rootDir: projectDir });
-const guardConfigRelPath = authority.status === "ready"
-  ? authority.guardConfig
-  : (existsSync(join(projectDir, NEUTRAL_GUARD_CONFIG)) ? NEUTRAL_GUARD_CONFIG : LEGACY_GUARD_CONFIG);
-const configPath = join(projectDir, guardConfigRelPath);
-const warnings = [];
-/** @type {Array<{id: string, re: RegExp, reason: string}>} */
-const PROTECTED_PATHS = [];
-let rawConfig = null;
-try {
-  rawConfig = readFileSync(configPath, "utf8");
-} catch {
-  // File absent -> no protected paths at all. Fail-safe and silent: the normal case.
-}
-if (rawConfig !== null) {
-  try {
-    const cfg = JSON.parse(rawConfig);
-    const list = cfg?.protectedTestPaths;
-    if (list !== undefined && !Array.isArray(list)) {
-      warnings.push('"protectedTestPaths" is not an array -> ignored');
-    }
-    for (const [i, entry] of (Array.isArray(list) ? list : []).entries()) {
-      if (typeof entry?.pattern !== "string" || entry.pattern === "") {
-        warnings.push(`protectedTestPaths[${i}]: missing/empty "pattern" -> entry skipped`);
-        continue;
-      }
-      try {
-        PROTECTED_PATHS.push({
-          id: typeof entry?.id === "string" && entry.id !== "" ? entry.id : `TP-${i + 1}`,
-          re: new RegExp(entry.pattern, "i"),
-          reason:
-            typeof entry?.reason === "string" && entry.reason !== ""
-              ? entry.reason
-              : `Protected test path matched: ${entry.pattern}`,
-        });
-      } catch (e) {
-        warnings.push(`protectedTestPaths[${i}]: invalid regex (${e.message}) -> entry skipped`);
-      }
-    }
-  } catch (e) {
-    warnings.push(`unparseable JSON (${e.message}) -> no protected paths active`);
-  }
-}
+const { rules: PROTECTED_PATHS, warnings, configPath } = loadProtectedTestPathRules({ rootDir: projectDir });
 
 // ---- verdict -------------------------------------------------------------------------
 function emit(code, lines) {
@@ -207,7 +176,7 @@ function emit(code, lines) {
  * Fail-closed everywhere: an override that cannot be read, validated or consumed leaves
  * the refusal exactly as it was.
  */
-const matched = PROTECTED_PATHS.find((rule) => rule.re.test(normalizedPath));
+const matched = protectedTestPathRuleFor(PROTECTED_PATHS, filePath);
 if (matched) {
   const denials = [{ guard: "guard-testpath.mjs", reason: `${matched.id}: ${matched.reason}` }];
 
