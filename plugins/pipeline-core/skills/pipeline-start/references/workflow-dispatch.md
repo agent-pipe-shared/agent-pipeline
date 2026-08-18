@@ -38,6 +38,50 @@ Live-tested 2026-08-18: with this instruction present, 9/9 parallel worktree
 dispatches landed on the correct HEAD (0/9 without it, in the same session,
 same cluster set, before the fix).
 
+## Concurrent non-isolated dispatches can orphan or lose commits — self-heal is worktree-only
+
+The `isolation: "worktree"` self-heal check above (verify `git rev-parse HEAD`
+against an expected SHA, `git checkout --detach` on mismatch) is written for
+a dispatch that owns its OWN worktree. It must never run — and must never be
+copied into a briefing — for a `parallel()`/fan-out round of dispatches that
+share the MAIN working tree (`isolation` omitted, several `agent()` calls
+committing concurrently). In a shared tree, every sibling's commit moves HEAD
+out from under the others; a dispatch that still carries a worktree-style
+self-heal check reads that as "wrong base" and self-heals by checking out its
+own (now-stale) expected SHA — which either discards a sibling's uncommitted
+edits outright, or detaches HEAD and starts a parallel commit chain that
+never rejoins the branch, orphaning every commit built on it once a later
+sibling checks back out to the branch tip.
+
+Confirmed 2026-08-18, a 10-dispatch `parallel()` round with `worktree: no`
+throughout: one dispatch's ~47-tool-call in-progress edit (uncommitted) was
+silently wiped by a sibling's self-heal checkout — its own dispatch record
+shows the edit made, then nothing after; the working tree was clean with no
+trace of it once the round finished, and it had to be fully re-dispatched.
+Four other dispatches committed successfully but ended up on a sibling chain
+off the same stale base, invisible from the branch tip (`git log` did not
+show them) until the Elephant diffed `git log --all`/`git branch --contains`
+against every dispatch's reported commit SHA, found the split, and reconciled
+with `git cherry-pick <base>..<orphan-tip>` after confirming zero file
+overlap between the two chains — a fully recoverable but costly manual
+rescue that would not have been needed had self-heal simply not fired.
+
+**Rule:** a briefing for a shared-tree (non-`isolation: "worktree"`) dispatch
+must NOT include the worktree self-heal check at all — commit narrowly
+(`git add -- <exact briefed files>`; never a broad `git add -A`/`.`) and stop
+there; do not verify or correct HEAD mid-task. After every such round, before
+trusting the round as landed, the Elephant must check for exactly this split:
+run `git log --oneline -N` and compare against each dispatch's own reported
+commit SHA (from its final report or dispatch record) — a reported SHA that
+does not appear in that log is on an orphaned sibling chain, not lost, and
+needs the cherry-pick reconciliation above (verify zero file-overlap between
+the chains first; a real overlap needs manual conflict resolution, not a
+blind cherry-pick). Prefer avoiding the situation over recovering from it:
+sequence (`pipeline()`, one commit in flight at a time) any set of dispatches
+that will `git commit` in the shared tree, or give each its own
+`isolation: "worktree"`, rather than running them concurrently in
+`parallel()` against the same checkout.
+
 ## Tool-call budget — the ~50-call termination cliff
 
 `guardrails/token-budget.md` (TB-06, Claude compatibility projection)
