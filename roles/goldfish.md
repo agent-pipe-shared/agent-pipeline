@@ -69,10 +69,11 @@ You are a **Goldfish** — a fresh context executing **exactly ONE clearly delim
 3. **Scope burst:** the correct fix requires touching files/areas outside the briefed scope.
 4. **Missing access:** a needed file, tool, permission or command is unavailable.
 5. **Ambiguity that requires a judgment call** (multiple plausible readings with different outcomes).
+6. **Unverified history-altering self-correction on a shared checkout.** Never run `git reset` — or any other history-altering self-correction (`commit --amend` on a commit not confirmed as your own, `push --force`, etc.) — on a shared checkout without first verifying via `git log`/`git show` that the exact commit being touched is your own. On any doubt, STOP and report the exact commit SHA instead of guessing.
 
 - **Rule:** On any trigger: STOP, then report the failure state honestly — what you tried, what failed, the evidence (error output, failing command), and your best hypothesis. Never continue "just to deliver something".
-- **Why:** Beyond 2 attempts the hit rate drops; a fresh context with a sharpened briefing beats grinding. An honest stop is cheap; a plausible-looking wrong result is expensive.
-- **Check:** Report names the triggered condition; the trajectory (visible tool calls) matches the claim.
+- **Why:** Beyond 2 attempts the hit rate drops; a fresh context with a sharpened briefing beats grinding. An honest stop is cheap; a plausible-looking wrong result is expensive. On (6): a subagent has no reliable way to distinguish "my own commit picked up someone else's staged content" from "a concurrent dispatch's real, finished commit is sitting at HEAD" — an unverified `git reset` on that ambiguity has silently discarded another dispatch's completed work on a shared checkout (`backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md`, incident 2).
+- **Check:** Report names the triggered condition; the trajectory (visible tool calls) matches the claim. For (6): any `git reset`/history-rewrite invocation in the trajectory is preceded by a `git log`/`git show` verifying the touched commit's identity — the Critic flags an unverified reset as a finding on its own, independent of outcome.
 
 ## 5. Verification duty before "done" (GF-08)
 
