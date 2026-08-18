@@ -52,6 +52,7 @@ import {
   validateContinuityState,
 } from "./continuity-state.mjs";
 import { resolveOnboardingPrivateState } from "./codex-onboarding-runtime.mjs";
+import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
 import {
   LEGACY_CALIBRATION,
@@ -558,6 +559,8 @@ function observeDetailed({
   rootDir,
   repositoryCapability = "local",
   spawn = defaultGitSpawn,
+  platform = process.platform,
+  assessWindowsPrivate = assessWindowsPrivatePath,
 } = {}) {
   const empty = {
     status: "unavailable",
@@ -614,17 +617,27 @@ function observeDetailed({
       };
     }
     const privatePaths = resolvePrivate(root, repositoryCapability, { spawn });
-    if (existsSync(privatePaths.directory) && (lstatSync(privatePaths.directory).mode & 0o777) !== 0o700) {
-      fail("KICKOFF-PRIVATE-UNAVAILABLE", "private onboarding state directory is not mode 0700");
+    if (existsSync(privatePaths.directory)) {
+      // Node synthesizes `.mode` on native Windows from the read-only attribute
+      // alone (group/other bits mirror the owner bits), so an exact-0700
+      // comparison is meaningless there and fails closed unconditionally,
+      // regardless of the directory's real security. On win32 this defers to
+      // the shared native DACL/owner/reparse-point assurance instead, mirroring
+      // afk-ledger.mjs:336-340.
+      const directorySecure = platform === "win32"
+        ? assessWindowsPrivate(privatePaths.directory).status === "secure"
+        : (lstatSync(privatePaths.directory).mode & 0o777) === 0o700;
+      if (!directorySecure) fail("KICKOFF-PRIVATE-UNAVAILABLE", "private onboarding state directory is not mode 0700");
     }
     const historyPath = join(privatePaths.directory, HISTORY_BASENAME);
     historyObservation = observeOptionalAbsoluteFile(historyPath, "private continuity history");
 
     let history = null;
     if (historyObservation.status === "present") {
-      if ((lstatSync(historyPath).mode & 0o777) !== 0o600) {
-        fail("KICKOFF-PRIVATE-UNAVAILABLE", "private continuity history is not mode 0600");
-      }
+      const historySecure = platform === "win32"
+        ? assessWindowsPrivate(historyPath).status === "secure"
+        : (lstatSync(historyPath).mode & 0o777) === 0o600;
+      if (!historySecure) fail("KICKOFF-PRIVATE-UNAVAILABLE", "private continuity history is not mode 0600");
       history = parseJsonObject(historyObservation, "private continuity history");
       validateHistory(history);
       // THE BINDING BELOW IS A RECORD OF A TRANSACTION, NOT A LIVE AUTHORITY, once

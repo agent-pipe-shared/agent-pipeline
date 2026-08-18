@@ -465,6 +465,65 @@ check("non-private history mode is unavailable", () => {
   assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "unavailable");
 });
 
+// Windows: Node synthesizes `.mode` on native Windows from the read-only
+// attribute alone, so a bare POSIX mode-bit comparison is meaningless there
+// and previously failed closed unconditionally (backlog/items/2026-08-18-
+// windows-posix-mode-bit-checks-are-meaningless-on-ntfs.md). These checks
+// inject `platform: "win32"` plus a stubbed DACL assessor to prove the win32
+// branch is what now decides the outcome, not the bare mode bits.
+//
+// Note on the directory half of this check: `resolvePrivate()` (this file)
+// delegates to `codex-onboarding-runtime.mjs`'s own already-correct
+// `assurePrivateDirectory`, which on POSIX auto-repairs (`chmodSync(path,
+// 0o700)`) an insecure directory it observes -- so a POSIX-insecure directory
+// mode can never actually reach this file's own inline check on a real POSIX
+// host in the first place; that check is a redundant belt-and-braces
+// duplicate for the directory case specifically. The history FILE has no such
+// auto-repair anywhere upstream, so its insecure-mode POSIX regression is
+// exercised directly above ("non-private history mode is unavailable").
+check("win32: a POSIX-insecure history file is admitted via the injected DACL assurance instead of failing closed", () => {
+  const root = fixture("win32-directory-secure");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const directory = join(root, ".git", "agent-pipeline", "onboarding");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  // Exactly what the old bare `(mode & 0o777) !== 0o600` comparison would
+  // have failed closed on unconditionally.
+  writeFileSync(join(directory, "continuity-history.json"), JSON.stringify(plan.targets.history.value), { mode: 0o644 });
+  const result = classifyOnboardingContinuity({
+    rootDir: root,
+    platform: "win32",
+    assessWindowsPrivate: () => ({ status: "secure" }),
+  });
+  assert.notEqual(result.status, "unavailable");
+  assert.equal(result.status, "damaged"); // no machine state yet, mirrors "private history without machine state is damaged"
+});
+
+check("win32: an insecure DACL assessment on the private directory still fails closed", () => {
+  const root = fixture("win32-directory-insecure");
+  const directory = join(root, ".git", "agent-pipeline", "onboarding");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const result = classifyOnboardingContinuity({
+    rootDir: root,
+    platform: "win32",
+    assessWindowsPrivate: () => ({ status: "insecure" }),
+  });
+  assert.equal(result.status, "unavailable");
+});
+
+check("win32: a secure directory but an insecure history-file DACL assessment still fails closed", () => {
+  const root = fixture("win32-history-insecure");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });
+  const directory = join(root, ".git", "agent-pipeline", "onboarding");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  writeFileSync(join(directory, "continuity-history.json"), JSON.stringify(plan.targets.history.value), { mode: 0o600 });
+  const result = classifyOnboardingContinuity({
+    rootDir: root,
+    platform: "win32",
+    assessWindowsPrivate: (path) => ({ status: path === directory ? "secure" : "insecure" }),
+  });
+  assert.equal(result.status, "unavailable");
+});
+
 for (const [name, handover] of [
   ["escape", "../outside.md"],
   ["absolute", "/tmp/outside.md"],
