@@ -1892,3 +1892,12 @@ Restated per this file's known limitation for ADR-0012/0045: `11e70e5a` is an an
 Restated per this file's known limitation for ADR-0012/0056/0058: `6100a6cc` is an ancestor and was already fully reconciled above.
 
 **ADR-0045** — `79e90d2f` adds 9 files under two new `specs/sprint-phoenix-epic/evidence/PHX-WP-*/` directories: each dispatched task's own dispatch record, commit-message artifacts, and test-run logs (`.tap`/`verify-log.txt`) — the same durable-artifact class as every prior ADR-0045 entry in this file. No package restructuring; purely additive.
+
+## Candidate 51ed4826ced0a29ebee4297f73c33368779b4826 — 2026-08-18, range 8a92d377..51ed4826, checkpoint 35: full account of the Phoenix-exclusive backlog triage stretch
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0058: checked, no change needed.
+
+Restated per this file's known limitation for ADR-0045/0056/0058: `79e90d2f` is an ancestor and was already fully reconciled above. ADR-0012's only new material is checkpoint 35 itself: the full narrative account of this stretch's backlog triage (1 closed as fixed upstream by Nova, 2 stale items corrected, 2 real fixes dispatched and landed, 145+ durable evidence files tracked, and the concurrent-git-index incident recorded honestly). Additive checkpoint prose only; the canonical-handover decision is untouched.
