@@ -1785,3 +1785,18 @@ the re-confirmed Verify baseline, this Layer 1b run, and the computed
 subject-sha256). Additive checkpoint prose only, same as every other entry in
 this file that reconciles ADR-0012; the canonical-handover decision (one
 versioned file, memory mirror-only) is untouched.
+
+## Candidate fb3b0ec3 — 2026-08-18, range 8a92d377..fb3b0ec3, adds only the checkpoint-30 correction note (the entry above's own `077b64ff` and a short append recording it)
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0058: checked, no change needed.
+
+Restated per this file's own known limitation: `f4711cba` is an ancestor of this
+candidate and was already fully reconciled by the entry immediately above;
+ADR-0045/0056/0058 are restated verbatim. ADR-0012's only new material is the
+"Correction, same checkpoint session" paragraph appended to checkpoint 30,
+recording the recomputed `subject-sha256` for the true final candidate — again
+additive checkpoint prose, nothing structural. `077b64ff` (this record's own
+prior commit) touched only this file, which no ADR governs.
