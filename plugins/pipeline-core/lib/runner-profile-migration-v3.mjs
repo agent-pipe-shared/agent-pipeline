@@ -94,12 +94,37 @@ const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
   // legacy project must derive its public runtime projection from its source.
   ".claude/settings.json": "{}\n",
   ".claude/pipeline.json": "{}\n",
-  ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
+  // The runtime manifest seed is deliberately ABSENT here: it is not this
+  // dictionary's to restate. `.claude/pipeline.yaml` is a preserve-only
+  // target for the YAML renderer (replaceClaudeTarget() in
+  // runtime-projection-v3.mjs owns only modelRouting/criticExport/
+  // session.keep_awake/language.human_facing; its `gates:` chapter is never
+  // computed -- whatever the baseline seed carries for `gates:` is exactly
+  // what a freshly materialized project keeps). A second, gates-less literal
+  // here previously let a legacy migration with no prior `.claude/pipeline.yaml`
+  // (an intentionally supported "cold" first materialization, see the comment
+  // above) write a manifest with NO gates chapter at all -- unlike the
+  // host-managed-Codex branch below, that write is never filtered out, so it
+  // reaches disk (backlog/items/2026-08-08-two-manifest-literals-still-bypass-
+  // the-single-seed-owner.md, wave-2 investigation, 2026-08-18). resolveLegacyRuntimeSeed()
+  // below routes this one key through freshManifestBytes() instead, the same
+  // single owner slimRuntimeSeed() already uses for slim V3 initialization.
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
   ".codex/agents/consult-advisor.toml": "",
 });
+// Single owner for `.claude/pipeline.yaml` across every branch of
+// runtimeBaselines() that can seed it for an absent target -- the legacy
+// (v0/v1/v2) branch and the host-managed-Codex branch both resolve through
+// this function instead of restating the manifest bytes a second time. See
+// the comment on LEGACY_V3_RUNTIME_SEEDS above for why a second literal here
+// was unsafe (backlog/items/2026-08-08-two-manifest-literals-still-bypass-
+// the-single-seed-owner.md).
+function resolveLegacyRuntimeSeed(relative) {
+  if (relative === ".claude/pipeline.yaml") return freshManifestBytes();
+  return LEGACY_V3_RUNTIME_SEEDS[relative];
+}
 // A slim private overlay can carry the complete, already-valid V3 source while
 // deliberately omitting every ignored runtime projection. These in-memory
 // baselines contain only the syntax needed by the byte-preserving renderer.
@@ -297,13 +322,13 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
     const target = assertNoSymlink(root, relative, deps);
     if (!deps.existsSync(target)) {
       const seed = legacy
-        ? LEGACY_V3_RUNTIME_SEEDS[relative]
+        ? resolveLegacyRuntimeSeed(relative)
         : initializeSlimV3 ? slimRuntimeSeed(relative, { overlayCalibration })
           // A reserved Codex mount supplies `.codex` at runtime.  Missing
           // Claude compatibility projections are renderer baselines only in
           // this mode; they must not make a freshly project-seeded root
           // invalid or become implicit portable output.
-          : hostManagedCodex ? LEGACY_V3_RUNTIME_SEEDS[relative]
+          : hostManagedCodex ? resolveLegacyRuntimeSeed(relative)
             : undefined;
       if (typeof seed !== "string") throw new Error(`declared runtime baseline is missing: ${relative}`);
       baselines[relative] = { status: "present", bytes: seed };
