@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "da0fb6d27bc74cf1f400052f72789de920f681f6febb3024dc7cbb801ed2fde9"
+    "transitionHead": "84676f177e31c4b6d298a5fbe3a0f70e3cb515402444526a2eb71cf8c358f6e8"
   },
   "counts": {
     "open": 85,
-    "in_progress": 12,
-    "closed": 156
+    "in_progress": 11,
+    "closed": 157
   },
   "items": [
     {
@@ -327,12 +327,16 @@
     },
     {
       "id": "pipeline.canonical-worktree-lifecycle",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; no completion claim.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "5a7862e9",
+      "closureEvidence": "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs"
     },
     {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
