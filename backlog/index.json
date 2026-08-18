@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "967c540c2fec0e2f6a1caaa61a15a94c3aa91a49e23a6d1989cd06697576a443"
+    "transitionHead": "b321addee92437d32f4f1ff4307ba1f2a81851ae2473910dd0c2f60a34f3ba20"
   },
   "counts": {
-    "open": 88,
+    "open": 87,
     "in_progress": 15,
-    "closed": 150
+    "closed": 151
   },
   "items": [
     {
@@ -1522,11 +1522,15 @@
     },
     {
       "id": "pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Confirmed live on Toolbox post-vendor-sync: observation-governance-bootstrap.mjs --root D:\\Dev\\Web\\Toolbox returns {\"status\":\"failed\",\"sourceCheckout\":true,\"code\":\"OGB-CHECKER-MISSING\"}. Not currently blocking anything (not wired into the PreToolUse guard, only into pipeline-start's own happy-path checklist step)."
+      "source": "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Confirmed live on Toolbox post-vendor-sync: observation-governance-bootstrap.mjs --root D:\\Dev\\Web\\Toolbox returns {\"status\":\"failed\",\"sourceCheckout\":true,\"code\":\"OGB-CHECKER-MISSING\"}. Not currently blocking anything (not wired into the PreToolUse guard, only into pipeline-start's own happy-path checklist step).",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "2fa93ed5",
+      "closureEvidence": "plugins/pipeline-core/lib/observation-governance-bootstrap.test.mjs"
     },
     {
       "id": "pipeline.observation-intake-document-governance",

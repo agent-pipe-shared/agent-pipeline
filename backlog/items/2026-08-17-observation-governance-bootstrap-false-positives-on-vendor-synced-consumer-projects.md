@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "2fa93ed5"
+closure_evidence: "plugins/pipeline-core/lib/observation-governance-bootstrap.test.mjs"
 source: "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Confirmed live on Toolbox post-vendor-sync: observation-governance-bootstrap.mjs --root D:\\Dev\\Web\\Toolbox returns {\"status\":\"failed\",\"sourceCheckout\":true,\"code\":\"OGB-CHECKER-MISSING\"}. Not currently blocking anything (not wired into the PreToolUse guard, only into pipeline-start's own happy-path checklist step)."
 ---
 
@@ -67,3 +71,17 @@ that this detector checks for and excludes.
   security-relevant; this one is a false-positive diagnostic only).
 - **Assignment:** unassigned.
 - **Date:** 2026-08-17
+
+### Closure, 2026-08-18
+
+Dispatched `NVA-OGBFIX-1` (goldfish-mechanic): added a `harness/` directory
+presence check as the second detection signal the Proposal named — vendor-sync
+never creates `harness/`, so a vendor-synced consumer project now correctly
+resolves `not-applicable` instead of the false `OGB-CHECKER-MISSING`. Reproduced
+the false positive RED first, then GREEN after the fix; four regression tests
+added (real source checkout, vendor-synced fixture, neither, genuinely-broken
+source checkout). Independently re-verified: `node --test
+plugins/pipeline-core/lib/observation-governance-bootstrap.test.mjs` → 6/6
+pass, exit 0. Commit `2fa93ed5`. Narrow lib-only fix, no guardrail/security
+class — closed without a separate Critic dispatch, consistent with this
+session's own precedent for small, low-risk mechanic-tier fixes.
