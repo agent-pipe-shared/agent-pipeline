@@ -3,10 +3,27 @@ schema: pipeline.backlog-item.v1
 id: pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: d5e5fed754098037f7142d786a122128880c2459
+closure_evidence: backlog/items/2026-08-12-four-critic-preimage-pins-drifted-or-never-valid.md
 source: "Surfaced by NVA-MICRO-3's fix to codex-isolated-critic-protected-preimage.test.mjs's assertion loop (fail-fast -> accumulate-all-mismatches, closing 2026-08-10-preimage-repin-disclosure-incomplete-for-roles-critic), 2026-08-18. The accumulate fix's own designed effect exposed two more mismatches beyond the one it was written to find."
 ---
+
+## Closure
+
+Independently re-verified 2026-08-18 (NVA-W0-1): confirmed sibling item
+`backlog/items/2026-08-12-four-critic-preimage-pins-drifted-or-never-valid.md`
+exists, is still `status: open`, and already names exactly the same two
+files (`codex-critic-dispatch.schema.json`, `codex-critic-host.mjs`) as its
+own "never-valid" entries, with a Sprint Alfred assignment covering
+investigating and re-pinning both. This item's own 2026-08-18 re-triage
+already reached this same conclusion. Closed as a duplicate instance of
+that item's scope, per `backlog/README.md`'s duplicate-merge convention —
+no independent dispatch needed; tracking stays on the older, canonical
+item.
 
 # `codex-isolated-critic-protected-preimage.v1.json` has two more stale pins the fail-fast test loop was hiding
 

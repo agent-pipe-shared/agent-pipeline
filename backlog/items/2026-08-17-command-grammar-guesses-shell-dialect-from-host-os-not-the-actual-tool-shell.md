@@ -3,10 +3,29 @@ schema: pipeline.backlog-item.v1
 id: pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: c0d772f21686311a1b1da5b150250055c47e8248
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 source: "Reported by the PO on 2026-08-17, relaying a live diagnosis from a downstream consumer-project session (Windows, D:\\Dev\\Web\\Toolbox) whose own guard-recovery command used --root \"$PWD\" and failed. Independently confirmed against this repository's own source before filing; no fix proposed yet, see Proposal."
 ---
+
+## Closure
+
+Independently re-verified 2026-08-18 (NVA-W0-1): `guard-lifecycle-ready.mjs:161`
+defines `const CLAUDE_BASH_SHELL_DIALECT_PLATFORM = "linux";`; all four
+`parseGuardCommand()` call sites in that file (`:1164`, `:1321`, `:1519`,
+`:2477`) pass `{ platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM }` explicitly
+instead of relying on the `process.platform` default. Regression test
+`guard-lifecycle-ready.test.mjs:839` ("Claude/Bash-path command parsing
+ignores a win32 host: $PWD expands and POSIX grammar governs") confirmed
+present and passing. `node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`:
+112/112 pass. Landed at commit `c0d772f2` ("fix(guard-lifecycle-ready): pin
+Claude/Bash shell dialect off host OS"). Codex path
+(`codex-pretool-guard.mjs`) left untouched, per this item's own explicit
+scope note.
 
 # `guard-command-grammar.mjs`'s `dialectFor()` selects the shell dialect from `process.platform`, which is the wrong signal for Claude's Bash tool on Windows
 

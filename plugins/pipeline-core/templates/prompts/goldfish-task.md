@@ -27,6 +27,18 @@ USAGE (Elephant)
 3. Dispatch as subagent (default: `goldfish-implementor`, effort `medium` per MP-27).
    Deviation from the role default REQUIRES the model justification in field 6.
 4. Writing tasks: worktree per project calibration (`project/pipeline.json`, else `.claude/pipeline.json`).
+   A worktree-isolated dispatch's mandatory first step is a self-check, not
+   just a stop: compare `git rev-parse HEAD` against the exact expected SHA
+   given in field 6; on mismatch, self-heal via
+   `git checkout --detach <exact-expected-sha>` (the worktree shares this
+   repo's object database, so any locally committed SHA is already present —
+   confirmed working, no network, no data loss on a fresh worktree with no
+   work of its own yet), re-verify, then proceed normally. Only STOP (report,
+   no further action) if that checkout itself fails — CLAUDE.md's
+   Environment note has the confirmed root cause
+   (`refs/remotes/origin/HEAD` resolves to a stale default-branch ref) and
+   the full pattern; copy it into field 5/6 of the briefing, do not
+   re-derive it.
 5. Light profile (stage-0 / bounded implementation ONLY): set field 6 `Profile: light` for a
    condensed 3-field report, reference-inlining, no baseline verify. Route mechanical work to
    `goldfish-mechanic`/`low` and bounded implementation to `goldfish-implementor`/`medium`. Use
@@ -140,6 +152,14 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
   proves the code was written, not that it works, and is NOT sufficient for
   this class of criterion. A marker check remains entirely appropriate for
   non-behavioral facts (a config value, a constant, a doc string).
+- If this dispatch touches any file under `plugins/pipeline-core/`, ALSO run
+  `node --test harness/scripts/check-consumer-safe-paths.test.mjs` before the
+  final report — that plugin ships to consumer projects where Pipeline-source-only
+  paths (`harness/...`, `specs/sprint-nova-epic/...`) named in a doc comment or
+  string do not exist; this check is cheap and sub-second, run it every time,
+  not only when a path feels risky (twice, `NVA-A1214-SUCCESS-1` and
+  `NVA-RETRYECON-1`, a dispatch's own DoD checks missed exactly this and it was
+  only caught by a later, separate Full Verify run).
 - {{ADDITIONAL_CHECKS or delete this line}}
 
 ### 4. Forbidden

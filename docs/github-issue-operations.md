@@ -48,6 +48,15 @@ The last command should resolve the consuming project's repository. If the
 project has multiple remotes, the user must explicitly select the intended
 `OWNER/REPO`; the pipeline must display that target before a write.
 
+**Re-check session capability proactively before the first GitHub-facing
+command that follows a commit in the same session.** A commit is exactly the
+kind of event that can invalidate session capability; running
+`node plugins/pipeline-core/scripts/project-onboarding-v3.mjs inspect --intent session --root <project-dir>`
+before that first `gh`/`git remote`/SSH-key command turns a reactive
+`GUARD-LIFECYCLE-NOT-READY` recovery (one denied call, one diagnostic detour,
+one retry) into a proactive check that never hits the wall
+(`backlog/items/2026-08-09-two-minor-happy-path-retries-in-the-final-codex-run.md`).
+
 ## Safe operation contract
 
 The project-scoped capability is intended to support read/list/search plus

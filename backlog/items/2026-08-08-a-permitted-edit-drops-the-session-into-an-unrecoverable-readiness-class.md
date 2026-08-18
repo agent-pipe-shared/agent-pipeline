@@ -3,11 +3,39 @@ schema: pipeline.backlog-item.v1
 id: pipeline.permitted-edit-drops-session-into-unrecoverable-readiness
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-15
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: 0130513fea987b181abc3bee184e86f1e38d49eb
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 source: "PO, 2026-08-08, unhappy-path transcript from a fresh Claude session on a greenfield project against the 0.5.4 local candidate. The session edited a bound PRD, lost session readiness, and could not act again until the human ran `sed -i`."
 ---
+
+## Closure
+
+Independently re-verified 2026-08-18 (NVA-W0-1): a typed refusal
+`GUARD-LIFECYCLE-AUTHORITY-BOUND` (`guard-lifecycle-ready.mjs:462-492`,
+`AUTHORITY_DOCUMENT_BOUND_CODE` at `:475`) is wired into the write path at
+`:2446-2448` (`boundAuthorityDocumentPath()` check before the write is
+admitted), covering Edit/Write/NotebookEdit against a currently bound PRD,
+Spec, or design input, in the same refusal family as the protected-State
+write refusal, and naming the reviewed-planning-change-and-rebind route
+(directions 1 and 2 from this item's own Triage). Direction 3 (readiness
+class stays non-liftable) is unaffected — this is a write-time refusal, not
+a readiness-class change. Regression tests confirmed present and passing:
+"writes to the currently bound PRD, Spec, or design input are blocked even
+when session readiness is exact, and name the rebind route", "Write and
+NotebookEdit are refused for a bound authority document exactly like Edit",
+"a reopened design (planInvalidation recorded) releases the authority-document
+write refusal", "a file beside the bound documents is not blocked by the
+authority-document refusal", "an absent, malformed, or authority-less
+Pipeline State is not treated as a bound authority document". `node --test
+plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`: 112/112 pass.
+Landed at commit `0130513f`. Directions 4 (sweep for other admitted-write
+paths into this class) and 5 (first-commit-at-onboarding) remain
+deliberately out of scope, per the PO's own 2026-08-11 decision.
 
 # A write the guard permits drops the session into a readiness class with no way back
 

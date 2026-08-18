@@ -166,6 +166,18 @@ The optional-install wording, localization, and broader first-use interaction
 tuning remain owned by Issue #25. This hotfix documents the new lifecycle so
 that Issue #25 does not tune against the superseded multi-restart flow.
 
+### Testing a new host-owned layout
+
+Every future addition of a host-owned onboarding layout (alongside the
+Codex host-managed layout above) requires a disposable-root test that
+asserts the end-to-end success contract: the public inspect/plan/apply/
+readback transaction actually completes, the exact allowed write set is
+proven, and every host control (`.git`, `.codex`, `.agents`, or the new
+layout's own) is preserved untouched. A rejection-only test (asserting the
+initializer refuses the layout) is valid solely for an explicitly
+unsupported layout — never as a stand-in for proving a supported layout's
+happy path, per `backlog/items/2026-07-25-managed-onboarding-success-contract.md`.
+
 ### Candidate and release boundary
 
 This page describes the 0.4.5 lifecycle candidate; it is not a version,

@@ -3,10 +3,33 @@ schema: pipeline.backlog-item.v1
 id: pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: a98bcb988fc4256da8e3eedf326ea8f358a6bc2e
+closure_evidence: plugins/pipeline-core/lib/human-guard-override.test.mjs
 source: "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Live-reproduced on that machine: po-gate-profile-repair.mjs apply failed repeatedly with PO-PROFILE-RECEIPT-WRITE-FAILED until the reporting session manually ran hardenWindowsPrivateDirectory('.git/agent-pipeline') from a diagnostic script, which fixed the ACL and let the repair succeed immediately after. Not currently blocking Toolbox (worked around live)."
 ---
+
+## Closure
+
+Independently re-verified 2026-08-18 (NVA-W0-1): commit `a98bcb98`
+("fix(pipeline-core): harden every newly-created path component in
+secureDirectory()") landed, with regression tests "secureDirectory hardens
+EVERY newly-created path component, not only the leaf (NVA-PAWINACL-2)"
+and "secureDirectory only ASSESSES an already-secure existing parent, never
+re-hardens it, when adding a new child (NVA-PAWINACL-2)" confirmed present
+and passing (mocked-Windows behavior, this suite's established pattern for
+Windows-only code exercised on a non-Windows host). `node --test
+plugins/pipeline-core/lib/human-guard-override.test.mjs`: both named tests
+pass (the suite's one pre-existing, unrelated `HGO-EXTERNAL-MARKETPLACE`
+environment-drift failure is untouched by this fix). **Caveat, closed with
+this explicitly attached, not silently dropped:** live re-confirmation on a
+real Windows checkout has not been done in this pass and is not further
+code work — this closure records that the code and its tests are correct
+and merged, not that a native Windows session has re-run the triggering
+scenario.
 
 # `secureDirectory()` only ACL-hardens the leaf of a recursive `mkdirSync`, leaving a SHARED intermediate directory insecure for later consumers (Windows)
 
