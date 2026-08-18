@@ -44,6 +44,7 @@
 | pipeline.closed-input-channel-review-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -261,6 +262,6 @@
 
 ## Counts
 
-- open: 85
+- open: 86
 - in_progress: 11
 - closed: 157
