@@ -76,3 +76,16 @@ A closely related sibling item from the SAME source report (backlog/items/2026-0
 **Risks/dependencies:** 1. Direct implementation dependency: this item's detection helper and P0-4's push-preflight coordinator both need the same 'does a valid machine-wide/project trust anchor exist' answer -- sequence or co-design them so the logic isn't written twice and doesn't drift (P0-4 is itself unassigned/open, so this item may need to either wait for it or be built first and then have P0-4 reuse it). 2. Do not let this item's fix regress PO-KEYDIR-01(A)'s 2026-08-11 decision that the KEY-DIRECTORY default is repo-scoped, not machine-wide (backlog/items/2026-08-10-po-key-directory-default-should-be-repo-scoped-not-machine-wide.md) -- this item is about the trust-ANCHOR artifact (public key digest committed into project/critical-human-proof.json), a different thing from where the private key lives, and the two must not get conflated in the dispatch. 3. Preserve the confirmed-true invariant that submit-plan/approve-plan (po-gate-authority.mjs) never gain a dependency on signature-key infrastructure -- any implementation that routes trust-anchor materialization through the plan-approval gate itself would be a regression the item's own text explicitly warns against. 4. Whatever 'controlled way' Option A's materialization step uses (a shown manual diff+commit, or the existing HGO signed-Edit ceremony) must go through the existing audited GS-2 escape routes only -- guard-gate-strength.mjs's design rationale is explicit that no new bypass may be added for this file. 5. The item's only cited evidence is a summary inside this backlog item itself; the underlying handover doc (docs/pipeline-greenfield-happy-path-handover.md) lives in an external test repo (Rune_Test1_Codex_060_52) not present in this checkout, so the exact sequence of 'two keys, an identity corrected' could not be independently verified beyond what the current code plausibly explains -- worth asking the source session for the literal transcript/commands if precision matters before scoping a dispatch.
 
 **Estimated complexity:** medium
+
+## Deferral note, 2026-08-19
+
+After 3 dispatch attempts made no committed progress on the combined
+scope (this item + full-push-preflight-before-signature, sharing a
+proposed trust-anchor detection helper), the Elephant made a deliberate
+scope-reduction decision: land full-push-preflight-before-signature's
+preflight hardening alone (closed separately, see that item), and defer
+this item's onboarding-time trust-anchor guidance to a future session.
+No functional gap results: GS-2 gate-strength protection of
+project/critical-human-proof.json is unaffected regardless: this item
+was always a UX convenience (surfacing a ready-to-use snippet), never a
+protection mechanism.

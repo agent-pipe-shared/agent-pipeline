@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.full-push-preflight-before-signature
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-4 (priority P0)"
 ---
@@ -67,3 +67,9 @@ an incorrect evidence path, is rejected before the passphrase prompt.
 **Risks/dependencies:** 1) Scoping risk on 'branch non-existence': the item's Proposal states it as a flat precondition, but a literal reading breaks the ordinary case of pushing a second commit to a feature branch already on the remote -- needs a PO decision on intent (new-branch-only vs. every push) before any implementation of that specific check, in either option. 2) Adjacent, distinct gap found in the same area, not this item: backlog/items/2026-08-18-push-approval-general-mode-lane-does-not-bind-remote-or-destination.md -- guard-push.mjs's chat/standing-approved lane checks only forCommit, never remote/destination (this repo runs in signature mode so it isn't exposed, but a project on chat/standing-approved mode is). Worth triaging in the same Wave-4 pass since both are about push-binding correctness, but they are independent fixes in different files/lanes. 3) Residual drift-voids-signature risk even after this item ships: unlike Guard Maintenance Window (which got an idempotent-reuse fix in backlog/items/2026-08-08-a-maintenance-window-signature-is-voided-by-an-unrelated-file-write.md, closed 2026-08-18), the push/authorize-critical ceremony has no equivalent -- a benign unrelated commit landing between a green preflight and the actual signature still voids it under the documented 'ordering rule'. Worth flagging as a natural follow-up reusing the GMW fix pattern, not something either option here solves. 4) Several other 2026-08-18-dated items touch the same signature-ceremony surface (hgo-signature-ceremony-requires-more-human-steps..., pipeline-author-repair-signature-mode-never-actually-admits-the-edit) -- worth triaging as one batch given the shared blast radius (po-human-approval.mjs / pipeline-state.mjs critical-action code), to avoid three separate dispatches touching the same security-tier file in the same wave.
 
 **Estimated complexity:** medium
+
+## Closure, 2026-08-19
+
+Implemented and merged: discovered that plugins/pipeline-core/scripts/push-prepare.mjs already implements the requested plan-push coordinator in full (clean-tree, verify-evidence freshness, threat-model, and trust-anchor checks, gated before rendering the signature command); docs/push-release-flow.md now names it as the mandatory first step; an independent Critic review was dispatched (task W4-CRITIC-2A).
+
+Commit(s): 1b619225.

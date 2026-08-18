@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.self-healing-local-cleanup-recovery
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-5 (priority P1)"
 ---
@@ -74,3 +74,9 @@ I also found two related, currently-open defects in the same file/mechanism fami
 3. This item's own 'Affected artifact' pointer (`session-cleanup-recovery.mjs`) is accurate for the TYPED, ready-plan confirmation friction (the actual scope of a fix), but the phrase in the item's Description — 'select a recommended attended-host-recovery' — matches the vocabulary of a DIFFERENT, adjacent escape-hatch mechanism (`session-cleanup.mjs plan-human-recovery`, backed by `onboarding-continuity.mjs`, surfaced via `cleanupHumanRecoveryAction()` in `project-onboarding-v3.mjs`), which is reached only when `planSessionCleanupRecovery` could NOT construct a typed plan at all. That escape hatch is explicitly untyped/unprovable by design and is out of scope for 'fully-typed' auto-execution — whichever session picks this item up should confirm, if possible, which of the two mechanisms the source greenfield report (Section 9, P1-5, in the external test repo not present in this checkout) actually observed, since it changes what 'fixing this' means.
 
 **Estimated complexity:** small
+
+## Closure, 2026-08-19
+
+Implemented and merged: all six typed cleanup-recovery kinds now auto-execute (requiresConfirmation: false) with a .bak pre-mutation backup safety net; an independent Critic review was dispatched for this security-relevant change (task W4-CRITIC-2C).
+
+Commit(s): 3d5fda6d.

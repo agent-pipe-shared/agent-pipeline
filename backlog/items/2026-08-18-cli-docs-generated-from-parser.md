@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.cli-docs-generated-from-parser
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-3 (priority P2)"
 ---
@@ -62,3 +62,9 @@ in CI as argv fixtures against the real parser.
 **Risks/dependencies:** This item substantially overlaps two already-closed items' explicitly-left-open follow-ups: `backlog/items/2026-08-09-push-approval-skill-reference-predates-adr-0061.md` Direction 2 ("a test or generation step that asserts the skill reference names every subcommand `po-human-approval.mjs --help` actually reports... remains genuinely open") and its own cross-reference `2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md` ("the same drift class"). Before dispatching, the PO should decide whether this 2026-08-18 item supersedes/consolidates those, or whether it's an unintentional re-filing — running three parallel backlog entries for the same fix is a coordination cost, not three fixes. Also note the precedent at `backlog/items/2026-08-16-guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table.md` (closed 2026-08-18): "derive from the CLI's own table" was recently done successfully there, but only for one narrow declared property on one list — it is evidence a narrowly-scoped derivation works, not evidence that full doc generation across `pipeline-state.mjs`'s 46 commands is proportionate right now.
 
 **Estimated complexity:** small (for the recommended Option 2, bounded to `docs/push-release-flow.md`)
+
+## Closure, 2026-08-19
+
+Implemented and merged: docs/push-release-flow.md's push/recovery command examples are now contract-tested as argv fixtures against the real parser.
+
+Commit(s): 4fb1753a.

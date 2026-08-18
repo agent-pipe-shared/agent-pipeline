@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.phase-aware-bootstrap-readiness
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-1 (priority P1)"
 ---
@@ -64,3 +64,9 @@ commit, a real verify contract must exist.
 **Risks/dependencies:** 1) Sequencing with backlog/items/2026-08-18-fresh-repo-onboarding-intake-first-transaction.md (id pipeline.fresh-repo-onboarding-intake-first-transaction): same source report (Rune P0-0, higher priority than this item's P1-1), and its proposal introduces its own 'design-ready'-shaped checkpoint/authority-binding transaction for fresh repos. If both are accepted for Wave-4, they should be designed together or in a fixed order (P0-0 first) -- doing this item in isolation risks inventing status vocabulary or transition semantics that P0-0's bigger onboarding-transaction redesign then has to reconcile or discard. 2) enterPlanImplementation is covered by pipeline-state.test.mjs and is state-machine code the repo treats as protected/tested (TP-class guard protections apply to Pipeline plugin source generally); changing it needs matching test coverage, not just the production code. 3) session-bootstrap.md's Step 3 calibration field-sketch pointer to 'docs/operating-model.md §8' is stale (that section is 'Operating shapes', not a calibration field list) -- worth fixing in the same pass since Step 5's text sits right next to it and any edit there will re-surface the same broken cross-reference. 4) The item's acceptance test says 'without a guard denial' but I found no hook (guard-lifecycle-ready.mjs, guard-testpath.mjs, setup-check.mjs) that currently enforces verify existence for a consumer project at all -- Step 5 today is a documented protocol step for the Elephant to follow manually, not a coded guard. Triage should confirm whether the PO's real complaint is about the documented protocol (as I found) or about an actual hook denial that I did not locate, since the fix shape differs (doc-only vs. doc+hook).
 
 **Estimated complexity:** medium
+
+## Closure, 2026-08-19
+
+Implemented and merged: harness/session-bootstrap.md Step 5 now warns rather than blocks at the design-to-implementation transition when no verify contract exists yet; the real hard block moved to the push gate via full-push-preflight-before-signature's verify-evidence-freshness check.
+
+Commit(s): e6daa7e1.

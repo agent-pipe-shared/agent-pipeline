@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.canonical-verify-evidence-path
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-5 (priority P0)"
 ---
@@ -67,3 +67,9 @@ settings, must produce exactly the file that the push guard consumes.
 **Risks/dependencies:** 1) guard-push.mjs is a large, TP-3-protected, self-application-critical file (per CLAUDE.md's guard-testpath discipline) -- even a pure literal-to-constant swap there should go through the same careful-edit discipline this repo already applies to that file, and its own test suite (guard-push.test.mjs) must be updated in the same commit. 2) The item's 'Affected artifact' list is inaccurate as written (see problemRestated) -- re-verify the corrected file list before building any dispatch briefing from it, per this session's own re-verify-before-dispatch discipline. 3) I could not confirm from this repo alone whether the reporting greenfield session (external repo Rune_Test1_Codex_060_52, out of this checkout's read/write scope) actually ran the onboarding-seeded correct command and still hit a mismatch, or ran something else -- worth a quick clarifying read of that repo's handover doc (read-only, it is an external project repo) before finalizing scope, since it would confirm whether the seeded-comment mitigation (already in project-onboarding-v3.mjs) was bypassed or was simply not present yet in the build under test. 4) No blocking dependency found on other open backlog items from the recent git log (item-hash-rescope-amendment, managed-onboarding-success-contract, guard-devplan/guard-testpath no-bash-write-lane item) -- these look unrelated to verify-evidence pathing.
 
 **Estimated complexity:** medium
+
+## Closure, 2026-08-19
+
+Implemented and merged: a shared VERIFY_EVIDENCE_DEFAULT_PATH constant now backs verify-evidence-producer.mjs's default --out, guard-push.mjs, and push-prepare.mjs, replacing three independent literals.
+
+Commit(s): 0ccdfdb8, 056c5fd0, e9047a60.

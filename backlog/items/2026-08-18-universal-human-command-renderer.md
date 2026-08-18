@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.universal-human-command-renderer
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-3 (priority P0)"
 ---
@@ -64,3 +64,9 @@ wrapping.
 **Risks/dependencies:** Dependency: 2026-08-02-unified-human-authorization-ux.md (open, remaining scope deferred to Sprint Alfred 2026-08-17) already owns the 'adoption check that prevents new one-off human-approval UX' ask -- triaging this item without cross-referencing that one risks two divergent governance mechanisms for the same problem, or the PO being asked to decide the same architectural question twice under different names. Design risk within the narrow fix itself: boundedOpaqueCopyCommand() takes one command STRING; the HGO ceremonies at the affected sites are 3-4 sequential commands (plan -> prepare-authorization -> emit-signature-digest -> authorize-by-signature), so the fix needs either N separate bounded renderings (one per step, each labeled) or a small primitive extension -- not a single trivial call-site swap, though still far smaller than inventing new infrastructure. Process risk: this is the third occurrence of the identical drift shape (a bounded/safe-disclosure fix landing at one site while a structurally identical sibling site is missed) after GF-059 (2026-08-09) and its 2026-08-17 follow-up -- worth flagging to the PO as a pattern, not a one-off, when deciding whether Option A's structural check is worth doing sooner rather than deferring to Alfred.
 
 **Estimated complexity:** medium
+
+## Closure, 2026-08-19
+
+Implemented and merged: guard-lifecycle-ready.mjs, guard-testpath.mjs, and human-guard-override.mjs's HGO-EXTERNAL-PROJECT-BOUNDARY branch now render HGO ceremony commands via the existing boundedOpaqueCopyCommand() renderer instead of ad hoc template strings.
+
+Commit(s): a8cb810a, b67d9e3a.

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.happy-path-local-telemetry
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-2 (priority P2)"
 ---
@@ -62,3 +62,9 @@ happy-path SLOs were met, without exporting any content or private data.
 **Risks/dependencies:** 1) The item's cited source (docs/pipeline-greenfield-happy-path-handover.md, Section 9/P2-2, test repo Rune_Test1_Codex_060_52) lives in an external repo not present in this checkout -- I could not verify the original finding's exact wording or severity beyond the backlog item's own paraphrase. 2) pipeline-state.mjs's activeFeature.phase enum is currently exactly {'design','implementation'} with an F1 history noting a prior writer/reader schema-drift bug already fixed once for this exact field -- any change adding phase values or a transition-history array needs care and a full re-run of the existing pipeline-state*.test.mjs suite (6 files touch phase/approval semantics directly). 3) Direct scope overlap with backlog/items/2026-08-17-goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate.md (reassigned to Sprint Alfred 2026-08-18) -- both want dispatch/phase-level tool-call instrumentation; triaging this item without cross-referencing that one risks duplicated design work. 4) Direct hook-family overlap with backlog/items/2026-08-18-guard-devplan-and-guard-testpath-have-no-bash-write-lane.md (open, same day, explicitly deferred pending its own design pass) -- any guard-denial-logging sub-scope of this item touches the identical files. 5) Whatever design ships must preserve the no-content/no-export discipline usage-ledger.mjs already establishes (path-free output, reads local transcripts only, never writes/exports); the acceptance test's 'without exporting any content or private data' language should be checked against that existing precedent rather than re-derived from scratch. 6) CLAUDE.md's own recently-learned lesson about signature-ceremony request files (.git/agent-pipeline/human-guard-overrides/requests/) being byte-identity-sensitive means any future signature-attempt telemetry must be strictly read-only and never run mid-ceremony.
 
 **Estimated complexity:** medium
+
+## Closure, 2026-08-19
+
+Implemented and merged: activeFeature gained an additive phase-transition history (plan-spec-state-v2.mjs), and usage-ledger.mjs now surfaces turn count and tool-call count per session/subagent.
+
+Commit(s): d2ba302a, f50f5345.

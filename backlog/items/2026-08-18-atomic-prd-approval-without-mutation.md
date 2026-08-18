@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.atomic-prd-approval-without-mutation
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-2 (priority P0)"
 ---
@@ -68,3 +68,9 @@ rebind, or signature step, and continuity is immediately valid.
 **Risks/dependencies:** Duplicate/overlap risk: this item is best triaged as a recurrence of the CLOSED defect `2026-08-08-a-promotion-freezes-a-prd-the-po-gate-will-reject.md` (fixed 2026-08-11, `fb918b86`) for a third marker (`po-plan-acknowledged`, added later per `2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md`) that was never brought under the same admission-time check -- Wave-4 should link/cross-reference both rather than triage this as fully independent, and whoever implements should re-read that closed item's Direction 1/2/5 before starting. Related open items in the same subsystem worth checking for overlap before assigning: `2026-07-25-po-gate-authority-receipt-readback.md`, `2026-07-25-po-gate-authority-path-canonicalization.md`, `2026-08-05-critical-human-proof-not-wired-to-push-and-prd-gates.md`, `2026-07-19-po-gate-worktree-authority.md`. Dependency: any implementation of Option 2 must reuse the exact lock/journal/fsync transaction pattern already built for `po-authority-rebind-plan/apply` (pipeline-state.mjs ~4313-4720) rather than inventing a parallel one, and must route through -- not around -- `guard-lifecycle-ready.mjs`'s `boundAuthorityDocumentPath()`/`AUTHORITY_DOCUMENT_BOUND_CODE` (lines 465-557), which is the actual current enforcer of "no direct edit to a bound PRD" and already names the sanctioned reopen-design/rebind route in its own refusal text. ADR-0021 (PRD-PO-Gate) is still explicitly "provisional, never formalized" -- if the PO does want the full Option 1 merge later, that's a natural piece to fold into ADR-0021's eventual formalization pass rather than a standalone patch. Correct the item's "Affected artifact" list when it's assigned: point at `plugins/pipeline-core/lib/po-gate-authority.mjs` and `plugins/pipeline-core/lib/onboarding-continuity.mjs` (the files that actually carry this logic) rather than `guard-apply-patch.mjs` (confirmed unrelated) and a "Promotion-History" file that does not exist under that name.
 
 **Estimated complexity:** medium
+
+## Closure, 2026-08-19
+
+Implemented and merged: a new po-authority-acknowledge-plan/apply pair gives a bound-but-unacknowledged PRD a sanctioned route to the acknowledgement marker, and promotionArtifacts() now admission-checks it; an independent Critic review was dispatched (task W4-CRITIC-2B).
+
+Commit(s): 00b768cb, ee72a712.
