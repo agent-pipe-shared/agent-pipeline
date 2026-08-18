@@ -159,6 +159,12 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/critical-action-approval-request.mjs",
   "plugins/pipeline-core/lib/document-hooks.mjs",
   "plugins/pipeline-core/lib/entrypoint.mjs",
+  // pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges: GMWKC01 now also walks
+  // process-spawn edges (a kernel file handing a first-party script path to
+  // node:child_process's spawnSync), not just static imports -- `project-onboarding-v3.mjs`
+  // above reaches these two writer scripts (and everything THEY import) through the
+  // process boundary, not an import.
+  "plugins/pipeline-core/lib/feature-package-topology.mjs",
   "plugins/pipeline-core/lib/gate-estimate.mjs",
   "plugins/pipeline-core/lib/git-cmd.mjs",
   "plugins/pipeline-core/lib/human-guard-override.mjs",
@@ -169,10 +175,26 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/plan-spec-state-v2.mjs",
   "plugins/pipeline-core/lib/po-gate-authority.mjs",
   "plugins/pipeline-core/lib/po-gate-profile-publisher.mjs",
+  "plugins/pipeline-core/lib/private-boundary.mjs",
   "plugins/pipeline-core/lib/project-authority.mjs",
   "plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs",
   "plugins/pipeline-core/lib/project-onboarding-v3.mjs",
+  // Pre-existing, unrelated static-import gap found already failing GMWKC01 at this
+  // dispatch's own base commit (guard-lifecycle-ready.mjs already imported both of these
+  // before this dispatch touched anything) -- closed alongside the spawn-edge fix above
+  // because GMWKC01 is one non-decomposable transitive-closure assertion over the whole
+  // array, not a per-edge-type check. Neither import is spawn-related.
+  "plugins/pipeline-core/lib/protected-test-paths.mjs",
+  // publication-authority.mjs/publication-bundle.mjs/publication-bundle-v2.mjs/
+  // publication-capability-preflight.mjs/review-economy.mjs below: transitive closure of
+  // scripts/pipeline-state.mjs (one of the two spawn-edge additions), not spawn edges
+  // themselves.
+  "plugins/pipeline-core/lib/publication-authority.mjs",
+  "plugins/pipeline-core/lib/publication-bundle.mjs",
+  "plugins/pipeline-core/lib/publication-bundle-v2.mjs",
+  "plugins/pipeline-core/lib/publication-capability-preflight.mjs",
   "plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
+  "plugins/pipeline-core/lib/review-economy.mjs",
   "plugins/pipeline-core/lib/runner-native-continuation.mjs",
   "plugins/pipeline-core/lib/runner-profile-migration-v2.mjs",
   "plugins/pipeline-core/lib/runner-profile-migration-v3.mjs",
@@ -188,6 +210,16 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/yaml-lite.mjs",
   "plugins/pipeline-core/scripts/codex-app-server-health.mjs",
   "plugins/pipeline-core/scripts/continuity-status.mjs",
+  // Two actual spawn-edge targets (pipeline.gmw-kernel-closure-test-does-not-model-
+  // spawn-edges): project-onboarding-v3.mjs's observePoAuthorityRebind/
+  // observePoAuthorityDecision/observePoProfileRepair spawn a child process running
+  // each of these as process.execPath's own script argument.
+  "plugins/pipeline-core/scripts/pipeline-state.mjs",
+  "plugins/pipeline-core/scripts/po-gate-profile-repair.mjs",
+  // Pre-existing, unrelated static-import gap (see protected-test-paths.mjs note above):
+  // guard-lifecycle-ready.mjs already imported this before this dispatch touched anything.
+  "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
+  "plugins/pipeline-core/scripts/publication-close-journal.mjs",
   "plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs",
 ]);
 

@@ -29,16 +29,34 @@
  * entries are parsed for imports -- `hooks.json` and `project/critical-human-proof.json`
  * have none.
  *
+ * SPAWN EDGES (pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges): a kernel
+ * file can also reach a first-party script through the PROCESS boundary rather than an
+ * import -- `spawnSync(process.execPath, [path, ...])`. The scanner follows this shape
+ * too, the same way it follows `import`/`export ... from`: it extracts the array's first
+ * element and classifies it --
+ *   - an IDENTIFIER is traced back through the file's own source: either a direct
+ *     `const NAME = fileURLToPath(new URL("../relative/spec.mjs", import.meta.url))`
+ *     script-path constant, or a simple `name = OTHER_NAME;` reassignment chased (up to
+ *     8 hops) to one. The resolved relative specifier is then resolved and checked for
+ *     kernel-set membership exactly like a relative import specifier.
+ *   - a STRING LITERAL is checked the same way a literal import specifier already is:
+ *     relative (`./`/`../`) literals become an edge, everything else (a flag like
+ *     `"-e"`, a bare subcommand) is ignored -- it is not a first-party script reference.
+ *   - anything else (a member expression, a call, a template literal, spread, ...) is a
+ *     shape the scanner cannot classify.
+ *
  * FAILS CLOSED on a shape it cannot classify: a dynamic `import(` call anywhere in a
- * kernel file's source aborts this check with a named-file diagnostic instead of
- * silently proceeding -- a silently-skipped file would defeat the entire point of this
- * test (a missed dynamic import is exactly the kind of hole a hand-maintained
- * enumeration already produced once).
+ * kernel file's source, an identifier passed to `spawnSync(process.execPath, [...])`
+ * that cannot be statically traced to a script-path constant, or any other unclassifiable
+ * first array element in that same call shape, aborts this check with a named-file
+ * diagnostic instead of silently proceeding -- a silently-skipped file would defeat the
+ * entire point of this test (a missed dynamic import, or a missed spawn edge, is exactly
+ * the kind of hole a hand-maintained enumeration already produced once).
  *
  * Run: node plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
  */
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, normalize, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -52,7 +70,83 @@ const IMPORT_FROM_RE = /\b(?:import|export)\s+[A-Za-z0-9_$,{}*\s]*?\bfrom\s+["']
 const SIDE_EFFECT_IMPORT_RE = /^\s*import\s+["']([^"']+)["']\s*;?\s*$/gm;
 const DYNAMIC_IMPORT_RE = /\bimport\s*\(/;
 
-/** Every first-party (relative-specifier) import ONE kernel file's source declares. */
+// Spawn-edge scanner (pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges): see
+// the "SPAWN EDGES" section of the file header for the shapes this classifies.
+const SPAWN_EXEC_PATH_RE = /\bspawnSync\(\s*process\.execPath\s*,\s*\[\s*([^,\]]+?)\s*[,\]]/g;
+const SCRIPT_PATH_CONST_RE = /\b(?:const|let|var)\s+([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*fileURLToPath\(\s*new\s+URL\(\s*["']([^"']+)["']\s*,\s*import\.meta\.url\s*\)\s*\)/g;
+const IDENTIFIER_REASSIGN_RE = /\b([A-Za-z_$][A-Za-z0-9_$]*)\s*=\s*([A-Za-z_$][A-Za-z0-9_$]*)\s*;/g;
+const IDENTIFIER_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+const STRING_LITERAL_RE = /^["']([^"']*)["']$/;
+const MAX_IDENTIFIER_CHASE_HOPS = 8;
+
+/**
+ * Map every identifier this ONE kernel file's source assigns from a
+ * `fileURLToPath(new URL("../relative/spec.mjs", import.meta.url))` script-path
+ * constant, or reassigns (`name = OTHER_NAME;`) from one, to its ultimate specifier.
+ */
+function scriptPathIdentifierMap(source) {
+  const map = new Map();
+  let match;
+  SCRIPT_PATH_CONST_RE.lastIndex = 0;
+  while ((match = SCRIPT_PATH_CONST_RE.exec(source)) !== null) {
+    map.set(match[1], { kind: "path", specifier: match[2] });
+  }
+  IDENTIFIER_REASSIGN_RE.lastIndex = 0;
+  while ((match = IDENTIFIER_REASSIGN_RE.exec(source)) !== null) {
+    const [, target, ref] = match;
+    if (!map.has(target)) map.set(target, { kind: "ref", ref });
+  }
+  return map;
+}
+
+function resolveScriptPathIdentifier(map, name, depth = 0) {
+  if (depth > MAX_IDENTIFIER_CHASE_HOPS) return null;
+  const entry = map.get(name);
+  if (!entry) return null;
+  if (entry.kind === "path") return entry.specifier;
+  return resolveScriptPathIdentifier(map, entry.ref, depth + 1);
+}
+
+/** Every `spawnSync(process.execPath, [<script>, ...])` edge ONE kernel file's source declares. */
+function spawnEdgeSpecifiers(source, repoRelativePath) {
+  const identifierMap = scriptPathIdentifierMap(source);
+  const specs = [];
+  SPAWN_EXEC_PATH_RE.lastIndex = 0;
+  let match;
+  while ((match = SPAWN_EXEC_PATH_RE.exec(source)) !== null) {
+    const token = match[1].trim();
+    if (IDENTIFIER_RE.test(token)) {
+      const resolved = resolveScriptPathIdentifier(identifierMap, token);
+      if (resolved === null) {
+        throw new Error(
+          `${repoRelativePath} calls spawnSync(process.execPath, [${token}, ...]) but "${token}" cannot be ` +
+          "statically traced to a fileURLToPath(new URL(...)) script-path constant -- this spawn-edge shape " +
+          "must be resolved by hand (name the spawned script and add it to NEVER_LIFTABLE_KERNEL_PATHS if " +
+          "first-party), not silently skipped.",
+        );
+      }
+      specs.push(resolved);
+      continue;
+    }
+    const literal = STRING_LITERAL_RE.exec(token);
+    if (literal !== null) {
+      // A non-relative string literal (a flag like "-e", a bare subcommand) is not a
+      // first-party script reference -- ignored, mirroring how a non-relative import
+      // specifier is already ignored below.
+      if (literal[1].startsWith("./") || literal[1].startsWith("../")) specs.push(literal[1]);
+      continue;
+    }
+    throw new Error(
+      `${repoRelativePath} calls spawnSync(process.execPath, [${token}, ...]) with a first array element the ` +
+      "static scanner cannot classify (neither a traceable identifier nor a string literal) -- this spawn-edge " +
+      "shape must be resolved by hand (name the spawned script and add it to NEVER_LIFTABLE_KERNEL_PATHS if " +
+      "first-party), not silently skipped.",
+    );
+  }
+  return specs;
+}
+
+/** Every first-party (relative-specifier) import/spawn-edge ONE kernel file's source declares. */
 function relativeImportSpecifiers(absPath, repoRelativePath) {
   const source = readFileSync(absPath, "utf8");
   if (DYNAMIC_IMPORT_RE.test(source)) {
@@ -68,6 +162,7 @@ function relativeImportSpecifiers(absPath, repoRelativePath) {
   while ((match = IMPORT_FROM_RE.exec(source)) !== null) specs.add(match[1]);
   SIDE_EFFECT_IMPORT_RE.lastIndex = 0;
   while ((match = SIDE_EFFECT_IMPORT_RE.exec(source)) !== null) specs.add(match[1]);
+  for (const spec of spawnEdgeSpecifiers(source, repoRelativePath)) specs.add(spec);
   const relativeSpecs = [];
   for (const spec of specs) {
     if (spec.startsWith("./") || spec.startsWith("../")) relativeSpecs.push(spec);
