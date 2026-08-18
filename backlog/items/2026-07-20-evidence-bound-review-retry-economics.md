@@ -154,3 +154,31 @@ out of this package's scope, not yet triaged or assigned. The module and
 its test are also not yet registered in `verify.mjs` (by design, since
 nothing calls it yet). Status stays `in_progress` until live wiring is
 designed, triaged, and lands.
+
+### Update, 2026-08-18 — release-bar triage: live-wiring follow-up decided
+
+- **Decision:** decided, queued for dispatch. The module itself
+  (`review-retry-planner.mjs`) is built, tested and Critic-PASSed; what
+  remains — wiring it into the actual Verify/Critic retry call sites — was
+  left "not yet triaged or assigned" immediately above, which is exactly
+  the unresolved-remainder shape the 2026-08-18 release-bar sweep exists
+  to close. Scoping it now: the wiring dispatch's job is to call the
+  already-accepted, already-tested decision function from
+  `harness/scripts/verify.mjs` and/or `publication-executor.mjs` at the
+  points where a retry is currently decided ad hoc, and to register the
+  module + its test in `verify.mjs`'s own suite enumeration — not to
+  redesign the acceptance boundary, which this item's Proposal already
+  settled and `NVA-RETRYECON-1` already implemented.
+- **Rationale:** live wiring changes what Verify/Critic admission actually
+  does on a retry, so it needs its own regression coverage and a
+  Critic review before it can be trusted — the same reasoning that kept it
+  out of `NVA-RETRYECON-1`'s own scope in the first place. `status` stays
+  `in_progress` rather than closing, since the module existing unwired is
+  not the same as this item's own goal (bounding retry economics in the
+  live gates) being met.
+- **Assignment (if accepted):** a follow-up `goldfish-deep` dispatch,
+  scoped exactly as above, with a mandatory Critic review before this item
+  can move toward closure — matching the same two-step pattern
+  (build-in-isolation, then wire-and-review) `NVA-RETRYECON-1`'s own
+  Triage already used successfully.
+- **Date:** 2026-08-18

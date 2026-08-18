@@ -91,3 +91,23 @@ not a quick patch). Directions worth weighing by whoever picks this up:
 - **Assignment:** queued for a future design/dispatch session; guardrail-tier
   work (MP-07), not a same-session patch.
 - **Date:** 2026-08-17
+
+### Update, 2026-08-18 — release-bar triage: assignment firmed to Sprint Alfred
+
+- **Decision:** unchanged (accepted, real gap) — firming only the
+  assignment, which the 2026-08-17 triage left as "a future design/dispatch
+  session" without naming one.
+- **Rationale:** this is the same MP-07 guardrail-tier design-pass class as
+  `2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md`
+  and `2026-08-07-agent-definitions-pin-the-review-tier-model.md`, both
+  already deferred to Sprint Alfred for materially the same reason
+  (routing/model discipline is enforced by discipline, not by a technical
+  check, and the fix needs its own guardrail-tier design pass, not a
+  same-session patch). Naming the same sprint keeps the three items
+  co-scheduled rather than one drifting unassigned.
+- **Assignment:** Sprint Alfred — matches its confirmed scope ("mechanical
+  governance, measurable rigor, and control integrity",
+  `docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17 amendment)
+  precisely; the three numbered directions in this item's own Proposal
+  section are the design's starting point.
+- **Date:** 2026-08-18

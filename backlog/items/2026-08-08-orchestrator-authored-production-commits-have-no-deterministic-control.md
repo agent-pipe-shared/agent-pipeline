@@ -106,3 +106,34 @@ record less true rather than more.
   not been asked about or approved — flag for a future explicit decision,
   do not bundle into the enforcement-mechanism design.
 - **Date:** 2026-08-11
+
+### Update, 2026-08-18 — release-bar triage: direction 1 decided
+
+- **Decision:** decided, queued for dispatch. Direction 1 (a decidable
+  commit-message-type check for a delivery/review range, independent of
+  the authorship-control question above) was flagged in the 2026-08-11
+  triage as "not covered by this decision... stays open" and never
+  actually decided. Confirmed against current source before deciding:
+  `plugins/pipeline-core/lib/commit-message-policy.mjs` implements GIT-03
+  (correlation-trailer privacy + `AI-Assisted:` marker) as a per-commit
+  PreToolUse check; it does not check the GIT-01 type vocabulary
+  (`guardrails/git.md:16`) at all, and nothing in the repository checks
+  commit subjects across a range (`guard-git.mjs` is a PreToolUse hook on
+  one command, not a range walker). The gap this item's Description
+  reported (`6decf59`'s `design` type going uncaught) is therefore still
+  real, unchanged since 2026-08-08.
+- **Rationale:** the check is genuinely decidable (a subject line either
+  starts with an admitted GIT-01 type or it does not) and small, but
+  wiring it into a guard/hook or a range-checking script is guardrail-tier
+  work (touches `plugins/pipeline-core/hooks/guard-git.mjs` and/or
+  `harness/scripts/verify.mjs`) and needs a regression suite to be trusted
+  — not a change this read-only triage pass can make itself.
+- **Assignment (if accepted):** a small `goldfish-implementor`/`goldfish-
+  mechanic` dispatch: extend `commit-message-policy.mjs` (or a thin
+  sibling module) with a pure `commitTypeFindings(subject)` check against
+  the GIT-01 vocabulary, wired wherever commit messages already pass
+  today, plus a range-mode entry point Critic/Verify can call against an
+  enumerated commit set. Sprint Alfred — same "mechanical governance"
+  scope as the authorship-control question this item's own primary
+  decision already assigned there.
+- **Date:** 2026-08-18

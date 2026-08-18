@@ -56,3 +56,29 @@ non-architecture tasks).
   fit without displacing current delivery work — PO's stated preference,
   cheapest slot wins.
 - **Date:** 2026-08-17
+
+### Update, 2026-08-18 — release-bar triage: reassigned off Nova A/B to Sprint Alfred
+
+- **Decision:** unchanged on substance (accepted, real observation, needs a
+  measurement pass before any fix, not resolvable by reading alone this
+  triage pass) — correcting only the assignment. "Nova A" and "Nova B" are
+  sub-slices of Sprint Nova itself, confirmed via `docs/adr/0043-post-go-
+  live-sprint-model.md` (Nova is one of the three canonical follow-up
+  planning windows established alongside Nightwing and Phoenix, and the
+  live `docs/state.md` record shows Nova A/Nova B are this same release's
+  own delivery tracks — the one shipping as 0.6.0). Deferring to "Nova B,
+  or Nova A" is therefore deferring within the current release, not to a
+  genuinely separate future sprint, and does not satisfy the release bar's
+  deferral exception.
+- **Rationale:** this item cannot be closed now (a real measurement pass
+  needs actual dispatch instrumentation and telemetry, which a read-only
+  triage pass cannot produce), so it is queued rather than closed; it is
+  reassigned to a genuinely distinct, still-open sprint so it does not
+  silently ride along inside the release it was supposed to be deferred
+  past.
+- **Assignment:** Sprint Alfred — matches its confirmed "measurable rigor"
+  scope (`docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17
+  amendment); first step is exactly this item's own Proposal (a
+  phase-by-phase token breakdown of one representative `goldfish-deep` and
+  one `critic` dispatch) before any optimization is attempted.
+- **Date:** 2026-08-18

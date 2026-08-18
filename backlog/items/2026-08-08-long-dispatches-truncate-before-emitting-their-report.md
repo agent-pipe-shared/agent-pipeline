@@ -440,3 +440,34 @@ announced-then-abandoned-pause failure mode, which needs its own dedicated
 thought (not a mechanical follow-on to the closing-allowance fix).
 
 - **Date:** 2026-08-16
+
+### Update, 2026-08-18 — release-bar triage: queue the remaining gap for dispatch
+
+- **Decision:** decided, queued for dispatch. The primary mechanism (the
+  closing allowance) is shipped and does not need further triage. The two
+  gaps left open by the 2026-08-16 update — (a) the "announced-then-
+  abandoned-pause" failure mode with no fix, and (b) the newly observed
+  nested-background-job non-resumption pattern — are real, unresolved
+  defects that need investigation and a design pass, not a same-session
+  patch: neither has a known mechanism yet, and any fix candidate would
+  need to be proven against reproduced instances before it could be
+  trusted, which this read-only triage pass cannot do.
+- **Rationale:** this item is a defect with `status: open`, not yet tied to
+  a named future sprint; per the 2026-08-18 release-bar sweep it must carry
+  an explicit, bounded decision rather than sit on a "keep open, revisit
+  later" line with no owner. Queuing for dispatch (rather than closing) is
+  correct because the fix is unknown, not merely unimplemented — the
+  2026-08-16 update's own words ("needs its own dedicated thought") already
+  say so.
+- **Assignment (if accepted):** a dedicated `goldfish-deep` investigation +
+  design dispatch, scoped to exactly the two open gaps above (not a
+  re-litigation of the shipped closing-allowance mechanism): (1) find or
+  rule out a detectable signal for the announced-then-abandoned-pause
+  pattern, given there is no wrong-shaped final message to catch; (2)
+  determine whether the nested `run_in_background` non-resumption pattern
+  recurs, and if so scope a fix. Sprint: Alfred — matches its confirmed
+  scope ("mechanical governance, measurable rigor, and control integrity",
+  `docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17 amendment)
+  precisely, and sits alongside the other dispatch-reliability items already
+  assigned there.
+- **Date:** 2026-08-18
