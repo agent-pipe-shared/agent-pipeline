@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.live-plugin-root-undefended-in-the-shell-lane
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Finding SL-1 of the PHX-R2-THREATMODEL-rework dispatch (2026-08-07), re-verified independently by the Elephant at source. Security class. NOT executed by either party — confirming it empirically would mean disarming the guard that is enforcing at the time."
 due: 2026-09-06
@@ -153,3 +153,38 @@ the gap to look closed.
   its own design pass and a T1 review before any of the three directions is
   implemented; not something to decide inline during a backlog sweep.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18 (PO decision)
+
+- **Investigation before the decision:** Option 3 (bootstrap integrity check,
+  detection not prevention) was the Elephant's recommendation over options 1
+  and 2, on the grounds that "does this shell invocation write" is not
+  decidable from a command line for an arbitrary interpreter, so both
+  preventive options risk either a bypassable carve-out or breaking
+  legitimate bootstrap commands. Scoping Option 3 concretely found it has no
+  available trusted baseline in the current local-dev topology: the local
+  marketplace clone (`/home/skar667/agent-pipeline-local-marketplace/`) is
+  not a git repository and its manifest carries no per-file digests or
+  version pinning — building a real baseline-recording mechanism is
+  materially more scope than "add an integrity check," and raises the same
+  self-protection regress (who guards the guard's own baseline record) the
+  item's Description already names as a known problem class.
+- **PO decision (verbatim intent):** "Restrisiko akzeptieren, da man sonst
+  andauernd mit merkwürdigen meldungen bei normalen updates geflutet wird" —
+  accept the residual risk, no fix built. A cheap bootstrap-to-bootstrap hash
+  comparison was also considered and explicitly declined: without a way to
+  distinguish a legitimate plugin update from tampering, it would fire on
+  every ordinary update, producing exactly the kind of unreviewable noise
+  item 2026-08-08 (the gitleaks/ledger collision, closed this same session)
+  already established as a real, recurring cost class in this repository.
+- **Residual, accepted knowingly:** the shell-lane gap (an interpreter
+  invocation via Bash, e.g. `node -e`, is not caught by
+  `isForbiddenCrossRepositoryMutation`'s executable allowlist) remains real
+  and unfixed. Mitigating factor also on record: the closest real-world
+  analogue this session observed (undisclosed self-implementation of
+  guardrail-adjacent files) was in fact caught after the fact by independent
+  Critic review, twice — see the closed
+  `2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md`
+  item, decided the same way (accept, no technical enforcement) for the same
+  proportionality reason.
+- **Closed, no code change.**
