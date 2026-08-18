@@ -154,3 +154,60 @@ follow-up was also filed:
 `backlog/items/2026-08-17-two-handover-rotation-mechanisms-use-different-archive-conventions.md`
 (reconciling the two archive-naming conventions — not urgent, not
 blocking).
+
+### Investigation/Implementation, 2026-08-18 (wave 2, dispatch NVA-W2-7)
+
+Re-verified live rather than trusting the note above: `docs/state.md` is
+1,700 lines (down from 7,633 at ADR-0066-authoring time — the rotation
+mechanism has been used since `NVA-HANDOVER-ROT-1` landed). Two archive
+files now exist under `docs/state-archive/`
+(`2026-08-18--nova-055-afk-block-through-sentinel-cyborg-reconciliation.md`,
+4,401 lines, and `2026-08-18--oldest-nova-047-history.md`, 2,465 lines).
+
+**Piece 1 — wiring `guard-handover-size.mjs` into `hooks.json` (TP-4).**
+Attempted the wiring directly: a new `PreToolUse` entry on the same
+`Edit|Write|NotebookEdit` matcher family, appended immediately after the
+existing `guard-testpath.mjs`/`guard-devplan.mjs` matcher block and before
+the `Stop` hooks section, carrying an inline `$comment` (matching the
+convention `guard-dispatch.mjs`'s own entry already uses, since the
+top-of-file numbered `$comment` list is itself already stale — it never
+mentions `guard-dispatch.mjs` or `guard-gate-strength.mjs` either, both
+added after that comment was last written) plus a single command,
+`node "${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs"`, timeout 10.
+Refused as expected, live: `TP-4`, `guard-testpath.mjs`,
+`plugins/pipeline-core/hooks/hooks\.json$`. The exact edit (old_string /
+new_string) is recorded in this dispatch's structured output
+(`pendingProtectedEdit`) for the orchestrator to run through a signed
+ceremony. The attempt itself made no mutation (`git status` after the
+refusal showed `hooks.json` unchanged) and, per CLAUDE.md's HGO-ceremony
+guidance, seeded a fresh override request for a future ceremony to consume.
+
+Separately, corrected a now-stale cross-reference discovered while
+investigating this piece: ADR-0066's Follow-up section and the
+"Correction + progress" section above both point at
+`evidence/dispatch-record-NVA-HANDOVER-ROT-1.json` for the exact wiring
+snippet. `evidence/` is gitignored (ADR-0063, "machine-regenerated
+evidence"), so that file does not exist in this (or any fresh) checkout —
+confirmed via `git log --all` on the path, no history at all. Appended a
+dated Correction bullet to ADR-0066's Follow-up section pointing future
+sessions at this dispatch's own record/report instead, rather than
+rewriting the original bullet's content.
+
+**Piece 2 — the one-time extraction pass (ADR-0066 Decision 7).** Per
+CLAUDE.md's own rule on this exact obligation ("may be done incrementally,
+scoped to the sections about to be rotated in one event — never required as
+an all-at-once pass over the whole file's history before any rotation can
+run"), judged this out of scope for this dispatch rather than attempted:
+no rotation event is running in this dispatch (nothing in `docs/state.md`
+is "about to be rotated" here), and reading through both existing archive
+files in full (6,866 lines combined) hunting for embedded durable rules
+would itself BE the prohibited all-at-once pass, not a scoped one. No
+extraction was performed. This piece remains open, to be picked up
+incrementally the next time a rotation event actually runs against
+specific sections.
+
+**Net effect on this item:** both remaining pieces from the prior section
+are still open; piece 1 now has a live, current `pendingProtectedEdit`
+ready for a signed ceremony (the previous one had gone stale/unreachable),
+piece 2 is unchanged and explicitly deferred per the incremental-extraction
+rule. Status intentionally left `open` — no closure claimed.
