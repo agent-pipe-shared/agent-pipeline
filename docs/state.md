@@ -87,6 +87,24 @@ the PO signs (e.g. a later fix), the subject-sha256 must be recomputed for the
 new candidate before Layer 2 — the proof is commit-bound and fails closed on
 mismatch.
 
+**Correction, same checkpoint session, before any command above was actually run
+by the PO.** Committing this checkpoint itself moved `HEAD` (predictable: this
+is the exact "extra commit" `docs/push-release-flow.md`'s Layer 1b write-order
+rule already names), which re-triggered ADR-0012 under Layer 1b's own
+no-composition limitation. Filed one more reconciliation entry for the widened
+range (`docs/doc-reconciliation.md`, candidate `f4711cba`, commit `077b64ff`)
+— restating ADR-0045/0056/0058 from the entry above, freshly reasoning only
+ADR-0012 for this checkpoint's own append. `077b64ff` is now the true final,
+stable candidate (it touches only the reconciliation record itself, which no
+ADR governs, so it cannot re-trigger this loop again). Recomputed
+`--subject-sha256` against it, exactly as the "Next steps" paragraph above
+already said to do: **`974491d3a6eeb215598c594bee8278bab85fc2237453952d26c133c8eefda575`**
+— superseding the `6f817d18…` value above, which was correct for `75bd72c2`
+but is now stale. Full Verify re-run fresh at `077b64ff`: same 3-red baseline,
+security clean (confirmed, not assumed). **The commands above are correct in
+shape; substitute this section's hash and, if the worktree isn't already
+there, `git checkout 077b64ff` in it first.**
+
 ---
 
 ## CHECKPOINT — 2026-08-18 (29): Class B is now EMPTY — A-AC-01 was a stale `build`-class entry, reclassified `po`; Sprint Phoenix has zero remaining agent-buildable acceptance criteria, only 5 Class-P (PO-gated) items left (READ THIS FIRST)
