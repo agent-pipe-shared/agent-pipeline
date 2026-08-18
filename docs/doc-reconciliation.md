@@ -47,6 +47,30 @@ something to do here without review.
 
 ## Entries
 
+## Candidate e5e3d7e44e9dd3a078df605245a276a794a9351d — 2026-08-18, range a07ef670..e5e3d7e4, checkpoint 37: incident recovery, R3/B3 closure, a security-scan case-collision fix, 12 more backlog items disposed
+
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` remains the single canonical handover file; this range
+  only appends checkpoint 37 in the established format (newest entry at the
+  top, "Last updated" line bumped). No competing handover artifact was
+  introduced.
+- ADR-0045: checked, no change needed.
+
+  The new evidence artifacts this range adds — `PHX-WP-DOCTEMPLATE-SWEEP/`'s
+  commit-message file, `PHX-WP-RPACK-STABLE-READ/dispatch-record.json`, and
+  `wp-p-ac11/aem-check-pac11.md`'s link-path fix — all sit under the
+  existing, already-enumerated `specs/sprint-phoenix-epic/evidence/`
+  location. The one rename in this range, `evidence/phx-wp-hac08/` →
+  `evidence/PHX-WP-HAC08-LEGACY-IMPORT-IMPL/`, is a same-tier rename (a
+  case-collision fix, not a new root artifact or a topology change) and
+  stays inside that same enumerated location. The pre-existing
+  `prd_phoenix-epic.md` vs. `prd.md` naming divergence this ADR already has
+  an open, PO-gated backlog item for
+  (`2026-08-09-adr-0045-topology-divergence-from-package-and-skill.md`,
+  status open, re-triaged this same range — see checkpoint 37) is unchanged
+  by this range — not touched, not worsened.
+
 ## Candidate a07ef670c2aac2abad17848006442cc7342fd0c1 — 2026-08-18, range 51ed4826..a07ef670, checkpoint 36: broad Workflow-triage of 84 backlog items, 36 disposed, 5 real fixes on the PO signing-ceremony surface
 
 - ADR-0012: checked, no change needed.
