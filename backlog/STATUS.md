@@ -30,6 +30,7 @@
 | pipeline.backlog-delivery-status-reconciliation | closed | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-baseline-migration-commit-unreachable | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
+| pipeline.backlog-plan-writers-skip-drift-classification | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | closed | workflow-improvement | pipeline | 2026-08-11 | — |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | 2026-08-08 | — |
@@ -104,6 +105,7 @@
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | closed | defect | pipeline | 2026-07-29 | — |
@@ -276,6 +278,6 @@
 
 ## Counts
 
-- open: 76
+- open: 78
 - in_progress: 7
 - closed: 185
