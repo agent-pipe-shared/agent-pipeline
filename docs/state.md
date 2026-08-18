@@ -8309,18 +8309,82 @@ rule that forks/general-purpose dispatches must be explicitly told never
 to invoke Workflow/Agent unless the Elephant authorizes it (see the fork
 incident in the entry above this one).
 
+## 2026-08-18 (OT09 fixed, C2f fully merged, the HGO admission "bug" resolved as a process gap, not a code defect)
+
+**The `consumeHumanGuardOverride` admission mystery is SOLVED — it was
+never a code defect.** Root cause, confirmed empirically (not just
+theorized): the consumption match is keyed on `toolInputSha256 =
+sha(canonical(toolInput))`, computed from the RAW tool_input payload of
+the retried Edit call. A live retry that is not byte-identical to the
+exact call that seeded the plan — a re-derived `old_string`/`new_string`,
+a different absolute-path spelling, an optional field present in one
+call and not the other — silently fails the match and falls through to
+an unarmed-looking denial, with nothing anywhere surfacing which field
+diverged. Proven directly: a safe dry-run retry of the OT09 edit (denied,
+no mutation) recorded a DIFFERENT `toolInputSha256` than the original
+expired capability's stored value. Fix (process, not code): attempt the
+intended edit once first (safe — PreToolUse blocks pre-execution), let
+that seed a fresh request carrying the exact retry's own hash, run
+`plan`/`prepare-authorization`/`emit-signature-digest` from THAT
+request, and after the PO signs, retry with the IDENTICAL tool call used
+to seed the request. Codified as a new CLAUDE.md Hard Rule (commit
+`18dc9ab9`). The two backlog items describing this as a suspected code
+defect
+(`2026-08-18-pipeline-author-repair-signature-mode-never-actually-admits-the-edit.md`)
+should be re-triaged against this finding next session — the
+`describeHumanGuardOverrideSelection()` `authorSourceRoot: null` display
+bug it also names is real and separate, still open.
+
+**OT09 fixed and committed (`467a92bc`).** The literal `gates?.push_approval`
+substring OT09 asserted against was removed by the
+PHX-WP-PAC08-RECONCILE-APPROVAL generalization (table-driven
+`value?.gates?.[key]` lookup); updated the assertion to
+`push: "push_approval"` (the `GATE_APPROVAL_MODE_KEYS` table entry,
+which does survive the generalization). Landed via a signed
+`pipeline-author-repair` HGO ceremony end to end, using the
+byte-identity-preflight process above. `guard-testpath-override.test.mjs`:
+19/19 green.
+
+**C2f fully merged (`72a293d5`, `a207eacb`).** The `requireAcknowledgement`
+gating fix (`d723d88b`, already committed in the worktree) plus the
+one remaining piece — `harness/scripts/pipeline-state.test.mjs`'s
+`seedSubprocessPoGateAuthority` fixture needed the
+`PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER` on its own line, and the import
+that name needs — both landed via two small, non-adjacent HGO ceremonies
+(one per Edit call, since a single Edit cannot span two non-contiguous
+regions) using the same byte-identity-preflight process. Both suites
+verified clean on the integrated branch: `po-gate-authority.test.mjs`
+61/61, `pipeline-state.test.mjs` 314/314.
+
+**New backlog item filed:** `2026-08-18-handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped.md`
+— `handover-rotate.mjs`'s `--acknowledge-extraction-done` marker is a
+repo-wide, one-time boolean, not scoped to which sections were actually
+reviewed; PO flagged this as a real design defect while planning an
+incremental oldest-sections-first extraction pass (ADR-0066 Decision 6).
+Not fixed this session — interim mitigation is a CLAUDE.md process rule
+(same commit `18dc9ab9`) never to treat the marker's existence as
+blanket permission for an unreviewed later batch.
+
+**Still open, not started this window:** the incremental extraction-pass
+fork (oldest ~2026-07-30 through ~2026-08-12 sections of this very file,
+cross-referenced against ADRs/guardrails/CLAUDE.md) was proposed and
+PO-approved but never actually dispatched — deprioritized in favor of
+finishing OT09/C2f first, per explicit PO sequencing instruction. The
+large Workflow-based batch for the ~45 backlog items already decided+
+scoped in their own Triage sections but not yet implemented/dispatched
+(from the 2026-08-18 full-backlog completeness sweep, entries above) is
+the next planned step after that, also not yet started. Current branch
+is `feat/sprint-nova-codex-v046` — **not** `main`; nothing in this whole
+session's window has touched the actual `main` branch, which still
+requires its own separate push/release ceremony
+(`docs/push-release-flow.md`) once a candidate is ready. `git worktree
+list` still shows `wf_7f39bfec-21b-3` — safe to remove now that C2f is
+fully merged.
+
 ## Recovery
 
-Nothing is in flight as of this entry. Before the release bar is met:
-(1) **C2f's worktree** (`wf_7f39bfec-21b-3`, HEAD `d723d88b`) is
-uncommitted-to-main and blocked on the `TP-5` protected-test-path wall —
-do not merge until `harness/scripts/pipeline-state.test.mjs`'s
-`seedSubprocessPoGateAuthority` fixture can be edited (needs the HGO
-ceremony fixed or a PO-run signature ceremony); (2) **OT09 is still
-red**, blocked on the exact same wall — do not re-attempt either ceremony
-without first landing the recommended instrumented-logging step described
-above, to avoid burning another PO passphrase entry on the same unfixed
-bug. No rollback action or public human-gate acceptance is recorded. Use
-ordinary revert commits after publication; do not rewrite shared history.
-If the checkout shows conflicting work, stop and report it before
-writing.
+Nothing is in flight as of this entry. Both OT09 and C2f are resolved
+and merged onto `feat/sprint-nova-codex-v046`. No rollback action or
+public human-gate acceptance is recorded. Use ordinary revert commits
+after publication; do not rewrite shared history. If the checkout shows
+conflicting work, stop and report it before writing.
