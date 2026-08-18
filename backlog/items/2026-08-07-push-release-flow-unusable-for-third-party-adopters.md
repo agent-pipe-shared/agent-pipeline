@@ -269,3 +269,16 @@ present at the keyboard throughout.
 - **Rationale:** PO's direct choice. Bounded, already proven on origin/main, closes the "two commands, one decision" complaint and its already-demonstrated stale-request failure mode.
 - **Assignment:** Dispatch-ready.
 - **Date:** 2026-08-18
+
+### Progress note — 2026-08-19
+
+Candidate #1 of the 2026-08-18 PO Decision (Option A) landed: `authorize-critical`
+single-command ceremony ported into `plugins/pipeline-core/scripts/po-human-approval.mjs`
+(commit `cbeeda8d`), collapsing the two-step `prepare-critical`/`approve-critical`
+split and its demonstrated stale-request failure mode; `docs/push-release-flow.md`
+Layers 2-3 rewritten; new `docs/adr/0065-port-authorize-critical-ceremony.md`
+(renumbered from an initial 0064 collision, resolved commit `13147709`). This
+closes only the specific Option-A scope decided 2026-08-18 — the item's own
+Description candidates #2 (harness classifier pre-clearance), #3 (narrowing
+`prepare-critical`'s cross-repo refusal), and #4 (a deliberate PO cost/benefit
+review of the stacked layers) remain undecided and unaddressed. Item stays open.

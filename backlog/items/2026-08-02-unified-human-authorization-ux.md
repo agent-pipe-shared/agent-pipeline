@@ -153,3 +153,26 @@ the currently-running workflow. #2 (publication unification) queues behind
 `PHX-WP-PORT-ADR0061-AUTHORIZE-CRITICAL` landing (file conflict on
 `po-human-approval.mjs`). #4 (adoption check) queues behind #3. #5 (adapter
 contract) is independent and dispatch-ready alongside #3.
+
+### Progress note — 2026-08-19
+
+All 5 work packages from the 2026-08-18 scoping pass now have a landed
+disposition: #1 (PRD-approval migration) stays superseded, no action needed.
+#2 (publication unification) landed as a regression test proving the migration
+was already functionally complete (commit `41c7711d`) — a real remaining
+asymmetry was found and left as a noted gap, not filed as its own item yet:
+`publication-authority.mjs` doesn't rebuild-verify `criticalProof` at execution
+time the way push/deploy do. #3 (gate/intent inventory) landed
+(`docs/human-authorization-inventory.md`, commit `acd8cb56`). #4
+(adoption-enforcement check) landed (`harness/scripts/check-auth-gate-inventory-drift.mjs`,
+commit `f1387980`, registered in Verify, passes clean against the real repo).
+#5 (Passkey/WebAuthn adapter-contract scope) landed (`docs/po-human-approval.md`'s
+extended "Adapter boundary" section, commit `49b9434c`) — this repo defines
+the adapter contract only, no desktop-app implementation, per its own scope
+boundary; found and disclosed one narrow coupling (`verifyPoApprovalProof`'s
+`crypto.verify(null,...)` assumes EdDSA-family keys, would need a small change
+for an ECDSA/P-256 Passkey credential) as a documented future-work note, not a
+blocker. **Remaining open scope:** the publication-authority execution-time
+asymmetry noted under #2 is not yet filed as its own backlog item; filing it
+is the one clearly-identified next step. Item stays open pending that filing
+and any further PO direction.

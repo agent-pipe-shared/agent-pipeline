@@ -112,3 +112,21 @@ Candidates, explicitly not a commitment:
 - **Rationale:** PO's direct choice, matching the Elephant's recommendation.
 - **Assignment:** Dispatch-ready — real, nontrivial work (the extraction pass runs first, then the archive/gate mechanism).
 - **Date:** 2026-08-18
+
+### Progress note — 2026-08-19
+
+Per the 2026-08-18 PO Decision (Option E, port/adapt Nova's ADR-0066), a
+dispatch (`PHX-WP-STATE-ROTATION-PORT-ADR0066`, commit `b53019ff`) made partial
+progress: a **targeted-search, not exhaustive** extraction pass found and
+extracted 3 durable rules into their correct homes (`guardrails/security.md`
+SEC-10, `roles/elephant.md` EL-29, `guardrails/quality-gates.md` QG-08), and
+wrote `docs/adr/0064-handover-rotation-extraction-archive-hard-size-gate.md`
+documenting the chosen mechanism. **Not yet built:** the rotation/archive
+script itself, and the hard size gate wired into the close-block ritual —
+both deferred for tool-budget reasons. **Not yet read:** roughly 15,000 of
+`docs/state.md`'s ~19,000+ lines (everything below the extraction pass's
+reach, including pre-checkpoint and inherited Nova-era history) — a full
+extraction pass over that remainder is still needed before rotation can run
+without risking destroying an un-extracted rule (the exact failure mode this
+item's own Description warns against). Item stays open; needs its own
+dedicated session given the remaining scale.
