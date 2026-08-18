@@ -37,6 +37,7 @@ import { COURSE_KINDS, buildCourseDecisionBrief, sha256Canonical } from "../../p
 import {
   PO_GATE_AUTHORITY_EVIDENCE_SCHEMA,
   PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
+  PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
   PO_GATE_PRD_LANGUAGE_MARKER,
   PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH,
   createPoGateProfileReceipt,
@@ -841,7 +842,7 @@ function seedSubprocessPoGateAuthority(dir, planPath) {
   const specBytes = Buffer.from("# Test Spec\n", "utf8");
   writeFileSync(specPath, specBytes);
   const specSha256 = createHash("sha256").update(specBytes).digest("hex");
-  writeFileSync(join(dir, planPath), `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n<!-- technical-spec-sha256: ${specSha256} -->\n# Test PRD\n`);
+  writeFileSync(join(dir, planPath), `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n<!-- technical-spec-sha256: ${specSha256} -->\n# Test PRD\n`);
 
   const gitCommonDir = join(dir, ".git");
   const receipt = createPoGateProfileReceipt({
