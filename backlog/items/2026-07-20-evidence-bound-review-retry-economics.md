@@ -207,3 +207,90 @@ a signed ceremony is available, and stop clean naming exactly what
 remains blocked otherwise.
 - **Date:** 2026-08-18
 - **Date:** 2026-08-18
+
+### Investigation/Implementation, 2026-08-18 (wave 2, dispatch NVA-W2-6)
+
+Wave-2 dispatch, worktree self-healed to the exact briefed base
+(`7eca44ca`) before any work. Read `review-retry-planner.mjs` (427
+lines), `harness/scripts/verify.mjs` (593 lines) and
+`plugins/pipeline-core/scripts/publication-executor.mjs` (946 lines) in
+full, plus `verify-journal.mjs`/`verify-resume.mjs` (Verify's own,
+separate, already-wired suite-level resume mechanism, ADR-0065) and
+`review-economy.mjs` (the precedent for "registered in `verify.mjs`'s
+suite list, actually consumed by a different script" — its decision
+functions are called from `codex-critic-host.mjs`/`pipeline-state.mjs`,
+neither of which is `verify.mjs`).
+
+**Finding:** neither `harness/scripts/verify.mjs` nor
+`publication-executor.mjs` contains an existing ad hoc retry-decision
+code path for `planReviewRetry` to replace. `publication-executor.mjs`'s
+own docstring states "No generic Git arguments or retry surface exist"
+by design — it is a single-shot, security-critical, authority-bound push
+executor; its one retry-shaped mechanism (`authority.record.status ===
+"executing"`, an in-flight-attempt resume) is a different, already-
+handled concept (retrying ONE already-approved push transaction), not
+"review or dispatch abort forces a broad repeat run" (the item's own
+Description). Introducing a review-retry-planning call site there would
+be an architecture change to a security-relevant script, not wiring —
+deliberately NOT done here. `review-retry-planner.mjs`'s own STAGES
+fixture (`critic-guard`, `critic-docs`, `readiness`) and field vocabulary
+(`route` = model/effort, `assurance`) is Critic-review-shaped, not
+Verify-suite-shaped; Verify's OWN suite-level retry/resume need is
+already served by the separate, mature `verify-resume.mjs`/ADR-0065
+mechanism, which the planner's own header explicitly says must stay
+independent (no `allowCrossCandidateReuse`-shaped switch).
+
+**Implemented (committed, not TP-3-protected):**
+- `harness/scripts/check-review-retry-plan.mjs` — the actual calling
+  code. Mirrors `check-phase26-invariants.mjs`/
+  `check-phase3-sdlc-coherence.mjs`'s established opt-in shape exactly:
+  no `--review-retry-input` argument SKIPs (exit 0, the common case);
+  a present argument is read, path-safety-checked (no symlink/traversal/
+  absolute path), JSON-parsed, schema-checked
+  (`pipeline.verify-review-retry-input.v1`), and passed to
+  `planReviewRetry` (`review-retry-planner.mjs`, unmodified). A valid
+  plan is written to the git-ignored `evidence/review-retry-plan-latest.json`
+  (exit 0); any failure (unsafe path, unreadable, malformed, wrong
+  schema, or a `planReviewRetry` rejection) fails closed (exit 1) rather
+  than silently no-op'ing past a broken machine-evidence pipeline — this
+  is the actual "call the decision function" wiring the item's Triage
+  asked for, using the identical pattern this file already uses for
+  `PIPELINE_PHASE26_RESULT`/`PIPELINE_PHASE3_RESULT`.
+- `harness/scripts/check-review-retry-plan.test.mjs` — 10 tests: flag
+  parsing, `DEFAULT_ROOT` sanity, unsafe/symlinked/absolute/traversal
+  paths, malformed JSON, wrong schema, a semantically invalid but
+  schema-valid request, a valid plan's shape, and the CLI no-argument
+  SKIP path (subprocess-spawned; the argument-present CLI paths are
+  covered via the exported `checkReviewRetryPlan` function directly
+  against an isolated temp root instead, matching
+  `check-phase3-sdlc-coherence.test.mjs`'s own precedent for why —
+  `DEFAULT_ROOT` resolves against the real checkout, not a spawned
+  subprocess's `cwd`).
+- `node --test` run for both: 10/10 new tests pass; the pre-existing
+  `review-retry-planner.test.mjs` re-run unchanged at 17/17.
+
+**Blocked at the TP-3 boundary (verify.mjs), exact edits below —
+reported as `pendingProtectedEdit`, not attempted:** three hunks —
+(A) a `PIPELINE_REVIEW_RETRY_INPUT` env-var constant alongside the
+existing `phase26Result`/`phase3Result` constants; (B) a
+`review-retry-planner-tests` suite entry (the module's own test,
+registering `review-retry-planner.mjs` itself per the Triage's explicit
+instruction) placed after `review-economy-tests`; (C) a
+`review-retry-plan-tests` + `review-retry-plan-check` suite-entry pair
+(mirroring the `phase26-invariants-tests`/`-check` pair exactly,
+including the conditional `args`) placed after the `phase26-invariants-*`
+entries. One confirmatory edit attempt was made (the import-only hunk)
+to obtain the exact guard diagnostics: `TP-3` (`guard-testpath`),
+request-sha256 `7eb43004198fe302a2c3d1e9496bcec870c2814b83250aa8d13d95c3858bfa35`,
+blocked pre-execution, no mutation applied (confirmed via `git diff`).
+No override was attempted. The three hunks touch non-adjacent regions
+of `verify.mjs`, so applying them needs either three separate signed
+edits or one edit whose `old_string` spans the full region between them
+(CLAUDE.md's own guidance on this).
+
+**Still not done, out of this dispatch's authority:** applying the
+three `verify.mjs` hunks above (needs a signed human-guard-override
+ceremony against this exact repo, run by whoever has the external Ed25519
+key — not this dispatch). Once applied and Verify itself confirms green,
+this item's remaining scope is fully closed. Status stays `in_progress`.
+- **Date:** 2026-08-18
