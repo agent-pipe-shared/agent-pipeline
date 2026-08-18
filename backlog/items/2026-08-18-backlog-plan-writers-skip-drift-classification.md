@@ -78,9 +78,18 @@ audit-and-fix task, not a mechanical find/replace — each function's exact
 call site and any options it passes to `validateTransitionLedger` need to be
 read individually first.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage, 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred — needs an empirical per-function audit
+  before any fix, not current-session work.
+- **Rationale:** confirmed real for one of five functions
+  (`planBacklogItemHashRescopeAmendment`, fixed 2026-08-18) via direct
+  reproduction against the real ledger; the other four are a reasoned
+  suspicion from shared code shape, not yet individually confirmed. Each
+  needs its own real-ledger reproduction before a fix is written, per this
+  item's own Proposal — rushing a blanket fix risks the same
+  over-generalization mistake this item exists to avoid.
+- **Assignment:** a future Pipeline hardening session; owned by whoever
+  next works on `plugins/pipeline-core/lib/backlog-state.mjs`'s writer
+  functions.
+- **Date:** 2026-08-18

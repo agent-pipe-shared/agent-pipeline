@@ -62,9 +62,16 @@ the identical gate decision a same-content Edit/Write would get. Needs its own
 scoped design pass (which shell constructs to parse, false-positive risk for
 legitimate read-only Bash use of these paths) — not a mechanical fix.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage, 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, deferred — needs its own scoped design pass
+  (which shell constructs to parse, false-positive risk for legitimate
+  read-only Bash use of these paths), not current-session work.
+- **Rationale:** confirmed real (exploited live this session by
+  NVA-W3-R3) and a genuine guardrail-coverage gap, but a correct fix
+  touches guard-devplan.mjs/guard-testpath.mjs's shell-parsing logic —
+  security-adjacent code that deserves a dedicated dispatch with real
+  design latitude, not a rushed same-session patch.
+- **Assignment:** a future Pipeline hardening session; owned by whoever
+  next works on the guard-devplan/guard-testpath family.
+- **Date:** 2026-08-18
