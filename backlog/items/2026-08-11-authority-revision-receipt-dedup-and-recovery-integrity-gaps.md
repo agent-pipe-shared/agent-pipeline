@@ -29,3 +29,10 @@ per `docs/state.md`'s PX0-AC-05 checkpoint note, neither yet fixed:
 
 - `docs/state.md` — PX0-AC-05 checkpoint entry originating this note (search "F5/F6 minor").
 - `guardrails/quality-gates.md` QG-06 — the rule this filing satisfies (no undated/unowned known gap).
+
+## Triage — 2026-08-18
+
+- **Decision:** accept-open, dispatch-ready.
+- **Rationale:** Re-verified directly against current source 2026-08-18 — `pipeline-state.mjs:3681`'s append-dedup still keys solely on `intentSha256` equality (F5), and no roll-forward recovery path re-validates the postimage PRD/Spec artifact bytes against the frozen digest (F6); both gaps are exactly as described, unchanged. No equivalent fix exists in the sibling Nova checkout (its `pipeline-state.mjs` has no `authorityRevisionReceipts` mechanism at all — the feature is Phoenix-only). Both fixes are bounded, ordinary engineering work that need no PO judgment call.
+- **Assignment (if accepted):** owner `pipeline`; dispatch as a small, fully-scoped Goldfish task before the 2026-09-10 due date already carried on this item.
+- **Date:** 2026-08-18

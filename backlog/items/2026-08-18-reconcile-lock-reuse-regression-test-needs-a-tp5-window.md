@@ -45,9 +45,9 @@ existing `RGs` fixture, with a symlinked `--root`. The exact test shape was
 already drafted once (2026-08-18 dispatch) and can be handed to the next
 dispatch as a concrete reference rather than designed from scratch.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-open, dispatch-ready (blocked on a TP-5 signed maintenance window, not on design).
+- **Rationale:** Confirmed the underlying lock-reuse fix (`pipeline-state.mjs:6284-6293`, `realpathSync`-resolved comparison) is landed and correct, and that the drafted regression test is still genuinely missing from `harness/scripts/pipeline-state.test.mjs` (TP-5 protected). The test shape is already fully specified from the dispatch that first drafted it; the only blocker is obtaining the signed TP-5 window, a procedural step, not a design decision.
+- **Assignment (if accepted):** owner `pipeline`; bundle into the next TP-5-touching maintenance window and dispatch the one-test Goldfish task at that point.
+- **Date:** 2026-08-18

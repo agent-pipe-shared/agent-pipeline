@@ -70,8 +70,9 @@ Not designed here. Candidates for a future session:
    the trailer block to be composed via a small script/snippet rather than
    free-hand prose, removing the wrap risk structurally.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-Not yet triaged. Filed same-session as the finding, alongside the sibling
-authorship-defect item, at the point of reconciling the Critic's FAIL
-verdict.
+- **Decision:** accept-open, dispatch-ready.
+- **Rationale:** Re-verified 2026-08-18 — `guardrails/git.md` GIT-03's verification guidance still uses a line-anchored `rg` search (`git log -5 --format=%B | rg "^AI-Assisted: true$"`) rather than structural trailer parsing (`git log --format='%(trailers...)'`), so a wrapped continuation line like the one in `78c6ef1` still would not be caught. Confirmed the same gap exists unfixed in Nova's `guardrails/git.md`. The minimal fix (update GIT-03's own sample verification command to structural trailer parsing, per the item's proposal option 2) is bounded documentation/tooling work with no PO judgment call needed; a follow-on mechanical hook check (option 1) can be scoped separately if wanted.
+- **Assignment (if accepted):** owner `pipeline`; dispatch before the 2026-09-08 due/expiry date already carried on this item.
+- **Date:** 2026-08-18

@@ -82,3 +82,10 @@ this item describes.
   `2026-08-07-dispatched-agents-return-truncated-mid-step.md` — the upstream
   condition. Truncated dispatches are what create the temptation this item is
   about; three occurred in a single session on 2026-08-08.
+
+## Triage — 2026-08-18
+
+- **Decision:** accept-open, dispatch-ready.
+- **Rationale:** Re-verified 2026-08-18 — no `Commit-Act:` trailer or equivalent mechanism exists in Phoenix's templates/guardrails/roles, and none exists in the sibling Nova checkout either. The three-part proposed repair (a conditional `Commit-Act:` trailer line; a mechanical dispatch-record-vs-commit consistency check; wording updates to `goldfish-task.md`/`critic-review.md`) is fully specified engineering work, no PO design tradeoff involved.
+- **Assignment (if accepted):** owner `pipeline`; dispatch before the 2026-09-07 due date already carried on this item.
+- **Date:** 2026-08-18
