@@ -160,7 +160,7 @@ Use this module when dispatching a bugfix (not for new features or mini-edits). 
 
 *Light-profile dispatch (`Profile: light`, field 6)? Use the condensed 3-field variant instead: (1) DoD + evidence, (2) changed files, (3) deviations & open items — target ≤ 600 tokens (`roles/goldfish.md` §6). The evidence duty (GF-08) and stop-condition honesty (GF-07) are never trimmed.*
 
-Evidence throughout is POINTERS ONLY — exact command + exit code + artifact path / commit SHA — never inline logs or full file dumps; full detail lives in the committed artifacts and is provided only on explicit Elephant request.
+Evidence throughout is POINTERS ONLY — exact command + exit code + artifact path / commit SHA — never inline logs or full file dumps; full detail lives in the committed artifacts and is provided only on explicit Elephant request. Before writing the final report, confirm every evidence-artifact path you are about to cite actually resolves on disk (e.g. `ls`/`stat`/Read) — a claimed path that does not resolve is a stop condition (field 5), not a detail to fix in prose.
 
 1. Result per DoD check — three-valued: passed / failed / not verifiable.
 2. **Evidence artifact (mandatory):** machine-written verify output (file/log
