@@ -6,6 +6,14 @@ const SHA = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40,64}$/u;
 const ID = /^[a-z][a-z0-9-]{0,63}$/u;
 const own = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+/**
+ * `trustPolicy` specifically (never `proof`) may also carry `humanName` —
+ * the SETUP-1 human-readable label recorded once at key-setup time
+ * (`po-human-approval.mjs`'s `setup --human-name`). It is never part of what
+ * is cryptographically verified here, so its presence must not fail-close a
+ * genuinely valid trust policy; any OTHER unrecognised extra key still must.
+ */
+const ownTrustPolicy = (value) => own(value, ["keyReference", "publicKeySha256"]) || own(value, ["keyReference", "publicKeySha256", "humanName"]);
 const text = (value) => typeof value === "string" && value.trim() !== "";
 const candidate = (value) => own(value, ["commit", "tree"]) && OID.test(value.commit) && OID.test(value.tree) && value.commit !== value.tree;
 const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : value !== null && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}` : JSON.stringify(value);
@@ -31,7 +39,7 @@ export function createPoApprovalIntent({ kind, featureId, planSha256, specSha256
  * resolve such an authority must fail closed.
  */
 export function verifyPoApprovalProof({ intent, trustPolicy, proof } = {}) {
-  if (!intent || !SHA.test(intent.sha256 ?? "") || !trustPolicy || !proof || !own(trustPolicy, ["keyReference", "publicKeySha256"]) || !text(trustPolicy.keyReference) || !SHA.test(trustPolicy.publicKeySha256) || !own(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"]) || proof.schema !== PO_APPROVAL_PROOF_SCHEMA || proof.intentSha256 !== intent.sha256 || proof.keyReference !== trustPolicy.keyReference || !text(proof.publicKey) || !text(proof.signatureBase64)) return { verified: false, code: "PO-APPROVAL-PROOF-INVALID" };
+  if (!intent || !SHA.test(intent.sha256 ?? "") || !trustPolicy || !proof || !ownTrustPolicy(trustPolicy) || !text(trustPolicy.keyReference) || !SHA.test(trustPolicy.publicKeySha256) || !own(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"]) || proof.schema !== PO_APPROVAL_PROOF_SCHEMA || proof.intentSha256 !== intent.sha256 || proof.keyReference !== trustPolicy.keyReference || !text(proof.publicKey) || !text(proof.signatureBase64)) return { verified: false, code: "PO-APPROVAL-PROOF-INVALID" };
   if (createHash("sha256").update(proof.publicKey).digest("hex") !== trustPolicy.publicKeySha256) return { verified: false, code: "PO-APPROVAL-TRUST-MISMATCH" };
   let signature; try { signature = Buffer.from(proof.signatureBase64, "base64"); } catch { return { verified: false, code: "PO-APPROVAL-PROOF-INVALID" }; }
   if (signature.length === 0) return { verified: false, code: "PO-APPROVAL-PROOF-INVALID" };
