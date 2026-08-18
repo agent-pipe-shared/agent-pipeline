@@ -70,15 +70,72 @@ whether they share a cause before treating them as two separate fixes.
 
 ## Triage
 
-Not yet decided — this item is filed to preserve the finding, not close
-it. Recommended next step for whoever picks this up: reproduce with
-temporary diagnostic instrumentation (a scratch-local, non-committed
-`console.error` at each `continue`/`return` branch inside
-`consumeHumanGuardOverride`, or a small isolated unit test constructing a
-capability record and calling the function directly) BEFORE re-engaging
-the PO for a live signature — the 30-minute TTL is real but not the
-scarce resource; a PO passphrase entry against a still-unfixed bug is.
-`guard-testpath.mjs`'s silent catch-all (lines 260-262) should also be
-loosened to at least log the real status/code it swallowed, even if the
-human-facing denial message stays unchanged for now — this is what made
-the live ceremony undiagnosable in real time.
+Not yet decided — still open, this update only narrows the diagnosis
+(read-only investigation, 2026-08-18, no guard/hook file touched, no
+live PO ceremony run).
+
+**The `describeHumanGuardOverrideSelection()` display bug is now FULLY
+CONFIRMED** (code inspection alone, no repro needed): it hardcodes
+`planHumanGuardOverride({..., authorSourceRoot: null})` when replanning a
+stored request for display. For a `pipeline-author-repair-candidate`
+request, `authorSourceRoot(repo.root, null)` returns `null` immediately
+(`typeof candidate !== "string"`), `authorEligiblePaths` then throws
+`HGO-AUTHOR-ROOT`, caught by the surrounding `catch { continue }`
+(~line 2890) — the record is silently skipped. This function
+structurally cannot resolve ANY author-repair-candidate request,
+unconditionally; it is a separate bug from the consumption bug below,
+does not affect whether consumption itself works, and its fix is
+independent: give it the request's own `candidateSourceRoot` (already
+recorded on the `author-repair-required` response and re-derivable from
+`request.eligiblePaths`) instead of a hardcoded `null` — or, since
+`authorSourceRoot()` only ever accepts one physical value anyway,
+`join(repo.root, "plugins", "pipeline-core")` whenever
+`request.mode === "pipeline-author-repair-candidate"`.
+
+**The consumption bug itself is NOT confirmed as a code defect.** A
+targeted repro (`scratch/critic-hgo-repro/repro-signature-author-repair.mjs`,
+left in place, gitignored) drove `authorizeHumanGuardOverrideBySignature()`
++ `pipeline-author-repair` mode together end to end — deny → plan →
+prepare → sign with a scratch Ed25519 key → authorize-by-signature →
+consume — and it **succeeded** (`armed` then `consumed`, clean exit) when
+the retried `toolInput` is byte-identical to the originally denied one.
+Notably, this exact combination (signature mode + author-repair mode
+together) has **zero existing test coverage**: every
+`authorizeHumanGuardOverrideBySignature` test omits `authorSourceRoot`,
+and the one test that does cover author-repair mode
+(`human-guard-override.test.mjs:1134-1220`) uses chat mode, not
+signature mode — so this combination was previously untested in both
+directions.
+
+Given the repro succeeds when inputs are byte-identical, the most
+probable real cause of the two live failures (OT09 ceremony, and now the
+C2f goldfish dispatch hitting the identical wall on a different guarded
+edit) is the **first, silent filter gate** in `consumeHumanGuardOverride()`
+(`human-guard-override.mjs:2689-2691`): `capability.toolInputSha256 !==
+toolInputSha256`. A non-match there does not error — it `continue`s past
+that capability and falls through to `{status: "absent"}`, indistinguishable
+from an unarmed request. Any field difference between the tool call that
+produced the original denial and the manually retried tool call (e.g. an
+optional field like `replace_all` present in one but not the other) would
+silently fail this match. Secondary, untested candidate:
+`capability.root !== repo.root` (~line 2714), a possible `rootDir`/
+`projectDir` resolution mismatch between the CLI ceremony's `--repo` and
+the live hook's resolved root — not ruled out; the isolated repro drives
+the library functions directly and cannot exercise the real hook's root
+resolution end to end.
+
+**Recommended next step, revised:** the diagnostic gap is now precise
+enough that a THIRD blind live-ceremony attempt is still not warranted.
+`guard-testpath.mjs`'s silent catch-all (lines 260-262) should be
+loosened, but the real fix needs to go further than originally scoped:
+even a non-throwing `consumeHumanGuardOverride()` result
+(`{status:"absent"}` or `{status:"replan", code:"HGO-DRIFT"}`) currently
+gives no visibility into which capability file (if any) came close to
+matching, or on which specific field (`toolInputSha256`, `root`,
+`denials`, expiry) it diverged. Add temporary, scoped instrumentation
+that logs — per skipped capability file — exactly which equality check
+in the ~2689-2721 chain first failed, land it, then run ONE more live
+ceremony attempt with that instrumentation in place: that turns the next
+attempt into a one-shot diagnosis instead of a third blind burn of PO
+TTL. Only after that log confirms the exact failing check should a
+correctness fix be written.
