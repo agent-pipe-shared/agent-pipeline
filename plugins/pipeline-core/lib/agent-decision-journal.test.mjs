@@ -633,3 +633,24 @@ test("R-AC-08 keeps the published command-offer state enum in step with the vali
   for(const [state] of OCCURRED_RECOVERY)assert.equal(branch.properties.state.enum.includes(state),true,`the published schema would reject a valid ${state} event`);
   assert.deepEqual(branch.properties.recoverability.enum,["not-applicable","recoverable","cleanup-required","rollback-required"],"the prospective recoverability category must not have grown an occurred value");
 });
+
+// PHX-WP-ADJ-REASONCODE-AND-CANCELKIND: RegExp#test coerces its argument
+// with String(...) before matching, so a bare `CODE.test(value.reasonCode)`
+// with no `typeof` guard let a single-element array whose sole entry matched
+// the pattern slip through (String(["SOME_CODE"]) === "SOME_CODE") even
+// though the published schema types `reasonCode` as a plain string. Mirrors
+// the existing `revalidationTrigger` typeof guard at all three call sites
+// this shape has (`validateAgentDecisionEvent`, `validateCommandOfferEvent`,
+// `validateLegacyImportObservationEvent`).
+const REASON_CODE_SITES=[
+  {label:"validateAgentDecisionEvent",validate:validateAgentDecisionEvent,fixture:value()},
+  {label:"validateCommandOfferEvent",validate:validateCommandOfferEvent,fixture:offer()},
+  {label:"validateLegacyImportObservationEvent",validate:validateLegacyImportObservationEvent,fixture:legacyImport()},
+];
+test("rejects an array-coerced reasonCode at all three reasonCode call sites, while a normal string reasonCode still passes",()=>{
+  for(const{label,validate,fixture}of REASON_CODE_SITES){
+    const accepted=validate(fixture);
+    assert.equal(accepted.reasonCode,fixture.reasonCode,`${label}: a normal string reasonCode regressed`);
+    assert.throws(()=>validate({...fixture,reasonCode:[fixture.reasonCode]}),(error)=>error instanceof AgentDecisionJournalError,`${label}: an array-coerced reasonCode ["${fixture.reasonCode}"] was admitted via RegExp#test's implicit String() coercion`);
+  }
+});
