@@ -36,6 +36,26 @@ the agent is cryptographically incapable of producing this proof by design
 
 ### Layers 2 + 3 — the human's one command (current shape)
 
+**Run this FIRST, before anything below in this section**
+(`plugins/pipeline-core/scripts/push-prepare.mjs`, backlog item
+`pipeline.full-push-preflight-before-signature`): a single READ-ONLY report
+that atomically checks a clean/unchanged working tree, canonical
+candidate-bound verify evidence, the push threat-model artifact, and the
+critical-human-proof trust-anchor posture (including the exact
+`external-key-directory-vs-committed-trustAnchors` membership check the next
+section describes by hand) — all BEFORE the passphrase prompt, not
+discovered one layer at a time by trial and error. Only once every check is
+green does it print the fully-formed `authorize-critical` command below,
+with a correct `--subject-sha256` already computed.
+
+```
+node plugins/pipeline-core/scripts/push-prepare.mjs \
+  --by <name> --remote <remote> --destination refs/heads/<branch>
+```
+
+A red check names its own remedy; nothing below this line needs running
+until the report is fully green.
+
 ```
 node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical \
   --repo-root <repo> --directory <external-po-dir> \
