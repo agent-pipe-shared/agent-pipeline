@@ -66,3 +66,9 @@ instruction.
 - **Rationale:** Re-checked 2026-08-18: no marker-file + `PreToolUse` write-lock mechanism exists in Phoenix's `hooks/hooks.json`. Nova only documents the single-consent bootstrap flow in prose (`plugins/pipeline-core/skills/pipeline-start/SKILL.md:80-83`), with no technical lock either — nothing to port. The item's own Proposal already names a concrete, bounded mechanism (a local marker written at consent, cleared only by real `project-onboarding-v3.mjs` completion or an explicit PO override, gating `Write`/`Edit`), so this can go to an ordinary dispatch without further PO design input.
 - **Assignment (if accepted):** unassigned; PO previously flagged this as "not relevant right now, but interesting hardening for the backlog" — still true, priority decision only, not a design decision.
 - **Date:** 2026-08-18
+
+## Triage — updated 2026-08-19
+
+- **Decision:** stays open — partial progress landed, real blocker remains.
+- **Rationale:** The onboarding-consent marker + PreToolUse lock guard file landed (commit `286673e2`), matching this item's own Proposal. Its `hooks.json` registration step is explicitly blocked by TP-4 per the commit's own message — needs a TP-4-scoped HGO ceremony (the PO's Ed25519 key, outside this session) to complete wiring. Not closeable until that ceremony runs.
+- **Date:** 2026-08-19

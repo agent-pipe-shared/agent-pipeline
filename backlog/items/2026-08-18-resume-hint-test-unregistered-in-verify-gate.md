@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.resume-hint-test-unregistered-in-verify-gate
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Discovered as a byproduct of the PHX-WP-GOVPROD-REGISTER dispatch (2026-08-18), which registered a different suite and found this one also unregistered while re-running the registration checker."
 ---
@@ -28,3 +28,9 @@ Confirm `node --test plugins/pipeline-core/lib/resume-hint.test.mjs` passes stan
 - **Rationale:** Small, mechanical, one-line registration with a ready-made model to copy (the sibling fix that just landed). No PO judgment call needed.
 - **Assignment (if accepted):** Goldfish, next TP-3 GMW window.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `resume-hint.test.mjs` is registered in `harness/scripts/verify.mjs`'s TEST_SUITES as of commit `67db3432` (part of a 5-file registration-gap fix).
+- **Date:** 2026-08-19

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-check-validates-prose-section-citations
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Measured by the PHX-R3-RESCOPE dispatch (344 stale citations across 57 files). PO decision (APS, 2026-08-07): accepted for implementation, as the follow-up that makes the defect class non-recurring."
 due: 2026-09-06
@@ -100,3 +100,9 @@ establishes.
 - **Rationale:** PO's direct choice, going further than the Elephant's staged recommendation (minimum form first) — both halves are built in the same round.
 - **Assignment:** Dispatch-ready.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `harness/scripts/check-section-citations.mjs` (commit `f028fd53`) parses §N/§N.M citations, FAILS on nonexistent-section citations, WARNS on wrong-section citations — both halves per the PO Decision. Registered in verify.mjs; 0 live violations found (the prior sweep already fixed all instances); 13/13 tests pass.
+- **Date:** 2026-08-19

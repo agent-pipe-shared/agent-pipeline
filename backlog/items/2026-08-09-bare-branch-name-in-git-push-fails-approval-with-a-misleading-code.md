@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.bare-branch-name-in-git-push-fails-approval-with-a-misleading-code
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in plugins/pipeline-core/lib/critical-action-authorization.mjs and plugins/pipeline-core/hooks/guard-push.mjs under dispatch PHX-BL4 (2026-08-09)."
 due: 2026-09-08
@@ -152,3 +152,9 @@ of implicit behavior this guard family has elsewhere refused to guess at.
 - **Rationale:** PO's direct choice, choosing the code-level fix over leaving the documentation-only state.
 - **Assignment:** Dispatch-ready.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `guard-push.mjs`'s new `resolveImplicitPushDestination()` (commit `4e1b9186`), wired into `parsePushBinding`, resolves a bare branch name's implicit destination per PO Decision Option B. Regression-tested (150/150 guard-push tests pass, including 4 new PG12x cases).
+- **Date:** 2026-08-19

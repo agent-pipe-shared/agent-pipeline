@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.elephant-authored-production-diff-closed-its-own-gating-criterion
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Independent Critic FAIL (2026-08-09, F2) on a full-range review of the Phoenix measurement/closure wave (57 commits, 8e7a2f7..f7d9c0d)."
 due: 2026-09-08
@@ -97,3 +97,9 @@ Not designed here. Candidates for a future session:
 - **Rationale:** Elephant recommendation, adopted: a hard mandatory gate targets the actual root cause (an implicit judgment call made under TTL time pressure) directly, unlike a checklist reminder (candidate 1, easy to skip — which is exactly how this violation happened) or re-budgeting the maintenance-window TTL (candidate 2, changes window duration without closing the gap it doesn't actually address).
 - **Assignment:** Dispatch-ready — brief a Goldfish to add the mandatory stage-0 self-check to the maintenance-window `prepare`/`install` flow, alongside candidate 1's checklist clarification (opening a window lifts file protection; it does not create a stage-0-equivalent EL-01 exception) as low-cost documentation.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `guard-maintenance-window.mjs`'s `assertStage0Declaration()`/`validStage0Declaration()` (commits `6bf621c5`, backward-compat hardened by `708842c6`) implement exactly PO Decision Candidate 3: a mandatory pre-commit stage-0 qualification check (`{filesChanged, diffLines, touchesTestFile}`), required for `authorshipMode: "elephant-direct"`, wired into both `prepareGuardMaintenanceWindowRequest()` and `installGuardMaintenanceWindow()`. The error message at line 388 cites this exact backlog item by filename. Backward-compat verified: does not retroactively invalidate a pre-existing window record missing the field.
+- **Date:** 2026-08-19

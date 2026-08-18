@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-registration-check-fixtures-lack-real-git-topology
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
 source: "Found by PHX-WP-VERIFYREG-TRIAGE while diagnosing verify-suite-registration-tests, windows-assurance-verify-registration-tests, scoped-verify-registration-tests, and verify-evidence-root-tests failures from a full clean-candidate Verify run, 2026-08-18/19."
 ---
@@ -52,4 +52,10 @@ behavior is correct and unaffected.
   real verify.mjs behavior, only these specific tests' own isolated
   environment.
 - **Assignment (if accepted):** Goldfish, deep tier (test-fixture authorship).
+- **Date:** 2026-08-19
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** All 3 named fixtures (`check-verify-suite-registration.test.mjs`, `windows-assurance-verify-registration.test.mjs`, `scoped-verify-registration.test.mjs`) rebuilt to `git init --quiet` their own fixture root instead of a bare `mkdtempSync`, commit `e61b0592` — mirroring `verify-evidence-root.test.mjs`'s real-git-topology pattern without tripping `verify.mjs`'s dirty-candidate fast-exit. All 3 suites pass (96/96 combined, up from 91/93); confirmed in a full clean-candidate Verify re-run.
 - **Date:** 2026-08-19

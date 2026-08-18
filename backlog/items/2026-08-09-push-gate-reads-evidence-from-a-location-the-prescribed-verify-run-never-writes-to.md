@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in harness/scripts/verify.mjs and plugins/pipeline-core/hooks/guard-push.mjs under dispatch PHX-BL4 (2026-08-09)."
 due: 2026-09-08
@@ -136,3 +136,9 @@ is worth a deliberate call, not a default.
 - **Rationale:** PO's direct choice, matching the Elephant's recommendation — closes the original evidence-location bug without breaking the `.git/phx-verify` clean-candidate route.
 - **Assignment:** Dispatch-ready.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `harness/scripts/verify.mjs` (commit `0136b29f`) redirects `evidenceDir`/`evidencePath` via a new `primaryRoot = dirname(gitCommonDirectory())`, matching PO Decision Option B's narrow scope exactly — `repoRoot`/`candidateIdentity()`/other consumers untouched. Regression-tested (`verify-evidence-root.test.mjs`, later hardened by commit `355aca58` to also resolve correctly when invoked from a non-primary worktree).
+- **Date:** 2026-08-19

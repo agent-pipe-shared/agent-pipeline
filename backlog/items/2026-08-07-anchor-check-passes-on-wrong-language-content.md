@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.anchor-check-passes-on-wrong-language-content
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Measured by the PHX-R3-RESCOPE dispatch and re-verified independently by the Elephant. PO decision (APS, 2026-08-07): accepted for implementation."
 due: 2026-09-06
@@ -106,3 +106,9 @@ it says. They are independent and can land in either order.
 - **Rationale:** PO's direct choice, matching the Elephant's recommendation.
 - **Assignment:** Dispatch-ready.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `harness/scripts/check-doc-contracts.mjs`'s `collectAnchors` (commit `41b7c470`) now scopes to only the English half of bilingual docs per PO Decision Option A; the 2 planted aliases removed, backlog/README.md's 4 affected links fixed in the same commit. 38/38 tests pass.
+- **Date:** 2026-08-19

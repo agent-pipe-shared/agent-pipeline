@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
 source: "Recorded in docs/state.md as F5/F6 (minor) findings from the PX0-AC-05 authority-revision receipt review chain: real, tracked, not yet fixed at the time of that checkpoint, but left without an owner or due date in the handover prose itself. Filed as a proper owned, dated backlog item per QG-06 (a known gap with no due date is a finding, not a mitigation), without altering the docs/state.md checkpoint narrative."
 due: 2026-09-10
@@ -36,3 +36,9 @@ per `docs/state.md`'s PX0-AC-05 checkpoint note, neither yet fixed:
 - **Rationale:** Re-verified directly against current source 2026-08-18 — `pipeline-state.mjs:3681`'s append-dedup still keys solely on `intentSha256` equality (F5), and no roll-forward recovery path re-validates the postimage PRD/Spec artifact bytes against the frozen digest (F6); both gaps are exactly as described, unchanged. No equivalent fix exists in the sibling Nova checkout (its `pipeline-state.mjs` has no `authorityRevisionReceipts` mechanism at all — the feature is Phoenix-only). Both fixes are bounded, ordinary engineering work that need no PO judgment call.
 - **Assignment (if accepted):** owner `pipeline`; dispatch as a small, fully-scoped Goldfish task before the 2026-09-10 due date already carried on this item.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `pipeline-state.mjs`'s `mergeAuthorityRevisionReceipt()` (F5: content-comparison dedup, refuses `AR-RECEIPT-COLLISION` on hash collision) and a postimage PRD/Spec re-validation in the roll-forward recovery path (F6: refuses `AR-RECOVER-ARTIFACT-STALE` on a mutated postimage) landed commit `17d0437d`. Regression-tested (AR-F5a/b/c, AR-F6a/b/c, all pass; full suite 532+/534).
+- **Date:** 2026-08-19

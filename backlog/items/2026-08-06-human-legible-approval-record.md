@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.human-legible-approval-record
 type: requirement
 owner: pipeline
-status: open
+status: closed
 source: Product Owner requirement raised at the Phoenix plan-approval gate
 created: 2026-08-06
 ---
@@ -78,3 +78,9 @@ reconstruction must expose the briefing alongside the digests.
 - **Rationale:** PO's explicit choice between the two named designs in the Proposal.
 - **Assignment:** Dispatch-ready — brief a Goldfish to design the closed vocabulary, derive the briefing from bound artifacts, persist it with the approval, and add the `H-AC-11` covering test.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `pipeline-state.mjs`'s closed-vocabulary plan-approval briefing (`PLAN_APPROVAL_BRIEFING_*`, `derivePlanApprovalBriefing`/`summarizePlanApprovalBriefing`/`validPlanApprovalBriefing`/`reconstructPlanApprovalBriefing`) is wired into both `submit-plan` and `approve-plan`, landed commit `8acfd936`, per PO Decision (structured bounded vocabulary, not free prose). H-AC-11 covering test present (HL-1..HL-17, all pass, 534/534 overall suite).
+- **Date:** 2026-08-19

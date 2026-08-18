@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Observed out-of-diff by the PHX-R1-REWORK-3 Critic (round 4) while deriving the shell lane's governance-marker list from source, offered without severity because it is not a defect of that review object. Independently re-verified from source by the Elephant before filing."
 due: 2026-09-06
@@ -130,3 +130,9 @@ semantics the wiring states about itself.
 - **Rationale:** PO's explicit choice.
 - **Assignment:** Dispatch-ready — brief a Goldfish (guard-kernel tier) to: (1) move both hook reads off module scope into the code path that already has a refusal (proposal step 1); (2) document the fail-open choice explicitly at the read site so it reads as decided, not accidental; (3) consider renaming/retiring the unguarded `loadRuntimeProjectionV3OwnedKeys()` export per proposal step 3 so picking the wrong one is visible at the call site; (4) add the regression test proposal step 4 describes, pinned to the now-decided fail-open behaviour (corrupt-manifest fixture must still exit 0 with a warning, not silently exit 1/2). Needs its own briefed dispatch and independent Critic review per the item's Proposal ("Owner: PO. Guard-kernel code").
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `guard-lifecycle-ready.mjs`'s new lazy `governanceMarkers(dependencies)` function (commit `34a75907`) replaces the crash-prone module-scope `loadRuntimeProjectionV3OwnedKeys()` call, catching failures and returning the fail-open shape ({markers: BASE_GOVERNANCE_MARKERS, warning: MANIFEST_FAILURE_WARNING}) on error — narrowing blast radius while preserving fail-open per PO ratification. Regression-tested (4 new tests proving both the fail-open and success shapes).
+- **Date:** 2026-08-19

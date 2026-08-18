@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agent-definitions-pin-the-review-tier-model
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-08-21
 source: "Critic round 1 of the 0.5.3 candidate, 2026-08-07 — the Critic reported its own route violation from direct same-dispatch evidence; the cause was found in the shipped agent definitions afterwards."
@@ -123,3 +123,9 @@ Not designed here. Candidates, explicitly not a commitment:
   a known, deliberately-unported gap rather than a rediscovered one.
 - **Date:** 2026-08-18
 - **Date:**
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** Nova's proven route pre-check (commit `08684e78`) ported into `critic.md`/`goldfish-deep.md` (commit `adc52efc`), content-identical port. A follow-up preimage-hash re-pin (commit `0dce39cb`) closed a downstream integrity-check gap the port itself introduced (disclosed, precedented re-pin per commit `7172a15b`).
+- **Date:** 2026-08-19

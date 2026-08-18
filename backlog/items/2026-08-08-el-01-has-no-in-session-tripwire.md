@@ -84,3 +84,9 @@ and restore rather than asserted.
 - **Rationale:** Refuse matches the enforcement shape of force-push/history-rewrite/protected-branch guards already in this repo. A dispatch record is existing, already machine-checked infrastructure (used throughout this session's own Triage), not a new trust surface a prompt could forge.
 - **Assignment:** Dispatch-ready — brief a Goldfish (guard-kernel tier, xhigh) to design and land the `PreToolUse` guard on `Edit`/`Write`, with the break-and-restore acceptance test the item's Proposal names.
 - **Date:** 2026-08-18
+
+## Triage — updated 2026-08-19
+
+- **Decision:** stays open — partial progress landed, real blocker remains.
+- **Rationale:** The EL-01 write-time tripwire guard file landed (commit `27b4867d`), matching this item's own Proposal. Its `hooks.json` registration step is explicitly blocked by TP-4 per the commit's own message — needs the SAME TP-4-scoped HGO ceremony as the sibling onboarding-consent-lock item to complete wiring. Not closeable until that ceremony runs.
+- **Date:** 2026-08-19

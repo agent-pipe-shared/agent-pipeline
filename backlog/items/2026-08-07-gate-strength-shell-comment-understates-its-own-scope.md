@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gate-strength-shell-comment-understates-its-own-scope
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Adjacent finding by the Elephant while verifying the GMW lift question for the WP2-WP3 Part A residuals (2026-08-07). Verified against the code, not assumed. Recorded rather than fixed because the affected file is a NEVER_LIFTABLE_KERNEL_PATH and cannot be edited in-session."
 due: 2026-09-06
@@ -109,3 +109,9 @@ self-description is not.
 - **Rationale:** `guard-lifecycle-ready.mjs:302` still says "five configuration paths (GS-1..GS-5)"; `GATE_STRENGTH_PATHS` (`guard-gate-strength.mjs:51-125`) now has eight entries — GS-1..GS-5, GS-7, GS-8, and a new GS-9 (`self-application-attestation-gate.mjs`) added since this item was filed. The comment has drifted a third time. No behaviour change is needed, only the wording — not a PO judgment call, only blocked by `guard-lifecycle-ready.mjs` being a NEVER_LIFTABLE_KERNEL_PATH.
 - **Assignment (if accepted):** ride along with the next briefed guard-kernel change window that touches this file; a plain comment edit, no design decision.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `guard-lifecycle-ready.mjs:350-354` (commit `e0a87ece`) now reads "Needles are every entry of GATE_STRENGTH_PATHS... not restated here as a count", matching this item's own Proposal option 1 exactly. Verified live in current code.
+- **Date:** 2026-08-19

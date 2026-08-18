@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 source: Push gate of 2026-08-08 — two of the four failed attempts trace to this cause; the worktree workaround is currently carried as an instruction in docs/state.md rather than as a fixed mechanism
 due: 2026-09-07
@@ -79,3 +79,9 @@ accepts the resulting evidence — demonstrated end to end, not asserted.
 - **Rationale:** Re-checked 2026-08-18: `po-approval-request.mjs`'s `observeCleanCandidate()` is unchanged and still refuses on the two permanently-dirty runtime files; `worktree-create.mjs` is still only the general-purpose helper, not a single entry point that creates the worktree, runs the cleanliness-gated command, copies the full artifact set back, and cleans up. Nova has the identical `observeCleanCandidate` logic and the same shape of `worktree-create.mjs` — nothing to port. The item already states its preferred design ("The first option is preferred precisely because it keeps the checks strict"), so this does not need a further PO judgment call to start.
 - **Assignment (if accepted):** build the wrapping entry point described in the item's proposal, option 1; no PO design decision required beyond scheduling.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `plugins/pipeline-core/scripts/clean-candidate-run.mjs` (commit `615bcd24`) is exactly the single entry point this item's Proposal option 1 asks for — its own header comment cites this backlog item by name. Creates a detached worktree at an exact candidate, runs the cleanliness-gated command, copies back the complete evidence artifact set, tears down. Demonstrated end-to-end this session across many verify/security-scan runs.
+- **Date:** 2026-08-19
