@@ -41,5 +41,7 @@ Central, versioned Operating Model for agentic development across the PO's proje
 
 If `git` is unexpectedly missing from a session's `PATH`, treat it as a stale shell environment, not a missing install. Probe availability and version locally with `command -v git` and `git --version`; never persist machine-specific installation paths or versions in this repository.
 
+`isolation: "worktree"` (Agent tool or Workflow `agent()`) is not reliable in this repo: it has repeatedly provisioned a fresh worktree from a stale default-branch reference (`origin`/`upstream` `main`, mirrored by the local `stable` branch) hundreds of commits behind the actual working branch, rather than from the current checkout — confirmed root cause, not a one-off. **After launching any worktree-isolated dispatch, run `git worktree list` immediately** and compare each listed commit against the expected HEAD before trusting the dispatch; do not wait for its result. A dispatch briefing that needs isolation should open with a mandatory self-check (`git rev-parse HEAD` against an exact expected SHA, stop on mismatch) so a bad base fails cheaply instead of producing work built on the wrong tree.
+
 ---
 *Kept intentionally short (context economy, operating-model §5.2/P5): nothing explained elsewhere is repeated here — follow the pointers instead.*
