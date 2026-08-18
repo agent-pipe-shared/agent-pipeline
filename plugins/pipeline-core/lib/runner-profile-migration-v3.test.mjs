@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
@@ -898,6 +898,38 @@ record("slim valid V3 runtime initialization is explicit, read-only at plan, and
     });
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /language:\n  human_facing: de\n/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("a host-managed-Codex fresh-project apply satisfies its own target boundary invariant", () => {
+  // Reproduces the host-managed-Codex fresh-project branch: `.codex` is a
+  // read-only, empty, host-owned mount (hasCodexRuntimeControlMount), and
+  // `.claude/*` runtime targets are absent. `validateTargetBoundary()` must
+  // accept the resulting `.claude/`-filtered target array -- before the fix
+  // it always threw "V3 transaction has an incomplete target boundary" on
+  // this branch, because it compared against the full unfiltered
+  // `runtimePaths()` count no matter what the plan actually filtered.
+  const root = fixture(yaml(v3Intent()), { omitCodex: true });
+  try {
+    rmSync(join(root, ".claude"), { recursive: true, force: true });
+    mkdirSync(join(root, ".codex"), { recursive: true });
+    chmodSync(join(root, ".codex"), 0o555);
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.runtimeMode, "host-managed-codex");
+    assert.ok(plan.targets.some((target) => target.path.startsWith(".claude/")) === false, "host-managed-Codex plan must not target .claude/*");
+    // Detection itself needs `.codex` read-only-and-empty (the host-reserved
+    // mount signal); the reserved mount is a live host concern orthogonal to
+    // this defect, so once the plan is captured it is made writable again for
+    // apply -- isolating the assertion to validateTargetBoundary's own count
+    // expectation on the `.claude/`-filtered shape, not to mount permissions.
+    chmodSync(join(root, ".codex"), 0o755);
+    const applied = applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true });
+    assert.equal(applied.status, "applied");
+    assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), yaml(v3Intent()));
+  } finally {
+    chmodSync(join(root, ".codex"), 0o755);
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 record("overlayCalibration separates a private overlay's own calibration from an ordinary consumer project's, by intent", () => {

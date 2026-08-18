@@ -712,9 +712,24 @@ function validateDirectoryBoundary(directories, targets) {
   }
 }
 function validateTargetBoundary(entries) {
-  const expected = runtimePaths().sort((a, b) => a.localeCompare(b));
+  // A host-managed-Codex plan filters `.claude/` paths out of its runtime
+  // targets before authentication (planRunnerProfileMigrationV3's
+  // `projectedTargets`, same predicate) because that tier is host-owned, not
+  // migration-owned, on that branch. This validator is the untrusted-input
+  // boundary for both `prepare()` and journal recovery, so it does not trust
+  // an externally supplied mode flag: it accepts only an exact match against
+  // one of the two canonical, freshly recomputed target lists -- the full
+  // runtime-ownership set, or that same set with every `.claude/` path
+  // removed. No other shape validates.
+  const full = runtimePaths().sort((a, b) => a.localeCompare(b));
+  const hostManagedCodex = full.filter((path) => !path.startsWith(".claude/"));
   const hasAuthorityLock = entries?.at(-2)?.path === AUTHORITY_LOCK_FILE && entries?.at(-2)?.kind === "authority-lock";
-  if (!Array.isArray(entries) || entries.length !== expected.length + 1 + (hasAuthorityLock ? 1 : 0)) throw new Error("V3 transaction has an incomplete target boundary");
+  if (!Array.isArray(entries)) throw new Error("V3 transaction has an incomplete target boundary");
+  const runtimeCount = entries.length - 1 - (hasAuthorityLock ? 1 : 0);
+  const expected = runtimeCount === full.length ? full
+    : runtimeCount === hostManagedCodex.length ? hostManagedCodex
+      : null;
+  if (!expected) throw new Error("V3 transaction has an incomplete target boundary");
   if (entries.at(-1)?.path !== SOURCE_FILE || entries.at(-1)?.kind !== "source") throw new Error("V3 transaction does not commit source last");
   const runtime = entries.slice(0, hasAuthorityLock ? -2 : -1);
   if (runtime.some((entry, index) => entry.kind !== "runtime" || entry.path !== expected[index])) throw new Error("V3 transaction differs from the owned runtime boundary");
