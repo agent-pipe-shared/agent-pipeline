@@ -33,6 +33,38 @@ const GOVERNANCE_MARKERS = [
  * this reads its result, never its absence or staleness, into a decision; a status other than
  * `available` adds no lines, exactly mirroring "no hint state can alter lifecycle readiness."
  */
+/**
+ * NVA backlog (2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-
+ * prior-transcript.md): the resume-hint card is deliberately barred from carrying "raw
+ * transcripts, commands, approvals, lifecycle instructions, host paths" (pipeline-start/
+ * SKILL.md #6) -- so even a fully working card was never going to recover the class of
+ * context the PO observed lost across a restart (already-hit guard errors, established
+ * workarounds, in-progress diagnostic state). Investigation found no code path in this
+ * repository that can reliably hand a restarting session its exact PRIOR rollout file: the
+ * one restart flow this codebase owns (`codex-onboarding-launch.mjs`) always spawns a
+ * genuinely fresh, unrelated Codex process with no `--resume`/session linkage, and an
+ * ordinary session restart (a human- or Codex-initiated new session) is not orchestrated by
+ * this plugin at all. Passing the path down explicitly is therefore not available; a bounded,
+ * host-specific DISCOVERY instruction is the next-best mechanism the PO's own direction
+ * accepted. This line is a fixed INSTRUCTION, never captured data -- it names a generic path
+ * PATTERN, not a specific host path, so it does not fall under the "no machine-specific
+ * absolute paths" rule (CLAUDE.md) any more than the pattern already written in the backlog
+ * item's own prose. It is unconditional (independent of resume-hint-card presence) because
+ * the PO's own direction (2026-08-12/2026-08-17 re-triages) scoped it to every restart, and it
+ * is phrased as a best-effort recovery step, never a blocking precondition, mirroring the
+ * resume-hint MUST-read step's own "never a gate" discipline one line below it.
+ */
+const PRIOR_ROLLOUT_TRANSCRIPT_LINE =
+  "On a startup, resume, clear or compact restart, also locate and read your own most recent " +
+  "PRIOR Codex rollout transcript for operational-context recovery (already-hit guard errors, " +
+  "established workarounds, in-progress diagnostic state) that the resume-hint card alone may " +
+  "not carry: look under $CODEX_HOME/sessions (or ~/.codex/sessions when CODEX_HOME is unset), " +
+  "most recent by modification time and excluding the file this session is itself writing to, " +
+  "and bound the read to the most recent handful of tool-call, tool-result and error entries " +
+  "rather than the full file; never quote large raw excerpts into any git-tracked file, and if " +
+  "no prior transcript can be found or read, say so honestly rather than claiming this step was " +
+  "done.";
+
 function resumeHintContextLines(root) {
   let observed;
   try {
@@ -74,6 +106,7 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
         "After a ready bootstrap, the Operating Model and compiled manifest are the gate authority: continue ordinary implementation, focused tests, commits, Verify, Critic preparation and state readback autonomously.",
         "Do not invent a human checkpoint for routine work. Request the PO only for a configured decision gate, required final acceptance, an irreversible/external consequence, or a typed hard block with no safe returned recovery action.",
         "A guard denial is not by itself a human gate: first execute its exact typed read-only or lifecycle recovery action when one is supplied.",
+        PRIOR_ROLLOUT_TRANSCRIPT_LINE,
         ...resumeHintContextLines(root),
       ].join(" "),
     };

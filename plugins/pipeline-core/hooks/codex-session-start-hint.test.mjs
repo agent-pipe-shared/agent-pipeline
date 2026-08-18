@@ -34,6 +34,15 @@ try {
   assert.match(governed.context, /Do not invent a human checkpoint for routine work/u);
   assert.match(governed.context, /A guard denial is not by itself a human gate/u);
 
+  // 2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript:
+  // a mandatory, unconditional (no resume-hint card required) instruction to locate and read the
+  // session's own most recent prior Codex rollout transcript, bounded and never a gate.
+  assert.match(governed.context, /locate and read your own most recent PRIOR Codex rollout transcript/u);
+  assert.match(governed.context, /\$CODEX_HOME\/sessions \(or ~\/\.codex\/sessions when CODEX_HOME is unset\)/u);
+  assert.match(governed.context, /bound the read to the most recent handful of tool-call, tool-result and error entries/u);
+  assert.match(governed.context, /never quote large raw excerpts into any git-tracked file/u);
+  assert.match(governed.context, /say so honestly rather than claiming this step was done/u);
+
   let stdout = "";
   const originalWrite = process.stdout.write;
   process.stdout.write = (chunk) => { stdout += chunk; return true; };
