@@ -226,8 +226,12 @@ if (matched) {
   let consumed = { status: "absent" };
   try {
     consumed = consumeHumanGuardOverride({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
-  } catch {
-    consumed = { status: "absent" }; // an unusable capability is not an authorization
+  } catch (error) {
+    // An unusable capability is not an authorization -- the refusal below still stands --
+    // but the prior silent swallow here made a real internal exception indistinguishable
+    // from "never attempted", which cost two live PO ceremonies their diagnosis. Surface it.
+    process.stderr.write(`[pipeline-human-override] guard-testpath consumeHumanGuardOverride threw: ${error?.message ?? error}\n`);
+    consumed = { status: "absent" };
   }
   if (consumed.status === "consumed") {
     process.stderr.write(
