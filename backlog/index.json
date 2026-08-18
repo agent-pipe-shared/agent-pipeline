@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d21aa30e7df353cccb2d3af09bda9547570a9a2e05a95c1a8278ef50fcaf42c3"
+    "transitionHead": "622861f1e9b7a384ddb06a16364cd40250ed765ab05bffae32b0d40d3310b634"
   },
   "counts": {
     "open": 85,
-    "in_progress": 14,
-    "closed": 154
+    "in_progress": 13,
+    "closed": 155
   },
   "items": [
     {
@@ -1513,12 +1513,16 @@
     },
     {
       "id": "pipeline.nonblocking-interaction-continuity",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; no completion claim.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "71bfbc1a",
+      "closureEvidence": "plugins/pipeline-core/lib/interaction-continuity.test.mjs"
     },
     {
       "id": "pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs",
