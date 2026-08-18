@@ -1881,3 +1881,14 @@ Restated per this file's known limitation for ADR-0012/0045: `11e70e5a` is an an
 **ADR-0058** — implicated by `4c2f04cb`, which touches `plugins/pipeline-core/lib/po-approval-proof.mjs`, explicitly named in ADR-0058's `Governs:` line. Checked against the ADR's own text: it names `po-approval-proof.mjs` only as the pre-existing, reused push-approval verification primitive GMW's `install` step depends on (§ "already established for push approval... the agent can `prepare` a digest-bound..."); it does not specify or constrain the exact field-set `verifyPoApprovalProof`'s `trustPolicy` argument must carry. The fix (accept an optional `humanName` field alongside the required `keyReference`/`publicKeySha256`, while keeping the `proof` object's own check exactly as strict as before) changes no cryptographic verification behavior and does not touch `docs/po-approval-proof-contract.md` (checked directly: that doc does not document the `trustPolicy` field shape at all, so no drift was introduced). Dispatched (goldfish-deep, `PHX-WP-TRUSTPOLICY-HUMANNAME`), not Elephant-direct — correctly, this is exactly the class of security-verification-primitive change EL-01 excludes from self-execution regardless of size. Independently re-verifiable: `node --test plugins/pipeline-core/lib/po-approval-proof.test.mjs` (dispatch report claims all cases green; not re-run by the Elephant in this reconciliation pass, noted rather than silently assumed).
 
 `169e9565`/`dfc08120` (the reasonCode fix) touch only `plugins/pipeline-core/lib/agent-decision-journal.mjs`, `.test.mjs`, and a backlog item — none ADR-governed.
+
+## Candidate 79e90d2faeded5fe2a45e6c84943eb2b4894e5ef — 2026-08-18, range 8a92d377..79e90d2f, dispatch evidence for the two backlog-fix dispatches
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0058: checked, no change needed.
+
+Restated per this file's known limitation for ADR-0012/0056/0058: `6100a6cc` is an ancestor and was already fully reconciled above.
+
+**ADR-0045** — `79e90d2f` adds 9 files under two new `specs/sprint-phoenix-epic/evidence/PHX-WP-*/` directories: each dispatched task's own dispatch record, commit-message artifacts, and test-run logs (`.tap`/`verify-log.txt`) — the same durable-artifact class as every prior ADR-0045 entry in this file. No package restructuring; purely additive.
