@@ -3,8 +3,12 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.critic-context-isolation"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-20"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "47c6d7fcfafde2823be4111234a8e8482408fcab"
+closure_evidence: "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
 source: "Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context"
 due: "2026-07-27"
 expires: "2026-08-03"
@@ -47,7 +51,24 @@ rather than silently retained as an active commitment.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Renewal (2026-08-18):** expired 2026-08-03, never triaged — found during
+  a systematic sweep for the same expired-unread-item pattern this session
+  caught repeatedly tonight. Renewed with current evidence.
+- **Decision:** accepted, closed. `plugins/pipeline-core/hooks/guard-dispatch.mjs`
+  (landed `47c6d7fc`, "feat(guard): preflight subagent dispatches against
+  their templates") directly implements this item's Proposal: a
+  deterministic, structural checklist assertion that a Critic/Goldfish
+  dispatch was built from its template and carries no coordinator prose,
+  hunt-list, or steer beyond paths/refs/metadata — observed blocking
+  exactly that failure mode live, twice, earlier in this same session. A
+  dedicated Critic review (`e4d4fa3f..47c6d7fc`, functional-equivalent-
+  read-only) returned **PASS, no findings** — independently traced every
+  contamination-detection regex against the real, shipped templates by
+  hand, then confirmed the test suite does the same from disk rather than
+  a hand-written stand-in (`node --test`: `dispatch-policy.test.mjs`
+  12/12, `guard-dispatch.test.mjs` 9/9, both re-run directly).
+- **Rationale:** the mechanism was already built, tested, and in active
+  daily use — what was missing was purely the triage/closure step, the
+  same shape as this session's other renewed-and-closed items tonight.
+- **Assignment:** closed, no further work.
+- **Date:** 2026-08-18
