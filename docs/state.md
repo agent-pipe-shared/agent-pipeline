@@ -7780,6 +7780,67 @@ Rather than keep hoping for one more lucky catch, ran an actual systematic sweep
    the new session. In the private overlay use `inspect`, `plan`, explicit
    `activate`, then `status` and `load-context`.
 
+## 2026-08-18 (daytime continuation) — the PO reopened the session; a mid-flight goldfish dispatch was found broken and repaired; the full Sentinel/Cyborg backlog residue was reconciled for real
+
+The PO explicitly instructed (in German): stop deferring, decide and act on
+every backlog item belonging to the next release now, and in particular
+check whether every Sentinel/Cyborg-tagged item is genuinely still open —
+both sprints are finished, so anything left tagged to them would otherwise
+never be revisited; strip the stale tag and re-triage under Nova where real.
+
+**`NVA-HGOTEST-1` (the four leaking `human-guard-override.test.mjs` tests,
+dispatched pre-compaction) had stopped mid-edit with a syntax-broken working
+tree** — its own session ended before writing the closing brace for the
+fourth wrapped test, before commit, before its report. The Elephant added
+the single missing `});`, independently re-ran the suite (63/64 pass, the
+one remaining failure the same pre-existing, separately-tracked
+`HGO-EXTERNAL-MARKETPLACE` host-config exception this item's own text
+already named as out of scope), committed on the dispatch's behalf
+(`abf2e580`), and closed `2026-08-17-four-human-guard-override-tests-...md`.
+
+**A parallel, redundant 3rd Critic-review dispatch for the maintenance-window
+commit-tolerance fix (`c8acb6a6`) returned FAIL against a candidate that had
+already been superseded.** Traced directly: both findings it raised (kernel
+exclusion, frozen TP-* patterns) were already fixed one commit later by
+`NVA-GMWFIX-4` (`e2151461`, an ancestor of current HEAD) and already
+independently re-verified by this session's own Slice A7 Critic-review
+chain (round 4 ran `GMWKC01`/`GMWKC02` directly, PASS). No 4th dispatch was
+needed — closed `2026-08-08-a-maintenance-window-signature-...md` on the
+existing evidence trail instead of re-deriving an already-recorded PASS.
+
+**Full Sentinel/Cyborg backlog reconciliation, not a sample.** Two parallel
+research forks investigated all 16 items still carrying only the bare
+"Sentinel recovery baseline" placeholder or a Cyborg cross-reference.
+Disposition: `pipeline.verify-gate-scoped-registration` closed (code already
+shipped and live in `harness/scripts/verify.mjs`, 35/35 tests, a prior
+Cyborg handover had asked for exactly this and it was never done);
+`pipeline.cross-repository-override-ledger-binding`'s CYB-5c ownership
+ambiguity resolved (CYB-5c fixed a different, older mechanism in
+`guard-git.mjs`; this item's real bug in `human-guard-override.mjs` was
+never fixed) and dispatched (`NVA-CROSSREPOLEDGER-1`, goldfish-deep,
+guardrail-tier); four more real AC-mapping/proof gaps against
+already-shipped code dispatched (`NVA-T1GOVPREFLIGHT-1`,
+`NVA-POGATEAUTH-1`, `NVA-WTLIFECYCLE-1`, `NVA-INTCONTINUITY-1`,
+goldfish-implementor); `afk-assumption-mode` split (suite-registration
+queued next, final-PO-disposition batched into the Nova A candidate
+freeze); `session-keep-awake` confirmed functionally complete, its one
+remaining gate batched into that same freeze rather than dispatched
+separately; `codex-plugin-validator-host-parity` and
+`execution-model-switchback` queued as design-then-implement packages (a
+parity strategy / an attestation mechanism need deciding first, not done
+this pass); `codex-sandbox-critic-longterm`'s strong lane confirmed
+genuinely externally gated (the PRD's own original upstream route, GitHub
+Issue #29) and documented as such, not conflated with a Nova code gap; the
+five items already correctly triaged to Nightwing/Phoenix/Alfred by earlier
+sessions (`documentation-information-architecture`, `dual-channel-publication`,
+`regulated-document-hooks`, `stateful-design-contract-template`,
+`unified-human-authorization-ux`) confirmed and left untouched. All 11
+touched item files committed (`60dc7e34`, `de50997d`).
+
+**In flight, five parallel dispatches, results not yet known:**
+`NVA-CROSSREPOLEDGER-1`, `NVA-T1GOVPREFLIGHT-1`, `NVA-POGATEAUTH-1`,
+`NVA-WTLIFECYCLE-1`, `NVA-INTCONTINUITY-1`.
+
 ## Recovery
 
 No persisted in-flight dispatch, rollback action or public human-gate acceptance
