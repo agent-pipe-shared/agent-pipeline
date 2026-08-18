@@ -427,6 +427,44 @@ test("governed consumer edits cannot escape their physical project root", () => 
   }
 });
 
+test("a host-temp-style scratchpad path is refused exactly like any other cross-repo target, and ADR-0059 documents that consequence", () => {
+  // Regression for backlog/items/2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md:
+  // the guard was already refusing a host-temp session scratchpad (proven below via tmpdir()),
+  // but ADR-0059 (the ADR that governs this guard's liftability) never said so anywhere -- an
+  // agent reading the ADR alone would not learn that "cross-repository" also covers its own
+  // assigned host-temp scratchpad. This pins both halves so neither can silently regress.
+  const path = root();
+  const hostTempScratch = mkdtempSync(join(tmpdir(), "guard-lifecycle-host-scratch-"));
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    assert.equal(isProjectWritePath(join(hostTempScratch, "note.txt"), path), false);
+    const result = evaluateLifecycleReadyGuard(edit(join(hostTempScratch, "note.txt")), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-CROSS-REPO-MUTATION/u);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(hostTempScratch, { recursive: true, force: true });
+  }
+
+  const adrPath = fileURLToPath(new URL("../../../docs/adr/0059-signed-human-guard-override.md", import.meta.url));
+  const adrText = readFileSync(adrPath, "utf8");
+  assert.match(
+    adrText,
+    /host-temp session scratchpad/u,
+    "ADR-0059 must document that GUARD-CROSS-REPO-MUTATION also blocks the host-temp session scratchpad, not merely another repository (Proposal point 4 of the session-scratchpad backlog item)",
+  );
+  assert.match(
+    adrText,
+    /session-scratchpad-is-unwritable-under-the-cross-repo-guard/u,
+    "ADR-0059's clarification must cross-reference the backlog item it was recorded for",
+  );
+});
+
 test("consumer sessions cannot mutate Pipeline sources, cachebusters or plugin installations", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-plugin-source-"));
