@@ -114,3 +114,10 @@ is worth a deliberate call, not a default.
 - **Rationale:** `verify.mjs` still writes evidence relative to its own module path rather than the git common directory; `guard-push.mjs`'s `resolveEvidenceProject` still resolves the evidence-reading directory via attached-branch worktree lookup, which never matches the detached `.git/phx-verify` convention. The item's own Proposal explicitly declines to choose between the two named directions (gate-side discovery of the detached worktree vs. making the runner always write to the project root) and frames the tradeoff as "worth a deliberate call, not a default" — this remains a PO design decision, not a mechanical fix to dispatch blind.
 - **Assignment (if accepted):** Unassigned — needs the PO's choice of direction (1) or (2) before dispatch.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Direction 2 — make `verify.mjs` resolve `repoRoot` from the git common-dir / primary worktree root (as `gitCommonDirectory()` already does elsewhere in the same file), not from its own module path. No new discovery logic in `guard-push.mjs`.
+- **Rationale:** Elephant recommendation, adopted: this is the narrower change (one function, one file) versus teaching the gate to trust a self-reported location or hard-code the `.git/phx-verify` path convention.
+- **Assignment:** Dispatch-ready — brief a Goldfish to change `verify.mjs`'s root resolution and add a regression test proving a run from the detached worktree still writes evidence to the project root.
+- **Date:** 2026-08-18

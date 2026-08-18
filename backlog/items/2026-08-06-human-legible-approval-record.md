@@ -71,3 +71,10 @@ reconstruction must expose the briefing alongside the digests.
 - **Rationale:** The plan-approval gate still persists only actor, timestamps, and digests (`pipeline-state.mjs` `submit-plan`/`approve-plan`); no briefing text is derived or stored anywhere. The item's own Proposal explicitly requires a PO choice between two named, tradeoff-bearing designs before any build starts — a bounded structured summary from a closed vocabulary kept portable, versus free prose confined to the restricted machine-local profile with only a digest in the portable record — "Choose one explicitly; both satisfy the requirement, and silently adding free text satisfies neither." This is a PO design decision, not an implementation gap; no default should be invented here. Note: the unrelated 2026-08-18 H-AC-11 O-4 disposition (GMW/HGO restricted attribution record, D-1 increment 2) covers a different evidence-intake slice and does not substitute for this item's plan-approval-gate requirement.
 - **Assignment (if accepted):** Unassigned — needs the PO's choice of vocabulary-vs-restricted-profile design before dispatch.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Structured, bounded vocabulary — kept portable. Not free prose / not confined to the restricted profile.
+- **Rationale:** PO's explicit choice between the two named designs in the Proposal.
+- **Assignment:** Dispatch-ready — brief a Goldfish to design the closed vocabulary, derive the briefing from bound artifacts, persist it with the approval, and add the `H-AC-11` covering test.
+- **Date:** 2026-08-18

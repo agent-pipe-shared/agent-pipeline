@@ -135,3 +135,13 @@ mapping above.
 - **Rationale:** Re-verified 2026-08-18 directly against current source: H-AC-12's enumeration still omits GMW (`specs/sprint-phoenix-epic/acceptance.md:369-375`) and `closeGuardMaintenanceWindow` still destroys the window record on close (`guard-maintenance-window.mjs:592`), exactly as described. The PO has separately decided the narrower O-1/O-2/O-4 sub-questions inside the linked design doc, but this item's own three sub-decisions — (1) the H-AC-12 amendment naming GMW, (2) GMW's retention mechanism (emit-on-transition vs append-only storage redesign), (3) the full portable/restricted field split for "by whom"/"why" — are not yet resolved in code or in `acceptance.md`. Not proposing a resolution here; restating that the gap is live and the choice among alternatives still needs the PO, not an agent default.
 - **Assignment (if accepted):** owner PO / pipeline (per the item's original framing); no change to the 2026-09-06 due date.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision (all three sub-questions, Elephant recommendation adopted):**
+  1. **H-AC-12 amendment:** yes — add GMW to the enumerated set of authority-granting paths.
+  2. **GMW retention:** emit-on-transition — GMW emits a ledger event at `install` (window opened) and at `close`; GMW's own private storage contract is unchanged.
+  3. **Two-record split:** portable record carries authority/actor class, assurance, stable reason code, scope digests, rule ids, validity bounds; restricted machine-local record carries natural-person attribution and free-form reason — per H-AC-05/H-AC-13. The already-disclosed residual stands: H-AC-11's first clause requires the portable record to carry the values that constitute the join, so a fully joinless design is not attainable for the GMW half (design doc §5.2 R-3/O-4) — accepted, not re-opened.
+- **Rationale:** (1) is mechanical once agreed and the enumeration is simply wrong without it. (2) is the smaller change per the item's own Proposal and preserves the machine-local/portable split H-AC-05 needs. (3) is what H-AC-05/H-AC-11/H-AC-13 already specify; the residual join-handle gap was already surfaced and reasoned about in the linked design doc rather than invented here.
+- **Assignment:** Dispatch-ready once the finalized GMW lands from the other session (sequencing constraint from the item itself); the H-AC-12 amendment and field mapping can proceed independently now.
+- **Date:** 2026-08-18

@@ -90,3 +90,10 @@ Not designed here. Candidates for a future session:
 - **Rationale:** Re-checked 2026-08-18: none of `docs/push-release-flow.md`, `roles/elephant.md`, or `plugins/pipeline-core/lib/guard-maintenance-window.mjs` mentions the checklist distinction this item proposes (file-protection lift vs. authorship-exception), and Nova has no equivalent either. The item's own Proposal section is explicit that it is "Not designed here" and lists three undesigned candidate directions — a checklist reminder, re-budgeting the maintenance-window TTL to assume a Goldfish round-trip, or a mandatory pre-commit stage-0 self-check — with a real tradeoff between them (process overhead vs. window duration vs. a new gate) that only the PO should settle.
 - **Assignment (if accepted):** PO to choose among the three named candidates before a dispatch is briefed.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Candidate 3 — a mandatory pre-commit stage-0 self-check. Before any Elephant-authored commit to a `project/guard-config.json`-protected path, even under an active signed maintenance window, an explicit stated stage-0 qualification check (file count, line count, no-test-file confirmation) is required.
+- **Rationale:** Elephant recommendation, adopted: a hard mandatory gate targets the actual root cause (an implicit judgment call made under TTL time pressure) directly, unlike a checklist reminder (candidate 1, easy to skip — which is exactly how this violation happened) or re-budgeting the maintenance-window TTL (candidate 2, changes window duration without closing the gap it doesn't actually address).
+- **Assignment:** Dispatch-ready — brief a Goldfish to add the mandatory stage-0 self-check to the maintenance-window `prepare`/`install` flow, alongside candidate 1's checklist clarification (opening a window lifts file protection; it does not create a stage-0-equivalent EL-01 exception) as low-cost documentation.
+- **Date:** 2026-08-18

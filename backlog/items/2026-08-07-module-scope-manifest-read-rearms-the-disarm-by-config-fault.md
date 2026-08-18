@@ -123,3 +123,10 @@ semantics the wiring states about itself.
 - **Rationale:** Re-verified 2026-08-18: `guard-lifecycle-ready.mjs:57` and `codex-pretool-guard.mjs:201` still read the manifest via the unguarded `loadRuntimeProjectionV3OwnedKeys()` at module scope, reproducing exactly the disarm-by-config-fault `runtime-projection-v3.mjs:99-118` documents having fixed elsewhere. Nova has the same unfixed call site (`guard-lifecycle-ready.mjs:104`), so this is not a case of skipping duplicated work — both lines are equally exposed. The item's own proposal step 2 states plainly that choosing fail-open vs. fail-closed here "is a behaviour change and therefore a PO decision, not an implementation detail," and step 3 (retiring/renaming the unguarded export) is a design call with its own 20+-call-site blast radius.
 - **Assignment (if accepted):** PO decision needed on failure direction before any dispatch is briefed.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Fail-open — keep the current admit-on-unreadable-manifest behaviour; do not change it to fail-closed. Ratified as the intended behaviour, not left as an accident.
+- **Rationale:** PO's explicit choice.
+- **Assignment:** Dispatch-ready — brief a Goldfish (guard-kernel tier) to: (1) move both hook reads off module scope into the code path that already has a refusal (proposal step 1); (2) document the fail-open choice explicitly at the read site so it reads as decided, not accidental; (3) consider renaming/retiring the unguarded `loadRuntimeProjectionV3OwnedKeys()` export per proposal step 3 so picking the wrong one is visible at the call site; (4) add the regression test proposal step 4 describes, pinned to the now-decided fail-open behaviour (corrupt-manifest fixture must still exit 0 with a warning, not silently exit 1/2). Needs its own briefed dispatch and independent Critic review per the item's Proposal ("Owner: PO. Guard-kernel code").
+- **Date:** 2026-08-18

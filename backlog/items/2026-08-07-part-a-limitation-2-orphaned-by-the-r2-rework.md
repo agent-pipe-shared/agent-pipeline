@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.part-a-limitation-2-orphaned-by-the-r2-rework
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: Critic finding F2 on PHX-R2-THREATMODEL-rework (specs/sprint-phoenix-epic/evidence/phx-r2-threatmodel-rework-critic-review-ad5d185.md). Recorded by the Elephant as the disposition of that finding — the item the finding says was missing.
 due: 2026-09-06
@@ -97,4 +97,11 @@ needs the design-first treatment (MP-22/MP-23).
 - **Decision:** Confirmed still open and unchanged; requires the PO's three-step determination named in the item's own Proposal (agent-reachability, cheapest local-expectation detection, or accepted permanent scope boundary) before any design or implementation work.
 - **Rationale:** The disclosed limitation (`design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md:155-165`) and the withdrawn successor mechanism (`design/part-a-residuals-and-dispatch-template-drift.md` §III.1) are unchanged since this item was filed. No new tracking, PO ruling, or design work addressing limitation 2 was found.
 - **Assignment (if accepted):** None yet — awaiting PO input per the item's own Proposal.
+- **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Close as an accepted, permanent scope boundary (Proposal step 3) — no detection mechanism built.
+- **Rationale:** Elephant recommendation, adopted: the residual risk is narrow (an already-allowlisted origin, a different commit within that same trusted origin — not an arbitrary repo), and closing it would require building a new locally-trusted expectation baseline (Proposal step 2) with no existing anchor to derive one from cheaply, disproportionate to that narrow risk. Consistent with the threat-model's own prior decision to rule out a new signed pin, and with the standing "guards bind agents, not humans" principle — this is not a control worth building for its own sake.
+- **Assignment:** None — item closes with this reasoning recorded, per the item's own step 3.
 - **Date:** 2026-08-18

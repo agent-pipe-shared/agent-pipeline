@@ -77,3 +77,10 @@ and restore rather than asserted.
 - **Rationale:** Re-checked 2026-08-18: no `PreToolUse` guard on `Edit`/`Write` enforces EL-01 at write time in either Phoenix's or Nova's `hooks/hooks.json` / `hooks/` directory — the rule is still enforced only by after-the-fact review. The item's own Proposal section poses two named design questions with real tradeoffs (how the guard trusts an Elephant-vs-Goldfish session identity; refusal vs. forced-disclosure as the enforcement shape) and explicitly defers both to a future decision rather than this item.
 - **Assignment (if accepted):** PO must pick the enforcement shape (refuse vs. forced-disclosure) and the session-identity signal before a dispatch can be briefed.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Refuse (hard block), consistent with the repository's other guards. Session-identity signal (Elephant recommendation, adopted): trust the presence of an active, matching dispatch record for the current tool-call context (a live `TASK_ID`/`dispatch-record.json` entry for a dispatched Goldfish) rather than a self-asserted role string in a prompt — a write is permitted only when it can be tied to an actually-open dispatch record.
+- **Rationale:** Refuse matches the enforcement shape of force-push/history-rewrite/protected-branch guards already in this repo. A dispatch record is existing, already machine-checked infrastructure (used throughout this session's own Triage), not a new trust surface a prompt could forge.
+- **Assignment:** Dispatch-ready — brief a Goldfish (guard-kernel tier, xhigh) to design and land the `PreToolUse` guard on `Edit`/`Write`, with the break-and-restore acceptance test the item's Proposal names.
+- **Date:** 2026-08-18
