@@ -74,7 +74,7 @@
 | pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.documentation-information-architecture | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
+| pipeline.elephant-direct-implementation-under-afk-authorization | closed | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -92,7 +92,7 @@
 | pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | open | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | 2026-08-09 | — |
-| pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.greenfield-seeded-with-private-overlay-calibration | closed | defect | pipeline | 2026-08-08 | — |
@@ -238,7 +238,7 @@
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching | open | defect | pipeline | 2026-08-17 | — |
-| pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions | open | workflow-improvement | pipeline | 2026-08-17 | — |
+| pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.two-manifest-literals-bypass-the-single-seed-owner | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | open | defect | pipeline | 2026-08-18 | — |
@@ -262,6 +262,6 @@
 
 ## Counts
 
-- open: 86
-- in_progress: 10
-- closed: 158
+- open: 84
+- in_progress: 9
+- closed: 161
