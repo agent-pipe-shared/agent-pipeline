@@ -65,3 +65,69 @@ test("decision.id still accepts the existing legitimate slug shape unchanged (re
   const intent = createAuthorityRevisionIntent(request);
   assert.equal(intent.value.decision.id, "phoenix-section-seven");
 });
+
+// SETUP-1 mirror: trust-policy.json shape disagreement fix (backlog
+// 2026-08-17-trust-policy-shape-disagreement-...), same latent bug in this
+// sister verifier. `setup --human-name` writes a 3-key named shape
+// {keyReference, publicKeySha256, humanName}; verifyAuthorityRevisionProof
+// must accept it, exactly as it accepts the 2-key legacy shape, without
+// loosening the precision of the `own()` check.
+test("trustPolicy 3-key shape with humanName verifies", () => {
+  const intent = createAuthorityRevisionIntent(request);
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const pem = publicKey.export({ type: "spki", format: "pem" });
+  const trustPolicy = { keyReference: "fixture", publicKeySha256: createHash("sha256").update(pem).digest("hex"), humanName: "Nova the PO" };
+  const proof = { schema: AUTHORITY_REVISION_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "fixture", publicKey: pem, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64") };
+  const result = verifyAuthorityRevisionProof({ intent, trustPolicy, proof });
+  assert.equal(result.verified, true);
+});
+
+test("trustPolicy 2-key legacy shape (no humanName) still verifies (regression)", () => {
+  const intent = createAuthorityRevisionIntent(request);
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const pem = publicKey.export({ type: "spki", format: "pem" });
+  const trustPolicy = { keyReference: "fixture", publicKeySha256: createHash("sha256").update(pem).digest("hex") };
+  const proof = { schema: AUTHORITY_REVISION_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "fixture", publicKey: pem, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64") };
+  assert.equal(verifyAuthorityRevisionProof({ intent, trustPolicy, proof }).verified, true);
+});
+
+test("trustPolicy with a required field missing still fails closed, humanName present or not", () => {
+  const intent = createAuthorityRevisionIntent(request);
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const pem = publicKey.export({ type: "spki", format: "pem" });
+  const publicKeySha256 = createHash("sha256").update(pem).digest("hex");
+  const proof = { schema: AUTHORITY_REVISION_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "fixture", publicKey: pem, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64") };
+  const missingKeyReference = { publicKeySha256, humanName: "Nova the PO" };
+  assert.equal(verifyAuthorityRevisionProof({ intent, trustPolicy: missingKeyReference, proof }).verified, false);
+  assert.equal(verifyAuthorityRevisionProof({ intent, trustPolicy: missingKeyReference, proof }).code, "AR-PROOF-INVALID");
+  const missingPublicKeySha256 = { keyReference: "fixture", humanName: "Nova the PO" };
+  assert.equal(verifyAuthorityRevisionProof({ intent, trustPolicy: missingPublicKeySha256, proof }).verified, false);
+  assert.equal(verifyAuthorityRevisionProof({ intent, trustPolicy: missingPublicKeySha256, proof }).code, "AR-PROOF-INVALID");
+  const missingBothNoHumanName = { humanName: "Nova the PO" };
+  assert.equal(verifyAuthorityRevisionProof({ intent, trustPolicy: missingBothNoHumanName, proof }).verified, false);
+  assert.equal(verifyAuthorityRevisionProof({ intent, trustPolicy: missingBothNoHumanName, proof }).code, "AR-PROOF-INVALID");
+});
+
+test("trustPolicy precision bar: only humanName specifically is tolerated, a different extra key still fails closed", () => {
+  const intent = createAuthorityRevisionIntent(request);
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const pem = publicKey.export({ type: "spki", format: "pem" });
+  const trustPolicy = { keyReference: "fixture", publicKeySha256: createHash("sha256").update(pem).digest("hex") };
+  const proof = { schema: AUTHORITY_REVISION_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "fixture", publicKey: pem, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64") };
+  const otherExtraKey = { ...trustPolicy, someOtherField: "x" };
+  const otherExtraKeyResult = verifyAuthorityRevisionProof({ intent, trustPolicy: otherExtraKey, proof });
+  assert.equal(otherExtraKeyResult.verified, false);
+  assert.equal(otherExtraKeyResult.code, "AR-PROOF-INVALID");
+});
+
+test("proof's own own() check stays exactly as strict as before: an extra key on proof still fails closed", () => {
+  const intent = createAuthorityRevisionIntent(request);
+  const { privateKey, publicKey } = generateKeyPairSync("ed25519");
+  const pem = publicKey.export({ type: "spki", format: "pem" });
+  const trustPolicy = { keyReference: "fixture", publicKeySha256: createHash("sha256").update(pem).digest("hex") };
+  const proof = { schema: AUTHORITY_REVISION_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "fixture", publicKey: pem, signatureBase64: sign(null, Buffer.from(intent.sha256), privateKey).toString("base64") };
+  const proofWithExtraKey = { ...proof, someOtherField: "x" };
+  const proofWithExtraKeyResult = verifyAuthorityRevisionProof({ intent, trustPolicy, proof: proofWithExtraKey });
+  assert.equal(proofWithExtraKeyResult.verified, false);
+  assert.equal(proofWithExtraKeyResult.code, "AR-PROOF-INVALID");
+});

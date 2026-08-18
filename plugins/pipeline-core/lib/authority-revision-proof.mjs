@@ -9,6 +9,14 @@ const own = (value, keys) => value !== null && typeof value === "object" && !Arr
 const canonical = (value) => Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : value !== null && typeof value === "object" ? `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}` : JSON.stringify(value);
 const authority = (value) => own(value, ["prd", "spec"]) && [value.prd, value.spec].every((entry) => own(entry, ["path", "sha256"]) && typeof entry.path === "string" && SHA.test(entry.sha256));
 const decisionScope = (value, featureId) => own(value, ["featureId", "phase"]) && value.featureId === featureId && value.phase === "design";
+/**
+ * `trustPolicy` specifically (never `proof`) may also carry `humanName` —
+ * the SETUP-1 human-readable label recorded once at key-setup time
+ * (`po-human-approval.mjs`'s `setup --human-name`). It is never part of what
+ * is cryptographically verified here, so its presence must not fail-close a
+ * genuinely valid trust policy; any OTHER unrecognised extra key still must.
+ */
+const ownTrustPolicy = (value) => own(value, ["keyReference", "publicKeySha256"]) || own(value, ["keyReference", "publicKeySha256", "humanName"]);
 
 export const AUTHORITY_REVISION_INTENT_SCHEMA = "pipeline.continuity-authority-revision-intent.v1";
 export const AUTHORITY_REVISION_PROOF_SCHEMA = "pipeline.continuity-authority-revision-proof.v1";
@@ -25,7 +33,7 @@ export function createAuthorityRevisionIntent({ schema, featureId, expectedRevis
 }
 
 export function verifyAuthorityRevisionProof({ intent, trustPolicy, proof } = {}) {
-  if (!intent || !SHA.test(intent.sha256 ?? "") || !trustPolicy || !proof || !own(trustPolicy, ["keyReference", "publicKeySha256"])
+  if (!intent || !SHA.test(intent.sha256 ?? "") || !trustPolicy || !proof || !ownTrustPolicy(trustPolicy)
     || !own(proof, ["schema", "intentSha256", "keyReference", "publicKey", "signatureBase64"])
     || proof.schema !== AUTHORITY_REVISION_PROOF_SCHEMA || proof.intentSha256 !== intent.sha256 || proof.keyReference !== trustPolicy.keyReference
     || createHash("sha256").update(proof.publicKey ?? "").digest("hex") !== trustPolicy.publicKeySha256) return Object.freeze({ verified: false, code: "AR-PROOF-INVALID" });
