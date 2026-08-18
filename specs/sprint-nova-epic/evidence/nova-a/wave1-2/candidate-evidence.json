@@ -1,0 +1,37 @@
+{
+  "candidate": {
+    "commit": "f06d1927185169c517e566e2936b6035b41f1eca",
+    "tree": "046197c1d8645b9315a498c26e8246b028170187"
+  },
+  "baseCommit": "03de8111a820ca217bcb9227513853c982c39e13",
+  "diffRange": "03de8111a820ca217bcb9227513853c982c39e13..f06d1927185169c517e566e2936b6035b41f1eca",
+  "description": "Wave 1 (11 items) + Wave 2 (8 items) of the 2026-08-18 systematic backlog sweep under sprint-nova-epic. Machine evidence for Critic trajectory verification.",
+  "verify": {
+    "path": "evidence/verify-latest.json",
+    "runAt": "2026-08-18",
+    "passCount": 270,
+    "failCount": 1,
+    "totalSuites": 271,
+    "failingSuites": ["human-guard-override-tests"],
+    "failingSuiteDisposition": "pre-existing, unrelated to this diff -- external marketplace mirror (~/agent-pipeline-local-marketplace) is stale relative to the checkout; confirmed via direct diff -rq before wave 1/2 work began and reconfirmed after"
+  },
+  "perItemTestRuns": [
+    { "wave": 1, "item": "NVA-W1-2 (po-human-approval write-path feedback)", "command": "node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs", "result": "71/71 pass" },
+    { "wave": 1, "item": "NVA-W1-3 (guard-maintenance-window kernel closure)", "command": "node --test plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs", "result": "2/2 pass" },
+    { "wave": 1, "item": "NVA-W1-6 (settings-allowlist-merge)", "command": "node --test plugins/pipeline-core/scripts/settings-allowlist-merge.test.mjs", "result": "16/16 pass" },
+    { "wave": 1, "item": "NVA-W1-8 (session-bootstrap directory contract)", "command": "node --test harness/scripts/check-session-bootstrap-directory-contract.test.mjs", "result": "pass" },
+    { "wave": 1, "item": "NVA-W1-9 (commit-message-policy GIT-01)", "command": "node --test plugins/pipeline-core/lib/commit-message-policy.test.mjs", "result": "27/27 pass" },
+    { "wave": 1, "item": "NVA-W1-10 (ADR-0059 scratchpad clarification)", "command": "node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs", "result": "5/5 pass" },
+    { "wave": 1, "item": "NVA-W1-11 (signing-ceremony unified CLI)", "command": "node --test plugins/pipeline-core/scripts/signing-ceremony.test.mjs", "result": "pass" },
+    { "wave": 2, "item": "NVA-W2-2 (codex-session-start-hint transcript reference)", "command": "node --test plugins/pipeline-core/hooks/codex-session-start-hint.test.mjs", "result": "22/22 pass" },
+    { "wave": 2, "item": "NVA-W2-3 (dispatch-authorship-verify design)", "command": "node --test plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs", "result": "33/33 pass" },
+    { "wave": 2, "item": "NVA-W2-5 (runner-profile-migration-v3 single-owner seed)", "command": "node --test plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs", "result": "44/44 pass" },
+    { "wave": 2, "item": "NVA-W2-6 (check-review-retry-plan)", "command": "node --test harness/scripts/check-review-retry-plan.test.mjs", "result": "10/10 pass" },
+    { "wave": 2, "item": "NVA-W2-8 (codex-isolated-critic-protected-preimage re-pin)", "command": "node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs", "result": "4/4 pass" }
+  ],
+  "knownPendingProtectedEdits": [
+    { "item": "evidence-bound-review-retry-economics", "boundary": "TP-3 (harness/scripts/verify.mjs suite registration)", "status": "documented in backlog item, not yet applied" },
+    { "item": "unregistered-suite-is-red-and-invisible-to-verify", "boundary": "TP-3 (harness/scripts/verify.mjs suite registration)", "status": "documented in backlog item, not yet applied" },
+    { "item": "handover-file-has-no-rotation-obligation", "boundary": "TP-4 (hooks.json wiring)", "status": "re-confirmed refused, documented, not yet applied" }
+  ]
+}
