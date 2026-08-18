@@ -95,7 +95,17 @@ distinguishing it from an unrelated add+delete.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Not decided — this entry records re-examination, not a
+  choice. Confirmed the premise still holds: `rg 'Governs:' docs/adr/`
+  returns exactly the same 5 lines quoted in the item (0012, 0040, 0045,
+  0056, 0058); none matches `docs/adr/**` itself, so an ADR-corpus change
+  (renumber, new ADR, superseded status) still triggers no reconciliation
+  obligation.
+- **Rationale:** The item's own Proposal is explicitly framed as a PO
+  question with real tension on both sides (a self-governing `Governs:` line
+  over the ADR corpus itself is either meaningfully closing the last gap, or
+  noisy churn on every ADR edit) — not a design the Elephant should just
+  pick.
+- **Assignment (if accepted):** Not assigned; needs the PO's answer to the
+  named tension before either direction is built.
+- **Date:** 2026-08-18

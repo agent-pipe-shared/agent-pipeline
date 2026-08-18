@@ -132,7 +132,17 @@ commitment, roughly in increasing order of intrusiveness:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Not decided — this entry records re-examination, not a
+  choice among the item's named candidates. Confirmed still live and
+  growing: `.gitleaksignore` is now 122 lines (was ~38 at filing), with new
+  `content-v1` entries for `backlog/transitions.ndjson` accumulating past
+  line 78. No per-path rule scoping, self-minting writer, or generated-data
+  classification comment exists.
+- **Rationale:** The item's own Proposal frames this explicitly as "not
+  designed here... candidates for a deliberate decision" among named
+  alternatives — an architectural call about how the ledger and the secret
+  scanner should relate, not a mechanical fix.
+- **Assignment (if accepted):** Not assigned; needs the PO decision the item
+  itself asks for. The list's continued unscoped growth is a live,
+  measurable cost of leaving this undecided.
+- **Date:** 2026-08-18

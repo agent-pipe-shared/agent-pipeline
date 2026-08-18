@@ -86,7 +86,19 @@ explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Not decided — this entry records re-examination, not a
+  choice among the item's four named designs. No technical enforcement of
+  MP-22/EL-01/EL-16 self-implementation exists in code today (re-verified:
+  no orchestrator-completion trailer/dispatch-record cross-check anywhere in
+  `plugins/`; Nova's `dispatch-authorship-verify.mjs` verifies source-marker
+  authorship, a different, narrower check per Nova's own sibling backlog item
+  `2026-08-10-verify-authorship-defaults-to-source-markers-not-behavior.md`
+  — it does not cover this gap either, so there is no cross-repo fix to
+  adopt here).
+- **Rationale:** The item's own Proposal explicitly frames all four
+  candidates as "not designed here, deliberately" — a genuine PO-owned
+  enforcement-design choice among mutually exclusive mechanisms, not a
+  backlog-sweep judgment call.
+- **Assignment (if accepted):** Not assigned; needs the PO decision the item
+  itself asks for before any candidate is designed further.
+- **Date:** 2026-08-18

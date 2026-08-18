@@ -96,7 +96,21 @@ mode at package-topology scale; a scoped, PO-decided fix does not.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Not decided — this entry records re-examination, not a
+  choice. Both divergences the item names are still present verbatim:
+  `docs/adr/0045-canonical-artifact-topology.md` still names `prd.md`, while
+  `specs/sprint-phoenix-epic/` carries `prd_phoenix-epic.md` plus several
+  unenumerated root artifacts (`RECOVERY.md`, `spec-revision-20260802.md`,
+  `phase-plan_gate-integrity.md`, `phase-residual_gate-integrity.md`).
+  Cross-checked against the sibling Nova checkout: the same pattern recurs
+  there independently (`prd_sprint-nova-epic.md` plus `implementation/`,
+  `plans/`, `release-lifecycle.json` outside ADR-0045's enumeration, against
+  an unchanged ADR-0045 text) — confirming this is a real drift between the
+  ADR and how every epic actually names/organizes its package, not a
+  Phoenix-only glitch, and not something Nova has already resolved either.
+- **Rationale:** The item explicitly frames its two questions (amend
+  ADR-0045's naming convention, and whether/how to enumerate an epic's extra
+  root artifacts) as PO-owned with no default answer proposed.
+- **Assignment (if accepted):** Not assigned; needs the PO's answer before
+  either ADR-0045 or the two checkouts' topology is changed.
+- **Date:** 2026-08-18
