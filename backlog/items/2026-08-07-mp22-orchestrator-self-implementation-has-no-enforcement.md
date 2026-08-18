@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.mp22-orchestrator-self-implementation-has-no-enforcement
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-08-21
 source: "Critic rounds 1 and 2 of the 0.5.3 candidate, 2026-08-07 — both independently found the same class of violation, round 2 with the sharper spec-ref."
@@ -102,3 +102,20 @@ explicitly not a commitment:
 - **Assignment (if accepted):** Not assigned; needs the PO decision the item
   itself asks for before any candidate is designed further.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18 (PO decision)
+
+- **PO decision (verbatim intent):** "ist so gewollt: close. Falls es mal
+  nötig ist soll es gehen aber per se nicht gewünscht sein" — the current
+  state (MP-22/EL-01/EL-16 as a prose-only rule, no technical enforcement
+  mechanism) is the desired end state, not an interim gap. Self-implementation
+  by the orchestrator must remain technically possible for the rare case it
+  is genuinely necessary, but is deliberately not encouraged or made
+  frictionless by tooling. None of the four proposed enforcement candidates
+  is being built.
+- **Consequence:** Detection stays exactly as it is today — a Critic review
+  reading both a commit and its dispatch record can still catch a violation
+  after the fact (as it already did, twice, for `503fe0d`/`584a598`); there
+  is and will be no in-session technical block. This is accepted, not a
+  residual risk to track further.
+- **Closed, no code change.**

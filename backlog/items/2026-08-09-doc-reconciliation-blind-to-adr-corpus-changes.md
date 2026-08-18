@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.doc-reconciliation-blind-to-adr-corpus-changes
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Raised as an unverified observation by an independent review of a commit range; the review explicitly did not build a repro. Confirmed at source under dispatch PHX-BL2 (2026-08-09): read all five `**Governs:**` lines in docs/adr/ and the paths touched by the 2026-08-09 ADR-0047 renumber commit (88a7133)."
 due: 2026-09-08
@@ -109,3 +109,12 @@ distinguishing it from an unrelated add+delete.
 - **Assignment (if accepted):** Not assigned; needs the PO's answer to the
   named tension before either direction is built.
 - **Date:** 2026-08-18
+
+## Triage — closed 2026-08-18 (PO decision)
+
+- **PO decision (verbatim intent):** "verwerfen und close - das ist nur
+  Rauschen" — a `**Governs:** docs/adr/**` (or per-file self-governing) line
+  would make every ADR edit self-implicating, producing exactly the
+  green-then-red-then-green churn the item's own Proposal warned about.
+  Rejected as noise, not built.
+- **Closed, no code change.**
