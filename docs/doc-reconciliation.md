@@ -47,6 +47,15 @@ something to do here without review.
 
 ## Entries
 
+## Candidate c2193f52fa3dd4f448456c4f352ddf67e3b17591 — 2026-08-18, range 2eb52dd2..c2193f52, finalize the PHX-WP-EVIDENCE-PATH-CHECK dispatch-record evidence
+
+- ADR-0045: checked, no change needed.
+
+  Same disposition as the immediately preceding entry: the finalized
+  `PHX-WP-EVIDENCE-PATH-CHECK/` evidence files sit under the existing,
+  already-enumerated `specs/sprint-phoenix-epic/evidence/` location. No new
+  root artifact, no topology change.
+
 ## Candidate 2eb52dd2de7b3aadc5979185d289dafa00408058 — 2026-08-18, range e5e3d7e4..2eb52dd2, template evidence-path-check fix (PHX-WP-EVIDENCE-PATH-CHECK) + backlog closure
 
 - ADR-0045: checked, no change needed.
