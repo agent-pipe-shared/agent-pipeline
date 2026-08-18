@@ -600,6 +600,19 @@ check("a bound plan digest detects a stale post-validation PRD", () => {
   });
 });
 
+// NVA-POGATEAUTH-1: the spec-digest positive case was previously proven only in
+// combination with a matching plan digest (approve-plan's own writer-lock
+// revalidation below). Isolate it here so a bound Spec digest is proven to
+// succeed on its own, exactly as the plan-digest positive case above already is.
+check("a bound Spec digest alone accepts the current PRD's neighboring spec.md", () => {
+  withFixture({}, ({ validate }) => {
+    const first = validate();
+    assert.equal(first.ok, true);
+    assert.equal(validate({ expectedSpecSha256: first.value.specSha256 }).ok, true);
+    assert.equal(validate({ expectedSpecSha256: "0".repeat(64) }).code, "PO-GATE-PRD-SPEC-MISMATCH");
+  });
+});
+
 function submitFixturePlan(primary, authority, profile) {
   const status = runPipelineState(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
     dir: primary,
