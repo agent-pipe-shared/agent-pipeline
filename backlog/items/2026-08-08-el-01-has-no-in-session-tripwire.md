@@ -71,9 +71,9 @@ Acceptance test: a deliberate orchestrator-session write to a source path under 
 risk-flagged feature is refused or forced into disclosure, demonstrated by break
 and restore rather than asserted.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — reviewed 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Confirmed still open, exactly as described. Not resolving here.
+- **Rationale:** Re-checked 2026-08-18: no `PreToolUse` guard on `Edit`/`Write` enforces EL-01 at write time in either Phoenix's or Nova's `hooks/hooks.json` / `hooks/` directory — the rule is still enforced only by after-the-fact review. The item's own Proposal section poses two named design questions with real tradeoffs (how the guard trusts an Elephant-vs-Goldfish session identity; refusal vs. forced-disclosure as the enforcement shape) and explicitly defers both to a future decision rather than this item.
+- **Assignment (if accepted):** PO must pick the enforcement shape (refuse vs. forced-disclosure) and the session-identity signal before a dispatch can be briefed.
+- **Date:** 2026-08-18

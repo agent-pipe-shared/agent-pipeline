@@ -84,8 +84,9 @@ Not designed here. Candidates for a future session:
    the same check EL-01 already defines, just made a mandatory pre-commit
    question rather than an implicit judgment call.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — reviewed 2026-08-18
 
-Not yet triaged. Filed same-session as the finding, at the point of
-reconciling the Critic's FAIL verdict, per this repo's "persist immediately"
-rule.
+- **Decision:** Confirmed still open, exactly as described. Not resolving here.
+- **Rationale:** Re-checked 2026-08-18: none of `docs/push-release-flow.md`, `roles/elephant.md`, or `plugins/pipeline-core/lib/guard-maintenance-window.mjs` mentions the checklist distinction this item proposes (file-protection lift vs. authorship-exception), and Nova has no equivalent either. The item's own Proposal section is explicit that it is "Not designed here" and lists three undesigned candidate directions — a checklist reminder, re-budgeting the maintenance-window TTL to assume a Goldfish round-trip, or a mandatory pre-commit stage-0 self-check — with a real tradeoff between them (process overhead vs. window duration vs. a new gate) that only the PO should settle.
+- **Assignment (if accepted):** PO to choose among the three named candidates before a dispatch is briefed.
+- **Date:** 2026-08-18

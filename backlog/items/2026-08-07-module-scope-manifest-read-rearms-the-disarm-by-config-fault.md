@@ -117,9 +117,9 @@ protecting this session — the demonstration would disarm the thing being
 demonstrated. The claim above rests on reading the four files and on the exit
 semantics the wiring states about itself.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — reviewed 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Confirmed still open, exactly as described. Not resolving here — this needs a PO choice, not an agent default.
+- **Rationale:** Re-verified 2026-08-18: `guard-lifecycle-ready.mjs:57` and `codex-pretool-guard.mjs:201` still read the manifest via the unguarded `loadRuntimeProjectionV3OwnedKeys()` at module scope, reproducing exactly the disarm-by-config-fault `runtime-projection-v3.mjs:99-118` documents having fixed elsewhere. Nova has the same unfixed call site (`guard-lifecycle-ready.mjs:104`), so this is not a case of skipping duplicated work — both lines are equally exposed. The item's own proposal step 2 states plainly that choosing fail-open vs. fail-closed here "is a behaviour change and therefore a PO decision, not an implementation detail," and step 3 (retiring/renaming the unguarded export) is a design call with its own 20+-call-site blast radius.
+- **Assignment (if accepted):** PO decision needed on failure direction before any dispatch is briefed.
+- **Date:** 2026-08-18

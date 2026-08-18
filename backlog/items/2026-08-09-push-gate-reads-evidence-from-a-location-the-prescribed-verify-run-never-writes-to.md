@@ -108,9 +108,9 @@ this repository happens to use today. This item does not choose for the
 maintainer — the tradeoff (a shared write location vs. gate-side discovery)
 is worth a deliberate call, not a default.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — reviewed 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Still open; confirmed live exactly as described, unresolved in both Phoenix and Nova.
+- **Rationale:** `verify.mjs` still writes evidence relative to its own module path rather than the git common directory; `guard-push.mjs`'s `resolveEvidenceProject` still resolves the evidence-reading directory via attached-branch worktree lookup, which never matches the detached `.git/phx-verify` convention. The item's own Proposal explicitly declines to choose between the two named directions (gate-side discovery of the detached worktree vs. making the runner always write to the project root) and frames the tradeoff as "worth a deliberate call, not a default" — this remains a PO design decision, not a mechanical fix to dispatch blind.
+- **Assignment (if accepted):** Unassigned — needs the PO's choice of direction (1) or (2) before dispatch.
+- **Date:** 2026-08-18

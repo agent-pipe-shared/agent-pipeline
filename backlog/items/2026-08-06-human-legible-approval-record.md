@@ -65,9 +65,9 @@ Cover it with the test `H-AC-11` currently lacks: an approval whose persisted
 briefing does not match the bound artifacts must fail, and a reviewer
 reconstruction must expose the briefing alongside the digests.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — reviewed 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Still open; not resolved. Confirmed unchanged from filing.
+- **Rationale:** The plan-approval gate still persists only actor, timestamps, and digests (`pipeline-state.mjs` `submit-plan`/`approve-plan`); no briefing text is derived or stored anywhere. The item's own Proposal explicitly requires a PO choice between two named, tradeoff-bearing designs before any build starts — a bounded structured summary from a closed vocabulary kept portable, versus free prose confined to the restricted machine-local profile with only a digest in the portable record — "Choose one explicitly; both satisfy the requirement, and silently adding free text satisfies neither." This is a PO design decision, not an implementation gap; no default should be invented here. Note: the unrelated 2026-08-18 H-AC-11 O-4 disposition (GMW/HGO restricted attribution record, D-1 increment 2) covers a different evidence-intake slice and does not substitute for this item's plan-approval-gate requirement.
+- **Assignment (if accepted):** Unassigned — needs the PO's choice of vocabulary-vs-restricted-profile design before dispatch.
+- **Date:** 2026-08-18

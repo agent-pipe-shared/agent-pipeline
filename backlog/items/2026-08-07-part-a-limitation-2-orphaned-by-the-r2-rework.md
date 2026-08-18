@@ -92,9 +92,9 @@ No implementation before that determination. Any answer touches the bootstrap
 readiness gate's `status` decision, the change class the PO has already ruled
 needs the design-first treatment (MP-22/MP-23).
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Confirmed still open and unchanged; requires the PO's three-step determination named in the item's own Proposal (agent-reachability, cheapest local-expectation detection, or accepted permanent scope boundary) before any design or implementation work.
+- **Rationale:** The disclosed limitation (`design/bootstrap-origin-allowlist-and-codex-wsl-freshness.md:155-165`) and the withdrawn successor mechanism (`design/part-a-residuals-and-dispatch-template-drift.md` §III.1) are unchanged since this item was filed. No new tracking, PO ruling, or design work addressing limitation 2 was found.
+- **Assignment (if accepted):** None yet — awaiting PO input per the item's own Proposal.
+- **Date:** 2026-08-18
