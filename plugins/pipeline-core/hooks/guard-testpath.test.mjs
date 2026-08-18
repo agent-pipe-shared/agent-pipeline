@@ -213,6 +213,61 @@ check("TP09 real armed GMW window scoped to TP-1 lifts the matching Edit", "Edit
   })());
 closeGuardMaintenanceWindow({ rootDir: GMW_DIR });
 
+// ---- selectivity (backlog: 2026-08-07-maintenance-window-selectivity-is-untested-at-both-levels):
+// TP09 above only ever queries the ONE TP rule its own window names, so it cannot tell a
+// correctly-scoped lift from a window that (by regression) opened every protected test path.
+// This fixture configures TWO liftable TP rules, arms a real signed window scoped to TP-1
+// only, and drives an Edit matching TP-2 -- the structural analogue of GST20's kernel-path
+// negative, adapted to this hook: one window, two rules, only the named one opens.
+const GMW_SEL_DIR = mkdtempSync(join(tmpdir(), "guard-testpath-gmw-sel-"));
+mkdirSync(join(GMW_SEL_DIR, ".claude"), { recursive: true });
+mkdirSync(join(GMW_SEL_DIR, "project"), { recursive: true });
+writeFileSync(join(GMW_SEL_DIR, ".claude", "guard-config.json"), JSON.stringify({
+  protectedTestPaths: [
+    {
+      pattern: "plugins/pipeline-core/hooks/guard-git\\.test\\.mjs$",
+      reason: "The git-guard union test suite is the implementation contract for guard-git.mjs.",
+    },
+    {
+      pattern: "plugins/pipeline-core/hooks/guard-gate-strength\\.test\\.mjs$",
+      reason: "The gate-strength test suite is the implementation contract for guard-gate-strength.mjs.",
+    },
+  ],
+}));
+writeFileSync(join(GMW_SEL_DIR, "plan.md"), "plan\n");
+writeFileSync(join(GMW_SEL_DIR, "spec.md"), "spec\n");
+const gmwSelPair = generateKeyPairSync("ed25519");
+const gmwSelPublicKey = gmwSelPair.publicKey.export({ type: "spki", format: "pem" });
+const gmwSelPublicKeySha256 = createHash("sha256").update(gmwSelPublicKey).digest("hex");
+writeFileSync(join(GMW_SEL_DIR, "project", "critical-human-proof.json"), JSON.stringify({
+  schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["push"],
+  trustAnchor: { keyReference: "tp-sel-e2e", publicKeySha256: gmwSelPublicKeySha256 },
+}));
+execFileSync("git", ["init", "-q"], { cwd: GMW_SEL_DIR });
+execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: GMW_SEL_DIR });
+execFileSync("git", ["config", "user.name", "Test"], { cwd: GMW_SEL_DIR });
+execFileSync("git", ["add", "-A"], { cwd: GMW_SEL_DIR });
+execFileSync("git", ["commit", "-q", "-m", "gmw-sel-fixture"], { cwd: GMW_SEL_DIR });
+
+check("TP14 block  a real armed window scoped to TP-1 does NOT lift a different in-scope-file TP-2 rule", "Edit",
+  "D:/repo/plugins/pipeline-core/hooks/guard-gate-strength.test.mjs", BLOCK, (() => {
+    const livePluginRoot = livePluginRoots()[0];
+    const { intent, request } = prepareGuardMaintenanceWindowRequest({
+      rootDir: GMW_SEL_DIR, scopeRuleIds: ["TP-1"], ttlSeconds: 300, reason: "TP14",
+      featureId: "tp-sel-gmw-e2e", planSha256: createHash("sha256").update("plan\n").digest("hex"),
+      specSha256: createHash("sha256").update("spec\n").digest("hex"), policyRevision: "tp-sel-gmw-e2e-v1", livePluginRoot,
+    });
+    const proof = {
+      schema: PO_APPROVAL_PROOF_SCHEMA, intentSha256: intent.sha256, keyReference: "tp-sel-e2e", publicKey: gmwSelPublicKey,
+      signatureBase64: sign(null, Buffer.from(intent.sha256, "utf8"), gmwSelPair.privateKey).toString("base64"),
+    };
+    installGuardMaintenanceWindow({
+      rootDir: GMW_SEL_DIR, request, anchors: [{ keyReference: "tp-sel-e2e", publicKeySha256: gmwSelPublicKeySha256 }], proof, livePluginRoot,
+    });
+    return { projectDir: GMW_SEL_DIR, stderrIncludes: ["Rule ID: TP-2"], stderrExcludes: ["lifted"] };
+  })());
+closeGuardMaintenanceWindow({ rootDir: GMW_SEL_DIR });
+
 // ---- ADR-0059 Decision 4: every denial names the mode-appropriate next step -----------
 // None of TP01-TP09 above ever reads gates.push_approval or the override-guidance section
 // of a denial: their fixture paths all live under plugins/pipeline-core, where HGO
@@ -362,7 +417,7 @@ check(
 );
 
 // ---- Summary -----------------------------------------------------------------------------
-for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, MODE_CHAT_DIR, ROUTE_DIR]) {
+for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, CFG_ID_DIR, GMW_DIR, GMW_SEL_DIR, MODE_CHAT_DIR, ROUTE_DIR]) {
   try {
     rmSync(dir, { recursive: true, force: true });
   } catch {
