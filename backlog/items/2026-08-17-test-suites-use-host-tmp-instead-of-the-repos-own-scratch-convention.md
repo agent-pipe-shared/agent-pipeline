@@ -100,3 +100,16 @@ Not designed here. Candidates, explicitly not a commitment:
   the worked example; remaining suites tracked separately, not silently
   dropped.
 - **Date:** 2026-08-18
+
+
+### Dispatch attempt, 2026-08-18 (wave 1, dispatch NVA-W1-12) — already implemented
+
+Investigation found the entire briefed scope (shared scratch/test-tmp helper,
+verify.mjs budget check, migration of the two highest-offender suites)
+already implemented and committed as ancestors of this dispatch's own base
+commit. No implementation was performed; re-ran the relevant node test
+suites at base HEAD and all pass with no changes made. Re-verify the
+specific claim (which commit, which suites) before closing this item, since
+this dispatch's own report did not cite one -- but treat the underlying
+work as done pending that confirmation, not as still-open implementation
+work for a future wave.

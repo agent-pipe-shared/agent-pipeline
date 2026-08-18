@@ -143,3 +143,34 @@ day-one legacy-tier manifests should exist at all, and if not, retire the
 implementation plus a test run required, not attempted in this read-only
 triage pass.
 - **Date:** 2026-08-18
+
+### Dispatch attempt, 2026-08-18 (wave 1, dispatch NVA-W1-4) — stopped, premise already settled
+
+The dispatch stopped before any change: at its own base HEAD, commit
+`3764265a` ("test(pipeline-core): prove greenfield onboarding never reaches
+a mixed authority", landed 2026-08-18T14:53:23+02:00, ~4.5h after this
+item's "Dispatch confirmation" above) had already answered both steps of
+the Assignment. It enumerates every path a fresh onboarding writes under
+`.claude/` and classifies each per `project-authority.mjs:43-66`
+(`LEGACY_MANIFEST`/`LEGACY_CALIBRATION` are ADR-0054 category C, deliberate
+legacy-tier projection writers whose write-side move belongs to ADR-0054
+step 3, not step 1), and adds an end-to-end regression asserting
+`readProjectAuthority()` never resolves `"mixed"` even with both tiers
+populated day-one. Its own commit message states the conclusion explicitly:
+"the byte-identity invariant commit 7a99a18 added therefore protects
+something real and stays."
+
+**In plain terms:** `.claude/pipeline.yaml` is still written alongside
+`project/pipeline.yaml` on a fresh repository, by design — that has not
+changed and this dispatch did not change it. What's now proven (127/127
+tests, `node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs`)
+is that this dual-write never produces the `mixed` authority status the
+original report worried about; the resolver classifies it correctly. If a
+fresh onboarding is still observed to fail or misbehave around authority
+resolution, that is a DIFFERENT, not-yet-reproduced symptom — re-open with
+the exact new evidence rather than assuming this item covers it.
+
+Not closed here — leaving open one more cycle in case the live symptom
+that opened this item (PO's 2026-08-07 observation, calibration/manifest
+sourced from different tiers) still needs independent re-confirmation
+against current code before this is marked resolved.

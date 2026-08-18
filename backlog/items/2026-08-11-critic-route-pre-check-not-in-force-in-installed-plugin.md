@@ -87,3 +87,16 @@ dispatch. Two things would close it:
   urgent — not blocking current Nova/Phoenix work.
 - **Assignment (if accepted):** next available Alfred slot.
 - **Date:** 2026-08-17
+
+
+### Dispatch attempt, 2026-08-18 (wave 1, dispatch NVA-W1-1) — pulled forward by mistake, not implemented
+
+This item's own Triage above ("Decision: accepted, deferred to Sprint
+Alfred" / "Assignment: next available Alfred slot") was mistakenly included
+in a Sprint Nova wave-1 implementation batch. The dispatched Goldfish
+correctly caught the contradiction (this item is Alfred's, not Nova's) and
+stopped before touching anything -- no branch created, no files changed.
+This item's Alfred deferral stands unchanged; it should not be picked up
+again from a Nova session. Recorded here as a process note: the Elephant's
+own wave-composition step missed this item's sprint assignment during
+triage-of-triage vetting.
