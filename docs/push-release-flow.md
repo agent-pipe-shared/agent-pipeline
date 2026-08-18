@@ -140,8 +140,11 @@ path in every project, including a consumer's, never a sprint-specific one.
 If that file does not exist yet in the target project, create it first with:
 
 ```
-node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model --dir <repo>
+node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model
 ```
+
+Takes no flags — run it from the project directory (or with
+`CLAUDE_PROJECT_DIR` set); there is no `--dir` flag on this script.
 
 which copies the plugin's shipped template into place (refuses if the file
 already exists, since overwriting it would invalidate any push proof already
