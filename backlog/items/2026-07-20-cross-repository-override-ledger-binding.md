@@ -166,4 +166,32 @@ change to the override ledger's own binding semantics — the same class
 of change this session's own precedent (the GMW commit-tolerance fix)
 required a Critic review to close, per this repo's self-application rule.
 Critic review dispatched (`docs/adr/0059-signed-human-guard-override.md`,
-diff `f24e4881..1404eb28`) — not yet returned.
+diff `f24e4881..1404eb28`).
+
+### Critic review result, 2026-08-18 — FAIL, one major finding, real and confirmed
+
+**F1 (major, confirmed by direct code reading before dispatching a
+fix):** `crossRepositoryTargetRoot()`'s own header comment claims a
+symlinked target "still fails closed exactly as it would for any other
+`topology()` caller" — but the implementation does not resolve the
+symlink at all: `if (!info.isDirectory() || info.isSymbolicLink())
+probe = dirname(target)` substitutes the SYMLINK'S OWN CONTAINING
+DIRECTORY, not its resolved target, as the discovery probe. A real `git
+-C <target>` would follow the symlink (the OS `chdir` it drives
+resolves it); `dirname(target)` does not. If a symlinked
+cross-repository target's containing directory happens to sit inside a
+DIFFERENT valid git repository (plausibly the coordinator's own), the
+function silently returns that wrong-but-valid root — nothing fails
+closed, because a normal, safe directory was found. This reproduces,
+for symlinked targets specifically, the exact misbinding class this
+whole fix exists to close. No test in the diff exercises a symlinked
+target. Also noted, non-blocking: the only evidence supplied for the
+Trajectory check was prose in this file, not a machine-generated
+artifact (QG-03) — the next dispatch should produce one.
+
+**Not yet fixed.** Queued as `NVA-CROSSREPOLEDGER-2` (goldfish-deep):
+resolve the symlink to its real target (not `dirname`) before probing,
+add a regression test with a symlinked cross-repository target pointing
+at a genuinely distinct fixture repository, and produce a
+machine-written verify-output artifact under `evidence/` as this
+dispatch's Trajectory evidence.
