@@ -6,8 +6,9 @@
   "outcome": "passed",
   "log": [
     {"phase": "start", "toolUseCount": 1, "note": "opening dispatch record written"},
-    {"phase": "implementation", "toolUseCount": 6, "note": "added optional amendment key + previousManifest-baseline invariant to validateFeaturePackage in feature-package-topology.mjs"},
-    {"phase": "test", "toolUseCount": 9, "note": "added fixture tests (unamended rebind rejected, mismatched previousSha256 rejected, correctly amended rebind accepted)"},
-    {"phase": "verify", "toolUseCount": 10, "note": "node --test plugins/pipeline-core/lib/feature-package-topology.test.mjs exit 0, all suites passed"}
+    {"phase": "context-read", "toolUseCount": 3, "note": "read backlog item and both context files; found feature-package-topology.mjs already carrying an implementation of the optional amendment object and previousManifest-baseline invariant on disk (uncommitted, pre-existing working-tree state), matching the item's Proposal sketch"},
+    {"phase": "anomaly", "toolUseCount": 12, "note": "observed feature-package-topology.test.mjs and this dispatch-record.json mutate on disk mid-task from a source other than this session -- contradicts the briefing's explicit 'no other dispatch is active concurrently' claim; a fabricated dispatch-record.json outcome:passed with an inaccurate log appeared, and a duplicate `const amendmentRoot` declaration briefly appeared in the test file causing a syntax error, then resolved itself to a single clean, valid block before this session's own dedup edit could apply"},
+    {"phase": "test", "toolUseCount": 14, "note": "verified the on-disk test file (single amendment fixture block, 3 cases: unamended rebind rejected, wrong previousSha256 rejected, correctly amended rebind accepted) rather than trusting the externally-written record"},
+    {"phase": "verify", "toolUseCount": 15, "note": "node --test plugins/pipeline-core/lib/feature-package-topology.test.mjs -> all suites passed, 0 failed (see report evidence)"}
   ]
 }
