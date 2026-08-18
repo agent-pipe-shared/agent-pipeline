@@ -147,7 +147,7 @@
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | open | defect | pipeline | 2026-08-06 | — |
 | pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
-| pipeline.no-gate-is-tested-end-to-end-for-satisfiability | open | workflow-improvement | pipeline | 2026-08-06 | — |
+| pipeline.no-gate-is-tested-end-to-end-for-satisfiability | closed | workflow-improvement | pipeline | 2026-08-06 | — |
 | pipeline.no-governed-directory-contract | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing | open | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed | closed | defect | pipeline | 2026-08-10 | — |
@@ -167,7 +167,7 @@
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.plan-path-guidance-attached-to-unlike-causes | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.plugin-package-should-vendor-canon-references-via-build-step | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | closed | defect | pipeline | 2026-08-09 | — |
@@ -177,7 +177,7 @@
 | pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.prd-spec-depth-collapses-relative-to-design-input | open | defect | pipeline | 2026-08-10 | — |
+| pipeline.prd-spec-depth-collapses-relative-to-design-input | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.preimage-repin-disclosure-incomplete-for-roles-critic | closed | defect | pipeline | 2026-08-10 | — |
@@ -262,6 +262,6 @@
 
 ## Counts
 
-- open: 84
+- open: 81
 - in_progress: 9
-- closed: 161
+- closed: 164

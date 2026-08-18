@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0196dd23b0a151663982da8cb20c4f6adbad674d390011a45e507a5ce0520115"
+    "transitionHead": "a9ea21a9ac9475ee15e98f597198866e15f6c1023e76c03a78eb0fcba64d6372"
   },
   "counts": {
-    "open": 84,
+    "open": 81,
     "in_progress": 9,
-    "closed": 161
+    "closed": 164
   },
   "items": [
     {
@@ -1489,11 +1489,15 @@
     },
     {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
+      "source": "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "df670de3dd491160cf8c003ecdf2ee12b9669818",
+      "closureEvidence": "guardrails/quality-gates.md"
     },
     {
       "id": "pipeline.no-governed-directory-contract",
@@ -1706,11 +1710,15 @@
     },
     {
       "id": "pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing. One of three examples from that report; the other two were checked and found already fixed/admitted (see Triage)."
+      "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing. One of three examples from that report; the other two were checked and found already fixed/admitted (see Triage).",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "9fa8a025f500333e47856b4b5f5f705b6cc12fc2",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.plan-path-guidance-attached-to-unlike-causes",
@@ -1823,11 +1831,15 @@
     },
     {
       "id": "pipeline.prd-spec-depth-collapses-relative-to-design-input",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "PO live observation during two greenfield kickoff test sessions on 2026-08-10 (Claude Code test project `Rune-Test1-Claude-054-44`, and two Codex rollout sessions under `~/.codex/sessions/2026/08/10/`, both still in progress at the time this item was filed). The PO states this is not new: the same pattern has been visible across roughly the last 10 kickoff/planning tests and, separately, across effectively all Pipeline GitHub Issues to date (bound PRD/Spec consistently thinner than the Issue that originated the same scope of work)."
+      "source": "PO live observation during two greenfield kickoff test sessions on 2026-08-10 (Claude Code test project `Rune-Test1-Claude-054-44`, and two Codex rollout sessions under `~/.codex/sessions/2026/08/10/`, both still in progress at the time this item was filed). The PO states this is not new: the same pattern has been visible across roughly the last 10 kickoff/planning tests and, separately, across effectively all Pipeline GitHub Issues to date (bound PRD/Spec consistently thinner than the Issue that originated the same scope of work).",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "9094e8c452246d2dd585a5139ae1349fd9144a10",
+      "closureEvidence": "plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md"
     },
     {
       "id": "pipeline.pre-existing-failure-claims-need-evidence",
