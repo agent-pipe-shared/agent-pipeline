@@ -82,7 +82,26 @@ Candidates, explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Deferred in Phoenix, not implemented here. The rotation
+  mechanism this item asks for (ADR-0060 Decision 5, left deliberately
+  undecided) has already been decided and shipped — in the sibling Nova
+  checkout, not this one.
+- **Rationale:** The PO's standing instruction for this session was to skip
+  work already solved in Nova. Nova's `docs/adr/0060-handover-placement-and-
+  rotation.md` now states: "the rotation mechanism (Decision 5) is closed by
+  ADR-0066 ([...]), 2026-08-17"; Nova's `docs/adr/0066-handover-rotation-
+  extraction-archive-hard-size-gate.md` exists and records the chosen
+  mechanism (extraction + archive + hard size gate). Nova's `docs/state.md`
+  is 1700 lines — consistent with rotation actually running there — against
+  this repo's `docs/state.md` at over 18,800 lines and growing, i.e. exactly
+  the unbounded growth this item warns about, still happening here.
+  `docs/adr/0066*.md` does not exist in this checkout. Porting/adopting
+  ADR-0066 here would be exactly the duplicate work the standing instruction
+  asked to skip, and adopting a rotation ADR authored against a different
+  epic's `docs/state.md` without re-deriving it against Phoenix's own file is
+  not a mechanical port in any case.
+- **Assignment (if accepted):** Not assigned in Phoenix. Porting ADR-0066 (or
+  independently re-deriving the same mechanism against this repo's own
+  `docs/state.md`, which by then may be considerably larger) closes this
+  item; the file's own continued growth is a live cost of leaving it open.
+- **Date:** 2026-08-18
