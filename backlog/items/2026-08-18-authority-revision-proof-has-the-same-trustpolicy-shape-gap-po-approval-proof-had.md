@@ -50,5 +50,5 @@ signature and keys were entirely valid — not a merely theoretical gap.
 - **Assignment:** implemented this dispatch (task `PHX-WP-ARPROOF-HUMANNAME`);
   owner `pipeline`.
 - **Date:** 2026-08-18
-- **Closure commit:** see the closing commit of task `PHX-WP-ARPROOF-HUMANNAME`
-  in this repository's history (SHA recorded there).
+- **Closure commit:** `a3d3f345`
+  (`fix(phoenix): accept the 3-key trustPolicy shape in authority-revision-proof verification`).
