@@ -88,3 +88,41 @@ Rule IDs: `QG-xx`.
 - The repro test **MUST** stay permanently in the suite after the fix goes green — it is the regression guard for exactly this bug, not a scratch artifact to delete once the fix lands.
 - **Why:** This was the largest substantive gap identified by an external review (Google, Whitepaper „Day 5") — no rule covered bugfix discipline at all. A fix without a preceding red repro cannot prove it fixed the reported failure rather than something adjacent; "fix + drive-by cleanup" in one commit is a scope-creep vector wearing a bugfix disguise, and QG-04's test-role separation only protects tests an implementor did not write in the first place.
 - **Verification:** Bugfix completion reports name the repro command/test and its pre-fix red result; the diff's test file shows the repro test present and green post-fix; a bugfix commit containing unrelated renames or cleanup is a QG-07 violation to flag in Critic review.
+
+## QG-08 — No commit while a Verify run is in flight
+
+- **MUST NOT** create a commit (handover, docs, code, anything) while a background/foreground `verify.mjs` run against the same working tree is still in progress. Verify requires one clean, unchanged Git candidate from start through evidence write (`VERIFY-CANDIDATE-DRIFT`); a mid-run commit invalidates that run and forces a re-run, even when the commit itself was unrelated to the diff under test.
+- **Why:** this exact self-inflicted pattern (a docs/state.md update, a benchmark file, a backlog item — landing while Verify was still running) cost a full re-run multiple times in the same Nova sprint block before being named as a standing rule; the guard already fails the run closed (`VERIFY-CANDIDATE-DRIFT`, `harness/scripts/verify.mjs`), but the cost is a wasted run, not a silent miss — writing the rule down front-loads that cost to "wait for the run to finish" instead of "re-run after the failure."
+- **Verification:** `VERIFY-CANDIDATE-DRIFT` in `harness/scripts/verify.mjs` is the mechanical backstop; this entry is the proactive form of the same rule for session/close discipline.
+
+## QG-09 — No unproven "cannot happen" claims
+
+- **MUST NOT** write "X cannot happen because Y" — in code, comments, or the handover/decision register — without a test or a measured probe behind it. Absent that evidence, state it as an open question instead of an assertion.
+- **Why:** named as a standing rule after a Critic round found three of five findings shared one root cause — the author reasoned about what the code should do instead of measuring what it does, then wrote the conclusion into a comment or the register. QG-07's reproduce-before-you-fix discipline would have caught the same class if followed; this rule closes the adjacent gap where no bug was being fixed yet, only a claim being written.
+- **Verification:** Critic review flags an unverified "cannot happen"/"X is impossible" assertion as a finding; the fix is either a test/probe demonstrating it, or a rewritten statement phrased as an open question.
+
+## QG-10 — Severity belongs to the check that produces a finding, not the gate that consumes it
+
+- A check **MUST** exit non-zero only for findings that genuinely block; an unfixable historical fact (e.g. a past commit's non-conforming shape that cannot be rewritten under GIT-04) **MUST** be reported, not made blocking. The push gate (`GG-03`, `authorizeRecordedPush`) stays exactly as strict as today — demanding `exitCode === 0` from `harness/scripts/verify.mjs` before an approval is recorded — because that demand is correct once each check classifies its own findings honestly.
+- **MUST NOT** widen the push gate itself to interpret or tolerate partial check failures; the rejected alternative was teaching the gate to distinguish blocking from non-blocking findings post hoc. Classification happens once, at the source (the check), not twice.
+- **Why:** A gate that has to second-guess a check's exit code duplicates the check's own judgment in a second place — the exact "two truths" failure QG-02 names for diverging check chains, applied to severity instead of command identity.
+- **Verification:** `node harness/scripts/verify.mjs` exits 0 iff no check reports a genuinely blocking finding; a check's own report/log distinguishes blocking findings from reported-but-non-blocking ones in its own output, not in the gate's interpretation of that output.
+
+## QG-11 — Test what the change altered, not only what it was meant to fix
+
+- A bugfix's or feature change's own regression tests **MUST** cover the code paths the diff actually touched, not only the originally reported symptom; a test that re-checks solely the intended repair does not prove the altered surface is otherwise safe.
+- **Why:** a heredoc-stripping fix to the push gate shipped tests covering the intended repair (allow a commit message mentioning the phrase) but not the altered surface (a command placed after the terminator) — the change made the gate fail-open, its own tests were green throughout, and an independent Critic caught the regression, not Verify (`backlog/items/2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md`).
+- **Verification:** Critic review checks that a change's added/modified tests exercise the diff's changed branches and surfaces, not solely the reported symptom; a diff that alters conditional logic without a test for the new or changed branch is a QG-11 finding.
+
+## QG-12 — A new `docs/**` file needs a matching governance registry entry
+
+- Any commit that adds a new file under `docs/**` **MUST** also add a matching entry to `governance/observation-doc-governance.json`'s documentation inventory; `check-observation-governance.mjs` refuses an unregistered new doc with `OG-DOC-UNCLASSIFIED`.
+- **Why:** a new `docs/**` file (e.g. an ADR, a handover-rotation archive file) that skips this registration step fails the gate mechanically, and the lesson was previously captured only in a personal AI cross-session memory file rather than any repo-committed artifact — a gap this session hit twice independently before it was named here (`backlog/items/2026-08-18-new-docs-file-needs-governance-registry-rule-has-no-repo-level-home.md`).
+- **Verification:** `check-observation-governance.mjs` (run via `harness/scripts/verify.mjs`) exits non-zero with `OG-DOC-UNCLASSIFIED` for any `docs/**` file present in the tree but absent from the registry.
+
+## QG-13 — Critic review round cap: one initial round, one re-review round
+
+- After the initial Critic round for a package, at most **one** re-review round follows a FAIL/blocking-finding rework: the Elephant dispatches the rework, then re-dispatches a fresh Critic exactly once against the reworked diff. If that re-review round ALSO reports a blocking finding, the Elephant **MUST NOT** dispatch a third Critic round for that package — it self-verifies the further rework directly instead.
+- **MUST NOT** reset the cap by re-labeling continued rework on the same underlying finding as a "new" package or task; only a genuine scope change (a materially different diff, a newly discovered A/G/S touch, or explicit PO direction) licenses a fresh initial round.
+- **Why:** this session's own handover history (`docs/state.md`) recorded two mutually inconsistent values in circulation within the same reviewed range — a "two-round cap" and a later, seemingly PO-confirmed "one Critic round per package, then self-verify" — with the rule itself codified nowhere in a repo-committed artifact (`backlog/items/2026-08-18-critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate.md`). PO decision 2026-08-18 (decision #5) resolved this as "1 initial Critic round + 1 re-review round" (two Critic dispatches total per package before self-verify takes over), written down once so exactly one number circulates repo-wide.
+- **Verification:** a completion/handover record showing more than two same-package Critic dispatches (initial + one re-review) without a documented scope-change justification is a QG-13 violation to flag in Critic/retro review; the Elephant's own report or state entry states which round — initial or re-review — a given Critic verdict belongs to.
