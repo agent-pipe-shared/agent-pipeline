@@ -557,6 +557,7 @@ const TEST_SUITES = [
   { name: "guard-authority-ledger-intake-tests", file: join(libDir, "guard-authority-ledger-intake.test.mjs") },
   { name: "guard-handoff-offer-tests", file: join(libDir, "guard-handoff-offer.test.mjs") },
   { name: "pipeline-state-lifecycle-event-tests", file: join(pluginScriptsDir, "pipeline-state-lifecycle-event.test.mjs") },
+  { name: "epic-file-contract-tests", file: join(scriptDir, "check-epic-file-contract.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at

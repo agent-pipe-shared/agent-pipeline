@@ -1,0 +1,15 @@
+{
+  "taskId": "PHX-WP-EPIC-FILE-CONTRACT",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "log": [
+    { "phase": "start", "toolUseCount": 3, "note": "Confirmed both target files exist uncommitted on disk. Beginning verification of soundness before commit." },
+    { "phase": "verify-test-suite", "toolUseCount": 9, "note": "node --test check-epic-file-contract.test.mjs: 16/16 pass, exit 0." },
+    { "phase": "verify-real-tree", "toolUseCount": 10, "note": "node check-epic-file-contract.mjs against real repo tree: exit 2, exactly 7 expected MISSING-FILE findings matching briefing (pre-existing spec drift, not a defect)." },
+    { "phase": "gmw-status-check", "toolUseCount": 11, "note": "guard-maintenance-window.mjs status: active, scopeRuleIds includes TP-3. Proceeding with verify.mjs registration." },
+    { "phase": "verify-mjs-registration", "toolUseCount": 15, "note": "Neighboring entries check-adr-consistency.test.mjs and check-skill-spec-coverage.test.mjs named in briefing are NOT actually present in verify.mjs TEST_SUITES (confirmed via grep, zero matches) -- briefing/repo discrepancy, noted as deviation. Used the general, well-established shape ({ name, file: join(scriptDir, ...) }) shared by dozens of other scriptDir-based -tests-only entries (e.g. observation-governance-tests) instead. Registered only the test suite entry (epic-file-contract-tests), not a check-execution entry, since running the check script itself against the real tree exits 2 by design and would break verify." },
+    { "phase": "reverify-standalone", "toolUseCount": 16, "note": "node --test check-epic-file-contract.test.mjs still passes standalone (16/16) after verify.mjs edit." }
+  ]
+}
