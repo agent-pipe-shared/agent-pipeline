@@ -21,7 +21,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
-import { externalPathIsOutsideRoot, run } from "./pipeline-state.mjs";
+import { SCHEMA_ID, externalPathIsOutsideRoot, run, statePath } from "./pipeline-state.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -360,6 +360,138 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   assert.equal(externalPathIsOutsideRoot("/repo", "/other/key.json", "linux"), true);
   assert.equal(externalPathIsOutsideRoot("/repo", "/repo/sub/key.json", "linux"), false);
   assert.equal(externalPathIsOutsideRoot("/repo", "/repo", "linux"), false);
+}
+
+// NVA-W4-2B. po-authority-acknowledge-plan/apply: an atomic route that inserts
+// PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER into an already-bound PRD without
+// releasing continuity's binding to it (no reopen-design/submit-plan/
+// approve-plan round trip), mirroring po-authority-rebind-plan/apply's own
+// transactional shape -- see the block comment above
+// buildPoAuthorityAcknowledgePlan in pipeline-state.mjs. Fixture shape mirrors
+// pipeline-state-rebind-runner.test.mjs's own seedPoAuthorityRebind-mirroring
+// fixture (a state/continuity pair already bound to a PRD/spec pair), adapted
+// for the pre-plan-approval state (planApproved: false) the acknowledgement
+// marker belongs in, and mocking `poGateAuthority`/`v4Inspection` for the same
+// reason that file does: the in-transaction postimage readback would otherwise
+// need a fully onboarded project tree this fixture does not build.
+function sha256Hex(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
+function acknowledgeFixture(name, { prdText } = {}) {
+  const root = mktempProjectDir();
+  mkdirSync(join(root, "specs", "ack-feature"), { recursive: true });
+  mkdirSync(join(root, "project"), { recursive: true });
+  const planPath = "specs/ack-feature/prd_ack-feature.md";
+  const specPath = "specs/ack-feature/spec.md";
+  writeFileSync(join(root, specPath), "# Technical Spec\nSome content.\n");
+  const specSha = sha256Hex(readFileSync(join(root, specPath)));
+  writeFileSync(join(root, planPath), prdText ?? "# PRD\nSome content.\n");
+  const planSha = sha256Hex(readFileSync(join(root, planPath)));
+  const profile = {
+    schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en",
+    sourceSha256: "1".repeat(64), runtimeSha256: "2".repeat(64),
+    receiptSha256: "3".repeat(64), repositoryFingerprint: "4".repeat(64),
+  };
+  const continuity = {
+    schema: "pipeline.continuity.v0", featureId: "ack-feature", revision: 2,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+    authority: { prd: { path: planPath, sha256: planSha }, spec: { path: specPath, sha256: specSha }, result: null },
+    queueHead: { packageId: "ack", actionId: "review", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  };
+  const state = {
+    schema: SCHEMA_ID, activeFeature: { id: "ack-feature", planPath, phase: "design" }, planApproved: false,
+    continuity, updatedAt: "2026-08-18T10:00:00.000Z",
+  };
+  writeFileSync(statePath(root), JSON.stringify(state, null, 2) + "\n");
+  const deps = {
+    dir: root, now: () => "2026-08-18T10:05:00.000Z",
+    poGateProfile: () => ({ ok: true, value: profile }),
+    poGateAuthority: ({ expectedPlanSha256, expectedSpecSha256 }) => ({
+      ok: true,
+      value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: expectedSpecSha256 },
+    }),
+    v4Inspection: () => ({ status: "ready" }),
+  };
+  return { root, deps, planPath, specPath, planSha, specSha };
+}
+
+function invokeCaptured(argv, deps) {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const out = []; const err = [];
+  console.log = (...args) => { out.push(args.join(" ")); };
+  console.error = (...args) => { err.push(args.join(" ")); };
+  try {
+    return { status: run(argv, deps), out: out.join("\n"), err: err.join("\n") };
+  } finally {
+    console.log = originalLog; console.error = originalError;
+  }
+}
+
+// Happy path: plan then apply inserts the marker as a new trailing PRD line,
+// bumps continuity.revision, and rebinds continuity.authority.prd.sha256 to
+// the new bytes -- without ever releasing the binding.
+{
+  const { root, deps, planPath } = acknowledgeFixture("happy");
+  const planned = invokeCaptured(["po-authority-acknowledge-plan"], deps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  assert.equal(plan.schema, "pipeline.po-authority-acknowledge-plan.v1");
+  const applied = invokeCaptured(plan.applyAction.argv.slice(1), deps);
+  assert.equal(applied.status, 0, applied.err);
+  const prdAfter = readFileSync(join(root, planPath), "utf8");
+  assert.match(prdAfter, /<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->/u,
+    "the apply must insert the sanctioned marker line");
+  const stateAfter = JSON.parse(readFileSync(statePath(root), "utf8"));
+  assert.equal(stateAfter.continuity.revision, 3, "the apply must bump continuity.revision");
+  assert.equal(stateAfter.continuity.authority.prd.sha256, sha256Hex(Buffer.from(prdAfter, "utf8")),
+    "the apply must rebind continuity.authority.prd.sha256 to the marker-carrying bytes");
+
+  // Re-running the plan against the now-acknowledged PRD must refuse: the
+  // marker is already present, and the route is one-shot per PRD.
+  const rePlanned = invokeCaptured(["po-authority-acknowledge-plan"], deps);
+  assert.equal(rePlanned.status, 2);
+  assert.ok(rePlanned.err.includes("PO-ACK-ALREADY-ACKNOWLEDGED"), rePlanned.err);
+}
+
+// Rejection: already acknowledged. Plan must refuse without mutating anything
+// when the marker is already present exactly once.
+{
+  const { root, deps, planPath } = acknowledgeFixture("already-acknowledged", {
+    prdText: "# PRD\nSome content.\n\n<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->\n",
+  });
+  const before = readFileSync(join(root, planPath), "utf8");
+  const beforeState = readFileSync(statePath(root), "utf8");
+  const refused = invokeCaptured(["po-authority-acknowledge-plan"], deps);
+  assert.equal(refused.status, 2);
+  assert.ok(refused.err.includes("PO-ACK-ALREADY-ACKNOWLEDGED"), refused.err);
+  assert.equal(readFileSync(join(root, planPath), "utf8"), before, "an already-acknowledged PRD must be byte-for-byte untouched");
+  assert.equal(readFileSync(statePath(root), "utf8"), beforeState, "an already-acknowledged plan refusal must not touch State either");
+}
+
+// Rejection: digest mismatch. A stale --plan-sha256 (the PRD/State moved on,
+// or was simply mistyped) must refuse with zero mutation, exactly like the
+// sibling rebind/decision routes it shares runPoAuthorityRebindApply with.
+{
+  const { root, deps, planPath } = acknowledgeFixture("digest-mismatch");
+  const planned = invokeCaptured(["po-authority-acknowledge-plan"], deps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  const realArgv = plan.applyAction.argv.slice(1);
+  const shaIndex = realArgv.indexOf("--plan-sha256") + 1;
+  const wrongSha = realArgv[shaIndex] === "f".repeat(64) ? "e".repeat(64) : "f".repeat(64);
+  const staleArgv = [...realArgv];
+  staleArgv[shaIndex] = wrongSha;
+  const before = readFileSync(join(root, planPath), "utf8");
+  const beforeState = readFileSync(statePath(root), "utf8");
+  const rejected = invokeCaptured(staleArgv, deps);
+  assert.equal(rejected.status, 2);
+  assert.ok(rejected.err.toLowerCase().includes("stale"), rejected.err);
+  assert.equal(readFileSync(join(root, planPath), "utf8"), before, "a stale-digest apply must leave the PRD untouched");
+  assert.equal(readFileSync(statePath(root), "utf8"), beforeState, "a stale-digest apply must leave State untouched");
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");

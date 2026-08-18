@@ -168,7 +168,11 @@ const ACKNOWLEDGEMENT_REPAIR = "The active PRD does not carry the PO's plan ackn
   + " If this PRD has not been bound by a kickoff promotion, the PO adds that single line to the PRD once satisfied."
   + " If a kickoff promotion has already bound this PRD, do not add that line in place: the promotion already bound"
   + " these exact bytes, and an in-place edit only breaks that binding without making this check pass;"
-  + " there is no sanctioned way to add the marker to an already-bound PRD today;"
+  + " instead use the sanctioned acknowledge route rather than editing the marker by hand:"
+  + " run the pipeline-core script pipeline-state.mjs po-authority-acknowledge-plan, then pipeline-state.mjs"
+  + " po-authority-acknowledge-apply --plan-sha256 <sha256> --updated-at <ISO-8601> --activate with the digest"
+  + " and timestamp that plan reports; it records the PO's acknowledgement without editing the PRD in place,"
+  + " and an agent must never run it without that PO review having actually happened."
   + " do not change activeFeature.planPath, which is not what is wrong here.";
 // A PRD whose bytes are not decodable UTF-8 never reaches any marker check. The
 // defect is the encoding of one file; no path, directory or PRD count is

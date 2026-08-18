@@ -304,6 +304,8 @@ import {
   validateCourseDecisionReceipt,
 } from "../lib/review-economy.mjs";
 import {
+  PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
+  PRD_ACKNOWLEDGEMENT_MARKER,
   validatePoGateAuthorityForRepository,
   validatePoGateProfileForRepository,
 } from "../lib/po-gate-authority.mjs";
@@ -437,6 +439,7 @@ const PIPELINE_STATE_COMMANDS = Object.freeze([
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
   "consume-deploy", "clear-deploy", "po-authority-rebind-plan", "po-authority-rebind-apply",
+  "po-authority-acknowledge-plan", "po-authority-acknowledge-apply",
   "po-authority-decision-plan", "po-authority-decision-select", "po-authority-decision-apply",
   "continuity-init", "continuity-cas", "continuity-apply-native", "continuity-integrate-final",
   "continuity-record-course-brief", "continuity-select-course", "continuity-apply-decision",
@@ -3894,6 +3897,8 @@ function runResultCloseCommand(sub, rest, deps) {
 // ---- AC-047-28: deliberately narrow stale PRD-marker / PO authority rebind ----
 
 const PO_REBIND_PLAN_SCHEMA = "pipeline.po-authority-rebind-plan.v1";
+const PO_ACK_PLAN_SCHEMA = "pipeline.po-authority-acknowledge-plan.v1";
+const PO_ACK_APPLY_SCHEMA = "pipeline.po-authority-acknowledge-apply.v1";
 const PO_DECISION_PLAN_SCHEMA = "pipeline.po-authority-decision-plan.v1";
 const PO_DECISION_SELECTION_SCHEMA = "pipeline.po-authority-selection.v1";
 const PO_REBIND_LOCK_TOKEN = "pipeline-po-authority-rebind-v1";
@@ -4460,6 +4465,169 @@ function resolvePoRebindRunner(explicitRunner, env) {
   return explicitRunner ?? (env.CLAUDECODE === "1" ? "claude" : "codex");
 }
 
+// ---- NVA-W4-2B: atomic PO-plan-acknowledgement without PRD mutation ----
+//
+// A kickoff promotion binds the PRD's bytes (continuity.authority.prd) before
+// submit-plan is ever reached; guard-lifecycle-ready.mjs's
+// protectedAuthorityDocumentWriteOnly() then refuses any direct edit to that
+// bound file. If the PRD never carried PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER
+// before it was bound (onboarding-continuity.mjs's promotionArtifacts() now
+// refuses a NEW promotion in that state, but a PRD promoted before that check
+// existed, or bound by any other route, has no way back), the PO plan gate's
+// requireAcknowledgement precondition can never be satisfied and the feature
+// is stuck. This gives that PRD the same shape of sanctioned, transactional,
+// lock-and-journal-protected route the Spec-drift rebind above already has --
+// deliberately built ON that machinery (physicalRebindFile, writeRebindFile,
+// publishRebindTransaction/recoverRebindTransaction/clearRebindTransaction,
+// PO_REBIND_LOCK_TOKEN, rebindTransactionPath, runPoAuthorityRebindApply), never
+// a second copy of it. The marker itself carries no computed value (ADR-0061
+// Decision 3), so unlike the Spec digest there is nothing to REPLACE -- this
+// only ever INSERTS the one sanctioned literal line, once. Deliberately does
+// NOT merge with approve-plan or touch activeFeature.phase/planApproval: this
+// stays a narrow, additive fix for exactly the acknowledgement marker, mirroring
+// the rebind/decision family's own "one concern per route" shape. Deliberately
+// carries no --by flag either, matching rebind-apply/decision-apply's own
+// precedent exactly (neither has one): the actual PO-authorship signal is the
+// marker TEXT itself, which per ADR-0061/ACKNOWLEDGEMENT_REPAIR can only ever
+// have been added by the PO out of band, never by an agent on their behalf --
+// unchanged by this route, which only makes an already-PO-authored marker
+// bindable into continuity despite the file being frozen.
+function eligibleAcknowledgeContinuity(state, prd, spec) {
+  const continuity = state?.continuity;
+  if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
+    || continuity.authority.prd.path !== prd.path || continuity.authority.spec.path !== spec.path
+    || continuity.authority.prd.sha256 !== prd.sha256 || continuity.authority.spec.sha256 !== spec.sha256
+    || continuity.queueHead?.dispatch !== null || continuity.blocker !== null
+    || continuity.decisionTxn !== null || continuity.closeTransition != null
+    || continuity.revision === Number.MAX_SAFE_INTEGER) return null;
+  return continuity;
+}
+
+/**
+ * Appends PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER as its own trailing line. Returns
+ * null on non-UTF-8 bytes or when the marker is already present -- the caller
+ * must already have refused that case, but insertion stays defensive rather
+ * than ever risking a silent duplicate.
+ */
+function appendAcknowledgementMarker(prdBytes) {
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true }).decode(prdBytes); } catch { return null; }
+  if ([...text.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length !== 0) return null;
+  const trimmed = text.replace(/\n+$/u, "");
+  const separator = trimmed.length === 0 ? "" : "\n\n";
+  const nextBytes = Buffer.from(`${trimmed}${separator}${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`, "utf8");
+  let confirm;
+  try { confirm = new TextDecoder("utf-8", { fatal: true }).decode(nextBytes); } catch { return null; }
+  return [...confirm.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length === 1 ? nextBytes : null;
+}
+
+function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.now?.() ?? new Date().toISOString()) {
+  if (existing.status !== "ok" || !existing.state) return { ok: false, code: "PO-ACK-STATE" };
+  const state = existing.state;
+  if (state.schema !== SCHEMA_ID || !state.activeFeature || typeof state.activeFeature.planPath !== "string"
+    || state.planApproved === true || state.planSubmission != null) return { ok: false, code: "PO-ACK-STATE" };
+  const prd = physicalRebindFile(dir, state.activeFeature.planPath);
+  if (prd === null) return { ok: false, code: "PO-ACK-PRD-IDENTITY" };
+  const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
+  if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "PO-ACK-STATE-IDENTITY" };
+  const specPath = `${dirname(state.activeFeature.planPath).split(sep).join("/")}/spec.md`;
+  const spec = physicalRebindFile(dir, specPath);
+  if (spec === null) return { ok: false, code: "PO-ACK-SPEC-IDENTITY" };
+  let prdText;
+  try { prdText = new TextDecoder("utf-8", { fatal: true }).decode(prd.bytes); } catch { return { ok: false, code: "PO-ACK-PRD-MARKER" }; }
+  const acknowledgementMarkers = [...prdText.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
+  if (acknowledgementMarkers.length > 1) return { ok: false, code: "PO-ACK-MARKER-DUPLICATE" };
+  if (acknowledgementMarkers.length === 1) return { ok: false, code: "PO-ACK-ALREADY-ACKNOWLEDGED" };
+  const continuity = eligibleAcknowledgeContinuity(state, prd, spec);
+  if (continuity === null) return { ok: false, code: "PO-ACK-CONTINUITY" };
+  const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
+  const currentProfile = validCurrentPoProfile(profile);
+  if (currentProfile === null) return { ok: false, code: "PO-ACK-PROFILE" };
+  const nextPrdBytes = appendAcknowledgementMarker(prd.bytes);
+  if (nextPrdBytes === null) return { ok: false, code: "PO-ACK-PRD-MARKER" };
+  const nextPrdSha256 = sha256Bytes(nextPrdBytes);
+  const nextAuthority = {
+    schema: "pipeline.po-gate-authority.v2",
+    humanFacing: currentProfile.humanFacing,
+    sourceSha256: currentProfile.sourceSha256,
+    runtimeSha256: currentProfile.runtimeSha256,
+    receiptSha256: currentProfile.receiptSha256,
+    repositoryFingerprint: currentProfile.repositoryFingerprint,
+    planPath: prd.path,
+    planSha256: nextPrdSha256,
+    specPath: spec.path,
+    specSha256: spec.sha256,
+  };
+  if (!canonicalIso(plannedAt)) return { ok: false, code: "PO-ACK-TIMESTAMP" };
+  const nextContinuity = structuredClone(continuity);
+  nextContinuity.revision += 1;
+  nextContinuity.authority.prd.sha256 = nextPrdSha256;
+  if (!validateContinuityState(nextContinuity, state.activeFeature.id).ok) return { ok: false, code: "PO-ACK-CONTINUITY" };
+  const nextState = structuredClone(state);
+  nextState.continuity = nextContinuity;
+  nextState.updatedAt = plannedAt;
+  if (nextState.gateEstimate !== undefined) return { ok: false, code: "PO-ACK-STATE" };
+  const payload = {
+    schema: PO_ACK_PLAN_SCHEMA,
+    root: realpathSync(resolve(dir)),
+    plannedAt,
+    preimage: {
+      state: { sha256: sha256Bytes(existing.raw), identity: stateFile.identity, updatedAt: state.updatedAt ?? null, continuityRevision: continuity.revision },
+      prd: { path: prd.path, sha256: prd.sha256, identity: prd.identity },
+      spec: { path: spec.path, sha256: spec.sha256, identity: spec.identity },
+      continuityAuthority: continuity.authority,
+    },
+    postimage: {
+      prd: { path: prd.path, sha256: nextPrdSha256 },
+      state: { sha256: sha256Bytes(JSON.stringify(nextState, null, 2) + "\n"), updatedAt: nextState.updatedAt, continuityRevision: nextContinuity.revision },
+      poGateAuthority: nextAuthority,
+      continuityAuthority: nextContinuity.authority,
+    },
+    assurance: { regularFilesOnly: true, linksRejected: true },
+  };
+  return { ok: true, payload, planSha256: sha256CanonicalJson(payload), nextPrdBytes, nextState };
+}
+
+function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
+  if (sub === "po-authority-acknowledge-plan" && rest.length !== 0) { console.error("Error: PO authority acknowledge plan takes no arguments."); return 2; }
+  const apply = sub === "po-authority-acknowledge-apply" ? parsePoRebindApply(rest) : null;
+  if (sub === "po-authority-acknowledge-apply" && apply === null) { console.error("Error: PO authority acknowledge apply requires --plan-sha256 <sha256> --updated-at <ISO-8601> --activate [--runner claude|codex]."); return 2; }
+  if (sub === "po-authority-acknowledge-plan" && existsSync(rebindTransactionPath(deps.dir))) {
+    console.error("Error: PO authority acknowledge recovery is pending; replay the exact previously confirmed apply action.");
+    return 2;
+  }
+  if (sub === "po-authority-acknowledge-apply") {
+    const runner = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
+    const lock = acquireContinuityLock(deps.dir, PO_REBIND_LOCK_TOKEN, deps);
+    if (!lock.ok) { console.error(`Error: PO authority acknowledge refused (${lock.code}); zero mutation.`); return 2; }
+    try {
+      const io = { replace: deps.replaceRebindPrdFdContents ?? ((fd, bytes) => { ftruncateSync(fd, 0); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset); fsyncSync(fd); }), rename: deps.renameRebindPrd ?? renameSync, sync: deps.syncRebindDirectory ?? syncDirectory };
+      const stateIo = { replace: deps.replaceRebindStateFdContents ?? io.replace, rename: deps.renameRebindState ?? renameSync, sync: deps.syncRebindDirectory ?? syncDirectory };
+      const recovered = recoverRebindTransaction(deps.dir, apply.planSha256, lock.ownerNonce, io, stateIo);
+      if (!recovered.ok) { console.error(`Error: PO authority acknowledge recovery refused (${recovered.code}); zero new mutation.`); return 2; }
+      if (recovered.kind === "rolled-back") { console.error("Error: PO authority acknowledge recovered its interrupted transaction; regenerate and confirm a new plan."); return 2; }
+      return runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
+        buildPlan: buildPoAuthorityAcknowledgePlan,
+        resultSchema: PO_ACK_APPLY_SCHEMA,
+        resultCode: "PO-ACK-APPLIED",
+        runner,
+      });
+    } finally { releaseContinuityLock(lock); }
+  }
+  const existing = readStateRaw(deps.dir);
+  const planned = buildPoAuthorityAcknowledgePlan(deps.dir, deps, existing, apply?.plannedAt);
+  if (!planned.ok) {
+    console.error(`Error: PO authority acknowledge refused (${planned.code}); zero mutation.`);
+    return 2;
+  }
+  console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: {
+    executable: process.execPath,
+    argv: [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--activate"],
+    mutation: true, requiresConfirmation: true, requiresHostBoundary: true,
+  } }, null, 2));
+  return 0;
+}
+
 function runPoAuthorityRebindCommand(sub, rest, deps) {
   if (sub === "po-authority-rebind-plan" && rest.length !== 0) { console.error("Error: PO authority rebind plan takes no arguments."); return 2; }
   const apply = sub === "po-authority-rebind-apply" ? parsePoRebindApply(rest) : null;
@@ -4822,6 +4990,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
   if (sub === "po-authority-rebind-plan" || sub === "po-authority-rebind-apply") {
     return runPoAuthorityRebindCommand(sub, rest, {
+      ...deps,
+      dir,
+      now,
+      poGateAuthority,
+      poGateProfile: deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)),
+    });
+  }
+  if (sub === "po-authority-acknowledge-plan" || sub === "po-authority-acknowledge-apply") {
+    return runPoAuthorityAcknowledgeCommand(sub, rest, {
       ...deps,
       dir,
       now,

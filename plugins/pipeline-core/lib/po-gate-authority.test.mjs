@@ -1397,6 +1397,38 @@ check("the Spec guidance names a rebind route pipeline-state actually provides",
   });
 });
 
+// NVA-W4-2B: the absent-acknowledgement-marker guidance (ACKNOWLEDGEMENT_REPAIR)
+// now names a sanctioned acknowledge route for an already-bound PRD -- mirror of
+// the immediately preceding check for the Spec-marker rebind route, same
+// contract: the writer's own command list is the source of truth for the
+// subcommand names, and its own usage line is the source of truth for the flag
+// forms, so the guidance text cannot silently drift from what pipeline-state.mjs
+// actually accepts.
+check("the acknowledgement guidance names an acknowledge route pipeline-state actually provides", () => {
+  const guidance = withFixture({}, ({ primary, validate }) => {
+    write(join(primary, "specs", "feature", "prd_feature.md"), `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${TECHNICAL_SPEC_MARKER(sha256(spec()))}\n# PRD\n`);
+    return validate({ expectedPlanSha256: "a".repeat(64), expectedSpecSha256: "b".repeat(64) }).repair;
+  });
+  withFixture({}, ({ primary }) => {
+    // The writer's own command list is the contract for the subcommand names ...
+    const allowed = captureStderr(() => {
+      assert.equal(runPipelineState(["po-authority-acknowledge-plan-typo"], { dir: primary, now: () => NOW }), 2);
+    });
+    for (const subcommand of ["po-authority-acknowledge-plan", "po-authority-acknowledge-apply"]) {
+      assert.ok(allowed.includes(subcommand), `${subcommand} is not an allowed command: ${allowed}`);
+      assert.ok(guidance.includes(`pipeline-state.mjs ${subcommand}`), `${subcommand} is not in the guidance: ${guidance}`);
+    }
+    // ... and its own usage line is the contract for the flag forms.
+    const usage = captureStderr(() => {
+      assert.equal(runPipelineState(["po-authority-acknowledge-apply"], { dir: primary, now: () => NOW }), 2);
+    });
+    for (const token of ["--plan-sha256 <sha256>", "--updated-at <ISO-8601>", "--activate"]) {
+      assert.ok(usage.includes(token), `${token} is not in the writer usage: ${usage}`);
+      assert.ok(guidance.includes(token), `${token} is not in the guidance: ${guidance}`);
+    }
+  });
+});
+
 check("a non-UTF-8 PRD is signposted to the file's encoding, not to plan-path repair", () => {
   withFixture({}, ({ primary, validate }) => {
     write(join(primary, "specs", "feature", "prd_feature.md"), Buffer.from([0xff, 0xfe]));
