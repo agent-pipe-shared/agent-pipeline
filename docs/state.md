@@ -3,7 +3,40 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-18 (checkpoint 38)
+**Last updated:** 2026-08-18 (checkpoint 39)
+
+---
+
+## CHECKPOINT — 2026-08-18 (39): PO decided all 5 remaining backlog decisions from checkpoint 37/38, then a 7-cluster Workflow triage re-verified all 42 still-open items against current Phoenix+Nova code — 2 more closed, 17 confirmed dispatch-ready, 7 collected as genuine PO design decisions (READ THIS FIRST)
+
+**PO instruction this stretch:** decide the 5 remaining items from checkpoint 38 (done, see below), then "du kannst sie von oben nach unten anfangen abzuarbeiten so weit wir kommen. Dabei aber bei jedem einmal gegen deinen eigenen code prüfen und den aktuellen von nova ob noch relevant oder erledigt. Wenn etwas harte umfassende design entscheidungen braucht, sammle diese fürs ende. Du kannst das claude workflow tool nutzen um massiv zu parallellisieren."
+
+**1. The 5 items pending after checkpoint 38 were all decided by the PO and closed/recorded:**
+- Item 1 (`live-plugin-root-undefended-in-the-shell-lane`): PO accepted the residual risk — no fix built. A bootstrap-to-bootstrap hash-compare v1 was also explicitly declined (would flood every ordinary plugin update with unreviewable noise, echoing item 3's own gitleaks-ignore-growth lesson). Closed, commit `85efcceb`.
+- Item 5 (`adr-0045-topology-divergence-from-package-and-skill`): PO decided the package enumeration is illustrative, not exhaustive — "die pipeline muss weiteren sinnvollen inhalt bereitstellen können der zur session passt." ADR-0045 amended twice (prd naming, then the enumeration claim softened). Closed, commits `f26227b7`, `0252cb01`.
+- Items 2 and 4 had already been decided in the immediately preceding turn (see checkpoint 38's own tail, not repeated here).
+
+**2. Full-backlog Workflow triage, 7 clusters, 42/42 open items covered.** Grouped by theme (signing-approval-ux 6, guard-enforcement 9, ledger-lifecycle-reconcile 7, dispatch-process-hygiene 4, doc-citation-topology 4, test-verify-hygiene 3, misc 9), each cluster run as one read-only parallel Workflow agent (no write mandate, no isolation needed — matches the pattern Nova's own `docs/state.md` documents for its "Bucket C/E parallel-sweep": read-only cluster proposals, then a single-writer sequential apply). Every item checked against current Phoenix source AND the sibling Nova checkout. Verdicts: 16 already-correctly-triaged (no edit), 2 close-fixed-in-Nova-only, 7 needs-PO-design-decision, 17 still-open-dispatch-ready (real, technically-clear fixes needing no PO judgment call, just implementation time).
+
+**3. Applied sequentially, single-writer, 6 commits:**
+- `591a2b8b` — closed `human-approval-ux-directory-clarity-and-single-command` (Nova's `PO-KEYDIR-01` A/B key-directory resolution + `sign-intent --request`) and `guard-lifecycle-ready-blocks-claude-memory-writes` (Nova's `claudeSessionMemoryDirectory`/`isClaudeSessionMemoryWritePath`), both fixed in Nova only, not ported, per standing instruction.
+- `45146efa`, `ed0ae821`, `8de76f28`, `0e3d65bc` — 17 dispatch-ready items re-confirmed with a bounded, no-PO-judgment-call fix recorded in Triage (full list: `epic-file-contract-has-no-drift-check`, `parallel-goldfish-dispatches-race-on-shared-checkout`, `seven-unregistered-suites-are-red-and-must-not-be-registered`, `maintenance-window-selectivity-is-untested-at-both-levels`, `resume-hint-opaque-token-rejects-hyphenated-english`, `authority-revision-receipt-dedup-and-recovery-integrity-gaps`, `reconcile-lock-reuse-regression-test-needs-a-tp5-window`, `the-commit-trailer-cannot-say-who-performed-the-commit-act`, `a-commit-trailer-block-with-a-wrapped-continuation-line-parses-as-empty`, `gate-strength-shell-comment-understates-its-own-scope`, `no-test-pins-the-ungoverned-path-rule-stand-down`, `technical-lock-for-pipeline-consent-before-onboarding-complete`, `a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate`, `readonly-command-guard-classification`, `governance-product-verify-suites-deregistered`, `immutable-manifest-entries-can-be-rebound-with-no-amendment-record`, `signed-authority-binding-durability`).
+- `cf816c3f` — 7 items re-confirmed live and unresolved, each restated (never a proposed resolution) as genuinely needing a PO choice among named alternatives: `human-legible-approval-record` (briefing vocabulary vs. restricted-profile design), `push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to` (gate-side discovery vs. runner-always-writes-to-root), `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger` (H-AC-12 amendment + GMW retention redesign + portable/restricted field split — 3 sub-decisions), `module-scope-manifest-read-rearms-the-disarm-by-config-fault` (fail-open vs. fail-closed, a behaviour change), `el-01-has-no-in-session-tripwire` (refuse vs. forced-disclosure enforcement shape + session-identity signal), `elephant-authored-production-diff-closed-its-own-gating-criterion` (checklist reminder vs. TTL re-budget vs. new stage-0 gate), `part-a-limitation-2-orphaned-by-the-r2-rework` (three-step scope determination the item's own Proposal names).
+
+**4. Doc-reconciliation clean throughout** — checked after every batch (`591a2b8b`, `0e3d65bc`, `cf816c3f`), 0 implicated ADRs each time (all changes are backlog/docs-adr prose, no `specs/**` governed paths touched except the two already-reconciled ADR-0045 amendments from item 5 above).
+
+**5. Backlog tally:** of the 42 items open at the start of this stretch, 2 closed this stretch (plus the 1 from item 1 above and the earlier session's 4 = 7 total closed today), 17 confirmed dispatch-ready (real work, no PO call needed — next candidates for a ~15-20-item Workflow-based implementation dispatch batch per the PO's own stated preference), 7 collected below as the PO-decision list, 16 already accurate and untouched.
+
+**PO decisions still needed (collected, not resolved) — 7 items:**
+1. `human-legible-approval-record` — structured closed-vocabulary briefing (portable) vs. free prose (restricted-profile only, digest portable)?
+2. `push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to` — gate learns to discover the detached worktree, or the runner is changed to always write evidence to the project root?
+3. `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger` — three sub-decisions: (a) amend H-AC-12's enumeration to name GMW, (b) GMW retention mechanism (emit-on-transition vs. append-only storage redesign), (c) the portable/restricted field split for "by whom"/"why".
+4. `module-scope-manifest-read-rearms-the-disarm-by-config-fault` — fail-open or fail-closed when the module-scope manifest read fails (a behaviour change, ~20+ call sites for the retire/rename alternative).
+5. `el-01-has-no-in-session-tripwire` — enforcement shape (hard refuse vs. forced-disclosure) and which session-identity signal a write-time guard would trust.
+6. `elephant-authored-production-diff-closed-its-own-gating-criterion` — checklist reminder vs. re-budgeted maintenance-window TTL vs. a new mandatory stage-0 self-check.
+7. `part-a-limitation-2-orphaned-by-the-r2-rework` — is the residual origin-allowlist gap agent-reachable, is cheap local-expectation detection worth building, or is it an accepted permanent scope boundary?
+
+**Next steps:** (1) present the 7 PO-decision items to the PO; (2) the 17 dispatch-ready items are ready for a Workflow-based implementation-dispatch batch (PO-confirmed sizing: ~15-20 items per batch) whenever there's time/appetite; (3) OT09/TP-7 and the two PO-only signing ceremonies remain exactly as in checkpoint 38, unchanged.
 
 ---
 
