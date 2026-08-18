@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in plugins/pipeline-core/scripts/po-human-approval.mjs under dispatch PHX-BL4 (2026-08-09)."
 due: 2026-09-08
@@ -95,7 +95,7 @@ part of the defect.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — superseded by Nova, not ported into Phoenix.
+- **Rationale:** Phoenix's po-human-approval.mjs still has the exact-key-shape own() check unchanged. Nova solved the underlying problem architecturally: a named third field (humanName) is now first-class in the shape check with dedicated humanNameMismatch/keyReferenceMismatch diagnostics (po-human-approval.mjs:770,875,898-900). Per PO direction (2026-08-18), closed here rather than ported — Nova's fix is the forward path for this specific tooling.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

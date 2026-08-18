@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.human-authorization-prompts-ignore-the-configured-language-profile
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-09-06
 source: "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
@@ -79,7 +79,7 @@ runs and before any artifact exists.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — superseded by Nova, not ported into Phoenix.
+- **Rationale:** Phoenix's CONFIRMATION_TOKEN and prompt text remain hardcoded English-only. Nova resolved this: the token stays the untranslated English literal for stability, while surrounding prompt text is resolved per continuity.runtime.humanFacingLanguage with English fallback (resolveHumanFacingLanguage(), wired into requireExplicitConfirmation() call sites). Per PO direction (2026-08-18), closed here rather than ported.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

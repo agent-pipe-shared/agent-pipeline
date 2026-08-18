@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 source: "Elephant self-observation across the Phoenix gate-integrity phase, 2026-08-07/08: six dispatches ended at or past budget, four with no report at all; recorded in docs/state.md before being filed here."
 due: 2026-09-07
@@ -66,7 +66,7 @@ point in field 5.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — superseded by Nova, not ported into Phoenix.
+- **Rationale:** Phoenix's roles/goldfish.md still has only the conditional (>~25-tool-use) report-early framing. Nova added GF-09-D 'Report durability' with an unconditional Report-last-act sub-duty (the report is written into dispatch-record.json as the goldfish's last act regardless of size), directly closing the described failure mode. Per PO direction (2026-08-18), closed here rather than ported.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

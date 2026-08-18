@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-09-07
 source: "Critic out-of-scope observation, Phoenix gate-integrity full review round 1, 2026-08-08: docs/deploy/README.md carries live operating-model section citations and appears in neither B3 inventory."
@@ -116,7 +116,7 @@ with a lint. That item is the durable fix; this one is its evidence.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — carrier defect fixed; residual open question already has its own backlog home.
+- **Rationale:** Step 1 (repair the citation carriers) is confirmed done: no 'operating-model.md...§' pattern remains in docs/deploy/README.md. Step 2 (the census-methodology open question) is explicitly deferred by the item's own text to backlog/items/2026-08-07-no-check-validates-prose-section-citations.md, which is confirmed still open and is the durable fix location. This item is now evidence for that item's priority, not an independent open defect. Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

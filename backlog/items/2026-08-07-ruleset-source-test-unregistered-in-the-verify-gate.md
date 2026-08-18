@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ruleset-source-test-unregistered-in-the-verify-gate
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Measured by the PHX-R1-REWORK-1 dispatch while correcting R1's protection boundary, and re-verified independently by the Elephant. Third occurrence of the same defect class in this feature area."
 due: 2026-09-06
@@ -178,7 +178,7 @@ for why it matters: `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — already resolved
+- **Rationale:** The named instance (ruleset-source.test.mjs unregistered) is fixed: registered in verify.mjs:499 as 'ruleset-source-tests'. (The item's broader 108/109-suite class finding is tracked separately and not reopened by this closure.) Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.trust-mismatch-names-neither-key-nor-directory
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 source: "Hit live on 2026-08-08 when the PO signed a maintenance-window intent from the wrong one of two same-named key directories. The signature was cryptographically sound; the install refused with a five-word code that named nothing. Diagnosing it took the agent four read-only steps that the tool could have done itself."
 due: 2026-09-07
@@ -96,7 +96,7 @@ picked up as a drive-by fix — recorded here so the finding survives the wait.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — superseded by Nova, not ported into Phoenix.
+- **Rationale:** Phoenix's verifyPoApprovalProof still returns only {verified:false, code:'PO-APPROVAL-TRUST-MISMATCH'} on mismatch. Nova's equivalent now returns both observedPublicKeySha256 and expectedPublicKeySha256, with a dedicated regression test (po-approval-proof.test.mjs:10-14, finding NVA-SIGDISCLOSE-1). Per PO direction (2026-08-18), closed here rather than ported.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.accepted-adrs-drift-from-implementation-undetected
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Found on 2026-08-09 by two determination-first dispatches (PHX-ADR40, PHX-ADR38) sent to restore text the 0.5.2 merge audit reported as lost. Neither restored anything: both found the text had been deliberately superseded, and both surfaced this drift instead. Verified independently at source by the Elephant before filing."
 due: 2026-09-08
@@ -79,7 +79,7 @@ positive.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — already resolved
+- **Rationale:** Both cited ADR/implementation contradictions are resolved: docs/adr/0040-advisor-consent-and-readonly-bash.md:20-23 now matches setup.mjs's actual default; docs/adr/0038-runner-neutral-advisory-v3.md:3-4 now correctly records supersession by ADR-0047. The proposed detector is built and registered: harness/scripts/check-adr-consistency.mjs class 4 (SUPERSESSION-DISAGREEMENT), with its own test file. Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

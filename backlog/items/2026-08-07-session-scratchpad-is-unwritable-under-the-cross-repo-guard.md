@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
 due: 2026-09-06
@@ -197,7 +197,7 @@ passing. Candidates for a deliberate decision, explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — superseded by Nova, not ported into Phoenix.
+- **Rationale:** Unfixed in Phoenix's own guard-lifecycle-ready.mjs (isProjectWritePath() has no scratch carve-out). Nova has since built and wired a repo-internal, gitignored scratch/ carve-out (PARTIAL_LIFECYCLE_SCRATCH_DIR, guard-lifecycle-ready.mjs:131 and surrounding machinery) implementing exactly the item's own recommended Option 2. Per PO direction (2026-08-18), items already resolved in Nova's current code are closed here rather than reimplemented — Phoenix does not need to duplicate Nova's own hardening. The memory-store half of the item (which the item itself says needs a different, undesigned answer) is not resolved by this and is not reopened as a separate item.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

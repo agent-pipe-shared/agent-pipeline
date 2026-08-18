@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.first-verify-run-is-red-with-four-failures
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 source: "The first end-to-end verify run this repository has completed in some time, obtained after repairing a duplicate suite registration the 0.5.3 merge introduced. 256 of 260 steps pass; four fail. All four are pre-existing and were invisible while the gate could not start."
 due: 2026-09-07
@@ -237,7 +237,7 @@ The run journal is at `.git/agent-pipeline/verify/runs/verify-1786142281528-629c
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — already resolved
+- **Rationale:** All four failures are now green in current Phoenix code, confirmed by direct test execution: TIER-DRIFT fixed (check-authority-tier-agreement.test.mjs 9/9 pass), product-capability-inventory fixed (check-product-capability-inventory.test.mjs 16/16 pass), gitleaks residue removed (security-scan.test.mjs 128/128 pass), backlog-state-check fixed via applyPrePublicCoreReachabilityRepair (check-backlog-state.mjs:802-847). Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

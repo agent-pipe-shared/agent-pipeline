@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatched-agents-return-truncated-mid-step
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-08-21
 source: "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day."
@@ -111,7 +111,7 @@ does not wait for the first:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — already resolved
+- **Rationale:** The runtime cause remains genuinely unknown and out of this repo's control (as the item itself says), but all proposed repository-side mitigations are implemented: commit-first-then-report and report-early running-log duty (roles/goldfish.md:99-100, templates/prompts/goldfish-task.md:133-159), truncated-report detection and same-context resume in roles/elephant.md (EL-20/EL-24/EL-25a region, lines 156,194,215-217). Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

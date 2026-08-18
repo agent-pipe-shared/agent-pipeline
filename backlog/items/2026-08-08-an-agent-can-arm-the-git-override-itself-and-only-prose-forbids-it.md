@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agent-can-self-arm-the-git-override
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 source: "Found on 2026-08-08 by the PHX-RED1 dispatch while diagnosing why plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs is red. The suite is not a broken test: it specifies a human-authority binding that was never built, and diagnosing that surfaced the live hole below. Verified independently at source by the Elephant before filing, not taken from the dispatch report."
 due: 2026-09-07
@@ -133,3 +133,10 @@ has nothing to decide.
   motion as the others.
 - `2026-08-07-approval-mechanisms-require-out-of-session-po-acts.md` — the
   out-of-session signing burden this override path conspicuously does not carry.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Close — Phoenix's own instance is fixed; residual scope is general pipeline hardening, not reopened here.
+- **Rationale:** PHX-GITAUTH (commit 1729334) restored phoenixGovernedProject() (guard-git.mjs:676), gating the self-arming path (:755,:894) on the presence of governance/events/registry.json — which this Phoenix checkout has, so self-arming is enforced here. The item's only remaining residual scope (repositories WITHOUT a governance registry, i.e. Pipeline consumer projects) is general pipeline hardening outside Phoenix's own delivered surface, not a Phoenix defect. Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.runtime-projection-v2-eager-manifest-load
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-07-27
 source: "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)"
 ---
@@ -61,7 +61,7 @@ is a foundational, widely-shared library file — same rigor as `894261d`.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close — superseded by Nova, not ported into Phoenix.
+- **Rationale:** Phoenix's runtime-projection-v2.mjs:72-73 still reads/freezes the manifest eagerly at module scope, unguarded. Nova replaced this with a lazy, memoized frozenOwnedKeys() function (lines 72-101) with an explicit comment naming the same fail-open risk chain through guard-lifecycle-ready.mjs and codex-pretool-guard.mjs. Per PO direction (2026-08-18), closed here rather than ported — flagged for awareness that Phoenix's own fail-closed hooks still depend on the unguarded module in the meantime.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18

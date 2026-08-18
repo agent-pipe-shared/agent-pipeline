@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
 due: 2026-09-06
@@ -135,3 +135,8 @@ pre-existing, harmless, not part of this defect; left untouched, flagged here
 for a future cleanup pass.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** Close — already resolved
+- **Rationale:** The proposed fix is present verbatim: withoutRunnerFlag() (guard-lifecycle-ready.mjs:703-710) now scans the whole argv array for --runner <claude|codex> instead of only a trailing pair; sanctionedOnboardingArgs() (:721-725) accepts the plan* branch's optional 5-token --intent form mirroring the inspect branch. Re-verified 2026-08-18.
+- **Assignment (if accepted):** n/a — disposed without further work
+- **Date:** 2026-08-18
