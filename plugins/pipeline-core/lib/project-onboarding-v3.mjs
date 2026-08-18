@@ -12,6 +12,7 @@ import {
   accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
   linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
 } from "node:fs";
+import { homedir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -78,6 +79,7 @@ import {
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1 } from "./critical-human-proof-policy.mjs";
+import { readMachinePlane } from "./machine-plane.mjs";
 
 const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
@@ -248,6 +250,7 @@ function deps(overrides = {}) {
     linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
     spawnSync, observeCodexOnboardingCapabilities, observeOnboardingAppServer,
     initializePoGateProfileReceipt, publishPoGateProfileReceipt,
+    homedir, readMachinePlane,
     ...overrides,
   };
 }
@@ -3954,6 +3957,91 @@ function collectAuthorIdentityAction(missing) {
   };
 }
 
+/**
+ * Ask, once per MACHINE, how a push approval is cleared and where the PO's
+ * signing key lives (backlog: installing-consumer-is-never-asked-any-setup-
+ * decision.md; design: specs/sprint-nova-epic/plans/nova-setup-bootstrap.md
+ * SS3). Every setting an installing consumer needs today resolves silently to
+ * its strictest default (`signature`, ADR-0056) with nobody ever telling them
+ * a key is required, let alone that one exists. This closes exactly that gap
+ * for the two decisions the PO scoped narrow for now -- `gates.push_approval`
+ * and the PO key directory -- leaving the rest of the machine/repository
+ * split (routing, language, session, usage, the remaining gates, autonomy,
+ * critic/advisor export) to the deferred, full-taxonomy treatment.
+ *
+ * "Once per machine" is not a new counter to maintain: it falls straight out
+ * of `unresolvedMachinePushApprovalSetup()` below, which is true exactly when
+ * this machine's own configuration plane (`machine-plane.mjs`) has never been
+ * written. A machine that already carries a valid plane has already been
+ * asked; nova-setup-bootstrap.md SS3's own resolution is "no question" for
+ * every repository onboarded on it afterward.
+ *
+ * Deliberately does NOT write `pipeline.user.yaml`, `machine.json`, or a key
+ * directory itself -- same asymmetry as `collectAuthorIdentityAction()`
+ * above: this asks and guides, the caller (with the PO present) performs the
+ * actual write with ordinary tools afterward. Only the PO ever creates the
+ * signing key, in their own terminal (nova-setup-bootstrap.md SS3.3/SS6a) --
+ * this library never runs `po-human-approval.mjs setup` on the PO's behalf
+ * and never touches key material.
+ */
+// A generous single-line bound: covers "signature" (9 bytes) and "chat"
+// (4 bytes) with ample margin, same role AUTHOR_IDENTITY_FIELD_MAX_BYTES
+// plays just above.
+const PUSH_APPROVAL_PREFERENCE_MAX_BYTES = 32;
+function collectPushApprovalPreferenceAction(poKeyDirectoryHint) {
+  return {
+    kind: "collect-input",
+    input: {
+      name: "pushApprovalPreference",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: PUSH_APPROVAL_PREFERENCE_MAX_BYTES,
+      singleLine: true,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "this machine has never been asked how a push approval is cleared, and every setting today resolves silently to the strictest default; ask the PO once, in plain language: \"signature\" proves each approval with a detached Ed25519 signature whose private key never leaves the PO's own terminal (recommended); \"chat\" instead records an attribution in the session -- a labelled record, not a proof. Accept exactly \"signature\" or \"chat\" as the answer, never invent one. "
+      + `If "signature": walk the PO through creating their signing key, proposing (never demanding) ${poKeyDirectoryHint ?? "a directory outside every repository"} as the default location -- let them choose a different absolute path if they prefer, but it must stay outside any checkout. The PO then runs \`node plugins/pipeline-core/scripts/po-human-approval.mjs setup --repo-root <this repository> --directory <the chosen directory>\` THEMSELVES, in their own terminal -- never through a tool call, and never with the key read, moved, or copied afterward. `
+      + "Once answered, write the chosen mode into this repository's committed gates.push_approval in pipeline.user.yaml (repository plane, ADR-0056), and record the same answer -- plus the key directory, if \"signature\" -- in the machine-scoped configuration plane (machine-plane.mjs) so no later repository on this machine is asked again.",
+    expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
+  };
+}
+
+/**
+ * The proposed default location for the PO's signing key directory
+ * (nova-setup-bootstrap.md SS3.3) -- a sibling of the machine-scoped
+ * configuration plane's own directory, NEVER inside it. `machine-plane.mjs`'s
+ * write carve-out admits exactly one file, `machine.json`; key material must
+ * never share that admitted path. This is only ever rendered into
+ * human-facing guidance text -- the directory itself is created by the PO, in
+ * their own terminal; this library never creates it and never writes into
+ * it, mirroring `machinePlaneFilePath()`'s own home-directory derivation.
+ */
+function defaultPoKeyDirectoryHint(fs) {
+  try {
+    const home = (fs.homedir ?? homedir)();
+    if (typeof home !== "string" || home.trim().length === 0) return null;
+    return join(home, "agent-pipeline-po");
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True exactly when THIS MACHINE has never answered the push-approval /
+ * PO-key-directory question: the machine-scoped configuration plane
+ * (`machine-plane.mjs`) is absent or fails its own validation. Deliberately
+ * three-valued-to-boolean, not "absent only" -- an invalid plane is just as
+ * unanswered as a missing one, and re-asking is the fail-closed response to
+ * either.
+ */
+function unresolvedMachinePushApprovalSetup(fs) {
+  const readPlane = fs.readMachinePlane ?? readMachinePlane;
+  return readPlane().status !== "valid";
+}
+
 function ensurePreimage(root, expectedState, fs) {
   const now = legacyInspection(root, fs);
   if (now.status !== expectedState) throw new Error(`root changed since planning (${now.status})`);
@@ -4454,6 +4542,19 @@ function withPendingAuthorIdentityAsk(observed, fs) {
   return { ...observed, authorIdentityAction: collectAuthorIdentityAction(missing) };
 }
 
+// Sibling of `withPendingAuthorIdentityAsk()` immediately above -- same
+// gating shape (local mode, same three resting statuses, same additive-only
+// contract), different question. Kept as its own function rather than folded
+// into that one: the two asks have unrelated resolutions (one is per-machine,
+// one is per-repository) and a shared name would misdescribe whichever
+// concern was not in it.
+function withPendingPushApprovalSetupAsk(observed, fs) {
+  if (observed.repository?.mode !== "local") return observed;
+  if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
+  if (!unresolvedMachinePushApprovalSetup(fs)) return observed;
+  return { ...observed, pushApprovalSetupAction: collectPushApprovalPreferenceAction(defaultPoKeyDirectoryHint(fs)) };
+}
+
 function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "onboarding", runner, operatorAuthority = null) {
   if (!activate || typeof planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(planSha256)) return v4Inspection(rootDir, fs, intent, runner);
   if (operation === "portable") {
@@ -4461,9 +4562,9 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
     // digest was produced with, or the digests never match and the apply is a
     // silent no-op that loops the caller back to adoption-required.
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: v4Inspection(rootDir, fs, intent, runner).runner });
-    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs);
+    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs);
     applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
-    return withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs);
+    return withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs);
   }
   const beforeApply = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "repair" && beforeApply.status === "continuity-damaged") {

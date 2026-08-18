@@ -140,6 +140,20 @@ export const fakeDeps = {
   observePersistedPoAuthority() {
     return { status: "absent" };
   },
+  // Deterministic "already asked" by default -- never falls through to the
+  // REAL `~/.agent-pipeline/machine.json` on whatever machine the suite
+  // happens to run on. Tests for the push-approval-setup ask (regression:
+  // installing-consumer-is-never-asked-any-setup-decision.md) override this
+  // explicitly to prove both the "unasked" and "already asked" cases.
+  readMachinePlane() {
+    return {
+      status: "valid",
+      plane: {
+        schema: "pipeline.machine-plane.v1", poKeyDirectory: null, pushApprovalDefault: "signature",
+        routing: null, language: null, session: null, usage: null, updatedAt: "2026-08-08T00:00:00.000Z",
+      },
+    };
+  },
   initializePoGateProfileReceipt() {
     return {
       ok: true,
@@ -2068,6 +2082,64 @@ test("apply-portable-seed --activate surfaces the missing-author-identity ask-st
     assert.equal(Object.prototype.hasOwnProperty.call(quietApplied.result, "authorIdentityAction"), false,
       "a configured repository must not be asked");
   } finally { dispose(missing); dispose(configured); }
+});
+
+// Regression for backlog 2026-08-08-an-installing-consumer-is-never-asked-
+// any-setup-decision.md: nothing in the install path ever asked how a push
+// approval is cleared or told the installer a PO signing key exists at all --
+// every setting resolved silently to its strictest default. This drives the
+// real CLI `apply-portable-seed --activate` path (same shape as the
+// author-identity regression above) and proves the ask surfaces exactly once
+// per MACHINE: fires when the machine-scoped configuration plane has never
+// been written, stays silent once it has, and never in either case changes
+// the lifecycle's own resting status or primary chained nextAction.
+test("apply-portable-seed --activate surfaces the push-approval-setup ask-step once per machine", () => {
+  const unasked = root();
+  const asked = root();
+  const invoke = (args, deps) => {
+    let output = "";
+    const code = onboardingCli(args, { deps, write: (chunk) => { output += chunk; } });
+    return { code, result: JSON.parse(output) };
+  };
+  try {
+    // (a) A machine with no configuration plane yet: the ask surfaces
+    // alongside the unchanged resting status and unchanged primary nextAction.
+    const neverAsked = { ...fakeDeps, readMachinePlane() { return { status: "absent", plane: null }; } };
+    const planned = invoke(["plan", "--root", unasked, "--runner", "codex"], neverAsked);
+    assert.equal(planned.code, 0);
+    const digest = planned.result.nextAction.argv[planned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const applied = invoke(["apply-portable-seed", "--root", unasked, "--plan-sha256", digest, "--activate", "--runner", "codex"], neverAsked);
+    assert.equal(applied.code, 0);
+    assert.equal(applied.result.status, "runtime-initialization-required",
+      "the ask-step must never replace or change the lifecycle's own resting status");
+    assert.equal(applied.result.nextAction.kind, "command",
+      "the ask-step must never replace the primary chained nextAction");
+    assert.equal(applied.result.pushApprovalSetupAction.kind, "collect-input");
+    assert.equal(applied.result.pushApprovalSetupAction.mutation, false);
+    assert.equal(applied.result.pushApprovalSetupAction.input.name, "pushApprovalPreference");
+    assert.match(applied.result.pushApprovalSetupAction.guidance, /"signature"/u);
+    assert.match(applied.result.pushApprovalSetupAction.guidance, /"chat"/u);
+    assert.match(applied.result.pushApprovalSetupAction.guidance, /agent-pipeline-po/u,
+      "must propose a default PO key directory, never demand one");
+    assert.doesNotMatch(applied.result.pushApprovalSetupAction.guidance, /\bsetup\.mjs\b/u,
+      "must never point an installing consumer at the script SETUP.md forbids them to use");
+    assert.match(applied.result.pushApprovalSetupAction.guidance, /po-human-approval\.mjs/u);
+
+    // A replay of the exact same apply call (zero-write, same digest) must
+    // observe the identical ask-step.
+    const replayed = invoke(["apply-portable-seed", "--root", unasked, "--plan-sha256", digest, "--activate", "--runner", "codex"], neverAsked);
+    assert.deepEqual(replayed.result, applied.result);
+
+    // (b) A machine whose configuration plane already exists: no question --
+    // exactly current (default `fakeDeps`) behavior, additive only.
+    const quietPlanned = invoke(["plan", "--root", asked, "--runner", "codex"], fakeDeps);
+    const quietDigest = quietPlanned.result.nextAction.argv[quietPlanned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const quietApplied = invoke(["apply-portable-seed", "--root", asked, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], fakeDeps);
+    assert.equal(quietApplied.code, 0);
+    assert.equal(quietApplied.result.status, "runtime-initialization-required");
+    assert.equal(Object.prototype.hasOwnProperty.call(quietApplied.result, "pushApprovalSetupAction"), false,
+      "a machine that already answered must not be asked again");
+  } finally { dispose(unasked); dispose(asked); }
 });
 
 test("shared command renderer derives one copy-safe line from exact argv in a spaced root", () => {
