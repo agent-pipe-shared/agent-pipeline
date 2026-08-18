@@ -2,6 +2,7 @@
 
 <!-- po-language: en -->
 <!-- technical-spec-sha256: f9b1f508cdc8c85764ef2f907f133c22e52176062329d9a9c98987f07c23be21 -->
+<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
