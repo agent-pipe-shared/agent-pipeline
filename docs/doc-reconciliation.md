@@ -1840,3 +1840,16 @@ Restated per this file's known limitation: `c6b882d8` is an ancestor of this can
 - ADR-0058: checked, no change needed.
 
 Restated per this file's known limitation: `f1205164` is an ancestor of this candidate and was already fully reconciled by the entry immediately above; ADR-0045/0056/0058 are restated verbatim — no commit in this range touches `specs/**` or any ADR-0056/0058-listed path. ADR-0012's only new material is checkpoint 33: answering the PO's question about what remains after the OT09/TP-7 fix lands with the exact 5-step sequence (Verify, Layer 1b reconciliation, subject-sha256 recompute, Layer 2/3 signing, Layer 4/5 push) rather than the oversimplified "just Verify." Additive checkpoint prose only; no code or config changed.
+
+## Candidate 8182c81fe9ab86baea9ac52f69f2dc58aedc4cba — 2026-08-18, range 8a92d377..8182c81f, A-AC-01/H-AC-11 disposition (d48251da) plus checkpoint 34 recording it and a new digest-drift finding
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0058: checked, no change needed.
+
+Restated per this file's known limitation for ADR-0056/0058: `4b25d4d8` is an ancestor and was already fully reconciled above; no commit in this range touches any ADR-0056/0058-listed path.
+
+**ADR-0045** — implicated by `d48251da`, which touches two files under `specs/sprint-phoenix-epic/`: `acceptance.md` (two PO-attributed amendments — A-AC-01's remaining ordering-seam gap struck per the PO's 2026-08-18 ruling, and H-AC-11's already-decided O-4 scoping decision given the backlog item EPIC-AC-05's `disposed` bar requires) and `evidence/acceptance-evidence-map.mjs` (matching `POINTERS` appends, no verdict change — both criteria stay `partial`). Pure textual disposition-recording inside `specs/sprint-phoenix-epic/`, the same established artifact class as every prior ADR-0045 entry in this file; neither the package's lifecycle state, artifact set, nor topology moved. Self-recorded directly by the Elephant transcribing an explicit, unambiguous PO chat decision — the same precedent this session already used repeatedly for A-AC-03/H-AC-11-O-4/L-AC-01's own amendments, not a fresh Elephant-originated judgment call. Independently re-verified before commit: `node specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs --mode default` regenerates without a syntax or runtime error.
+
+**ADR-0012** — `8182c81f` (checkpoint 34) records the A-AC-01/H-AC-11 disposition, the 8 GitHub issue status comments, and a new finding: editing `acceptance.md` re-triggered the known `FTP-ARTIFACT-2` `lifecycle.json` digest-drift bug (confirmed via `pipeline-state.mjs feature-package-status`), which adds a second PO-signed `feature-package-reconcile` ceremony to the push sequence checkpoint 33 already documented. Additive checkpoint prose only; the canonical-handover decision is untouched.
