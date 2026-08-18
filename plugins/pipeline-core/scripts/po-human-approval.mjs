@@ -349,6 +349,57 @@ function artifactPath(directory, name) {
   return path;
 }
 
+// NVA-CLI-FEEDBACK-1 (backlog/items/2026-08-09-critical-push-signing-
+// ceremony-gives-no-path-feedback.md): the fixed set of recognised
+// subcommands, named once and reused both for validation (below) and for the
+// "did you mean" suggestion on an unrecognised one -- a single list, never
+// two that could drift apart.
+const KNOWN_COMMANDS = ["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent"];
+
+// NVA-CLI-FEEDBACK-1: standard O(len(a)*len(b)) Levenshtein edit distance
+// (insert/delete/substitute, each cost 1) between two subcommand strings.
+// Used only to power the unknown-subcommand suggestion below -- it never
+// gates or widens what counts as a valid subcommand.
+function levenshteinDistance(a, b) {
+  const rows = a.length + 1; const cols = b.length + 1;
+  const distances = Array.from({ length: rows }, (_, row) => {
+    const line = new Array(cols).fill(0);
+    line[0] = row;
+    return line;
+  });
+  for (let col = 1; col < cols; col += 1) distances[0][col] = col;
+  for (let row = 1; row < rows; row += 1) {
+    for (let col = 1; col < cols; col += 1) {
+      const cost = a[row - 1] === b[col - 1] ? 0 : 1;
+      distances[row][col] = Math.min(
+        distances[row - 1][col] + 1,
+        distances[row][col - 1] + 1,
+        distances[row - 1][col - 1] + cost,
+      );
+    }
+  }
+  return distances[rows - 1][cols - 1];
+}
+
+// NVA-CLI-FEEDBACK-1: names the single closest known subcommand to an
+// unrecognised one typed by an agent or human, so a plausible-but-wrong guess
+// (e.g. "aprove-critical") gets a concrete "did you mean" hint instead of
+// only the generic usage dump -- closing the gap the backlog item above
+// documents ("a single guess costs the entire CLI-driven path rather than
+// one retry"). Returns `null` for an empty/non-string input, or when even the
+// closest candidate is farther than SUBCOMMAND_SUGGESTION_MAX_DISTANCE --
+// a wild guess must never manufacture a misleading suggestion.
+const SUBCOMMAND_SUGGESTION_MAX_DISTANCE = 4;
+function suggestSubcommand(input, candidates) {
+  if (typeof input !== "string" || input.length === 0) return null;
+  let best = null; let bestDistance = Infinity;
+  for (const candidate of candidates) {
+    const distance = levenshteinDistance(input, candidate);
+    if (distance < bestDistance) { bestDistance = distance; best = candidate; }
+  }
+  return best !== null && bestDistance <= SUBCOMMAND_SUGGESTION_MAX_DISTANCE ? best : null;
+}
+
 export function parseHumanArgs(argv, dependencies = {}) {
   const [command, ...tokens] = argv; const values = { command, keyReference: "local-po-key" }; const supplied = new Set();
   for (let index = 0; index < tokens.length; index += 1) {
@@ -366,7 +417,10 @@ export function parseHumanArgs(argv, dependencies = {}) {
   // setDirectorySource): pre-existing deepStrictEqual shape assertions elsewhere
   // must not see a new own-enumerable field on this object.
   Object.defineProperty(values, "keyReferenceSupplied", { value: supplied.has("keyReference"), enumerable: false, configurable: true });
-  if (!new Set(["setup", "prepare", "prepare-all", "approve", "approve-all", "verify", "verify-all", "prepare-critical", "approve-critical", "verify-critical", "authorize-critical", "sign-intent"]).has(command)) return { error: USAGE };
+  if (!new Set(KNOWN_COMMANDS).has(command)) {
+    const suggestion = suggestSubcommand(command, KNOWN_COMMANDS);
+    return { error: suggestion ? `${USAGE}\nUnknown subcommand "${command}". Did you mean "${suggestion}"?` : USAGE };
+  }
   // PO-KEYDIR-01(A)/SETUP-2b/AC-11: precedence, in this exact order. An explicit
   // --directory always wins and is used exactly as before, never even consulting
   // any of the tiers below. Absent that, this repository's OWN remembered directory
@@ -863,7 +917,12 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName);
       write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 });
       persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
-      return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: true };
+      // NVA-CLI-FEEDBACK-1: state where the key material and authority record
+      // actually live -- an operator/agent that needs to hand a generated file
+      // to another process must not have to already know the fixed path
+      // convention (backlog/items/2026-08-09-critical-push-signing-ceremony-
+      // gives-no-path-feedback.md).
+      return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: true, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
     }
     if (present.privateKey && present.publicKey && present.authority) {
       const authority = json(paths.authority); const publicKey = read(paths.publicKey, "utf8");
@@ -886,7 +945,8 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
         const upgraded = localAuthority(publicKey, authority.keyReference, args.humanName);
         write(paths.authority, `${JSON.stringify(upgraded, null, 2)}\n`, { mode: 0o600 });
         persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
-        return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority: upgraded, recovered: true };
+        // NVA-CLI-FEEDBACK-1: see the recovery branch above for rationale.
+        return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority: upgraded, recovered: true, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
       }
       // GF-104: a named record already exists. Explicit --human-name/--key-reference
       // values that differ from it are a deliberate identity change this command does
@@ -901,7 +961,10 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
         fail("a PO authority record already exists under a different name/key-reference than supplied; changing an established identity is not something setup does silently -- rerun without --human-name/--key-reference to keep the existing record, or remove the existing authority files first if a deliberate rebind is intended.");
       }
       persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
-      return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false };
+      // NVA-CLI-FEEDBACK-1: idempotent re-run -- nothing new was written this call,
+      // but the operator/agent still needs to know where the existing key material
+      // and authority record live, so the paths are reported here too.
+      return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, recovered: false, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
     }
     if (present.privateKey || present.publicKey || present.authority) fail("partial PO authority exists; refusing to overwrite it");
     if (!text(args.humanName)) fail(SETUP_NEW_AUTHORITY_NEEDS_NAME);
@@ -909,7 +972,7 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     command("openssl", ["pkey", "-in", paths.privateKey, "-pubout", "-out", paths.publicKey], dependencies);
     const authority = localAuthority(read(paths.publicKey, "utf8"), args.keyReference, args.humanName); write(paths.authority, `${JSON.stringify(authority, null, 2)}\n`, { mode: 0o600 }); chmodSync(paths.privateKey, 0o600);
     persistExplicitDirectoryIntoRepoScope(args, directory, gitCommonDir, dependencies);
-    return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority };
+    return { ok: true, code: "PO-HUMAN-AUTHORITY-READY", authority, paths: { privateKey: paths.privateKey, publicKey: paths.publicKey, authority: paths.authority } };
   }
   if (args.command === "authorize-critical") {
     // Fail closed on missing key material before anything is written or observed:
@@ -933,17 +996,21 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       "this approval does NOT cover: any other commit or tree than the candidate above, any other subject digest, any action attempted after the expiry above, and any action of a different kind -- each of those needs its own approval.",
     ], dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
-    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer };
+    // NVA-CLI-FEEDBACK-1: state the paths this call just wrote (request/proof/
+    // signer survive; intent/signature are removed by signIntentIntoProof).
+    return { ok: true, code: "PO-HUMAN-CRITICAL-AUTHORIZATION-READY", candidate: request.candidate, action: request.action, intentSha256, signer: signed.signer, paths: { request: paths.request, proof: paths.proof, signer: paths.signer } };
   }
   if (args.command === "prepare" || args.command === "prepare-critical") {
     if (critical) {
       const { request } = criticalApprovalRequest({ args, repository, featureId, dependencies });
       write(paths.request, `${JSON.stringify(request, null, 2)}\n`, { mode: 0o600 });
-      return { ok: true, code: "PO-HUMAN-CRITICAL-REQUEST-READY", candidate: request.candidate, intentSha256: request.approvalIntent.sha256, action: request.action };
+      // NVA-CLI-FEEDBACK-1: state the path this call just wrote.
+      return { ok: true, code: "PO-HUMAN-CRITICAL-REQUEST-READY", candidate: request.candidate, intentSha256: request.approvalIntent.sha256, action: request.action, paths: { request: paths.request } };
     }
     const result = runApprovalRequest(["prepare", "--repo-root", repository, "--feature-id", featureId, "--plan", args.plan ?? "specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md", "--spec", args.spec ?? "specs/2026-07-24-sprint-cyborg-epic/spec.md", "--model", args.model ?? `specs/${featureId}/threat-model.json`]);
     write(paths.request, `${JSON.stringify(result, null, 2)}\n`, { mode: 0o600 });
-    return { ok: true, code: "PO-HUMAN-REQUEST-READY", candidate: result.value.candidate, intentSha256: result.value.approvalIntent.sha256 };
+    // NVA-CLI-FEEDBACK-1: state the path this call just wrote.
+    return { ok: true, code: "PO-HUMAN-REQUEST-READY", candidate: result.value.candidate, intentSha256: result.value.approvalIntent.sha256, paths: { request: paths.request } };
   }
   if (args.command === "sign-intent") {
     if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before sign-intent");
@@ -1040,8 +1107,18 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       assertUnlinkedRegularFileOrAbsent(scratchSignerPath, "scratch mirror artifacts must be unlinked regular files inside this repository's own scratch/ directory");
       write(scratchSignerPath, `${JSON.stringify(signed.signer, null, 2)}\n`, { mode: 0o600 });
     }
+    // NVA-CLI-FEEDBACK-1: state the paths this call just wrote -- the external
+    // manual proof/signer (durable, read by every verifier) and, when --request
+    // was used, the additional repo-scratch mirror. The pre-existing top-level
+    // scratchProofPath/scratchSignerPath fields are kept unchanged for callers
+    // that already read them; `paths` is purely additive.
     return {
       ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256, signer: signed.signer,
+      paths: {
+        proof: manual.proof,
+        signer: manual.signer,
+        ...(scratchProofPath !== null ? { scratchProofPath, scratchSignerPath } : {}),
+      },
       ...(scratchProofPath !== null ? { scratchProofPath, scratchSignerPath } : {}),
     };
   }
@@ -1059,7 +1136,9 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     }
     requireExplicitConfirmation(summary, dependencies, humanFacingLanguage);
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: { intent: paths.intent, signature: paths.signature, proof: paths.proof, signer: paths.signer }, io: { write, read }, dependencies });
-    return { ok: true, code: "PO-HUMAN-PROOF-READY", intentSha256, signer: signed.signer };
+    // NVA-CLI-FEEDBACK-1: state the paths this call just wrote (proof/signer
+    // survive; intent/signature are removed by signIntentIntoProof).
+    return { ok: true, code: "PO-HUMAN-PROOF-READY", intentSha256, signer: signed.signer, paths: { proof: paths.proof, signer: paths.signer } };
   }
   if (!exists(paths.proof)) fail("run approve before verify");
   const candidate = (dependencies.observeCandidate ?? observeCleanCandidate)(repository);

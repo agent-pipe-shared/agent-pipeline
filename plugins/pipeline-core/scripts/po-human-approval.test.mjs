@@ -203,6 +203,9 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
     assert.match(confirmationPrompts[0], /type exactly "approve"/iu, "the confirmation prompt must require an explicit typed token, not a bare y/n");
 
     const proofPath = join(dirs.directory, "proof-manual.json");
+    // NVA-CLI-FEEDBACK-1: the success result states the absolute paths it just
+    // wrote, so an operator/agent never has to guess or poll for them.
+    assert.deepEqual(result.paths, { proof: proofPath, signer: join(dirs.directory, "signer-manual.json") });
     assert.equal(existsSync(proofPath), true);
     const proof = JSON.parse(readFileSync(proofPath, "utf8"));
     assert.equal(proof.schema, PO_APPROVAL_PROOF_SCHEMA);
@@ -263,6 +266,15 @@ test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scra
     const scratchSignerPath = join(scratchDir, "reconcile-signer-42.json");
     assert.equal(result.scratchProofPath, scratchProofPath);
     assert.equal(result.scratchSignerPath, scratchSignerPath);
+    // NVA-CLI-FEEDBACK-1: the nested `paths` field carries the same
+    // information as the pre-existing top-level fields, plus the external
+    // durable proof/signer paths -- additive, never a replacement.
+    assert.deepEqual(result.paths, {
+      proof: join(dirs.directory, "proof-manual.json"),
+      signer: join(dirs.directory, "signer-manual.json"),
+      scratchProofPath,
+      scratchSignerPath,
+    });
     assert.deepEqual(JSON.parse(readFileSync(scratchProofPath, "utf8")), externalProof);
     assert.deepEqual(JSON.parse(readFileSync(scratchSignerPath, "utf8")), externalSigner);
     assert.equal(externalSigner.keyReference, authority.keyReference);
@@ -583,6 +595,7 @@ function criticalArtifacts(dirs, kind = "push") {
     proof: join(dirs.directory, `proof-${fp}-critical-${kind}.json`),
     intent: join(dirs.directory, `intent-${fp}-critical-${kind}.txt`),
     signature: join(dirs.directory, `signature-${fp}-critical-${kind}.bin`),
+    signer: join(dirs.directory, `signer-${fp}-critical-${kind}.json`),
   };
 }
 
@@ -643,6 +656,10 @@ test("authorize-critical prepares and signs in ONE invocation, and the proof is 
     const verified = verifyCriticalActionApprovalRequest({ request, trustPolicy: authority, proof, expectedCandidate: { ...CANDIDATE }, expectedAction: action });
     assert.equal(verified.verified, true);
     assert.equal(verified.code, "CRITICAL-ACTION-PROOF-VERIFIED");
+
+    // NVA-CLI-FEEDBACK-1: the success result states the absolute paths it just
+    // wrote, so an operator/agent never has to guess or poll for them.
+    assert.deepEqual(result.paths, { request: paths.request, proof: paths.proof, signer: paths.signer });
 
     // Temporary signing material is gone; only request + proof remain.
     assert.equal(existsSync(paths.intent), false);
@@ -1043,6 +1060,11 @@ test("the two-invocation prepare-critical + approve-critical flow is unchanged a
     assert.equal(verifyCriticalActionApprovalRequest({ request, trustPolicy: authority, proof, expectedCandidate: { ...CANDIDATE }, expectedAction: action }).verified, true);
     assert.equal(existsSync(paths.intent), false);
     assert.equal(existsSync(paths.signature), false);
+
+    // NVA-CLI-FEEDBACK-1: both halves of the two-invocation flow state the
+    // paths they each just wrote.
+    assert.deepEqual(prepared.paths, { request: paths.request });
+    assert.deepEqual(approved.paths, { proof: paths.proof, signer: paths.signer });
   } finally {
     cleanup(dirs);
   }
@@ -1803,6 +1825,13 @@ test("GF-104: setup against an existing named authority record stays unchanged (
     );
     assert.equal(resultNoFlags.ok, true);
     assert.equal(resultNoFlags.code, "PO-HUMAN-AUTHORITY-READY");
+    // NVA-CLI-FEEDBACK-1: even an idempotent re-run (nothing newly written)
+    // states where the existing key material and authority record live.
+    assert.deepEqual(resultNoFlags.paths, {
+      privateKey: join(dirsNoFlags.directory, "po-private.pem"),
+      publicKey: join(dirsNoFlags.directory, "po-public.pem"),
+      authority: join(dirsNoFlags.directory, "trust-policy.json"),
+    });
 
     keyFixture(dirsMatching.directory);
     const resultMatching = runHumanApproval(
