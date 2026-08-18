@@ -1813,3 +1813,12 @@ prior commit) touched only this file, which no ADR governs.
 **ADR-0012** — `docs/state.md` gained checkpoint 31 (this session's doc-contract root-cause-fix narrative). Additive checkpoint prose only, same disposition as every prior entry reconciling this ADR; the canonical-handover decision is untouched.
 
 **ADR-0045** — implicated by two NEW commits under `specs/**` since the `fb3b0ec3` entry: `824e02d2` (one line in `specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs`, wrapping a regex literal in backticks so the generator stops emitting the doc-contract false positive on future regeneration) and `d202633c` (the identical one-line transformation mechanically applied to the 17 already-committed snapshot files that inherited the bug from that same source string, `acceptance-evidence-map-20260817.md` through `...q.md`). Both are pure textual corrections inside the `evidence/` subdirectory — an established legitimate artifact class per every earlier ADR-0045 entry in this file — and neither changes the package's lifecycle state, artifact set, or topology; `824e02d2` was self-executed directly (1 file, 1 line, plain-JS data string, no architecture/schema/test/guardrail-hook-CI/dependency/security-surface touch — the same EL-01 stage-0 class as checkpoint 29's `A-AC-01` reclassification in this identical file), `d202633c` was a dispatched `goldfish-mechanic` task (17 files, fully specified, zero design latitude) whose result was independently re-verified by the Elephant (`check-doc-contracts.mjs` exit 0, re-run directly, not trusted from the dispatch report).
+
+## Candidate c6b882d887318bbb2c5ca61baf8c2a6a8d1fcd81 — 2026-08-18, range 8a92d377..c6b882d8, checkpoint 31's confirmed-baseline/subject-sha256 addendum
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0058: checked, no change needed.
+
+Restated per this file's known limitation: `c581a218` is an ancestor of this candidate and was already fully reconciled by the entry immediately above; ADR-0045/0056/0058 are restated verbatim. ADR-0012's only new material is the addendum to checkpoint 31 recording the re-confirmed 382/383 Verify baseline and the recomputed `subject-sha256` for candidate `334f7cf7` — additive checkpoint prose, nothing structural. `334f7cf7` (this record's own prior-prior commit) touched only `docs/doc-reconciliation.md`, which no ADR governs.
