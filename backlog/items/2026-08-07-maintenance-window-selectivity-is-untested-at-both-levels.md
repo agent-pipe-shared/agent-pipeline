@@ -103,3 +103,38 @@ level — the point is the invariant, not the case count.
   membership test the item describes).
 - **Assignment (if accepted):** next available Alfred slot.
 - **Date:** 2026-08-17
+
+### Implementation, 2026-08-18 (wave 1, dispatch NVA-W1-7)
+
+- **Library-level gap: confirmed already closed, no change needed.**
+  `plugins/pipeline-core/lib/guard-maintenance-window.test.mjs:206`, inside
+  GMW03, already asserts `windowCoversRule({ rootDir, ruleId: "TP-2" }).covered
+  === false` for a window installed with `scopeRuleIds: ["GS-6", "TP-1"]`
+  (line 195). `TP-2` is a distinct liftable rule id from `TP-1` (both `TP-*`,
+  per GMW01's own liftability assertions), so this is the exact selectivity
+  property the item describes, already pinned. No edit made to this file.
+- **Hook-level gap: attempt blocked before any write, nothing changed or
+  committed.** Read `guard-testpath.test.mjs` TP09 (line 197) and confirmed it
+  is a pure happy path (one `protectedTestPaths` entry, one window scoped to
+  `TP-1`, only the matching lift asserted). Read
+  `plugins/pipeline-core/lib/protected-test-paths.mjs` and confirmed rule ids
+  default to `TP-<index+1>` by config-array position, so a second
+  `protectedTestPaths` entry yields `TP-2` — designed a TP14 (control: the
+  named `TP-1` file stays lifted)/TP15 (negative: a second, unnamed `TP-2`
+  file stays refused under the same window) pair mirroring
+  `guard-gate-strength.test.mjs` GST20's already-correct model. Attempting the
+  `Edit` on `guard-testpath.test.mjs` itself (a TP-protected file, matching
+  its own suite's `TP-2` rule in this repo's live guard-config) was BLOCKED
+  pre-execution by `guard-testpath.mjs`: `Rule ID: TP-2`, reason
+  "guard-testpath test suite gates this very guard (E5/QG-04) — no ad-hoc
+  edits outside a briefed test-change task", offering only a signature-mode
+  HGO ceremony as a route. Per this dispatch's explicit instruction, stopped
+  immediately without attempting any override. `git status --porcelain` and
+  `git diff --stat` confirmed the working tree stayed byte-identical to HEAD
+  — no partial mutation. No test count to report; 0 files changed, 0 commits.
+- **Remaining work:** the hook-level negative case (TP14/TP15 as designed
+  above, or an equivalent) still needs to land, gated on a signed
+  maintenance-window/HGO ceremony on `guard-testpath.test.mjs` — the same
+  ceremony this item's own "Affected artifact" section already anticipated
+  ("Both hook suites are themselves protected test paths ... this work needs
+  a maintenance window of its own").
