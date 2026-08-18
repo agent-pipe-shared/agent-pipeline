@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import {
   createPoGateProfileReceipt,
   derivePoGateRepositoryFingerprint,
+  PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
   poGateProfileReceiptPath,
   serializePoGateProfileReceipt,
   validatePoGateAuthority,
@@ -1100,10 +1101,13 @@ function promotionSeed(name, { privatized = false, bumpRevision = privatized, po
   const specBytes = `# ${name} specification\n`;
   writeFileSync(join(directory, "spec.md"), specBytes);
   // The promoted PRD is the approval subject, so it carries the PO-gate
-  // markers: the human-facing language and the digest of the Spec beside it.
+  // markers: the human-facing language, the digest of the Spec beside it, and
+  // the PO's own plan acknowledgement (this fixture represents an already
+  // human-reviewed PRD, the state every promotion test in this file assumes).
   writeFileSync(join(directory, "prd_promoted.md"), [
     `<!-- po-language: ${poLanguage} -->`,
     `<!-- technical-spec-sha256: ${digest(specBytes)} -->`,
+    PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
     `# ${name} PRD`,
     "",
   ].join("\n"));
