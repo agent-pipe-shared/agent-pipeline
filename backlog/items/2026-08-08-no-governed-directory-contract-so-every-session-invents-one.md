@@ -147,3 +147,68 @@ not supersede it and does not claim to close it.
   status update; no re-opening of the six original decision points, which
   ADR-0063 already resolved.
 - **Date:** 2026-08-18
+
+### Implementation, 2026-08-18 (wave 1, dispatch NVA-W1-8)
+
+Started from base HEAD `c2f8cd13` per this dispatch's briefing. Before making
+any change, found that two of the three named follow-ups already exist at
+that exact base HEAD, landed by other dispatches earlier in the same wave:
+
+- **Follow-up 1 (`.gitignore` anchoring audit): already fully done**, commit
+  `2b90e547` (`fix(.gitignore): anchor directory-only ignore patterns per
+  ADR-0063 audit`, dispatch NVA-SWEEP-I2f) — anchors the bare `scratch/` line
+  to `/scratch/`, documents `.vscode/`/`.idea/` as deliberately
+  depth-unbounded, and adds `harness/scripts/check-gitignore-anchoring.test.mjs`
+  (4 tests, still passing).
+- **Follow-up 2 (kinds table wired into agent-facing briefing): partially
+  done, gap closed by this dispatch.** Commit `99aeafd2` (`docs(pipeline-start,
+  templates): surface ADR-0063's directory-kinds table`) had already wired
+  `plugins/pipeline-core/skills/pipeline-start/SKILL.md` (the executable
+  form) plus `templates/prompts/goldfish-task.md` and
+  `templates/prompts/critic-review.md` (and their vendored copies), but had
+  **not** touched `harness/session-bootstrap.md` — the file this dispatch's
+  own scope summary named explicitly, and CLAUDE.md's "full spec" pointer for
+  the bootstrap protocol. This dispatch added the same condensed pointer to
+  `harness/session-bootstrap.md` §1 Purpose (new paragraph inserted after
+  the "Why a dedicated protocol" paragraph, before the first `---` divider,
+  so every role reads it during bootstrap regardless of which role-specific
+  section follows) — see `harness/session-bootstrap.md:28-45`. Added
+  `harness/scripts/check-session-bootstrap-directory-contract.test.mjs` (5
+  tests: pointer presence, `scratch/` mention, kinds named, SKILL.md
+  cross-reference, placement inside §1 ahead of §2) to pin it.
+- **Follow-up 3 (Verify gate assertion): already built standalone, TP-3
+  registration confirmed blocked (matches this dispatch's own briefed
+  contingency).** Commit `760bcc6c` (`feat(harness): add standalone
+  ADR-0063 directory-contract check`) added
+  `harness/scripts/check-directory-contract.mjs` (checks: no tracked file in
+  an undeclared top-level directory; every bare directory-name `.gitignore`
+  pattern anchored or justified) plus
+  `harness/scripts/check-directory-contract.test.mjs` (20 tests, still
+  passing), explicitly NOT registered in `harness/scripts/verify.mjs`'s
+  `TEST_SUITES` because that file is TP-3-protected. This dispatch
+  independently re-confirmed the block live rather than trusting the prior
+  commit message alone: attempting to add a `TEST_SUITES` entry for
+  `check-directory-contract.test.mjs` was refused pre-execution by
+  `guard-testpath.mjs`, **Rule ID TP-3**, no mutation occurred. Per this
+  dispatch's briefing, stopped that sub-step, made no retry, attempted no
+  override. Registering the check into `verify.mjs` remains open, requiring
+  the audited human-guard-override signature ceremony — out of any single
+  Goldfish dispatch's authority.
+
+**Test count this dispatch added:** 5 (all passing,
+`node --test harness/scripts/check-session-bootstrap-directory-contract.test.mjs`
+exit 0). Pre-existing suites `check-directory-contract.test.mjs` (20 tests)
+and `check-gitignore-anchoring.test.mjs` (4 tests) re-run as a regression
+check, both still passing, unaffected by the doc-only edit.
+
+**Files changed by this dispatch:** `harness/session-bootstrap.md` (new
+pointer paragraph), `harness/scripts/check-session-bootstrap-directory-contract.test.mjs`
+(new test file), this backlog item (this section). Commit SHA reported
+separately by the dispatching Elephant/orchestrator.
+
+**Status left for central triage (not decided by this dispatch):** follow-up
+3's `verify.mjs` registration is the only genuinely unbuilt sub-item left
+across all three follow-ups; it needs a dedicated TP-3-ceremony dispatch.
+Frontmatter `status:` and any Closure section are intentionally left
+untouched here, per this dispatch's own briefing — closure is a central,
+post-Critic-review decision.

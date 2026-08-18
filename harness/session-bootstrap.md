@@ -25,6 +25,25 @@ Every new session must ensure three things **before** it starts working:
 
 **Why a dedicated protocol:** the plugin cache is a **copy per user per machine**. A push to the central repo does **not** propagate automatically — auto-update is off by default for custom marketplaces, and during the SHA phase every commit counts as a new version that only a manual refresh picks up. Across two machines this creates **cache drift**: machine B works with stale guardrails without noticing — the old copy-paste drift in a new form. The bootstrap check surfaces this drift at every session start instead of relying on discipline.
 
+**Directory contract (ADR-0063):** a fresh session inventing its own directory
+layout is a distinct failure mode from cache/handover drift, closed
+separately. Any temporary file (probe script, held note, throwaway fixture)
+goes in the repository's own `scratch/` directory (ignored, project-root
+only — never a host-temp path, never `.git/`). Where anything ELSE new
+belongs — a durable evidence artifact, a spec package, a decision record —
+is governed by `docs/adr/0063-repository-directory-contract.md`'s
+directory-kinds table, not invented per session: normative canon stays in
+its existing location (`docs/`, `roles/`, `guardrails/`, `policies/`);
+decision records live in `docs/adr/`; specifications live in
+`specs/<feature-id>/` (ADR-0045); evidence a gate or backlog
+`closure_evidence` field actually cites lives in `backlog/evidence/` or
+`specs/*/evidence/` (tracked); machine-regenerated evidence lives in the
+ignored root `evidence/`; plugin-owned private runtime state lives under
+`.git/agent-pipeline/**` and declared `.claude/` paths. Never invent a new
+top-level directory for a kind this table already names a home for. The
+executable form (`plugins/pipeline-core/skills/pipeline-start/SKILL.md`,
+"Scratch space") carries the same pointer.
+
 ---
 
 ## 2. Mechanism decision: three layers
