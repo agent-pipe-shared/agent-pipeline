@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-05
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "18e5516cf14a9a02fca8cd9bdb6c6ddb1fcf4d78"
+closure_evidence: "backlog/items/2026-08-05-critical-human-proof-not-wired-to-push-and-prd-gates.md"
 source: "PO question during Sprint Nova session, 2026-08-05: asked whether the ed25519 human-proof mechanism (built for Sprint Cyborg) needed one-time setup before this session's branch push. Investigation found it exists but is not enforced for either of the two human gates it was meant to secure."
 due: 2026-09-05
 ---

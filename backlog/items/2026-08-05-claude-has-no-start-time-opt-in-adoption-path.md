@@ -5,6 +5,10 @@ type: idea
 owner: pipeline
 status: closed
 created: 2026-08-05
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "88dc3ba6952f226ed4f9caa57bad982cb660a425"
+closure_evidence: "backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md"
 source: "PO observation, Sprint Nova session 2026-08-05, in the same session that reproduced the setup.mjs marketplace collision by hand"
 due: 2026-09-05
 ---

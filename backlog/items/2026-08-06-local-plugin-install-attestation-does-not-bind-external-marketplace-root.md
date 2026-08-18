@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "88dc3ba6952f226ed4f9caa57bad982cb660a425"
+closure_evidence: "backlog/items/2026-08-06-local-plugin-install-attestation-does-not-bind-external-marketplace-root.md"
 source: "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06"
 due: 2026-09-06
 ---

@@ -8,6 +8,10 @@ created: 2026-08-07
 source: "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
 due: 2026-09-06
 expires: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "88dc3ba6952f226ed4f9caa57bad982cb660a425"
+closure_evidence: "backlog/items/2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md"
 ---
 
 # GS-6 blocks the version field in `plugin.json` exactly as hard as it blocks guard code

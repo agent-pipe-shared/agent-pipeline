@@ -7,6 +7,10 @@ status: closed
 created: 2026-08-07
 source: Critic finding F2 on PHX-R2-THREATMODEL-rework (specs/sprint-phoenix-epic/evidence/phx-r2-threatmodel-rework-critic-review-ad5d185.md). Recorded by the Elephant as the disposition of that finding — the item the finding says was missing.
 due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "5c3c50d4bebf17a847b673560c5638cc7f385f17"
+closure_evidence: "backlog/items/2026-08-07-part-a-limitation-2-orphaned-by-the-r2-rework.md"
 ---
 
 # Part A's disclosed limitation 2 lost its successor mechanism and has no owner

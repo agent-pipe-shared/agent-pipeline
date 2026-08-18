@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-05
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "c12cbdf7058204863fd9f96df84699e20e51347b"
+closure_evidence: "backlog/items/2026-08-05-claude-dir-leftovers-defeat-runner-neutral-project-migration.md"
 source: "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift"
 due: 2026-09-05
 ---

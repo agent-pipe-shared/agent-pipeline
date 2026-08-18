@@ -8,6 +8,10 @@ created: 2026-08-06
 source: "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
 due: 2026-09-05
 expires: 2026-09-05
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "88dc3ba6952f226ed4f9caa57bad982cb660a425"
+closure_evidence: "backlog/items/2026-08-06-restart-launch-is-codex-only-for-every-runner.md"
 ---
 
 # The `restart-required` step names Codex regardless of the active runner

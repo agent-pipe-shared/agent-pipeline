@@ -5,6 +5,10 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 created: 2026-08-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "18e5516cf14a9a02fca8cd9bdb6c6ddb1fcf4d78"
+closure_evidence: "backlog/items/2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md"
 source: "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
 due: 2026-09-06
 ---
