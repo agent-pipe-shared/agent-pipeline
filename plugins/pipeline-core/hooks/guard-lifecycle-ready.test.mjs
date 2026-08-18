@@ -21,13 +21,16 @@ import {
   ProjectOnboardingReadyError,
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
+  BASE_GOVERNANCE_MARKERS,
   evaluateLifecycleReadyGuard,
+  governanceMarkers,
   isForbiddenCrossRepositoryMutation,
   isNarrowRepositoryRecoveryCommand,
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
   isSanctionedLifecycleCommand,
   main,
+  MANIFEST_FAILURE_WARNING,
   retryActionsForDeniedCommand,
 } from "./guard-lifecycle-ready.mjs";
 import {
@@ -134,6 +137,76 @@ test("source, calibration, lock, and runtime-only markers activate exact session
       assert.equal(calls, 1, marker);
     } finally { rmSync(path, { recursive: true, force: true }); }
   }
+});
+
+// NOVA-GOVMARKERS-WIRING: governanceMarkers() itself -- the direct unit-level fail-open
+// contract, independent of whichever call site consumes it. Regression pin for the wiring
+// bug where evaluateLifecycleReadyGuard's sole runtime call site read the pre-rename
+// `GOVERNANCE_MARKERS` identifier, which governanceMarkers()'s introduction had removed --
+// a ReferenceError on every invocation, silently caught by the surrounding try/catch and
+// turned into blocked() (GUARD-LIFECYCLE-NOT-READY): the OPPOSITE of the fail-open contract
+// asserted here (backlog/items/2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-
+// config-fault.md).
+test("governanceMarkers() fails open to the fixed base markers, with an explicit warning, when the runtime-projection loader throws", () => {
+  const result = governanceMarkers({
+    loadRuntimeProjectionV3OwnedKeysFn() {
+      throw new Error("config/runtime-projection-v3-owned-keys.json unreadable");
+    },
+  });
+  assert.deepEqual(result, { markers: BASE_GOVERNANCE_MARKERS, warning: MANIFEST_FAILURE_WARNING });
+});
+
+test("governanceMarkers() returns the real runtime-projection-derived markers, with no warning, when the loader succeeds", () => {
+  const result = governanceMarkers({
+    loadRuntimeProjectionV3OwnedKeysFn() {
+      return { targets: [{ path: ".codex/config.toml" }, { path: "pipeline.user.yaml" }] };
+    },
+  });
+  assert.equal(result.warning, null);
+  // Fixed base markers are always present, deduplicated against any runtime-projection overlap.
+  for (const marker of BASE_GOVERNANCE_MARKERS) assert.ok(result.markers.includes(marker), marker);
+  assert.ok(result.markers.includes(".codex/config.toml"));
+  assert.equal(result.markers.filter((marker) => marker === "pipeline.user.yaml").length, 1);
+});
+
+test("evaluateLifecycleReadyGuard threads its own dependencies into governanceMarkers() and stays fail-open, not fail-closed, on a throwing loader", () => {
+  const path = root();
+  let calls = 0;
+  try {
+    // A BASE_GOVERNANCE_MARKERS marker is present, so `governed` must resolve true purely
+    // from the fixed base list even though the injected runtime-projection loader throws.
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      loadRuntimeProjectionV3OwnedKeysFn() {
+        throw new Error("config/runtime-projection-v3-owned-keys.json unreadable");
+      },
+      requireProjectOnboardingReadyFn() {
+        calls += 1;
+        deny();
+      },
+    });
+    // The pre-fix bug never reached this call: the stale `GOVERNANCE_MARKERS` identifier
+    // threw a ReferenceError caught by the outer try/catch, returning blocked() immediately.
+    assert.equal(calls, 1);
+    assert.equal(result.exitCode, 2);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("evaluateLifecycleReadyGuard stays admit-open on a throwing loader when no governance marker at all is present", () => {
+  const path = root();
+  let calls = 0;
+  try {
+    const result = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      loadRuntimeProjectionV3OwnedKeysFn() {
+        throw new Error("config/runtime-projection-v3-owned-keys.json unreadable");
+      },
+      requireProjectOnboardingReadyFn() { calls += 1; },
+    });
+    assert.deepEqual(result, { exitCode: 0, stderr: "" });
+    assert.equal(calls, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
 test("exact session readiness allows the governed project write and threads the caller-supplied runner explicitly", () => {

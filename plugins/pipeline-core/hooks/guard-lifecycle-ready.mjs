@@ -47,15 +47,60 @@ import {
 // this file's own header comments on crossRepositoryMutationBlocked()).
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
-const GOVERNANCE_MARKERS = [
+export const BASE_GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
   "pipeline.user.yaml",
   "project/pipeline.json",
   "project/pipeline.yaml",
   ".claude/pipeline.json",
   ".claude/pipeline.yaml",
-  ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
-].filter((value, index, values) => values.indexOf(value) === index);
+];
+export const MANIFEST_FAILURE_WARNING =
+  "[pipeline-config-warning] guard-lifecycle-ready: config/runtime-projection-v3-owned-keys.json "
+  + "is missing or unreadable; governance-marker detection continues using only the fixed base "
+  + "markers. Deliberate fail-open (PO decision 2026-08-18, backlog/items/"
+  + "2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-config-fault.md) -- an unreadable "
+  + "manifest must not refuse an otherwise-permitted write.\n";
+
+/**
+ * Resolve the full governance-marker list LAZILY, at the point of use, never
+ * as a module-scope side effect.
+ *
+ * Reading `config/runtime-projection-v3-owned-keys.json` at module scope
+ * (via the unguarded `loadRuntimeProjectionV3OwnedKeys()`, one identifier
+ * away from `runtime-projection-v3.mjs`'s own memoized, lazily-guarded
+ * `frozenOwnedKeys()`) meant a missing, unreadable, or malformed manifest
+ * threw during this module's own ES-module evaluation -- merely IMPORTING
+ * this hook crashed, before `main()` existed, which `hooks/hooks.json`
+ * defines as exit 1, "allow + config warning": a config fault silently
+ * DISARMED this fail-closed gate for every write in the process
+ * (backlog/items/2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-config-fault.md).
+ *
+ * PO decision 2026-08-18 (same item): keep admitting on an unreadable
+ * manifest -- do NOT turn it into a refusal -- but stop letting the failure
+ * escape as an uncontrolled crash. Catching it right here, at the one call
+ * site that consumes it, narrows the blast radius from "the entire hook
+ * process crashes and every write for its lifetime is silently admitted" to
+ * "the runtime-projection-derived markers are treated as absent for this one
+ * call; the fixed BASE_GOVERNANCE_MARKERS above are still enforced
+ * normally." The admit-don't-refuse outcome the PO ratified is unchanged;
+ * only its blast radius and its visibility (an explicit warning instead of a
+ * bare uncaught-exception stack trace) are narrower and deliberate now.
+ */
+export function governanceMarkers(dependencies = {}) {
+  const loadFn = dependencies.loadRuntimeProjectionV3OwnedKeysFn ?? loadRuntimeProjectionV3OwnedKeys;
+  try {
+    return {
+      markers: [
+        ...BASE_GOVERNANCE_MARKERS,
+        ...loadFn().targets.map((target) => target.path),
+      ].filter((value, index, values) => values.indexOf(value) === index),
+      warning: null,
+    };
+  } catch {
+    return { markers: BASE_GOVERNANCE_MARKERS, warning: MANIFEST_FAILURE_WARNING };
+  }
+}
 const READY_RECEIPT_KEYS = ["intent", "schema", "status"];
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
@@ -1139,7 +1184,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   let governed;
   try {
     const exists = dependencies.existsSyncFn ?? existsSync;
-    governed = GOVERNANCE_MARKERS.some((marker) => exists(join(root, marker)));
+    governed = governanceMarkers(dependencies).markers.some((marker) => exists(join(root, marker)));
   } catch {
     return blocked();
   }
