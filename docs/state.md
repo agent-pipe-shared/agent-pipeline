@@ -3,7 +3,13 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 43)
+**Last updated:** 2026-08-19 (checkpoint 44)
+
+---
+
+## CHECKPOINT — 2026-08-19 (44): further gate-cleanup landed after checkpoint 43; Verify down to 4 red suites (from 18); one still-unexplained batch-only failure under active investigation (READ THIS FIRST)
+
+Since checkpoint 43: `PHX-WP-VERIFYREG-FIXTURE-GITTOPOLOGY-FIX` (`e61b0592`) rebuilt 3 verify-registration test fixtures (`check-verify-suite-registration.test.mjs`, `windows-assurance-verify-registration.test.mjs`, `scoped-verify-registration.test.mjs`) to `git init --quiet` their own fixture root instead of a bare `mkdtempSync` — all 3 now pass (96/96 combined, up from 91/93). `PHX-WP-AUTH-ADOPTION-CHECK` (`f1387980`, finished by the orchestrator after a truncated report — real work verified sound first) built `harness/scripts/check-auth-gate-inventory-drift.mjs`, closing `unified-human-authorization-ux` work package #4; passes clean against the real repo (10 surfaces, all acknowledged). A fresh full clean-candidate Verify re-run (commit `f1387980`) now shows **only 4 red suites** (down from 18 originally, 8 after checkpoint 43): `guard-testpath-override-tests` (OT09/TP-7, filed), `product-capability-inventory-tests` (2 unwired guard hooks, filed, blocked on the same TP-4/HGO ceremony), `backlog-ledger-reconciliation-tests`+`backlog-state-check` (historical closure-metadata gaps, filed, needs a PO decision on remediation approach) — all 3 already filed as backlog items per checkpoint 43. **New, not yet resolved:** `verify-evidence-root-tests` still fails inside the full batch run despite passing 1/1 reliably standalone (confirmed 3 times) — the fixture-fix round's "batch truncation from a sibling crash" hypothesis did NOT hold (fixing the 3 siblings didn't resolve this one). `PHX-WP-EVIDENCEROOT-BATCH-FAILURE-INVESTIGATE` is dispatched and running as of this write — check its outcome before assuming this is still open. Security-scan itself has been clean (exit 0, 0 blocking findings) since the gitleaks-ignore fix landed in the checkpoint-43 round.
 
 ---
 
