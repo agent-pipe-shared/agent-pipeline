@@ -1,0 +1,14 @@
+fix(gmw): disclose the bound candidate commit in prepare's output
+
+prepare's returned value now carries a plain-text `warning` field stating
+that the signature is valid only while HEAD stays at the bound candidate
+commit sha (read from intent.value.candidate.commit), and that nothing
+should be committed between signing and installing. Closes the disclosure
+gap from backlog item 2026-08-08-a-prepared-maintenance-window-dies-at-
+the-next-commit.md (option 1): the human previously had no warning before
+spending a signature that install's own commit/tree-mismatch check would
+silently invalidate. install/status/close and all existing return shapes
+are unchanged.
+
+Dispatch: PHX-WP-GMW-PREPARE-WARNING (goldfish)
+AI-Assisted: true
