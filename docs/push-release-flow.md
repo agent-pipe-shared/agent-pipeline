@@ -71,7 +71,8 @@ given carefully.
 > `prepare-critical` left a stale request on disk that a later, decoupled
 > `approve-critical` then silently signed, because the two commands never bound
 > to the same in-memory request. `authorize-critical` (ported from
-> origin/main's [ADR-0061](adr/0061-uniform-human-approval-ceremony.md); this
+> origin/main's ADR-0061, "one ceremony for every human gate" — not tracked on
+> this branch, hence no link here; this
 > repo's own port is recorded in
 > [ADR-0065](adr/0065-port-authorize-critical-ceremony.md)) closes that gap by
 > construction: it builds the request and signs *that exact object* inside one
