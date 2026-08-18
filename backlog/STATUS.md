@@ -44,7 +44,7 @@
 | pipeline.close-spec-retention-and-consent | closed | workflow-improvement | pipeline | 2026-07-21 | — |
 | pipeline.closed-input-channel-review-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.codex-plugin-validator-host-parity | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | open | idea | pipeline | 2026-08-09 | — |
@@ -61,7 +61,7 @@
 | pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
+| pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.critical-human-proof-policy-lacks-the-reconcile-approval-generalization | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.critical-push-signing-ceremony-gives-no-path-feedback | open | workflow-improvement | pipeline | 2026-08-09 | — |
@@ -100,7 +100,7 @@
 | pipeline.grammar-refusal-does-not-say-which-part-failed | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.greenfield-seeded-with-private-overlay-calibration | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit | open | idea | pipeline | 2026-08-17 | — |
+| pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit | closed | idea | pipeline | 2026-08-17 | — |
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal | open | defect | pipeline | 2026-08-09 | — |
@@ -276,6 +276,6 @@
 
 ## Counts
 
-- open: 79
-- in_progress: 8
-- closed: 181
+- open: 77
+- in_progress: 7
+- closed: 184

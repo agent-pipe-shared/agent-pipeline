@@ -5,6 +5,10 @@ type: idea
 owner: pipeline
 status: closed
 created: 2026-08-17
+closed_at: 2026-08-18
+closure_repository: self
+closure_commit: 10d27ea2575ef864880fb407f97b7df203dc25a3
+closure_evidence: backlog/items/2026-08-17-gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit.md
 source: "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; verified against source -- accurately described, and this repository's own gate-strength design is deliberately fail-closed here (see docstring cited below), so this is a feature-gap/enhancement request, not a defect."
 ---
 
