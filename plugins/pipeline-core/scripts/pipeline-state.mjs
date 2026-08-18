@@ -362,7 +362,7 @@ import {
   readCloseCoordinator,
 } from "./publication-close-journal.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
-import { syncStateMdNextAction } from "../lib/onboarding-continuity.mjs";
+import { nextActionSection, syncStateMdNextAction } from "../lib/onboarding-continuity.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
@@ -432,6 +432,7 @@ const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
 // `materialize-push-threat-model` was absent from it while another refusal named
 // that exact command as the way out of a stuck approval.
 const PIPELINE_STATE_COMMANDS = Object.freeze([
+  "inspect",
   "set-feature", "submit-plan", "approve-plan", "reopen-design", "seal-plan-approval",
   "set-phase", "set-gate-estimate", "revoke-plan", "bind-plan-spec", "approve-push",
   "materialize-push-threat-model", "prepare-push-subject", "close-feature", "discard-feature", "approve-deploy",
@@ -508,6 +509,7 @@ const RESULT_CASE_MIGRATION_PLAN_SCHEMA = "pipeline.continuity-result-case-migra
 const RESULT_CASE_MIGRATION_APPLY_SCHEMA = "pipeline.continuity-result-case-migration-apply.v1";
 const RESULT_CASE_MIGRATION_JOURNAL_SCHEMA = "pipeline.continuity-result-case-migration-journal.v1";
 const RESULT_CASE_MIGRATION_LOCK_TOKEN = "pipeline-result-case-migration-v1";
+const INSPECT_SCHEMA = "pipeline.inspect.v1";
 const LEGACY_PLAN_APPROVAL_KEYS = ["approvedBy", "approvedAt", "poGateAuthority"];
 const LEGACY_PO_GATE_AUTHORITY_KEYS = [
   "schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256",
@@ -5927,6 +5929,37 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       console.log(
         `${toRemove.length} open deploy approval(s) for environment "${env}"${isBlank(artifact) ? "" : ` / artifact "${artifact}"`} removed by "${by}" (${clearedAt}).`,
       );
+      return 0;
+    }
+
+    // `inspect` -- the ONE consolidated read-only subcommand (NVA-W4-07). Every
+    // one of the ~14 mutating writer subcommands above prints a terse,
+    // human-prose one-liner (its own contract, left untouched here); a caller
+    // that wants CURRENT phase/approval/next-action structured together has had
+    // to re-read `docs/state.md`'s "## Next action" section separately (the
+    // exact section `syncNextActionDocs` keeps in sync after every mutation)
+    // instead of getting it back from the CLI. `inspect` fixes that by reusing
+    // the `continuity-result-rebind`/`continuity-result-bootstrap` family's
+    // richer structured-JSON pattern (a `schema` field plus nested detail)
+    // rather than the terse pattern -- it performs ZERO writes: no lock, no
+    // `writeState`, no `syncNextActionDocs` call. `nextActionSection(base)` is
+    // the SAME pure renderer those mutating commands call before writing to
+    // `docs/state.md`, so the returned text is byte-identical to what a fresh
+    // read of that file's section would show, without a second read.
+    case "inspect": {
+      const lifecycle = derivePlanLifecycle(base);
+      const payload = {
+        schema: INSPECT_SCHEMA,
+        generatedAt: now(),
+        activeFeature: base.activeFeature ?? null,
+        phase: base.activeFeature?.phase ?? null,
+        planApproved: base.planApproved === true,
+        lifecycle: { ok: lifecycle.ok, code: lifecycle.code, status: lifecycle.status },
+        pushApproval: base.pushApproval ?? null,
+        closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
+        nextAction: nextActionSection(base),
+      };
+      console.log(JSON.stringify(payload, null, 2));
       return 0;
     }
 

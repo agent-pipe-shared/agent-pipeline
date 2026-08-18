@@ -72,6 +72,20 @@ USAGE (Elephant)
     `pipeline-core:` `agentType` prefix, a stated tool-call budget, the
     worktree self-heal block where isolation is used) — read it before
     building a Workflow dispatch; it does not replace this template.
+11. **Checking current phase/approval state while composing a briefing:** run
+    `node plugins/pipeline-core/scripts/pipeline-state.mjs inspect` (read-only,
+    zero writes) rather than hand-reading `docs/state.md`'s "## Next action"
+    section or re-deriving phase/approval from
+    `project/pipeline-state.json` yourself. It returns one structured JSON
+    payload — `activeFeature`, `phase`, `planApproved`, `lifecycle`,
+    `pushApproval`, and `nextAction` (the exact text the mutating
+    subcommands, e.g. `set-feature`/`approve-plan`, already keep in sync in
+    `docs/state.md`) — reusing the `continuity-result-rebind`/
+    `continuity-result-bootstrap` family's richer structured-JSON pattern
+    rather than the terse one-line writer-subcommand shape. NOT for the
+    briefing's field 2 (Context files) itself — `inspect`'s output is a tool
+    result for the Elephant's own pre-dispatch orientation, never something to
+    paste into PO-facing chat text as a message-budget shortcut.
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->
