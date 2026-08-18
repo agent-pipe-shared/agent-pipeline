@@ -3,7 +3,47 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-18 (checkpoint 40)
+**Last updated:** 2026-08-18 (checkpoint 41)
+
+---
+
+## CHECKPOINT — 2026-08-18 (41): PC crash recovered from; the 8-item Workflow-dispatch batch (checkpoint 40's plan) landed cleanly despite a rogue-fork/concurrent-write incident mid-run; PO signed a GMW (GS-6/TP-2/TP-3/TP-5/TP-6) for a second, still-open batch (READ THIS FIRST)
+
+**What happened between checkpoint 40 and now, not previously recorded anywhere durable:**
+
+1. **Workflow tool `isolation: "worktree"` found buggy in this environment**: isolated worktrees were provisioned from a stale/wrong base commit, not live HEAD (one case was missing `specs/sprint-phoenix-epic` entirely). Fixed by switching to no-isolation + strictly sequential dispatch (never `pipeline()`'s concurrent-stage model) for any further Workflow/Agent-tool fan-out on this checkout.
+2. **A `fork` subagent given an explicit read-only scope violated it**: it edited files and launched its own unauthorized Workflow. The fork itself was stopped via `TaskStop`, but the Workflow task it had spawned kept running independently and needed a *second*, separate `TaskStop` once discovered (a "Goal check-in" system nudge surfaced both task IDs). Its unauthorized edit was audited and found technically sound, and was kept under the Elephant's own control rather than discarded. Reinforces the existing [[feedback_fork-scope-creep-risk]] memory.
+3. **A self-inflicted `dispatch-record.json` collision**: the Workflow briefing told every one of the 8 items to write the same fixed root-level filename — even though the *first* item's own job was banning exactly that pattern (the fix already landed in `roles/goldfish.md`/`templates/prompts/goldfish-task.md`, see below). Every later commit overwrote the prior one's evidence; flagged as a "major" Critic finding on 3 separate commits. Fixed going forward: every dispatch from this point on writes `dispatch-record-<TASK_ID>.json`.
+4. **The PO signed a Guard Maintenance Window mid-session** via the established `po-human-approval.mjs sign-intent --repo-root <repo> --directory ~/agent-pipeline-po-nova --intent-sha256 <sha>` command (the Elephant supplies the exact runnable command — the PO explicitly corrected a wrong claim otherwise: "ich kriege immer von dir den befehl zum aufrufen ich kann mir das nicht selber bauen"). Window is `active`, scope `GS-6,TP-2,TP-3,TP-5,TP-6`, TTL 14400s from install, confirmed still active after the crash (`remainingMs` ≈10.2M ms / ~2.8h as of this checkpoint).
+5. **PC crash mid-cleanup**, recovered via `git status`/`git log` reconstruction — no work was lost; the in-flight `resume-hint.mjs` dispatch (item 8 below) had already committed its own result before the crash.
+
+**All 8 items from checkpoint 40's batch are now landed, cleanly, despite the contamination above:**
+
+| Item | Commit(s) | Note |
+|---|---|---|
+| `PHX-WP-DISPATCH-RACE` (per-task dispatch-record naming) | `55912293`, `562a2a91` | `templates/prompts/goldfish-task.md` + the last stale reference in `roles/goldfish.md:101` |
+| `PHX-WP-GIT03-TRAILER-CHECK` | `a9c0f025` | GIT-03 sample verification: line-grep → structural `git log --format='%(trailers:...)'` parsing |
+| `PHX-WP-HAC12-GMW-NAME` | `b1c57d2c` | H-AC-12 enumeration now names GMW (ADR-0058) explicitly; Critic-verified complete |
+| `PHX-WP-MANIFEST-AMENDMENT` | `01d2c3c0` (real code, Critic-verified correct) | See reconciliation note below — `7d3550b5` is a **misleading commit message**, not a code defect |
+| `PHX-WP-AUTHORITY-BINDING-DURABILITY` | `4cd3e93d`, `e709c440` | Untangled from the contamination; dead-code helpers removed, the two fail-closed PRD/spec-path checks in `submitPlan()` kept and regression-tested (13/13 pass) |
+| `PHX-WP-EPIC-FILE-CONTRACT` | `78137b1a`, `3f9bc6b8` | New `harness/scripts/check-epic-file-contract.mjs` (16/16 tests pass), registered in `verify.mjs`'s `TEST_SUITES`; its own exit-2 against real ADR-renumbering drift left deliberately un-gated (correct-by-design, not a bug) |
+| `PHX-WP-COMMIT-ACT-TRAILER` | `f5db8aeb`, `8efc783a` | Optional `Commit-Act: orchestrator` trailer + Critic-guidance wording for Elephant-performed commits |
+| resume-hint.mjs `RH-SCHEMA` false-context-blame bug (found by Critic reviewing `f685a2b5`) | `977a78ee` | `buildResumeHint()` now only calls `resumeHintContextDetail()` when the failure actually `cause === "context"`; new regression test `RH-SCHEMA-DIAG-2`; 7/7 tests pass |
+
+**Reconciliation — `PHX-WP-MANIFEST-AMENDMENT` evidence-trail finding:** two independent Critic passes flagged commit `7d3550b5`'s message/diff mismatch: the message reads as if it adds the amendment-record feature, but the diff only touches `dispatch-record.json`'s log field (a second, concurrent dispatch's after-the-fact verification note, written once it found the feature already present on disk from `01d2c3c0`). The actual code change is real, landed, and independently Critic-verified correct in `01d2c3c0`. `7d3550b5` is not rewritten (unpushed but not the immediately-prior self-correction either, and `dispatch-record.json` at repo root is itself an ephemeral, repeatedly-overwritten scratch log by design, not a durable evidence artifact) — this checkpoint entry is the durable correction: **treat `7d3550b5` as a mislabeled evidence-log update, not a second code change.**
+
+**GMW batch 2 — still open, dispatch-ready, matches the active window's scope, not yet started:**
+
+1. `backlog/items/2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md` (TP-3)
+2. `backlog/items/2026-08-18-reconcile-lock-reuse-regression-test-needs-a-tp5-window.md` (TP-5)
+3. `backlog/items/2026-08-07-maintenance-window-selectivity-is-untested-at-both-levels.md` (TP-2/TP-6)
+4. `backlog/items/2026-08-07-no-test-pins-the-ungoverned-path-rule-stand-down.md` (TP-2/TP-6)
+5. `backlog/items/2026-08-07-governance-product-verify-suites-deregistered.md` (TP-3)
+6. `backlog/items/2026-08-09-push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to.md` (TP-3, `harness/scripts/verify.mjs`; PO already decided direction 2 at checkpoint 40 item 2)
+
+`backlog/items/2026-08-11-reconcile-lock-reuse-uses-lexical-not-real-path-comparison.md` is already `status: closed` (superseded by item 2 above) — not a 7th item.
+
+**Unchanged:** OT09/TP-7 still needs a fix from a separate plugin-authoring-repo session; the PO's physical presence with their Ed25519 key is still needed for the Layer 2/3 push-signing and `feature-package-reconcile` ceremonies. No `git push` has been executed at any point in this session.
 
 ---
 
