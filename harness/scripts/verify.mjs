@@ -558,6 +558,11 @@ const TEST_SUITES = [
   { name: "guard-handoff-offer-tests", file: join(libDir, "guard-handoff-offer.test.mjs") },
   { name: "pipeline-state-lifecycle-event-tests", file: join(pluginScriptsDir, "pipeline-state-lifecycle-event.test.mjs") },
   { name: "epic-file-contract-tests", file: join(scriptDir, "check-epic-file-contract.test.mjs") },
+  { name: "plan-spec-state-v2-legacy-tests", file: join(repoRoot, "harness", "lib", "plan-spec-state-v2.test.mjs") },
+  { name: "recovery-bridge-approval-tests", file: join(scriptDir, "recovery-bridge-approval.test.mjs") },
+  { name: "guard-git-phoenix-tests", file: join(hooksDir, "guard-git-phoenix.test.mjs") },
+  { name: "afk-activation-tests", file: join(pluginScriptsDir, "afk-activation.test.mjs") },
+  { name: "codex-isolated-critic-protected-preimage-tests", file: join(pluginScriptsDir, "codex-isolated-critic-protected-preimage.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at

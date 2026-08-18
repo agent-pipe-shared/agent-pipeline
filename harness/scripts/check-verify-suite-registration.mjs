@@ -200,31 +200,6 @@ export const EXCLUSIONS = Object.freeze({
     owner: "PO",
     expires: "2026-09-07",
   }),
-  "harness/lib/plan-spec-state-v2.test.mjs": Object.freeze({
-    reason: "GREEN, not red: repaired 2026-08-09 (PHX-PLANSPEC, commit 1f37b40) by restoring the human-decision-bound plan-approval writer that merge 75b8361 dropped; the suite loads and passes 8 checks. It is not a duplicate of its registered successor -- it pins the human-decision lineage the successor does not cover. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "harness/scripts/recovery-bridge-approval.test.mjs": Object.freeze({
-    reason: "GREEN, not red: repaired 2026-08-09 (PHX-BRIDGE, commit 77a2f50) by restoring the recovery-bridge decision contract that merge 75b8361 dropped; the suite loads and passes. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs": Object.freeze({
-    reason: "GREEN, not red: repaired 2026-08-09 (PHX-GITAUTH, commit 1729334) by restoring the phoenixGovernedProject predicate that merge 75b8361 deleted. This was recorded as a contract contradiction with guard-git.test.mjs OV-AC1 and was not one -- the two suites never touched the same path; one fixture is Phoenix-governed and the other is not, and the merge removed the predicate that told them apart. NOTE: this suite is cwd-sensitive (it spawns the guard), so it must be run from the repository root, not from the detached verify worktree. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "plugins/pipeline-core/scripts/afk-activation.test.mjs": Object.freeze({
-    reason: "red (R1.2): AssertionError, false !== true",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
-  "plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs": Object.freeze({
-    reason: "GREEN, not red: repaired 2026-08-09 (PHX-PIN2) by re-baselining the six drifted rawSha256 pins of nine to the bytes on disk, on recorded PO authorization; the other three already matched, and none of the nine pinned files was touched. The suite loads and passes 4 checks. Parked solely because registering it edits verify.mjs, a protected test path whose maintenance window is closed and whose reopening needs a human signature. Register on the next window; this entry is a scheduling record, not a defect record.",
-    owner: "PO",
-    expires: "2026-09-07",
-  }),
 });
 
 function toPosix(rawPath) { return rawPath.split(sep).join("/"); }
