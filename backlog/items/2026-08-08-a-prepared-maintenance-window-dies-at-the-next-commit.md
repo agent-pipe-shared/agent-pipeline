@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.prepared-maintenance-window-dies-at-the-next-commit
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 source: "Found on 2026-08-08 while planning a TP-3/TP-5 window for Phoenix. The Elephant was about to hand the PO a prepare command with two implementation dispatches still in flight; reading install() first showed that every commit those dispatches made would have voided the signature before it could be used. Caught by reading, not by a refusal -- the ceremony gives no warning at prepare time."
 due: 2026-09-07
@@ -88,3 +88,18 @@ Option 1 is unambiguously an improvement and should ship regardless.
 - The two signing-UX findings recorded in `docs/state.md` (the five-minute plan
   TTL, and the intent digest the tooling never prints) belong to the same
   ceremony and should be repaired together rather than one at a time.
+
+## Triage — closed 2026-08-18
+
+- **Decision:** Accept and fix Option 1 only (options 2/3 need their own
+  decision, per the item's own text — not taken here).
+- **Assignment:** `PHX-WP-GMW-PREPARE-WARNING` (goldfish-deep), commit
+  `2e22cc02`. `prepare`'s returned `value` now carries a `warning` string:
+  "This signature is valid only while HEAD stays at `<sha>`. Commit nothing
+  between signing and installing." — sourced from `intent.value.candidate.commit`
+  (the briefing's guessed path, `subject.candidate.commit`, turned out wrong;
+  the dispatch found and used the real one, documented inline in the code).
+  `install`/`status`/`close` and the refusal logic itself are unchanged.
+  Independently re-verified by the Elephant: re-ran the same `prepare`
+  smoke-test command directly, confirmed the `warning` field's sha matches
+  live `HEAD`.
