@@ -80,7 +80,39 @@ at most a human German pass, explicitly not a defect blocking anything.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** ACCEPTED, narrowed. Class 1: no repair, close as historical
+  record per the Proposal's own recommendation. Class 3: deferred, human-only
+  German pass, not blocking. Class 2: stays OPEN — this item's own warning
+  was violated a second time on 2026-08-18 (see below), which raises rather
+  than lowers the bar for how it must be fixed next.
+- **Rationale:** Classes 1 and 3 need no design work; the Proposal already
+  states the correct disposition for each and nothing since 2026-08-09
+  changes it. Class 2 is different: on 2026-08-18, a `PHX-WP-DOCTEMPLATE-SWEEP`
+  dispatch's "FIX 2" repeated the exact trap this item documents — a plain
+  Goldfish edit to `specs/sprint-phoenix-epic/spec.md:407` (the line had
+  drifted from `:403`) changing the ADR path, which broke the `specSha256`
+  binding and put session readiness into `partial` again, blocking all
+  further writes until the PO ran `git checkout --
+  specs/sprint-phoenix-epic/spec.md` outside the session. That is the
+  **third** recorded occurrence of the identical failure mode (the
+  `PHX-ADR-FIX` dispatch that produced `88a7133`, this item's own filing, and
+  now this one) — twice now on the exact same line. Root cause of the repeat:
+  the dispatch briefing stated "fix the stale path" without quoting this
+  item's Class 2 warning verbatim, so a Goldfish following "fix the stale
+  path" literally has no way to know the file is hash-bound authority. A
+  briefing that names the target line without also naming the constraint
+  invites exactly this.
+- **Assignment (if accepted):** Class 2 is NOT dispatchable as an ordinary
+  Goldfish edit under any briefing that does not itself go through the
+  reviewed Spec-rebind mechanism this item's Proposal names (whatever the
+  Phoenix calibration prescribes for a hash-bound Spec correction — see
+  `guard-lifecycle-ready.mjs`'s `partial`-readiness recovery path and
+  `pipeline-state.mjs po-authority-decision-plan/-select/-apply`). The
+  `-apply` step transitions the project `phase` from `implementation` to
+  `design`, which is disproportionate for a one-line typo fix — whoever picks
+  this up next should treat that cost as a real input to *when* this gets
+  fixed (e.g. bundle it with other Spec-authority work that already needs
+  that transition), not fix it via a plain edit to avoid the cost. Left open
+  rather than closed-as-accepted-drift, because the ADR path in the live Spec
+  is still wrong.
+- **Date:** 2026-08-18
