@@ -51,7 +51,7 @@ assert.deepEqual(normalPreflight.bootstrapPayload.retainedChecks, [
 
 const temp = mkdtempSync("/tmp/bootstrap-envelope-");
 const envelopePath = join(temp, "envelope.json");
-writeFileSync(envelopePath, JSON.stringify({ schema: "pipeline.test-envelope.v1", payload: "x".repeat(20_000) }));
+writeFileSync(envelopePath, JSON.stringify({ schema: "pipeline.test-envelope.v1", payload: "x".repeat(50_000) }));
 const overReceipt = buildReceipt({ root: join(here, ".."), envelope: JSON.parse(readFileSync(envelopePath, "utf8")) });
 assert.equal(overReceipt.overBudget, true);
 assert.equal(overReceipt.originalMeasurement.withinBudget, false);

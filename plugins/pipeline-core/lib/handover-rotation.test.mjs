@@ -25,7 +25,7 @@ function fixtureRoot(label) {
 }
 
 // -- HANDOVER_MAX_BYTES is independently justified, never the bootstrap constant --
-assert.equal(HANDOVER_MAX_BYTES, 12_000);
+assert.equal(HANDOVER_MAX_BYTES, 30_000);
 assert.equal(HANDOVER_DEFAULT_PATH, "docs/state.md");
 
 // -- measureHandoverBytes mirrors measureBootstrapBytes's shape/metric --

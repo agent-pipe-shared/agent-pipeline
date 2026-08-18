@@ -18,7 +18,7 @@ assert.equal(positive.withinBudget, true);
 const tampered = measureBootstrapPayload({ featureId: "nova", revision: 5 }, { mode: "normal" });
 assert.notEqual(tampered.digestSha256, positive.digestSha256);
 
-const over = boundedPayload({ code: "PCR-READY", featureId: "nova", revision: 7, huge: "x".repeat(20_000) }, { mode: "compact" });
+const over = boundedPayload({ code: "PCR-READY", featureId: "nova", revision: 7, huge: "x".repeat(50_000) }, { mode: "compact" });
 assert.equal(over.overBudget, true);
 assert.equal(over.originalMeasurement.withinBudget, false);
 assert.equal(over.emittedMeasurement.withinBudget, true);

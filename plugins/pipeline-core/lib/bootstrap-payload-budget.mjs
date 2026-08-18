@@ -10,9 +10,14 @@ export const BOOTSTRAP_PAYLOAD_SCHEMA = "pipeline.bootstrap-payload-measurement.
  * skills/pipeline-start/pipeline-start-v3.test.mjs. That raise reached only one
  * of the then-five copies, and the disagreeing copies are exactly what this
  * constant now prevents: bootstrap-payload-measure.test.mjs asserts that no
- * consumer carries a second literal of this number.
+ * consumer carries a second literal of this number. Raised again 2026-08-18
+ * (PO decision) from 18,000 to 45,000, in the same step that raised
+ * `HANDOVER_MAX_BYTES` (`lib/handover-rotation.mjs`) from 12,000 to 30,000 --
+ * preserving that constant's original 1.5x-headroom relationship to this one
+ * (18,000/12,000 = 45,000/30,000 = 1.5) rather than letting the handover cap
+ * alone exceed the whole bootstrap budget.
  */
-export const BOOTSTRAP_PAYLOAD_MAX_BYTES = 18_000;
+export const BOOTSTRAP_PAYLOAD_MAX_BYTES = 45_000;
 
 function text(value) {
   return typeof value === "string" ? value : JSON.stringify(value ?? null);

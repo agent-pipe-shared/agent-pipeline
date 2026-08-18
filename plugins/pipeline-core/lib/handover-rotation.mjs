@@ -22,17 +22,23 @@ import { resolveAuthorityArtifactPath } from "./project-authority.mjs";
 export const HANDOVER_MEASUREMENT_SCHEMA = "pipeline.handover-measurement.v1";
 
 /**
- * ADR-0066 Decision 4: a new, independently-justified constant. 12,000
- * utf8-byte-upper-bound units leaves headroom for the rest of a bootstrap
- * read under the existing 18,000-unit `BOOTSTRAP_PAYLOAD_MAX_BYTES` ceiling
- * (`lib/bootstrap-payload-budget.mjs`) while staying generous enough that a
- * single realistic current block does not thrash against it constantly.
- * The Elephant's reasoned default per the ADR, not a PO-specified figure --
- * expected to be revisited once real rotation cadence is observed (ADR-0066
- * Follow-up). NEVER derived from, or asserted equal to, the bootstrap
- * constant; the two are allowed to diverge by construction.
+ * ADR-0066 Decision 4: a new, independently-justified constant. Raised from
+ * the original 12,000 to 30,000 (2026-08-18, PO decision): the original
+ * figure proved unrealistic for a project at this repo's actual scale
+ * (confirmed live -- docs/state.md still ran to ~110,000 bytes after two
+ * full ADR-0066 rotation passes, with its "Operational head" and "Open
+ * items and next block" sections alone exceeding the old cap before any
+ * historical narrative is even counted). `BOOTSTRAP_PAYLOAD_MAX_BYTES`
+ * (`lib/bootstrap-payload-budget.mjs`) was raised in the same step, keeping
+ * this constant's original 1.5x-headroom relationship to it (18,000/12,000
+ * = 1.5; 45,000/30,000 = 1.5) so the rest of a bootstrap read still has
+ * proportional room. The Elephant's reasoned default per the ADR, not a
+ * PO-specified figure -- expected to be revisited again once real rotation
+ * cadence at this new cap is observed (ADR-0066 Follow-up). NEVER derived
+ * from, or asserted equal to, the bootstrap constant; the two are allowed
+ * to diverge by construction.
  */
-export const HANDOVER_MAX_BYTES = 12_000;
+export const HANDOVER_MAX_BYTES = 30_000;
 
 /** ADR-0066 Decision 5: the default handover path when a project has not configured one. */
 export const HANDOVER_DEFAULT_PATH = "docs/state.md";
