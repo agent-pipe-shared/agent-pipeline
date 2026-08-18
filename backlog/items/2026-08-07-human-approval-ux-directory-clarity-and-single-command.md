@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.human-approval-ux-directory-clarity-and-single-command
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-09-06
 source: "PO decision and observation during the first live guard-maintenance-window signing on 2026-08-07: the wrong key directory was used twice before the trust mismatch surfaced, and the PO was handed two commands where only the first is theirs."
@@ -121,9 +121,9 @@ worthless precisely where it is most needed.
 Related, same family: the confirmation prompt is English-only
 ([`pipeline.human-authorization-prompts-ignore-the-configured-language-profile`](2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md)).
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — closed 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Close as fixed-in-Nova-only, not ported; do not duplicate.
+- **Rationale:** Issue #3 (state which commands are human-only vs. agent-safe) is already fixed directly in Phoenix (commit `71f330db`, `docs/po-human-approval.md` "Which commands are yours"). Issues #1 (configured key directory, checked before prompting) and #2 (sign-intent renders what it actually signs) are unfixed here but are both solved in Nova's `plugins/pipeline-core/scripts/po-human-approval.mjs`: a precedence-ordered remembered/configured PO key-directory resolution (`PO-KEYDIR-01(A)`/`(B)`, `--directory` > repo-remembered directory > machine-scoped config > env var, checked against the pinned public-key hash) checked before any prompt, and a `sign-intent --request <path>` flag that verifies the request's `intentSha256` against the signed digest and renders scope/effect/duration in plain language. Per the project's standing instruction to skip work already solved in Nova rather than duplicate it, this item is closed here.
+- **Assignment (if accepted):** n/a — disposed without further Phoenix-side work; see Nova's `po-human-approval.mjs` (`PO-KEYDIR-01` A/B) and its `--request`-flag `sign-intent` for the equivalent, already-shipped fix, as the forward path if this tooling is ever unified/ported.
+- **Date:** 2026-08-18

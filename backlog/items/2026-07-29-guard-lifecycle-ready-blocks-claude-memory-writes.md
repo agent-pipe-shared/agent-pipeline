@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-lifecycle-ready-blocks-claude-memory-writes
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-07-29
 source: "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
 ---
@@ -96,3 +96,10 @@ point.
 - **Assignment (if accepted):** n/a — no implementation assigned; PO should
   first confirm/re-locate the cited 2026-07-29 decision.
 - **Date:** 2026-08-06
+
+## Triage — closed 2026-08-18
+
+- **Decision:** Close as fixed-in-Nova-only, not ported; the citation gap above is also resolved.
+- **Rationale:** Nova's `guard-lifecycle-ready.mjs` now carries `claudeSessionMemoryDirectory()`/`isClaudeSessionMemoryWritePath()` (`:906-978`), wired into the write-admission path (`:2424-2443`) so a write strictly inside the session's own derived `.../memory/` directory is admitted outright (symlink-safe, via the same realpath walk `isProjectWritePath()` uses), while every other cross-repository write is still refused exactly as before. Nova's own inline comment cites "PO decision, 2026-08-08 — Option A" and names this exact backlog item by filename — so the decision this item's 2026-08-06 Triage searched for and couldn't find was made one day later (2026-08-08) and one repo away (Nova), as Option A, not Option B as originally cited. Phoenix's own `guard-lifecycle-ready.mjs` remains unchanged and still has no memory carve-out.
+- **Assignment (if the PO wants parity in Phoenix):** port Nova's `claudeSessionMemoryDirectory`/`isClaudeSessionMemoryWritePath` mechanism verbatim via a briefed dispatch against Phoenix's TP-protected `guard-lifecycle-ready.mjs` — not done automatically here, since Phoenix's own memory-write needs may differ.
+- **Date:** 2026-08-18
