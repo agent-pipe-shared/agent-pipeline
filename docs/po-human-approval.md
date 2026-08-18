@@ -1,5 +1,9 @@
 # PO approval: one human action
 
+For the full list of every human intent/gate this repository implements and
+which ones sit on this shared contract versus a different mechanism, see
+[`docs/human-authorization-inventory.md`](human-authorization-inventory.md).
+
 The agent owns every public preparation step: it creates the candidate-bound
 request, refreshes it after a candidate change, and verifies the public proof.
 The person owns only key setup (once) and approval. The encrypted private key
