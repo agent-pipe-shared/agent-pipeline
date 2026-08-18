@@ -232,6 +232,118 @@ test("sign-intent signs a digest end-to-end with a real OpenSSL round trip and t
   }
 });
 
+// NVA-SWEEP-F2 (backlog/items/2026-08-16-gmw-reconcile-still-needs-a-manual-copy-after-
+// the-po-signs.md, direction b): `--request` collapses the two manual `cp` steps the PO
+// previously ran around a GMW/HGO reconcile sign-intent into the same command that signs
+// -- reading the digest straight out of this repository's own scratch/ tree and mirroring
+// the resulting proof/signer back into scratch/ next to the request, so the requesting
+// agent session finds them on its own next turn with no PO-run copy step in between.
+test("NVA-SWEEP-F2: sign-intent --request reads the digest from a repo-root scratch/ file and mirrors the proof/signer back into scratch/ next to it, with no external-directory copy in between", () => {
+  const dirs = fixtureDirs();
+  try {
+    const { authority } = keyFixture(dirs.directory);
+    const intentSha256 = createHash("sha256").update("pipeline.gmw-reconcile-request-fixture").digest("hex");
+    const scratchDir = join(dirs.repoRoot, "scratch");
+    mkdirSync(scratchDir, { recursive: true });
+    const requestPath = join(scratchDir, "reconcile-request-42.json");
+    writeFileSync(requestPath, `${JSON.stringify({ intentSha256 }, null, 2)}\n`);
+    const dependencies = { readConfirmation: () => "approve" };
+    const result = runHumanApproval(
+      ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/reconcile-request-42.json"],
+      dependencies,
+    );
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-SIGN-INTENT-READY");
+    assert.equal(result.intentSha256, intentSha256);
+
+    const externalProof = JSON.parse(readFileSync(join(dirs.directory, "proof-manual.json"), "utf8"));
+    const externalSigner = JSON.parse(readFileSync(join(dirs.directory, "signer-manual.json"), "utf8"));
+
+    const scratchProofPath = join(scratchDir, "reconcile-proof-42.json");
+    const scratchSignerPath = join(scratchDir, "reconcile-signer-42.json");
+    assert.equal(result.scratchProofPath, scratchProofPath);
+    assert.equal(result.scratchSignerPath, scratchSignerPath);
+    assert.deepEqual(JSON.parse(readFileSync(scratchProofPath, "utf8")), externalProof);
+    assert.deepEqual(JSON.parse(readFileSync(scratchSignerPath, "utf8")), externalSigner);
+    assert.equal(externalSigner.keyReference, authority.keyReference);
+
+    const verified = verifyPoApprovalProof({ intent: { sha256: intentSha256 }, trustPolicy: authority, proof: externalProof });
+    assert.equal(verified.verified, true);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-SWEEP-F2: sign-intent --request is rejected outside this repository's own scratch/ tree", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const outsideDir = join(dirs.repoRoot, "not-scratch");
+    mkdirSync(outsideDir, { recursive: true });
+    writeFileSync(join(outsideDir, "reconcile-request-1.json"), `${JSON.stringify({ intentSha256: "a".repeat(64) }, null, 2)}\n`);
+    assert.throws(
+      () => runHumanApproval(
+        ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "not-scratch/reconcile-request-1.json"],
+        { readConfirmation: () => "approve" },
+      ),
+      /--request must be a path inside this repository's own scratch\/ directory/,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-SWEEP-F2: sign-intent rejects supplying both --intent-sha256 and --request, and rejects supplying neither", () => {
+  const dirs = fixtureDirs();
+  try {
+    assert.throws(
+      () => runHumanApproval(
+        ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", "a".repeat(64), "--request", "scratch/reconcile-request-1.json"],
+        {},
+      ),
+      /Usage:/,
+      "both flags together must be rejected",
+    );
+    assert.throws(
+      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], {}),
+      /Usage:/,
+      "neither flag must be rejected",
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-SWEEP-F2: sign-intent --request fails closed on malformed JSON, a missing intentSha256 field, and a basename that cannot derive a sibling proof/signer name", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    const scratchDir = join(dirs.repoRoot, "scratch");
+    mkdirSync(scratchDir, { recursive: true });
+    const dependencies = { readConfirmation: () => "approve" };
+
+    writeFileSync(join(scratchDir, "reconcile-request-bad.json"), "not json");
+    assert.throws(
+      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/reconcile-request-bad.json"], dependencies),
+      /--request must contain valid JSON/,
+    );
+
+    writeFileSync(join(scratchDir, "reconcile-request-missing.json"), `${JSON.stringify({ other: "field" }, null, 2)}\n`);
+    assert.throws(
+      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/reconcile-request-missing.json"], dependencies),
+      /--request JSON must carry an intentSha256 field/,
+    );
+
+    writeFileSync(join(scratchDir, "unnamed-42.json"), `${JSON.stringify({ intentSha256: "a".repeat(64) }, null, 2)}\n`);
+    assert.throws(
+      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/unnamed-42.json"], dependencies),
+      /must contain "request" so sibling proof\/signer paths can be derived/,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("NVA-SIGDISCLOSE-1 Finding 3: sign-intent reports a missing --human-name specifically, distinct from a genuine key mismatch, when the trust-policy record predates --human-name but the key itself is correct", () => {
   const dirs = fixtureDirs();
   try {

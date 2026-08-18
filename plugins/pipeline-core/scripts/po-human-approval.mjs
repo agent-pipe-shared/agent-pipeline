@@ -41,7 +41,7 @@ import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 const SCRIPT = fileURLToPath(import.meta.url);
 const PLUGIN_ROOT = resolve(dirname(SCRIPT), "..");
 
-const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | sign-intent --repo-root <repo> --directory <external-dir> --intent-sha256 <sha256> | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601>";
+const USAGE = "Usage: po-human-approval.mjs setup --repo-root <repo> --directory <external-dir> [--key-reference <id>] | prepare --repo-root <repo> --directory <external-dir> [--feature-id <id> --plan <repo-path> --spec <repo-path> --model <repo-path>] | prepare-all --repo-root <repo> --directory <external-dir> | approve --repo-root <repo> --directory <external-dir> [--feature-id <id>] | approve-all --repo-root <repo> --directory <external-dir> | verify --repo-root <repo> --directory <external-dir> [--feature-id <id>] | verify-all --repo-root <repo> --directory <external-dir> | prepare-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601> | approve-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | verify-critical --repo-root <repo> --directory <external-dir> --kind <push|deploy|publication|release-preflight> | sign-intent --repo-root <repo> --directory <external-dir> (--intent-sha256 <sha256> | --request <repo-scratch-relative-path>) | authorize-critical --repo-root <repo> --directory <external-dir> --feature-id <id> --plan <repo-path> --spec <repo-path> --kind <push|deploy|publication|release-preflight> --subject-sha256 <sha256> [--subject <repo-path>] --expires-at <ISO-8601>";
 // This repo's own environment inputs are all named PIPELINE_<PURPOSE> (see
 // PIPELINE_GUARD_OVERRIDE, PIPELINE_LIVE_CERTIFICATION_AUTHORITY,
 // PIPELINE_SECURITY_REVIEWER_ID elsewhere in this plugin); PO_APPROVAL_DIRECTORY
@@ -242,6 +242,42 @@ export function outside(repoRoot, path, platform = process.platform) {
   const rel = platform === "win32" ? raw.split("\\").join("/") : raw;
   return rel === "" ? false : rel === ".." || rel.startsWith("../") || api.isAbsolute(rel);
 }
+
+/**
+ * NVA-SWEEP-F2: `sign-intent --request` is deliberately scoped to this repository's
+ * OWN `scratch/` tree, not "anywhere inside the repository" -- the one hand-off
+ * location an agent session may write to directly (templates/prompts/agent-
+ * obligations.md SS3: guard-devplan's exempt prefixes) and the PO's own unguarded
+ * shell already reaches alongside the external `--directory`, with no guard-boundary
+ * change. Returns the repo-relative path (posix-separated, always starting
+ * `scratch/` or exactly `scratch`) on success, `null` on anything else -- outside the
+ * repository, equal to the repository root itself, or inside the repository but
+ * outside `scratch/`. Mirrors outside()'s own win32/posix relative-path handling
+ * (same drive-letter/backslash care) rather than a second, naive comparison.
+ */
+function repoScratchRelativePath(repoRoot, path, platform = process.platform) {
+  const api = platform === "win32" ? win32Path : posixPath;
+  const root = api.resolve(repoRoot); const target = api.resolve(path);
+  const raw = api.relative(root, target);
+  const rel = platform === "win32" ? raw.split("\\").join("/") : raw;
+  if (rel === "" || rel === ".." || rel.startsWith("../") || api.isAbsolute(rel)) return null;
+  return rel === "scratch" || rel.startsWith("scratch/") ? rel : null;
+}
+
+/**
+ * NVA-SWEEP-F2: derives the sibling proof/signer path next to a `--request` file by
+ * substituting the FIRST occurrence of "request" in its basename (never its
+ * directory, so a `scratch/reconcile-request/` directory segment is left alone) --
+ * `scratch/reconcile-request-42.json` yields `scratch/reconcile-proof-42.json` for
+ * `replacement === "proof"`. Returns `null` when the basename carries no such
+ * literal (nothing to substitute), so the caller fails closed instead of silently
+ * writing back to the request's own path.
+ */
+function scratchSiblingPath(requestPath, replacement) {
+  const dir = dirname(requestPath); const base = basename(requestPath);
+  if (!base.includes("request")) return null;
+  return join(dir, base.replace("request", replacement));
+}
 function fail(message) { throw new Error(message); }
 function json(path) { return JSON.parse(readFileSync(path, "utf8")); }
 function publicKeyPolicy(publicKey, keyReference) {
@@ -310,7 +346,7 @@ export function parseHumanArgs(argv, dependencies = {}) {
     const key = tokens[index]; const value = tokens[index + 1];
     if (!key?.startsWith("--") || typeof value !== "string" || value.startsWith("--")) return { error: USAGE };
     const normalized = key.slice(2).replace(/-([a-z])/gu, (_, letter) => letter.toUpperCase());
-    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "expiresAt", "intentSha256"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
+    if (!new Set(["directory", "repoRoot", "keyReference", "humanName", "featureId", "plan", "spec", "model", "kind", "subject", "subjectSha256", "expiresAt", "intentSha256", "request"]).has(normalized) || supplied.has(normalized)) return { error: USAGE };
     supplied.add(normalized); values[normalized] = value; index += 1;
   }
   // GF-104: keyReference always carries a default ("local-po-key") even when the
@@ -382,7 +418,19 @@ export function parseHumanArgs(argv, dependencies = {}) {
   // re-reads an existing record must not be forced to repeat a name it already has.
   if (command.endsWith("-all") && (values.featureId || values.plan || values.spec || values.model)) return { error: USAGE };
   if (command.endsWith("-critical") && !CRITICAL_ACTION_KINDS.includes(values.kind)) return { error: USAGE };
-  if (command === "sign-intent" && !SHA.test(values.intentSha256 ?? "")) return { error: USAGE };
+  // NVA-SWEEP-F2 (backlog/items/2026-08-16-gmw-reconcile-still-needs-a-manual-copy-after-
+  // the-po-signs.md, Triage confirmation 2026-08-18, direction b): `--request` is an
+  // ALTERNATIVE source for the digest, never a second one accepted alongside
+  // `--intent-sha256` -- exactly one of the two must be supplied. A caller-supplied
+  // `--intent-sha256` that is present but malformed (wrong length/hex) still yields the
+  // pre-existing usage error here, unchanged: `hasIntentSha` is false either way, and
+  // `hasRequest` stays false when `--request` was never passed, so the two agree and this
+  // still refuses exactly as it always did.
+  if (command === "sign-intent") {
+    const hasIntentSha = SHA.test(values.intentSha256 ?? "");
+    const hasRequest = text(values.request);
+    if (hasIntentSha === hasRequest) return { error: USAGE };
+  }
   return values;
 }
 
@@ -885,6 +933,32 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
   }
   if (args.command === "sign-intent") {
     if (!exists(paths.privateKey) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup before sign-intent");
+    // NVA-SWEEP-F2 (backlog/items/2026-08-16-gmw-reconcile-still-needs-a-manual-copy-
+    // after-the-po-signs.md, Triage confirmation 2026-08-18, direction b): `--request`
+    // reads the digest directly out of a JSON file the PO already has local filesystem
+    // access to -- this repository's own `scratch/` tree -- instead of requiring the
+    // agent to relay a bare `--intent-sha256` string another way. `parseHumanArgs`
+    // already guarantees exactly one of `--intent-sha256`/`--request` was supplied.
+    // Everything below (disclosure, confirmation, signing) is unchanged and driven by
+    // the SAME `intentSha256` local either way -- `--request` only changes where that
+    // value comes from and, further below, adds a second write target for the result.
+    let scratchProofPath = null; let scratchSignerPath = null;
+    if (text(args.request)) {
+      const requestPath = resolve(repository, args.request);
+      const scratchRel = repoScratchRelativePath(repository, requestPath);
+      if (scratchRel === null) fail("--request must be a path inside this repository's own scratch/ directory");
+      let raw;
+      try { raw = read(requestPath, "utf8"); } catch { fail("--request could not be read"); }
+      let record;
+      try { record = JSON.parse(raw); } catch { fail("--request must contain valid JSON"); }
+      if (!SHA.test(record?.intentSha256 ?? "")) fail("--request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)");
+      args.intentSha256 = record.intentSha256;
+      scratchProofPath = scratchSiblingPath(requestPath, "proof");
+      scratchSignerPath = scratchSiblingPath(requestPath, "signer");
+      if (scratchProofPath === null || scratchSignerPath === null) {
+        fail('--request file name must contain "request" so sibling proof/signer paths can be derived (e.g. reconcile-request-<id>.json)');
+      }
+    }
     const intentSha256 = args.intentSha256;
     // The human is not asked to authorize a bare digest (ADR-0061 Decision 4): the
     // request recorded behind it is resolved and its own recorded reason, scope and
@@ -925,7 +999,20 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
       signer: artifactPath(directory, "signer-manual.json"),
     };
     const signed = signIntentIntoProof({ intentSha256, keys: paths, artifacts: manual, io: { write, read }, dependencies });
-    return { ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256, signer: signed.signer };
+    // NVA-SWEEP-F2: this is the "write the proof" half -- the durable proof written to
+    // the external `--directory` above is UNCHANGED (still the artifact every other
+    // verifier reads), and this is an ADDITIONAL mirror into the same repo-root
+    // scratch/ location `--request` was read from, so the requesting agent session
+    // finds the proof waiting in its OWN root on its next turn with no PO-run `cp`
+    // step in between.
+    if (scratchProofPath !== null) {
+      write(scratchProofPath, `${JSON.stringify(signed.proof, null, 2)}\n`, { mode: 0o600 });
+      write(scratchSignerPath, `${JSON.stringify(signed.signer, null, 2)}\n`, { mode: 0o600 });
+    }
+    return {
+      ok: true, code: "PO-HUMAN-SIGN-INTENT-READY", intentSha256, signer: signed.signer,
+      ...(scratchProofPath !== null ? { scratchProofPath, scratchSignerPath } : {}),
+    };
   }
   if (!exists(paths.request) || !exists(paths.publicKey) || !exists(paths.authority)) fail("run setup and prepare before approving");
   const request = approvalRequestFromExternalJson(json(paths.request));
