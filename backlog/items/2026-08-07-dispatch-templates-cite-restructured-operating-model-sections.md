@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatch-templates-cite-restructured-operating-model-sections
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
 created: 2026-08-07
 source: "Critic round-4 briefing-violations note, delta re-review of WP2-WP3-partA-rework-3 (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-3-delta-critic-review-138e2e3.md); widened by the Elephant on verification. Recorded, not fixed, because the correct target is a real decision rather than a renumbering."
 due: 2026-09-06
@@ -168,4 +168,34 @@ in-session edit.
   against.
 - **Sequencing satisfied 2026-08-08:** the 0.5.3 merge landed (`35d9e11`). The
   sweep is no longer blocked.
-- **Date:** 2026-08-07 (figures amended 2026-08-08)
+- **Closed 2026-08-18, verified rather than assumed.** The B3 sweep's actual
+  edits landed across a long series of `phx-r3-*`/`docs(phx-r3)` commits after
+  this item's last update (e.g. `162c30c3` for `docs/deploy/README.md`), but
+  this item's own frontmatter was never flipped to `closed` once they had —
+  found while resuming backlog work this session. Re-verified independently
+  today with the exact AC-R3-1 method (`rg -n "§"` then `rg -n "OM §"`, never
+  `operating-model`), run across the whole repository rather than trusting the
+  prior inventory: `rg -n "OM §" --glob "*.md" .` and
+  `rg -no "operating-model\.md[^)]{0,30}§[0-9.]+" --glob "*.md" .` both return
+  hits **only** inside the classes B3 explicitly excludes — `docs/adr/**`
+  (C9), `specs/**` and `backlog/**` (C10, including this item, the design
+  document, and the evidence inventories themselves, all of which *quote* the
+  defect rather than carry it) — plus `backlog/README.md` and
+  `backlog/items/TEMPLATE.md`, both archival/C10. Targeted checks against the
+  higher-traffic live files the design flagged by name — `CLAUDE.md`,
+  `roles/goldfish.md`, `roles/critic.md`, `harness/review-protocol.md`,
+  `templates/prompts/critic-review.md`, `templates/prompts/goldfish-task.md`,
+  every file under `plugins/pipeline-core/`, and
+  `harness/scripts/check-claude-md-lines.mjs` — show zero remaining stale
+  numbered citations to `docs/operating-model.md`; every `§` in those files
+  now resolves to that file's own stable numbering (`harness/review-protocol.md`,
+  ADRs by id) or to a heading-title citation. `node
+  harness/scripts/check-doc-contracts.mjs` exits 0 (664 files, 964 links, 13
+  anchors) after an unrelated fix landed the same session (commit
+  `c1167320`, a dangling relative-link pair in an unrelated evidence file).
+  AC-R3-2 through AC-R3-7 were not re-derived line-by-line against the full
+  39-file B3 set today — that would re-do the `phx-r3-b3-inventory-*`
+  evidence work rather than trust it — but AC-R3-1 (the one criterion that
+  defines "is the defect class gone") is satisfied by direct measurement, not
+  by inference from the commit log. Closing on that basis.
+- **Date:** 2026-08-07 (figures amended 2026-08-08; closed 2026-08-18)
