@@ -54,4 +54,4 @@ exact drift from recurring a fourth time.
 - **Rationale:** matches canonical KINDS Set in lifecycle-governance-events.mjs; no code or test reads this schema file today so this is zero runtime risk, pure published-contract drift correction
 - **Assignment (if accepted):** this dispatch (PHX-WP-LAC08-CANCELFIX)
 - **Date:** 2026-08-18
-- **Closure commit:** (recorded post-commit — see commit history for PHX-WP-LAC08-CANCELFIX)
+- **Closure commit:** da72aacf
