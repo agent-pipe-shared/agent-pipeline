@@ -160,3 +160,90 @@ Not yet decided. Suggested approach for whoever picks this up:
    consumer project vendors via the marketplace; a fix here (once
    verified and stamped) is what would actually reach that project on its
    next `claude plugin update`.
+
+## Triage (2026-08-18, goldfish-deep dispatch NVA-WINMODE-1)
+
+- **Decision:** accepted. All 7 files named in the dispatch (the confirmed
+  reproduced bug plus the full "High confidence" list) were fixed with the
+  same pattern: branch on `platform === "win32"` and delegate to the shared
+  DACL-based `assessWindowsPrivatePath` (from `lib/windows-private-state.mjs`
+  — the actual export source; `human-guard-override.mjs` only imports it,
+  it does not re-export it) instead of a bare POSIX mode-bit comparison,
+  mirroring `lib/afk-ledger.mjs:336-340`. POSIX (non-win32) behavior is
+  byte-for-byte unchanged in every file.
+- **Files fixed, with commit SHA and test evidence (suite name + pass
+  count):**
+  1. `lib/onboarding-continuity.mjs` (`observeDetailed`, lines 617/625,
+     the confirmed reproduced bug) — commit `b1e28a70`.
+     `node --test plugins/pipeline-core/lib/onboarding-continuity.test.mjs`
+     → 158/158 pass.
+  2. `lib/local-supervisor-state.mjs` (`trustedAncestor`,
+     `ownedStateDirectory`, `ownedStateFile`) — commit `22f321c0`.
+     `node --test plugins/pipeline-core/lib/local-supervisor-state.test.mjs`
+     → 25/25 pass.
+  3. `scripts/worktree-create.mjs` (`ownerNonce`) — commit `24f71290`.
+     `node --test plugins/pipeline-core/scripts/worktree-create.test.mjs`
+     (new file; none existed before) → 3/3 pass.
+  4. `scripts/pipeline-state.mjs` (`ensureCaseMigrationDirectory`,
+     `ensureBootstrapPrivateDirectory`, `observeBootstrapPrivateDirectory`,
+     `readPrivateBootstrap`) — commit `00053e64`.
+     `node --test plugins/pipeline-core/scripts/pipeline-state-result-case-migration.test.mjs`
+     → 3/3 pass;
+     `node --test plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs`
+     → 6/6 pass;
+     `node --test plugins/pipeline-core/scripts/pipeline-state.test.mjs`
+     (regression check on the shared file) → 1/1 pass.
+  5. `scripts/afk-claude-host.mjs` (`loadPrepared`) — commit `45bfe87e`.
+     `node --test plugins/pipeline-core/scripts/afk-claude-host.test.mjs`
+     → 9/9 pass (2 new tests exercise the real, previously fully-stubbed
+     `loadPrepared` via a real scratch git repo).
+  6. `scripts/critic-route-activation.mjs` (`assertPrivate`) — commit
+     `7d6cb1a9`. `node --test plugins/pipeline-core/scripts/critic-route-activation.test.mjs`
+     → 8/8 pass.
+  7. `scripts/session-cleanup.mjs` (`ownerNonce`, same bug/pattern as
+     `worktree-create.mjs`) — commit `a285912f`.
+     `node --test plugins/pipeline-core/scripts/session-cleanup-owner-nonce.test.mjs`
+     (new file; none existed before) → 3/3 pass; regression check on
+     `session-cleanup-binding.test.mjs` → 45/45 pass and
+     `session-cleanup-power.test.mjs` → 2/2 pass.
+  - `node --test harness/scripts/check-consumer-safe-paths.test.mjs` → 9/9
+    pass (required since this dispatch touched `plugins/pipeline-core/**`).
+- **Stopped-on files:** none. All 7 files matched the expected fix pattern;
+  no per-file stop condition was triggered.
+- **Notable finding during implementation (not a stop, a design note):**
+  the directory-level check at `onboarding-continuity.mjs:617` turned out
+  to be effectively unreachable-as-failing on POSIX even before this fix —
+  `resolvePrivate()` in the same file delegates to
+  `codex-onboarding-runtime.mjs`'s own already-correct
+  `assurePrivateDirectory`, which auto-repairs (`chmodSync(path, 0o700)`)
+  an insecure directory it observes on POSIX before this file's own inline
+  check ever runs. The fix was still applied for consistency and because it
+  is the code path Windows actually hits (no such auto-repair exists for
+  win32 there), but a POSIX regression test specifically isolating "the bare
+  directory check fails on an insecure-mode directory" could not be
+  constructed for that reason (see commit `b1e28a70`'s test-file comment).
+  The sibling file-level check (`:625`, the continuity history file) has no
+  such auto-repair and its POSIX regression is directly tested.
+- **New test files created (in scope per the dispatch, not yet registered
+  in `harness/scripts/verify.mjs` — TP-3 protected, forbidden to edit by
+  the dispatch's own scope; named here as a follow-up for whoever next
+  touches that registry):** `scripts/worktree-create.test.mjs`,
+  `scripts/session-cleanup-owner-nonce.test.mjs`.
+- **Not yet done — explicit scope boundary, not an oversight:** production
+  callers of the now win32-capable checks (e.g. `loadPersistedActivation`,
+  `finalizeClaudeWorker`, the `pipeline-state.mjs` private-state helpers)
+  still default to `process.platform`/the real `assessWindowsPrivatePath`
+  when no override is supplied, so no caller needs to change to pick up the
+  fix — but this dispatch did not go hunting for every indirect production
+  call site to double-check each one's real-Windows reachability beyond the
+  ones the backlog item named.
+- **Status: implementation and mocked-Windows testing are complete, but
+  closure is withheld.** This dispatch ran on Linux/WSL only and cannot
+  perform a live-Windows re-verification. `status:` frontmatter stays
+  `open`. Per this repo's own established convention for this exact
+  situation (see `backlog/items/2026-08-17-windows-acl-hardening-never-
+  remediates-a-pre-existing-insecure-directory.md`'s own Triage), whoever
+  next runs a native-Windows session against this branch should re-run all
+  7 suites above (plus the two regression suites) live before this item is
+  treated as closed.
+- **Date:** 2026-08-18
