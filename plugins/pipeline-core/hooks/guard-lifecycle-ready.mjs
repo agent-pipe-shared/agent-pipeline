@@ -292,14 +292,22 @@ function crossRepositoryMutationBlocked() {
  * SHAPE. Substring, not token, matching: the path that matters can sit INSIDE a quoted
  * script argument (`node -e '...writeFileSync("pipeline.user.yaml", ...)'`), where token
  * matching sees one opaque word. That deliberately over-refuses -- a `git commit -m`
- * message merely naming one of these files is refused too. Over-refusal costs a `-F`
- * flag; under-refusal costs the gate. Read-only diagnostics are exempt via the existing
- * classifier, so `cat`, `rg`, `sha256sum` and `git diff` on these paths keep working.
+ * message merely naming one of these files is refused too, and the same over-refusal
+ * applies to the product-source entries (GS-8, GS-9), not only the configuration ones --
+ * a shell command or commit message that merely names one of those source files is
+ * refused too. Over-refusal costs a `-F` flag; under-refusal costs the gate. Read-only
+ * diagnostics are exempt via the existing classifier, so `cat`, `rg`, `sha256sum` and
+ * `git diff` on these paths keep working.
  */
 function gateStrengthShellRefusal(command, root) {
   if (typeof command !== "string" || command === "") return null;
   if (isReadOnlyDiagnosticCommand(command, root)) return null;
-  // Scoped to the five configuration paths (GS-1..GS-5) deliberately. The live plugin
+  // Needles are every entry of GATE_STRENGTH_PATHS (imported above), by basename -- not
+  // restated here as a count or a fixed category, because that is what went stale last
+  // time: this sentence used to say "the five configuration paths (GS-1..GS-5)" and the
+  // table has since grown past that count and past that category (GS-7's legacy-tier
+  // config, then GS-8 and GS-9, which protect product source rather than configuration --
+  // see their own entries in guard-gate-strength.mjs for why). The live plugin
   // root (GS-6) is NOT a needle here: executing a plugin script by absolute path is the
   // normal bootstrap and recovery shape, so matching the root would refuse
   // `node <pluginRoot>/scripts/project-onboarding-v3.mjs inspect` -- the very command the
