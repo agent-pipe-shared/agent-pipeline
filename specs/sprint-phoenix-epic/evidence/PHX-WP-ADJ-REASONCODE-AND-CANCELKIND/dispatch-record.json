@@ -1,0 +1,24 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "taskId": "PHX-WP-ADJ-REASONCODE-AND-CANCELKIND",
+  "model": "claude-sonnet-5 (effort xhigh)",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "in-progress",
+  "log": [
+    {
+      "phase": "opening: dispatch record created, starting bootstrap/context read",
+      "toolUses": 3
+    },
+    {
+      "phase": "Fix 1 implemented + tested: 3 reasonCode sites guarded, test added, suite green",
+      "toolUses": 12,
+      "finding": "Confirmed via grep exactly 3 occurrences of bare `CODE.test(value.reasonCode)` (validateAgentDecisionEvent, validateCommandOfferEvent, validateLegacyImportObservationEvent), no 4th site. Replaced all 3 with the typeof guard mirroring revalidationTrigger's existing style via one replace_all edit (identical old/new string at all 3 sites). Added one parametrized test covering all 3 validators. node --test: 52/52 pass, 0 fail (artifact node-test-agent-decision-journal.tap)."
+    },
+    {
+      "phase": "Fix 1 commits landed + backlog item closed",
+      "toolUses": 20,
+      "finding": "Commit 169e9565 (code+test, clean, no other files touched). Commit dfc08120 (backlog closure: status closed, closed_at 2026-08-18, closure_commit 169e9565, Triage Decision filled). DEVIATION: dfc08120 unexpectedly also modified docs/doc-reconciliation.md (+11 lines, a reconciliation entry for a pre-existing unreconciled commit range 8a92d377..11e70e5a that predates this dispatch entirely) -- this fired from a mandatory repo pre-commit hook, not from anything this dispatch staged or authored; `git add` for that commit named only the one backlog file. The briefing forbids touching docs/doc-reconciliation.md, but the guard union separately forbids skipping hooks (--no-verify), so the two rules collide on a hook-driven side effect outside this dispatch's control. Not reverted (amend/reset both forbidden by default). Flagged explicitly for the orchestrating session, not silently left in the diff."
+    }
+  ]
+}

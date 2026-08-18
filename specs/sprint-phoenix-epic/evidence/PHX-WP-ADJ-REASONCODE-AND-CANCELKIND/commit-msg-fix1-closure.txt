@@ -1,0 +1,7 @@
+docs(backlog): close the agent-decision-journal reasonCode array-coercion item
+
+Fixed in commit 169e9565, which closed all three CODE.test(value.reasonCode)
+sites this item's filing text left open ("possibly"), not just the one
+originally described.
+
+AI-Assisted: true
