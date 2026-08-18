@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.adr-0045-topology-divergence-from-package-and-skill
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "First real run of harness/scripts/check-doc-reconciliation.mjs over the commit range 8dcb1cc..dec2ed4 implicated docs/adr/0045-canonical-artifact-topology.md (Governs: specs/**) because paths under specs/ changed in that range. Reading the ADR against the actual specs/sprint-phoenix-epic/ package it governs then showed two distinct divergences between the decision record and the shipped implementation."
 due: 2026-09-08
@@ -137,3 +137,22 @@ mode at package-topology scale; a scoped, PO-decided fix does not.
   (so extra root files are fine as-is and no further action is needed, beyond
   possibly softening the ADR's "paths make package membership discoverable"
   claim). Still needs the PO's answer; item stays open.
+
+## Triage — question 1 decided 2026-08-18, item closed
+
+- **PO decision (verbatim intent):** "ja es muss der pipeline möglich sein
+  hier weiteren sinnvollen inhalt bereitzustellen der zu der jeweiligen
+  session passt" — the enumeration is **illustrative/non-exhaustive**, not a
+  closed set. A package root may carry further session- or
+  feature-appropriate artifacts beyond the core list; this is normal
+  practice (confirmed independently recurring in both Phoenix and Nova), not
+  a violation to fix.
+- **Done:** `docs/adr/0045-canonical-artifact-topology.md` amended to state
+  the enumeration is "the required core, not an exhaustive closed set,"
+  name the pattern explicitly (recovery notes, phase plans, point-in-time
+  spec-revision snapshots), and soften "paths make package membership
+  discoverable" to "paths make the CORE package membership discoverable" —
+  no false completeness claim remains. No file relocation needed; no
+  drift-check tooling built (would be meaningless against a non-exhaustive
+  list).
+- **Both questions now closed.** Item closed.
