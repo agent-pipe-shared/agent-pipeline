@@ -122,6 +122,7 @@ import {
   humanGuardRouteUnavailableReason,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
+import { boundedOpaqueCopyCommand } from "../lib/project-onboarding-v3.mjs";
 import {
   loadProtectedTestPathRules,
   protectedTestPathRuleFor,
@@ -129,6 +130,35 @@ import {
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Renders each already-assembled ceremony command through boundedOpaqueCopyCommand()
+ * (NVA-W4-01B) so a human whose terminal wraps a line mid-path or mid-digest still has a
+ * copy-safe alternative -- appended AFTER the existing flat per-command chain, never
+ * replacing it: the flat chain's own text stays exactly as printed today. Mirrors
+ * guard-lifecycle-ready.mjs's own boundedCeremonyRenderingBlock() exactly, the same
+ * near-byte-identical-duplicate arrangement this file's continuation text already uses. A
+ * rendering failure for one step (or one shell within a step) never suppresses the flat
+ * chain or the other steps.
+ */
+function boundedCeremonyRenderingBlock(steps) {
+  const blocks = [];
+  for (const { label, command } of steps) {
+    let bounded;
+    try {
+      bounded = boundedOpaqueCopyCommand(command);
+    } catch {
+      continue;
+    }
+    const shells = [];
+    if (bounded.posix) shells.push(`  posix:\n${bounded.posix}`);
+    if (bounded.powershell) shells.push(`  powershell:\n${bounded.powershell}`);
+    if (bounded.cmd) shells.push(`  cmd.exe:\n${bounded.cmd}`);
+    if (shells.length === 0) continue;
+    blocks.push(`Bounded copy-safe rendering of the ${label} step (max ${bounded.maxColumns} columns per line; use this if the line above wrapped when you copied it):\n${shells.join("\n")}`);
+  }
+  return blocks.join("\n\n");
+}
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let filePath = "";
@@ -278,11 +308,28 @@ if (matched) {
               `there is no in-session activate step for this mode):`,
             `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
           ].join("\n");
+        // NVA-W4-01B: the same steps rendered again, bounded, appended AFTER the flat
+        // chain above -- see boundedCeremonyRenderingBlock()'s own header.
+        const planCommand = `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256}`;
+        const ceremonySteps = approvalMode === "chat"
+          ? [
+            { label: "plan", command: planCommand },
+            { label: "prepare-authorization", command: `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<human-reason>"` },
+            { label: "authorize", command: `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate` },
+          ]
+          : [
+            { label: "plan", command: planCommand },
+            { label: "prepare-authorization", command: `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"` },
+            { label: "emit-signature-digest", command: `${process.execPath} ${JSON.stringify(script)} emit-signature-digest --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256>` },
+            { label: "authorize-by-signature", command: `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>` },
+          ];
+        const boundedBlock = boundedCeremonyRenderingBlock(ceremonySteps);
         overrideGuidance = [
           "",
           "Human override available for this exact edit (one use; audited; the human confirms):",
           `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256}`,
           continuation,
+          ...(boundedBlock ? ["", boundedBlock] : []),
         ].join("\n");
       } else {
         overrideGuidance = ["", humanGuardRouteUnavailableReason("edit", { planned })].join("\n");
