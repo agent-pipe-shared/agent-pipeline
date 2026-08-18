@@ -9,6 +9,7 @@ import test from "node:test";
 
 import { VerifyEvidenceError, VERIFY_EVIDENCE_SCHEMA, produceVerifyEvidence } from "./verify-evidence-producer.mjs";
 import { deriveGateEvidence } from "./publication-gate-evidence.mjs";
+import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 
 function git(root, args) { return execFileSync("git", ["-C", root, ...args], { encoding: "utf8" }).trim(); }
 
@@ -93,6 +94,25 @@ test("a calibration naming no verify command is refused, never defaulted", () =>
       (error) => error instanceof VerifyEvidenceError && error.code === "VEP-NO-COMMAND",
     );
   } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("a bare invocation with no --out resolves to the shared VERIFY_EVIDENCE_DEFAULT_PATH constant", () => {
+  withFixture('node -e "process.exit(0)"', (root) => {
+    const result = produceVerifyEvidence({ rootDir: root });
+    assert.equal(result.status, "passed");
+    assert.equal(result.outPath, join(root, VERIFY_EVIDENCE_DEFAULT_PATH));
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), true);
+  });
+});
+
+test("the CLI wrapper with no --out flag also resolves to the shared default path", () => {
+  withFixture('node -e "process.exit(0)"', (root) => {
+    const scriptPath = new URL("./verify-evidence-producer.mjs", import.meta.url).pathname;
+    const stdout = execFileSync("node", [scriptPath, "--root", root], { encoding: "utf8" });
+    const parsed = JSON.parse(stdout);
+    assert.equal(parsed.status, "passed");
+    assert.equal(existsSync(join(root, VERIFY_EVIDENCE_DEFAULT_PATH)), true);
+  });
 });
 
 test("the CLI wrapper exits 0 and writes evidence for a passing run", () => {

@@ -33,7 +33,12 @@
  *     alone, requires refusing evidence for a run whose tree moved under it.
  *
  * Usage:
- *   node verify-evidence-producer.mjs --out <repo-relative path> [--root <repo>]
+ *   node verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]
+ *
+ * `--out` defaults to `VERIFY_EVIDENCE_DEFAULT_PATH` (../lib/verify-evidence-path.mjs)
+ * -- the same path `guard-push.mjs` and `push-prepare.mjs` read -- so a bare
+ * invocation with no `--out` flag produces exactly the file the push gate
+ * consumes. An explicit `--out` still overrides it for a supplementary run.
  *
  * Exit 0: evidence written for a passing run. Exit 1: the working tree was
  * dirty -- an artifact recording that explicitly IS written. Exit 2: the
@@ -46,6 +51,7 @@ import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
 import { resolveAuthorityArtifactPath } from "../lib/project-authority.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 
 export const VERIFY_EVIDENCE_SCHEMA = "pipeline.verify-evidence.v0";
 
@@ -106,7 +112,7 @@ function writeEvidence(target, evidence) {
  * write `pipeline.verify-evidence.v0` bound to the exact commit and tree that
  * was verified. Never creates history, never invents a command.
  */
-export function produceVerifyEvidence({ rootDir = process.cwd(), outPath }) {
+export function produceVerifyEvidence({ rootDir = process.cwd(), outPath = VERIFY_EVIDENCE_DEFAULT_PATH }) {
   const root = resolve(rootDir);
   const target = safeOutPath(root, outPath);
   const { command, project } = readConfiguredVerifyCommand(root);
@@ -165,12 +171,11 @@ function parseArgs(argv) {
     const flag = argv[index];
     const next = argv[index + 1];
     if (!flag?.startsWith("--") || next === undefined || next.startsWith("--")) {
-      fail("VEP-USAGE", "Usage: verify-evidence-producer.mjs --out <repo-relative path> [--root <repo>]");
+      fail("VEP-USAGE", "Usage: verify-evidence-producer.mjs [--out <repo-relative path>] [--root <repo>]");
     }
     value[flag] = next;
   }
-  if (!value["--out"]) fail("VEP-USAGE", "--out is required.");
-  return { rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] };
+  return { rootDir: value["--root"] ?? process.cwd(), outPath: value["--out"] ?? VERIFY_EVIDENCE_DEFAULT_PATH };
 }
 
 if (isDirectInvocation(import.meta.url)) {
