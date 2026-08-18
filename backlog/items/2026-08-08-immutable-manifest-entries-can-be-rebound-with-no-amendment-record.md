@@ -72,9 +72,9 @@ Acceptance test: rebinding an `immutable` entry without an amendment record make
 the feature-package check exit non-zero, demonstrated by a deliberate fixture
 rather than asserted.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-open, unfixed in both Phoenix and Nova.
+- **Rationale:** `feature-package-topology.mjs`'s exact-keys check still admits no amendment field, so an `immutable` entry's digest can still be silently rebound with no record, exactly as Critic F5 found. Nova has the identical code (`feature-package-topology.mjs:95`, byte-identical `exact()`/mutability logic) and no equivalent fix, so this is not a duplicate-of-Nova closure.
+- **Assignment (if accepted):** Bounded Goldfish dispatch per this item's own Proposal sketch: add an optional `amendment: {at, reason, previousSha256}` object, require it exactly when an `immutable` entry's digest differs from its previously recorded value, and add the fixture-based acceptance test the item specifies. The item's own text explicitly defers the stricter "immutable digests never change, model renames as retire+add" redesign question to a separate PO decision — do not fold that into this dispatch.
+- **Date:** 2026-08-18

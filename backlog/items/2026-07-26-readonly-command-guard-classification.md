@@ -43,9 +43,9 @@ plugin installation. Add a closed, non-implementation close-artifact inventory
 or sanctioned writer so mandatory History and telemetry records can be written
 before plan approval without exempting product files.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accept-open, still unfixed.
+- **Rationale:** The false-positive class this item describes reproduced again during this same session's own read-only investigation work (composed local Bash calls rejected by `guard-lifecycle-ready.mjs` with `GUARD-PARSE-UNSUPPORTED`/`GUARD-OPERATOR-UNAPPROVED`/`GUARD-REDIRECT-UNAPPROVED`), and `specs/sprint-phoenix-epic/RECOVERY.md` R-02 shows it recurring across multiple prior sessions since filing. No command-shape fixtures distinguishing safe local read-only composition, and no sanctioned close-artifact writer for History/telemetry records, exist in the current guard or Dev-Plan gate code. Nova has no equivalent fix under this or a related name.
+- **Assignment (if accepted):** A bounded Goldfish dispatch, scoped exactly per this item's own Proposal (fixtures + sanctioned writer, preserving fail-closed handling for unknown structure/mutation/pipeline-source/marketplace/plugin-install), through the normal plan gate — not a freehand guard edit.
+- **Date:** 2026-08-18
