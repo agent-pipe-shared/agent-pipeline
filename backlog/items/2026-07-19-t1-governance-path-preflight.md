@@ -60,3 +60,55 @@ architecture?
 before further dispatch: either specify the `gateEta` wiring point (T1
 packet schema ← `continuity-status.mjs`) or formally reword/retire the
 AC's second clause. Queued, unassigned.
+
+### PO-decision implementation, 2026-08-18 (wave 3, dispatch NVA-W3-12)
+
+PO decision #18 resolved the design question raised above as **option
+B**: retire/reword the stale "gate ETA" AC wording rather than build a
+new `gateEta` field. Implemented as a pure spec/acceptance-text edit,
+no code change:
+
+- `specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md` —
+  reworded the "Required outcomes" bullet that carried the actual AC
+  clause 2 text ("T1 packets include governance paths and an honest
+  gate ETA or `unknown`.") to state that T1 packets include governance
+  paths and fail closed when governance context cannot be derived, and
+  that the packet schema carries no gate-ETA field, so the original
+  "honest gate ETA or `unknown`" clause is retired as stale.
+- `specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md`
+  — reworded the `pipeline.t1-governance-path-preflight` row's "Current
+  AC assessment" and "Remaining sanctioned gate" columns to record
+  clause 1 (governance paths) as proven closed (`CPG01/CPG02/CPG05/
+  CPG06`, `CPP01` green, no code changed) and clause 2 (gate ETA) as
+  retired by this decision, leaving only the remaining tool-setup AC as
+  the sanctioned gate.
+
+**Evidence (re-run, unchanged from the prior dispatch, confirming the
+doc-only edit did not regress anything):** `node --test
+plugins/pipeline-core/lib/critic-packet-governance.test.mjs` (7/7
+pass), `node --test
+plugins/pipeline-core/scripts/critic-packet-preflight.test.mjs` (6/6
+pass), `node --test
+plugins/pipeline-core/lib/workflow-writer-preflight.test.mjs` (58/58
+pass).
+
+**Deliberately not touched (scoping judgment call):** `spec.md`'s
+"Starting reconciliation classification" table (line ~203, explicitly
+framed as "a design hypothesis to be proven in SNT-7, not closure
+evidence") and the German `non-windows-close-preparation.md`
+close-prep row also restate "path/ETA/tool-setup" style language, but
+both are historical/preparatory snapshots rather than live AC or
+acceptance text; rewriting them risked silently editing frozen
+historical records outside what PO decision #18 named ("the T1 packet
+spec/acceptance text"). The `prd_sentinel-epic.md` "Complete backlog
+scope" table's "Required completion" cell for this item (still reading
+"audit and complete path, ETA, and setup ACs, then close") was left
+alone for the same reason — it is the epic's starting-scope table, not
+the live AC.
+
+**Status stays `in_progress`, not closed.** "Tool-setup disposition" is
+a distinct sub-scope of this AC (never mentioned in the actual clause-1/
+clause-2 sentence, only in secondary summaries) and is untouched by
+this decision — it remains genuinely open and unassigned. Clause 1
+(governance paths) is proven; clause 2 (gate ETA) is now retired by
+spec/AC wording; the remaining sanctioned gate is the tool-setup AC.
