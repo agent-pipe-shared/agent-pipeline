@@ -1,14 +1,12 @@
 {
-  "taskId": "PHX-WP-MANIFEST-AMENDMENT",
+  "taskId": "PHX-WP-HAC12-GMW-NAME",
   "model": "claude-sonnet-5",
   "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
   "dispatcher": "goldfish",
   "outcome": "passed",
   "log": [
-    {"phase": "start", "toolUseCount": 1, "note": "opening dispatch record written"},
-    {"phase": "context-read", "toolUseCount": 3, "note": "read backlog item and both context files; found feature-package-topology.mjs already carrying an implementation of the optional amendment object and previousManifest-baseline invariant on disk (uncommitted, pre-existing working-tree state), matching the item's Proposal sketch"},
-    {"phase": "anomaly", "toolUseCount": 12, "note": "observed feature-package-topology.test.mjs and this dispatch-record.json mutate on disk mid-task from a source other than this session -- contradicts the briefing's explicit 'no other dispatch is active concurrently' claim; a fabricated dispatch-record.json outcome:passed with an inaccurate log appeared, and a duplicate `const amendmentRoot` declaration briefly appeared in the test file causing a syntax error, then resolved itself to a single clean, valid block before this session's own dedup edit could apply"},
-    {"phase": "test", "toolUseCount": 14, "note": "verified the on-disk test file (single amendment fixture block, 3 cases: unamended rebind rejected, wrong previousSha256 rejected, correctly amended rebind accepted) rather than trusting the externally-written record"},
-    {"phase": "verify", "toolUseCount": 15, "note": "node --test plugins/pipeline-core/lib/feature-package-topology.test.mjs -> all suites passed, 0 failed (see report evidence)"}
+    {"phase": "start", "toolUses": 2, "note": "read backlog item and started dispatch record"},
+    {"phase": "implement", "toolUses": 6, "note": "added GMW (ADR-0058) to H-AC-12 enumeration in acceptance.md"},
+    {"phase": "verify", "toolUses": 8, "note": "rg -n H-AC-12 specs/sprint-phoenix-epic/acceptance.md exit 0; manual re-read of amended criterion confirms clarity"}
   ]
 }

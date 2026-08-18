@@ -369,7 +369,8 @@ architecture prose or an implementation briefing.
 - **H-AC-12:** WHEN an existing guard, plan, release, deployment, or override
   path grants or consumes human authority, including `guard-devplan`,
   `guard-push`, `pipeline-state`, release planning, deploy approval/consumption,
-  and Git-guard override consumption, THE SYSTEM SHALL reference and validate
+  Git-guard override consumption, and the Guard Maintenance Window (GMW,
+  ADR-0058), THE SYSTEM SHALL reference and validate
   the canonical decision ID before the transition becomes effective. Every
   direct reader SHALL dual-evaluate during migration, fail on disagreement,
   and carry the shared compatibility owner and expiry.
