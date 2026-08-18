@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 import {
   ProjectOnboardingReadyError,
@@ -239,22 +240,29 @@ function resolveRunner(flags, env) {
   return env.CLAUDECODE === "1" ? "claude" : "codex";
 }
 
-function ownerNonce(flags, env) {
+function ownerNonce(flags, env, { platform = process.platform, assessWindowsPrivate = assessWindowsPrivatePath } = {}) {
   if (flags["owner-nonce-file"] && env.PIPELINE_SESSION_OWNER_NONCE) {
     throw new Error("Use either --owner-nonce-file or PIPELINE_SESSION_OWNER_NONCE, not both");
   }
   if (flags["owner-nonce-file"]) {
-    const stat = lstatSync(flags["owner-nonce-file"]);
-    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0) {
+    const path = flags["owner-nonce-file"];
+    const stat = lstatSync(path);
+    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1) {
       throw new Error("--owner-nonce-file must be a mode-0600 single-link regular file");
     }
-    return readFileSync(flags["owner-nonce-file"], "utf8").trimEnd();
+    // Node synthesizes `.mode` on native Windows from the read-only attribute
+    // alone, so a bare mode-bit comparison is meaningless there and fails
+    // closed unconditionally; on win32 this defers to the shared native
+    // DACL/owner assurance instead, mirroring afk-ledger.mjs:336-340.
+    const secure = platform === "win32" ? assessWindowsPrivate(path).status === "secure" : (stat.mode & 0o077) === 0;
+    if (!secure) throw new Error("--owner-nonce-file must be a mode-0600 single-link regular file");
+    return readFileSync(path, "utf8").trimEnd();
   }
   if (env.PIPELINE_SESSION_OWNER_NONCE) return env.PIPELINE_SESSION_OWNER_NONCE;
   throw new Error("Command requires --owner-nonce-file or PIPELINE_SESSION_OWNER_NONCE");
 }
 
-function sessionOwner(repo, flags, env) {
+function sessionOwner(repo, flags, env, io) {
   const descriptorId = flags["session-descriptor"];
   if (descriptorId) {
     if (flags.session || flags["owner-nonce-file"] || env.PIPELINE_SESSION_OWNER_NONCE) {
@@ -264,7 +272,7 @@ function sessionOwner(repo, flags, env) {
     return loadSessionDescriptor(repo, descriptorId, { expectedDescriptorSha256: flags["expected-descriptor-sha256"] });
   }
   if (flags["expected-descriptor-sha256"]) throw new Error("--expected-descriptor-sha256 requires --session-descriptor");
-  return { sessionId: required(flags, "session"), ownerNonce: ownerNonce(flags, env), descriptorSha256: null };
+  return { sessionId: required(flags, "session"), ownerNonce: ownerNonce(flags, env, io), descriptorSha256: null };
 }
 
 export function main(argv = process.argv.slice(2), env = process.env, dependencies = {}) {
@@ -489,10 +497,12 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       output = { ok: true, code: "WT-SESSION-BINDING-RELEASED" };
     }
   } else if (command === "hygiene") {
-    const session = flags["session-descriptor"] ? sessionOwner(repo, flags, env) : { sessionId: required(flags, "session") };
+    const session = flags["session-descriptor"]
+      ? sessionOwner(repo, flags, env, { platform: dependencies.platform, assessWindowsPrivate: dependencies.assessWindowsPrivate })
+      : { sessionId: required(flags, "session") };
     output = checkHygiene(repo, { sessionId: session.sessionId });
   } else {
-    const session = sessionOwner(repo, flags, env);
+    const session = sessionOwner(repo, flags, env, { platform: dependencies.platform, assessWindowsPrivate: dependencies.assessWindowsPrivate });
     const nonce = session.ownerNonce;
     const ownedSessionId = session.sessionId;
     if (command === "register-intent") {
