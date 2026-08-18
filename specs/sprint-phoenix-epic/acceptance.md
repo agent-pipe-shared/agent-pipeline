@@ -354,6 +354,18 @@ architecture prose or an implementation briefing.
   proved blocker recorded in the amendment above, and the clause is
   satisfied only once the restricted profile demonstrably behaves as
   described, under this criterion's ordinary evidence requirements.
+
+  **Disposition per EPIC-AC-05 (2026-08-18).** O-4's scoping decision above
+  was PO-attributed but lacked a filed backlog item naming an owner and a
+  calendar expiry or named trigger, so it did not yet meet EPIC-AC-05's
+  `disposed` bar. Filed now, formalizing what the design doc already names
+  rather than adding new scope:
+  `backlog/items/2026-08-18-h-ac-11-restricted-profile-intake-record-is-design-increment-2.md`,
+  owner `pipeline`, named trigger: `design/gmw-hgo-evidence-intake-into-the-human-ledger.md`'s
+  own increment 2 (D-1, the restricted machine-local attribution record),
+  which that design places outside Phoenix's increment 1 scope. H-AC-11
+  stays `partial`; this disposes the remaining intake-path gap as deferred
+  to a named future increment, not built in this epic.
 - **H-AC-12:** WHEN an existing guard, plan, release, deployment, or override
   path grants or consumes human authority, including `guard-devplan`,
   `guard-push`, `pipeline-state`, release planning, deploy approval/consumption,
@@ -448,6 +460,32 @@ architecture prose or an implementation briefing.
   SYSTEM SHALL record its domain, status, selected option, stable reason codes,
   evidence basis/gaps, and revalidation trigger before dependent action where
   policy requires.
+
+  **Amendment for the remaining ordering seam (PO, 2026-08-18).** The record
+  shape and the wired producer/ordering seams (revalidation-trigger field,
+  advisory-decision producer) are real; the one remaining gap was the
+  `main-session-route.mjs` ordering seam, blocked on a Claude host adapter
+  supplying `pipelineMainSessionRoute` that does not exist in this codebase
+  (`specs/sprint-phoenix-epic/design/agent-decision-identity-scoping.md` §7
+  step 3 already names this precondition-not-met and recommends deferring
+  rather than force-building it). The PO struck this remaining gap rather than
+  scoping the adapter: the risk this seam exists to catch — two sessions
+  drifting onto different execution hosts and needing a journaled record of
+  which one was authoritative — is better closed by preventing the
+  precondition itself (no two sessions, same or different runner, operating
+  concurrently against the same repository root) than by journaling around
+  it after the fact. `observeConcurrentSessionWarning`
+  (`plugins/pipeline-core/scripts/pipeline-start-preflight.mjs`, commit
+  `645de988`, PHX-WP-AAC01-MULTISESSION) already ships a read-only,
+  non-blocking warning for exactly this condition; hardening that into real
+  prevention makes this ordering seam's remaining gap moot on its own.
+  Tracked as
+  `backlog/items/2026-08-18-concurrent-session-prevention-supersedes-a-ac-01s-remaining-gap.md`,
+  owner `pipeline`, named trigger: any future increment that hardens
+  `observeConcurrentSessionWarning` from a warning into an actual
+  prevention mechanism. A-AC-01 stays `partial` in the evidence map (the
+  criterion's own verdict is unchanged); this amendment disposes only the
+  remaining ordering-seam gap per EPIC-AC-05.
 - **A-AC-02:** WHEN an assumption becomes verified, contradicted, expired,
   invalidated, or superseded, THE SYSTEM SHALL append a linked event without
   rewriting the original.
