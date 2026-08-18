@@ -93,3 +93,33 @@ before or as part of implementing the fix, not after.
   threading approach before a dispatch briefing can be written; not this
   AFK block's immediate next action.
 - **Date:** 2026-08-17
+
+### Bounded design decision and dispatch scope, 0.6.0 release triage sweep, 2026-08-18
+
+- **Decision:** the design call the 2026-08-17 Triage deferred is made:
+  for the Claude/Bash call path in `guard-lifecycle-ready.mjs` only, the
+  un-optioned `parseGuardCommand(command, root)` call sites should pass an
+  explicit `{ platform }` that is NEVER `"win32"`, regardless of host OS —
+  because this item's own Description already establishes, and this pass
+  does not re-litigate, that Claude's Bash tool always executes through
+  Git-Bash/POSIX on every host including Windows. Concretely: thread a
+  fixed non-Windows platform value (e.g. `"linux"`) as the third-argument
+  `options.platform` at those call sites, rather than relying on the
+  `process.platform` default. `dialectFor()`'s own content-based
+  Windows heuristics (drive-letter prefix, `.exe` suffix) are untouched by
+  this and keep working on a literal Windows-shaped command string.
+  `codex-pretool-guard.mjs`'s already-explicit platform threading remains
+  untouched, per the item's own existing scope note.
+- **Dispatch scope:** (1) update the affected `parseGuardCommand()` call
+  sites in `guard-lifecycle-ready.mjs` to pass the fixed non-Windows
+  platform explicitly; (2) verify the two named follow-on effects from the
+  Proposal (the `rg`/`head` diagnostic-pipeline exception's `.exe` naming;
+  `2>/dev/null` vs `2>nul` redirect handling) are unaffected, since the
+  fix only changes dialect SELECTION, not the POSIX-vs-Windows token
+  grammar itself, and record that check's outcome; (3) add/extend a test
+  pinning `$PWD`/`${PWD}` expansion for the Claude/Bash path on a
+  `platform: "win32"` host input, since that is the exact regression this
+  item reports and the one a future change could silently reintroduce.
+- **Assignment:** unassigned, queued for a goldfish-deep/implement-tier
+  dispatch with Verify (guardrail/hook file, MP-07).
+- **Date:** 2026-08-18

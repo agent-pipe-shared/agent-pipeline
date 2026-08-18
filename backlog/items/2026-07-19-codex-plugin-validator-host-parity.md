@@ -36,3 +36,16 @@ evidence records), which is a design call this session did not make.
 Queued as the next design-then-implement package after tonight's
 in-flight dispatches land. **Assignment:** pipeline, unassigned
 pending the parity-strategy design decision. **Date:** 2026-08-18
+
+### Reconfirmed in the 0.6.0 release backlog sweep, 2026-08-18
+
+Re-read in full: the same-day Triage above is a real, specific,
+bounded decision made independently of the closed Sentinel sprint
+(not a stale carryover from it) — it names the exact remaining gate
+(native-vs-generic Codex A/B on identical fixtures, host/version
+bound), states plainly why it was not dispatched (the parity-strategy
+design call has not been made), and records a concrete assignment.
+No re-decision needed this pass. This is real design+implementation
+work needing Verify against live fixtures, so it is not attempted
+here either. **Status unchanged (`in_progress`, not closed).**
+**Date:** 2026-08-18

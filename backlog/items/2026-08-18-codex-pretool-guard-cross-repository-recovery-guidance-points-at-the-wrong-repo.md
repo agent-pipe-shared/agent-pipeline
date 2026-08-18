@@ -53,3 +53,34 @@ commands, coordinator otherwise).
   correct); lower priority than the fix it follows from.
 - **Assignment:** unassigned.
 - **Date:** 2026-08-18
+
+### Bounded for dispatch, 0.6.0 release triage sweep, 2026-08-18
+
+- **Decision:** confirmed as a real, narrow display-text defect;
+  queued for a bounded implement-tier dispatch with Verify, not
+  attempted in this read-only pass (guardrail/hook code, MP-07).
+- **Root cause, confirmed by reading:** `recordHumanGuardDenial()`'s
+  `status: "planned"` return value
+  (`human-guard-override.mjs:2101`, literally
+  `{ status: "planned", requestSha256 }`) does **not** carry back the
+  `repo.root` the function already computes two lines above
+  (`:2019-2021`, `topology(crossRepositoryRoot ?? physicalRootDir, spawn)`,
+  where `crossRepositoryRoot` is exactly the
+  `crossRepositoryTargetRoot()` resolution `NVA-CROSSREPOLEDGER-1`
+  added). `codex-pretool-guard.mjs` therefore has no correct root to
+  use and falls back to `projectRoot` at every `--repo
+  ${JSON.stringify(projectRoot)}` guidance site (currently ~lines
+  504-524, all keyed off the `planned` object).
+- **Bounded dispatch scope:** (1) add the already-computed `repo.root`
+  to the `"planned"` return payload in `recordHumanGuardDenial()`
+  (and check whether the `"author-repair-required"` branch a few
+  lines above has the identical gap); (2) have
+  `codex-pretool-guard.mjs`'s guidance-text construction use
+  `planned.root` in place of `projectRoot` at those sites. Verify with
+  a case that exercises a `cross-repository-target` denial so the
+  printed `--repo` is checked against the actual target repo, not
+  just the ordinary same-repo case where the two values coincide and
+  the bug is invisible.
+- **Assignment:** unassigned, queued for a goldfish/implement-tier
+  dispatch with Verify.
+- **Date:** 2026-08-18

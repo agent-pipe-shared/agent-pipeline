@@ -158,3 +158,20 @@ proper spec for it rather than a quick patch.
   with the two narrower live-test findings from today (git-identity set
   timing, signing-ceremony disclosures).
 - **Date:** 2026-08-17
+
+### Reconfirmed in the 0.6.0 release backlog sweep, 2026-08-18
+
+- **Decision:** no re-decision needed — the 2026-08-17 re-triage already
+  records a real, specific, PO-confirmed decision explicitly scoped to
+  0.6.0 (mandatory resume-hint entry directing a restart to read the prior
+  session's own JSON transcript; write-side comprehensiveness gap also
+  named) with a concrete, bounded assignment (a dedicated design +
+  implementation dispatch). That work has not yet been dispatched.
+- **Rationale:** this is real work touching the resume-hint mechanism and
+  Codex restart flow — needs a design pass and Verify to trust, not a
+  same-pass fix; this read-only triage sweep is not the place to attempt
+  it.
+- **Assignment:** unchanged — unassigned, queued for a dedicated
+  design+implementation dispatch before 0.6.0 ships, per the constraints
+  the 2026-08-12/2026-08-17 re-triages already recorded.
+- **Date:** 2026-08-18
