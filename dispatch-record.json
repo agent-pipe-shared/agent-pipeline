@@ -1,12 +1,12 @@
 {
-  "taskId": "PHX-WP-RESUME-HINT-DIAG",
+  "taskId": "PHX-WP-GIT03-TRAILER-CHECK",
   "model": "claude-sonnet-5",
   "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
   "dispatcher": "goldfish",
   "outcome": "passed",
   "log": [
-    {"phase": "start", "toolUseCount": 1},
-    {"phase": "context-read", "toolUseCount": 4, "note": "backlog item, resume-hint.mjs, resume-hint.test.mjs already contained the diagnostic-half fix uncommitted in the working tree"},
-    {"phase": "verify", "toolUseCount": 8, "note": "node --test plugins/pipeline-core/lib/resume-hint.test.mjs: 6 passed, 0 failed, exit 0"}
+    {"phase": "start", "toolUses": 1, "note": "dispatch record created as opening act"},
+    {"phase": "implement", "toolUses": 6, "note": "updated GIT-03 verification line in guardrails/git.md to structural trailer parsing"},
+    {"phase": "verify", "toolUses": 7, "note": "git log -1 --format='%(trailers:only=true,unfold=true)' HEAD exit 0, printed non-empty Dispatch/AI-Assisted trailers"}
   ]
 }

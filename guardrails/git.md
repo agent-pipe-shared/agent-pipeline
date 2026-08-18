@@ -37,7 +37,7 @@ Rule IDs: `GIT-xx`.
 
 - **MUST NOT** put provider- or model-specific co-author trailers, session URLs or IDs, account identifiers, or any other private correlation data into commit metadata. The anonymous marker is the complete AI-assistance signal; `Dispatch:` may identify a grounded work package but must not encode a provider, account, or session.
 - **Why:** Commit history needs a durable, provider-neutral assistance signal without turning public history into a correlation index. Work-package provenance remains in the versioned dispatch record and its grounded `Dispatch:` trailer; full chat logs are not archived.
-- **Verification:** `git log -5 --format=%B | rg "^AI-Assisted: true$"` samples the marker; the `/close` ritual checks the current block for prohibited correlation metadata.
+- **Verification:** `git log -1 --format='%(trailers:only=true,unfold=true)' <commit>` samples the marker via structural trailer parsing (not a line-anchored text search) — a wrapped continuation line inside the trailer block breaks git's trailer parser and correctly makes this check report empty, catching the malformed case that a body-text grep like `rg "^AI-Assisted: true$"` would miss; the `/close` ritual checks the current block for prohibited correlation metadata.
 
 ## GIT-04 — No force-push, no history rewrite, no destructive bulk operations (guard union)
 
