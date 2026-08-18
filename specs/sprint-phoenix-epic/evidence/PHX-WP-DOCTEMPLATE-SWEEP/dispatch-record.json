@@ -1,0 +1,14 @@
+{
+  "taskId": "PHX-WP-DOCTEMPLATE-SWEEP",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "concluded-partial",
+  "log": [
+    {"phase": "opening", "toolUseCount": 2, "note": "dispatch record created before any other work"},
+    {"phase": "fix1-done", "toolUseCount": 28, "note": "FIX 1 committed c12cbdf7, backlog item closed"},
+    {"phase": "fix2-incident", "note": "FIX 2 (repointing the ADR-0047 path in specs/sprint-phoenix-epic/spec.md) made a direct edit to hash-bound Spec authority, breaking specSha256 and putting session readiness into partial. Reverted by the PO outside the session (git checkout). Root-caused and disposed in backlog/items/2026-08-09-adr-0047-renumber-left-live-references-behind.md's Triage (2026-08-18): the file stays hash-bound authority and needs the reviewed Spec-rebind path, not a plain edit. See scratch/incident-report.md for the original self-assessment."},
+    {"phase": "fixes-3-6-found-already-done", "note": "Independent verification on 2026-08-18 (AC-R3-1 method, rg -n \"§\" / rg -n \"OM §\" across the whole repo) found the dispatch templates and every other live agent-facing file already carry zero stale numbered docs/operating-model.md citations -- the R3/B3 sweep this dispatch's FIXES 3-6 were meant to continue had already landed in prior commits (e.g. 162c30c3), just without its backlog item's frontmatter reflecting it. Closed backlog/items/2026-08-07-dispatch-templates-cite-restructured-operating-model-sections.md on that basis rather than re-doing work already done."},
+    {"phase": "closing", "note": "Concluding this dispatch record here: FIX 1 landed, FIX 2 reverted with its backlog item left correctly open (not to be plain-edited again), FIXES 3-6 verified already satisfied by prior work. No further action pending under this taskId."}
+  ]
+}
