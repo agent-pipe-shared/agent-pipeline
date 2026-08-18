@@ -3,10 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agent-decision-journal-code-pattern-array-coercion
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
 source: "Found 2026-08-16 by PHX-WP-AAC01-REVALIDATION-TRIGGER while adding revalidationTrigger: RegExp.test() stringifies its argument, so CODE.test(value.reasonCode) alone admits an array like [\"SOME_CODE\"] where a string is required. Fixed for the new field with an added typeof guard; the pre-existing reasonCode instance was left untouched as out of scope."
 due: 2026-09-30
+closed_at: 2026-08-18
+closure_commit: 169e9565
 ---
 
 # `agent-decision-journal.mjs`'s `CODE.test(...)` checks admit an array via implicit stringification
@@ -46,7 +48,7 @@ the test `170c44ef` already added for `revalidationTrigger`.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed (implemented)
+- **Rationale:** live grep confirmed the same bare `CODE.test(value.reasonCode)` gap in exactly three sites (`validateAgentDecisionEvent`, `validateCommandOfferEvent`, `validateLegacyImportObservationEvent`), one more than this item's own filing text hedged ("possibly"). All three now carry the same `typeof value.reasonCode !== "string"` guard `revalidationTrigger` already used, mirrored exactly in style/placement. One parametrized regression test covers all three call sites (array-coerced reasonCode rejected, normal string reasonCode still accepted). `node --test plugins/pipeline-core/lib/agent-decision-journal.test.mjs`: 52/52 pass, 0 fail, commit `169e9565`.
+- **Assignment (if accepted):** n/a — implemented this session.
+- **Date:** 2026-08-18
