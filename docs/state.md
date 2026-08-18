@@ -7841,6 +7841,78 @@ touched item files committed (`60dc7e34`, `de50997d`).
 `NVA-CROSSREPOLEDGER-1`, `NVA-T1GOVPREFLIGHT-1`, `NVA-POGATEAUTH-1`,
 `NVA-WTLIFECYCLE-1`, `NVA-INTCONTINUITY-1`.
 
+## 2026-08-18 (daytime continuation 2) — all five dispatches landed; the cross-repository fix went through a real two-round Critic fix-and-verify cycle; the Sentinel/Cyborg reconciliation is done
+
+All five dispatches returned. Two closed clean with no gap found
+(`nonblocking-interaction-continuity` — all four AC shapes already
+proven; `t1-governance-path-preflight` — stopped clean instead of
+guessing on its second AC clause, needs a design ruling on whether the
+T1 packet schema should gain a `gateEta` field sourced from
+`continuity-status.mjs`, stays `in_progress`). Two closed after finding
+and fixing one real coverage/behavior gap each with a new regression
+test, both independently re-verified by the Elephant, no production
+defect in either case (`po-gate-worktree-authority` — Spec-digest
+positive case had only ever been proven jointly with the plan digest,
+isolated; `canonical-worktree-lifecycle` — post-commit cleanliness had
+only ever been proven via untracked-file dirty states, never against an
+actual committed deliverable, closed with new test `D0-09`). Two of the
+four dispatches (`NVA-HGOTEST-1` pre-compaction, `NVA-WTLIFECYCLE-1`
+this block) had stopped mid-flight with the fix staged but not
+committed and no final report — the Elephant independently re-ran their
+suites and committed on their behalf both times; worth naming as a
+recurring pattern this session, not a one-off.
+
+**`NVA-CROSSREPOLEDGER-1` (cross-repository override ledger binding)
+went through a genuine two-round fix-and-Critic-verify cycle, the same
+shape as this session's earlier ADR-0065 Tier-B thread.** Round 1
+landed the core fix (bind ledger/evaluation/consumption to the
+guarded command's actual target repository, not the coordinator) with
+four regression tests, 67/68 green. A fresh Critic review (T1,
+guardrail-class) returned FAIL: `crossRepositoryTargetRoot()`'s own
+header comment claimed a symlinked target "fails closed exactly as any
+other `topology()` caller," but the implementation used
+`dirname(target)` instead of resolving the symlink — a symlinked
+cross-repository target could silently bind to whatever repository
+happened to contain the symlink itself, reproducing the exact
+misbinding class the whole fix exists to close. Confirmed by direct
+code reading before dispatching a fix. `NVA-CROSSREPOLEDGER-2` resolved
+the full symlink chain via `realpathSync` (mirroring `physicalRoot()`'s
+existing idiom), added two regression tests with genuinely distinct git
+fixtures, 69/70 green. A second Critic review's first attempt correctly
+STOPPED on a dispatch-construction defect of the Elephant's own making
+(this repo's `.claude/pipeline.yaml` governance block requires every
+dispatch to include `governance/examples/{guidelines,policies}` as
+guardrail tokens — omitted, so hunt category 11 could never run);
+re-dispatched immediately with the correct tokens (does not count
+against the round cap, since no review had completed). That review
+returned **PASS**, no findings, one disclosed process note carried
+forward for future dispatches on this item family (the evidence
+artifact should be a JSON file with candidate binding, not a plain-text
+transcript — this dispatch's worked despite the shape mismatch only
+because the reviewer independently reconstructed the evidence from
+`git diff`/`git show`). Closed. A real, separate, lower-priority finding
+the first dispatch disclosed (`codex-pretool-guard.mjs`'s printed
+recovery guidance still names the coordinator's `--repo`, now stale for
+cross-repository denials specifically) was filed as its own item rather
+than folded in silently.
+
+**Full tally for the Sentinel/Cyborg reconciliation thread, this
+session:** 7 items closed (`four-human-guard-override-tests-leak...`,
+`a-maintenance-window-signature-...`, `verify-gate-scoped-registration`,
+`nonblocking-interaction-continuity`, `po-gate-worktree-authority`,
+`canonical-worktree-lifecycle`, `cross-repository-override-ledger-binding`),
+1 new item filed (`codex-pretool-guard-cross-repository-recovery-guidance-...`),
+1 stays open pending a design ruling (`t1-governance-path-preflight`),
+2 queued as design-then-implement packages not yet dispatched
+(`codex-plugin-validator-host-parity`, `execution-model-switchback`),
+1 split between a queued next dispatch and the eventual candidate
+freeze (`afk-assumption-mode`), 1 batched entirely into the candidate
+freeze (`session-keep-awake`), 1 documented as genuinely externally
+gated rather than a Nova code gap (`codex-sandbox-critic-longterm`'s
+strong lane), 5 confirmed already correctly triaged elsewhere and left
+untouched. No Sentinel/Cyborg-tagged item remains a bare, undecided
+placeholder.
+
 ## Recovery
 
 No persisted in-flight dispatch, rollback action or public human-gate acceptance
