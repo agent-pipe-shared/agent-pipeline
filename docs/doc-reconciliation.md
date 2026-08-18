@@ -1695,3 +1695,73 @@ format offers exactly two line shapes, and neither says "checked, and a
 divergence was filed". A third shape is worth adding, and adding it belongs in
 the same review as the ancestor-span widening noted above rather than in the
 commit that first needed it.
+
+## Candidate b87ef50dffed3268ea591ab0566d0fe9756d1c9b — 2026-08-18, range 8a92d377..b87ef50d, checkpoints 17-29: the EPIC-AC-04 Critic FAIL/fix cycle, H-AC-12's remaining two readers, the PO's two-key trust-anchor expansion, repeated `lifecycle.json` digest reconciliation, and the Class B closure sweep ending in A-AC-01's reclassification
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0058: checked, no change needed.
+
+**Restated per the known limitation this file's header names.** This range's start,
+`8a92d377`, is the same base the two entries above (`1cb00e72`, `7071298`) already
+reconciled from a narrower start; both are ancestors of this candidate. ADR-0058's
+finding below restates `8bb4c147`'s already-checked disposition (an ancestor of
+`1cb00e72`) rather than re-deriving it; ADR-0056's restates `0d3d9bcc`/`2390e02f`'s
+v3-empty-set migration the same way. Only the genuinely new material below — commits
+that are not ancestors of either prior entry — is freshly reasoned.
+
+**ADR-0012** — `docs/state.md` was appended to for every checkpoint in this range
+(17 through 29, the EPIC-AC-04 Critic audit, the Class A/D/S/B closure sweep, and
+this checkpoint's own A-AC-01 CLOSURE fix). Every change is additive checkpoint
+prose in the one canonical file the ADR names; nothing moved to a second file.
+
+**ADR-0045** — implicated by the long list of `specs/sprint-phoenix-epic/**` paths
+this range touches: `acceptance.md` (four PO-decision amendments — EPIC-AC-05,
+R-AC-06, L-AC-01, PX0-AC-13, H-AC-11 O-4), `spec.md`, `lifecycle.json`, and dozens
+of `design/`/`evidence/` artifacts (Critic-review records, dispatch records, test
+transcripts, evidence-map snapshots). All are the same established artifact classes
+prior entries in this file already named as legitimate package contents; none
+change the topology's own rules. `lifecycle.json`'s five changes in this range
+(`3c904496`, `f40fda0a`, `8e91872e`, `a62f95c4`, `7178e126`) are the same recurring
+`FTP-ARTIFACT-2` digest-drift pattern already covered by the `1cb00e72` entry above
+— read directly this time rather than assumed: each commit message names a fresh
+PO-signed `feature-package-reconcile` ceremony (a distinct plan-sha256 and, where
+recorded, intent-sha256 per ceremony) and a digest-only transaction, never a hand
+edit; `a62f95c4`'s and `3c904496`'s messages were read in full to confirm this.
+
+**ADR-0056** — implicated by `plugins/pipeline-core/hooks/guard-push.mjs` and
+`project/critical-human-proof.json`. Two changes, both read against the ADR's own
+decision text rather than assumed compatible:
+1. `ae13b68b` (H-AC-12's remaining two direct readers of human authority) adds an
+   **optional** `decisionReference` dual-evaluation to `guard-push.mjs`'s existing
+   check (c) — evaluated only when the pre-existing `pushApproval.lastApproved`
+   record itself carries that field, and it fails closed on disagreement rather
+   than substituting for the existing commit-bound signature/chat verdict. This
+   layers an additional, opt-in check onto the same clearance record; it does not
+   touch `gates.push_approval`'s mode selection or its own verification path,
+   which is what the ADR's Decision section actually governs.
+2. `26b1fcf7` populates `trustAnchors` (left deliberately empty by `2390e02f`,
+   restated above) with two entries — the PO's WSL and OneDrive signing keys.
+   Read against the ADR's own 2026-08-16 correction: `trustAnchors` is documented
+   there as a SET whose non-empty case "enforces membership by BOTH `keyReference`
+   and `publicKeySha256`, a lone v1/v2 anchor being wrapped as a set of one" — a
+   two-entry set for the same PO's two machines is that exact mechanism at N=2,
+   not a new shape. This restores identity-pinning (the state the correction
+   describes as having been given up for the multi-machine problem) while solving
+   that same problem by naming both machines' keys instead of relaxing the check;
+   it is a data change using the ADR's already-described set semantics, not a
+   design change requiring a further amendment.
+
+**ADR-0058** — implicated by `plugins/pipeline-core/lib/human-guard-override.mjs`.
+The one new-since-`1cb00e72` reasoning surface is `6a548cf9`'s v3 trust-anchor port,
+already fully reasoned in that entry above (restated, not re-derived: same file,
+same commit, an ancestor of this candidate). No commit in this range past `1cb00e72`
+touches this file again.
+
+Full Verify re-run fresh at this exact candidate (`b87ef50d`, detached worktree
+`.git/phx-verify`): 383 suites, the same known 3-red baseline this range's own
+checkpoint 28/29 already state (`guard-testpath-override-tests` — TP-7, no route
+from this session; `doc-contract-tests`/`doc-contract-check` — pre-existing linter
+false positive, out of scope since 2026-08-16), `security-scan` clean. Confirmed
+independently for this record, not carried over from checkpoint prose.
