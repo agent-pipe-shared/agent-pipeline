@@ -316,20 +316,33 @@ function fsyncDirectory(path) {
 }
 
 /**
- * Only the components newly created by this call are hardened as owned; a
- * pre-existing (possibly raced-in) directory is merely assessed, never assumed
- * to be ours -- the same discipline as private-boundary.mjs's directory chain.
- * `existing` must be the nearest already-existing ancestor captured BEFORE the
- * caller's mkdirSync, and `code` is the caller's own error code.
+ * Every component from `existing` (the nearest already-existing ancestor,
+ * captured BEFORE the caller's mkdirSync) down through `parent` is covered,
+ * whether or not this call created it. A directory this call created is
+ * hardened outright, the same discipline as private-boundary.mjs's directory
+ * chain. `existing` itself is never assumed to be ours -- it is assessed
+ * first -- but unlike the earlier assess-only discipline it is now
+ * auto-remediated (hardened) rather than left to fail closed forever when
+ * found insecure: hardening only ever tightens an ACL to owner-only, never
+ * loosens access or touches contents, so uniform remediation carries no
+ * credential-exposure asymmetry between a transient and a long-lived
+ * directory (2026-08-18 Triage decision on the pipeline.windows-acl-hardening
+ * backlog item). This also closes the item's ancestor-skip gap: `existing` is
+ * now assessed/remediated unconditionally, not only when `created.length` is
+ * zero -- previously an insecure `existing` was never even looked at once a
+ * new directory was created below it. `code` is the caller's own error code.
  */
-function assureWindowsLocalDirectories(existing, parent, code) {
+export function assureWindowsLocalDirectories(existing, parent, code, {
+  harden = hardenWindowsPrivateDirectory,
+  assess = assessWindowsPrivatePath,
+} = {}) {
   const created = [];
   for (let cursor = resolve(parent); cursor !== existing; cursor = dirname(cursor)) created.push(cursor);
   created.reverse();
   for (const directory of created) {
-    if (hardenWindowsPrivateDirectory(directory).status !== "secure") fail(code, "local state directory Windows assurance is unavailable or insecure");
+    if (harden(directory).status !== "secure") fail(code, "local state directory Windows assurance is unavailable or insecure");
   }
-  if (created.length === 0 && assessWindowsPrivatePath(existing).status !== "secure") {
+  if (assess(existing).status !== "secure" && harden(existing).status !== "secure") {
     fail(code, "local state directory Windows assurance is unavailable or insecure");
   }
 }

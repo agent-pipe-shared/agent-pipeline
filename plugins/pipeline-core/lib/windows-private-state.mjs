@@ -131,7 +131,13 @@ export function assessWindowsPrivatePath(path, options = {}) {
   return evaluateWindowsPrivateState(observation);
 }
 
-/** Harden only a freshly created private directory, then re-observe it. */
+/**
+ * Harden a private directory, then re-observe it. `path` may be freshly
+ * created by the caller or a pre-existing directory being auto-remediated
+ * (worktree-lifecycle.mjs's `assureWindowsLocalDirectories` does the latter);
+ * either way this only ever resets the DACL to the concrete current
+ * principal, never loosens access or touches contents.
+ */
 export function hardenWindowsPrivateDirectory(path, options = {}) {
   const result = invoke(path, HARDEN_DIRECTORY_SCRIPT, options);
   if (result?.status) return result;

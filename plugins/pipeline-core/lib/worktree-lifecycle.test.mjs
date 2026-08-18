@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   WorktreeLifecycleError,
+  assureWindowsLocalDirectories,
   canonicalBranchTarget,
   canonicalDetachedTarget,
   checkSessionHygiene,
@@ -841,6 +842,73 @@ check("D0 CLI reports a blocked cleanup with exit 2", () => {
 check("D0 parser accepts NUL porcelain without path guessing", () => {
   const parsed = parseWorktreePorcelain("worktree /repo\0HEAD " + "a".repeat(40) + "\0branch refs/heads/main\0\0");
   assert.deepEqual(parsed, [{ path: "/repo", HEAD: "a".repeat(40), branch: "refs/heads/main" }]);
+});
+
+check("WT-LOCAL-WINDOWS-ASSURANCE auto-remediates a pre-existing insecure directory instead of only failing closed", () => {
+  const base = mkdtempSync(join(tmpdir(), "wt-lifecycle-win-assure-"));
+  fixtureRoots.push(base);
+  const existing = resolve(base, "descriptors");
+  const hardened = [];
+  const assessed = [];
+  assureWindowsLocalDirectories(existing, existing, "WT-LOCAL-WINDOWS-ASSURANCE", {
+    assess: (directory) => { assessed.push(directory); return { status: "insecure" }; },
+    harden: (directory) => { hardened.push(directory); return { status: "secure" }; },
+  });
+  assert.deepEqual(assessed, [existing]);
+  assert.deepEqual(hardened, [existing]);
+});
+
+check("WT-LOCAL-WINDOWS-ASSURANCE still fails closed when a pre-existing directory cannot be remediated", () => {
+  const base = mkdtempSync(join(tmpdir(), "wt-lifecycle-win-assure-"));
+  fixtureRoots.push(base);
+  const existing = resolve(base, "descriptors");
+  assertLifecycleError(() => assureWindowsLocalDirectories(existing, existing, "WT-LOCAL-WINDOWS-ASSURANCE", {
+    assess: () => ({ status: "insecure" }),
+    harden: () => ({ status: "unavailable" }),
+  }), "WT-LOCAL-WINDOWS-ASSURANCE");
+});
+
+check("WT-LOCAL-WINDOWS-ASSURANCE closes the ancestor-skip gap: an insecure existing ancestor is remediated even when directories were created below it", () => {
+  const base = mkdtempSync(join(tmpdir(), "wt-lifecycle-win-assure-"));
+  fixtureRoots.push(base);
+  const existing = resolve(base, "session-descriptors");
+  const parent = resolve(existing, "active", "leaf");
+  const hardened = [];
+  const assessed = [];
+  assureWindowsLocalDirectories(existing, parent, "WT-LOCAL-WINDOWS-ASSURANCE", {
+    assess: (directory) => { assessed.push(directory); return { status: "insecure" }; },
+    harden: (directory) => { hardened.push(directory); return { status: "secure" }; },
+  });
+  assert.deepEqual(assessed, [existing]);
+  assert.deepEqual(hardened, [resolve(existing, "active"), parent, existing]);
+});
+
+check("WT-LOCAL-WINDOWS-ASSURANCE does not re-harden an already-secure existing ancestor", () => {
+  const base = mkdtempSync(join(tmpdir(), "wt-lifecycle-win-assure-"));
+  fixtureRoots.push(base);
+  const existing = resolve(base, "session-descriptors");
+  const parent = resolve(existing, "active");
+  const hardened = [];
+  assureWindowsLocalDirectories(existing, parent, "WT-LOCAL-WINDOWS-ASSURANCE", {
+    assess: () => ({ status: "secure" }),
+    harden: (directory) => { hardened.push(directory); return { status: "secure" }; },
+  });
+  assert.deepEqual(hardened, [parent]);
+});
+
+check("WT-LOCAL-WINDOWS-ASSURANCE still hardens every newly-created component outright, without assessing them first", () => {
+  const base = mkdtempSync(join(tmpdir(), "wt-lifecycle-win-assure-"));
+  fixtureRoots.push(base);
+  const existing = resolve(base, "session-descriptors");
+  const parent = resolve(existing, "active", "leaf");
+  const assessed = [];
+  const hardened = [];
+  assureWindowsLocalDirectories(existing, parent, "WT-LOCAL-WINDOWS-ASSURANCE", {
+    assess: (directory) => { assessed.push(directory); return { status: "secure" }; },
+    harden: (directory) => { hardened.push(directory); return { status: "secure" }; },
+  });
+  assert.deepEqual(assessed, [existing]);
+  assert.deepEqual(hardened, [resolve(existing, "active"), parent]);
 });
 
 function readdirJson(path) {
