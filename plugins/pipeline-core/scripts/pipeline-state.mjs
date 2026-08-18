@@ -3566,6 +3566,28 @@ function readAuthorityRevisionFile(dir, relativePath) {
 }
 
 /**
+ * F5: dedup keyed on `intentSha256` alone would silently merge a hash COLLISION --
+ * two DIFFERENT receipts that happen to share an `intentSha256` string -- into a
+ * single retained entry, discarding one of them without a trace. A genuine duplicate
+ * re-splice of the SAME closed intent is deterministic (every `durableReceipt` field
+ * is derived from the same frozen intent value inside `buildAuthorityRevisionPlan`),
+ * so it always produces a byte-for-byte identical receipt; anything that shares the
+ * digest but not the content is therefore never a legitimate replay and must fail
+ * closed rather than silently merge OR silently append a second entry under an
+ * ambiguous, already-claimed correlation key. Exported (not inlined at the call site)
+ * so this decision is directly unit-testable: a genuine SHA-256 collision cannot be
+ * constructed in a test, but two hand-built receipt objects sharing an `intentSha256`
+ * with different content can.
+ */
+export function mergeAuthorityRevisionReceipt(priorReceipts, durableReceipt) {
+  const list = Array.isArray(priorReceipts) ? priorReceipts : [];
+  const priorByIntent = list.find((entry) => entry?.intentSha256 === durableReceipt.intentSha256);
+  if (priorByIntent === undefined) return { ok: true, receipts: [...list, durableReceipt] };
+  if (!sameJson(priorByIntent, durableReceipt)) return { ok: false, code: "AR-RECEIPT-COLLISION" };
+  return { ok: true, receipts: list };
+}
+
+/**
  * Re-derivable from either a `--proposal-file` (plan) or the intent embedded in a
  * previously-planned `--request-file` (apply): both are the same closed shape
  * `createAuthorityRevisionIntent` accepts, and every check below re-reads reality
@@ -3675,12 +3697,14 @@ function buildAuthorityRevisionPlan(dir, existing, proposal, updatedAt, deps = {
   // continuity record's own closed shape is validated by lib/continuity-state.mjs's
   // ROOT_KEYS, out of this change's scope. Append-only and idempotent by correlation
   // key so a receipt is never duplicated if this ever re-splices onto a State that
-  // already carries it.
+  // already carries it -- F5: `mergeAuthorityRevisionReceipt` re-derives/compares the
+  // underlying content, not just the `intentSha256` string, before treating two
+  // entries as the same duplicate (see its own doc comment).
   const priorReceipts = Array.isArray(state.authorityRevisionReceipts) ? state.authorityRevisionReceipts : [];
   const durableReceipt = { ...receipt, intentSha256: intent.sha256 };
-  nextState.authorityRevisionReceipts = priorReceipts.some((entry) => entry?.intentSha256 === durableReceipt.intentSha256)
-    ? priorReceipts
-    : [...priorReceipts, durableReceipt];
+  const merged = mergeAuthorityRevisionReceipt(priorReceipts, durableReceipt);
+  if (!merged.ok) return { ok: false, code: merged.code };
+  nextState.authorityRevisionReceipts = merged.receipts;
 
   const nextStateBytes = Buffer.from(`${JSON.stringify(nextState, null, 2)}\n`, "utf8");
 
@@ -3996,6 +4020,26 @@ function runAuthorityRevisionRecoverCommand(dir, rest, deps) {
     let postState;
     try { postState = JSON.parse(Buffer.from(journal.postStateBase64, "base64").toString("utf8")); }
     catch { console.error("Error: continuity-authority-revision-recover refused (AR-JOURNAL); recovery journal retained."); return 2; }
+
+    // F6: the journal's MAC privately seals `postStateBase64`'s own bytes, but the PRD/
+    // Spec artifact FILES it references are never sealed by that MAC -- only their frozen
+    // digest is, inside `postState.continuity.authority`. Between the interrupted apply
+    // that froze this journal and this recovery run completing it forward, those files
+    // could have been mutated out-of-band (a stray edit, a checkout, a bug) without
+    // touching State at all. Blindly replaying `postState` would then certify a State
+    // authority binding that no longer matches what is actually on disk. Same
+    // `physicalRebindFile`-based re-validation `buildAuthorityRevisionPlan` performs at
+    // build time (AR-NEXT-AUTHORITY-STALE), re-run here fresh, immediately before the
+    // write completes -- never trusting the frozen digest alone.
+    const postPrd = physicalRebindFile(dir, postState?.continuity?.authority?.prd?.path);
+    const postSpec = physicalRebindFile(dir, postState?.continuity?.authority?.spec?.path);
+    if (postPrd === null || postSpec === null
+      || postPrd.sha256 !== postState?.continuity?.authority?.prd?.sha256
+      || postSpec.sha256 !== postState?.continuity?.authority?.spec?.sha256) {
+      console.error("Error: continuity-authority-revision-recover refused (AR-RECOVER-ARTIFACT-STALE); recovery journal retained.");
+      return 2;
+    }
+
     const written = atomicWriteContinuityState(dir, postState, lock, deps);
     if (!written.ok) { console.error(`Error: continuity-authority-revision-recover refused (${written.code}); recovery journal retained.`); return 2; }
     const persisted = readStateRaw(dir);

@@ -23,6 +23,7 @@ import {
   acquireContinuityLock,
   atomicWriteContinuityState,
   continuityLockPath,
+  mergeAuthorityRevisionReceipt,
   releaseContinuityLock,
   run,
   readState,
@@ -4128,6 +4129,57 @@ function runAuthorityRevisionTests() {
     && /PS-CONTINUITY-LOCKED/.test(blocked.err), blocked.err);
   ok("AR07b-2 State is preserved exactly as the first read-back authority (untouched)", stateBytes(fx.dir).equals(preBytes), "state mutated under a foreign lock");
   releaseContinuityLock(foreign);
+}
+
+// ---- PX0-AC-05 F5 regression (PHX-WP-AUTHREV-RECEIPT-INTEGRITY): mergeAuthorityRevisionReceipt
+// dedups on CONTENT, not just a shared intentSha256 string -- a genuine SHA-256 collision
+// cannot be constructed against the real CLI's hash pipeline (preStateSha256, bound into
+// intentSha256, covers the entire state file including authorityRevisionReceipts itself --
+// a hash fixed-point/preimage problem), so this exercises the exported pure function
+// directly with two hand-built receipts sharing an intentSha256 but different content.
+{
+  const priorReceipt = { operation: "continuity-authority-revision", intentSha256: "a".repeat(64), featureId: "f1", note: "first" };
+  const collidingReceipt = { operation: "continuity-authority-revision", intentSha256: "a".repeat(64), featureId: "f1", note: "different-content" };
+  const collision = mergeAuthorityRevisionReceipt([priorReceipt], collidingReceipt);
+  ok("AR-F5a two receipts sharing intentSha256 but differing in content are refused as a collision (AR-RECEIPT-COLLISION), never merged or silently appended",
+    collision.ok === false && collision.code === "AR-RECEIPT-COLLISION", JSON.stringify(collision));
+
+  const duplicateReceipt = { ...priorReceipt };
+  const duplicate = mergeAuthorityRevisionReceipt([priorReceipt], duplicateReceipt);
+  ok("AR-F5b a genuine duplicate (same intentSha256 AND identical content) still dedups correctly -- no regression on the happy path",
+    duplicate.ok === true && duplicate.receipts.length === 1 && JSON.stringify(duplicate.receipts[0]) === JSON.stringify(priorReceipt), JSON.stringify(duplicate));
+
+  const newReceipt = { operation: "continuity-authority-revision", intentSha256: "b".repeat(64), featureId: "f2", note: "new" };
+  const appended = mergeAuthorityRevisionReceipt([priorReceipt], newReceipt);
+  ok("AR-F5c a receipt with a genuinely new intentSha256 is appended (not treated as a collision or a duplicate)",
+    appended.ok === true && appended.receipts.length === 2 && JSON.stringify(appended.receipts[1]) === JSON.stringify(newReceipt), JSON.stringify(appended));
+}
+
+// ---- PX0-AC-06 F6 regression (PHX-WP-AUTHREV-RECEIPT-INTEGRITY): the journal's MAC seals
+// postStateBase64's own bytes, but not the PRD/Spec artifact FILES that postState's
+// continuity.authority merely references by frozen digest -- those files can be mutated
+// out-of-band between the interrupted apply that froze the journal and a later recovery
+// run completing it forward. Recovery re-validates the postimage's PRD/Spec bytes against
+// their own frozen sha256 immediately before the roll-forward write, refusing closed
+// (AR-RECOVER-ARTIFACT-STALE) rather than certifying a State authority binding that no
+// longer matches what is actually on disk.
+{
+  const { fx, request } = preparedRevision("ar-f6-postimage-artifact-stale");
+  const preBytes = stateBytes(fx.dir);
+  const interrupted = arApplyCmd(fx, request.name, request.sha256, "ar-lock-001", authorityDeps(fx.dir, { afterAuthorityRevisionJournal: () => false }));
+  ok("AR-F6-setup1 apply interrupted after journal publication, State still exactly the preimage",
+    interrupted.value === 2 && stateBytes(fx.dir).equals(preBytes), interrupted.err);
+  const journalPath = join(fx.dir, ".fake-git-common", "agent-pipeline", "continuity-authority-revision", "journal");
+  ok("AR-F6-setup2 the journal is retained after the interruption", existsSync(journalPath), journalPath);
+  // Mutate the postimage PRD bytes AFTER the journal was frozen -- the same file the frozen
+  // postState.continuity.authority.prd.sha256 already points to.
+  writeFileSync(join(fx.dir, fx.prdRel), "# mutated postimage PRD, never planned or approved\n");
+  const recovered = arRecoverCmd(fx);
+  ok("AR-F6a recover refuses (AR-RECOVER-ARTIFACT-STALE) when the postimage PRD bytes were mutated after the journal was frozen",
+    recovered.value === 2 && /AR-RECOVER-ARTIFACT-STALE/.test(recovered.err), recovered.err);
+  ok("AR-F6b State remains byte-identical to the preimage -- zero write on the stale-artifact refusal",
+    stateBytes(fx.dir).equals(preBytes), "state mutated despite a stale postimage PRD");
+  ok("AR-F6c the journal is still retained after the refusal (not silently retired)", existsSync(journalPath), journalPath);
 }
 
 }
