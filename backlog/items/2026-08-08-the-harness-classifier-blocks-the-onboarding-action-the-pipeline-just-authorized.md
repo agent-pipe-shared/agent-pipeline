@@ -164,3 +164,97 @@ deciding the right shipping mechanism (direction 2/3) is still
 unaddressed. Directions 2–3 remain fully open, need explicit human
 review before any settings-file edit is attempted again, and must not
 route around a classifier refusal by switching tools if one occurs.
+
+### Implementation, 2026-08-18 (wave 1, dispatch NVA-W1-6)
+
+Directions 2 (granularity) and 3 (entry ownership), scoped to exactly the two
+CLIs Direction 1 already verified closed
+(`plugins/pipeline-core/scripts/pipeline-state-approve-push-argv-closure.test.mjs`,
+`plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs`).
+
+**New file** `plugins/pipeline-core/scripts/settings-allowlist-merge.mjs`
+(module + closed-argv CLI, `plan`/`apply` subcommands):
+
+- `PIPELINE_CLI_SETTINGS_ALLOWLIST_CANDIDATES` (settings-allowlist-merge.mjs:61-78)
+  — the one plugin-owned candidate registry, two entries:
+  - `project-onboarding-v3` → `Bash(node plugins/pipeline-core/scripts/project-onboarding-v3.mjs *)`,
+    scope `whole-script`. Every subcommand's entire argv is refused outside a
+    closed grammar by the CLI's own parser, so the widest settings-layer
+    prefix that still names only this script is safe.
+  - `pipeline-state-approve-push` → `Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push *)`,
+    scope `subcommand:approve-push`. Only that one subcommand's argv is
+    validated by the closed `parseExactFlags` parser; the entry is scoped to
+    the subcommand rather than `pipeline-state.mjs *` because the rest of
+    that CLI's surface was never verified closed. This is Direction 2's
+    "narrowest entry the settings syntax supports" answer, made structural:
+    `settings-allowlist-merge.test.mjs`'s "granularity decision is encoded,
+    not just documented" test asserts the approve-push pattern can never
+    collapse to a whole-script prefix.
+- `planSettingsAllowlistMerge({ rootDir, deps })` (settings-allowlist-merge.mjs:107-178)
+  — read-only. Reads a target project's `.claude/settings.json` (or treats
+  it as absent), computes which candidates are missing, and returns the full
+  proposed after-bytes plus a `planSha256` digest. Never writes. Refuses
+  (status `unrepairable`) rather than blind-overwriting invalid JSON or a
+  non-object shape.
+- `applySettingsAllowlistMerge({ rootDir, planSha256, activate, deps })`
+  (settings-allowlist-merge.mjs:187-244) — the only function in the module
+  that writes. Requires `activate: true` (never inferred/defaulted) AND a
+  `planSha256` matching a freshly recomputed plan; also re-checks the
+  target's bytes haven't changed since planning. Writes atomically
+  (temp file + `renameSync` inside the same `.claude` directory) and
+  verifies the readback before reporting success.
+- CLI `main()` (settings-allowlist-merge.mjs:287-307): closed argv
+  (`plan --root <dir>`, `apply --root <dir> --plan-sha256 <sha> --activate`),
+  refuses any unrecognized subcommand/flag with exit 2, mirroring the
+  argv-closure discipline Direction 1 established for the two candidate CLIs
+  themselves.
+
+**Direction 3 (ownership) answer:** "shipped with the plugin." The registry
+and the merge mechanism live inside `plugins/pipeline-core/`, version
+-controlled with the rest of the plugin — not invented ad hoc per project,
+not silently written into any operator's local settings. But applying the
+merge to a concrete `.claude/settings.json` is never automatic: nothing in
+`project-onboarding-v3.mjs`'s apply-\* flow calls
+`applySettingsAllowlistMerge`, and the CLI itself only ever writes when an
+operator runs `apply --activate` after reviewing `plan`'s printed diff. That
+split is structural, not a documented promise — `apply` without `--activate`
+returns `activation-required` and writes nothing; a stale/mismatched
+`--plan-sha256` returns `invalid-plan` and writes nothing; both are covered
+by tests that assert the target file is untouched afterward.
+
+**Tests:** new `plugins/pipeline-core/scripts/settings-allowlist-merge.test.mjs`,
+16 `node:test` cases, all against throwaway fixture directories (never a
+real project's `.claude/settings.json`): registry granularity assertions;
+`plan` on a fresh project, on a project with one candidate already present,
+on a project with both present (no-op), on invalid JSON, and on a
+non-object JSON shape; `apply` without `--activate`, with a stale plan
+digest, with a target that changed since planning, against a project
+missing the `.claude` directory itself (fails closed, no crash), and the
+success + idempotent-replan path; three CLI-level tests (closed-argv
+refusals, missing `--plan-sha256`, and a full `plan` → `apply --activate`
+argv round-trip). `node --test plugins/pipeline-core/scripts/settings-allowlist-merge.test.mjs`
+— 16/16 pass, exit 0.
+
+**What this dispatch deliberately did NOT do, per its own briefing and this
+item's own instruction:** it never invoked `apply --activate` against any
+real repository's `.claude/settings.json`, including this one. A read-only
+`plan --root <this worktree>` was run against this repository's actual
+`.claude/settings.json` to confirm the mechanism produces a sane diff here;
+`git status` confirmed the file was untouched afterward. That plan's
+`added` list was `["project-onboarding-v3", "pipeline-state-approve-push"]`
+(neither entry present yet in this repo's committed `.claude/settings.json`)
+and its proposed `permissions.allow` after-merge was:
+
+```
+"Bash(git push *)",
+"Bash(node plugins/pipeline-core/scripts/project-onboarding-v3.mjs *)",
+"Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push *)"
+```
+
+Whether to actually run `apply --activate` for this repository's own
+`.claude/settings.json` (or for a hosted project via onboarding) is left
+for explicit PO/human review, per this item's own instruction above. This
+dispatch also did not touch `harness/scripts/verify.mjs`'s suite
+registration (left for the centralized post-merge integration pass) and
+did not re-verify Direction 1's already-passing argv-closure suites beyond
+reading them.
