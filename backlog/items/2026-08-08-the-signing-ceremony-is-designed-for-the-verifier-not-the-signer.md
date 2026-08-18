@@ -290,3 +290,16 @@ scope for both NVA-SIGENTRY-1 and NVA-SIGDISCLOSE-1.
   remaining `sign-intent --request` work if scheduled together, since both
   touch `po-human-approval.mjs`.
 - **Date:** 2026-08-18
+
+### Implementation, 2026-08-18 (wave 1, dispatch NVA-W1-11)
+
+Direction step 1 (a unified orchestrating signing-ceremony script) implemented:
+new `plugins/pipeline-core/scripts/signing-ceremony.mjs` walks the signer
+through prepare -> present+sign -> install -> verify as one CLI, preserving
+the real OpenSSL prompt (never scripted/bypassed) and requiring exactly one
+human decision point (the confirmation before signing), matching this item's
+two hard constraints. Verified: `node --test
+plugins/pipeline-core/scripts/signing-ceremony.test.mjs`, 5/5 pass, including
+an abort-before-install case (declining the confirmation installs nothing)
+and a stale-commit mismatch case (GMW-CANDIDATE-COMMIT-MISMATCH surfaced
+plainly when the tree moves between prepare and install).
