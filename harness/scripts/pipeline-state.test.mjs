@@ -4775,6 +4775,78 @@ function runFeaturePackageReconcileTests() {
     JSON.stringify(governingState));
 }
 
+{
+  // RGt -- PHX-WP-RECONCILE-LOCK-SYMLINK-TEST (regression test for the reconcile lock-reuse
+  // fix landed 2026-08-18: reuseLock in defaultFeaturePackageReconcileApproval now compares
+  // realpathSync-resolved paths via holderLock.path instead of a lexical resolve() comparison
+  // -- see plugins/pipeline-core/scripts/pipeline-state.mjs, the comment above `reuseLock`).
+  // Modeled directly on RGs above, with one added wrinkle: CLAUDE_PROJECT_DIR (which
+  // `dir = deps.dir ?? projectDir()` resolves through, since deps.dir is deliberately
+  // omitted) points at a SYMLINK that resolves to the SAME real directory `--root` names,
+  // rather than at that literal directory itself. `--root` itself stays the real, unsymlinked
+  // path -- physicalRebindFile()'s own, unrelated ancestor-symlink safety check would refuse
+  // an actually-symlinked `--root` before ever reaching `reuseLock` (FTP-RECONCILE-IDENTITY),
+  // which is a different guarantee than the one under test here. Before the lock-reuse fix,
+  // `continuityLockPath(dir)` was compared lexically against `holderLock.path` (acquired
+  // under the real `--root` path), so a symlink-reached `dir` produced a DIFFERENT string
+  // even though it names the identical file on disk, and the approval's own writeState() call
+  // would then try to acquire a SECOND exclusive lock on that identical path -- colliding with
+  // itself (PS-CONTINUITY-LOCKED / FTP-RECONCILE-APPROVAL-REJECTED) even though the caller
+  // already legitimately holds that lock. realpathSync-based comparison resolves both sides
+  // to the same real path and correctly reuses the lock.
+  const fx = seedReconcilePackage("rgt-self-governing-symlink");
+  const grownPrd = "# rec-pkg PRD (grown)\n";
+  writeFileSync(join(fx.dir, fx.files.prd.rel), grownPrd);
+  const { digest } = reconcilePlanDigest(fx);
+  mkdirSync(join(fx.dir, "project"), { recursive: true });
+  writeFileSync(join(fx.dir, "project", "pipeline-state.json"), `${JSON.stringify({
+    schema: SCHEMA_ID, planApproved: true,
+    activeFeature: { id: PAC08_FEATURE_ID, planPath: `specs/${PAC08_FEATURE_ID}/prd.md`, phase: "implementation" },
+    planApproval: { poGateAuthority: { planSha256: PAC08_PLAN_SHA256, specSha256: PAC08_SPEC_SHA256 } },
+  }, null, 2)}\n`);
+  pac08GatesYaml(fx.dir, "signature");
+  const proof = pac08Proof({ manifest: fx.manifestRel, planSha256: digest });
+  // A symlink, reserved via freshDir() (so ALL_DIRS cleanup removes the symlink entry itself
+  // -- rmSync on a symlink unlinks it without following into the target), that resolves to
+  // fx.dir's real path. This is the "`--root` reached through a symlink" case the fix closes.
+  const symlinkRoot = freshDir("rgt-self-governing-symlink-root");
+  rmSync(symlinkRoot, { recursive: true, force: true });
+  symlinkSync(fx.dir, symlinkRoot, "dir");
+  const deps = {
+    // deliberately NO `dir` key at all -- the real CLI never injects one either.
+    now: () => PAC08_NOW,
+    gitCommonDir: fx.deps.gitCommonDir, ownerNonce: fx.deps.ownerNonce,
+    gitCandidate: () => ({ ok: true, ...PAC08_CANDIDATE }),
+  };
+  const priorProjectDirSet = Object.hasOwn(process.env, "CLAUDE_PROJECT_DIR");
+  const priorProjectDir = process.env.CLAUDE_PROJECT_DIR;
+  let applied;
+  try {
+    process.env.CLAUDE_PROJECT_DIR = symlinkRoot;
+    applied = reconcileApplyCmd(fx.dir, [
+      "--manifest", fx.manifestRel, "--plan-sha256", digest,
+      "--by", "PO", "--proof-request", proof.requestPath, "--proof-authority", proof.authorityPath, "--proof", proof.proofPath,
+    ], deps);
+  } finally {
+    if (priorProjectDirSet) process.env.CLAUDE_PROJECT_DIR = priorProjectDir;
+    else delete process.env.CLAUDE_PROJECT_DIR;
+  }
+  const receipt = JSON.parse(applied.out || "{}");
+  ok("RGt a symlinked --root resolving (via realpath) to the same directory as the caller's already-held lock reuses that lock instead of self-colliding -- no PS-CONTINUITY-LOCKED/FTP-RECONCILE-APPROVAL-REJECTED",
+    applied.value === 0 && receipt.status === "applied", applied.out || applied.err);
+  const persisted = JSON.parse(readFileSync(join(fx.dir, fx.manifestRel), "utf8"));
+  ok("RGt-2 the manifest was actually rewritten through the symlinked topology, not a no-op",
+    persisted.artifacts[0].sha256 === sha256Hex(grownPrd), JSON.stringify(persisted));
+  const governingState = readState(fx.dir);
+  ok("RGt-3 the SAME real directory's governing state now carries both the reconcile's usual approval side effects (lastApproved/criticalProofConsumption), proving the write genuinely happened despite the caller's lock having been acquired under a symlinked path",
+    governingState.status === "ok"
+    && governingState.state.featurePackageReconcileApproval?.lastApproved?.approvedBy === "PO"
+    && governingState.state.featurePackageReconcileApproval.lastApproved.forCommit === PAC08_CANDIDATE.commit
+    && Array.isArray(governingState.state.criticalProofConsumption)
+    && governingState.state.criticalProofConsumption.some((entry) => entry.kind === "feature-package-reconcile"),
+    JSON.stringify(governingState));
+}
+
 }
 
 runFeaturePackageReadTests();
