@@ -1822,3 +1822,12 @@ prior commit) touched only this file, which no ADR governs.
 - ADR-0058: checked, no change needed.
 
 Restated per this file's known limitation: `c581a218` is an ancestor of this candidate and was already fully reconciled by the entry immediately above; ADR-0045/0056/0058 are restated verbatim. ADR-0012's only new material is the addendum to checkpoint 31 recording the re-confirmed 382/383 Verify baseline and the recomputed `subject-sha256` for candidate `334f7cf7` — additive checkpoint prose, nothing structural. `334f7cf7` (this record's own prior-prior commit) touched only `docs/doc-reconciliation.md`, which no ADR governs.
+
+## Candidate f1205164df4b3fe23196f9c949ae9b20e7ee772f — 2026-08-18, range 8a92d377..f1205164, checkpoint 32: OT09/TP-7 handover for a plugin-authoring session
+
+- ADR-0012: checked, no change needed.
+- ADR-0045: checked, no change needed.
+- ADR-0056: checked, no change needed.
+- ADR-0058: checked, no change needed.
+
+Restated per this file's known limitation: `c6b882d8` is an ancestor of this candidate and was already fully reconciled by the entry immediately above; ADR-0045/0056/0058 are restated verbatim — no commit in this range touches `specs/**` or any ADR-0056/0058-listed path. ADR-0012's only new material is checkpoint 32 itself: a diagnosis-and-handover entry for the last remaining Full Verify red (`guard-testpath-override-tests` OT09), tracing it to a drift between this repo's vendored `plugins/pipeline-core/lib/critical-human-proof-policy.mjs` and the marketplace author source, addressed to a separate plugin-authoring session. Additive checkpoint prose only — read-only investigation (grep/Read against this repo and `~/agent-pipeline-local-marketplace`), no code or config changed by this entry; the canonical-handover decision is untouched.
