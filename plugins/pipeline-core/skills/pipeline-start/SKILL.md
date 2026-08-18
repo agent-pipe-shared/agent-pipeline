@@ -244,6 +244,11 @@ The happy path loads no reference file. Load only the exact condition:
   before a human clears it;
 - `references/transcript-forensics.md` for preparing a forensic-analysis
   dispatch of a runner's own session transcript after a live test run.
+- `references/workflow-dispatch.md` for using the Workflow tool or
+  `isolation: "worktree"` to fan out Goldfish/Critic work: the
+  Elephant-only orchestration rule, the mandatory worktree self-heal
+  briefing text, the ~50-tool-call termination cliff and required budget
+  language, and how to recover a truncated dispatch's real work.
 
 No happy-path reference is mandatory. Lazy loading never widens authority and
 must preserve lifecycle, V3 authority, calibration, handover, Verify and
@@ -264,10 +269,15 @@ A feature's implementation is not complete until a Critic review
 result — pass, or a documented fail-then-fix cycle; this is a requirement to
 satisfy before treating the block as done, not an optional or ambient step.
 Implementation work under an `epic`- or `feature`-profile plan is dispatched
-to a Goldfish subagent (via the Agent/Task tool) rather than written
-directly by this session; a `mini`-profile plan may be implemented directly.
-This is a followed instruction, not a technically guard-enforced rule — no
-guard blocks or detects a non-dispatched write.
+to a Goldfish subagent (via the Agent/Task tool, optionally fanned out with
+the Workflow tool) rather than written directly by this session; a
+`mini`-profile plan may be implemented directly. This is a followed
+instruction, not a technically guard-enforced rule — no guard blocks or
+detects a non-dispatched write. The Workflow tool and the Agent tool's own
+fan-out capability are Elephant-only — never delegate them to a fork or
+`general-purpose` subagent, which inherit the full parent toolset unlike the
+tool-scoped `goldfish-*`/`critic` roles; see `references/workflow-dispatch.md`
+before using either.
 
 A recorded PRD/Spec approval is an execution mandate for its accepted scope.
 Choose implementation details, sequencing, bounded recovery, test fixes and
