@@ -163,6 +163,7 @@
 | pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | closed | defect | pipeline | 2026-08-07 | — |
@@ -274,6 +275,6 @@
 
 ## Counts
 
-- open: 92
+- open: 93
 - in_progress: 9
 - closed: 165

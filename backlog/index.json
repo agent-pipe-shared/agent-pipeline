@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "69c2efb34ff003db4ac9cd347fa803e1ddea59eef2c109bcd5a64585f070abca"
+    "transitionHead": "4adb6c39718e8dc9bd9dbcf48d20ee0ddd032345cb524b407b3a5f67a79e4910"
   },
   "counts": {
-    "open": 92,
+    "open": 93,
     "in_progress": 9,
     "closed": 165
   },
@@ -1643,6 +1643,14 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
+    },
+    {
+      "id": "pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Live incident, 2026-08-18, this session: setting project/pipeline.json's `handover` key to the ADR-0066-Decision-5-sanctioned `{ path, maxBytes }` object shape (already fully supported by handover-rotate.mjs/lib/handover-rotation.mjs) dropped the session into an unrecoverable continuity-observation-unavailable readiness class, blocking every Edit/Write/mutating-Bash tool call. Recovered only via an out-of-session `! git checkout -- project/pipeline.json` run by the PO directly (bypassing the tool-call hook chain), since even the guard's own suggested recovery command was itself blocked by the same gate."
     },
     {
       "id": "pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates",
