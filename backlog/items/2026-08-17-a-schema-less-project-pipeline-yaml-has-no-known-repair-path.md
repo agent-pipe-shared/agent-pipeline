@@ -154,3 +154,100 @@ target rather than a close or a sprint deferral. Not attempted here — the
 investigation needs either an out-of-session artifact (the D:\Dev\HA
 marketplace pin) or code changes to `manifest.mjs`/`project-onboarding-v3.mjs`
 that need test coverage to trust. No change to the recorded decision.
+
+### Investigation/Implementation, 2026-08-18 (wave 2, dispatch NVA-W2-1)
+
+**Finding: the Proposal's step 3 fix is already implemented, tested, and
+committed on this branch — landed in a commit made AFTER this item's own
+"0.6.0 release-bar confirmation" note above, which was never updated to
+record it.** No new production code was needed or written by this dispatch;
+this section documents the discovery and re-verifies it, per the "re-verify
+an inherited 'still open' claim" rule (`CLAUDE.md` Hard rules).
+
+- **Commit `e4d2a036`** ("fix(manifest): self-heal a schema-less-but-otherwise-valid
+  project manifest", authored 2026-08-18T14:31:39+02:00) is an ancestor of
+  this dispatch's base HEAD `7eca44ca` — confirmed by reading the checked-out
+  file content directly (the code is present) and via `git log -- plugins/pipeline-core/lib/manifest.mjs`.
+  It postdates commit `29ac4508` (2026-08-18T10:21:54+02:00, the "0.6.0
+  release-bar confirmation" text above) by roughly 4 hours: the confirmation's
+  "not attempted here" was accurate at the moment it was written, then went
+  stale a few hours later without the item being revisited.
+- **What the commit does, verified by reading the current source:**
+  - `plugins/pipeline-core/lib/manifest.mjs:698-723` — `detectSchemaLessRepair()`
+    (private helper): returns `{ available: true, kind: "missing-schema-field",
+    normalizedManifest, message }` only when the manifest is a plain object
+    with no own `schema` key AND `{ schema: "pipeline.manifest.v0", ...manifest }`
+    validates with zero errors (schema + semantics). Returns `null` for every
+    other case, including "has a schema key already" and "still has an
+    unrelated defect after adding schema" — matches the Proposal's "never
+    silently" requirement.
+  - `manifest.mjs:744-782` — `validateManifest()` now accepts a `selfHeal`
+    option (default `false`, so every existing caller's behavior is
+    byte-for-byte unchanged). On any invalid manifest it always attempts
+    `detectSchemaLessRepair()` and attaches the result as `.repair` on the
+    returned object regardless of `selfHeal` — so a caller that never opts in
+    still *sees* a repair is available instead of a bare "invalid" dead end.
+    Only `selfHeal: true` flips `status` to `"ok"`, using the in-memory
+    normalized manifest, and always appends the repair message to `warnings`
+    (never a silent accept).
+  - `manifest.mjs:798-847` — `loadManifest()` threads the same `selfHeal`
+    option through to `validateManifest()`.
+  - `plugins/pipeline-core/lib/project-onboarding-v3.mjs:2861-2887` —
+    `planProjectOnboardingManifestRepairV4` now branches on
+    `canonicalManifest.repair?.available`: when true it emits the NEW
+    diagnostic `canonical_manifest_schema_missing_repairable` with an
+    actionable remediation string naming `selfHeal: true` and the owning
+    authority workflow, instead of falling into the old generic
+    `canonical_manifest_requires_owner_repair` dead end (which is still used,
+    correctly, for every other absent/invalid case).
+  - Test coverage in `plugins/pipeline-core/lib/project-onboarding-v3.test.mjs:4837-4893`
+    (three tests, already registered in `harness/scripts/verify.mjs` since
+    they live in an existing suite file, per the file's own inline comment at
+    `:4833-4836` explaining why no new test file was created): (1) the
+    positive `validateManifest` repair-detect + selfHeal path, including the
+    "never mutates the input object" assertion, (2) the negative "a second,
+    unrelated defect still blocks repair" case, (3) an end-to-end test that
+    reproduces the exact backlog scenario — takes `freshManifestBytes()` (the
+    real generator's own output), strips `schema: pipeline.manifest.v0\n`
+    from it (this is explicitly commented as producing "the same class of
+    file the backlog item's traced repair chain produces"), writes it to
+    `project/pipeline.yaml`, and confirms `loadManifest()` surfaces
+    `.repair.available === true`, `loadManifest(..., { selfHeal: true })`
+    heals it to `status: "ok"`, and
+    `planProjectOnboardingManifestRepairV4` now reports the new diagnostic
+    code end to end.
+- **Independently re-verified rather than trusted from the commit message:**
+  - `git merge-base`/direct file inspection: `e4d2a036` present at this
+    dispatch's HEAD `7eca44ca` — confirmed (its `manifest.mjs`/
+    `project-onboarding-v3.mjs` code is on disk after the self-heal checkout,
+    before any edit made by this dispatch).
+  - The commit's version-staleness claim ("pinned commit `d2e2fc4c` is 271
+    commits and a day behind current HEAD"): `d2e2fc4c` exists
+    (`fix(po-human-approval): make outside() separator-aware on win32`,
+    2026-08-17T09:22:16+02:00 — one day before `e4d2a036`, as claimed).
+    `git rev-list --count d2e2fc4c..7eca44ca` returns 329 from this
+    dispatch's later HEAD (not 271) — expected, not a discrepancy: more
+    commits landed between `e4d2a036`'s authoring time and this dispatch's
+    base commit; the underlying claim (hundreds of commits of staleness) is
+    confirmed either way.
+  - Searched the rest of `backlog/` for any other item referencing
+    `detectSchemaLessRepair` / `canonical_manifest_schema_missing_repairable`
+    / this item's own filename stem — none found; this fix was not
+    double-filed or done under a different item's dispatch.
+  - Ran `node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs`
+    from this dispatch's checkout: **127 passed, 0 failed**, including the
+    three tests named above (exit reported via the node test runner's own
+    summary, not reformulated).
+- **What this dispatch did NOT do, and why:** did not re-implement the fix
+  (already present and tested — a second implementation would be redundant,
+  duplicate work against the exact same code); did not touch `manifest.mjs`
+  or `project-onboarding-v3.mjs` (nothing to change); did not change this
+  item's `status:` frontmatter or add a Closure section (out of this
+  dispatch's DoD — that decision belongs to a future Elephant/PO session,
+  which should treat the fix above as already shipped when re-triaging this
+  item, not as still-open work).
+- **Open question for a future session:** confirm whether `e4d2a036` carries
+  a `Dispatch:` trailer identifying which prior dispatch produced it — the
+  commit message body has no such trailer, which is a minor process-hygiene
+  gap (dispatch attribution), not a functional one; not investigated further
+  here as it is outside this item's own scope.
