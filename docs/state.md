@@ -3,7 +3,27 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 45)
+**Last updated:** 2026-08-19 (checkpoint 46)
+
+---
+
+## CHECKPOINT — 2026-08-19 (46): backlog closeout round complete — every open item now has an accurate, current record; 14 down to 14 (different 14: closures replaced by fresh finds), goal state reached modulo external blockers (READ THIS FIRST)
+
+`PHX-WP-BACKLOG-CLOSEOUT-ROUND3` (commit `a6d60e32`) closed the 14 items the checkpoint-45 audit found already resolved. `PHX-WP-AUTH-ADAPTER-CONTRACT-SCOPE` (`49b9434c`) and `PHX-WP-CAPABILITY-INVENTORY-VERIFYPHASE-SYNC` (`31cf651c`) landed the 2 remaining genuinely-actionable work packages. `PHX-WP-BACKLOG-PARTIAL-PROGRESS-NOTES` (`b0301f03`) added accurate landed-sub-progress notes to 3 items that stay open but were undocumented on their own sub-completions (push-release-flow's ADR-0061-port piece; unified-auth-ux's all-5-work-packages disposition; handover-rotation's partial extraction).
+
+**Final state: 14 open backlog items remain (`rg -l "^status: open" backlog/items/`, excl. TEMPLATE.md), every one with a current, dated, accurate reason it cannot close today:**
+- Externally blocked on the PO's physical Ed25519 key (TP-4/TP-7 HGO ceremonies): `el-01-has-no-in-session-tripwire`, `technical-lock-for-pipeline-consent-before-onboarding-complete`, `guard-testpath-override-ot09-stale-literal-pattern`, `product-capability-inventory-two-guard-hooks-uncategorized` (piece 2 only).
+- Externally blocked on a separate repo session: `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger`.
+- Needs a PO decision before work can be scoped: `backlog-closure-metadata-missing-across-historical-items` (historical remediation approach).
+- Needs a real design pass (not implementation) before dispatch-ready: `h-ac-11-restricted-profile-intake-record-is-design-increment-2`.
+- Correctly deferred per standing PO instruction (Nova already solved it): `absent-runner-flag-silently-defaults-to-codex`.
+- Deferred/bundled per PO decision: `adr-0047-renumber-left-live-references-behind`.
+- Wrong sprint, correctly untouched: `lifecycle-event-schema-has-no-non-dispatch-correlation-shape` (Nova B).
+- Genuinely large remaining scope, needs its own session: `handover-file-has-no-rotation-obligation` (docs/state.md rotation).
+- Broader undecided scope beyond what was dispatched: `push-release-flow-unusable-for-third-party-adopters` (candidates #2-#4), `unified-human-authorization-ux` (one small filing follow-up: the publication-authority execution-time asymmetry noted this session is not yet its own backlog item).
+- Stays open by design, not a gap: `acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest` (library-only auto-rebind is the correct final shape; routine future drift needs a deliberate trigger, not an automatic one).
+
+**No silent bookkeeping gaps remain** — every open item's file accurately reflects what has and hasn't landed. Verify/security-scan gate state is unchanged from checkpoint 44 (396/398, security-scan clean, 3 of the above red suites are the only Verify failures). This is the goal state reachable without the PO's physical presence (Ed25519 key) or further PO decisions.
 
 ---
 
