@@ -560,8 +560,6 @@ ist kein menschliches Gate: zuerst ihre exakte typisierte Read-only- oder
 Lifecycle-Recovery ausführen. So bleibt menschliches Urteil sichtbar, ohne den
 PO zum Implementierungs-Relay zu machen.
 
-<a id="7-feedback-loop"></a>
-
 ## 6. Evidenz, Review und Recovery
 
 Evidenz bindet ein Ergebnis an seinen Kandidaten und hält fest, was wirklich
@@ -579,8 +577,6 @@ die betroffene Arbeit gestoppt. Recovery erfolgt aus dem benannten Artefakt
 oder über einen neu gebrief­ten Task, nicht aus erinnerter Chat-Historie.
 Destruktive Git-Operationen bleiben geschützt, auch wenn ein Modell oder Prompt
 sie verlangt.
-
-<a id="8-projekt-kalibrierungsschicht"></a>
 
 ## 7. Projektkalibrierung und Erweiterungen
 

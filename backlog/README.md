@@ -13,7 +13,7 @@ behavior observations use a GitHub Issue as their single source from capture
 through triage; only accepted implementation work is linked into this backlog,
 as defined by the [observation intake governance](../docs/observation-intake.md).
 The backlog remains the concrete implementation of the feedback loop from
-[`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop).
+[`docs/operating-model.md` §4](../docs/operating-model.md#4-the-lifecycle) (step 8 retro).
 
 ## Item types
 
@@ -62,7 +62,7 @@ implementation, or closure.
 
 ## Triage rules
 
-Per [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop): triage is owned by the **Elephant of the next pipeline session** (not the Goldfish who created the item — separation of proposal and decision).
+Per [`docs/operating-model.md` §4](../docs/operating-model.md#4-the-lifecycle) (step 8 retro): triage is owned by the **Elephant of the next pipeline session** (not the Goldfish who created the item — separation of proposal and decision).
 
 1. Review all items with `status: open` (at a natural session/phase boundary, not mid-execution).
 2. Decide per item: **accept** (note phase/release in the item) / **reject** (rationale in the item, `status: rejected`) / **defer** (`status: deferred`, state the condition).
@@ -76,7 +76,7 @@ As long as the pipeline is versioned in the SHA phase ([ADR-0002](../docs/adr/00
 
 ## Close-retro
 
-Every completed project session ends (part of the `/close` ritual) with a **retro written by the session Elephant itself** on the question "What should the pipeline do better next time?". The answer is either a concrete backlog item (usually `type: workflow-improvement`) or a transfer item to the pipeline Elephant, or a deliberate, explicitly noted "nothing" — silence is not a valid answer ([`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop)). **The PO is no longer asked via a ritual question**; he submits his own observations separately through his own channel.
+Every completed project session ends (part of the `/close` ritual) with a **retro written by the session Elephant itself** on the question "What should the pipeline do better next time?". The answer is either a concrete backlog item (usually `type: workflow-improvement`) or a transfer item to the pipeline Elephant, or a deliberate, explicitly noted "nothing" — silence is not a valid answer ([`docs/operating-model.md` §4](../docs/operating-model.md#4-the-lifecycle), step 8 retro). **The PO is no longer asked via a ritual question**; he submits his own observations separately through his own channel.
 
 ## Tooling radar (special case)
 
@@ -85,7 +85,7 @@ The tooling radar has its own, already fully specified contract in [`policies/to
 ## OPEN
 
 - OPEN (Phase 4): the `/close` skill (close-block) does not yet automate the triage reminder. The radar catch-up rule is anchored as a check step "tooling radar due?" in the close-block skill (step 7) and in `harness/checklists/session-close.md`; a standalone `/radar` skill remains open.
-- Schema format for **calibration files** is decided (shipped with the plugin): JSON (`.claude/pipeline.json`, [`docs/operating-model.md` §8](../docs/operating-model.md#8-projekt-kalibrierungsschicht)). Backlog items deliberately stay Markdown+frontmatter — they are human-readable process artifacts, not skill calibration.
+- Schema format for **calibration files** is decided (shipped with the plugin): JSON (`.claude/pipeline.json`, [`docs/operating-model.md` §7](../docs/operating-model.md#7-project-calibration-and-extensions)). Backlog items deliberately stay Markdown+frontmatter — they are human-readable process artifacts, not skill calibration.
 
 ## References
 

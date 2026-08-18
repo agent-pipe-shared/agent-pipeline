@@ -180,9 +180,22 @@ function baseSlug(value) {
     .replace(/\s/g, "-");
 }
 
+/**
+ * Bilingual-doc convention (CLAUDE.md, Language): a file that carries a
+ * DE-REFERENCE-BELOW marker line has an authoritative English half above it
+ * and a redundant full German reference translation below it that agents
+ * must not read. Anchor collection honors that same boundary: an anchor
+ * that only exists below the marker must not let a link resolve as if it
+ * pointed at the (never-consulted) English content.
+ */
+function englishHalfLines(lines) {
+  const markerIndex = lines.findIndex((line) => line.includes("DE-REFERENCE-BELOW"));
+  return markerIndex === -1 ? lines : lines.slice(0, markerIndex);
+}
+
 export function collectAnchors(markdown) {
   const text = stripFencedCode(markdown);
-  const lines = text.split("\n");
+  const lines = englishHalfLines(text.split("\n"));
   const anchors = new Set();
   const headingSlugs = new Set();
   const nextSuffix = new Map();

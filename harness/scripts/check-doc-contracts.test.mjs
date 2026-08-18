@@ -141,6 +141,30 @@ test("anchors implement unicode, explicit ids, setext, and duplicate suffixes", 
   assert(!independent.has("foo-2"));
 });
 
+test("collectAnchors scopes to the half above a DE-REFERENCE-BELOW marker", () => {
+  const bilingual =
+    "# English Heading\n\n<a id=\"planted-alias\"></a>\n\n<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a German reader copy. -->\n\n# Deutsche Überschrift\n\n<a id=\"other-alias\"></a>\n";
+  const anchors = collectAnchors(bilingual);
+  assert(anchors.has("english-heading"));
+  assert(anchors.has("planted-alias"));
+  assert(!anchors.has("deutsche-überschrift"));
+  assert(!anchors.has("other-alias"));
+  const monolingual = collectAnchors("# English Heading\n\n# Deutsche Überschrift\n");
+  assert(monolingual.has("english-heading"));
+  assert(monolingual.has("deutsche-überschrift"));
+});
+
+test("a link into the German half of a bilingual doc fails the anchor check", () => {
+  const { root } = fixture({
+    "docs/state.md":
+      "# State\n\n[Calibration](../.claude/pipeline.json)\n\n<a id=\"english-alias\"></a>\n\n<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a German reader copy. -->\n\n<a id=\"german-alias\"></a>\n",
+    "README.md": "# Home\n\n[Reachable](docs/state.md#english-alias) [Unreachable](docs/state.md#german-alias)\n",
+  });
+  const reasons = runFixture(root).findings.join("\n");
+  assert.match(reasons, /README\.md:3 -> docs\/state\.md#german-alias: anchor not found/);
+  assert.doesNotMatch(reasons, /english-alias/);
+});
+
 test("inline and reference links are extracted while fenced fakes are ignored", () => {
   const links = extractMarkdownLinks(
     '[ref]: docs/state.md#state\n[A](README.md)\n[B][ref]\n[C](missing_(v1).md)\n[D](missing.md "Title")\n[E](<angle.md> \'Title\')\n```\n[X](missing.md)\n```\n',
