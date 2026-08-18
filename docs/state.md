@@ -7913,6 +7913,51 @@ strong lane), 5 confirmed already correctly triaged elsewhere and left
 untouched. No Sentinel/Cyborg-tagged item remains a bare, undecided
 placeholder.
 
+## 2026-08-18 (daytime continuation 3) — 0.6.0 version bump; a real Verify regression from this session's own closures found and fixed
+
+The PO's Stop-hook correctly pushed back on treating the Sentinel/Cyborg
+reconciliation as sufficient for the standing "release 0.6.0, deploy to
+main" goal — neither the version bump nor the candidate freeze nor the
+Main publication had happened. Proceeded autonomously per the operating
+model (routine implementation choices do not need a fresh PO touch).
+
+**Version bumped to `0.6.0`** across all three surfaces (`VERSION`,
+both plugin manifests, stamped `+{claude,codex}.20260818090525.8574686`).
+`claude plugin validate plugins/pipeline-core`: passed. Commit `cad15998`.
+
+**A fresh Full Verify immediately caught a real regression this
+session's own backlog work introduced.** `backlog-state-tests` and
+`backlog-state-check` — both previously clean, not part of the known
+exception — failed. Root cause traced directly: `check-backlog-state.mjs`
+requires `closure_commit` to be a full 40-char lowercase Git commit OID;
+every closure this session (13 items) and one from immediately before it
+(2 items, 15 total) used the short 8-char form instead. The malformed
+field cascaded into a flood of unrelated "ledger event N: id does not
+name a current backlog item" findings — resolving each short SHA to its
+full form via `git rev-parse` and regenerating `backlog/index.json`
+cleared all of it at once, confirming the cascade's actual cause. Fixed,
+commit `92039bbb`. Two pre-existing, unrelated DRIFT-classified findings
+remain (ledger event 403, `pipeline.codex-read-only-steps-escalate-individually-once`)
+— predate this session, tolerated by the checker's own cutoff-sequence
+logic, not touched.
+
+**Fresh Full Verify after both fixes: 268/269 green, exit path clean
+except the one known, separately-tracked `human-guard-override-tests`
+host-config exception** (`HGO-EXTERNAL-MARKETPLACE`, unrelated to any
+change this session made — confirmed identical on unmodified `main`
+multiple times today). `security-scan.mjs`: included in the Verify run,
+clean (no separate finding). Candidate at `92039bbb`, local test
+candidate — not yet frozen as the Nova A release candidate, no push
+approval prepared or recorded.
+
+**Lesson worth naming:** this session's own extensive backlog-closure
+work introduced a real, mechanical field-format defect (short vs. full
+commit SHA) that a fresh Verify run caught immediately — exactly the
+"trust but verify" discipline this whole session repeatedly needed. The
+closure_commit convention (`git rev-parse <short-sha>` before writing
+the frontmatter field, never the short form a `git log --oneline`
+naturally hands back) is worth stating explicitly for future closures.
+
 ## Recovery
 
 No persisted in-flight dispatch, rollback action or public human-gate acceptance
