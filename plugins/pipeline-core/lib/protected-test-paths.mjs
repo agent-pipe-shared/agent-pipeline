@@ -262,7 +262,7 @@ export function protectedTestPathBasenameNeedles(rules) {
       const literal = segment.replace(/\\(.)/gu, "$1");
       if (literal === "") continue;
       const needle = literal.toLowerCase();
-      const key = `${rule.id} ${needle}`;
+      const key = `${rule.id} ${needle}`;
       if (seen.has(key)) continue;
       seen.add(key);
       needles.push({ rule, needle });

@@ -193,9 +193,9 @@ function globToRegExp(pattern) {
     .map((segment) =>
       segment
         .replace(/[.+^${}()|[\]\\]/gu, "\\$&")
-        .replace(/\*\*/gu, " ")
+        .replace(/\*\*/gu, " ")
         .replace(/\*/gu, "[^/]*")
-        .replace(/ /gu, ".*"),
+        .replace(/ /gu, ".*"),
     )
     .join("/");
   return new RegExp(`^${body}$`, "u");
