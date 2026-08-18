@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "abf2e580"
+closure_evidence: "plugins/pipeline-core/lib/human-guard-override.test.mjs"
 source: "Elephant investigation, 2026-08-17, after the PO resynced this host's local marketplace copy and reloaded the plugin: 4 of the 5 previously-documented 'human-guard-override-tests marketplace-staleness' failures did NOT clear, while a 5th (F1 CRITIC-REMEDY-09) did. Investigated why -- root cause is different from what every prior record this session (including the consolidated Critic review's F-0) attributed it to."
 ---
 
@@ -98,3 +102,28 @@ outcome be for their specific scenario) rather than a blanket mock.
   still routed to a dispatch rather than hand-authored.
 - **Assignment:** queued; not yet dispatched.
 - **Date:** 2026-08-17
+
+### Closure, 2026-08-18
+
+Dispatched `NVA-HGOTEST-1` (goldfish-implementor): added a
+`withFakeCodexRegistry()` PATH-shim helper (a fake `codex` executable
+prepended to `process.env.PATH` for a test's duration, read fresh per
+call by the production code, reaching every call in the chain
+uniformly without a production-code change) and wrapped all four named
+tests in it. The dispatch's own session ended before writing the
+closing brace for the fourth wrapped test, before commit, and before
+its report, leaving a syntax-broken working tree; the Elephant added
+the single missing `});`, independently re-ran the suite, and
+committed on the dispatch's behalf. `node --test
+plugins/pipeline-core/lib/human-guard-override.test.mjs`: 63/64 pass —
+all four named tests green, every previously-green test still green,
+each test's own stated subject (git-unavailability,
+changed-candidate-source rejection, signed-path denial,
+spawn-injectability) still genuinely exercised. The one remaining
+failure (`F1 (dispatch CRITIC-REMEDY-09)`, `HGO-EXTERNAL-MARKETPLACE`)
+is the pre-existing, separately-tracked host-config exception this
+item's own Description explicitly distinguishes from its four tests —
+out of scope, unaffected. Commit `abf2e580`. Narrow test-only fix, no
+production-code change — closed without a separate Critic dispatch,
+consistent with this session's own precedent for small, low-risk
+mechanic/implementor-tier test fixes.

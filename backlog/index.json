@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b321addee92437d32f4f1ff4307ba1f2a81851ae2473910dd0c2f60a34f3ba20"
+    "transitionHead": "661b97ad89b990f3b26ad262fe0fe3b19a73bb5839f99054b4b624edaa01c9ca"
   },
   "counts": {
-    "open": 87,
+    "open": 85,
     "in_progress": 15,
-    "closed": 151
+    "closed": 153
   },
   "items": [
     {
@@ -777,11 +777,15 @@
     },
     {
       "id": "pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Elephant investigation, 2026-08-17, after the PO resynced this host's local marketplace copy and reloaded the plugin: 4 of the 5 previously-documented 'human-guard-override-tests marketplace-staleness' failures did NOT clear, while a 5th (F1 CRITIC-REMEDY-09) did. Investigated why -- root cause is different from what every prior record this session (including the consolidated Critic review's F-0) attributed it to."
+      "source": "Elephant investigation, 2026-08-17, after the PO resynced this host's local marketplace copy and reloaded the plugin: 4 of the 5 previously-documented 'human-guard-override-tests marketplace-staleness' failures did NOT clear, while a 5th (F1 CRITIC-REMEDY-09) did. Investigated why -- root cause is different from what every prior record this session (including the consolidated Critic review's F-0) attributed it to.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "abf2e580",
+      "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
     },
     {
       "id": "pipeline.fresh-repo-onboarding-never-asks-for-git-identity",
@@ -1337,11 +1341,15 @@
     },
     {
       "id": "pipeline.maintenance-window-signature-voided-by-unrelated-write",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Observed live while opening a Guard Maintenance Window for an AFK hardening session, 2026-08-08. The PO had already signed; the install failed."
+      "source": "Observed live while opening a Guard Maintenance Window for an AFK hardening session, 2026-08-08. The PO had already signed; the install failed.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "e2151461",
+      "closureEvidence": "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs"
     },
     {
       "id": "pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits",

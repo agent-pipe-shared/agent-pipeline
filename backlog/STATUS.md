@@ -80,7 +80,7 @@
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.four-critic-preimage-pins-drifted-or-never-valid | open | defect | pipeline | 2026-08-12 | — |
-| pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.git-appears-despite-initializes-git-false | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | 2026-08-10 | — |
@@ -134,7 +134,7 @@
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.long-dispatches-truncate-before-emitting-their-report | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.maintenance-window-selectivity-is-untested-at-both-levels | open | defect | pipeline | 2026-08-07 | — |
-| pipeline.maintenance-window-signature-voided-by-unrelated-write | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.maintenance-window-signature-voided-by-unrelated-write | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | 2026-08-17 | — |
@@ -261,6 +261,6 @@
 
 ## Counts
 
-- open: 87
+- open: 85
 - in_progress: 15
-- closed: 151
+- closed: 153

@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.maintenance-window-signature-voided-by-unrelated-write
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "e2151461"
+closure_evidence: "plugins/pipeline-core/lib/guard-maintenance-window.test.mjs"
 source: "Observed live while opening a Guard Maintenance Window for an AFK hardening session, 2026-08-08. The PO had already signed; the install failed."
 ---
 
@@ -179,3 +183,40 @@ still refusing, and the `TP-*` scope path). Commit `c8acb6a6`.
 explicit instruction, this security-tier change needs a Critic review
 before being treated as complete — not yet scheduled. Do not close this
 item on the implementation alone.
+
+### Closure, 2026-08-18 — the required Critic review already ran, as part of the Slice A7 gate chain
+
+A dedicated 3rd Critic-review dispatch was launched against the
+`c8acb6a6` candidate this session before this closure note was written.
+It correctly returned **FAIL**: F1 (blocker) — `pathWithinScope()` never
+consulted `isNeverLiftableKernelPath()`, so a commit rewriting the guard
+kernel itself (`guard-maintenance-window.mjs` or a sibling
+`NEVER_LIFTABLE_KERNEL_PATHS` entry) could be wrongly tolerated as
+in-scope; F2 (major) — the `TP-*` scope-pattern set was re-read live at
+install time instead of frozen at prepare time, a TOCTOU break of
+ADR-0058 Decision 5's binding guarantee.
+
+Both findings were **already fixed one commit later than the reviewed
+candidate**, before this dispatch even ran: `NVA-GMWFIX-4`
+(`e2151461`, "close two GMW commit-tolerance holes: kernel exclusion,
+frozen TP-* patterns"), independently corroborated by the reviewer's
+own commit-message match. That fix, and this exact file's kernel-closure
+invariant, were then independently covered by this same session's Slice
+A7 comprehensive Critic-review chain: round 4 **ran the kernel-closure
+test directly rather than trusting a claim** (`GMWKC01`/`GMWKC02`, both
+pass) and returned PASS with no findings on `guard-maintenance-window.mjs`
+plus its full diff since round 2; round 5 closed the chain's one
+remaining disclosed gap elsewhere. `docs/state.md` (2026-08-18, "continued
+3") records both rounds and the fix. `e2151461` is an ancestor of the
+current candidate HEAD.
+
+The stale, pre-`e2151461` 3rd dispatch's FAIL verdict is therefore
+superseded, not disregarded: it reviewed real code that genuinely had
+the defect, at a commit that predates the actual fix — its finding and
+the fix that resolved it are consistent, not contradictory. No further
+Critic dispatch is needed; re-running one against the current candidate
+would re-derive the same already-recorded PASS. Original trigger (a
+signature voided by an unrelated file write) fixed by `23d93b0a`/
+`64450b35`; the narrower commit-landing case fixed by `NVA-GMWFIX-3`
+(`c8acb6a6`) and hardened by `NVA-GMWFIX-4` (`e2151461`); both
+independently Critic-verified. Closed.
