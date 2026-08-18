@@ -153,6 +153,40 @@ invocation). It never inspects content for "does this look like a durable
 rule" — that judgment stays human/Elephant work, done once, before rotation
 is ever exercised for real on a given file's accumulated history.
 
+## Addendum 2026-08-18 (Decision 6 amendment — schema v2, section-scoped marker)
+
+Decision 6's marker, as originally shipped (`NVA-HANDOVER-ROT-1`), was a
+repo-wide, one-time boolean: checked once per repository, never re-asked.
+In use, this defeated the incremental-extraction posture Decision 7 assumes
+— once ANY section's extraction pass set the marker, the script no longer
+gated ANY future rotation on extraction being done for that specific
+content. A rotation of sections added, or edited, long after the marker
+was set — and never actually reviewed by anyone — went through with no
+further check at all (discovered 2026-08-18 while planning an incremental,
+oldest-sections-first extraction pass; PO reaction on reading the actual
+behavior back: *"das macht auch keinen Sinn und sollte angepasst
+werden"*). Tracked as
+`backlog/items/2026-08-18-handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped.md`.
+
+`handover-rotate.mjs`'s marker is amended to schema
+`pipeline.handover-rotation-extraction-ack.v2` (`NVA-W3-R3`): it now
+records, per acknowledged section, its title AND a content hash (sha256 of
+that section's own lines) at the moment of acknowledgment, instead of one
+repo-wide flag. A rotation naming a never-acknowledged section still
+refuses exactly as an entirely un-acknowledged repository did before; a
+section edited after acknowledgment but before rotation refuses again too,
+since its current content hash no longer matches what was reviewed; a
+multi-section rotation where only some sections are acknowledged fails
+closed for the entire requested set, never a partial rotation of just the
+acknowledged subset. An old-schema (v1) or missing marker file is treated
+as fully unacknowledged, never grandfathered into the new semantics. The
+CLI's `--acknowledge-extraction-done` now requires at least one
+`--section-heading` — the whole-repository, no-argument form no longer
+exists. This does not change Decision 6's underlying principle (the script
+still never guesses at rule-extraction; that judgment stays human/Elephant
+work); it only closes the gap between "acknowledged once" and "actually
+covers the content being rotated."
+
 **7. The one-time extraction pass over this repository's current 7,633-line
 file is NOT done by this ADR.** It is real, judgment-heavy work — reading
 dense narrative history to find every embedded standing rule and lift it
