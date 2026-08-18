@@ -833,6 +833,60 @@ test("authorize-critical prepares and signs in ONE invocation, and the resulting
   }
 });
 
+/* ------------------------------------------------------------------------- *
+ * PHX-WP-PUBLICATION-UNIFICATION -- ADR-0056 named publication's non-migration
+ * onto the shared `pipeline.po-approval-proof.v1` contract as its own recorded
+ * follow-up ("two shapes now exist where one would be better"). At THIS layer
+ * -- the human-terminal signing ceremony `po-human-approval.mjs` owns -- kind
+ * "publication" was already composed by the exact same `criticalApprovalRequest`
+ * call site as "push"/"deploy" (see `CRITICAL_COMMAND_KINDS` and the "prepare-critical
+ * keeps composing push/deploy/publication requests exactly as before" test above);
+ * nothing here special-cases the kind. What was missing was proof that the FULL
+ * sign+verify round trip -- not just request composition -- is byte-identical for
+ * "publication": this test is the "publication" twin of "authorize-critical prepares
+ * and signs in ONE invocation..." above, same assertions, same shape.
+ * ------------------------------------------------------------------------- */
+test("authorize-critical round-trips kind publication exactly like push: one invocation prepares and signs, and the proof verifies against the request built in that same call", () => {
+  const dirs = fixtureDirs();
+  try {
+    writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
+    writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
+    const { authority } = keyFixture(dirs.directory);
+    const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
+    const subjectSha256 = "a".repeat(64);
+    const confirmations = [];
+    const dependencies = {
+      observeCandidate: () => observed,
+      readConfirmation: (prompt) => { confirmations.push(prompt); return "approve"; },
+    };
+    const result = runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs, { kind: "publication", subjectSha256 })], dependencies);
+    assert.equal(result.ok, true);
+    assert.equal(result.code, "PO-HUMAN-CRITICAL-AUTHORIZATION-READY");
+    assert.deepEqual(result.candidate, observed);
+    assert.equal(result.action.kind, "publication");
+    assert.equal(result.action.subjectSha256, subjectSha256);
+
+    assert.equal(confirmations.length, 1, "authorize-critical must ask for exactly one explicit confirmation before signing");
+    assert.match(confirmations[0], new RegExp(subjectSha256, "u"), "the confirmation must state the exact subject being authorized");
+    assert.match(confirmations[0], /does NOT cover/u, "the confirmation must state the approval's bounds (ADR-0061 Decision 4)");
+
+    const request = JSON.parse(readFileSync(join(dirs.directory, "request-critical-publication.json"), "utf8"));
+    const proof = JSON.parse(readFileSync(join(dirs.directory, "proof-critical-publication.json"), "utf8"));
+    assert.equal(proof.schema, "pipeline.po-approval-proof.v1", "publication's proof uses the exact same shared schema as push/deploy");
+    assert.equal(proof.keyReference, authority.keyReference);
+    const verified = verifyCriticalActionApprovalRequest({
+      request, trustPolicy: authority, proof, expectedCandidate: observed, expectedAction: request.action,
+    });
+    assert.equal(verified.verified, true, "the proof produced by authorize-critical for kind publication must verify against the request it built in the same call");
+
+    // Temp signing artifacts are cleaned up; only the durable request/proof remain.
+    assert.equal(existsSync(join(dirs.directory, "intent-critical-publication.txt")), false);
+    assert.equal(existsSync(join(dirs.directory, "signature-critical-publication.bin")), false);
+  } finally {
+    cleanup(dirs);
+  }
+});
+
 test("authorize-critical never signs a stale request left in the external directory: it overwrites it with the request it just built and signs THAT one (the failure mode ADR-0061 removes)", () => {
   const dirs = fixtureDirs();
   try {
