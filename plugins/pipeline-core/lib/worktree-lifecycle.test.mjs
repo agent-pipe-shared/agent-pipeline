@@ -538,6 +538,56 @@ check("D0-07 hygiene still flags current-worktree-dirty when a genuinely foreign
   assert(receipt.reasons.includes("current-worktree-dirty"));
 });
 
+// NVA-WTLIFECYCLE-1: backlog-acceptance-matrix.md names "post-commit
+// cleanliness" as a distinct, unproven dimension of the AC in
+// prd_sentinel-epic.md:151-154 ("...cleaned safely in full and light close
+// profiles"). Every prior dirty-worktree check (D0-06/D0-07) reaches its
+// clean state by deleting an untracked file; none commits a real deliverable
+// first. This proves the identical git-status-driven mechanism also holds
+// for the actual close-block scenario: the session COMMITS its shipped work,
+// hygiene reports clean git state but still flags the undrained scratch
+// manifest, cleanup removes only the registered scratch resource, and the
+// committed deliverable is left byte-identical and the worktree hygiene-clean
+// afterward.
+check("D0-09 post-commit cleanliness: cleanup drains session scratch after a real deliverable commit, leaving committed content untouched", () => {
+  const { primary } = repoFixture();
+  const sessionId = "session-post-commit";
+  const ownerNonce = "owner-nonce-post-commit-0001";
+  const deliverable = join(primary, "deliverable.txt");
+  writeFileSync(deliverable, "shipped work\n");
+  git(primary, ["add", "deliverable.txt"]);
+  git(primary, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-m", "deliverable"]);
+  const deliverableSha256 = rawSha256(readFileSync(deliverable));
+
+  const scratch = mkdtempSync(join(tmpdir(), "worktree-post-commit-test-"));
+  fixtureRoots.push(scratch);
+  const evidence = join(scratch, "evidence.txt");
+  const fields = { sessionId, ownerNonce, resourceId: "post-commit-evidence" };
+  registerTemporaryIntent(primary, {
+    ...fields,
+    type: "scratch-file",
+    path: evidence,
+    contentClass: "scratch",
+    soleCopy: false,
+    cleanupPolicy: "unlink-file",
+  });
+  writeFileSync(evidence, "evidence\n");
+  finalizeTemporaryResource(primary, fields);
+
+  const beforeCleanup = checkSessionHygiene(primary, { sessionId });
+  assert.equal(beforeCleanup.reasons.includes("current-worktree-dirty"), false);
+  assert.equal(beforeCleanup.reasons.includes("session-manifest-not-drained"), true);
+
+  const complete = cleanupSession(primary, fields);
+  assert.equal(complete.ok, true);
+  assert.equal(existsSync(evidence), false);
+  assert.equal(existsSync(deliverable), true);
+  assert.equal(rawSha256(readFileSync(deliverable)), deliverableSha256);
+
+  const afterCleanup = checkSessionHygiene(primary, { sessionId });
+  assert.equal(afterCleanup.ok, true);
+});
+
 check("D0-08 clean migration creates/verifies canonical copy before removing old registration", () => {
   const { fixture, primary, head } = repoFixture();
   branch(primary, "feat/move");
