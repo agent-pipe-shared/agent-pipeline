@@ -580,6 +580,11 @@ const TEST_SUITES = [
   { name: "guard-git-phoenix-tests", file: join(hooksDir, "guard-git-phoenix.test.mjs") },
   { name: "afk-activation-tests", file: join(pluginScriptsDir, "afk-activation.test.mjs") },
   { name: "codex-isolated-critic-protected-preimage-tests", file: join(pluginScriptsDir, "codex-isolated-critic-protected-preimage.test.mjs") },
+  { name: "resume-hint-tests", file: join(libDir, "resume-hint.test.mjs") },
+  { name: "guard-el01-tripwire-tests", file: join(hooksDir, "guard-el01-tripwire.test.mjs") },
+  { name: "guard-onboarding-consent-lock-tests", file: join(hooksDir, "guard-onboarding-consent-lock.test.mjs") },
+  { name: "onboarding-consent-marker-tests", file: join(libDir, "onboarding-consent-marker.test.mjs") },
+  { name: "clean-candidate-run-tests", file: join(pluginScriptsDir, "clean-candidate-run.test.mjs") },
   { name: "verify-evidence-root-tests", file: join(scriptDir, "verify-evidence-root.test.mjs") },
 ];
 
