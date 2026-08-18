@@ -106,7 +106,85 @@ try {
   assert.match(withHint.context, /A guard denial is not by itself a human gate/u);
   assert.equal(withHint.message, governed.message);
 
-  console.log("codex-session-start-hint: 22 passed");
+  // NVA-W4-09: on source === "compact", the hint must reuse post-compact-reground.mjs's
+  // own PCR-READY/PCR-BLOCKED projection instead of unconditionally instructing a full
+  // re-bootstrap. First, no state present -> a fail-closed PCR stop, never the bootstrap text.
+  let compactStdout = "";
+  const originalWriteCompact = process.stdout.write;
+  process.stdout.write = (chunk) => { compactStdout += chunk; return true; };
+  try {
+    main({ projectDir: root, input: { source: "compact" } });
+  } finally {
+    process.stdout.write = originalWriteCompact;
+  }
+  assert.doesNotMatch(compactStdout, /run pipeline-core:pipeline-start/u);
+  assert.match(compactStdout, /PCR-OUTER-INVALID/u);
+
+  // Second, a valid ready continuity state -> the lightweight reground continuation,
+  // not the full bootstrap instruction, via the real CLI (exercises stdin JSON parsing).
+  const compactRoot = mkdtempSync(join(tmpdir(), "codex-session-start-compact-"));
+  try {
+    mkdirSync(join(compactRoot, ".claude"), { recursive: true });
+    const hex = (ch) => ch.repeat(64);
+    const continuityState = {
+      schema: "pipeline.state.v0",
+      activeFeature: { id: "f1", planPath: "specs/prd.md", phase: "implementation" },
+      continuity: {
+        schema: "pipeline.continuity.v0",
+        featureId: "f1",
+        revision: 4,
+        runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+        authority: {
+          prd: { path: "specs/prd.md", sha256: hex("a") },
+          spec: { path: "specs/spec.md", sha256: hex("b") },
+          result: { path: "specs/result.md", sha256: hex("c") },
+        },
+        queueHead: {
+          packageId: "P1",
+          actionId: "post-compact-reground",
+          nextAction: "dispatch",
+          productRetryCount: 0,
+          environmentRerouteCount: 0,
+          dispatch: null,
+        },
+        blocker: null,
+        acknowledgedFinal: null,
+        resume: { mode: "resume-on-next-turn", sourceRevision: 4, reasonCode: "compact-reload" },
+        recovery: null,
+        decisionTxn: null,
+        capacity: {
+          concurrencyLimit: 3,
+          reservedCriticSlots: 1,
+          reservedRecoverySlots: 1,
+          fallbackPolicy: "defer",
+        },
+      },
+    };
+    writeFileSync(join(compactRoot, ".claude", "pipeline-state.json"), `${JSON.stringify(continuityState)}\n`);
+    const compactCli = spawnSync(process.execPath, [script], {
+      cwd: compactRoot,
+      encoding: "utf8",
+      input: JSON.stringify({ source: "compact" }),
+    });
+    assert.equal(compactCli.status, 0, compactCli.stderr);
+    const compactPayload = JSON.parse(compactCli.stdout);
+    assert.doesNotMatch(compactPayload.systemMessage, /run pipeline-core:pipeline-start/u);
+    assert.match(compactPayload.systemMessage, /Re-grounding after \/compact\./u);
+    assert.match(compactPayload.systemMessage, /"code":"PCR-READY"/u);
+
+    // A stdin read failure (empty/malformed) must still fall back safely, never crash.
+    const nonCompactCli = spawnSync(process.execPath, [script], {
+      cwd: compactRoot,
+      encoding: "utf8",
+      input: "",
+    });
+    assert.equal(nonCompactCli.status, 0, nonCompactCli.stderr);
+    assert.equal(JSON.parse(nonCompactCli.stdout).hookSpecificOutput.hookEventName, "SessionStart");
+  } finally {
+    rmSync(compactRoot, { recursive: true, force: true });
+  }
+
+  console.log("codex-session-start-hint: 27 passed");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

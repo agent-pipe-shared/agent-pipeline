@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Surface a concise, non-mutating Agent-Pipeline entry hint in every Codex session. */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { inspectResumeHint } from "../lib/resume-hint.mjs";
+import { decideOutput, loadStateSafe, shouldActivate } from "./post-compact-reground.mjs";
+import { LEGACY_STATE, NEUTRAL_STATE, resolveProjectAuthorityPaths } from "../lib/project-authority.mjs";
 
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -131,7 +133,41 @@ export function sessionStartMessage(projectDir = process.cwd(), exists = existsS
   return sessionStartDecision(projectDir, exists).message;
 }
 
-export function main({ projectDir, exists } = {}) {
+/**
+ * NVA-W4-09: on a `compact` SessionStart, do not unconditionally instruct a full
+ * re-bootstrap. Reuse post-compact-reground.mjs's own exported projection logic --
+ * the same PCR-READY/PCR-BLOCKED skip-or-continue signal Claude already gets on
+ * compact via its own separately-wired `compact`-matcher hook -- so a Codex session
+ * (whose codex-hooks.json SessionStart matcher includes `compact` on THIS hook,
+ * since post-compact-reground.mjs is not itself wired into codex-hooks.json) gets
+ * the identical lightweight re-ground instead of a redundant full bootstrap.
+ */
+function compactStdout(input, projectDir) {
+  if (!shouldActivate(input)) return null;
+  const rootDir = resolve(projectDir ?? process.cwd());
+  const authority = resolveProjectAuthorityPaths({ rootDir });
+  const statePath = authority.status === "ready"
+    ? authority.state
+    : (existsSync(join(rootDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  const state = loadStateSafe(join(rootDir, statePath));
+  const { stdout } = decideOutput(input, state);
+  return stdout || null;
+}
+
+function readStdinInput() {
+  try {
+    return JSON.parse(readFileSync(0, "utf8"));
+  } catch {
+    return null;
+  }
+}
+
+export function main({ projectDir, exists, input } = {}) {
+  const compact = compactStdout(input, projectDir);
+  if (compact) {
+    process.stdout.write(compact);
+    return;
+  }
   const decision = sessionStartDecision(projectDir, exists);
   process.stdout.write(`${JSON.stringify({
     systemMessage: decision.message,
@@ -142,4 +178,4 @@ export function main({ projectDir, exists } = {}) {
   })}\n`);
 }
 
-if (isDirectInvocation(import.meta.url)) main();
+if (isDirectInvocation(import.meta.url)) main({ input: readStdinInput() });
