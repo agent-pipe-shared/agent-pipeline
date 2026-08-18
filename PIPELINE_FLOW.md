@@ -6,8 +6,9 @@ This is the **one maintained visual guide to the user-facing V3 flow**. It helps
 you choose a route and understand who does what. It is not permission to skip a
 gate or change a project. The active PRD and Spec define the work; the
 [Operating Model](docs/operating-model.md), the project's `pipeline.user.yaml`,
-`.claude/pipeline.yaml`, and `.claude/pipeline.json` define the applicable
-contract. If this guide disagrees with one of them, use that source.
+`.claude/pipeline.yaml`, and the project calibration at its resolved authority
+tier (`project/pipeline.json`, else `.claude/pipeline.json`) define the
+applicable contract. If this guide disagrees with one of them, use that source.
 
 ## Start here: one change, one honest route
 
@@ -240,8 +241,10 @@ V3-Ablauf**. Sie hilft dir, einen Weg zu wählen und zu verstehen, wer was tut.
 Sie erlaubt nicht, ein Gate zu überspringen oder ein Projekt zu verändern. Das
 aktive PRD und die Spec definieren die Arbeit; das
 [Operating Model](docs/operating-model.md), die `pipeline.user.yaml` des
-Projekts, `.claude/pipeline.yaml` und `.claude/pipeline.json` definieren den
-anwendbaren Vertrag. Bei einem Widerspruch gilt diese Quelle.
+Projekts, `.claude/pipeline.yaml` und die Projektkalibrierung auf ihrer
+aufgelösten Autoritätsstufe (`project/pipeline.json`, sonst
+`.claude/pipeline.json`) definieren den anwendbaren Vertrag. Bei einem
+Widerspruch gilt diese Quelle.
 
 ## Hier beginnen: eine Änderung, ein ehrlicher Weg
 

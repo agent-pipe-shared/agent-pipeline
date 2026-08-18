@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
 source: "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift"
 due: 2026-09-05
@@ -184,4 +184,20 @@ angle rather than the migration-completeness angle).
   ~7-line repointing list above — small enough for a `goldfish-mechanic`
   dispatch (uniform doc-sync edit following the `896a7a0` pattern), not
   assigned this session.
-- **Date:** 2026-08-06
+
+  **Update 2026-08-18 (accept and fix, closing):** the remaining 5-file list
+  repointed under PHX-WP-DOCTEMPLATE-SWEEP/FIX 1 - close-block/SKILL.md:83,98,179,
+  goldfish-{implementor,mechanic,deep}.md:11, SETUP.md:275,333, and
+  PIPELINE_FLOW.md:9,243 (including its German half) - now carry the same
+  "resolved authority tier: project/pipeline.json, else
+  .claude/pipeline.json" phrasing as roles/goldfish.md:52.
+  SETUP.md:333's literal cp ... .claude/pipeline.json shell example was
+  kept as-is (a runner-neutral rewrite of a worked example would be
+  disruptive) with a short added note pointing a runner-neutral project at
+  project/pipeline.json instead. All remaining rg hits for
+  .claude/pipeline.json in the 6 checked files are now either part of the
+  corrected resolved-tier phrasing itself or that one deliberate example
+  line plus its note.
+- **Assignment:** this dispatch (PHX-WP-DOCTEMPLATE-SWEEP).
+- **Date:** 2026-08-18
+- **Closure commit:** this commit (fix and closure land together; see this dispatch's commit repointing the 6-file resolved-tier list).

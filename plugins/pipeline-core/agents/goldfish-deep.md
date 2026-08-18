@@ -8,7 +8,8 @@ tools: Read, Edit, Write, Grep, Glob, Bash
 # NO `memory` field — deliberate: memory would auto-activate persistent write surfaces; the
 #   pipeline learns via the versioned operating model, not via agent memory.
 # Worktree isolation is deliberately NOT hardcoded here: the Elephant enables it per dispatch
-#   according to the project calibration (.claude/pipeline.json, field `worktree`). Caution: a
+#   according to the project calibration at its resolved authority tier (project/pipeline.json,
+#   else .claude/pipeline.json; field `worktree`). Caution: a
 #   project's compile/type-check gate can be fail-open inside a worktree - verify this per project
 #   when enabling worktree isolation.
 # model: sonnet = implement-tier shipped default (MP-02; configured in pipeline.user.yaml ->
