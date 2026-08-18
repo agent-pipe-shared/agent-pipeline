@@ -60,7 +60,7 @@ import {
 import { gateConfig, loadManifest, validateManifest } from "./manifest.mjs";
 import { captureResumeHint, discardResumeHint, inspectResumeHint } from "./resume-hint.mjs";
 import { inspectObservationGovernanceBootstrap } from "./observation-governance-bootstrap.mjs";
-import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
+import { PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER, validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
 import { initializePoGateProfileReceipt as initializeActualPoGateProfileReceipt } from "./po-gate-profile-publisher.mjs";
 import { isDirectInvocation } from "./entrypoint.mjs";
 
@@ -287,6 +287,18 @@ export function completeKickoff(path, goal = "Build a safe project", deps = fake
   assert.equal(result.status, expectedStatus);
   assert.equal(result.continuity.status, "valid");
   return plan;
+}
+
+// Simulates the PO's own out-of-band act (never an agent's, per
+// po-gate-authority.mjs's PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER contract) of
+// having personally read the active PRD and judged it content-sound and
+// Spec-consistent, for a test that needs to reach submit-plan/approve-plan
+// (an ACTIVE po-gate-authority validation) on a kickoff-generated PRD.
+// Kickoff itself must never add this marker -- only a test simulating a
+// completed human review does, deliberately, as a distinct step.
+export function acknowledgePoGatePlan(rootDir, planPath) {
+  const path = join(rootDir, planPath);
+  writeFileSync(path, `${readFileSync(path, "utf8")}${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
 }
 
 function assertSingleLineAction(action, expected) {
@@ -2860,6 +2872,7 @@ test("a real fresh local kickoff is immediately a valid canonical PO authority",
     completeKickoff(path, "Create one canonical fresh feature", localDeps);
     const authority = validatePoGateAuthorityForRepository({ repoRoot: path });
     assert.equal(authority.ok, true, JSON.stringify(authority));
+    acknowledgePoGatePlan(path, JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath);
     const stderr = [];
     const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
       dir: path,
@@ -2905,6 +2918,7 @@ test("kickoff choosing a language different from the portable-seed default reach
     // "ready", not send the caller through plan-repair/apply-repair to
     // reconcile the runtime manifest the migration owned-keys table tracks.
     assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: localDeps, runner: "codex" }).status, "ready");
+    acknowledgePoGatePlan(path, JSON.parse(readFileSync(join(path, "project/pipeline-state.json"), "utf8")).activeFeature.planPath);
     const stderr = [];
     const exit = pipelineStateRun(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
       dir: path,
@@ -2946,6 +2960,7 @@ test("promoting a PRD whose language differs from kickoff's own answer reaches a
     writeFileSync(join(path, prdPath), [
       "<!-- po-language: de -->",
       `<!-- technical-spec-sha256: ${specSha256} -->`,
+      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
       "",
       "# Promo-lang product requirements",
       "",
@@ -3008,6 +3023,7 @@ test("the seeded dev-plan gate refuses implementation before approval and admits
     writeFileSync(join(path, prdPath), [
       "<!-- po-language: en -->",
       `<!-- technical-spec-sha256: ${specSha256} -->`,
+      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
       "",
       "# Gated product requirements",
       "",
@@ -3088,6 +3104,7 @@ test("V4 inspection proposes set-phase --phase implementation once the plan is a
     writeFileSync(join(path, prdPath), [
       "<!-- po-language: en -->",
       `<!-- technical-spec-sha256: ${specSha256} -->`,
+      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
       "",
       "# Handover product requirements",
       "",
