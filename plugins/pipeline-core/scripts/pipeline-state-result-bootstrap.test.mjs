@@ -63,6 +63,33 @@ function plan(f) {
   assert.equal(value.status, 0, value.err); assert.deepEqual(readFileSync(f.statePath), before); return JSON.parse(value.out);
 }
 
+// Windows: Node synthesizes `.mode` on native Windows from the read-only
+// attribute alone, so the bare `(info.mode & 0o077)` comparison in
+// ensureBootstrapPrivateDirectory/readPrivateBootstrap failed closed
+// unconditionally there (backlog/items/2026-08-18-windows-posix-mode-bit-
+// checks-are-meaningless-on-ntfs.md). These inject `platform`/
+// `assessWindowsPrivate` via the CLI's own `deps` seam to prove the win32
+// branch decides the outcome, not the bare mode bits.
+test("win32: a POSIX-insecure private result-bootstrap directory is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged)", () => {
+  const f = fixture("win32-secure"); const p = plan(f);
+  // Exactly what the old bare `(info.mode & 0o077) !== 0` comparison would
+  // have failed closed on unconditionally, on every platform.
+  mkdirSync(join(f.commonDir, "agent-pipeline"), { recursive: true, mode: 0o755 });
+  mkdirSync(join(f.commonDir, "agent-pipeline", "result-bootstrap"), { mode: 0o755 });
+  const posix = invoke(f.root, p.applyAction.argv.slice(1));
+  assert.equal(posix.status, 2);
+  assert.doesNotMatch(posix.out, /"status":"(?:applied|replayed)"/);
+  const win32Secure = invoke(f.root, p.applyAction.argv.slice(1), { platform: "win32", assessWindowsPrivate: () => ({ status: "secure" }) });
+  assert.equal(win32Secure.status, 0, win32Secure.err);
+});
+
+test("win32: an insecure DACL assessment on the private result-bootstrap directory still fails closed", () => {
+  const f = fixture("win32-insecure"); const p = plan(f);
+  const win32Insecure = invoke(f.root, p.applyAction.argv.slice(1), { platform: "win32", assessWindowsPrivate: () => ({ status: "insecure" }) });
+  assert.equal(win32Insecure.status, 2);
+  assert.doesNotMatch(win32Insecure.out, /"status":"(?:applied|replayed)"/);
+});
+
 test("AC-047-143--146: readonly plan binds existing lowercase canonical Result prefix and strict appended fence", () => {
   const f = fixture("success"); const p = plan(f);
   const fence = Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n");

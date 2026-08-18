@@ -29,6 +29,34 @@ function fixture(name) {
 }
 function plan(f) { const state = readFileSync(f.statePath); const lifecycle = readFileSync(f.lifecyclePath); const r = invoke(f.root, ["continuity-result-case-migration-plan", "--result-path", "specs/feature/Result.md", "--archive-path", "specs/feature/archive/result.md"]); assert.equal(r.status, 0, r.err); assert.deepEqual(readFileSync(f.statePath), state); assert.deepEqual(readFileSync(f.lifecyclePath), lifecycle); return JSON.parse(r.out); }
 
+// Windows: Node synthesizes `.mode` on native Windows from the read-only
+// attribute alone, so the bare `(info.mode & 0o077)` comparison in
+// ensureCaseMigrationDirectory/readPrivateBootstrap failed closed
+// unconditionally there (backlog/items/2026-08-18-windows-posix-mode-bit-
+// checks-are-meaningless-on-ntfs.md). These inject `platform`/
+// `assessWindowsPrivate` via the CLI's own `deps` seam to prove the win32
+// branch decides the outcome, not the bare mode bits.
+test("win32: a POSIX-insecure private case-migration directory is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged)", () => {
+  const f = fixture("win32-secure"); const p = plan(f);
+  // Exactly what the old bare `(info.mode & 0o077) !== 0` comparison would
+  // have failed closed on unconditionally, on every platform.
+  mkdirSync(join(f.root, ".git-common", "agent-pipeline"), { recursive: true, mode: 0o755 });
+  mkdirSync(join(f.root, ".git-common", "agent-pipeline", "result-case-migration"), { mode: 0o755 });
+  const posix = invoke(f.root, p.applyAction.argv.slice(1));
+  assert.equal(posix.status, 2);
+  assert.doesNotMatch(posix.out, /"status":"(?:applied|replayed)"/);
+  const win32Secure = invoke(f.root, p.applyAction.argv.slice(1), { platform: "win32", assessWindowsPrivate: () => ({ status: "secure" }) });
+  assert.equal(win32Secure.status, 0, win32Secure.err);
+  assert.equal(JSON.parse(win32Secure.out).status, "applied");
+});
+
+test("win32: an insecure DACL assessment on the private case-migration directory still fails closed", () => {
+  const f = fixture("win32-insecure"); const p = plan(f);
+  const win32Insecure = invoke(f.root, p.applyAction.argv.slice(1), { platform: "win32", assessWindowsPrivate: () => ({ status: "insecure" }) });
+  assert.equal(win32Insecure.status, 2);
+  assert.doesNotMatch(win32Insecure.out, /"status":"(?:applied|replayed)"/);
+});
+
 test("Phoenix migration rejects candidate, lifecycle, State and archive drift and recovers a source-moved journal", () => {
   for (const mode of ["state", "lifecycle", "candidate", "archive"]) { const f = fixture(mode); const p = plan(f); if (mode === "state") writeFileSync(f.statePath, Buffer.from("{}\n")); if (mode === "lifecycle") writeFileSync(f.lifecyclePath, Buffer.from("{}\n")); if (mode === "candidate") writeFileSync(f.upperPath, Buffer.from("changed\n")); if (mode === "archive") { mkdirSync(join(f.dir, "archive")); writeFileSync(f.archivePath, Buffer.from("occupied\n")); } const r = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(r.status, 2, mode); assert.doesNotMatch(r.out, /"status":"(?:applied|replayed)"/); }
   const f = fixture("recovery"); const p = plan(f); const first = invoke(f.root, p.applyAction.argv.slice(1), { afterCaseMigrationSource: () => false }); assert.equal(first.status, 2); assert.deepEqual(readFileSync(f.archivePath), f.lower); const second = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(second.status, 0, second.err); assert.equal(JSON.parse(second.out).status, "replayed"); assert.deepEqual(readFileSync(f.upperPath), f.upper); assert.throws(() => readFileSync(f.lowerPath)); const state = JSON.parse(readFileSync(f.statePath)); assert.equal(state.continuity.authority.result.path, "specs/feature/Result.md"); assert.equal(state.continuity.revision, 8); const lifecycle = JSON.parse(readFileSync(f.lifecyclePath)); assert.deepEqual(lifecycle.artifacts.filter((x) => x.class === "result").map((x) => [x.path, x.authority, x.retention]), [["specs/feature/archive/result.md", false, "archive"], ["specs/feature/Result.md", true, "active"]]); const replay = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(replay.status, 0, replay.err); assert.equal(JSON.parse(replay.out).status, "replayed");

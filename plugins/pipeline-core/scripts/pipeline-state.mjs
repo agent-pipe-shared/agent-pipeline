@@ -363,6 +363,7 @@ import {
 } from "./publication-close-journal.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { syncStateMdNextAction } from "../lib/onboarding-continuity.mjs";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -3217,20 +3218,31 @@ function caseMigrationPrivatePaths(dir, deps = {}) {
   const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir); if (!common?.ok || typeof common.path !== "string") return null;
   try { const root = realpathSync(common.path); if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null; const namespace = join(root, "agent-pipeline"); const base = join(namespace, "result-case-migration"); return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") }; } catch { return null; }
 }
-function ensureCaseMigrationDirectory(paths) {
+function ensureCaseMigrationDirectory(paths, deps = {}) {
   if (paths === null) return false;
-  try { for (const path of [paths.namespace, paths.base]) { if (!existsSync(path)) mkdirSync(path, { mode: 0o700 }); const info = lstatSync(path); if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o077) !== 0) return false; } return true; } catch { return false; }
+  const platform = deps.platform ?? process.platform;
+  const assessWindowsPrivate = deps.assessWindowsPrivate ?? assessWindowsPrivatePath;
+  try {
+    for (const path of [paths.namespace, paths.base]) {
+      if (!existsSync(path)) mkdirSync(path, { mode: 0o700 });
+      const info = lstatSync(path);
+      if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path) return false;
+      const secure = platform === "win32" ? assessWindowsPrivate(path).status === "secure" : (info.mode & 0o077) === 0;
+      if (!secure) return false;
+    }
+    return true;
+  } catch { return false; }
 }
 function caseMigrationMac(key, value) { return createHmac("sha256", key).update(JSON.stringify(value)).digest("hex"); }
 function loadCaseMigrationJournal(dir, deps = {}) {
-  const paths = caseMigrationPrivatePaths(dir, deps); if (!ensureCaseMigrationDirectory(paths)) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" };
-  const raw = readPrivateBootstrap(paths.journal); if (raw === null) return { ok: true, paths, journal: null };
-  const key = readPrivateBootstrap(paths.key); if (key === null || key.byteLength !== 32) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" };
+  const paths = caseMigrationPrivatePaths(dir, deps); if (!ensureCaseMigrationDirectory(paths, deps)) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" };
+  const raw = readPrivateBootstrap(paths.journal, deps); if (raw === null) return { ok: true, paths, journal: null };
+  const key = readPrivateBootstrap(paths.key, deps); if (key === null || key.byteLength !== 32) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" };
   try { const value = JSON.parse(raw.toString("utf8")); const { mac, ...core } = value; if (value.schema !== RESULT_CASE_MIGRATION_JOURNAL_SCHEMA || !SHA256_RE.test(value.planSha256) || !SHA256_RE.test(value.stateSha256) || !SHA256_RE.test(value.postStateSha256) || !SHA256_RE.test(value.lifecycleSha256) || !SHA256_RE.test(value.postLifecycleSha256) || !value.source || !value.target || !value.archive || typeof value.postStateBase64 !== "string" || typeof value.postLifecycleBase64 !== "string" || !SHA256_RE.test(mac) || caseMigrationMac(key, core) !== mac) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" }; return { ok: true, paths, journal: value }; } catch { return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" }; }
 }
 function publishCaseMigrationJournal(dir, plan, deps = {}) {
-  const paths = caseMigrationPrivatePaths(dir, deps); if (!ensureCaseMigrationDirectory(paths)) return false;
-  let key = readPrivateBootstrap(paths.key); if (key === null) { key = randomBytes(32); if (!writePrivateBootstrap(paths.key, key)) return false; } if (key.byteLength !== 32) return false;
+  const paths = caseMigrationPrivatePaths(dir, deps); if (!ensureCaseMigrationDirectory(paths, deps)) return false;
+  let key = readPrivateBootstrap(paths.key, deps); if (key === null) { key = randomBytes(32); if (!writePrivateBootstrap(paths.key, key)) return false; } if (key.byteLength !== 32) return false;
   const core = { schema: RESULT_CASE_MIGRATION_JOURNAL_SCHEMA, planSha256: plan.planSha256, stateSha256: plan.payload.preimage.stateSha256, postStateSha256: plan.payload.postimage.stateSha256, lifecycleSha256: plan.payload.preimage.lifecycle.sha256, postLifecycleSha256: plan.payload.postimage.lifecycleSha256, source: { path: plan.source.path, sha256: plan.source.sha256 }, target: { path: plan.target.path, sha256: plan.target.sha256 }, archive: plan.archive, postStateBase64: plan.nextStateBytes.toString("base64"), postLifecycleBase64: plan.lifecycle.postBytes.toString("base64") };
   return writePrivateBootstrap(paths.journal, Buffer.from(JSON.stringify({ ...core, mac: caseMigrationMac(key, core) }) + "\n", "utf8"), false);
 }
@@ -3402,25 +3414,33 @@ function resultBootstrapPrivatePaths(dir, deps = {}) {
   } catch { return null; }
 }
 
-function ensureBootstrapPrivateDirectory(paths) {
+function bootstrapPrivateDirectorySecure(path, info, deps) {
+  const platform = deps.platform ?? process.platform;
+  const assessWindowsPrivate = deps.assessWindowsPrivate ?? assessWindowsPrivatePath;
+  return platform === "win32" ? assessWindowsPrivate(path).status === "secure" : (info.mode & 0o077) === 0;
+}
+
+function ensureBootstrapPrivateDirectory(paths, deps = {}) {
   if (paths === null) return false;
   try {
     for (const path of [paths.namespace, paths.base]) {
       if (!existsSync(path)) mkdirSync(path, { mode: 0o700 });
       const info = lstatSync(path);
-      if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o077) !== 0) return false;
+      if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path) return false;
+      if (!bootstrapPrivateDirectorySecure(path, info, deps)) return false;
     }
     return true;
   } catch { return false; }
 }
 
-function observeBootstrapPrivateDirectory(paths) {
+function observeBootstrapPrivateDirectory(paths, deps = {}) {
   if (paths === null) return false;
   try {
     for (const path of [paths.namespace, paths.base]) {
       if (!existsSync(path)) continue;
       const info = lstatSync(path);
-      if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o077) !== 0) return false;
+      if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path) return false;
+      if (!bootstrapPrivateDirectorySecure(path, info, deps)) return false;
     }
     return true;
   } catch { return false; }
@@ -3439,17 +3459,24 @@ function writePrivateBootstrap(path, bytes, replace = false) {
   } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
 }
 
-function readPrivateBootstrap(path) {
-  try { const s = lstatSync(path); return s.isFile() && !s.isSymbolicLink() && s.nlink === 1 && (s.mode & 0o077) === 0 ? readFileSync(path) : null; } catch { return null; }
+function readPrivateBootstrap(path, deps = {}) {
+  const platform = deps.platform ?? process.platform;
+  const assessWindowsPrivate = deps.assessWindowsPrivate ?? assessWindowsPrivatePath;
+  try {
+    const s = lstatSync(path);
+    if (!s.isFile() || s.isSymbolicLink() || s.nlink !== 1) return null;
+    const secure = platform === "win32" ? assessWindowsPrivate(path).status === "secure" : (s.mode & 0o077) === 0;
+    return secure ? readFileSync(path) : null;
+  } catch { return null; }
 }
 
 function bootstrapJournalMac(key, record) { return createHmac("sha256", key).update(JSON.stringify(record)).digest("hex"); }
 
 function loadBootstrapJournal(dir, deps = {}) {
   const paths = resultBootstrapPrivatePaths(dir, deps);
-  if (paths === null || !observeBootstrapPrivateDirectory(paths)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-GIT-COMMON-DIR" };
-  const key = readPrivateBootstrap(paths.key);
-  const raw = readPrivateBootstrap(paths.journal);
+  if (paths === null || !observeBootstrapPrivateDirectory(paths, deps)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-GIT-COMMON-DIR" };
+  const key = readPrivateBootstrap(paths.key, deps);
+  const raw = readPrivateBootstrap(paths.journal, deps);
   if (raw === null) return { ok: true, journal: null, paths, key };
   if (key === null || key.byteLength !== 32) return { ok: false, code: "PS-RESULT-BOOTSTRAP-JOURNAL" };
   try {
@@ -3466,8 +3493,8 @@ function loadBootstrapJournal(dir, deps = {}) {
 
 function publishBootstrapJournal(dir, plan, deps = {}) {
   const paths = resultBootstrapPrivatePaths(dir, deps);
-  if (!ensureBootstrapPrivateDirectory(paths)) return false;
-  let key = readPrivateBootstrap(paths.key);
+  if (!ensureBootstrapPrivateDirectory(paths, deps)) return false;
+  let key = readPrivateBootstrap(paths.key, deps);
   if (key === null) { key = randomBytes(32); if (!writePrivateBootstrap(paths.key, key)) return false; }
   if (key.byteLength !== 32) return false;
   const core = { schema: RESULT_BOOTSTRAP_JOURNAL_SCHEMA, planSha256: plan.planSha256, stateSha256: plan.payload.preimage.stateSha256, postStateSha256: plan.payload.postimage.stateSha256, result: { path: plan.payload.result.path, sha256: plan.payload.result.sha256 } };
@@ -3475,8 +3502,8 @@ function publishBootstrapJournal(dir, plan, deps = {}) {
   return writePrivateBootstrap(paths.journal, bytes, false);
 }
 
-function retireBootstrapJournal(paths) {
-  try { return ensureBootstrapPrivateDirectory(paths) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
+function retireBootstrapJournal(paths, deps = {}) {
+  try { return ensureBootstrapPrivateDirectory(paths, deps) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
 }
 
 function parseResultBootstrapApply(argv) {
@@ -3523,7 +3550,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
         || !resultBootstrapEligible({ ...current.state, continuity: { ...current.state.continuity, authority: { ...current.state.continuity.authority, result: null }, revision: current.state.continuity.revision - 1, resume: { ...current.state.continuity.resume, sourceRevision: current.state.continuity.revision - 1 } } }, prd, spec)
         || current.state.activeFeature.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity.authority.result?.path !== resultPath
         || resultObserved === null || resultObserved.sha256 !== current.state.continuity.authority.result.sha256) { console.error("Error: Result bootstrap replay postimage is invalid; zero mutation."); return 2; }
-      if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
+      if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths, deps))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
       console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion: featureClosureProgress("review") })); return 0;
     }
     // A durable Result may legitimately exist while State is still at the exact
@@ -3563,7 +3590,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
     if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== apply.expectedPostStateSha256 || persisted.state.continuity.authority.result?.sha256 !== planned.payload.result.sha256) { console.error("Error: Result bootstrap postimage readback is unresolved; recovery journal retained."); return 2; }
     if (deps.afterResultBootstrapState?.() === false) { console.error("Error: Result bootstrap interrupted after State commit; recovery journal retained."); return 2; }
     const recovered = loadBootstrapJournal(deps.dir, deps);
-    if (!recovered.ok || recovered.journal === null || recovered.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(recovered.paths)) { console.error("Error: Result bootstrap journal retirement is unresolved."); return 2; }
+    if (!recovered.ok || recovered.journal === null || recovered.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(recovered.paths, deps)) { console.error("Error: Result bootstrap journal retirement is unresolved."); return 2; }
     console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: featureClosureProgress("review") })); return 0;
   } finally { releaseContinuityLock(lock); }
 }
