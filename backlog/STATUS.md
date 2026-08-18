@@ -5,7 +5,7 @@
 
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
-| pipeline.a-promoted-feature-can-never-pass-the-plan-gate | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
@@ -31,7 +31,7 @@
 | pipeline.backlog-ledger-baseline-migration-commit-unreachable | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | open | workflow-improvement | pipeline | 2026-08-11 | — |
+| pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | closed | workflow-improvement | pipeline | 2026-08-11 | — |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module | open | workflow-improvement | pipeline | 2026-08-08 | — |
@@ -62,7 +62,7 @@
 | pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | open | defect | pipeline | 2026-08-05 | — |
-| pipeline.critical-human-proof-policy-lacks-the-reconcile-approval-generalization | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.critical-human-proof-policy-lacks-the-reconcile-approval-generalization | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.critical-push-signing-ceremony-gives-no-path-feedback | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command | closed | defect | pipeline | 2026-08-17 | — |
@@ -101,7 +101,7 @@
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.greenfield-seeded-with-private-overlay-calibration | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit | open | idea | pipeline | 2026-08-17 | — |
-| pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | closed | defect | pipeline | 2026-08-17 | — |
@@ -121,7 +121,7 @@
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | open | defect | pipeline | 2026-08-12 | — |
+| pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-guard-override-shares-the-po-human-approval-posix-normalization-bug | closed | defect | pipeline | 2026-08-17 | — |
@@ -150,7 +150,7 @@
 | pipeline.mp22-orchestrator-self-implementation-has-no-enforcement | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.native-windows-verify-red-suite-class | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | open | defect | pipeline | 2026-08-06 | — |
+| pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home | open | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
@@ -237,7 +237,7 @@
 | pipeline.single-trust-anchor-excludes-key-rotation-and-teams | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.skill-arguments-and-bootstrap-length | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.spec-retention-on-close | open | defect | pipeline | 2026-07-20 | — |
+| pipeline.spec-retention-on-close | closed | defect | pipeline | 2026-07-20 | — |
 | pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.stateful-design-contract-template | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.t1-governance-path-preflight | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -275,6 +275,6 @@
 
 ## Counts
 
-- open: 93
+- open: 86
 - in_progress: 9
-- closed: 165
+- closed: 172

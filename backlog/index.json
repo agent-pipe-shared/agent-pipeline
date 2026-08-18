@@ -3,21 +3,25 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4adb6c39718e8dc9bd9dbcf48d20ee0ddd032345cb524b407b3a5f67a79e4910"
+    "transitionHead": "80d8fbfc0124b8b80bebf98bd859de18708e282e9579b0b34ba67cf7a0897bcb"
   },
   "counts": {
-    "open": 93,
+    "open": 86,
     "in_progress": 9,
-    "closed": 165
+    "closed": 172
   },
   "items": [
     {
       "id": "pipeline.a-promoted-feature-can-never-pass-the-plan-gate",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO, live greenfield onboarding with the Claude runner, 2026-08-07: 'der status wird initial falsch gesetzt und es gibt keinen sauberen lauf zum PRD und Freigabe'. The session located both halves in code before reporting."
+      "source": "PO, live greenfield onboarding with the Claude runner, 2026-08-07: 'der status wird initial falsch gesetzt und es gibt keinen sauberen lauf zum PRD und Freigabe'. The session located both halves in code before reporting.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "72a293d59694e6184f190bb3c141f7b2d509b8da",
+      "closureEvidence": "plugins/pipeline-core/lib/po-gate-authority.test.mjs"
     },
     {
       "id": "pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path",
@@ -275,11 +279,15 @@
     },
     {
       "id": "pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-11",
-      "source": "Critic review (F4, minor) of NVA-A8-4's real benchmark implementation, dispatched against commits 7132c5c7..de0b16fc, 2026-08-11."
+      "source": "Critic review (F4, minor) of NVA-A8-4's real benchmark implementation, dispatched against commits 7132c5c7..de0b16fc, 2026-08-11.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "e3e521834f45f3733f597932ab1693bcdfaeb721",
+      "closureEvidence": "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs"
     },
     {
       "id": "pipeline.blocking-push-gate-has-no-terminal-exception-boundary",
@@ -602,11 +610,15 @@
     },
     {
       "id": "pipeline.critical-human-proof-policy-lacks-the-reconcile-approval-generalization",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "PO, 2026-08-18, relayed live from the sibling agent-pipeline-share_phoenix session: Phoenix's local `plugins/pipeline-core/lib/critical-human-proof-policy.mjs` was legitimately generalized (ADR-0056's 2026-08-11 Follow-up, PHX-WP-PAC08-RECONCILE-APPROVAL) to a `GATE_APPROVAL_MODE_KEYS` lookup table supporting a second gate (`gates.reconcile_approval`, kind `feature-package-reconcile`), multi-round Critic-reviewed (T2-T5 findings referenced in its own comments). Phoenix's TP-7-protected `guard-testpath-override.test.mjs` OT09 still pins the pre-generalization literal `gates?.push_approval`, which no longer appears in the generalized source, blocking Phoenix's own Verify/push. TP-7 requires the fix at an explicit author source root, which Phoenix's own session cannot self-select or write to. Confirmed by direct read of both repos: neither this repo (Nova) nor the local marketplace copy has the generalization yet -- Nova and marketplace currently agree with each other (both pre-generalization), only Phoenix has moved ahead."
+      "source": "PO, 2026-08-18, relayed live from the sibling agent-pipeline-share_phoenix session: Phoenix's local `plugins/pipeline-core/lib/critical-human-proof-policy.mjs` was legitimately generalized (ADR-0056's 2026-08-11 Follow-up, PHX-WP-PAC08-RECONCILE-APPROVAL) to a `GATE_APPROVAL_MODE_KEYS` lookup table supporting a second gate (`gates.reconcile_approval`, kind `feature-package-reconcile`), multi-round Critic-reviewed (T2-T5 findings referenced in its own comments). Phoenix's TP-7-protected `guard-testpath-override.test.mjs` OT09 still pins the pre-generalization literal `gates?.push_approval`, which no longer appears in the generalized source, blocking Phoenix's own Verify/push. TP-7 requires the fix at an explicit author source root, which Phoenix's own session cannot self-select or write to. Confirmed by direct read of both repos: neither this repo (Nova) nor the local marketplace copy has the generalization yet -- Nova and marketplace currently agree with each other (both pre-generalization), only Phoenix has moved ahead.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "d44f992eb60120005a4a02950af1356e2484d719",
+      "closureEvidence": "plugins/pipeline-core/lib/critical-human-proof-policy.test.mjs"
     },
     {
       "id": "pipeline.critical-human-proof-policy-seeded-without-trust-anchor",
@@ -1001,11 +1013,15 @@
     },
     {
       "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
+      "source": "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "586f59edcffb9cebca139f1f4394a3c9ed9a66f9",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-gate-strength.test.mjs"
     },
     {
       "id": "pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell",
@@ -1209,11 +1225,15 @@
     },
     {
       "id": "pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-12",
-      "source": "NVA-BL-67, 2026-08-12, surfaced while measuring an unrelated manifest-seed divergence (backlog/items/2026-08-08-two-manifest-literals-still-bypass-the-single-seed-owner.md). Explicitly flagged as unconfirmed, not asserted as a production defect."
+      "source": "NVA-BL-67, 2026-08-12, surfaced while measuring an unrelated manifest-seed divergence (backlog/items/2026-08-08-two-manifest-literals-still-bypass-the-single-seed-owner.md). Explicitly flagged as unconfirmed, not asserted as a production defect.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "d8fd9a37e686c5b469328860464f18db770e92e8",
+      "closureEvidence": "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs"
     },
     {
       "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
@@ -1509,11 +1529,15 @@
     },
     {
       "id": "pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
+      "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "958019482046a0b126b5d396e8adbaeb44fb76ae",
+      "closureEvidence": "plugins/pipeline-core/lib/runtime-projection-v3.test.mjs"
     },
     {
       "id": "pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home",
@@ -2478,11 +2502,15 @@
     },
     {
       "id": "pipeline.spec-retention-on-close",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Sentinel recovery audit after Public close/transfer"
+      "source": "Sentinel recovery audit after Public close/transfer",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "98b173f03b294e48914467d76803234c9677891e",
+      "closureEvidence": "plugins/pipeline-core/lib/transfer-classification.test.mjs"
     },
     {
       "id": "pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy",
