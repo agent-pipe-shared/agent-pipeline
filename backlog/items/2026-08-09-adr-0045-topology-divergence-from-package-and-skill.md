@@ -114,3 +114,26 @@ mode at package-topology scale; a scoped, PO-decided fix does not.
 - **Assignment (if accepted):** Not assigned; needs the PO's answer before
   either ADR-0045 or the two checkouts' topology is changed.
 - **Date:** 2026-08-18
+
+## Triage — question 2 decided 2026-08-18, question 1 still open
+
+- **PO decision on the naming question:** "prd_topic ist besser" — ADR-0045
+  amended (not the skill) to name `prd_<topic>.md` instead of `prd.md`,
+  matching the convention both `plugins/pipeline-core/skills/pipeline-start/SKILL.md`
+  prescribes and every actual package (Phoenix's `prd_phoenix-epic.md`,
+  Nova's `prd_sprint-nova-epic.md`) already uses. Done in
+  `docs/adr/0045-canonical-artifact-topology.md` (header stamped
+  `Amended: 2026-08-18`).
+- **Question 1 clarified, not yet decided.** "Artefakt-Aufzählung" refers to
+  ADR-0045's list of files a package root is declared to contain (`prd_<topic>.md`,
+  `spec.md`, `acceptance.md`, `result.md`, `lifecycle.json`, `plans/`,
+  `design/`, `evidence/`). The actual `specs/sprint-phoenix-epic/` root also
+  carries four files that list never names: `RECOVERY.md`,
+  `spec-revision-20260802.md`, `phase-plan_gate-integrity.md`,
+  `phase-residual_gate-integrity.md`. The open question is whether that list
+  is meant to be **exhaustive** (so those four extra files are a topology
+  violation — either move them under an existing bucket like `evidence/`, or
+  extend the ADR's enumeration to name them) or **illustrative/non-exhaustive**
+  (so extra root files are fine as-is and no further action is needed, beyond
+  possibly softening the ADR's "paths make package membership discoverable"
+  claim). Still needs the PO's answer; item stays open.

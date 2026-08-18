@@ -17,7 +17,7 @@ or evidence is invented.
 
 | Class | Canonical package home | Authority / retention |
 | --- | --- | --- |
-| PRD, Spec, acceptance, Result | `prd.md`, `spec.md`, `acceptance.md`, `result.md` | One PRD and Spec authority while active; Result is append-only. |
+| PRD, Spec, acceptance, Result | `prd_<topic>.md`, `spec.md`, `acceptance.md`, `result.md` | One PRD and Spec authority while active; Result is append-only. |
 | Design and plan | `design/`, `plans/` | Mutable working inputs; retain when referenced. |
 | Candidate evidence | `evidence/` | Immutable, non-authoritative, exact-candidate bound. |
 | ADR, backlog, handover, release, retention, supply-chain, private-local | Their established dedicated roots | Governed by their existing schemas; private/local artifacts never join a portable package. |
