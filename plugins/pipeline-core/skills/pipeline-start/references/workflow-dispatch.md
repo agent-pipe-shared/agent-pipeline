@@ -61,6 +61,33 @@ what's done vs. remaining, and end the turn with that as the report. A
 clean checkpoint at 80% beats a silent cutoff at 100% with zero report —
 state this priority explicitly in the briefing, not just the number.
 
+## `agentType` needs the `pipeline-core:` prefix
+
+A Workflow `agent()` call's `opts.agentType` resolves from the same registry
+as the Agent tool's `subagent_type`, but a bare role name (`'goldfish-implementor'`,
+`'goldfish-deep'`, `'critic'`) is NOT recognized inside a Workflow script and
+fails immediately — it needs the plugin prefix: `'pipeline-core:goldfish-implementor'`,
+`'pipeline-core:goldfish-deep'`, `'pipeline-core:critic'`. Confirmed
+2026-08-18: a two-agent parallel dispatch failed outright on the first
+attempt with bare names before this was known.
+
+## Fixing a persisted script: re-invoke with inline `script`, never `Edit` the persisted file
+
+Every `Workflow` call persists its script to a file under
+`~/.claude/projects/.../workflows/scripts/`, outside the project root — the
+tool result reports that path. That file cannot be `Edit`ed directly: it is
+outside repo containment and the attempt is BLOCKED
+(`GUARD-CROSS-REPO-MUTATION`). To fix a bug in a script that already ran
+(wrong `agentType`, wrong prompt text, etc.), re-invoke `Workflow` with the
+CORRECTED FULL INLINE `script` parameter (not `scriptPath` pointing at the
+broken persisted file, and not `resumeFromRunId` alone, which replays the
+same broken script) — this persists to a fresh path and runs clean. A retry
+that reuses the same broken `scriptPath` without first supplying a corrected
+inline script fails identically, as expected. Confirmed 2026-08-18: this
+exact sequence (bare-agentType failure → blocked Edit attempt → futile
+scriptPath retry → successful corrected-inline-script retry) cost three
+attempts before landing.
+
 ## Recovering a truncated dispatch
 
 Do not discard a truncated dispatch's work without first checking: `git
