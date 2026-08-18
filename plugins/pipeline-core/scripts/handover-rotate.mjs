@@ -195,8 +195,38 @@ function slugify(text) {
     .slice(0, 60) || "block";
 }
 
-export function buildArchiveFileContent({ archiveSections, handoverPath, rotationDate, summary }) {
+// A rotated section can carry a bare-relative markdown link (e.g. `adr/0051-foo.md`) that
+// resolved correctly from `handoverPath`'s own directory. ARCHIVE_DIR is not necessarily the
+// same directory depth as `handoverPath`, so the identical relative target can silently break
+// once the content moves -- confirmed live 2026-08-18 (`docs/state.md`'s "adr/0051-..." link
+// broke once its section moved one level deeper into `docs/state-archive/`). Absolute paths,
+// URLs/schemes, and same-document anchors are left untouched; only the link TARGET is rewritten,
+// never link text or any other content.
+const MARKDOWN_LINK_TARGET_RE = /\]\(([^)\s][^)]*)\)/gu;
+const EXTERNAL_OR_ANCHOR_LINK_RE = /^(?:[a-z][a-z0-9+.-]*:|#|\/)/iu;
+
+export function adjustRelativeLinksForArchiveDepth(sectionLines, { handoverPath, archivePath }) {
+  const fromDir = dirname(handoverPath);
+  const toDir = dirname(archivePath);
+  if (fromDir === toDir) return sectionLines;
+  return sectionLines.map((line) => line.replace(MARKDOWN_LINK_TARGET_RE, (whole, target) => {
+    if (EXTERNAL_OR_ANCHOR_LINK_RE.test(target)) return whole;
+    const hashIndex = target.indexOf("#");
+    const pathPart = hashIndex === -1 ? target : target.slice(0, hashIndex);
+    const fragment = hashIndex === -1 ? "" : target.slice(hashIndex);
+    const rewritten = toPortableRelativeLink(relative(toDir, join(fromDir, pathPart)));
+    return `](${rewritten}${fragment})`;
+  }));
+}
+
+export function buildArchiveFileContent({ archiveSections, handoverPath, archivePath, rotationDate, summary }) {
   const titles = archiveSections.map((s) => s.title).join(", ");
+  let linksAdjusted = false;
+  const body = archiveSections.map((s) => {
+    const adjustedLines = adjustRelativeLinksForArchiveDepth(s.lines, { handoverPath, archivePath });
+    if (adjustedLines.some((line, i) => line !== s.lines[i])) linksAdjusted = true;
+    return adjustedLines.join("\n");
+  }).join("\n\n");
   const header = [
     `# Handover archive -- ${titles}`,
     "",
@@ -204,11 +234,14 @@ export function buildArchiveFileContent({ archiveSections, handoverPath, rotatio
       "`plugins/pipeline-core/scripts/handover-rotate.mjs` (ADR-0066).",
     `> Section(s) archived: ${titles}.`,
     summary ? `> Summary: ${summary}` : null,
-    "> Append-only once written; never edited by hand. Content below is byte-for-byte",
-    `> identical to its original \`${handoverPath}\` text at the time of rotation.`,
+    "> Append-only once written; never edited by hand.",
+    linksAdjusted
+      ? "> Content below is verbatim except that relative markdown link target(s) were rewritten "
+        + "to keep resolving correctly at this file's directory depth (link text and all other "
+        + "content are untouched)."
+      : `> Content below is byte-for-byte identical to its original \`${handoverPath}\` text at the time of rotation.`,
     "",
   ].filter((line) => line !== null).join("\n");
-  const body = archiveSections.map((s) => s.lines.join("\n")).join("\n\n");
   return `${header}\n${body}\n`;
 }
 
@@ -273,7 +306,7 @@ export function planRotation({
   const resolvedSlug = slugify(slug ?? plan.archiveSections[0].title);
   const archivePath = `${ARCHIVE_DIR}/${rotationDate}--${resolvedSlug}.md`;
   const archiveContent = buildArchiveFileContent({
-    archiveSections: plan.archiveSections, handoverPath, rotationDate, summary,
+    archiveSections: plan.archiveSections, handoverPath, archivePath, rotationDate, summary,
   });
   const linkTarget = toPortableRelativeLink(relative(dirname(handoverPath), archivePath));
   const resolvedDateRange = dateRange ?? rotationDate;
@@ -315,6 +348,57 @@ function assertPathWithinRoot(root, candidatePath, label) {
   return resolvedCandidate;
 }
 
+// -- Documentation-governance registration (Pipeline-repo self-hosting only) --
+
+const DOC_GOVERNANCE_RELATIVE_PATH = join("governance", "observation-doc-governance.json");
+const GOVERNANCE_PATH_LINE_RE = /^\s*"[^"]+",?\s*$/;
+
+function governancePathOf(line) {
+  return line.trim().replace(/^"/, "").replace(/",?$/, "");
+}
+
+/**
+ * `check-observation-governance.mjs`'s OG-DOC-UNCLASSIFIED check requires every `docs/**` file
+ * to be listed in this registry's audience/lifecycle inventory -- confirmed live 2026-08-18: a
+ * freshly rotated archive file failed that check immediately. A rotation must never hand the
+ * caller a new, unclassified doc to register by hand, so this runs automatically as part of
+ * every rotation, placing the new archive path into the SAME inventory group as `handoverPath`
+ * (kept alphabetically sorted, matching OG-DOC-ORDER). Surgical line-level edit, not a full
+ * JSON.parse/stringify round-trip, so an unrelated part of the file is never touched. Consumer
+ * projects that installed pipeline-core without this repo's own self-referential registry file
+ * simply have nothing to update (`existsSync` guard below) -- this is Pipeline-repo
+ * self-hosting, not a general-purpose feature.
+ */
+export function registerArchiveInDocGovernance(root, { handoverPath, archivePath }) {
+  const governanceFullPath = join(root, DOC_GOVERNANCE_RELATIVE_PATH);
+  if (!existsSync(governanceFullPath)) return { updated: false, reason: "no self-referential doc-governance registry in this project" };
+  const raw = readFileSync(governanceFullPath, "utf8");
+  const lines = raw.split("\n");
+  const handoverLineIdx = lines.findIndex(
+    (line) => GOVERNANCE_PATH_LINE_RE.test(line) && governancePathOf(line) === handoverPath,
+  );
+  if (handoverLineIdx === -1) {
+    throw new HandoverRotationError(
+      "HANDOVER-ROTATION-GOVERNANCE-PATH-NOT-FOUND",
+      `${handoverPath} is not listed in ${DOC_GOVERNANCE_RELATIVE_PATH}'s documentation inventory, so `
+        + `${archivePath} cannot be auto-registered into the same audience/lifecycle group. Register `
+        + `${handoverPath} there first -- no file was written.`,
+    );
+  }
+  let start = handoverLineIdx;
+  while (start > 0 && GOVERNANCE_PATH_LINE_RE.test(lines[start - 1])) start--;
+  let end = handoverLineIdx;
+  while (end < lines.length - 1 && GOVERNANCE_PATH_LINE_RE.test(lines[end + 1])) end++;
+  const indent = lines[handoverLineIdx].match(/^(\s*)/u)[1];
+  const existingPaths = lines.slice(start, end + 1).map(governancePathOf);
+  if (existingPaths.includes(archivePath)) return { updated: false, reason: "already registered" };
+  const sortedPaths = [...existingPaths, archivePath].sort();
+  const newGroupLines = sortedPaths.map((p, i) => `${indent}"${p}"${i < sortedPaths.length - 1 ? "," : ""}`);
+  const newLines = [...lines.slice(0, start), ...newGroupLines, ...lines.slice(end + 1)];
+  writeFileSync(governanceFullPath, newLines.join("\n"), "utf8");
+  return { updated: true, path: DOC_GOVERNANCE_RELATIVE_PATH };
+}
+
 /** Full I/O orchestration used by the CLI: read, gate on acknowledgment, plan, write. */
 export function rotateHandover({
   root, handoverPath, sectionHeadings, summary, dateRange, slug, rotationDate = new Date().toISOString().slice(0, 10),
@@ -339,9 +423,12 @@ export function rotateHandover({
       `${plan.archivePath} already exists. Archive files are append-only-once-written and never overwritten; choose a different --slug.`,
     );
   }
+  // Runs BEFORE any write below: a governance-registration refusal must leave zero mutation,
+  // same as every other typed refusal in this script.
+  const governanceRegistration = registerArchiveInDocGovernance(root, { handoverPath: resolvedHandoverPath, archivePath: plan.archivePath });
   writeFileSync(fullArchivePath, plan.archiveContent, "utf8");
   writeFileSync(fullHandoverPath, plan.newLiveContent, "utf8");
-  return plan;
+  return { ...plan, governanceRegistration };
 }
 
 // -- CLI --

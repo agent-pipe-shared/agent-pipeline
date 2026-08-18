@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  adjustRelativeLinksForArchiveDepth,
   ARCHIVE_DIR,
   ARCHIVED_HISTORY_HEADING,
   HandoverRotationError,
@@ -13,6 +14,7 @@ import {
   planHandoverRotation,
   planRotation,
   recordExtractionAcknowledged,
+  registerArchiveInDocGovernance,
   rotateHandover,
   splitHandoverSections,
 } from "./handover-rotate.mjs";
@@ -276,6 +278,167 @@ const SAMPLE = [
     assert.equal(existsSync(markerPath), false, "checking status must never create the acknowledgment marker");
     assert.equal(isExtractionAcknowledged(root), false, "calling it repeatedly stays read-only");
     assert.equal(existsSync(markerPath), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == adjustRelativeLinksForArchiveDepth: rewrites a bare-relative link, leaves URLs/anchors/absolute paths alone ==
+{
+  const lines = [
+    "See [ADR](adr/0051-foo.md) and [same-doc](#heading) and [ext](https://example.com/x) and [abs](/root.md).",
+  ];
+  const adjusted = adjustRelativeLinksForArchiveDepth(lines, { handoverPath: "docs/state.md", archivePath: "docs/state-archive/2026-08-18--x.md" });
+  assert.equal(
+    adjusted[0],
+    "See [ADR](../adr/0051-foo.md) and [same-doc](#heading) and [ext](https://example.com/x) and [abs](/root.md).",
+  );
+}
+
+// == adjustRelativeLinksForArchiveDepth: no-op when handoverPath and archivePath share a directory ==
+{
+  const lines = ["[x](foo.md)"];
+  const adjusted = adjustRelativeLinksForArchiveDepth(lines, { handoverPath: "docs/state.md", archivePath: "docs/2026-08-18--x.md" });
+  assert.equal(adjusted[0], "[x](foo.md)");
+}
+
+// == A real rotation depth-adjusts a relative link and discloses the deviation in the archive header ==
+{
+  const root = fixtureRoot("link-adjust");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    const withLink = [
+      "# docs/state.md",
+      "",
+      "## Block A",
+      "See [ADR-0051](adr/0051-foo.md) for background.",
+      "",
+      "## Block B",
+      "B content.",
+      "",
+    ].join("\n");
+    writeFileSync(join(root, "docs", "state.md"), withLink, "utf8");
+    recordExtractionAcknowledged(root);
+
+    const plan = rotateHandover({
+      root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
+    });
+    const archiveContent = readFileSync(join(root, plan.archivePath), "utf8");
+    assert.ok(archiveContent.includes("[ADR-0051](../adr/0051-foo.md)"), "the relative link is rewritten one level up");
+    assert.ok(!archiveContent.includes("(adr/0051-foo.md)"), "the original (now-broken) target is gone");
+    assert.ok(archiveContent.includes("relative markdown link target"), "the header discloses the deviation");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == A rotation with no relative links keeps the plain byte-for-byte header claim ==
+{
+  const root = fixtureRoot("link-noop-header");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    recordExtractionAcknowledged(root);
+    const plan = rotateHandover({
+      root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
+    });
+    const archiveContent = readFileSync(join(root, plan.archivePath), "utf8");
+    assert.ok(archiveContent.includes("byte-for-byte identical"), "no links to adjust -> the plain verbatim claim stays");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+const GOVERNANCE_FIXTURE = [
+  "{",
+  '  "documentation": {',
+  '    "inventory": [',
+  "      {",
+  '        "audience": "maintainer",',
+  '        "lifecycle": "maintained",',
+  '        "paths": [',
+  '          "docs/aaa.md",',
+  '          "docs/state.md"',
+  "        ]",
+  "      }",
+  "    ]",
+  "  }",
+  "}",
+  "",
+].join("\n");
+
+// == registerArchiveInDocGovernance: inserts the new archive path into handoverPath's group, sorted, comma-correct ==
+{
+  const root = fixtureRoot("governance-register");
+  try {
+    mkdirSync(join(root, "governance"), { recursive: true });
+    writeFileSync(join(root, "governance", "observation-doc-governance.json"), GOVERNANCE_FIXTURE, "utf8");
+    const result = registerArchiveInDocGovernance(root, {
+      handoverPath: "docs/state.md",
+      archivePath: "docs/state-archive/2026-08-18--x.md",
+    });
+    assert.equal(result.updated, true);
+    const rewritten = readFileSync(join(root, "governance", "observation-doc-governance.json"), "utf8");
+    const parsed = JSON.parse(rewritten);
+    assert.deepEqual(
+      parsed.documentation.inventory[0].paths,
+      ["docs/aaa.md", "docs/state-archive/2026-08-18--x.md", "docs/state.md"],
+    );
+    // Calling it again for the same archivePath is a no-op, not a duplicate insertion.
+    const second = registerArchiveInDocGovernance(root, {
+      handoverPath: "docs/state.md",
+      archivePath: "docs/state-archive/2026-08-18--x.md",
+    });
+    assert.equal(second.updated, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == registerArchiveInDocGovernance: no registry file present -> silent no-op (consumer-project posture) ==
+{
+  const root = fixtureRoot("governance-absent");
+  try {
+    const result = registerArchiveInDocGovernance(root, { handoverPath: "docs/state.md", archivePath: "docs/state-archive/x.md" });
+    assert.equal(result.updated, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == registerArchiveInDocGovernance: handoverPath not listed -> typed error, zero mutation ==
+{
+  const root = fixtureRoot("governance-unlisted");
+  try {
+    mkdirSync(join(root, "governance"), { recursive: true });
+    writeFileSync(join(root, "governance", "observation-doc-governance.json"), GOVERNANCE_FIXTURE, "utf8");
+    const before = readFileSync(join(root, "governance", "observation-doc-governance.json"), "utf8");
+    assert.throws(
+      () => registerArchiveInDocGovernance(root, { handoverPath: "docs/not-listed.md", archivePath: "docs/state-archive/x.md" }),
+      (error) => error instanceof HandoverRotationError && error.code === "HANDOVER-ROTATION-GOVERNANCE-PATH-NOT-FOUND",
+    );
+    const after = readFileSync(join(root, "governance", "observation-doc-governance.json"), "utf8");
+    assert.equal(after, before, "a refused governance registration must leave the file byte-identical");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == A full rotation auto-registers the new archive path when a doc-governance registry is present ==
+{
+  const root = fixtureRoot("rotation-with-governance");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    mkdirSync(join(root, "governance"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    writeFileSync(join(root, "governance", "observation-doc-governance.json"), GOVERNANCE_FIXTURE, "utf8");
+    recordExtractionAcknowledged(root);
+    const plan = rotateHandover({
+      root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
+    });
+    assert.equal(plan.governanceRegistration.updated, true);
+    const registry = JSON.parse(readFileSync(join(root, "governance", "observation-doc-governance.json"), "utf8"));
+    assert.ok(registry.documentation.inventory[0].paths.includes(plan.archivePath));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
