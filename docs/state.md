@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-18 — see "Open items and next block" below for current status; most session-dated history now lives in `docs/state-archive/` (index: "Archived history" below).
+**Last updated:** 2026-08-18 — Toolbox blocker (`windows-posix-mode-bit-checks-are-meaningless-on-ntfs`) fixed via `NVA-WINMODE-1` (7 files, open pending live-Windows reverify) and the Phoenix blocker (`critical-human-proof-policy-lacks-the-reconcile-approval-generalization`, closed earlier) both confirmed in; backlog item `authority-gate-bypassable-by-choosing-a-different-write-tool` closed (Critic PASS); fresh local `0.6.0` candidate `56d9f568` stamped at 270/271 green — see "2026-08-18 (Toolbox/Phoenix blockers, HGO ceremony-scope PO feedback, fresh 0.6.0 candidate)" below, which is now the current block; most session-dated history now lives in `docs/state-archive/` (index: "Archived history" below).
 **Project status:** ACTIVE
 **Release version:** `0.5.4` released
 **Release state:** version `0.5.4` · tag `v0.5.4` · commit `dd1eb9eedeb7ac48860c8ec9745750c9a8367b32` · tree `b6857469bbc84de94c0f917ed64dc59b0eccc8de` · status `published`
@@ -1610,10 +1610,91 @@ requires its own separate push/release ceremony
 list` still shows `wf_7f39bfec-21b-3` — safe to remove now that C2f is
 fully merged.
 
+## 2026-08-18 (Toolbox/Phoenix blockers, HGO ceremony-scope PO feedback, fresh 0.6.0 candidate)
+
+**Toolbox and Phoenix blockers both confirmed included before this
+candidate.** Per explicit PO sequencing: finish this wave's backlog
+work, status overview, then a local candidate — gated on the two
+morning handover blockers being in.
+
+- **Toolbox** (`2026-08-18-windows-posix-mode-bit-checks-are-meaningless-on-ntfs.md`):
+  `NVA-WINMODE-1` (`goldfish-deep`, resumed twice after truncation —
+  same tool-budget truncation pattern as before, recovered procedurally
+  each time per the established resume protocol) fixed all 7 files in
+  scope with the shared DACL-based `assessWindowsPrivatePath` pattern
+  (mirroring `lib/afk-ledger.mjs:336-340`), one commit per file
+  (`b1e28a70`, `22f321c0`, `00053e64`, `24f71290`, `45bfe87e`,
+  `7d6cb1a9`, `a285912f`), mocked-Windows + POSIX regression tests per
+  file, `check-consumer-safe-paths.test.mjs` clean. `status:` correctly
+  left `open` — Linux/WSL session, closure needs a live-Windows
+  reverify (same convention as the 2026-08-17 Windows ACL item).
+- **Phoenix** (`2026-08-18-critical-human-proof-policy-lacks-the-reconcile-approval-generalization.md`):
+  already closed earlier this session, confirmed still closed.
+
+**Backlog item `authority-gate-bypassable-by-choosing-a-different-write-tool`
+closed for real.** The GL-09 classifier-fault fail-closed fix
+(`9e477150`, from the earlier full-Verify-regression block) turned out
+to be the residual gap in exactly this item's own GUARD-TESTPATH-SHELL
+mechanism — confirmed by reading the code comment at
+`guard-lifecycle-ready.mjs:812`, which cites this backlog item by name
+as the mechanism's origin. Critic-reviewed on the properly-scoped range
+`9fab42cf..a6f1bcbf` (parent of `9e477150`, so the fix commit is
+actually inside the diff — two prior attempts used the wrong range or a
+malformed dispatch and never produced a real review): **PASS**, no
+findings, all evidence-claimed suite counts independently rerun and
+matched. Sibling item `a-permitted-edit-drops-the-session-into-an-
+unrecoverable-readiness-class.md` was named to the same dispatch as
+context only and stays open — the Critic itself flagged that this diff
+touches none of its own, separately unimplemented scope.
+
+**Two TP-3 human-guard-override ceremonies registered the two new
+Windows-fix test suites in `verify.mjs`** (`93911e70`
+`session-cleanup-owner-nonce-tests`, `51d483a7` `worktree-create-tests`)
+— both required the full signature-mode ceremony (`plan` agent-run;
+`prepare-authorization`/`emit-signature-digest`/`sign-intent`/
+`authorize-by-signature` PO-run, per ADR-0059 defense-in-depth). Each
+Edit is single-use/`toolInputSha256`-bound, so two separate,
+non-adjacent registrations needed two full ceremonies.
+
+**PO design feedback, filed as its own backlog item, NOT implemented
+this session:** the PO explicitly disagrees with requiring three of the
+four ceremony steps to run "outside this session" — only `sign-intent`
+genuinely needs the external key; the rest is digest computation the
+agent could do itself without weakening the protection boundary. Filed
+as `2026-08-18-hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs.md`
+(deferred, "bei Gelegenheit" — needs its own security-focused design
+pass and Critic review, not an ad hoc edit).
+
+**Incidental fix:** `docs/product-capability-inventory.json` (the
+`deterministic-verification` capability's surface list) was out of sync
+with the two newly-registered `verify.mjs` suites, failing
+`product-capability-inventory-tests` — not TP-protected, fixed directly
+(`96cf8059`).
+
+**Fresh local `0.6.0` candidate stamped: `56d9f568`** (manifest
+`+{claude,codex}.20260818162535.96cf805`). Full clean Verify: 270/271
+green, exact binding, only the known `human-guard-override-tests`
+exception remains (external marketplace mirror staleness — this
+session cannot write `~/agent-pipeline-local-marketplace/`,
+`GUARD-CROSS-REPO-MUTATION`; needs PO or an authorized external sync to
+actually reach Toolbox/Phoenix). `security-scan.mjs`: CLEAN. Local test
+candidate, not a release — no push approval prepared or recorded.
+
+**Next planned step, PO-directed:** immediately after this candidate,
+proceed to the remaining open (84 after this window's closures) +
+in_progress (9) backlog items using a `Workflow`-tool fan-out with
+maximum sensible parallelization — PO explicitly asked for small related
+items to be grouped into slices per agent rather than one-agent-per-item,
+~16-concurrent hard cap noted to the PO. Not yet started as of this
+entry. The still-standing large full-backlog completeness-sweep fan-out
+(from the 2026-08-18 sweep entries earlier in this file) and the
+incremental handover-rotation extraction pass are the same still-pending
+work this refers to — not two separate backlogs.
+
 ## Recovery
 
-Nothing is in flight as of this entry. Both OT09 and C2f are resolved
-and merged onto `feat/sprint-nova-codex-v046`. No rollback action or
-public human-gate acceptance is recorded. Use ordinary revert commits
-after publication; do not rewrite shared history. If the checkout shows
-conflicting work, stop and report it before writing.
+Nothing is in flight as of this entry. The `56d9f568` local candidate is
+committed and stable on `feat/sprint-nova-codex-v046`. No rollback
+action or public human-gate acceptance is recorded. Use ordinary revert
+commits after publication; do not rewrite shared history. If the
+checkout shows conflicting work, stop and report it before writing.
