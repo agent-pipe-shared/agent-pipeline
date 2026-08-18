@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-07-27
 source: "CYB-A0 round-2 Critic re-review (new-issue N1), found while verifying the fix for round-1 F1-F5 in plugins/pipeline-core/lib/recovery-preview-attestation.mjs"
 ---
@@ -62,7 +62,14 @@ line, not a time-triggered item; does not block CYB-A0's closure.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accept and fix, as proposed — snapshot `acknowledgementId`
+  once into a local `const`, use it at all three sites.
+- **Rationale:** Small, mechanical, additive, exactly as the item's own
+  Proposal specified; no design latitude.
+- **Assignment (if accepted):** `PHX-WP-RPACK-STABLE-READ` (goldfish),
+  commit `97ba6598`. Independently re-verified: `node --test
+  plugins/pipeline-core/lib/recovery-preview-attestation.test.mjs` → 14/14
+  pass, exit 0 (13 pre-existing + 1 new regression test with a
+  non-idempotent `get acknowledgementId()` getter). Diff matches the
+  proposal exactly.
+- **Date:** 2026-08-18
