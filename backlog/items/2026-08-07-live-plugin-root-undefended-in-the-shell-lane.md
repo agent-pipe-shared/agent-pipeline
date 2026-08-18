@@ -133,7 +133,23 @@ the gap to look closed.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Not decided — stays open pending the PO design pass this item
+  itself calls for. This entry records that the item was re-examined and the
+  situation is unchanged, not that a choice among the three directions was
+  made.
+- **Rationale:** `guard-lifecycle-ready.mjs`'s `isForbiddenCrossRepositoryMutation`
+  is still an executable allowlist (`codex`/`python`/`git`/`cp`/`mv`/`rm`/`sed`,
+  falling through to `return false` for any other interpreter, e.g. `node`) and
+  `gateStrengthShellRefusal`'s needles still deliberately exclude the live
+  plugin root — re-verified directly against current source, unchanged in
+  shape. What HAS changed since filing: the misleading comment this item's
+  Proposal closing line called out (`:202-204` asserting a compensating
+  control that doesn't compensate) was corrected — `docs/state.md` records
+  the honest rewrite, and a Critic pass independently re-derived and confirmed
+  the gap (tracked there as finding SL-1). That is real progress (the
+  self-report no longer overclaims), but it is not a fix, and it is not one
+  of this item's three named directions — none of them has been chosen.
+- **Assignment (if accepted):** Owner: PO, per the item's own header. Needs
+  its own design pass and a T1 review before any of the three directions is
+  implemented; not something to decide inline during a backlog sweep.
+- **Date:** 2026-08-18
