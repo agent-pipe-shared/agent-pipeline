@@ -4,6 +4,7 @@
 import assert from "node:assert/strict";
 import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import {
+  chmodSync,
   copyFileSync,
   cpSync,
   existsSync,
@@ -18,7 +19,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { delimiter, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
@@ -72,6 +73,37 @@ function reasonDigest(reason) {
 }
 
 const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }];
+
+// NVA-HGOTEST-1: `prepareHumanGuardOverrideAuthorization()`, `authorizeHumanGuardOverride()`
+// and `authorizeHumanGuardOverrideBySignature()` re-derive the global-plugin-install plan
+// internally and carry NO `codexSpawn` seam of their own (unlike `recordHumanGuardDenial`,
+// `planHumanGuardOverride` and `consumeHumanGuardOverride`, the three entry points the
+// sibling "spawn is injectable" test exercises) -- so mocking only `codexSpawn` at the call
+// sites that accept it still leaves those three re-derivations reading the REAL,
+// uncontrolled `codex` binary this HOST may or may not have registered under
+// `agent-pipeline-local`. `codexMarketplaceRegistry()` resolves `codex` by spawning it with
+// `env.PATH: process.env.PATH`, read fresh on every call (never captured at import time), so
+// a temporary directory prepended to `process.env.PATH` for a test's duration reaches every
+// call in the chain uniformly -- including the un-seamed ones -- without a production-code
+// change. Every test below that needs the `global-plugin-install` shape to be host-
+// independent wraps its body in this helper with an empty `marketplaces` array (the
+// synthetic fixture never registers `agent-pipeline-local` itself, so "not registered" is
+// the outcome consistent with what each of these tests actually builds).
+function withFakeCodexRegistry(marketplaces, fn) {
+  const dir = mkdtempSync(join(tmpdir(), "fake-codex-"));
+  const scriptPath = join(dir, "codex");
+  const payload = JSON.stringify({ marketplaces }).replace(/'/g, "'\\''");
+  writeFileSync(scriptPath, `#!/bin/sh\nprintf '%s' '${payload}'\n`);
+  chmodSync(scriptPath, 0o755);
+  const originalPath = process.env.PATH;
+  process.env.PATH = `${dir}${delimiter}${originalPath ?? ""}`;
+  try {
+    return fn();
+  } finally {
+    process.env.PATH = originalPath;
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
 
 // ---------------------------------------------------------------------------------
 // ADR-0059 Decision 1: authorizeHumanGuardOverrideBySignature() tests.
@@ -365,6 +397,11 @@ test("ADR-0059 Decision 1: an invalid, wrong-key or mismatched proof is refused 
 });
 
 test("ADR-0059 Decision 1: the global-plugin-install denial class is refused for the signed path with HGO-SIGNATURE-UNSUPPORTED-MODE", () => {
+  // NVA-HGOTEST-1: this test's own subject is the signed-path refusal, orthogonal to
+  // this host's real, uncontrolled `agent-pipeline-local` marketplace registration --
+  // see withFakeCodexRegistry() above for why the whole body needs the shim, not only
+  // the entry points that carry a `codexSpawn` parameter.
+  withFakeCodexRegistry([], () => {
   const root = fixtureSignature();
   try {
     mkdirSync(join(root, "harness", "scripts"), { recursive: true });
@@ -408,6 +445,7 @@ test("ADR-0059 Decision 1: the global-plugin-install denial class is refused for
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+  });
 });
 
 test("ADR-0059 Decision 1: an absent trustAnchor (no trustPolicy given, no committed anchor) is refused with HGO-TRUST-ANCHOR-MISSING", () => {
@@ -577,6 +615,9 @@ test("one exact attended capability is audited, consumed once and cannot be repl
 });
 
 test("a host-Git-unavailable hook can consume only the exact audited local plugin installation", () => {
+  // NVA-HGOTEST-1: see withFakeCodexRegistry() above -- this test's own subject is
+  // host-Git-unavailability, orthogonal to this host's real marketplace registration.
+  withFakeCodexRegistry([], () => {
   const root = fixture();
   try {
     mkdirSync(join(root, "harness", "scripts"), { recursive: true });
@@ -669,9 +710,14 @@ test("a host-Git-unavailable hook can consume only the exact audited local plugi
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+  });
 });
 
 test("local plugin installation capability rejects a changed candidate source", () => {
+  // NVA-HGOTEST-1: see withFakeCodexRegistry() above -- this test's own subject is
+  // changed-candidate-source rejection, orthogonal to this host's real marketplace
+  // registration.
+  withFakeCodexRegistry([], () => {
   const root = fixture();
   try {
     mkdirSync(join(root, "harness", "scripts"), { recursive: true });
@@ -717,6 +763,7 @@ test("local plugin installation capability rejects a changed candidate source", 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+  });
 });
 
 test("commit and exact in-root patch admission never execute the effect or claim success", () => {
@@ -2206,6 +2253,16 @@ test("NVA-MKTHASH-1: a real directory copy is folded into statusSha256, and a su
 // collapse into the same state while the test still went green. The calls are recorded and
 // asserted from outside instead.
 test("NVA-BL-20 F5: the Codex marketplace-registry spawn is injectable from all three production entry points", () => {
+  // NVA-HGOTEST-1: `prepareHumanGuardOverrideAuthorization()`/`authorizeHumanGuardOverride()`
+  // below carry no `codexSpawn` seam (see withFakeCodexRegistry() above), so they always
+  // read the REAL `codex` binary -- shimmed here to "not registered", the SAME state
+  // `record(notRegistered)`/`plan(notRegistered)` inject explicitly via their own seam, so
+  // the un-seamed calls stay consistent with the stored request/plan instead of drifting
+  // against this host's real, uncontrolled marketplace registration. This does not weaken
+  // this test's own subject: the codexSpawn-seam assertions below still exercise the real
+  // `codexMarketplaceRegistry()` argv/parse path exactly as before, via their OWN explicit
+  // injection at the three entry points that carry the parameter.
+  withFakeCodexRegistry([], () => {
   const root = fixture();
   try {
     // The global-plugin-install shape, identical to the sibling fixtures above.
@@ -2295,6 +2352,7 @@ test("NVA-BL-20 F5: the Codex marketplace-registry spawn is injectable from all 
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+  });
 });
 
 // ---------------------------------------------------------------------------------
