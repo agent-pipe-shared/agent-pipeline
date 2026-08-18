@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.native-windows-verify-red-suite-class
 type: defect
 owner: pipeline
-status: open
+status: deferred
 created: 2026-08-07
 source: "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
 due: 2026-09-06
@@ -73,6 +73,13 @@ here rather than as isolated one-off items.
   since the original measurement — this session runs on Linux/WSL and cannot
   execute that measurement itself, so the class-level disposition is
   unchanged from filing.
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** re-verified
+again; no native-Windows access available from this checkout either. The
+Decision above already reads "accept-deferred" — flipping the frontmatter
+`status` field to match (it had been left at `open` despite the Triage
+decision). Condition to revisit unchanged: a session with native Windows
+access re-measures the class-level count.
 - **Assignment (if accepted):** PO, next time native Windows access (Git-Bash
   and PowerShell) is available — run Verify on both shells against current
   HEAD, diff the red-suite count against the original 11/25 baseline, and

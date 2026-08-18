@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-ready-path-unconditional-restart-barrier-read
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
 due: 2026-09-06
@@ -74,3 +74,18 @@ before proposing a fix — the two may share a root cause or a fix.
   `readRestartBarrier` is meaningfully Codex-specific or only its naming is.
   No PO scope call needed to start that investigation.
 - **Date:** 2026-08-07
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** still
+unfixed in Phoenix — `project-onboarding-v3.mjs:3060` still calls
+`readRestartBarrier()` unconditionally in the ready-path branch. Nova has
+since built `requiresNativeRuntimeReadback(runner)`
+(`codex-onboarding-runtime.mjs:175`,
+`RUNNERS_WITHOUT_NATIVE_RUNTIME_READBACK = new Set(["claude"])`), threaded
+through all 3 restart-barrier call sites, so a Claude-only session never
+reads the barrier at all — the shared root cause this item's own Assignment
+suspected with its paired item
+(`2026-08-06-restart-launch-is-codex-only-for-every-runner.md`, also closed
+today on the same basis) turned out to be real: both are solved by the same
+runner-neutrality guard function in Nova. Per PO direction (2026-08-18):
+items already resolved in Nova's current code are closed here rather than
+reimplemented. Closing.

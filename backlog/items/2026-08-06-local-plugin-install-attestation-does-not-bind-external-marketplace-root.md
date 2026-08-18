@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-06
 source: "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06"
 due: 2026-09-06
@@ -113,3 +113,16 @@ Owner: PO. Due: 2026-09-06.
   design/attestation work on a security-relevant install path, not a
   same-session mechanical fix.
 - **Date:** 2026-08-07
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** still
+unfixed in Phoenix's own `human-guard-override.mjs` — confirmed unchanged.
+Nova has since built the `goldfish-deep`+design work this Triage called for:
+a dedicated `externalLocalMarketplaceObservation` function (Nova
+`human-guard-override.mjs:344,546-610,1191`) that resolves the host
+marketplace registry's external root, hashes its own `marketplace.json`, and
+verifies the `plugins/pipeline-core` entry (symlink/junction OR
+content-hash-equal real copy) resolves back to the exact checkout — folded
+into the observation's `externalMarketplace` field, with updated preview
+text. Per PO direction (2026-08-18): items already resolved in Nova's
+current code are closed here rather than reimplemented, since Phoenix does
+not need to duplicate Nova's own hardening. Closing.

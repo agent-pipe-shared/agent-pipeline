@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.claude-has-no-start-time-opt-in-adoption-path
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
 source: "PO observation, Sprint Nova session 2026-08-05, in the same session that reproduced the setup.mjs marketplace collision by hand"
 due: 2026-09-05
@@ -59,3 +59,15 @@ Owner: PO. Due: 2026-09-05.
   onboarding?), then a normal kickoff/PRD/Spec cycle. Not blocking 0.5.2 or
   Nova B.
 - **Date:** 2026-08-07
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** the
+in-repo-hint-only version this Triage flagged as needing a PO scope decision
+has since landed without a separate PRD/Spec cycle: `hooks.json`'s
+`SessionStart` block (matcher `startup|resume|clear`) now registers
+`codex-session-start-hint.mjs` for Claude too (previously Codex-only via
+`codex-hooks.json`), and its `sessionStartDecision()` (lines 19-56) branches
+on an ungoverned repo to return exactly the proposed opt-in flow: state Agent
+Pipeline is available, ask whether to install it, end the turn and wait for
+consent before invoking `pipeline-core:pipeline-start`. This satisfies the
+item's core ask (a bootstrap adoption/opt-in hint for Claude sessions,
+matching what Codex's onboarding already offered). Closing.

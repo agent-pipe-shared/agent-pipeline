@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.restart-launch-is-codex-only-for-every-runner
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-06
 source: "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
 due: 2026-09-05
@@ -82,6 +82,19 @@ confirming the actual runtime behavior, not just the naming.
   ready/restart machinery) — investigate both together, they may share a
   root cause or a fix.
 - **Date:** 2026-08-07
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** still
+unfixed in Phoenix — `guard-lifecycle-ready.mjs`'s `LAUNCH_SCRIPT` names only
+`codex-onboarding-launch.mjs`, and `project-onboarding-v3.mjs` still builds
+the Codex launcher argv and Codex-worded diagnostic unconditionally. Nova has
+since built exactly the runner-aware fix this item's open questions were
+blocking: `restartAction()` (Nova `project-onboarding-v3.mjs` ~line 1983)
+branches `if (runner !== "codex") return externalOperatorRestartAction(runner)`,
+with a code comment explicitly cross-referencing this backlog item's name —
+i.e. Nova already answered both open questions by building the runner-aware
+path rather than investigating the old one further. Per PO direction
+(2026-08-18): items already resolved in Nova's current code are closed here
+rather than reimplemented. Closing.
 
 ## Update, 2026-08-07 (second live session)
 

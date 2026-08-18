@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-06
 source: "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
 due: 2026-09-06
@@ -134,3 +134,16 @@ resolver serves is the tier the compiler writes.
   `d4b2fcc`/`2c24ec7`, Sprint Nova session, 2026-08-06. Step 3 unassigned;
   sequenced after 0.5.2 per `docs/state.md`.
 - **Date:** 2026-08-06
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** step 3 (the
+remaining, narrowed scope of this item) is still unfixed in Phoenix's own
+`runtime-projection-v3-owned-keys.json` (only `.claude/*`/`.codex/*`
+targets). Nova has since closed exactly this step architecturally: its V3
+compiler config declares a `neutralAuthorityMirrors` array (lines 72-84)
+making `project/pipeline.yaml`/`project/pipeline.json` compiler-write
+targets that mirror the `.claude/*` tier. Per PO direction (2026-08-18):
+items already resolved in Nova's current code are closed here rather than
+reimplemented. Closing (the item's title claim is now moot in the sense
+that matters — Nova's compiler does update the neutral tier; Phoenix's own
+compiler still doesn't, but the step-4 drift check already catches it, so
+nothing silently regresses).

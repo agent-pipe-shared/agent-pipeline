@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
 due: 2026-09-06
@@ -99,3 +99,15 @@ denials — only for `guard-testpath.mjs`/Codex-adapter denials).
   candidate #3, since both describe the same shape of gap (guard drawn at a
   directory boundary, not at what needs protecting) on overlapping code.
 - **Date:** 2026-08-07
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** the accepted
+fix has since landed via a different, already-shipped mechanism than the
+`goldfish-deep`+T1-Critic path this Triage assigned: `guard-gate-strength.mjs`
+(lines 220-240) now gates whether a GS-6 hit can be lifted on
+`isNeverLiftableKernelPath` (`guard-maintenance-window.mjs:120-128`,
+`NEVER_LIFTABLE_KERNEL_PATHS`), which does NOT include
+`.claude-plugin/plugin.json` — exactly the split this item's own Proposal
+asked for (guard-reading code stays override-free; inert metadata gets a
+routed, signed Guard Maintenance Window path instead of a bare refusal).
+Confirmed identical in Nova, i.e. this was reviewed shared architecture, not
+a drive-by patch. Closing.

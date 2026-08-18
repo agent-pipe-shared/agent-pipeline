@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.approval-mechanisms-require-out-of-session-po-acts
 type: defect
 owner: pipeline
-status: open
+status: deferred
 created: 2026-08-07
 source: "PO ruling (APS, 2026-08-07) establishing the top rule that no PO activity outside the session may ever be required and that one release must cover everything. Measured from source on origin/main by the Phoenix session the same day; the mechanism work is assigned to the Nova session."
 due: 2026-09-06
@@ -131,7 +131,15 @@ a design.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
+- **Decision:** Defer — real and open, but assigned to Nova, not Phoenix's own scope.
+- **Rationale:** the item's own Assignment already names Nova as the owner
+  ("diese implementierung belassen wir dem nova elephant"). Re-verified
+  2026-08-18: Nova has made partial progress — `guard-gate-strength.mjs` no
+  longer offers a hand-editing escape hatch for GS-1..5/GS-7, routing
+  through an extended Human Guard Override instead (ADR-0059 Decision 4/6).
+  Concern #2 (HGO binds one exact `toolInputSha256`, one act = one release,
+  no chain) and concern #3 (GMW `LIFTABLE_RULE_IDS` fixed to `["GS-6"]` plus
+  TP-*) remain unchanged in both Phoenix and Nova. Not Phoenix's own
+  assigned work either way.
 - **Assignment (if accepted):** Nova session (PO-assigned 2026-08-07).
 - **Date:** 2026-08-07

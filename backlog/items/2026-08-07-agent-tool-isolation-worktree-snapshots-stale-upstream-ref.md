@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref
 type: defect
 owner: pipeline
-status: open
+status: deferred
 created: 2026-08-07
 source: "NOVA-GMW-1 first dispatch attempt, 2026-08-07 -- Agent tool isolation:worktree."
 due: 2026-09-06
@@ -67,3 +67,12 @@ is not used at all for that dispatch.
   session can fix (harness-level tool behavior); recorded so the workaround
   is not rediscovered from scratch next time.
 - **Date:** 2026-08-07
+
+**Update 2026-08-18 (Elephant, Phoenix backlog-clearing pass):** re-verified
+— still no `isolation: "worktree"` implementation exists under
+`plugins/pipeline-core` or `harness/` in this checkout to inspect or patch;
+this is genuinely harness/tool-level, not a repository-code defect, and has
+no bearing on Phoenix's own delivered epic surface. Flipping frontmatter
+`status` to `deferred` to match the Decision's substance (harness-level,
+nothing repository-side to fix). Condition to revisit: whichever layer owns
+the Agent/Workflow tool's isolation mechanism.
