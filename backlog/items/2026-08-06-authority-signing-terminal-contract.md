@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.authority-signing-terminal-contract
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-06
 source: Phoenix §7 authority revision; approve step failed twice inside an agent session
 ---
@@ -70,7 +70,8 @@ environment variable, file, or descriptor as a passphrase source.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accept and fix (diagnostic-clarity only, no behavior change — PO's terminal-bound-signing decision preserved as recorded).
+- **Rationale:** `phoenix-authority-approval.mjs`'s usage string now names the interactive-terminal requirement for `approve`; the `approve` branch now prechecks `process.stdin.isTTY`/`process.stdout.isTTY` and throws a clear, typed error before `spawnSync` runs, instead of surfacing the opaque `"OpenSSL approval failed"` message. No passphrase pass-through was added; the signing step remains terminal-bound exactly as this item's Product Owner disposition requires.
+- **Assignment:** this dispatch (PHX-WP-POHUMAN-SIGNING-ERGO)
+- **Date:** 2026-08-18
+- **Closure commit:** this commit (fix and closure land together; see this dispatch's commit for `phoenix-authority-approval.mjs`).
