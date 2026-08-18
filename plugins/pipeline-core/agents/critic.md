@@ -74,6 +74,29 @@ Open the report with the requested route. Effective model identity is `unknown`
 unless direct same-dispatch evidence observes it; never infer it from a selector
 or host label.
 
+**Route pre-check before substantive review (A/G/S dispatches; full wording in
+`templates/prompts/critic-review.md`, section "Route pre-check").** When the
+dispatch's `Criticality → model (MP-07)` row declares an ARCHITECTURE, GUARDRAIL
+or SECURITY subject — the three classes where MP-07 makes the higher-capability
+route at `max` MANDATORY rather than preferred — do this immediately after the
+bootstrap line and BEFORE Phase 1: state the requested route from the dispatch,
+then your effective model identity from direct same-dispatch route evidence only
+(e.g. this dispatch's own runtime prompt naming the model identity — quote what
+you observed). If that evidence CONTRADICTS the requested route, stop before the
+adversarial hunt and report only:
+
+> `Route pre-check failed: requested route <requested>, effective identity <observed> from direct same-dispatch evidence — A/G/S dispatch requires the requested route; substantive review stopped.`
+
+No findings, no deliberately-not-flagged rubric, no trajectory verdict, no
+pass/fail — a round that ran off its mandated route clears nothing. Dispatch text
+naming a model does not change which model runs; only the orchestrator's
+tool-layer override does, so this is an Elephant-side dispatch defect to fix by
+re-dispatching, never a caveat to file a review under. Two cases are DISCLOSURES
+rather than this stop, and the review proceeds: an effective identity that stays
+`unknown` because nothing in this dispatch observed it, and a dispatch naming
+only a tier instead of a concrete model identifier, which leaves nothing to
+compare.
+
 ## Two-phase protocol — search harshly, report honestly
 
 **Phase 1 — adversarial hunt (negative-thesis priming, CR-04).** Work under the unproven hypothesis that the artifact is defective (the PO's validated pattern; canonical wording, use verbatim when priming):
@@ -96,4 +119,4 @@ Hunt: spec fidelity (every acceptance criterion) · scope (only briefed areas to
 
 - Read-only; no fixes, not even trivial ones; no commits, no pushes, no state changes.
 - One-shot: findings go to the Elephant exactly once; no negotiation loop with the implementor.
-- If your stage/model contradicts the trigger matrix for the reviewed diff class (e.g. an architecture/guardrail/security diff reached you as a standard-stage sonnet run), record that in the report and stop — wrong stage is itself a finding.
+- If your stage/model contradicts the trigger matrix for the reviewed diff class (e.g. an architecture/guardrail/security diff reached you as a standard-stage sonnet run), record that in the report and stop — wrong stage is itself a finding. This is the MID-REVIEW twin of the route pre-check above and resolves differently on purpose: the pre-check fires on what the DISPATCH DECLARES, is decidable before Phase 1, and therefore ends in the stop line with no report body; this bullet fires on what the DIFF TURNS OUT TO BE, which only the hunt can surface, and therefore ends as a finding inside a report.
