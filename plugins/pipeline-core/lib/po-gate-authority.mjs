@@ -50,6 +50,22 @@ export const PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH = join(
   "profile-receipt.json",
 );
 export const PO_GATE_PRD_LANGUAGE_MARKER = (language) => `<!-- po-language: ${language} -->`;
+// The literal (parameter-free) line the active PRD must carry, added by the PO
+// -- never by an agent authoring or revising the PRD on the PO's behalf -- to
+// record that they have personally read the PRD and judge it content-sound
+// and consistent with the neighboring spec.md (backlog/items/2026-08-07-
+// a-promoted-feature-can-never-pass-the-plan-gate.md, PO decision 2026-08-11:
+// "A und PRD inhaltlich okay und passend zur Spec ist das gate"). This is
+// additive to, never a replacement of, the mechanical prd_*.md/path check
+// (PRD_NAME/PO-GATE-PRD-CARDINALITY/PO-GATE-PLAN-PATH-MISMATCH above) and the
+// byte-exact technical-Spec-digest binding (TECHNICAL_SPEC_MARKER below): both
+// stay load-bearing on their own causes, this marker only adds a third,
+// independent, mandatory precondition. It deliberately carries no computed
+// value (no digest, no timestamp) -- content-soundness is a judgment a
+// machine cannot derive (ADR-0061 Decision 3), so there is nothing here for
+// the gate to verify beyond the line's bare, exact presence; the actual
+// review is the PO's own act, out of band, before this line is added.
+export const PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER = "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->";
 
 const PO_GATE_PROFILE_SOURCE = "pipeline.user.yaml";
 const SUPPORTED_LANGUAGES = new Set(["de", "en"]);
@@ -60,6 +76,10 @@ const PRD_NAME = /^prd_[^/\\]+\.md$/u;
 // same grammar, never a re-declared copy that could drift from this one.
 export const PRD_LANGUAGE_MARKER = /^<!-- po-language: ([a-z]{2}) -->$/gmu;
 export const TECHNICAL_SPEC_MARKER = /^<!-- technical-spec-sha256: ([0-9a-f]{64}) -->$/gmu;
+// Same closed grammar as the two markers above: anchored, single-line, exact
+// text, matched with matchAll so a caller can also detect an accidental
+// duplicate rather than only its absence.
+export const PRD_ACKNOWLEDGEMENT_MARKER = /^<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->$/gmu;
 const RECEIPT_KEYS = [
   "schema",
   "repositoryFingerprint",
@@ -128,6 +148,26 @@ const SPEC_MARKER_MISSING_REPAIR = "The active PRD does not carry the technical 
   + " If this PRD has not been bound by a kickoff promotion, add that single line to the PRD."
   + " If a kickoff promotion has already bound this PRD, do not add or edit that line in place: the promotion already"
   + " bound these exact bytes, and an in-place edit only breaks that binding without making this check pass;"
+  + " there is no sanctioned way to add the marker to an already-bound PRD today;"
+  + " do not change activeFeature.planPath, which is not what is wrong here.";
+// PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING is additive to, never a substitute for,
+// PO-GATE-PRD-SPEC-MARKER-MISSING/-MISMATCH above: those bind the PRD to the
+// Spec's *bytes*; this one records that the PO has actually judged the result
+// -- content-sound and consistent with that Spec -- which no digest can stand
+// in for. Same caveat as the Spec marker: adding this line to an
+// already-promotion-bound PRD changes its bytes and breaks that binding
+// without making this check pass, and there is no sanctioned route back from
+// that state today, so the remedy below names the fix only for the
+// still-freely-editable case and is honest that the bound case has none.
+const ACKNOWLEDGEMENT_REPAIR = "The active PRD does not carry the PO's plan acknowledgement marker exactly once, as"
+  + ` ${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER} on its own line.`
+  + " This line is the PO's own record -- after personally reading the PRD -- that its content is sound and it is"
+  + " consistent with the neighboring spec.md; it is additive to the mechanical prd_*.md/path check and the technical"
+  + " Spec digest binding above, not a replacement for either, and an agent must never add it on the PO's behalf"
+  + " without that review having actually happened."
+  + " If this PRD has not been bound by a kickoff promotion, the PO adds that single line to the PRD once satisfied."
+  + " If a kickoff promotion has already bound this PRD, do not add that line in place: the promotion already bound"
+  + " these exact bytes, and an in-place edit only breaks that binding without making this check pass;"
   + " there is no sanctioned way to add the marker to an already-bound PRD today;"
   + " do not change activeFeature.planPath, which is not what is wrong here.";
 // A PRD whose bytes are not decodable UTF-8 never reaches any marker check. The
@@ -656,7 +696,7 @@ function activeFeatureState(repoRoot) {
   return { status: "active", id: active.id, planPath, documentLanguage };
 }
 
-function prdAuthority(repoRoot, active, expectedLanguage) {
+function prdAuthority(repoRoot, active, expectedLanguage, requireAcknowledgement) {
   const featureDirectory = dirname(active.planPath).split(sep).join("/");
   let directory;
   try {
@@ -733,6 +773,29 @@ function prdAuthority(repoRoot, active, expectedLanguage) {
   if (specMarkers[0] !== specSha256) {
     return fail("PO-GATE-PRD-SPEC-MISMATCH", "The active PRD technical Spec marker must exactly match the neighboring spec.md bytes.", SPEC_REPAIR);
   }
+  // Additive third precondition, checked only once the mechanical path/
+  // cardinality check and the byte-exact Spec-digest binding above both
+  // already hold: the PO's own explicit acknowledgement that this PRD's
+  // content is sound and consistent with that same spec.md (backlog item
+  // 2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md). Absent and
+  // duplicate are the same defect for the same reason as the Spec marker
+  // above -- there is no single acknowledgement to trust either way.
+  // Enforcement is gated on requireAcknowledgement: this same function also
+  // backs a purely read-only diagnostic path (check-po-gate-authority.mjs's
+  // passive read, which never binds expectedPlanSha256/expectedSpecSha256)
+  // that never carried this marker before and must not be forced to
+  // retroactively. Only an ACTIVE approval/rebind validation -- the caller
+  // passing at least one of those two expected digests -- requires it.
+  if (requireAcknowledgement) {
+    const acknowledgementMarkers = [...text.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)];
+    if (acknowledgementMarkers.length !== 1) {
+      return fail(
+        "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING",
+        "The active PRD must carry the PO's plan acknowledgement marker exactly once.",
+        ACKNOWLEDGEMENT_REPAIR,
+      );
+    }
+  }
   return {
     ok: true,
     planSha256: sha256(planBytes),
@@ -776,7 +839,11 @@ export function validatePoGateAuthority({
   // only when set; unset (the {de, en}-marker or pre-GF-070 case) falls back to
   // today's exact behavior.
   const expectedDocumentLanguage = active.documentLanguage ?? profileEvidence.humanFacing;
-  const prd = prdAuthority(current, active, expectedDocumentLanguage);
+  // Passed (not undefined) => ACTIVE approval/rebind validation => the PO
+  // acknowledgement marker must fire. Not passed => passive diagnostic read
+  // (e.g. check-po-gate-authority.mjs) => it must not.
+  const requireAcknowledgement = expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined;
+  const prd = prdAuthority(current, active, expectedDocumentLanguage, requireAcknowledgement);
   if (!prd.ok) return prd;
   if (expectedPlanSha256 !== undefined && (!SHA256.test(expectedPlanSha256) || expectedPlanSha256 !== prd.planSha256)) {
     return fail("PO-GATE-PLAN-DIGEST-STALE", "The active PRD changed after the authority snapshot was taken.", SNAPSHOT_REPAIR);

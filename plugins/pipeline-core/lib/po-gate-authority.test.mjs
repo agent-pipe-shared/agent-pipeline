@@ -22,6 +22,7 @@ import { fileURLToPath } from "node:url";
 import { run as runPipelineState } from "../../../harness/scripts/pipeline-state.mjs";
 
 import {
+  PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
   PO_GATE_PRD_LANGUAGE_MARKER,
   PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH,
   createPoGateProfileReceipt,
@@ -162,7 +163,7 @@ function spec(body = "# Technical Spec\n") {
 }
 
 function prd(language, body = "# PRD\n", specBytes = spec()) {
-  return `${PO_GATE_PRD_LANGUAGE_MARKER(language)}\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n${body}`;
+  return `${PO_GATE_PRD_LANGUAGE_MARKER(language)}\n${TECHNICAL_SPEC_MARKER(sha256(specBytes))}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n${body}`;
 }
 
 function populateRoot(root, language = "de") {
@@ -566,6 +567,36 @@ check("the technical Spec marker has closed single-line lowercase grammar", () =
       assert.equal(result.code, "PO-GATE-PRD-SPEC-MARKER-MISSING");
     });
   }
+});
+
+// 2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md: the PO's own
+// plan acknowledgement is a third, independent precondition (additive to the
+// two marker checks above), so it gets the same "absent, or not exactly once"
+// closed-grammar proof the technical Spec marker gets immediately above.
+// Enforcement only fires during an ACTIVE approval/rebind validation (a
+// non-undefined expectedPlanSha256/expectedSpecSha256), never during a
+// passive diagnostic read, so this scenario must exercise the active path.
+check("the PO plan acknowledgement marker must be present exactly once", () => {
+  const validLanguage = PO_GATE_PRD_LANGUAGE_MARKER("de");
+  const specMarker = TECHNICAL_SPEC_MARKER(sha256(spec()));
+  for (const content of [
+    `${validLanguage}\n${specMarker}\n# PRD\n`,
+    `${validLanguage}\n${specMarker}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n# PRD\n`,
+  ]) {
+    withFixture({}, ({ primary, validate }) => {
+      write(join(primary, "specs", "feature", "prd_feature.md"), content);
+      const result = validate({ expectedPlanSha256: "a".repeat(64), expectedSpecSha256: "b".repeat(64) });
+      assert.equal(result.ok, false, JSON.stringify(result));
+      assert.equal(result.code, "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING", JSON.stringify(result));
+    });
+  }
+});
+
+check("a PRD carrying the language marker, the Spec marker and the acknowledgement marker exactly once each passes", () => {
+  withFixture({}, ({ validate }) => {
+    const result = validate();
+    assert.equal(result.ok, true, JSON.stringify(result));
+  });
 });
 
 check("technical Spec marker binds the neighboring spec.md bytes and detects drift", () => {
@@ -1314,6 +1345,29 @@ check("an absent technical Spec marker is signposted to adding the line, and nam
     assert.match(result.repair, /do not change activeFeature\.planPath/u, JSON.stringify(result));
     // No route is named for the already-bound state: it is not offered
     // because it is known to refuse there.
+    assert.equal(/po-authority-rebind/u.test(result.repair), false, JSON.stringify(result));
+  });
+});
+
+// 2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md: same honesty
+// requirement as the technical Spec marker immediately above -- the repair
+// must name the actual remedy (the PO adding the line after reviewing the
+// PRD) and must not invent an already-bound-PRD route, because none exists.
+// Active validation (non-undefined expected digests) is required for this
+// check to fire at all.
+check("an absent PO plan acknowledgement marker is signposted to the PO adding the line, and names no route for an already-bound PRD", () => {
+  withFixture({}, ({ primary, validate }) => {
+    write(
+      join(primary, "specs", "feature", "prd_feature.md"),
+      `${PO_GATE_PRD_LANGUAGE_MARKER("de")}\n${TECHNICAL_SPEC_MARKER(sha256(spec()))}\n# PRD\n`,
+    );
+    const result = validate({ expectedPlanSha256: "a".repeat(64), expectedSpecSha256: "b".repeat(64) });
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.code, "PO-GATE-PRD-ACKNOWLEDGEMENT-MISSING", JSON.stringify(result));
+    assert.match(result.repair, /po-plan-acknowledged: content-sound-and-spec-consistent/u, JSON.stringify(result));
+    assert.match(result.repair, /PO's own record/u, JSON.stringify(result));
+    assert.equal(result.repair.includes(PLAN_PATH_REPAIR), false, JSON.stringify(result));
+    assert.match(result.repair, /do not change activeFeature\.planPath/u, JSON.stringify(result));
     assert.equal(/po-authority-rebind/u.test(result.repair), false, JSON.stringify(result));
   });
 });
