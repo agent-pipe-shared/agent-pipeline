@@ -393,6 +393,8 @@ const TEST_SUITES = [
   { name: "po-approval-gate-tests", file: join(pluginScriptsDir, "po-approval-gate.test.mjs") },
   { name: "doc-contract-tests", file: join(scriptDir, "check-doc-contracts.test.mjs") },
   { name: "doc-contract-check", file: join(scriptDir, "check-doc-contracts.mjs") },
+  { name: "auth-gate-inventory-drift-tests", file: join(scriptDir, "check-auth-gate-inventory-drift.test.mjs") },
+  { name: "auth-gate-inventory-drift-check", file: join(scriptDir, "check-auth-gate-inventory-drift.mjs") },
   { name: "section-citation-tests", file: join(scriptDir, "check-section-citations.test.mjs") },
   { name: "section-citation-check", file: join(scriptDir, "check-section-citations.mjs") },
   { name: "authority-tier-agreement-tests", file: join(scriptDir, "check-authority-tier-agreement.test.mjs") },
