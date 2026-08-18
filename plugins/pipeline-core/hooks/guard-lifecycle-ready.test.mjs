@@ -264,6 +264,138 @@ test("direct State edits remain blocked even when session readiness is exact", (
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// backlog: permitted-edit-drops-session-into-unrecoverable-readiness. Writes the exact
+// live-binding shape `boundAuthorityDocumentPath()` reads: `continuity.authority.prd/.spec`
+// on Pipeline State, mirroring what `establishedContinuity`/`normalizedContinuity`
+// (onboarding-continuity.mjs) actually set -- the same live binding that module's own
+// 2026-08-09 resolution note names as authoritative over the private promotion history.
+function withContinuityAuthority(path, {
+  prdPath = "specs/2026-08-18-demo/prd_demo.md",
+  specPath = "specs/2026-08-18-demo/spec.md",
+  planInvalidation,
+} = {}) {
+  const state = {
+    schema: "pipeline.state.v0",
+    continuity: {
+      authority: {
+        prd: { path: prdPath },
+        spec: { path: specPath },
+      },
+    },
+  };
+  if (planInvalidation !== undefined) state.planInvalidation = planInvalidation;
+  writeFileSync(join(path, ".claude", "pipeline-state.json"), JSON.stringify(state));
+  return { prdPath, specPath, designInputPath: join(dirname(specPath), "design-input.md") };
+}
+
+function readyStub() {
+  return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+}
+
+test("writes to the currently bound PRD, Spec, or design input are blocked even when session readiness is exact, and name the rebind route", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const { prdPath, specPath, designInputPath } = withContinuityAuthority(path);
+    for (const filePath of [prdPath, specPath, designInputPath]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: readyStub,
+      });
+      assert.equal(result.exitCode, 2, filePath);
+      assert.match(result.stderr, /BLOCKED \(guard-lifecycle-ready/u, filePath);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-AUTHORITY-BOUND/u, filePath);
+      assert.match(result.stderr, /currently bound authority/u, filePath);
+      assert.match(result.stderr, new RegExp(`File: ${filePath.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}`, "u"), filePath);
+      assert.match(result.stderr, /reopen-design --by <name>/u, filePath);
+      assert.match(result.stderr, /submit-plan --by <name>/u, filePath);
+      assert.match(result.stderr, /approve-plan --by <name>/u, filePath);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("Write and NotebookEdit are refused for a bound authority document exactly like Edit", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const { specPath } = withContinuityAuthority(path);
+    for (const call of [write(specPath), notebookEdit(specPath)]) {
+      const result = evaluateLifecycleReadyGuard(call, {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: readyStub,
+      });
+      assert.equal(result.exitCode, 2, call.tool_name);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-AUTHORITY-BOUND/u, call.tool_name);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("a reopened design (planInvalidation recorded) releases the authority-document write refusal", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const { specPath, prdPath, designInputPath } = withContinuityAuthority(path, {
+      planInvalidation: { invalidatedAt: "2026-08-18T00:00:00.000Z", invalidatedBy: "PO" },
+    });
+    let readinessCalls = 0;
+    for (const filePath of [prdPath, specPath, designInputPath]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() {
+          readinessCalls += 1;
+          return readyStub();
+        },
+      });
+      assert.equal(result.exitCode, 0, filePath);
+    }
+    assert.equal(readinessCalls, 3);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("a file beside the bound documents is not blocked by the authority-document refusal", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    withContinuityAuthority(path);
+    const result = evaluateLifecycleReadyGuard(edit("specs/2026-08-18-demo/README.md"), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(result.exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("an absent, malformed, or authority-less Pipeline State is not treated as a bound authority document", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const target = edit("specs/2026-08-18-demo/prd_demo.md");
+
+    // No .claude/pipeline-state.json at all yet.
+    let result = evaluateLifecycleReadyGuard(target, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(result.exitCode, 0, "absent state");
+
+    // Present but unparseable.
+    writeFileSync(join(path, ".claude", "pipeline-state.json"), "not json");
+    result = evaluateLifecycleReadyGuard(target, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(result.exitCode, 0, "malformed state");
+
+    // Present, valid, but carrying no continuity.authority (pre-kickoff/pristine).
+    writeFileSync(join(path, ".claude", "pipeline-state.json"), JSON.stringify({ schema: "pipeline.state.v0" }));
+    result = evaluateLifecycleReadyGuard(target, {
+      projectDir: path,
+      requireProjectOnboardingReadyFn: readyStub,
+    });
+    assert.equal(result.exitCode, 0, "no continuity.authority");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("governed consumer edits cannot escape their physical project root", () => {
   const path = root();
   const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-outside-"));

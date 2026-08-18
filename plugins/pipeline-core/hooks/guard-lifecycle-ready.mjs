@@ -459,6 +459,100 @@ function protectedStateWriterOnly() {
   );
 }
 
+// GUARD-LIFECYCLE-AUTHORITY-BOUND: same typed-refusal family as
+// protectedStateWriterOnly() above, extended per backlog
+// 2026-08-08-a-permitted-edit-drops-the-session-into-an-unrecoverable-readiness-class.md.
+// A direct write to Pipeline State was already refused outright; a write to the
+// currently bound PRD, its Spec, or its design input was admitted and only caught
+// afterwards, by the continuity mutual-digest binding in
+// onboarding-continuity.mjs (`observeDetailed`), which throws
+// KICKOFF-PROMOTION-AUTHORITY-DRIFT / KICKOFF-PROMOTION-EVIDENCE-DRIFT and lands the
+// session in the non-liftable `continuity-observation-unavailable` readiness class
+// with no agent-executable exit. This closes the entrance instead of only detecting
+// the fall afterwards. Direction 3 of that item -- the readiness class itself stays
+// non-liftable -- is an explicit hard constraint this refusal does not touch: it
+// prevents the drift, it does not offer any new way to lift the class once reached.
+const AUTHORITY_DOCUMENT_BOUND_CODE = "GUARD-LIFECYCLE-AUTHORITY-BOUND";
+
+function protectedAuthorityDocumentWriteOnly(matchedRelativePath) {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${AUTHORITY_DOCUMENT_BOUND_CODE}: this file is the currently bound authority `
+      + "document (the promoted PRD, its Spec, or its design input) and must not be "
+      + "edited directly while it is bound.\n"
+      + `File: ${matchedRelativePath}\n`
+      + "A direct edit here does not change the recorded binding -- it only drifts the "
+      + "file out from under it, which the continuity check later reports as an "
+      + "unavailable observation rather than as the edit that caused it.\n"
+      + "The sanctioned route for a genuine planning change: run `reopen-design --by "
+      + "<name>` to release the binding, make the edit, then rebind with `submit-plan "
+      + "--by <name> --profile <epic|feature|mini>` and `approve-plan --by <name>`.\n",
+  );
+}
+
+/**
+ * The write-time counterpart used by evaluateLifecycleReadyGuard() to decide
+ * AUTHORITY_DOCUMENT_BOUND_CODE. Returns the matched relative path, or null when
+ * the write target is not a currently bound authority document.
+ *
+ * The live binding is `continuity.authority.prd`/`.spec` in Pipeline State -- the
+ * SAME live binding onboarding-continuity.mjs names as authoritative over the
+ * private promotion-history record once a feature's design has ever been reopened
+ * (its 2026-08-09 resolution note: "the live binding for an edited package is
+ * `continuity.authority` plus `planApproval.poGateAuthority`"). The design input is
+ * never itself named in Pipeline State; `promotionInput()` in
+ * onboarding-continuity.mjs fixes it at promotion time as the sibling of the Spec
+ * under the exact basename `design-input.md`, so it is derived here rather than
+ * read from the private continuity history a second time at write time.
+ *
+ * `reopen-design` durably releases this binding until the next
+ * `submit-plan`/`approve-plan` re-establishes it (recorded as `planInvalidation` on
+ * State); a state carrying it is legitimately mid a sanctioned edit and is not
+ * matched here -- matching it would refuse the very route this refusal names.
+ *
+ * Fails OPEN on anything absent, unreadable, unparseable, or short of the exact
+ * shape expected: this is an additional, data-dependent write-time refusal layered
+ * on top of the readiness gate that already runs after it, not the gate itself --
+ * when nothing can be determined about the current binding, there is nothing yet
+ * known to protect here, and the existing post-hoc continuity check is unchanged.
+ */
+function boundAuthorityDocumentPath(root, requested) {
+  for (const relativeStatePath of [join(".claude", "pipeline-state.json"), join("project", "pipeline-state.json")]) {
+    let raw;
+    try {
+      raw = readFileSync(join(root, relativeStatePath), "utf8");
+    } catch {
+      continue; // absent here -- try the other installed-layout location
+    }
+    let state;
+    try {
+      state = JSON.parse(raw);
+    } catch {
+      return null; // present but unreadable -- nothing determinable, fail open
+    }
+    if (state === null || typeof state !== "object" || Array.isArray(state)) return null;
+    if (state.planInvalidation !== null && typeof state.planInvalidation === "object") return null;
+    const authority = state.continuity?.authority;
+    if (authority === null || typeof authority !== "object") return null;
+    const prdPath = authority.prd?.path;
+    const specPath = authority.spec?.path;
+    if (typeof prdPath !== "string" || prdPath === "" || typeof specPath !== "string" || specPath === "") return null;
+    const candidates = [prdPath, specPath, join(dirname(specPath), "design-input.md")];
+    for (const candidate of candidates) {
+      let candidateAbsolute;
+      try {
+        candidateAbsolute = resolve(root, candidate);
+      } catch {
+        continue;
+      }
+      if (candidateAbsolute === requested) return candidate;
+    }
+    return null;
+  }
+  return null;
+}
+
 // Hoisted for the same reason GRAMMAR_DENIAL_GUIDANCE is: the HGO request/capability is
 // bound to the exact denial reason string, so the text the denial prints and the text the
 // route binds must be one constant, never two copies that can drift.
@@ -2314,6 +2408,10 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
       if (requested === join(root, ".claude", "pipeline-state.json")
         || requested === join(root, "project", "pipeline-state.json")) {
         return withLifts(lifts, protectedStateWriterOnly());
+      }
+      const boundAuthority = boundAuthorityDocumentPath(root, requested);
+      if (boundAuthority !== null) {
+        return withLifts(lifts, protectedAuthorityDocumentWriteOnly(boundAuthority));
       }
     }
   }
