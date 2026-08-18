@@ -3,7 +3,27 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-18 (checkpoint 39)
+**Last updated:** 2026-08-18 (checkpoint 40)
+
+---
+
+## CHECKPOINT — 2026-08-18 (40): PO decided all 7 collected design-decision items from checkpoint 39 — 6 now dispatch-ready, 1 closed as an accepted scope boundary. No PO design decisions remain open in the Phoenix backlog (READ THIS FIRST)
+
+**PO's verbatim decisions** (given as `1. strukturiert // 2. empfehlung // 3. empfehlung // 4. fail-open // 5. refuse // 6. empfehlung // 7. empfehlung` — "empfehlung" meaning "use your best recommendation", after which the Elephant re-read each item's own Proposal section from source and gave a grounded recommendation rather than inventing one):
+
+1. **`human-legible-approval-record`** — structured, bounded, closed-vocabulary briefing, kept portable (not free prose / not restricted-profile-only). PO's direct choice.
+2. **`push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to`** — direction 2: `verify.mjs` will resolve `repoRoot` from the git common-dir / primary worktree root (like `gitCommonDirectory()` already does in the same file), not from its own module path, so evidence always lands at the project root regardless of invocation directory. Recommended as the narrower change (one function, one file) vs. teaching the gate new discovery logic.
+3. **`gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger`** — all three sub-decisions: (a) amend H-AC-12 to name GMW; (b) GMW retention via emit-on-transition (ledger event at `install`/`close`, no storage-contract redesign); (c) portable/restricted field split per H-AC-05/H-AC-11/H-AC-13 (role/assurance/reason-code/scope-digests portable; natural-person attribution/free-form reason restricted machine-local), with the already-disclosed residual accepted — H-AC-11 requires the portable record to carry the values that constitute the join, so a fully joinless design is not attainable for the GMW half (design doc §5.2 R-3/O-4).
+4. **`module-scope-manifest-read-rearms-the-disarm-by-config-fault`** — fail-open. PO's direct choice: keep the current admit-on-unreadable-manifest behaviour, ratified as intended rather than left as an accident. The dispatch will still move both hook reads off module scope, document the choice explicitly, consider renaming/retiring the unguarded export, and add the regression test the item names — all pinned to fail-open, not fail-closed.
+5. **`el-01-has-no-in-session-tripwire`** — refuse (hard block). PO's direct choice for the enforcement shape. Session-identity signal (recommended): trust an active, matching dispatch record for the current tool-call context, not a self-asserted role string in a prompt.
+6. **`elephant-authored-production-diff-closed-its-own-gating-criterion`** — candidate 3: a mandatory pre-commit stage-0 self-check before any Elephant-authored commit to a protected path, even under an open signed maintenance window. Recommended over a checklist reminder (easy to skip — which is exactly how this violation happened) or re-budgeting the window TTL (doesn't close the gap).
+7. **`part-a-limitation-2-orphaned-by-the-r2-rework`** — close as an accepted, permanent scope boundary; no detection mechanism built. Recommended: the residual is narrow (same allowlisted origin, different commit — not an arbitrary repo), and building a new locally-trusted expectation baseline to close it is disproportionate; consistent with the threat model's own prior rejection of a new signed pin and the standing "guards bind agents, not humans" principle.
+
+**Applied:** all 7 items' Triage sections got a `### PO Decision — 2026-08-18` block recording the decision, rationale, and resulting assignment; item 7's frontmatter flipped `status: open` → `status: closed`. Commit `5c3c50d4`. Doc-reconciliation checked clean afterward (0 implicated ADRs — `backlog/**` carries no `Governs:` line).
+
+**Backlog state after this checkpoint:** zero open PO-design-decision items remain. 23 items are now confirmed dispatch-ready in total (the 17 from checkpoint 39 plus 6 of these 7 — item 7 is closed, not dispatch-ready). No route to implement any of them exists yet in this session; the next candidate action is a Workflow-based implementation-dispatch batch (PO-confirmed sizing ~15-20 items) whenever there is time/appetite for it.
+
+**Unchanged from checkpoint 39:** OT09/TP-7 still needs a fix from a separate plugin-authoring-repo session; the PO's physical presence with their Ed25519 key is still needed for the Layer 2/3 push-signing and `feature-package-reconcile` ceremonies before any push can happen. No `git push` has been executed at any point in this session.
 
 ---
 
