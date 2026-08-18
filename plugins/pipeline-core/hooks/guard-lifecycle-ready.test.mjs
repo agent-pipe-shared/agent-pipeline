@@ -704,7 +704,11 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       assert.match(result.stderr, /separate parallel tool calls/u, command);
       assert.match(result.stderr, /Do not construct a new composed command/u, command);
       assert.match(result.stderr, /If typed retryActions are present/u, command);
-      assert.match(result.stderr, /Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions/u, command);
+      assert.match(
+        result.stderr,
+        /Only bounded rg-to-rg, rg-to-head, grep-to-grep, and grep-to-head diagnostic pipelines are admitted as exceptions/u,
+        command,
+      );
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

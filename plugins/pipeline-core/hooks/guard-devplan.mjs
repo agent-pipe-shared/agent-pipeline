@@ -50,6 +50,11 @@
  *     prepare).
  *   - `gates.dev-plan.exemptPaths` (array of path-prefix strings) from the manifest,
  *     if present — project-specific additional exemptions.
+ *   - The sanctioned close-artifact writer: exactly `HISTORY.md` (exact match, root
+ *     file) and `telemetry/` (directory prefix) — the mandatory root-level close
+ *     records, unconditionally exempt regardless of lifecycle phase, never a general
+ *     product-file exemption (see CLOSE_ARTIFACT_EXACT_PATHS/CLOSE_ARTIFACT_PREFIXES
+ *     below; backlog/items/2026-07-26-readonly-command-guard-classification.md).
  *
  * ABSOLUTE PATHS AND THE PROJECT ROOT (C1 fix, from a critic review):
  * Claude Code's write PreToolUse contract typically delivers the target path (read via
@@ -302,6 +307,27 @@ const LEDGER_FIRST_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
 
 const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
 
+// ---- sanctioned close-artifact writer (root-level History/telemetry close records) -----
+// The mandatory root-level History (`HISTORY.md`) and telemetry (`telemetry/`) close
+// records must be writable before plan approval without exempting any actual product
+// file (backlog/items/2026-07-26-readonly-command-guard-classification.md;
+// specs/sprint-phoenix-epic/RECOVERY.md R-02: this gate previously classified these
+// mandatory closeout writes as "implementation" while the plan correctly stayed
+// unapproved -- a false-positive deadlock, not a security gap). This is a closed,
+// non-implementation classification -- exactly these two artifacts, kept deliberately
+// separate from DEFAULT_EXEMPT_PREFIXES's directory-prefix semantics because HISTORY.md
+// is a single root FILE: an exact match only, never a prefix match, so an unrelated file
+// merely sharing the "history.md" string prefix (e.g. a hypothetical "HISTORY.md.bak")
+// is NOT exempted. `telemetry/` is a directory prefix, matched the same way the
+// DEFAULT_EXEMPT_PREFIXES entries are.
+const CLOSE_ARTIFACT_EXACT_PATHS = ["history.md"];
+const CLOSE_ARTIFACT_PREFIXES = ["telemetry/"];
+
+function isSanctionedCloseArtifact(normalizedCandidatePath) {
+  return CLOSE_ARTIFACT_EXACT_PATHS.includes(normalizedCandidatePath)
+    || CLOSE_ARTIFACT_PREFIXES.some((prefix) => normalizedCandidatePath.startsWith(prefix));
+}
+
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
   process.exit(code);
@@ -457,7 +483,8 @@ const touchesAuthority = authoritativePaths.some((path) => normalizedPath === pa
 const isDraftAuthority = lifecycle.status === "draft" && touchesAuthority;
 const isExempt = isDraftAuthority
   || (!touchesAuthority
-    && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix))));
+    && (exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)))
+      || isSanctionedCloseArtifact(normalizedPath)));
 if (isExempt) process.exit(0);
 
 // ---- verdict --------------------------------------------------------------------------

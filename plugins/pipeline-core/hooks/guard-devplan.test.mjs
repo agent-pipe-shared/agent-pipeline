@@ -646,6 +646,68 @@ function decisionReference({ fingerprint, decisionId, decisionDigest, checkpoint
   });
 }
 
+// ---- DP29 sanctioned close-artifact writer: HISTORY.md and telemetry/ -> allow ----------
+// backlog/items/2026-07-26-readonly-command-guard-classification.md;
+// specs/sprint-phoenix-epic/RECOVERY.md R-02: mandatory root-level History/telemetry close
+// records must be writable before plan approval without exempting any actual product file.
+{
+  const dir = freshDir("close-artifact-history");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, UNAPPROVED_STATE);
+  check("DP29 allow  root-level HISTORY.md is a sanctioned close artifact", "Edit", "HISTORY.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("DP29b allow  telemetry/costs.md is a sanctioned close artifact", "Edit", "telemetry/costs.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("DP29c allow  root-level HISTORY.md matched case-insensitively", "Edit", "history.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+}
+
+// ---- DP30 close-artifact classification stays exact, not a loose prefix ----------------
+// A file merely sharing the "history.md" string prefix, or living outside telemetry/, is
+// NOT a close record and must still be gated like any other product file.
+{
+  const dir = freshDir("close-artifact-not-loose");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, UNAPPROVED_STATE);
+  check("DP30 block  HISTORY.md.bak is NOT exempted by the close-artifact exact match", "Edit", "HISTORY.md.bak", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+  check("DP30b block  nested docs/HISTORY.md (not root) is NOT the sanctioned close artifact", "Edit", "src/HISTORY.md", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+  check("DP30c block  telemetry-extra/costs.md is NOT the telemetry/ close-record prefix", "Edit", "telemetry-extra/costs.md", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+  check("DP30d block  ordinary product file src/foo.ts remains gated as before", "Edit", "src/foo.ts", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+}
+
+// ---- DP31 sanctioned close artifacts are exempt regardless of lifecycle phase ----------
+{
+  const dir = freshDir("close-artifact-approved");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeState(dir, APPROVED_STATE); // approved design, not yet "implementation" -- still gated normally
+  check("DP31 allow  HISTORY.md stays exempt even under an approved-but-not-implementation state", "Edit", "HISTORY.md", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("DP31b block  sanity: src/foo.ts is still gated in the same fixture", "Edit", "src/foo.ts", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["approved", "set-phase"],
+  });
+}
+
 // ---- Cleanup --------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

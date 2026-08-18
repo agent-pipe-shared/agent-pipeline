@@ -180,7 +180,7 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
         + "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n"
         + "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.\n"
         + "If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n"
-        + "Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions.\n"
+        + "Only bounded rg-to-rg, rg-to-head, grep-to-grep, and grep-to-head diagnostic pipelines are admitted as exceptions.\n"
         + `${JSON.stringify(retryEnvelope)}\n`
         + overrideGuidance,
     );
@@ -449,14 +449,61 @@ function isRestartResumeHintCapture(command, root, options = {}) {
 }
 
 /**
+ * Extends the bounded read-only pipeline family (guard-command-grammar.mjs's
+ * isBoundedReadOnlyPipeline, rg-to-rg/rg-to-head only) with the "grep-to-grep"
+ * and "grep-to-head" shapes: the same closed, bounded two-segment structure
+ * already admitted for rg, applied to grep, because a bare `grep ... | head`
+ * pipeline is the most frequent read-only diagnostic shape actually rejected
+ * in practice (backlog/items/2026-07-26-readonly-command-guard-classification.md;
+ * specs/sprint-phoenix-epic/RECOVERY.md R-02). Deliberately kept LOCAL to this
+ * file rather than added to guard-command-grammar.mjs: this dispatch's briefed
+ * scope is exactly guard-lifecycle-ready.mjs, the Dev-Plan gate file, and their
+ * test files -- guard-command-grammar.mjs is a separate, unbriefed file, so this
+ * duplicates only the bounded head-count/redirect shape already proven safe for
+ * rg (never a general shell composer). The grep source/sink argv predicate
+ * itself is identical to the already-accepted single-command grep rule below
+ * (`--files-with-matches` excluded) -- this recognizes the SAME already-safe
+ * command now composed via one bounded pipe, nothing more permissive.
+ */
+function isBoundedGrepPipeline(parsed, root) {
+  if (!parsed || parsed.parseStatus !== "accepted"
+    || parsed.segments.length !== 2
+    || parsed.operators.length !== 1
+    || parsed.operators[0].operator !== "|"
+    || parsed.redirects.length > 1) return false;
+  const windows = parsed.dialect === "windows-readonly-pipeline";
+  const expectedGrep = windows ? "grep.exe" : "grep";
+  const sourceName = basename(parsed.segments[0].executable).toLowerCase();
+  if (sourceName !== expectedGrep) return false;
+  const validGrepArgs = (argv) => !argv.some((arg) => arg === "--files-with-matches");
+  if (!validGrepArgs(parsed.segments[0].argv)) return false;
+  const sinkName = basename(parsed.segments[1].executable).toLowerCase();
+  if (sinkName === expectedGrep) {
+    return parsed.redirects.length === 0 && validGrepArgs(parsed.segments[1].argv);
+  }
+  if (sinkName !== (windows ? "head.exe" : "head")) return false;
+  if (parsed.redirects.length === 1) {
+    const redirect = parsed.redirects[0];
+    if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"
+      || (windows ? redirect.target.toLowerCase() !== "nul" : redirect.target !== "/dev/null")) return false;
+  }
+  const headArgs = parsed.segments[1].argv;
+  if (headArgs.length !== 2 || headArgs[0] !== "-n"
+    || !/^(?:[1-9]|[1-9][0-9]|[1-4][0-9]{2}|500)$/u.test(headArgs[1])) return false;
+  return true;
+}
+
+/**
  * Keep fail-closed lifecycle states diagnosable without turning arbitrary
  * shell syntax into a write bypass.  Only one simple command is accepted; the
  * parser already rejects control operators, redirections and command
- * substitution.
+ * substitution. The bounded rg and grep pipeline families (above) are the
+ * only two-segment exceptions.
  */
 export function isReadOnlyDiagnosticCommand(command, root) {
   const parsed = parseGuardCommand(command, root);
   if (isBoundedReadOnlyPipeline(parsed, root)) return true;
+  if (isBoundedGrepPipeline(parsed, root)) return true;
   const words = simpleWords(command, root);
   if (!words || words.length === 0) return false;
   const executable = basename(words[0]).toLowerCase();
@@ -674,6 +721,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   if (isAgentPoPublicCommand(command, root)) return false;
   if (poApprovalArgs(command, root, PO_APPROVAL_GATE_SCRIPT) !== null) return true;
   if (isBoundedReadOnlyPipeline(parsed, root)) return false;
+  if (isBoundedGrepPipeline(parsed, root)) return false;
   if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
   if (parsed.parseStatus === "accepted" && parsed.redirects.length > 0) {
     return parsed.redirects.some((redirect) => {
