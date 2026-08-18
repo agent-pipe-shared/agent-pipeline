@@ -6269,14 +6269,28 @@ function defaultFeaturePackageReconcileApproval(argv, deps) {
       updatedAt: now,
     };
     // Reuse the caller's already-held lock only when it is genuinely for THIS same
-    // resolved path -- comparing resolved absolute paths, not raw dir strings, so a
-    // relative vs. absolute spelling of the same directory still counts as the same path.
-    // In the ordinary `dir !== root` topology `reuseLock` stays undefined and `writeState`
-    // acquires its own lock exactly as before (untouched behavior).
-    const reuseLock = holderLock?.ok === true && holderRoot !== undefined
-      && resolve(continuityLockPath(dir)) === resolve(continuityLockPath(holderRoot))
-      ? holderLock
-      : undefined;
+    // path on disk -- comparing REAL (symlink-resolved) paths via `realpathSync`, not
+    // lexical `resolve()`, so a `--root` reached through a symlink still counts as the
+    // same path as the caller's already-held lock. The caller's held-lock path comes
+    // from `holderLock.path` (the field `acquireContinuityLock` already returns on
+    // success) rather than being recomputed via `continuityLockPath(holderRoot)`, since
+    // that recomputation depends on `statePath()`'s existence-dependent branching and
+    // can in principle diverge from the path actually locked. Both `realpathSync` calls
+    // are wrapped so a resolution failure (e.g. a dangling symlink) is treated as "not
+    // the same path" rather than thrown -- `reuseLock` stays `undefined` and `writeState`
+    // falls back to acquiring its own lock exactly as before (untouched, fail-closed
+    // behavior). In the ordinary `dir !== root` topology `reuseLock` likewise stays
+    // undefined and `writeState` acquires its own lock exactly as before.
+    const reuseLock = (() => {
+      if (holderLock?.ok !== true || holderRoot === undefined || typeof holderLock.path !== "string") return undefined;
+      try {
+        const heldReal = realpathSync(holderLock.path);
+        const candidateReal = realpathSync(continuityLockPath(dir));
+        return heldReal === candidateReal ? holderLock : undefined;
+      } catch {
+        return undefined;
+      }
+    })();
     const writeResult = writeState(dir, next, state, reuseLock ? { reuseLock } : {});
     if (!stateWriteSucceeded(writeResult)) return { ok: false, code: writeResult.code };
     return { ok: true };

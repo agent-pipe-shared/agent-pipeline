@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.reconcile-lock-reuse-lexical-path-comparison
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
 source: "Independent Critic review, 2026-08-11, commit 3e1a727e (single-commit delta review), Finding 1. specs/sprint-phoenix-epic/evidence/pac08-f1-critic-review-3e1a727e.md"
 ---
@@ -64,7 +64,7 @@ resolving to the same real directory as `projectDir()`) closes both at once.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accept and fix.
+- **Rationale:** `defaultFeaturePackageReconcileApproval`'s `reuseLock` computation (`plugins/pipeline-core/scripts/pipeline-state.mjs`, ~line 6276) now derives the caller's held-lock path from `holderLock.path` (the field `acquireContinuityLock` already returns on success, rather than recomputing it via the existence-dependent `continuityLockPath(holderRoot)`) and compares `realpathSync`-resolved real paths, wrapped in try/catch so a resolution failure is treated as "not the same path" — `reuseLock` stays `undefined` and `writeState` falls back to acquiring its own lock exactly as before (fail-closed behavior preserved, only widened to recognize more genuinely-safe reuse cases). Verified against the full `harness/scripts/pipeline-state.test.mjs` suite: 504/506 pass, the only 2 failures (PS54af/PS54ag) are the already-documented, unrelated FTP-ARTIFACT-2 digest-drift finding (`backlog/items/2026-08-17-acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest.md`), not a regression from this change. The regression test the Proposal asks for (a symlinked `--root` case, RGt) could NOT be added this session: `harness/scripts/pipeline-state.test.mjs` is a TP-5 protected test path requiring a signed maintenance window an agent session cannot self-authorize — tracked separately as `backlog/items/2026-08-18-reconcile-lock-reuse-regression-test-needs-a-tp5-window.md`.
+- **Assignment:** this dispatch (PHX-WP-RECONCILE-LOCK-REALPATH)
+- **Date:** 2026-08-18
