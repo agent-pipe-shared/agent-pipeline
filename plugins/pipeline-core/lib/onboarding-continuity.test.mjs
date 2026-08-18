@@ -1063,7 +1063,7 @@ for (const stage of KICKOFF_FAULT_STAGES) {
   });
 }
 
-function promotionSeed(name, { privatized = false, poLanguage = "en" } = {}) {
+function promotionSeed(name, { privatized = false, bumpRevision = privatized, poLanguage = "en" } = {}) {
   const root = fixture(`promotion-${name}`, { neutral: privatized });
   const kickoff = planOnboardingKickoff({ rootDir: root, goal: `Promote ${name}` });
   const statePath = join(root, kickoff.targets.state.path);
@@ -1083,9 +1083,17 @@ function promotionSeed(name, { privatized = false, poLanguage = "en" } = {}) {
         descriptorSha256: "a".repeat(64),
       },
     });
-    const state = JSON.parse(readFileSync(statePath, "utf8"));
-    state.continuity.revision = 1;
-    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    // `bumpRevision` (default: mirrors `privatized`, so every existing caller
+    // keeps promoting a revision-1 re-kickoff exactly as before) is set false
+    // by the revision-0->1 recovery test below: it needs a private
+    // session-cleanup binding to exist at kickoff time -- exactly like a
+    // revision-1 re-kickoff -- while the kickoff itself stays at revision 0,
+    // the ordinary first-ever kickoff a project runs.
+    if (bumpRevision) {
+      const state = JSON.parse(readFileSync(statePath, "utf8"));
+      state.continuity.revision = 1;
+      writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    }
   }
   const directory = join(root, "specs", "promoted");
   mkdirSync(directory, { recursive: true });
@@ -1544,6 +1552,50 @@ check("legacy promotion cleanup recovery is crash-replay safe after private bind
     expectedPlanSha256: plan.planSha256,
     activate: true,
     deps: { lockStaleMs: 0, nowMs: Date.now() + 1_000 },
+  });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+});
+
+check("ordinary first kickoff->promotion (revision 0 to 1) also has a read-only digest-bound repair and exact replay", () => {
+  // Unlike `legacyPromotionCleanupMismatch` (which seeds `privatized: true`, a
+  // revision-1 re-kickoff), this is the single most common path: the very
+  // first kickoff a project ever runs. A private session-cleanup binding can
+  // still exist at kickoff time (bound to the kickoff-XXXX pseudo feature id)
+  // -- `recognisedKickoff` simply never reads it for a revision-0 kickoff, so
+  // `buildKickoffPromotionPlan` structurally never carries a `cleanupBinding`
+  // promotion target for it. Recovering that binding afterward is exactly
+  // `kickoffPromotionCleanupRecoveryPlanCore`'s job, and it used to hardcode
+  // `state.continuity.revision !== 2`, excluding this revision-0->1 case.
+  const seed = promotionSeed("legacy-revision-zero", { privatized: true, bumpRevision: false });
+  const kickoffBinding = readOnboardingSessionCleanupBinding({ rootDir: seed.root });
+  assert.equal(kickoffBinding.revision, 0);
+  const promotion = planOnboardingKickoffPromotion(seed.request);
+  assert.equal(promotion.kickoff.revision, 0);
+  assert.equal(promotion.targets.cleanupBinding, undefined);
+  assert.equal(applyOnboardingKickoffPromotion({
+    plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true,
+  }).status, "applied");
+  const plan = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.revision, 1);
+  assert.equal(plan.feature.from.startsWith("kickoff-"), true);
+  assert.equal(plan.feature.to, seed.request.featureId);
+  const applied = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.mutated, true);
+  assert.equal(applied.revision, 1);
+  const boundBinding = readOnboardingSessionCleanupBinding({ rootDir: seed.root });
+  assert.equal(boundBinding.status, "bound");
+  assert.equal(boundBinding.revision, 1);
+  const replay = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
   });
   assert.equal(replay.status, "replayed");
   assert.equal(replay.mutated, false);

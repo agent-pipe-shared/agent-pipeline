@@ -5121,9 +5121,20 @@ export function applyOnboardingKickoffPromotion({
 function kickoffPromotionCleanupRecoveryPlanCore(observed, binding, sessionCleanupScript) {
   const state = observed.state;
   const entry = observed.history?.transactions?.at(-1);
+  // `buildKickoffPromotionPlan`/`validatePromotionPlan` (~line 4044,
+  // "![0, 1].includes(plan.kickoff.revision)") only ever admit a kickoff at
+  // revision 0 or 1, and always set the promoted state's `continuity.revision`
+  // to kickoff.revision + 1 -- so a genuinely completed kickoff-promotion's own
+  // state postimage can only ever land on revision 1 (the ordinary first
+  // kickoff->promotion, the single most common path) or revision 2 (a
+  // re-kickoff promoted a second time). A bare `!== 2` here used to accept only
+  // the second of those two legitimate outcomes, silently excluding
+  // revision-0->1 -- the more common case -- from ever getting an in-session
+  // recovery candidate.
+  const promotedRevisions = [0, 1].map((kickoffRevision) => kickoffRevision + 1);
   if (observed.continuity.status !== "valid" || observed.stateRelativePath !== NEUTRAL_STATE || binding.binding === null
     || entry?.kind !== "kickoff-promotion" || entry.cleanupBinding !== undefined
-    || observed.history.transactions.length !== 2 || state?.continuity?.revision !== 2
+    || observed.history.transactions.length !== 2 || !promotedRevisions.includes(state?.continuity?.revision)
     || state.activeFeature?.id !== entry.featureId || state.activeFeature?.planPath !== entry.planPath
     || state.continuity.featureId !== entry.featureId || state.continuity.authority.result !== null
     || state.continuity.authority.prd?.sha256 !== entry.prdSha256
