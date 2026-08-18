@@ -72,3 +72,46 @@ process).
 - **Rationale:** PO's direct choice, matching the Elephant's recommendation.
 - **Assignment:** Dispatch-ready — real design/implementation work with its own review bar (an insufficiently-scrutinized rebind path could become an unintended ceremony bypass).
 - **Date:** 2026-08-18
+
+### Implementation finding — 2026-08-18 (three dispatches)
+
+Commit `546967b9` built `validateFeaturePackage`'s `options.autoRebindMutable`
+(a mutable-only, tested library capability). Two follow-up dispatches then
+found the option is **structurally unsafe to wire into any CLI write path**
+(`feature-package-apply`/`feature-package-reconcile`), not merely
+unwired-for-now:
+
+- An internal recompute that silently self-heals a mutable-class digest
+  cannot distinguish a routine edit from deliberate tampering, and the
+  caller's own preview digest (from the read-only, deliberately-unwired
+  `feature-package-plan`) never reflects the healed state either way.
+- Wiring it into `feature-package-apply` broke `WRc` (a routine drift between
+  plan and apply must still be refused) and `WRg` (a manually tampered digest
+  must be refused, not silently corrected) — the write path's
+  `--plan-sha256` freshness/anti-tamper contract is defeated.
+- A reconcile-path probe (immediately reverted after capturing evidence)
+  produced 27 further failures across the `RG*` series for the identical
+  reason.
+
+**Net effect on this item's scope:** the PO's Option B ("a lightweight,
+non-PO-gated auto-rebind path for mutable-class artifacts") is delivered only
+as a **library-level, deliberate, out-of-band capability** (commit `836d0ff2`
+records the final decision and the reverted CLI-write-path attempt) — not as
+transparent self-healing during ordinary `apply`/`reconcile` CLI use, which
+this finding shows would silently defeat the exact tamper-detection guarantee
+the PO's own decision text flagged as the risk to watch for ("an
+insufficiently-scrutinized rebind path could become an unintended ceremony
+bypass"). The live drift this item was filed against (`lifecycle.json`
+vs. `acceptance.md`) was reconciled once via this library path (commit
+`bd79cf58`); a future routine drift needs the same deliberate,
+out-of-band invocation — it does not yet self-heal automatically inside the
+ordinary PO-facing flow. Whether a routine, non-transparent trigger (e.g. a
+dedicated CLI verb an operator or Elephant invokes explicitly, rather than a
+silent side effect of `apply`/`reconcile`) should be built is a further,
+still-open design question — not resolved by this finding, only newly
+informed by it.
+
+- **Status:** stays open — the underlying routine-drift friction this item
+  was filed against is only partially closed (a manual/deliberate remedy
+  exists; no automatic one does, and the investigation shows an automatic
+  one at the CLI write-path level cannot be built safely).
