@@ -113,3 +113,22 @@ still matches but `fakesecrets.yaml` does not, plus the accompanying test
 case the protected path currently blocks. Status stays open; not closeable
 from within a session.
 - **Date:** 2026-08-18
+
+### PO decision, 2026-08-18 (20-item decision batch) — ceremony scheduled, no in-session step exists
+
+PO decision: A — schedule the author-repair ceremony now. Checked
+whether anything could be prepared in-session first (matching the
+plan/prepare-authorization/emit-signature-digest pattern used for
+signature-mode ceremonies): confirmed there is none. `repair-map.mjs
+--help` for `HGO-AUTHOR-ROOT-REQUIRED` explicitly reports `command:
+(none)` — this lift class (`by: attended-author-outside-session`) has
+no in-session-triggerable command at all, unlike the general
+`HGO-ELIGIBLE` signature-mode class. **What the PO needs to do,
+exactly:** outside any session, as the attended author, directly edit
+`plugins/pipeline-core/lib/guard-git.test.mjs` to add the boundary-
+anchored regex test case (`fakesecrets.yaml` must NOT match, per this
+item's own Proposal), then apply the accompanying one-line fix to
+`guard-git.mjs`'s `GG-11` pattern (~line 403) the same way. No signature
+ceremony, digest, or session command is involved — this is a plain,
+attended, out-of-session edit to a TP-1 protected test path. Status
+stays open until the PO does this.
