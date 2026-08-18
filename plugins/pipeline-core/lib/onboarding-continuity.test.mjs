@@ -156,6 +156,26 @@ check("custom configured handover is observed instead of docs/state.md", () => {
   assert.match(result.handoverSha256, /^[a-f0-9]{64}$/u);
 });
 
+// Regression for pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string:
+// an ADR-0066 Decision 5 `{ path, maxBytes }` object-shaped `handover` key
+// must resolve via its `.path`, the same dual-shape `handover-rotation.mjs`'s
+// `resolveHandoverConfig()` already supports, not throw KICKOFF-PATH-UNSAFE
+// (observed live as a session-stranding `continuity-observation-unavailable`
+// readiness class) when handed straight to `safeRelativePath()`.
+check("object-shaped configured handover ({ path, maxBytes }) is observed instead of failing unavailable", () => {
+  const root = fixture("object-handover", { handover: { path: "notes/project state.md", maxBytes: 30000 } });
+  mkdirSync(join(root, "notes"), { recursive: true });
+  writeFileSync(join(root, "notes", "project state.md"), "configured\n");
+  const result = classifyOnboardingContinuity({ rootDir: root });
+  assert.equal(result.status, "damaged");
+  assert.match(result.handoverSha256, /^[a-f0-9]{64}$/u);
+});
+
+check("object-shaped configured handover without a usable .path still fails unavailable", () => {
+  const root = fixture("object-handover-no-path", { handover: { maxBytes: 30000 } });
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "unavailable");
+});
+
 check("present inactive state is damaged rather than pristine", () => {
   const root = fixture("inactive-state");
   writeFileSync(join(root, ".claude", "pipeline-state.json"), '{"schema":"pipeline.state.v0"}\n');

@@ -578,9 +578,22 @@ function observeDetailed({
     const calibrationObservation = observeOptionalProjectFile(root, selectedPaths.calibration, "Pipeline calibration");
     if (calibrationObservation.status !== "present") return { continuity: empty };
     const calibration = parseJsonObject(calibrationObservation, "Pipeline calibration");
-    const handoverPath = calibration.handover === undefined
+    // Dual-shape `calibration.handover`, matching `handover-rotation.mjs`'s
+    // `resolveHandoverConfig()`: a plain string names the path directly
+    // (predating ADR-0066); an ADR-0066 Decision 5 `{ path, maxBytes }` object
+    // names it via `.path` (`maxBytes` is not read here -- this call site only
+    // ever needed the path). Anything else (including an object without a
+    // usable `.path`) still reaches `safeRelativePath()` and fails closed with
+    // `KICKOFF-PATH-UNSAFE`, same as before this fix.
+    const handoverValue = calibration.handover;
+    const handoverPathCandidate = handoverValue
+      && typeof handoverValue === "object"
+      && !Array.isArray(handoverValue)
+      ? handoverValue.path
+      : handoverValue;
+    const handoverPath = handoverValue === undefined
       ? "docs/state.md"
-      : safeRelativePath(calibration.handover, "configured handover");
+      : safeRelativePath(handoverPathCandidate, "configured handover");
     if ([selectedPaths.calibration, selectedPaths.state].includes(handoverPath)
       || handoverPath === ".git" || handoverPath.startsWith(".git/")) {
       fail("KICKOFF-PATH-UNSAFE", "configured handover collides with a control path");
