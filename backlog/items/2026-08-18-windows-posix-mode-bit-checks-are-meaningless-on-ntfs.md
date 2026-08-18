@@ -224,11 +224,12 @@ Not yet decided. Suggested approach for whoever picks this up:
   constructed for that reason (see commit `b1e28a70`'s test-file comment).
   The sibling file-level check (`:625`, the continuity history file) has no
   such auto-repair and its POSIX regression is directly tested.
-- **New test files created (in scope per the dispatch, not yet registered
-  in `harness/scripts/verify.mjs` — TP-3 protected, forbidden to edit by
-  the dispatch's own scope; named here as a follow-up for whoever next
-  touches that registry):** `scripts/worktree-create.test.mjs`,
-  `scripts/session-cleanup-owner-nonce.test.mjs`.
+- **New test files created** (in scope per the dispatch; TP-3 protected, so
+  the dispatch itself could not register them): `scripts/worktree-create.test.mjs`,
+  `scripts/session-cleanup-owner-nonce.test.mjs`. **Registered in
+  `harness/scripts/verify.mjs` 2026-08-18** via two PO-signed
+  human-guard-override ceremonies (ADR-0059), commits `93911e70` and
+  `51d483a7` — both suites now run as part of the standard Verify gate.
 - **Not yet done — explicit scope boundary, not an oversight:** production
   callers of the now win32-capable checks (e.g. `loadPersistedActivation`,
   `finalizeClaudeWorker`, the `pipeline-state.mjs` private-state helpers)

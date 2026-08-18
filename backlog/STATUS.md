@@ -119,6 +119,7 @@
 | pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | open | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | open | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | closed | defect | pipeline | 2026-08-12 | — |
@@ -275,6 +276,6 @@
 
 ## Counts
 
-- open: 85
+- open: 86
 - in_progress: 9
 - closed: 173

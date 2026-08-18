@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "54ed304d4f066c7ef84d3f14e9e7905877e372d09a2a96ac8d09214d8361e982"
+    "transitionHead": "cdb27105d765696c50e7fdbb88129543d259196a6b581bacb79ed48e75adfbbf"
   },
   "counts": {
-    "open": 85,
+    "open": 86,
     "in_progress": 9,
     "closed": 173
   },
@@ -1202,6 +1202,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Third measured instance of this class; the first two were on the push path."
+    },
+    {
+      "id": "pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "PO, 2026-08-18, live during two TP-3 human-guard-override ceremonies run this session (registering worktree-create-tests / session-cleanup-owner-nonce-tests in verify.mjs). The PO ran all four CLI steps (plan handed to the agent; prepare-authorization, emit-signature-digest, sign-intent, authorize-by-signature run by the PO) and objected explicitly: 'wiederspricht klar meinen design vorgaben nur so wenig PO gates wie wirklich nötig und nur der teil mit dem externen key ist der echte schutz'."
     },
     {
       "id": "pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw",
