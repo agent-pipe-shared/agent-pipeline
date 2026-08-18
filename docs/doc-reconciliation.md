@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 2eb52dd2de7b3aadc5979185d289dafa00408058 — 2026-08-18, range e5e3d7e4..2eb52dd2, template evidence-path-check fix (PHX-WP-EVIDENCE-PATH-CHECK) + backlog closure
+
+- ADR-0045: checked, no change needed.
+
+  The changed paths in this range (`PHX-WP-RPACK-STABLE-READ/dispatch-record.json`'s
+  finalize and `commit-msg.txt`) sit under the existing, already-enumerated
+  `specs/sprint-phoenix-epic/evidence/` location. No new root artifact, no
+  topology change. `templates/prompts/goldfish-task.md` itself is not a path
+  this ADR's `Governs:` line matches.
+
 ## Candidate e5e3d7e44e9dd3a078df605245a276a794a9351d — 2026-08-18, range a07ef670..e5e3d7e4, checkpoint 37: incident recovery, R3/B3 closure, a security-scan case-collision fix, 12 more backlog items disposed
 
 - ADR-0012: checked, no change needed.
