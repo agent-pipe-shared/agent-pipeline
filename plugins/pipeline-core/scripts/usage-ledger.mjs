@@ -32,7 +32,10 @@
  *     $ figure per model, from `--prices`) instead of the full table — meant to be
  *     pasted into the close-block ritual's `telemetry/costs.md` row (token half
  *     "collected", $ half always marked "estimated" — real session-$ is not
- *     machine-readable). Path-free and English-language.
+ *     machine-readable). Path-free and English-language. Also carries a turn-count
+ *     / tool-call-count breakdown per (model, actor) — see "Activity accounting"
+ *     below. Same discipline as the token half: no transcript content, no
+ *     absolute path, nothing written to disk — counts only, printed to stdout.
  *
  * Session scoping: `--session <uuid>` restricts aggregation to one session (incl.
  * its subagent transcripts, via the shared `sessionId` field — see schema notes
@@ -81,6 +84,30 @@
  *   - Malformed/unparseable lines are skipped, counted, and reported as a
  *     diagnostic — never treated as a hard error (transcripts are append-only
  *     logs from a live product, not a controlled fixture).
+ *
+ * Activity accounting (turn count / tool-call count, NVA-W4-02B):
+ *   - "actor" distinguishes the top-level session transcript ("main") from a
+ *     subagent transcript ("subagent:<basename>", basename taken only from the
+ *     file name — e.g. `agent-<uuid>` — never a path). Derived purely from a
+ *     file's location relative to the transcripts root (any path segment named
+ *     "subagents" marks it a subagent transcript), independent of record
+ *     content.
+ *   - "turn" = one distinct assistant message. Same identity the token half
+ *     already relies on (`message.id`, deduped — see the PROVEN duplication
+ *     fact above): every record sharing one `message.id` is one turn, counted
+ *     once, regardless of how many stream-update records repeat it. A record
+ *     with no `message.id` cannot be deduped and is counted as its own turn
+ *     (declared fallback, same convention as the token half).
+ *   - "tool call" = one distinct `tool_use` content block, identified by its
+ *     own `id` field (e.g. `toolu_...`), which the API never reuses — so
+ *     counting is done by scanning `message.content` on EVERY raw assistant
+ *     record (not only the deduped-last one) and keeping a set of block ids
+ *     per (project, session, model, actor). This is deliberately independent
+ *     of whether a duplicate stream-update record repeats the full content
+ *     array or only a delta — either way, a genuine tool-use block's id is
+ *     seen at least once and never double-counted. A `tool_use` block missing
+ *     an `id` (none observed so far, defensive only) cannot be deduped and is
+ *     counted individually, surfaced via a diagnostic in `--row` output.
  */
 import { readdirSync, statSync, createReadStream, readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
@@ -264,6 +291,17 @@ function deriveFromPath(filePath) {
   return { project, sessionId };
 }
 
+// Derives the "actor" label for a transcript file: "main" for the top-level
+// session file, "subagent:<basename>" for anything under a `subagents/`
+// directory (basename only, e.g. `agent-<uuid>` — never a path). See the
+// "Activity accounting" doc block above.
+function actorOf(filePath) {
+  const rel = path.relative(root, filePath);
+  const segments = rel.split(path.sep);
+  if (!segments.includes("subagents")) return "main";
+  return `subagent:${path.basename(filePath, ".jsonl")}`;
+}
+
 function emptyAgg() {
   return {
     messages: 0,
@@ -280,6 +318,10 @@ function emptyAgg() {
 
 const files = collectJsonlFiles(root);
 const rows = new Map(); // key: `${project}${KEY_SEP}${sessionId}${KEY_SEP}${model}` -> agg
+// key: `${project}${KEY_SEP}${sessionId}${KEY_SEP}${model}${KEY_SEP}${actor}` -> turn/tool-call agg
+// (see "Activity accounting" doc block above). Scoped identically to `rows`
+// (only records passing the active --session/--latest selection are added).
+const activity = new Map();
 let malformedLines = 0;
 let assistantRecords = 0; // raw assistant-usage records seen, BEFORE message.id dedup
 let unreadableFiles = 0;
@@ -317,8 +359,40 @@ function accumulate(project, sessionId, model, usageData, timestamp) {
   }
 }
 
+function emptyActivity() {
+  return {
+    turnIds: new Set(), // distinct message.id seen (a duplicate stream-update record adds nothing new)
+    idlessTurns: 0, // records with no message.id — can't be deduped, counted individually (declared fallback)
+    toolCallIds: new Set(), // distinct tool_use block id seen, across ALL raw records (not only the deduped-last one)
+    toolCallsUnidentified: 0, // tool_use blocks with no id — can't be deduped, counted individually (defensive)
+  };
+}
+
+// Records one raw assistant record's contribution to turn/tool-call counts.
+// Called once per raw record (unlike `accumulate`, which runs once per
+// deduped message.id) — see the "Activity accounting" doc block above for why
+// tool-call dedup does not depend on message-level dedup.
+function recordActivity(project, sessionId, model, actor, id, content) {
+  const key = `${project}${KEY_SEP}${sessionId}${KEY_SEP}${model}${KEY_SEP}${actor}`;
+  let agg = activity.get(key);
+  if (!agg) {
+    agg = emptyActivity();
+    activity.set(key, agg);
+  }
+  if (id) agg.turnIds.add(id);
+  else agg.idlessTurns++;
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (!block || block.type !== "tool_use") continue;
+      if (typeof block.id === "string" && block.id) agg.toolCallIds.add(block.id);
+      else agg.toolCallsUnidentified++;
+    }
+  }
+}
+
 for (const file of files) {
   const { project: pathProject, sessionId: pathSessionId } = deriveFromPath(file);
+  const fileActor = actorOf(file);
   let rl;
   try {
     rl = createInterface({ input: createReadStream(file, { encoding: "utf8" }), crlfDelay: Infinity });
@@ -326,7 +400,7 @@ for (const file of files) {
     unreadableFiles++;
     continue;
   }
-  const matchedSelection = await processLines(rl, pathProject, pathSessionId);
+  const matchedSelection = await processLines(rl, pathProject, pathSessionId, fileActor);
   if (sessionFilter && matchedSelection) filesConsumedForSelection++;
 }
 
@@ -337,7 +411,7 @@ for (const file of files) {
 // `message.id` cannot be deduped and are accumulated immediately, individually
 // (declared fallback). Returns whether this file contributed at least one
 // record matching `sessionFilter` (undefined/ignored when no filter is active).
-async function processLines(rl, pathProject, pathSessionId) {
+async function processLines(rl, pathProject, pathSessionId, fileActor) {
   const lastById = new Map(); // message.id -> latest {sessionId, model, usageData, timestamp} seen in this file
   let matchedSelection = false;
 
@@ -361,6 +435,8 @@ async function processLines(rl, pathProject, pathSessionId) {
     const id = message.id;
 
     const inSelection = !sessionFilter || sessionId === sessionFilter; // --session / --latest scoping
+
+    if (inSelection) recordActivity(pathProject, sessionId, model, fileActor, id, message.content);
 
     if (!id) {
       if (inSelection) idlessRecords++; // diagnostic scoped to the active selection, not the whole root
@@ -530,6 +606,28 @@ function estimateUsd(agg, rates) {
   );
 }
 
+// Aggregates the `activity` map (keyed per project/session/model/actor) down
+// to per-(model, actor) totals — same granularity drop as `groupByModel`
+// already applies to tokens (session identity is scoping-only, never shown).
+function summarizeActivity() {
+  const byModelActor = new Map(); // `${model}${KEY_SEP}${actor}` -> {model, actor, turns, toolCalls, toolCallsUnidentified}
+  for (const [key, agg] of activity.entries()) {
+    const parts = key.split(KEY_SEP);
+    const model = parts[2];
+    const actor = parts[3];
+    const groupKey = `${model}${KEY_SEP}${actor}`;
+    let entry = byModelActor.get(groupKey);
+    if (!entry) {
+      entry = { model, actor, turns: 0, toolCalls: 0, toolCallsUnidentified: 0 };
+      byModelActor.set(groupKey, entry);
+    }
+    entry.turns += agg.turnIds.size + agg.idlessTurns;
+    entry.toolCalls += agg.toolCallIds.size;
+    entry.toolCallsUnidentified += agg.toolCallsUnidentified;
+  }
+  return [...byModelActor.values()].sort((a, b) => b.turns - a.turns);
+}
+
 function renderRow() {
   const pricesPath = pricesPathArg || DEFAULT_PRICES_PATH;
   const prices = loadPrices(pricesPath);
@@ -585,6 +683,28 @@ function renderRow() {
   fragment.push(
     `Notes: $ values estimated, price table asOf ${prices.asOf ?? "n/a"} (${path.basename(pricesPath)}); cache TTL per model taken from the transcript (ephemeral_5m/1h) where present, otherwise 5m rate assumed (declared assumption${undeterminedTotal > 0 ? `, ${fmtDe(undeterminedTotal)} cache-write tokens without TTL data` : ""}).`,
   );
+
+  const activitySummary = summarizeActivity();
+  if (activitySummary.length > 0) {
+    let totalTurns = 0;
+    let totalToolCalls = 0;
+    let totalUnidentified = 0;
+    const activityLines = activitySummary.map((e) => {
+      totalTurns += e.turns;
+      totalToolCalls += e.toolCalls;
+      totalUnidentified += e.toolCallsUnidentified;
+      return `- ${e.model} / ${e.actor}: ${fmtDe(e.turns)} turn(s) / ${fmtDe(e.toolCalls)} tool call(s)`;
+    });
+    fragment.push("");
+    fragment.push("Turns / tool calls per `/usage` (collected, script):");
+    fragment.push(...activityLines);
+    fragment.push(
+      `TOTAL: ${fmtDe(totalTurns)} turn(s) / ${fmtDe(totalToolCalls)} tool call(s)` +
+        (totalUnidentified > 0
+          ? ` (+ ${fmtDe(totalUnidentified)} tool-use block(s) without an id, counted individually — dedup not possible)`
+          : ""),
+    );
+  }
 
   console.log(fragment.join("\n"));
   process.exit(0);
