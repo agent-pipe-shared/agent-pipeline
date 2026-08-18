@@ -7,7 +7,7 @@ status: "closed"
 created: 2026-08-06
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "PENDING"
+closure_commit: "df670de3dd491160cf8c003ecdf2ee12b9669818"
 closure_evidence: "guardrails/quality-gates.md#QG-11"
 source: "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
 due: 2026-09-06

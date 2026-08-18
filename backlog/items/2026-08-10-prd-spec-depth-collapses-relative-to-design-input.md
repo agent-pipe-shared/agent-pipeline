@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-10
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "PENDING"
+closure_commit: "9094e8c452246d2dd585a5139ae1349fd9144a10"
 closure_evidence: "plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md"
 source: "PO live observation during two greenfield kickoff test sessions on 2026-08-10 (Claude Code test project `Rune-Test1-Claude-054-44`, and two Codex rollout sessions under `~/.codex/sessions/2026/08/10/`, both still in progress at the time this item was filed). The PO states this is not new: the same pattern has been visible across roughly the last 10 kickoff/planning tests and, separately, across effectively all Pipeline GitHub Issues to date (bound PRD/Spec consistently thinner than the Issue that originated the same scope of work)."
 ---
