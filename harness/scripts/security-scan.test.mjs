@@ -581,8 +581,9 @@ process.exit(0);
       return { status: 0, stdout: "", stderr: "" };
     },
   });
+  const gitleaksConfigPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".gitleaks.toml");
   assertEqual("gitleaks run: candidate tree uses its verified physical root", invocation.args, [
-    "detect", "--source", rootDir, "--no-git", "--report-format", "json",
+    "detect", "--source", rootDir, "--no-git", "--config", gitleaksConfigPath, "--report-format", "json",
     "--report-path", invocation.args[invocation.args.indexOf("--report-path") + 1], "--no-banner", "--exit-code", "0",
   ]);
   assertEqual("gitleaks run: candidate tree source resolves from candidate cwd", invocation.opts.cwd, rootDir);
