@@ -3,7 +3,21 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-18 (checkpoint 32)
+**Last updated:** 2026-08-18 (checkpoint 33)
+
+---
+
+## CHECKPOINT — 2026-08-18 (33): exact post-fix push sequence recorded — 5 steps, not just "Verify green" (READ THIS FIRST)
+
+**PO asked, after being told a plugin-authoring session would fix OT09/TP-7 and produce a new local candidate here: "danach fehlt nur der full verify und dann können wir pushen richtig?"** Answer given and persisted here so it isn't re-derived or oversimplified next session: Verify green is necessary but not sufficient. The full sequence once a new candidate lands (whether from the OT09 fix or any other future commit):
+
+1. **Full Verify** — re-run fresh in the detached worktree (`.git/phx-verify`, `git checkout <candidate>` first, confirm clean via `git status --porcelain --untracked-files=all`), confirm 383/383 (or the actual current suite count). Don't trust a prior run at an older commit.
+2. **Layer 1b** — `docs/doc-reconciliation.md` needs a new `## Candidate <full-40-hex-sha>` entry for the new HEAD, reconciling all 4 currently-implicated ADRs (ADR-0012, ADR-0045, ADR-0056, ADR-0058) per `check-doc-reconciliation.mjs`'s rules (see that file's own header for the write-order rule: the record commits AFTER the candidate it names, so the push range carries one extra commit touching only this file). This has been required after every single commit so far this session, including docs-only ones.
+3. **Recompute `--subject-sha256`** — via `node scratch/compute-push-subject-sha256.mjs <worktree-or-repo-root>` (gitignored, still on disk) against the actual final candidate. The value goes stale the instant any further commit lands (steps 2 and 3 can chain: reconciling moves HEAD, which can require re-reconciling — bounded, stops once a commit only touches `docs/doc-reconciliation.md` itself).
+4. **Layer 2/3 signing — the PO's own separate, independent condition.** Not removed by Verify going green. Requires the PO physically present at their machine with the private key in `~/agent-pipeline-po-nova` (never in this repo/session), running `po-approval-gate.mjs prepare-critical` then `po-human-approval.mjs approve-critical` themselves — confirmed agent-blocked by the harness classifier itself, not just by policy.
+5. **Layer 4/5** — agent work once the PO's proof files exist: `pipeline-state.mjs approve-push` (consumes the proof), then `git push origin sprint_phoenix:refs/heads/sprint_phoenix` (full refspec).
+
+**Next steps:** wait for (a) the plugin-authoring session's OT09/TP-7 fix to land and sync into this checkout, and (b) the PO to be physically home. Neither has happened yet. When (a) lands, run steps 1-3 here before asking the PO to do step 4.
 
 ---
 
