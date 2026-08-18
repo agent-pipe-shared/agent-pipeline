@@ -20,7 +20,7 @@ GG-03` ritual is unaffected by this port (that layer's own design question is
 still tracked in
 `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`
 candidates #2-#4 and this port's own forbidden-scope note) — see
-[ADR-0064](adr/0064-port-authorize-critical-ceremony.md).
+[ADR-0065](adr/0065-port-authorize-critical-ceremony.md).
 
 ## The five layers, in order
 
@@ -73,7 +73,7 @@ given carefully.
 > to the same in-memory request. `authorize-critical` (ported from
 > origin/main's [ADR-0061](adr/0061-uniform-human-approval-ceremony.md); this
 > repo's own port is recorded in
-> [ADR-0064](adr/0064-port-authorize-critical-ceremony.md)) closes that gap by
+> [ADR-0065](adr/0065-port-authorize-critical-ceremony.md)) closes that gap by
 > construction: it builds the request and signs *that exact object* inside one
 > invocation, so nothing already sitting on disk can ever be the thing that
 > gets signed. `prepare-critical`/`approve-critical` still exist in
