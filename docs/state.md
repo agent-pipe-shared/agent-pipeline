@@ -3,7 +3,27 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-18 (checkpoint 37)
+**Last updated:** 2026-08-18 (checkpoint 38)
+
+---
+
+## CHECKPOINT — 2026-08-18 (38): answered the PO's direct OT09 question with a fresh live re-test, root-caused it to a Phoenix-local commit, and empirically proved TP-7 has no override route from this checkout at all (READ THIS FIRST)
+
+**PO question this stretch (verbatim):** "OT09 sollte mit der neuen Pipeline Version gehen oder?" — treated as a genuine question requiring fresh evidence, not a recalled answer from earlier in the session.
+
+**1. Re-ran OT09 live, does not depend on stale notes.** `plugins/pipeline-core/hooks/guard-testpath-override.test.mjs` (around lines 206-214) still fails against the currently loaded plugin runtime (`0.5.3`, `status: "plugin-refresh-required"` per `pipeline-start-preflight.mjs` — distinct from the newer installed marketplace version `0.6.0+claude.20260818162535.96cf805`, which has not synced into this checkout and does not by itself change an already-loaded session's runtime hooks without an actual restart).
+
+**2. Root cause identified, not just the symptom.** The test's stale assertion checks `/gates\?\.push_approval/u` directly, but Phoenix-local commit `c6bd3a6b` generalized that single hardcoded lookup into `GATE_APPROVAL_MODE_KEYS` (a `kind → pipeline.user.yaml gates.* key` table, `{ push: "push_approval", "feature-package-reconcile": "reconcile_approval" }`) in `plugins/pipeline-core/lib/critical-human-proof-policy.mjs`. The refactor never updated its own test's regex, so OT09 fails against genuinely-newer, correct code — not a regression in the fix, a stale assertion in the test.
+
+**3. Confirmed empirically, not just read, that this cannot be fixed from this checkout.** Attempted a live `Edit` to the test file (updating the stale regex to check for `GATE_APPROVAL_MODE_KEYS`/`push:\s*"push_approval"` instead). The guard refused it outright: `status=author-repair-required` — TP-7 (`project/guard-config.json:33-37`) classifies this file as "Pipeline plugin source," and its override planner offers no PO-signable ceremony at all for that classification (unlike TP-3/TP-5, which do admit an external-operator Ed25519 HGO route). The fix must land in the separate plugin-authoring repository, not here, under any circumstance — no signature, however obtained, changes this from inside a consumer-project checkout.
+
+**4. New risk surfaced, not previously stated this plainly:** `reconcile_approval`/`GATE_APPROVAL_MODE_KEYS` may exist ONLY in Phoenix's local fork of `critical-human-proof-policy.mjs` (commit `c6bd3a6b` is Phoenix-local). If the upstream plugin-authoring repo does not carry the same generalization, a future marketplace refresh risks silently reverting this file to the single-key form — worth checking from the authoring side when OT09's real fix is made there, not just patching the test in isolation.
+
+**Answer given to the PO (already delivered in-session, recorded here for the durable record):** No — OT09 does not yet pass with the newer Pipeline version load; it still fails, for a stale-test reason (not a functional regression), and the fix is out of reach from this checkout (author-repair-required, TP-7, no override route). Needs a session against the plugin-authoring repo.
+
+**Nothing else changed this stretch.** No commits landed (this checkpoint entry is the only write); git status unchanged from checkpoint 37's baseline (`plugins/pipeline-core/scripts/dispatch-record.json`, `project/pipeline-state.json` modified per the standing 3-file local-state exception, plus untracked `.claude/tmp/`/`.pipeline/`). No push attempted or possible — both external blockers (OT09/TP-7 author-side fix; PO physical presence for Layer 2/3 push signing and `feature-package-reconcile`) remain exactly as in checkpoint 37.
+
+**Next steps:** unchanged from checkpoint 37 items (1)-(3) — OT09/TP-7 still needs the plugin-authoring-repo session; ~28 `leave-open-needs-work` backlog items from the checkpoint-37 Workflow triage remain available if more unattended backlog time is wanted; the two PO-only signing ceremonies are still pending.
 
 ---
 
