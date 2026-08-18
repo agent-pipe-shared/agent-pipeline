@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Elephant pre-Critic-dispatch check on PHX-WP-AAC04 (commit 78006b4), 2026-08-09."
 due: 2026-09-08
@@ -63,3 +63,16 @@ two commands with `--test-reporter=tap
 --test-reporter-destination=<claimed path>`, producing the real artifacts at
 the exact cited paths before the Critic dispatch that needed them as
 evidence. The template gap above remains open.
+
+## Triage — closed 2026-08-18
+
+- **Decision:** Accept and fix, as recommended.
+- **Assignment:** `PHX-WP-EVIDENCE-PATH-CHECK` (goldfish-mechanic), commit
+  `de7cf0d4`. Added to `templates/prompts/goldfish-task.md`'s "Final report"
+  section: "Before writing the final report, confirm every evidence-artifact
+  path you are about to cite actually resolves on disk (e.g. `ls`/`stat`/
+  Read) — a claimed path that does not resolve is a stop condition (field
+  5), not a detail to fix in prose." Independently re-verified: `node
+  harness/scripts/check-doc-contracts.mjs` exits 0 (664 files, 964 links, 13
+  anchors); diff matches the proposal exactly, single sentence, no
+  restructuring.
