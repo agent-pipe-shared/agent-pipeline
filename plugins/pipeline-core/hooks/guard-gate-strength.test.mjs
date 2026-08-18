@@ -630,6 +630,33 @@ try {
     assert.ok(!block.includes(root), "the reason leaked the repository root");
   });
 
+  check("GST31 every path-table rule stands down, in both lanes, when no governance marker is present", () => {
+    // Mirrors GST17's shape but on the opposite fixture: none of the five governance
+    // markers (pipeline.user.yaml, project/pipeline.yaml, .claude/pipeline.yaml,
+    // project/guard-config.json, .claude/guard-config.json) exist here, so the
+    // governed-check at guard-gate-strength.mjs:210-218 (and its shell-lane sibling at
+    // guard-lifecycle-ready.mjs:893-900) must exit 0 for every GS-1..GS-5/GS-7/GS-8
+    // rule in the table -- the stand-down is the specified behaviour
+    // (backlog/items/2026-08-07-no-test-pins-the-ungoverned-path-rule-stand-down.md),
+    // so this pins it rather than challenging it. GS-6 is not in GATE_STRENGTH_PATHS
+    // (it is checked before, and independently of, the marker gate) and is out of
+    // scope here.
+    const base = mkdtempSync(join(tmpdir(), "gate-strength-ungoverned-"));
+    roots.push(base);
+    writeFileSync(join(base, "README.md"), "# unrelated project\n");
+    for (const rule of GATE_STRENGTH_PATHS) {
+      const write = spawnSync(process.execPath, [GUARD], {
+        input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: rule.path }, cwd: base }),
+        encoding: "utf8",
+        cwd: base,
+        env: { ...process.env, CLAUDE_PROJECT_DIR: base },
+      });
+      assert.equal(write.status, 0, `write lane refuses ${rule.path} without any governance marker present`);
+      assert.doesNotMatch(shell(base, `touch ${rule.path}`).stderr, /GUARD-GATE-STRENGTH-SHELL/u,
+        `shell lane refuses ${rule.path} without any governance marker present`);
+    }
+  });
+
   console.log(`\nguard-gate-strength: ${passed} passed, ${failed} failed`);
 } finally {
   for (const entry of roots) rmSync(entry, { recursive: true, force: true });
