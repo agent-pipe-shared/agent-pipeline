@@ -391,10 +391,28 @@ check("ADR-0059 Decision 4: the continuation names the configured mode's own fin
       // signing, i.e. between prepare-authorization and authorize-by-signature.
       assert.match(reason, /emit-signature-digest --repo/u,
         "signature mode must offer the digest-emission step before signing");
+      // PO decision 2026-08-18 #12 (backlog/items/2026-08-18-hgo-signature-ceremony-
+      // requires-more-human-steps-than-the-key-actually-needs.md): prepare-authorization
+      // and emit-signature-digest are pure local digest computation (ADR-0059 Decision 1)
+      // and now run agentically, in-session; only authorize-by-signature still needs the
+      // external Ed25519 key and is labelled "outside this session". An inserted mode-
+      // change label line now sits between emit-signature-digest and authorize-by-signature,
+      // so the adjacency check allows one extra labelled line there while still pinning the
+      // overall order and the in-session/outside-this-session split.
       assert.match(
         reason,
-        /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+        /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n(?:[^\n]*\n)?[^\n]*authorize-by-signature --repo/u,
         "emit-signature-digest must sit between prepare-authorization and authorize-by-signature",
+      );
+      assert.match(
+        reason,
+        /Then, in this session[^\n]*\n[^\n]*prepare-authorization --repo/u,
+        "prepare-authorization must be labelled as running in this session",
+      );
+      assert.match(
+        reason,
+        /Then, outside this session[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+        "authorize-by-signature must be labelled as running outside this session",
       );
       assert.match(reason, /\bauthorize-by-signature --repo\b[^\n]*--proof <external-proof\.json>/u,
         "signature mode must offer its own decisive final step");
