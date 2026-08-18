@@ -67,6 +67,16 @@ import {
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
 import { createPoApprovalIntent, PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
+// TPSHELL-*: the shell lane of the test-path authority gate. Imported from the library the
+// guard defers to, for the same reason AC-10 states above -- and because the write lane
+// (guard-testpath.mjs) reads the identical exports, which is the property TPSHELL-5 pins.
+import {
+  loadProtectedTestPathRules,
+  protectedTestPathBasenameNeedles,
+  protectedTestPathShellHit,
+  resolveGuardConfigPath,
+  TESTPATH_SHELL_DENIAL_CODE,
+} from "../lib/protected-test-paths.mjs";
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
@@ -4216,5 +4226,235 @@ test("NVA-BL-76: a real signed capability reaches the read-scope denial end to e
   } finally {
     rmSync(projectDir, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------------
+// TPSHELL-* (backlog: 2026-08-08-an-authority-gate-is-bypassable-by-choosing-a-different-
+// write-tool.md). guard-testpath.mjs is wired for Edit|Write|NotebookEdit only, so a Bash
+// or PowerShell write to a TP-protected path passed unclaimed -- measured, not inferred: a
+// briefed dispatch hit TP-5, could not clear it, wrote the same bytes through Bash/Node
+// `fs`, and reported it as a deviation. guardrails/global.md GL-09 calls this gate
+// authority-bearing, so its coverage must not depend on tool choice. The rule now travels
+// the shell lane out of the same definition, here, beside GUARD-GATE-STRENGTH-SHELL.
+// ---------------------------------------------------------------------------------
+const TPSHELL_TARGET = "plugins/pipeline-core/hooks/guard-push.test.mjs";
+const TPSHELL_RULES = [
+  {
+    id: "TP-1",
+    pattern: "plugins/pipeline-core/hooks/guard-git\\.test\\.mjs$",
+    reason: "guard-git test suite gates the git-guard union.",
+  },
+  {
+    id: "TP-5",
+    pattern: "(?:plugins/pipeline-core/hooks/guard-push(?:-v2)?|harness/scripts/pipeline-state)\\.test\\.mjs$",
+    reason: "guard-push test suite gates the release/deploy push-enforcement hook.",
+  },
+];
+
+/** A governed, READY fixture whose guard-config sits wherever the resolver actually looks. */
+function tpShellFixture(protectedTestPaths = TPSHELL_RULES, { base = null } = {}) {
+  const path = base ?? mkdtempSync(join(tmpdir(), "guard-lifecycle-tpshell-"));
+  if (base === null) writeFileSync(join(path, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const configPath = resolveGuardConfigPath(path);
+  mkdirSync(dirname(configPath), { recursive: true });
+  writeFileSync(configPath, JSON.stringify({ protectedTestPaths }, null, 2));
+  return path;
+}
+
+const TPSHELL_READY = { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+function tpShellRun(path, command, toolName = "Bash") {
+  return evaluateLifecycleReadyGuard(
+    { tool_name: toolName, tool_input: { command } },
+    { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } },
+  );
+}
+
+/**
+ * TPSHELL-1. Both directions in one test, for the reason GSSHELL-STAGE-1 states one
+ * function up: a refusal-only test would pass just as happily on a rule that had started
+ * refusing `node --test <suite>` too -- and unlike the gate-strength paths, these files
+ * EXIST to be run, so an over-refusal here would break the very verification the guard's
+ * own header prescribes. The fixture is READY, so every admission below is a real exit 0
+ * rather than a different guard's refusal standing in for one.
+ */
+test("TPSHELL-1: a shell write to a protected test path is refused, while reading and running it stay admitted", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      // the exact shape the reported bypass used
+      `node -e "require('fs').writeFileSync('${TPSHELL_TARGET}','x')"`,
+      // …and the same idea with the path assembled from a literal basename
+      `node -e "writeFileSync(join(dir,'guard-push.test.mjs'),'x')"`,
+      `python3 -c "open('${TPSHELL_TARGET}','w').write('x')"`,
+      `printf x > ${TPSHELL_TARGET}`,
+      `printf x >> ${TPSHELL_TARGET}`,
+      `cp scratch/fake.mjs ${TPSHELL_TARGET}`,
+      `mv scratch/fake.mjs ${TPSHELL_TARGET}`,
+      `rm ${TPSHELL_TARGET}`,
+      `truncate -s 0 ${TPSHELL_TARGET}`,
+      `tee ${TPSHELL_TARGET}`,
+      `sed -i s/a/b/ ${TPSHELL_TARGET}`,
+      `git checkout HEAD -- ${TPSHELL_TARGET}`,
+      `git apply ${TPSHELL_TARGET}`,
+      // a second configured rule, and its non-plugin sibling path
+      "rm plugins/pipeline-core/hooks/guard-git.test.mjs",
+      "rm harness/scripts/pipeline-state.test.mjs",
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted a shell write: ${command}`);
+      assert.match(result.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+    for (const command of [
+      `node --test ${TPSHELL_TARGET}`,
+      `node ${TPSHELL_TARGET}`,
+      `cat ${TPSHELL_TARGET}`,
+      `rg -n describe ${TPSHELL_TARGET}`,
+      `git add ${TPSHELL_TARGET}`,
+      `git diff ${TPSHELL_TARGET}`,
+      `git log ${TPSHELL_TARGET}`,
+      // a differently-named neighbour that merely carries the protected name as a prefix
+      `rm ${TPSHELL_TARGET}.bak`,
+      // an unprotected suite, written freely
+      "cp a.mjs src/other.test.mjs",
+    ]) {
+      const result = tpShellRun(path, command);
+      assert.equal(result.exitCode, 0, `refused a read/run/unrelated command: ${command} -- ${result.stderr}`);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * TPSHELL-2. The lane is config-driven exactly like the write lane: a project that
+ * protects nothing gets nothing new refused. Without this, TPSHELL-1 could be green on a
+ * rule that refused those commands unconditionally.
+ */
+test("TPSHELL-2: with no protectedTestPaths configured the shell lane claims nothing", () => {
+  const path = tpShellFixture([]);
+  try {
+    for (const command of [
+      `node -e "require('fs').writeFileSync('${TPSHELL_TARGET}','x')"`,
+      `cp scratch/fake.mjs ${TPSHELL_TARGET}`,
+      `rm ${TPSHELL_TARGET}`,
+    ]) {
+      assert.doesNotMatch(tpShellRun(path, command).stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * TPSHELL-3. PowerShell is wired into the SAME PreToolUse matcher as Bash and returns
+ * early from every POSIX check below the gate-strength lane -- the exact asymmetry that
+ * left `Set-Content project/guard-config.json` unclaimed for the sibling gate. The
+ * test-path lane runs before that early return, so it covers both shells.
+ */
+test("TPSHELL-3: a PowerShell write cmdlet naming a protected test path is refused, Get-Content is not", () => {
+  const path = tpShellFixture();
+  try {
+    for (const command of [
+      `Set-Content ${TPSHELL_TARGET} "x"`,
+      `Add-Content ${TPSHELL_TARGET} "x"`,
+      `Remove-Item ${TPSHELL_TARGET}`,
+      `Copy-Item other.mjs ${TPSHELL_TARGET}`,
+    ]) {
+      const result = tpShellRun(path, command, "PowerShell");
+      assert.equal(result.exitCode, 2, `admitted a PowerShell write: ${command}`);
+      assert.match(result.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), command);
+    }
+    assert.equal(tpShellRun(path, `Get-Content ${TPSHELL_TARGET}`, "PowerShell").exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * TPSHELL-4. The half that decides whether this closes the gap or relocates it. The
+ * reported bypass happened because the SANCTIONED route was closed before the unsanctioned
+ * one was taken, so a refusal with no lift would reproduce the same outcome one layer over.
+ * Per the item's own triage (PO, 2026-08-11: "human override muss möglich sein per Signatur
+ * oder Chat je Config") this refusal carries the same audited chat-or-signature ceremony the
+ * write lane already offers -- not a new mechanism. Both modes are armed for real here, and
+ * the capability's single use is checked, because an override that stayed armed would be a
+ * standing hole rather than one audited action.
+ */
+test("TPSHELL-4: the shell-lane refusal is liftable by a real chat- and signature-armed capability, once", () => {
+  for (const mode of ["chat", "signature"]) {
+    const path = tpShellFixture(TPSHELL_RULES, { base: hgoGitFixture(mode) });
+    try {
+      const command = `cp scratch/fake.mjs ${TPSHELL_TARGET}`;
+      const first = tpShellRun(path, command);
+      assert.equal(first.exitCode, 2, `precondition (${mode}): the shell lane must refuse first`);
+      assert.match(first.stderr, new RegExp(TESTPATH_SHELL_DENIAL_CODE, "u"), mode);
+      // ADR-0059 Decision 4: the denial names the CURRENTLY CONFIGURED mode's next command.
+      if (mode === "chat") {
+        assert.match(first.stderr, /guard-human-override\.mjs" authorize --repo/u, "chat denial must name its own activate step");
+        assert.doesNotMatch(first.stderr, /authorize-by-signature/u, "chat denial must not name signature's step");
+      } else {
+        assert.match(first.stderr, /authorize-by-signature/u, "signature denial must name the signed step");
+        assert.doesNotMatch(first.stderr, /--activate/u, "signature denial must not offer in-session activation");
+      }
+
+      const denials = [{
+        guard: "guard-lifecycle-ready.mjs",
+        reason: `${TESTPATH_SHELL_DENIAL_CODE}: TP-5: ${TPSHELL_RULES[1].reason}`,
+      }];
+      if (mode === "chat") hgoArmByChat(path, { command }, denials);
+      else hgoArmBySignature(path, { command }, denials);
+
+      const admitted = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return TPSHELL_READY; },
+      });
+      assert.equal(admitted.exitCode, 0, `${mode}-armed capability did not admit the exact command: ${admitted.stderr}`);
+      assert.match(
+        admitted.stderr,
+        new RegExp(`\\[pipeline-human-override\\] guard-lifecycle-ready ${TESTPATH_SHELL_DENIAL_CODE}: exact one-time capability consumed`, "u"),
+        mode,
+      );
+      assert.equal(tpShellRun(path, command).exitCode, 2, `the ${mode} capability was reusable`);
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  }
+});
+
+/**
+ * TPSHELL-5. One definition, two lanes. If the shell lane ever grew its own copy of the
+ * rule list, the two lanes could silently disagree about which paths are protected -- the
+ * failure this whole item is about, rebuilt inside the fix. Asserted against THIS
+ * repository's real committed guard-config rather than a fixture, so a rule added there and
+ * not reachable from the shell lane fails here.
+ */
+test("TPSHELL-5: the shell lane and the write lane resolve the same rules from the same committed config", () => {
+  const repoRoot = fileURLToPath(new URL("../../../", import.meta.url));
+  const { rules } = loadProtectedTestPathRules({ rootDir: repoRoot });
+  assert.ok(rules.length > 0, "this repository must have protectedTestPaths configured for this test to mean anything");
+  for (const rule of rules) {
+    assert.ok(typeof rule.id === "string" && rule.id !== "", "every rule carries an id the denial can name");
+  }
+  // Every configured rule is reachable from the shell lane through at least one write shape.
+  const guardGit = rules.find((rule) => rule.re.test("plugins/pipeline-core/hooks/guard-git.test.mjs"));
+  assert.ok(guardGit, "TP-1 must be resolvable from the shared loader");
+  const hit = protectedTestPathShellHit({
+    command: "rm plugins/pipeline-core/hooks/guard-git.test.mjs",
+    rules,
+    root: repoRoot,
+  });
+  assert.equal(hit?.rule.id, guardGit.id);
+});
+
+/**
+ * TPSHELL-6. The narrower literal-basename lane exists so opaque interpreter code that
+ * assembles a path (`join(dir, "guard-push.test.mjs")`) is still caught. It derives its
+ * needles FROM the configured patterns, so it cannot drift -- but a derivation that
+ * silently produced nothing would leave that lane inert while every other assertion above
+ * stayed green, which is exactly how the first version of it behaved.
+ */
+test("TPSHELL-6: literal basenames are derived from the configured patterns, alternation included", () => {
+  const { rules } = loadProtectedTestPathRules({
+    rootDir: fileURLToPath(new URL("../../../", import.meta.url)),
+  });
+  const needles = protectedTestPathBasenameNeedles(rules).map((entry) => entry.needle);
+  assert.ok(needles.includes("guard-git.test.mjs"), `plain pattern yielded no needle: ${needles.join(", ")}`);
+  // TP-5 is an alternation with a nested optional group -- and it guards the very file the
+  // reported bypass wrote to, so "too clever to reduce" is not an acceptable outcome here.
+  for (const needle of ["guard-push.test.mjs", "guard-push-v2.test.mjs", "pipeline-state.test.mjs"]) {
+    assert.ok(needles.includes(needle), `alternation pattern yielded no needle for ${needle}: ${needles.join(", ")}`);
   }
 });

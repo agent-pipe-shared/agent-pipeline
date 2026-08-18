@@ -224,9 +224,9 @@ const NEEDLE_EXPANSION_CAP = 32;
  * anything richer simply stops expanding and contributes no needle rather than sending this
  * function looking for a general regex engine.
  *
- * Without this, TP-5 -- `(?:…guard-push(?:-v2)?|harness/scripts/pipeline-state)\.test\.mjs$`,
- * the rule guarding the very file the reported bypass wrote to -- reduced to a segment full
- * of metacharacters and yielded nothing.
+ * Without this, a rule written as an alternation of two directories with a nested optional
+ * group -- the shape guarding the very suite the reported bypass wrote to -- reduced to a
+ * segment full of metacharacters and yielded nothing.
  */
 function expandPatternAlternatives(body) {
   let alternatives = [body];
