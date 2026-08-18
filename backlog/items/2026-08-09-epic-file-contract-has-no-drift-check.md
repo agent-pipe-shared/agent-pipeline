@@ -79,9 +79,9 @@ the PO has already dispositioned in the other direction (accept the drift as
 practice, not as something this item silently repairs by rewriting the
 inventory).
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** ACCEPTED for implementation as an ordinary bounded dispatch. Confirmed still live: no mechanical check anywhere in `harness/scripts/` (Phoenix) or its Nova sibling validates an Epic's declared file inventory (`specs/sprint-phoenix-epic/spec.md` §7) against the tracked tree.
+- **Rationale:** The Proposal is already narrowly scoped and technically unambiguous — verify every path the inventory names exists; report (do not fail) on tracked files under the inventory's covered roots that it does not name. The one question needing a PO judgment call (whether to edit §7 itself to add missing entries) is explicitly out of scope and already dispositioned separately. What remains is a standard new-check-plus-registration task, same shape as the sprint's other drift checks.
+- **Assignment (if accepted):** A Goldfish dispatch to add `harness/scripts/check-epic-file-contract.mjs`, with its own `.test.mjs`, registered in `harness/scripts/verify.mjs`'s `TEST_SUITES` list (TP-3-protected, needs the standard override handling).
+- **Date:** 2026-08-18

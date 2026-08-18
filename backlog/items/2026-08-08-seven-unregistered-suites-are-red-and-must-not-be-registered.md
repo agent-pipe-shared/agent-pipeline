@@ -160,9 +160,9 @@ to exactly that one remaining, mechanical, already-scoped step.
    gate in the commit that makes it green, never before, and never as part of a
    batch that would let one red hide inside a larger change.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** still_open_dispatch_ready — not closing. Independently re-verified 2026-08-18: all five suites currently pass standalone (`harness/lib/plan-spec-state-v2.test.mjs` 8/8, `harness/scripts/recovery-bridge-approval.test.mjs` 1/1, `plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs` 1/1, `plugins/pipeline-core/scripts/afk-activation.test.mjs` 13/13 — live-run confirmed, `plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs` 4/4), matching this item's own 2026-08-18 Proposal update and the `EXCLUSIONS` entries in `harness/scripts/check-verify-suite-registration.mjs:203-227` (each carries a "GREEN, not red" reason naming its repair commit — except `afk-activation.test.mjs`'s entry at line 218-222, which is stale text still reading "red (R1.2)").
+- **Rationale:** Repair work is done; the only remaining step is registering the five entries in `harness/scripts/verify.mjs`, which is mechanical and needs no PO judgment call — it is blocked purely on TP-3's protected-test-path gate requiring a signed GMW window, the standard prerequisite for any edit to this file.
+- **Assignment (if accepted):** Goldfish, dispatched once a TP-3-scoped GMW window is signed and open; the dispatch should also correct the stale "red" reason text for `afk-activation.test.mjs` in `check-verify-suite-registration.mjs` while it edits the same file's exclusion list.
+- **Date:** 2026-08-18

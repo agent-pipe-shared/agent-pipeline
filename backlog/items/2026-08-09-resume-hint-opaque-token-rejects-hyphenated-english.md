@@ -88,9 +88,9 @@ Two separable proposals, deliberately not one fix:
    `[0-9a-f]{16,}` or `ghp_`/`sk-` prefixes) through unflagged. This item
    files the defect and its evidence; it does not propose a replacement rule.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage — 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** still_open_dispatch_ready. Verified at source: `plugins/pipeline-core/lib/resume-hint.mjs:31-63` is unchanged — `opaqueToken()`, the single undifferentiated `RH-SCHEMA` code, and `buildResumeHint`'s bare `throw new Error(checked.code)` all still reproduce exactly as described. Nova has solved this item's "diagnostic half" only: `opaqueToken()` there is byte-for-byte identical (the false-positive detector is untouched, matching this item's own "do not propose a relaxation without evidence" stance), but `resumeHintContextDetail()` and an updated `buildResumeHint` now turn a bare `RH-SCHEMA` into `RH-SCHEMA: <field> must be ... free of secrets and opaque tokens`, naming the offending field.
+- **Rationale:** The diagnostic half is a low-risk, already-designed fix (Nova's `resumeHintContextDetail` pattern) that can be ported/adapted into Phoenix via an ordinary dispatch with no PO judgment call. The detector half (the actual false-positive heuristic) remains correctly unfixed everywhere and should stay filed exactly as the item's Proposal #2 already prescribes.
+- **Assignment (if accepted):** Goldfish, scoped ONLY to porting the diagnostic-half fix (name the failing field, following Nova's `resumeHintContextDetail` shape) into Phoenix's `resume-hint.mjs`; do not touch `opaqueToken()`'s detection logic in the same dispatch.
+- **Date:** 2026-08-18
