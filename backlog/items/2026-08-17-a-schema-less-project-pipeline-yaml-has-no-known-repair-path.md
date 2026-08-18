@@ -143,3 +143,14 @@ be investigation, not implementation:
   then locate the actual generator if still reproducible on current
   source.
 - **Date:** 2026-08-17
+
+### 0.6.0 release-bar confirmation (2026-08-18)
+
+Re-checked during the Nova 0.6.0 release triage sweep: the decision above is
+already specific and bounded (version-staleness check first, then generator
+location, then consider a self-healing `loadManifest()` repair) and names no
+future sprint, so per the release bar it stays a same-release dispatch
+target rather than a close or a sprint deferral. Not attempted here — the
+investigation needs either an out-of-session artifact (the D:\Dev\HA
+marketplace pin) or code changes to `manifest.mjs`/`project-onboarding-v3.mjs`
+that need test coverage to trust. No change to the recorded decision.

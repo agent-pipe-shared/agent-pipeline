@@ -118,3 +118,19 @@ already adopted.
   eligible. Directions 2 (granularity) and 3 (entry ownership) follow once
   the eligible-CLI set is established.
 - **Date:** 2026-08-11
+
+### 0.6.0 release-bar confirmation (2026-08-18)
+
+Re-checked during the Nova 0.6.0 release triage sweep: the 2026-08-11
+decision is already specific and bounded but names no sprint and no
+dispatch owner, so per the release bar it stays a same-release dispatch
+target. Scope for that dispatch, unchanged from the existing Direction:
+(a) enumerate the onboarding/push Pipeline CLIs proposed as allowlist
+candidates and confirm each guard admits a closed, positional argv set,
+refusing everything else; (b) for verified CLIs only, add narrowly-scoped
+settings allowlist entries (shipped with the plugin, not silently written
+to an operator's local settings) plus a regression test proving refusal
+still holds outside the closed argv set; (c) drop any candidate whose
+guard does not admit a closed set rather than loosen the allowlist to fit
+it. Touches permission/settings surface and needs test verification, so
+not attempted here.

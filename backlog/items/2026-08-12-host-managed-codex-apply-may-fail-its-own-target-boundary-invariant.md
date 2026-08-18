@@ -80,3 +80,13 @@ intentional and harmless.
   same way `projectedTargets` is filtered) or explain in code why the two
   must differ. Not fixed in this triage pass (docs/backlog-only).
 - **Date:** 2026-08-17
+
+### 0.6.0 release-bar confirmation (2026-08-18)
+
+Re-checked during the Nova 0.6.0 release triage sweep: the 2026-08-17
+decision above is already a confirmed, specific, bounded defect with a fix
+direction and dispatch owner, and is deliberately not sprint-deferred given
+its severity. It therefore stays a same-release dispatch target. Not
+attempted here — it is transaction-integrity code (`validateTargetBoundary()`
+/ `prepare()`) that needs a regression test proving both the fixed
+host-managed-Codex branch and the unfiltered branch stay correct.

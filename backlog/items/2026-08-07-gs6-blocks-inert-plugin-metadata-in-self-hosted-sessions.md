@@ -99,3 +99,17 @@ denials — only for `guard-testpath.mjs`/Codex-adapter denials).
   candidate #3, since both describe the same shape of gap (guard drawn at a
   directory boundary, not at what needs protecting) on overlapping code.
 - **Date:** 2026-08-07
+
+### 0.6.0 release-bar confirmation (2026-08-18)
+
+Re-checked during the Nova 0.6.0 release triage sweep: the 2026-08-07
+decision above is already specific and bounded (split GS-6's scope; route
+inert `plugin.json` version edits through the existing
+`pipeline-author-repair` flow; keep guard-reading code override-free) with a
+dispatch assignment already named (goldfish-deep + T1 Critic, bundled with
+the related push-release-flow item's candidate #3). It names no sprint, so
+per the release bar it stays a same-release dispatch target rather than a
+close. Not attempted here — it is guard-wiring code (`guard-gate-strength.mjs`,
+`human-guard-override.mjs`) that this session's read-only scope does not
+authorize touching, and needs an independent Critic round per the item's own
+rationale.

@@ -210,3 +210,15 @@ project root.
   config-UI treatment remains Nightwing per this item's own PO-recorded
   decision.
 - **Date:** 2026-08-17
+
+### 0.6.0 release-bar confirmation (2026-08-18)
+
+Re-checked during the Nova 0.6.0 release triage sweep: the full config-UI
+treatment is already correctly deferred to Sprint Nightwing per the PO's own
+2026-08-08 decision above. The one remaining piece that is NOT deferred — the
+narrow-gauge bootstrap `collect-input` question for `gates.push_approval` and
+the machine-plane PO-key-directory guided creation — has a specific, bounded
+assignment already recorded (goldfish-deep, onboarding/lifecycle code) and
+stays a same-release dispatch target rather than a close, since it needs real
+design latitude in `project-onboarding-v3.mjs` plus test coverage to trust.
+Not attempted here.
