@@ -219,3 +219,14 @@ diff `1404eb28..6d9e8f83`, evidence `evidence/NVA-CROSSREPOLEDGER-2-verify.txt`)
 — not yet returned. Per this session's own cap, a 2nd FAIL here would
 be self-verified by the Elephant directly rather than triggering a 3rd
 Critic dispatch.
+
+First attempt at this 2nd review STOPPED on a dispatch-construction
+defect, not a code verdict: `.claude/pipeline.yaml` declares a
+`governance` block (`guidelines_path`/`policies_path`) this repo's own
+Critic-review skill requires every dispatch to include as guardrail
+tokens; the first dispatch omitted them, so the skill's own hunt
+category 11 (governance conformance) could never run and it correctly
+refused to issue a verdict rather than review with a gap. Re-dispatched
+immediately with `governance/examples/guidelines` and
+`governance/examples/policies` added — this does not count against the
+2-round FAIL cap, since no review completed.
