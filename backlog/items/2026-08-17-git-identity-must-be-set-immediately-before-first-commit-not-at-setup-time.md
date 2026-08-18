@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "f57375ff"
+closure_evidence: "plugins/pipeline-core/lib/project-onboarding-v3.mjs"
 source: "PO, 2026-08-17, live Codex happy-path restart test: 'ausserdem fragt er zwar früh daten zu git identitäten etc ab aber versucht diese dann vor readiness zu setzen, das sollte er nicht. abfragen ist gut aber nicht das setzen so früh.' (Codex correctly asks early for git identity data, but then tries to SET it before readiness — that should not happen; asking early is fine, setting that early is not.)"
 ---
 
@@ -80,4 +84,10 @@ the guidance text, don't remove what those assertions check for.
 - **Assignment:** dispatched same-day as NVA-GITID-1 (goldfish-deep,
   worktree-isolated — a second non-isolated dispatch was already running in
   the main checkout at filing time).
-- **Date:** 2026-08-17
+- **Closure (2026-08-18):** NVA-GITID-1 landed — `collectAuthorIdentityAction()`'s
+  guidance at `project-onboarding-v3.mjs:3939` now explicitly holds the
+  answered values and defers the `git config` write to "immediately before
+  authoring this repository's first commit, never sooner". Confirmed present
+  at HEAD during a systematic 0.6.0-release backlog sweep; item was left
+  `open` past landing rather than closed.
+- **Date:** 2026-08-17 (closed 2026-08-18)

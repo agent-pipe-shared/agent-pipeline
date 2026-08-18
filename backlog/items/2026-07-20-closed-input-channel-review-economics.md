@@ -3,11 +3,15 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.closed-input-channel-review-economics"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-20"
 source: "close retro; bounded privacy correction review"
 due: "2026-08-10"
 expires: "2026-08-17"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "f57375ff"
+closure_evidence: "plugins/pipeline-core/skills/capture-observation/SKILL.md"
 ---
 
 # Prefer closed input channels before variant hardening
@@ -34,3 +38,16 @@ waves.
 The current observation intake now enforces the closed-channel rule and has a
 candidate-bound privacy PASS. The next Pipeline Elephant should convert this
 lesson into a reusable design/checklist rule and close this item with evidence.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted, closed. `plugins/pipeline-core/skills/capture-observation/SKILL.md:18`
+  already states and enforces the closed-channel rule this item asked for
+  (structured same-target links, fail-closed rejection of free-text
+  coordinates) — confirmed present at HEAD during a systematic 0.6.0-release
+  backlog sweep, 2026-08-18.
+- **Rationale:** the acceptance criteria were already met by prior work; only
+  the closure step itself was left undone (item stayed `in_progress` past its
+  own `expires` date without a Triage entry).
+- **Assignment:** closed, no further work.
+- **Date:** 2026-08-18

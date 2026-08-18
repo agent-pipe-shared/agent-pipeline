@@ -377,6 +377,24 @@ release, and it must not be run at the same time as local-development testing
 through `agent-pipeline-local` from the same checkout — the two exercise
 different purposes and should not be combined.
 
+**The Pipeline's own self-application checkout is the one exception that
+genuinely wants both purposes at once**: a self-describing tracked
+`pipeline-core@agent-pipeline` install (so a fresh clone or CI runner with no
+local marketplace ever registered still loads the guard-hook set) AND active
+local-candidate testing through `agent-pipeline-local` on the same checkout.
+Claude Code merges `enabledPlugins` across scopes additively, so combining
+both as written above double-loads the plugin (`/reload-plugins` reports
+"Reloaded: 2 plugins" instead of 1). The tracked `.claude/settings.json` must
+keep naming `pipeline-core@agent-pipeline` regardless (narrowing it to the
+local selector broke the self-describing contract for any checkout without a
+local marketplace registered — a fail-open regression, caught by Critic
+review and reverted). The fix is host-local, not tracked: add an untracked
+`.claude/settings.local.json` on the development machine with
+`"enabledPlugins": { "pipeline-core@agent-pipeline": false }`, so this one
+checkout's dev sessions load only the local-development install while the
+tracked file still resolves correctly for everyone else (PO decision,
+2026-08-17).
+
 ## Scope model
 
 `claude plugin install`/`update`/`uninstall` accept three install scopes

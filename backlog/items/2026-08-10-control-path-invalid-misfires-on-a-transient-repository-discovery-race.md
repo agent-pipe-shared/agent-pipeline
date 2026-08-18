@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
 created: 2026-08-10
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "f57375ff"
+closure_evidence: "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs"
 source: "Live greenfield onboarding test, 2026-08-10 (both Claude Code and Codex hit it independently on separate fresh test projects). PO-reported live: onboarding got stuck reporting `repository-control-path-invalid` with no recovery path, right after a Codex restart relaunch."
 ---
 
@@ -97,4 +101,10 @@ fix scoped to the one observed, reproducible-enough-to-root-cause defect.
   live-blocking severity and the PO's direct real-time instruction to fix it
   now. Self-verified: 23/23 tests green in
   `codex-onboarding-capabilities.test.mjs` including the two new ones.
-- **Date:** 2026-08-10
+- **Closure (2026-08-18):** the fix landed and was self-verified on
+  2026-08-10 (23/23 green including the two new regression tests) but was
+  left `status: in_progress` rather than closed. Found stale during a
+  systematic 0.6.0-release backlog sweep. Re-confirmed the retry wrapper and
+  both regression tests are still present and unmodified at HEAD. Closing
+  with no further work — a purely administrative status correction.
+- **Date:** 2026-08-10 (closed 2026-08-18)

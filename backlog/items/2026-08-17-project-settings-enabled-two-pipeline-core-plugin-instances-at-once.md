@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.project-settings-enabled-two-pipeline-core-plugin-instances-at-once
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "f57375ff"
+closure_evidence: "docs/claude-local-plugin-development.md"
 source: "Caught live by the PO while verifying the 0.5.5 toolbox-refresh candidate: `/reload-plugins` in this repository's own dev session reported \"Reloaded: 2 plugins\" instead of 1."
 ---
 
@@ -101,3 +105,17 @@ Option A: a host-local, untracked workaround
 the tracked file. Documenting this combined-purpose case in
 `docs/claude-local-plugin-development.md` so it does not have to be
 re-derived on the next machine setup. Dispatched (docs only).
+
+### Closure, 2026-08-18
+
+Both halves of Option A confirmed complete during a systematic 0.6.0-release
+backlog sweep: `.claude/settings.local.json` on this machine already carried
+`"pipeline-core@agent-pipeline": false` (the host-local workaround), and the
+documentation half was the one piece still missing — added directly to
+`docs/claude-local-plugin-development.md` (new paragraph after "Reaching the
+released selector from this checkout", documenting the combined-purpose case
+and the exact `settings.local.json` shape). Closing with no further work;
+unrelated to the separate duplicate-registration incident fixed live earlier
+the same session (two `pipeline-core@agent-pipeline-local` entries at
+user+local scope simultaneously — a different combination than this item's
+own `agent-pipeline` + `agent-pipeline-local` symptom).

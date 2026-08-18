@@ -3,11 +3,15 @@ schema: pipeline.backlog-item.v1
 id: pipeline.parallel-goldfish-dispatches-race-on-shared-checkout
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint."
 due: 2026-09-06
 expires: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "f57375ff"
+closure_evidence: "templates/prompts/goldfish-task.md"
 ---
 
 # Parallel Goldfish dispatches without worktree isolation race on shared files
@@ -147,4 +151,11 @@ Not designed here. Candidates for a future session:
   this session (holding all new dispatches until the current in-flight
   fix-round work clears, per the one-committer-at-a-time rule this item's
   own incident 2 already justified).
-- **Date:** 2026-08-11
+- **Closure (2026-08-18):** Option A landed —
+  `templates/prompts/goldfish-task.md:194` requires the standard evidence
+  file name `dispatch-record-{{TASK_ID}}.json`, confirmed present at HEAD
+  during a systematic 0.6.0-release backlog sweep. Candidates B/C/D were
+  deliberately not picked (recorded above as a real decision, not an
+  oversight) and are not reopened by this closure — a future session may
+  file a fresh item for any of them if the underlying risk resurfaces.
+- **Date:** 2026-08-11 (closed 2026-08-18)

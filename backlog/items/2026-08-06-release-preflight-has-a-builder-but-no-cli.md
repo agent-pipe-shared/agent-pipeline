@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.release-preflight-has-a-builder-but-no-cli
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
 created: 2026-08-06
 source: "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
 due: 2026-09-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "f57375ff"
+closure_evidence: "plugins/pipeline-core/scripts/release-preflight-cli.mjs"
 ---
 
 # `release-preflight` has a builder and a validator but no CLI, so the publication executor's fifth gate still has no producer
@@ -86,3 +90,15 @@ All five publication gates now have producers.
 
 - `plugins/pipeline-core/scripts/publication-gate-evidence.mjs` — the same problem for the other four gates, solved.
 - `docs/release-0.5.2-readiness.md` — carries the version-surface step this preflight would check.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted, closed. The item's own "Resolved 2026-08-06" section
+  already documents `release-preflight-cli.mjs` landing and closing the gap —
+  confirmed present at HEAD during a systematic 0.6.0-release backlog sweep,
+  2026-08-18. Status was left `in_progress` rather than moved to `closed`.
+- **Rationale:** the fix was already built, tested (RPC02/RPC06 mentioned
+  inline) and self-documented as resolving the gap; only the status field
+  itself was stale.
+- **Assignment:** closed, no further work.
+- **Date:** 2026-08-18

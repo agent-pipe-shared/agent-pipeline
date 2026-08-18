@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.pre-existing-failure-claims-need-evidence
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "f57375ff"
+closure_evidence: "docs/state.md"
 due: 2026-08-22
 source: "Two dispatches on 2026-08-08 independently classified the same red checks as pre-existing and unrelated. Both were wrong; a bisect settled it in one step and found the introducing commit."
 ---
@@ -93,4 +97,12 @@ is a property of how the wave is orchestrated, not of the suite or of Verify.
 - **Rationale:** PO, 2026-08-12: "1."
 - **Assignment (if accepted):** Elephant-process change (how waves are
   orchestrated), not a code dispatch — apply going forward this session.
-- **Date:** 2026-08-12
+- **Closure (2026-08-18):** Option 1 (full Verify at a wave's midpoint/end)
+  is a process rule, not code, and has been the session's own repeated
+  practice since the decision — every Nova A block this session ran a clean
+  Full Verify after each dispatch wave before proceeding, per `docs/state.md`.
+  Points 1-2 (evidence-carrying claims in the Goldfish contract) remain
+  tracked separately under Task #66 and are not reopened by this closure.
+  Closing this item since its own decided scope (points 3-4) is in
+  continuous effect.
+- **Date:** 2026-08-12 (closed 2026-08-18)

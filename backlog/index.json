@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "29ca6d34b588a24b14d2d1b06e17b92fbd6449ed3ee4c052c7aae28ff3177e40"
+    "transitionHead": "967c540c2fec0e2f6a1caaa61a15a94c3aa91a49e23a6d1989cd06697576a443"
   },
   "counts": {
-    "open": 92,
-    "in_progress": 18,
-    "closed": 143
+    "open": 88,
+    "in_progress": 15,
+    "closed": 150
   },
   "items": [
     {
@@ -380,11 +380,15 @@
     },
     {
       "id": "pipeline.closed-input-channel-review-economics",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "close retro; bounded privacy correction review"
+      "source": "close retro; bounded privacy correction review",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "f57375ff",
+      "closureEvidence": "plugins/pipeline-core/skills/capture-observation/SKILL.md"
     },
     {
       "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",
@@ -506,11 +510,15 @@
     },
     {
       "id": "pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "Live greenfield onboarding test, 2026-08-10 (both Claude Code and Codex hit it independently on separate fresh test projects). PO-reported live: onboarding got stuck reporting `repository-control-path-invalid` with no recovery path, right after a Codex restart relaunch."
+      "source": "Live greenfield onboarding test, 2026-08-10 (both Claude Code and Codex hit it independently on separate fresh test projects). PO-reported live: onboarding got stuck reporting `repository-control-path-invalid` with no recovery path, right after a Codex restart relaunch.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "f57375ff",
+      "closureEvidence": "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs"
     },
     {
       "id": "pipeline.critic-context-isolation",
@@ -809,11 +817,15 @@
     },
     {
       "id": "pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "PO, 2026-08-17, live Codex happy-path restart test: 'ausserdem fragt er zwar früh daten zu git identitäten etc ab aber versucht diese dann vor readiness zu setzen, das sollte er nicht. abfragen ist gut aber nicht das setzen so früh.' (Codex correctly asks early for git identity data, but then tries to SET it before readiness — that should not happen; asking early is fine, setting that early is not.)"
+      "source": "PO, 2026-08-17, live Codex happy-path restart test: 'ausserdem fragt er zwar früh daten zu git identitäten etc ab aber versucht diese dann vor readiness zu setzen, das sollte er nicht. abfragen ist gut aber nicht das setzen so früh.' (Codex correctly asks early for git identity data, but then tries to SET it before readiness — that should not happen; asking early is fine, setting that early is not.)",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "f57375ff",
+      "closureEvidence": "plugins/pipeline-core/lib/project-onboarding-v3.mjs"
     },
     {
       "id": "pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation",
@@ -1598,11 +1610,15 @@
     },
     {
       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint."
+      "source": "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "f57375ff",
+      "closureEvidence": "templates/prompts/goldfish-task.md"
     },
     {
       "id": "pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback",
@@ -1771,11 +1787,15 @@
     },
     {
       "id": "pipeline.pre-existing-failure-claims-need-evidence",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Two dispatches on 2026-08-08 independently classified the same red checks as pre-existing and unrelated. Both were wrong; a bisect settled it in one step and found the introducing commit."
+      "source": "Two dispatches on 2026-08-08 independently classified the same red checks as pre-existing and unrelated. Both were wrong; a bisect settled it in one step and found the introducing commit.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "f57375ff",
+      "closureEvidence": "docs/state.md"
     },
     {
       "id": "pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous",
@@ -1851,11 +1871,15 @@
     },
     {
       "id": "pipeline.project-settings-enabled-two-pipeline-core-plugin-instances-at-once",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Caught live by the PO while verifying the 0.5.5 toolbox-refresh candidate: `/reload-plugins` in this repository's own dev session reported \"Reloaded: 2 plugins\" instead of 1."
+      "source": "Caught live by the PO while verifying the 0.5.5 toolbox-refresh candidate: `/reload-plugins` in this repository's own dev session reported \"Reloaded: 2 plugins\" instead of 1.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "f57375ff",
+      "closureEvidence": "docs/claude-local-plugin-development.md"
     },
     {
       "id": "pipeline.promotion-freezes-a-prd-the-po-gate-will-reject",
@@ -2017,11 +2041,15 @@
     },
     {
       "id": "pipeline.release-preflight-has-a-builder-but-no-cli",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
+      "source": "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "f57375ff",
+      "closureEvidence": "plugins/pipeline-core/scripts/release-preflight-cli.mjs"
     },
     {
       "id": "pipeline.reopen-design-invites-the-edit-that-ends-the-session",
