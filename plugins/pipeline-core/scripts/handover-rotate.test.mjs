@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -9,13 +10,16 @@ import {
   adjustRelativeLinksForArchiveDepth,
   ARCHIVE_DIR,
   ARCHIVED_HISTORY_HEADING,
+  assertSectionsExtractionAcknowledged,
+  getAcknowledgedSections,
   HandoverRotationError,
-  isExtractionAcknowledged,
+  isSectionExtractionAcknowledged,
   planHandoverRotation,
   planRotation,
   recordExtractionAcknowledged,
   registerArchiveInDocGovernance,
   rotateHandover,
+  sectionContentHash,
   splitHandoverSections,
 } from "./handover-rotate.mjs";
 
@@ -23,6 +27,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const PLUGIN_ROOT = resolve(HERE, "..");
 const REPO_ROOT = resolve(PLUGIN_ROOT, "..", "..");
 const SCRATCH_ROOT = join(REPO_ROOT, "scratch");
+const SCRIPT_PATH = join(HERE, "handover-rotate.mjs");
 mkdirSync(SCRATCH_ROOT, { recursive: true });
 
 function fixtureRoot(label) {
@@ -98,7 +103,17 @@ const SAMPLE = [
   assert.ok(rotation.newLiveContent.includes(rotation.archivePath));
 }
 
-// == DoD item 6: rotateHandover() refuses without acknowledgment -- typed error, zero mutation ==
+// == sectionContentHash: stable for identical bytes, changes when a section's own lines change ==
+{
+  const { sections } = splitHandoverSections(SAMPLE);
+  const hashA1 = sectionContentHash(sections[0].lines);
+  const hashA2 = sectionContentHash(sections[0].lines);
+  assert.equal(hashA1, hashA2, "hashing the same lines twice is stable");
+  const edited = sections[0].lines.map((line, i) => (i === 1 ? "Content A line 1, edited." : line));
+  assert.notEqual(sectionContentHash(edited), hashA1, "editing a section's content changes its hash");
+}
+
+// == DoD (a): rotateHandover() refuses when the requested section is never acknowledged -- typed error naming it, zero mutation ==
 {
   const root = fixtureRoot("no-ack");
   try {
@@ -106,12 +121,14 @@ const SAMPLE = [
     writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
     const before = readFileSync(join(root, "docs", "state.md"), "utf8");
 
-    assert.equal(isExtractionAcknowledged(root), false);
+    assert.deepEqual(getAcknowledgedSections(root), []);
     assert.throws(
       () => rotateHandover({
         root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
       }),
-      (error) => error instanceof HandoverRotationError && error.code === "HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED",
+      (error) => error instanceof HandoverRotationError
+        && error.code === "HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED"
+        && error.message.includes('"Block A"'),
     );
 
     const after = readFileSync(join(root, "docs", "state.md"), "utf8");
@@ -122,19 +139,27 @@ const SAMPLE = [
   }
 }
 
-// == DoD item 7: rotation succeeds once acknowledged, and the index links to the new archive file ==
+// == DoD (b): acknowledging a section then rotating it succeeds, and the index links to the new archive file ==
 {
   const root = fixtureRoot("ack-then-rotate");
   try {
     mkdirSync(join(root, "docs"), { recursive: true });
     writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
 
-    const ack1 = recordExtractionAcknowledged(root, { now: () => "2026-08-17T00:00:00.000Z" });
+    const [ack1] = recordExtractionAcknowledged(root, {
+      sectionHeadings: ["Block A"], liveContent: SAMPLE, now: () => "2026-08-17T00:00:00.000Z",
+    });
+    assert.equal(ack1.title, "Block A");
     assert.equal(ack1.acknowledgedAt, "2026-08-17T00:00:00.000Z");
-    assert.equal(isExtractionAcknowledged(root), true);
-    // Idempotent: a second call does not overwrite the first timestamp.
-    const ack2 = recordExtractionAcknowledged(root, { now: () => "2099-01-01T00:00:00.000Z" });
-    assert.equal(ack2.acknowledgedAt, "2026-08-17T00:00:00.000Z");
+    const expectedHash = sectionContentHash(splitHandoverSections(SAMPLE).sections[0].lines);
+    assert.equal(ack1.contentHash, expectedHash);
+    assert.equal(isSectionExtractionAcknowledged(root, { title: "Block A", contentHash: expectedHash }), true);
+    // Re-acknowledging (upsert, not idempotent-preservation) replaces the entry's timestamp for the same title.
+    const [ack2] = recordExtractionAcknowledged(root, {
+      sectionHeadings: ["Block A"], liveContent: SAMPLE, now: () => "2099-01-01T00:00:00.000Z",
+    });
+    assert.equal(ack2.acknowledgedAt, "2099-01-01T00:00:00.000Z");
+    assert.equal(getAcknowledgedSections(root).length, 1, "re-acknowledging the same title upserts, never duplicates");
 
     const plan = rotateHandover({
       root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "moved Block A", rotationDate: "2026-08-17",
@@ -153,6 +178,101 @@ const SAMPLE = [
     assert.ok(liveContent.includes(plan.archivePath), "live file's Archived history index must link to the new archive file");
     assert.ok(liveContent.includes("Content B line 1."), "the still-open block stays in the live file verbatim");
     assert.ok(!liveContent.includes("Content A line 1."), "the archived block's content leaves the live file");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == DoD (c): editing a section's content after acknowledgment (before rotation) makes it refuse again ==
+{
+  const root = fixtureRoot("edited-after-ack");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE });
+    const originalHash = sectionContentHash(splitHandoverSections(SAMPLE).sections[0].lines);
+    assert.equal(isSectionExtractionAcknowledged(root, { title: "Block A", contentHash: originalHash }), true);
+
+    const edited = SAMPLE.replace("Content A line 2.", "Content A line 2, edited after acknowledgment.");
+    writeFileSync(join(root, "docs", "state.md"), edited, "utf8");
+    const before = readFileSync(join(root, "docs", "state.md"), "utf8");
+
+    assert.throws(
+      () => rotateHandover({
+        root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
+      }),
+      (error) => error instanceof HandoverRotationError
+        && error.code === "HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED"
+        && error.message.includes('"Block A"'),
+    );
+    const after = readFileSync(join(root, "docs", "state.md"), "utf8");
+    assert.equal(after, before, "a content-hash-mismatch refusal leaves the live file byte-identical");
+    // The stale acknowledgment (by the OLD hash) still stands untouched -- only the CURRENT content fails to match it.
+    assert.equal(isSectionExtractionAcknowledged(root, { title: "Block A", contentHash: originalHash }), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == DoD (d): a multi-section rotation where only some sections are acknowledged fails closed entirely, naming ALL failing sections ==
+{
+  const root = fixtureRoot("multi-section-partial-ack");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    const threeBlock = [
+      "# docs/state.md", "", "## Block A", "A content.", "", "## Block B", "B content.", "", "## Block C", "C content.", "",
+    ].join("\n");
+    writeFileSync(join(root, "docs", "state.md"), threeBlock, "utf8");
+    // Only Block A is acknowledged; Block B and Block C are left unacknowledged.
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: threeBlock });
+    const before = readFileSync(join(root, "docs", "state.md"), "utf8");
+
+    assert.throws(
+      () => rotateHandover({
+        root, handoverPath: "docs/state.md", sectionHeadings: ["Block A", "Block B", "Block C"], summary: "s", rotationDate: "2026-08-17",
+      }),
+      (error) => {
+        if (!(error instanceof HandoverRotationError) || error.code !== "HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED") return false;
+        return error.message.includes('"Block B"') && error.message.includes('"Block C"') && !error.message.includes('"Block A"');
+      },
+    );
+    const after = readFileSync(join(root, "docs", "state.md"), "utf8");
+    assert.equal(after, before, "a partially-acknowledged multi-section rotation fails closed with zero mutation");
+    assert.equal(existsSync(join(root, ARCHIVE_DIR)), false, "no archive directory for a fully-refused multi-section rotation, not even for the acknowledged subset");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == DoD (e): an old-schema (or missing) marker file is treated as fully unacknowledged, not a crash ==
+{
+  const root = fixtureRoot("old-schema-marker");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    const markerPath = join(root, ".git", "agent-pipeline", "handover-rotation", "extraction-acknowledged.json");
+    mkdirSync(dirname(markerPath), { recursive: true });
+    writeFileSync(
+      markerPath,
+      `${JSON.stringify({ schema: "pipeline.handover-rotation-extraction-ack.v1", acknowledgedAt: "2026-08-17T00:00:00.000Z" })}\n`,
+      "utf8",
+    );
+
+    assert.deepEqual(getAcknowledgedSections(root), [], "an old-schema (v1) marker is treated as absent, never grandfathered");
+    const before = readFileSync(join(root, "docs", "state.md"), "utf8");
+    assert.throws(
+      () => rotateHandover({
+        root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
+      }),
+      (error) => error instanceof HandoverRotationError && error.code === "HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED",
+    );
+    assert.equal(readFileSync(join(root, "docs", "state.md"), "utf8"), before, "an old-schema-marker refusal leaves the live file untouched");
+
+    // Acknowledging a section now upserts a fresh v2 record over the old-schema file -- no crash, no partial trust.
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE });
+    const rewritten = JSON.parse(readFileSync(markerPath, "utf8"));
+    assert.equal(rewritten.schema, "pipeline.handover-rotation-extraction-ack.v2");
+    assert.equal(rewritten.acknowledgedSections.length, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -177,7 +297,10 @@ const SAMPLE = [
       "",
     ].join("\n");
     writeFileSync(join(root, "docs", "state.md"), twoBlock, "utf8");
-    recordExtractionAcknowledged(root, { now: () => "2026-08-17T00:00:00.000Z" });
+    // Per-section hashing means acknowledging both headings against the ORIGINAL content stays valid for the
+    // second rotation even though the live file has already changed shape after the first rotation removed
+    // Block A -- Block B's own lines are untouched by that removal.
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A", "Block B"], liveContent: twoBlock, now: () => "2026-08-17T00:00:00.000Z" });
 
     rotateHandover({ root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "first", rotationDate: "2026-08-17" });
     const secondPlan = rotateHandover({ root, handoverPath: "docs/state.md", sectionHeadings: ["Block B"], summary: "second", rotationDate: "2026-08-18", slug: "second-slug" });
@@ -192,15 +315,30 @@ const SAMPLE = [
   }
 }
 
-// == Rotating a repeated (already-archived) heading refuses with a typed error, zero mutation ==
+// == Rotating an already-archived (now-missing) heading refuses with a typed error, zero mutation ==
+{
+  const root = fixtureRoot("repeated-heading");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE });
+    rotateHandover({ root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17" });
+    const after = readFileSync(join(root, "docs", "state.md"), "utf8");
+
+    assert.throws(
+      () => rotateHandover({ root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s2", rotationDate: "2026-08-18" }),
+      (error) => error instanceof HandoverRotationError && error.code === "HANDOVER-ROTATION-SECTION-NOT-FOUND",
+    );
+    assert.equal(readFileSync(join(root, "docs", "state.md"), "utf8"), after, "a refused repeat rotation leaves the live file untouched");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == A rotation of a file that does not exist refuses with a typed error before any acknowledgment check ==
 {
   const root = fixtureRoot("missing-file");
   try {
-    assert.throws(
-      () => rotateHandover({ root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17" }),
-      (error) => error instanceof HandoverRotationError, // not-acknowledged fires first; still a typed, zero-mutation refusal
-    );
-    recordExtractionAcknowledged(root);
     assert.throws(
       () => rotateHandover({ root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17" }),
       (error) => error instanceof HandoverRotationError && error.code === "HANDOVER-ROTATION-FILE-NOT-FOUND",
@@ -214,7 +352,6 @@ const SAMPLE = [
 {
   const root = fixtureRoot("traversal-handover-path");
   try {
-    recordExtractionAcknowledged(root);
     const outsideTarget = join(dirname(root), "outside-secret.md");
     assert.throws(
       () => rotateHandover({
@@ -235,7 +372,7 @@ const SAMPLE = [
   try {
     mkdirSync(join(root, "docs"), { recursive: true });
     writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
-    recordExtractionAcknowledged(root);
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE });
     assert.throws(
       () => rotateHandover({
         root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "../../../etc/evil",
@@ -255,7 +392,7 @@ const SAMPLE = [
   try {
     mkdirSync(join(root, "docs"), { recursive: true });
     writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
-    recordExtractionAcknowledged(root);
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE });
     const plan = rotateHandover({
       root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s",
       rotationDate: "2026-08-17", slug: "../../../../etc/evil",
@@ -269,15 +406,32 @@ const SAMPLE = [
   }
 }
 
-// == NVA-HANDOVER-ROT-2 F4: the read-only status check never creates the acknowledgment marker as a side effect ==
+// == The read-only accessors never create the acknowledgment marker as a side effect ==
 {
   const root = fixtureRoot("status-read-only");
   try {
     const markerPath = join(root, ".git", "agent-pipeline", "handover-rotation", "extraction-acknowledged.json");
-    assert.equal(isExtractionAcknowledged(root), false);
+    assert.deepEqual(getAcknowledgedSections(root), []);
     assert.equal(existsSync(markerPath), false, "checking status must never create the acknowledgment marker");
-    assert.equal(isExtractionAcknowledged(root), false, "calling it repeatedly stays read-only");
-    assert.equal(existsSync(markerPath), false);
+    assert.equal(isSectionExtractionAcknowledged(root, { title: "Block A", contentHash: "deadbeef" }), false);
+    assert.equal(existsSync(markerPath), false, "calling it repeatedly stays read-only");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == assertSectionsExtractionAcknowledged is directly callable and read-only too ==
+{
+  const root = fixtureRoot("assert-read-only");
+  try {
+    const markerPath = join(root, ".git", "agent-pipeline", "handover-rotation", "extraction-acknowledged.json");
+    assert.throws(
+      () => assertSectionsExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE }),
+      (error) => error instanceof HandoverRotationError && error.code === "HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED",
+    );
+    assert.equal(existsSync(markerPath), false, "a refusal from the assert function must never create the marker file");
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE });
+    assert.doesNotThrow(() => assertSectionsExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE }));
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -318,7 +472,7 @@ const SAMPLE = [
       "",
     ].join("\n");
     writeFileSync(join(root, "docs", "state.md"), withLink, "utf8");
-    recordExtractionAcknowledged(root);
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: withLink });
 
     const plan = rotateHandover({
       root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
@@ -338,7 +492,7 @@ const SAMPLE = [
   try {
     mkdirSync(join(root, "docs"), { recursive: true });
     writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
-    recordExtractionAcknowledged(root);
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE });
     const plan = rotateHandover({
       root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
     });
@@ -432,13 +586,62 @@ const GOVERNANCE_FIXTURE = [
     mkdirSync(join(root, "governance"), { recursive: true });
     writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
     writeFileSync(join(root, "governance", "observation-doc-governance.json"), GOVERNANCE_FIXTURE, "utf8");
-    recordExtractionAcknowledged(root);
+    recordExtractionAcknowledged(root, { sectionHeadings: ["Block A"], liveContent: SAMPLE });
     const plan = rotateHandover({
       root, handoverPath: "docs/state.md", sectionHeadings: ["Block A"], summary: "s", rotationDate: "2026-08-17",
     });
     assert.equal(plan.governanceRegistration.updated, true);
     const registry = JSON.parse(readFileSync(join(root, "governance", "observation-doc-governance.json"), "utf8"));
     assert.ok(registry.documentation.inventory[0].paths.includes(plan.archivePath));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == DoD (f): CLI --acknowledge-extraction-done with no --section-heading is a usage error, exit 1, no marker written ==
+{
+  const root = fixtureRoot("cli-usage-error");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    const spawned = spawnSync(process.execPath, [SCRIPT_PATH, "--root", root, "--acknowledge-extraction-done"], { encoding: "utf8" });
+    assert.equal(spawned.status, 1, "no --section-heading given must exit 1");
+    assert.ok(/section-heading/i.test(spawned.stderr), "the usage error must mention --section-heading");
+    assert.equal(
+      existsSync(join(root, ".git", "agent-pipeline", "handover-rotation", "extraction-acknowledged.json")),
+      false,
+      "a usage error must write no marker file",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}
+
+// == CLI: --acknowledge-extraction-done with --section-heading succeeds, prints a confirmation, and --status reports it ==
+{
+  const root = fixtureRoot("cli-acknowledge");
+  try {
+    mkdirSync(join(root, "docs"), { recursive: true });
+    writeFileSync(join(root, "docs", "state.md"), SAMPLE, "utf8");
+    const ackSpawn = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", root, "--acknowledge-extraction-done", "--section-heading", "Block A"],
+      { encoding: "utf8" },
+    );
+    assert.equal(ackSpawn.status, 0, ackSpawn.stderr);
+    assert.ok(ackSpawn.stdout.includes("Block A"), "the confirmation line names the acknowledged section");
+
+    const statusSpawn = spawnSync(process.execPath, [SCRIPT_PATH, "--root", root, "--status"], { encoding: "utf8" });
+    assert.equal(statusSpawn.status, 0, statusSpawn.stderr);
+    assert.ok(statusSpawn.stdout.includes("Block A"), "--status lists the acknowledged section");
+
+    const statusOneSpawn = spawnSync(
+      process.execPath,
+      [SCRIPT_PATH, "--root", root, "--status", "--section-heading", "Block B"],
+      { encoding: "utf8" },
+    );
+    assert.equal(statusOneSpawn.status, 0, statusOneSpawn.stderr);
+    assert.ok(/NOT acknowledged/.test(statusOneSpawn.stdout), "--status --section-heading reports an unacknowledged section correctly");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

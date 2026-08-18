@@ -27,18 +27,21 @@
  * rather than converging -- see
  * `backlog/items/2026-08-17-two-handover-rotation-mechanisms-use-different-archive-conventions.md`.
  *
- * ADR-0066 Decision 6 (the one-time extraction gate): this script REFUSES to
- * run any rotation -- typed error, zero mutation -- unless a
- * repository-local marker confirms `--acknowledge-extraction-done` has been
- * explicitly passed at least once for this repository. Record the
- * acknowledgment once (`--acknowledge-extraction-done`, no other args); it
- * persists under `.git/agent-pipeline/handover-rotation/` and is never
- * re-asked on later invocations.
+ * ADR-0066 Decision 6 (the section-scoped extraction gate, schema v2 as of
+ * 2026-08-18): this script REFUSES to run any rotation -- typed error, zero
+ * mutation -- unless EVERY section named in that rotation's `--section-heading`
+ * list has been explicitly acknowledged, at its CURRENT content, via
+ * `--acknowledge-extraction-done --section-heading "<title>"` (repeatable).
+ * The marker records title + content-hash pairs, not a repo-wide boolean: a
+ * section never acknowledged still refuses rotation, and a section edited
+ * after acknowledgment but before rotation refuses again too (its hash no
+ * longer matches). Persists under `.git/agent-pipeline/handover-rotation/`.
  *
  * Never deletes content: every byte removed from the live file exists
  * verbatim in the archive file it was moved to (round-trip losslessness is
  * pinned by this script's own test suite).
  */
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,7 +51,7 @@ import { HANDOVER_MEASUREMENT_SCHEMA, resolveHandoverConfig } from "../lib/hando
 
 export const ARCHIVE_DIR = "docs/state-archive";
 const ACK_MARKER_RELATIVE = join(".git", "agent-pipeline", "handover-rotation", "extraction-acknowledged.json");
-const ACK_MARKER_SCHEMA = "pipeline.handover-rotation-extraction-ack.v1";
+const ACK_MARKER_SCHEMA = "pipeline.handover-rotation-extraction-ack.v2";
 export const HANDOVER_ROTATE_SCRIPT_PATH = fileURLToPath(import.meta.url);
 
 export class HandoverRotationError extends Error {
@@ -59,53 +62,126 @@ export class HandoverRotationError extends Error {
   }
 }
 
-// -- ADR-0066 Decision 6: the one-time extraction-acknowledgment marker --
+// -- ADR-0066 Decision 6 (schema v2, amended 2026-08-18): the section-scoped,
+// content-hash-bound extraction-acknowledgment marker. --
+//
+// Schema v1 (removed) was a repo-wide boolean: once set, it stopped gating ANY
+// future rotation on extraction being done for that specific content -- a
+// rotation of sections added long after the marker was set, and never
+// reviewed by anyone, went through with no further check at all. Schema v2
+// instead tracks exactly WHICH sections were reviewed and WHAT their content
+// was at review time (a sha256 of the section's own lines, the same slice
+// `splitHandoverSections`/`planHandoverRotation` already use), so a rotation
+// naming a never-acknowledged section still refuses, and an edit to a section
+// after acknowledgment but before rotation also re-triggers the refusal
+// (content-hash mismatch -- the prior acknowledgment no longer covers the new
+// bytes). An old-schema (or missing/corrupt) marker file is treated as fully
+// ABSENT, never grandfathered -- this forces a real, section-scoped
+// acknowledgment pass under the new semantics rather than silently trusting a
+// prior repo-wide grant.
 
 function ackMarkerPath(root) {
   return join(root, ACK_MARKER_RELATIVE);
 }
 
-/** Read-only: has `--acknowledge-extraction-done` ever been recorded for this repository? */
-export function isExtractionAcknowledged(root) {
+/** sha256 (hex) of a section's exact line content (title heading line through its last content line). */
+export function sectionContentHash(sectionLines) {
+  return createHash("sha256").update(sectionLines.join("\n"), "utf8").digest("hex");
+}
+
+/** Reads the persisted v2 marker, or `null` if absent, unparsable, or not schema v2 (old-schema is treated as absent). */
+function readAckMarker(root) {
   const markerPath = ackMarkerPath(root);
-  if (!existsSync(markerPath)) return false;
+  if (!existsSync(markerPath)) return null;
   try {
     const parsed = JSON.parse(readFileSync(markerPath, "utf8"));
-    return parsed?.schema === ACK_MARKER_SCHEMA && typeof parsed?.acknowledgedAt === "string";
+    if (parsed?.schema !== ACK_MARKER_SCHEMA || !Array.isArray(parsed?.acknowledgedSections)) return null;
+    return parsed;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/** Read-only accessor: the currently persisted acknowledged-section records, or `[]` if absent/invalid-schema. */
+export function getAcknowledgedSections(root) {
+  return readAckMarker(root)?.acknowledgedSections ?? [];
+}
+
+/** Read-only: is `title` acknowledged with exactly this `contentHash` right now? */
+export function isSectionExtractionAcknowledged(root, { title, contentHash }) {
+  return getAcknowledgedSections(root).some((entry) => entry.title === title && entry.contentHash === contentHash);
+}
+
+/** Locates `heading` among `liveContent`'s H2 sections; throws a typed error for an unmatched heading. */
+function locateSectionOrThrow(liveContent, heading) {
+  const { sections } = splitHandoverSections(liveContent);
+  const match = sections.find((s) => s.title === heading);
+  if (!match) {
+    throw new HandoverRotationError(
+      "HANDOVER-ROTATION-SECTION-NOT-FOUND",
+      `No "## ${heading}" section was found in the live handover file. No mutation performed.`,
+    );
+  }
+  return match;
 }
 
 /**
- * Records the acknowledgment marker (idempotent: a pre-existing marker is
- * left untouched and its original content is returned, never overwritten
- * with a new timestamp -- "checked once per repository", not re-stamped).
+ * Records (or updates) the extraction-acknowledgment marker for each heading in
+ * `sectionHeadings`, computing that section's current content hash from `liveContent`
+ * and upserting it (by title) into the persisted `acknowledgedSections` array -- a
+ * re-acknowledgment after a fresh review replaces the prior entry's hash/timestamp for
+ * the same title, it never accumulates stale duplicates. An unmatched heading is a typed
+ * error, zero mutation -- mirrors `planHandoverRotation`'s existing unmatched-heading
+ * pattern (never a silent no-op).
  */
-export function recordExtractionAcknowledged(root, { now = () => new Date().toISOString() } = {}) {
-  const markerPath = ackMarkerPath(root);
-  if (existsSync(markerPath)) {
-    try {
-      const parsed = JSON.parse(readFileSync(markerPath, "utf8"));
-      if (parsed?.schema === ACK_MARKER_SCHEMA) return parsed;
-    } catch {
-      // fall through and rewrite a corrupt marker
-    }
+export function recordExtractionAcknowledged(root, { sectionHeadings, liveContent, now = () => new Date().toISOString() }) {
+  if (!Array.isArray(sectionHeadings) || sectionHeadings.length === 0) {
+    throw new HandoverRotationError(
+      "HANDOVER-ROTATION-NO-SECTIONS",
+      "At least one --section-heading is required to acknowledge extraction.",
+    );
   }
+  const newEntries = sectionHeadings.map((title) => {
+    const section = locateSectionOrThrow(liveContent, title);
+    return { title, contentHash: sectionContentHash(section.lines), acknowledgedAt: now() };
+  });
+  const existing = getAcknowledgedSections(root);
+  const byTitle = new Map(existing.map((entry) => [entry.title, entry]));
+  for (const entry of newEntries) byTitle.set(entry.title, entry);
+  const record = { schema: ACK_MARKER_SCHEMA, acknowledgedSections: [...byTitle.values()] };
+  const markerPath = ackMarkerPath(root);
   mkdirSync(dirname(markerPath), { recursive: true });
-  const record = { schema: ACK_MARKER_SCHEMA, acknowledgedAt: now() };
-  writeFileSync(markerPath, `${JSON.stringify(record)}\n`, { mode: 0o600 });
-  return record;
+  writeFileSync(markerPath, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 });
+  return newEntries;
 }
 
-function assertExtractionAcknowledged(root) {
-  if (isExtractionAcknowledged(root)) return;
+/**
+ * Gates a rotation naming `sectionHeadings`: every one of them must be acknowledged, by
+ * title AND current content hash, against `liveContent`. If ANY section fails, throws ONE
+ * typed error naming ALL failing section titles -- a rotation spanning multiple sections
+ * where only some are acknowledged fails closed entirely, never a partial rotation of just
+ * the acknowledged subset (same "never a silent partial success" ethos as
+ * `planHandoverRotation`'s unmatched-heading behavior).
+ */
+export function assertSectionsExtractionAcknowledged(root, { sectionHeadings, liveContent }) {
+  const failing = [];
+  for (const title of sectionHeadings) {
+    const section = locateSectionOrThrow(liveContent, title);
+    const hash = sectionContentHash(section.lines);
+    if (!isSectionExtractionAcknowledged(root, { title, contentHash: hash })) failing.push(title);
+  }
+  if (failing.length === 0) return;
   throw new HandoverRotationError(
     "HANDOVER-EXTRACTION-NOT-ACKNOWLEDGED",
     "Rotation refused: the one-time durable-rule extraction pass (ADR-0066 Decision 7) has not been "
-      + "acknowledged for this repository. This script never auto-detects embedded durable rules "
-      + "(Decision 6) -- extraction is real, judgment-heavy human/Elephant work, done once, before any "
-      + "rotation runs for real. Run `--acknowledge-extraction-done` once you have completed that pass.",
+      + "acknowledged for the following section(s) at their CURRENT content "
+      + `(ADR-0066 Decision 6, schema v2): ${failing.map((t) => `"${t}"`).join(", ")}. This script never `
+      + "auto-detects embedded durable rules -- extraction is real, judgment-heavy human/Elephant work, done "
+      + "once per section, before that section is ever rotated for real. A section edited after a prior "
+      + "acknowledgment but before rotation also re-triggers this refusal (its content hash no longer matches "
+      + "what was reviewed). Run `--acknowledge-extraction-done --section-heading \"<title>\"` for each section "
+      + "above once its extraction pass is genuinely complete. No rotation was performed (fails closed for the "
+      + "entire requested set, not just the unacknowledged sections).",
   );
 }
 
@@ -403,7 +479,6 @@ export function registerArchiveInDocGovernance(root, { handoverPath, archivePath
 export function rotateHandover({
   root, handoverPath, sectionHeadings, summary, dateRange, slug, rotationDate = new Date().toISOString().slice(0, 10),
 }) {
-  assertExtractionAcknowledged(root);
   const resolvedHandoverPath = handoverPath ?? resolveHandoverConfig({ rootDir: root }).path;
   const fullHandoverPath = join(root, resolvedHandoverPath);
   assertPathWithinRoot(root, fullHandoverPath, "The handover path (--handover-path)");
@@ -411,6 +486,7 @@ export function rotateHandover({
     throw new HandoverRotationError("HANDOVER-ROTATION-FILE-NOT-FOUND", `${resolvedHandoverPath} not found under ${root}.`);
   }
   const liveContent = readFileSync(fullHandoverPath, "utf8");
+  assertSectionsExtractionAcknowledged(root, { sectionHeadings, liveContent });
   const plan = planRotation({
     liveContent, handoverPath: resolvedHandoverPath, sectionHeadings, summary, dateRange, slug, rotationDate,
   });
@@ -459,21 +535,51 @@ if (isDirectInvocation(import.meta.url)) {
   const root = resolve(args.root);
   try {
     if (args.status) {
-      // Read-only: NVA-HANDOVER-ROT-2 F4. Never records the marker, only reports it -- the
-      // close-block ritual checks this first so `--acknowledge-extraction-done` stays a
-      // deliberate human/Elephant judgment call, never a routine automated step.
-      const acknowledged = isExtractionAcknowledged(root);
-      console.log(acknowledged
-        ? `Extraction acknowledgment: RECORDED for ${root}.`
-        : `Extraction acknowledgment: NOT recorded for ${root}. Rotation is refused (ADR-0066 Decision 6) until `
-          + "--acknowledge-extraction-done is run -- only once the one-time durable-rule extraction pass (ADR-0066 "
-          + "Decision 7) is genuinely complete for this repository. This is a human/Elephant judgment call, never "
-          + "an automated step of routine closing.");
+      // Read-only: NVA-HANDOVER-ROT-2 F4 / NVA-W3-R3 (schema v2). Never records the marker,
+      // only reports it -- the close-block ritual checks this first so
+      // `--acknowledge-extraction-done` stays a deliberate human/Elephant judgment call, never
+      // a routine automated step. With a --section-heading given, reports just that one
+      // section's acknowledged-or-not state (against the live file's current content); without
+      // one, lists every CURRENTLY PERSISTED acknowledged section.
+      if (args.sectionHeadings.length > 0) {
+        const resolvedHandoverPath = args.handoverPath ?? resolveHandoverConfig({ rootDir: root }).path;
+        const liveContent = readFileSync(join(root, resolvedHandoverPath), "utf8");
+        for (const title of args.sectionHeadings) {
+          const section = locateSectionOrThrow(liveContent, title);
+          const hash = sectionContentHash(section.lines);
+          const acknowledged = isSectionExtractionAcknowledged(root, { title, contentHash: hash });
+          console.log(`"${title}": ${acknowledged ? "ACKNOWLEDGED" : "NOT acknowledged"} (content hash ${hash.slice(0, 12)}).`);
+        }
+      } else {
+        const sections = getAcknowledgedSections(root);
+        if (sections.length === 0) {
+          console.log(`Extraction acknowledgment: no sections recorded for ${root}. Rotation of any section is refused `
+            + "(ADR-0066 Decision 6, schema v2) until --acknowledge-extraction-done --section-heading \"<title>\" is run "
+            + "for it -- only once the one-time durable-rule extraction pass (ADR-0066 Decision 7) is genuinely complete "
+            + "for that section. This is a human/Elephant judgment call, never an automated step of routine closing.");
+        } else {
+          console.log(`Extraction acknowledgment: ${sections.length} section(s) recorded for ${root}:`);
+          for (const entry of sections) {
+            console.log(`  "${entry.title}" (content hash ${entry.contentHash.slice(0, 12)}, acknowledged ${entry.acknowledgedAt}).`);
+          }
+        }
+      }
       process.exit(0);
     }
     if (args.acknowledge) {
-      const record = recordExtractionAcknowledged(root);
-      console.log(`Extraction acknowledgment recorded for ${root} at ${record.acknowledgedAt} (schema ${HANDOVER_MEASUREMENT_SCHEMA} handover measurement in effect).`);
+      if (args.sectionHeadings.length === 0) {
+        console.error("handover-rotate: --acknowledge-extraction-done requires at least one --section-heading "
+          + "\"<title>\" -- schema v2 (ADR-0066 Decision 6) acknowledges specific sections, never the whole "
+          + "repository at once.");
+        process.exit(1);
+      }
+      const resolvedHandoverPath = args.handoverPath ?? resolveHandoverConfig({ rootDir: root }).path;
+      const liveContent = readFileSync(join(root, resolvedHandoverPath), "utf8");
+      const entries = recordExtractionAcknowledged(root, { sectionHeadings: args.sectionHeadings, liveContent });
+      for (const entry of entries) {
+        console.log(`Extraction acknowledgment recorded for "${entry.title}" (content hash ${entry.contentHash.slice(0, 12)}) `
+          + `at ${entry.acknowledgedAt} (schema ${HANDOVER_MEASUREMENT_SCHEMA} handover measurement in effect).`);
+      }
       process.exit(0);
     }
     if (!args.summary) {
