@@ -5955,6 +5955,19 @@ function runFeaturePackageApplyCommand(argv, deps) {
   const lock = acquireContinuityLock(root, FEATURE_PACKAGE_APPLY_LOCK_TOKEN, deps);
   if (!lock.ok) return refuseFeaturePackageRead(sub, `writer lock unavailable (${lock.code})`);
   try {
+    // Deliberately unwired for autoRebindMutable (PHX-WP-AUTOREBIND-WRITEPATH-INVESTIGATE-
+    // FINISH): wiring it here was tried and reverted after testing showed it defeats the
+    // --plan-sha256 freshness/anti-tamper contract for ANY manifest with a mutable+authority
+    // artifact (routinely the PRD/acceptance -- see feature-package-topology.mjs's own
+    // PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND note). An internal recompute that silently self-heals
+    // a mutable digest cannot distinguish a routine edit from deliberate tampering, and the
+    // caller's own preview digest (from feature-package-plan, which stays unwired) never
+    // reflects the healed state either way -- so WRc (a routine drift between plan and apply
+    // must still be refused) and WRg (a manually tampered digest must be refused, not silently
+    // "corrected") both regressed when this was wired. autoRebindMutable remains a safe,
+    // tested LIBRARY capability (planFeaturePackageTransition/planFeaturePackageReconcile,
+    // feature-package-topology.mjs) for a deliberate, out-of-band invocation -- never
+    // hardwired into a CLI write path that also consumes an approval-bound preview digest.
     const preview = buildFeaturePackageApplyPreview(parsed.value);
     if (!preview.ok) return refuseFeaturePackageRead(sub, preview.error);
     const { manifest, kind, plan, planSha256, manifestBytes } = preview;

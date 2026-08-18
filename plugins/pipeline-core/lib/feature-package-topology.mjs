@@ -214,9 +214,16 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath, pr
   return { ok: findings.length === 0, findings, receipt, rebinds };
 }
 
-/** A non-mutating, idempotent transition preview. Application remains a human-gated writer. */
-export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPath, nextState) {
-  const checked = validateFeaturePackage(rootDir, manifestPath);
+/**
+ * A non-mutating, idempotent transition preview by default. Application remains a
+ * human-gated writer. `options.autoRebindMutable` (default false) is passed straight
+ * through to the underlying `validateFeaturePackage` call (PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND):
+ * when set, a stale mutable-class artifact digest is self-healed on disk BEFORE this preview
+ * is computed, so a routine mutable-class drift no longer rejects the transition outright.
+ * Every existing caller that omits `options` is unaffected.
+ */
+export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPath, nextState, options = {}) {
+  const checked = validateFeaturePackage(rootDir, manifestPath, null, options);
   if (!checked.ok) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-current-package", findings: checked.findings };
   if (!FEATURE_STATES.includes(nextState)) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-target-state", findings: [] };
   if (checked.receipt.state === nextState) return { schema: "pipeline.feature-package-transition-plan.v1", status: "noop", manifest: checked.receipt.manifest, from: nextState, to: nextState, changes: [] };
@@ -396,10 +403,18 @@ function checkResultReconciliationFence(resultAuthority, artifact, currentBytes,
  * `resultAuthority` is the caller's current Continuity State `authority.result` binding
  * (`{ path, sha256 }` or `null`); it is consulted ONLY when a `result`-class artifact's
  * digest is being reconciled, per the Result fence (see `checkResultReconciliationFence`).
+ *
+ * `options.autoRebindMutable` (default false) is passed straight through to the underlying
+ * `validateFeaturePackage` call (PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND): a stale mutable-class
+ * artifact digest is self-healed on disk BEFORE this preview is computed, so a manifest whose
+ * ONLY drift is mutable-class ends up with nothing left to reconcile here (`status: "noop"`)
+ * instead of demanding the PO-signed ceremony for a routine, non-authority-gated resync.
+ * `immutable`/`append-only` entries are never touched by the auto-rebind, whatever this flag
+ * is set to -- they still flow through the reconcile ceremony below, unchanged.
  */
-export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPath, resultAuthority = null) {
+export function planFeaturePackageReconcile(rootDir = process.cwd(), manifestPath, resultAuthority = null, options = {}) {
   const root = resolve(rootDir);
-  const checked = validateFeaturePackage(root, manifestPath);
+  const checked = validateFeaturePackage(root, manifestPath, null, options);
   if (checked.receipt === null) {
     return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-current-package", findings: checked.findings };
   }
