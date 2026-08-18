@@ -2,7 +2,12 @@
 
 > Agent-Pipeline · Sprint Nova · as of 2026-08-07
 
-**Status:** accepted for the placement rule, open for the rotation mechanism
+**Status:** accepted for the placement rule; the rotation-mechanism *shape*
+(Decision 5) is addressed by [ADR-0064](0064-handover-rotation-extraction-archive-hard-size-gate.md),
+2026-08-18 — read Decision 5 below as historical context for the question
+ADR-0064 answers. ADR-0064 itself records that the extraction pass is
+partial and the mechanism build/rotation are NOT yet done — Decision 5 is
+therefore shape-closed, not fully discharged.
 (2026-08-07, PO instruction, chat) — *"state ist ja auch dafür gedacht. weil
 eine neue session immer dumm ist und deine zwischendokumente nicht finden würde.
 eins der agentischen entwicklungsprobleme: auch ein Elephant ist am Anfang ein

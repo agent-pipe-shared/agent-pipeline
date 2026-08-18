@@ -161,3 +161,28 @@ new term for this case).
   the conflation-detection case, the six-term-presence case (including a
   missing-term failure naming the term), and a clean pass against this
   repo's real docs.
+
+## SEC-10 — Threat-model scope: the guard union defends against the agent, not against a human operator
+
+- The adversary every guard/signature/ceremony mechanism in this repository
+  (git-guard union, GMW, HGO, `signature`-mode push approval) is built to
+  defend against is **the agent acting on its own or manipulated authority**
+  — never a human with legitimate machine access. **MUST NOT** propose,
+  design, or add a NEW human-facing ceremony, key, or approval step whose
+  only stated benefit is resistance against a human operator (e.g. a second
+  PO-held signing key, a per-release human signing ceremony) — that is
+  outside this pipeline's threat model, not a stronger version of it.
+  ADR-0056 `signature` mode's existing detached-signature burden is already
+  at the accepted ceiling for human-facing friction; a new proposal that
+  would add to it needs the PO's explicit, threat-model-aware sign-off,
+  never an Elephant default.
+- **Why:** PO ruling (2026-08-07, verbatim): *"PO schlüssel?! ne jetzt
+  übertreiben wir hier wieder! wir sichern den agenten ab und nicht den
+  human. Das signieren ausserhalb ist schon heftig genug."* — stated while
+  rejecting a proposed second PO-held release-signing key, and generalized
+  by the PO as a standing scope rule for this repository's guard work, not
+  a one-off rejection of that specific proposal.
+- **Verification:** A design/ADR proposing a new human-facing signing/
+  approval mechanism names, explicitly, which agent-side threat it closes;
+  a proposal whose only justification is human-adversary resistance is a
+  SEC-10 violation to flag at design review or Critic review.
