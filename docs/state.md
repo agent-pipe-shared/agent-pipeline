@@ -3,7 +3,15 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 44)
+**Last updated:** 2026-08-19 (checkpoint 45)
+
+---
+
+## CHECKPOINT — 2026-08-19 (45): stop-hook correctly flagged the "process ALL open backlog items" goal as incomplete; full 27-item audit run; bookkeeping gap found (code landed, backlog items never closed); closeout round dispatched (READ THIS FIRST)
+
+A stop-hook challenged checkpoint 44's status report: it was accurate about Verify/security-scan gate state but incomplete on "process every open, non-other-sprint backlog item." A fork audited all 27 then-open items against actual landed code. Findings: **14 items were already resolved by this session's own commits but never had their own Triage/status updated to closed** (pure bookkeeping gap, not missing work) — including 2 non-obvious ones the fork initially filed as "never examined": `2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md` is resolved by `clean-candidate-run.mjs` (commit `615bcd24`, whose own header comment cites this item by name) and `2026-08-09-elephant-authored-production-diff-closed-its-own-gating-criterion.md` is resolved by the stage0-selfcheck mandatory pre-commit qualification (commits `6bf621c5`/`708842c6`, whose own error message cites this item by filename). 2 items get a partial-progress update but stay open (`technical-lock-for-pipeline-consent...` and `el-01-has-no-in-session-tripwire` — both have their guard file landed, both still blocked on the same TP-4/HGO ceremony for `hooks.json` wiring). 1 item (`absent-runner-flag-silently-defaults-to-codex`) is correctly deferred per the PO's standing Nova-duplicate-skip instruction, not a miss. `PHX-WP-BACKLOG-CLOSEOUT-ROUND3` workflow (`w3t0zuefc`) is dispatched — closes the 14, updates the 2 partial items, and dispatches the 2 remaining genuinely-actionable-but-undispatched work packages (`unified-human-authorization-ux` #5 Passkey/WebAuthn adapter-contract scope; `product-capability-inventory` piece 1, mechanical verify-phase capability entries) — **check its outcome before assuming this is done**.
+
+Everything from checkpoint 44 (Verify 396/398, security-scan clean, 3 externally-blocked/PO-decision-pending suites) is unchanged and still accurate.
 
 ---
 
