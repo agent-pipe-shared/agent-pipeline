@@ -21,15 +21,99 @@ import {
   planProjectOnboardingSourceRecoveryV4,
 } from "../lib/project-onboarding-v3.mjs";
 
+// GUARDDERIVE-1 (backlog:
+// 2026-08-16-guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table.md).
+// The ONE registered subcommand table of this CLI. Every consumer of "which
+// subcommands exist / which of them write / which of them an automated session
+// may be told to run" derives from this literal, so adding a subcommand is a
+// single edit that forces an explicit decision per property instead of leaving
+// a second, hand-maintained copy somewhere else to drift. Three consumers today:
+//
+//   1. parse() below -- FLAT_COMMANDS, the argv[0] tokens it recognises.
+//   2. APPLY_SHAPED_COMMANDS below -- the --activate validity check and the
+//      exit-status decision, which stay derived from ONE `mutates` declaration
+//      so they can never silently disagree (RUNNERNEUT-1 mechanism C).
+//   3. hooks/guard-lifecycle-ready.mjs -- via automatedLifecycleArgvCommands(),
+//      replacing the hand-maintained plan* array that had gone stale three
+//      separate times (backlog items 2026-08-08, 2026-08-09, 2026-08-16).
+//
+// Per entry:
+//   name    -- the internal command id. `flat: true` entries are also the exact
+//              argv[0] token; `flat: false` entries are synthesized by parse()
+//              from a compound form (`kickoff promote apply` -> kickoff-promote-apply).
+//   mutates -- the DECLARED write property. `true` means the command may write
+//              and therefore accepts --activate. This is what read-only-ness is
+//              keyed on: never the `plan` name prefix, so a future WRITING
+//              subcommand that happens to be named plan-* is not admitted
+//              anywhere merely for matching the naming convention.
+//   automatedArgvShape -- "lifecycle" means an AUTOMATED (machine-issued)
+//              invocation of this command is exactly the bare
+//              lifecycleArgv([SCRIPT, name, "--root", root], runner, intent)
+//              argv: `--root <root> [--runner <claude|codex>] [--intent <value>]`
+//              and nothing wider -- deliberately NOT the full human-invoked CLI
+//              surface, which for some of these commands accepts further flags
+//              (plan-partial-authority's --profile/--source). `null` means the
+//              command has no such bare automated shape (it carries digests,
+//              operands, or arrives through a compound subcommand path); those
+//              are admitted, where they are admitted at all, only by the guard's
+//              own explicit per-command branches. This distinction is the
+//              twice-Critic-reviewed defense-in-depth the guard is built on and
+//              is preserved here on purpose, not widened.
+const ONBOARDING_SUBCOMMANDS = Object.freeze([
+  { name: "inspect", flat: true, mutates: false, automatedArgvShape: null },
+  { name: "plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "plan-reinstall", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "apply-reinstall", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "plan-partial-authority", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "apply-partial-authority", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "plan-source-recovery", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "plan-manifest-repair", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "apply-manifest-repair", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "apply-portable-seed", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "plan-runtime", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "initialize-runtime", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "plan-repair", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "apply-repair", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "plan-readback", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "apply-readback", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "continuity-inspect", flat: false, mutates: false, automatedArgvShape: null },
+  { name: "kickoff-plan", flat: false, mutates: false, automatedArgvShape: null },
+  { name: "kickoff-apply", flat: false, mutates: true, automatedArgvShape: null },
+  { name: "kickoff-promote-plan", flat: false, mutates: false, automatedArgvShape: null },
+  { name: "kickoff-promote-apply", flat: false, mutates: true, automatedArgvShape: null },
+  { name: "adopt-remote-plan", flat: false, mutates: false, automatedArgvShape: null },
+  { name: "adopt-remote-apply", flat: false, mutates: true, automatedArgvShape: null },
+].map((entry) => Object.freeze(entry)));
+
+export { ONBOARDING_SUBCOMMANDS };
+
+/**
+ * GUARDDERIVE-1: the read-only, bare-lifecycleArgv-shaped subcommand names,
+ * derived from the two DECLARED properties above -- never from the `plan` name
+ * prefix. Both conditions must hold: a mutating command is excluded whatever it
+ * is named, and a read-only command whose automated invocation is not the bare
+ * lifecycle argv is excluded too. Exported for hooks/guard-lifecycle-ready.mjs;
+ * takes the table as a parameter so the derivation itself is unit-testable
+ * against synthetic entries without touching the real registration.
+ */
+export function automatedLifecycleArgvCommands(subcommands = ONBOARDING_SUBCOMMANDS) {
+  return Object.freeze(subcommands
+    .filter((entry) => entry.mutates === false && entry.automatedArgvShape === "lifecycle")
+    .map((entry) => entry.name));
+}
+
+// The argv[0] tokens parse() recognises directly (the compound `kickoff`,
+// `kickoff promote`, `adopt-remote` and `continuity` forms are handled by their
+// own branches below and synthesize the remaining names in the table).
+const FLAT_COMMANDS = ONBOARDING_SUBCOMMANDS.filter((entry) => entry.flat).map((entry) => entry.name);
+
 // The commands that mutate (accept --activate). Shared between the --activate
 // validity check and the exit-status decision below, so the two can never
 // silently drift apart: what may write is exactly what the exit code below
 // treats as "apply-shaped" (RUNNERNEUT-1 mechanism C).
-const APPLY_SHAPED_COMMANDS = new Set([
-  "apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback",
-  "apply-manifest-repair", "apply-partial-authority", "apply-reinstall",
-  "kickoff-apply", "kickoff-promote-apply", "adopt-remote-apply",
-]);
+const APPLY_SHAPED_COMMANDS = new Set(
+  ONBOARDING_SUBCOMMANDS.filter((entry) => entry.mutates).map((entry) => entry.name),
+);
 
 // CLI-edge runner resolution -- NOT the reverted library-level default
 // (project-onboarding-v3.mjs carries the full history). Deep inside the
@@ -78,7 +162,7 @@ function parse(args) {
     if (args[1] !== "inspect") return { error: "continuity requires inspect" };
     output.command = "continuity-inspect";
     start = 2;
-  } else if (["inspect", "plan", "plan-reinstall", "apply-reinstall", "plan-partial-authority", "apply-partial-authority", "plan-source-recovery", "plan-manifest-repair", "apply-manifest-repair", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
+  } else if (FLAT_COMMANDS.includes(args[0])) {
     output.command = args[0];
     start = 1;
   }

@@ -48,6 +48,12 @@ import {
   isBoundedReadOnlyPipeline,
   parseGuardCommand,
 } from "./guard-command-grammar.mjs";
+// GUARDDERIVE-1: imported straight from the onboarding CLI the guard defers to, never
+// restated here -- the whole point of the change is that one table is the single source.
+import {
+  automatedLifecycleArgvCommands,
+  ONBOARDING_SUBCOMMANDS,
+} from "../scripts/project-onboarding-v3.mjs";
 // NOVA-LCR-HGO-1 (ADR-0059 Decision 3/4): the same generic HGO Bash class the guard now
 // consumes for its three closed-shell-grammar denials. Arming driven through the library
 // directly, mirroring guard-testpath-override.test.mjs's `arm()` (chat) and
@@ -1530,6 +1536,90 @@ test("GUARDALLOW-1: plan-partial-authority is admitted with the same shape as it
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * GUARDDERIVE-1 (backlog:
+ * 2026-08-16-guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table.md).
+ * The guard's admitted plan* NAME set is now derived from ONBOARDING_SUBCOMMANDS -- the
+ * onboarding CLI's own registered subcommand table -- instead of the hand-maintained array
+ * that had gone stale three separate times against that CLI (backlog items 2026-08-08,
+ * 2026-08-09, 2026-08-16). These three tests pin the three things that fix depends on:
+ * the derived set is exactly what the guard admits, the derivation keys on the DECLARED
+ * properties rather than the `plan` name prefix, and the table itself stays well-formed
+ * so a newly registered subcommand cannot arrive without an explicit decision.
+ */
+test("GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivation, and admits exactly that set", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const derived = automatedLifecycleArgvCommands();
+    // Regression pin against a silent widening OR narrowing: this is the exact set the
+    // hand-maintained array carried at the moment it was replaced. A future entry may
+    // legitimately extend it, but never by accident -- this assertion has to be edited
+    // deliberately alongside the table.
+    assert.deepEqual([...derived].sort(), [
+      "plan", "plan-manifest-repair", "plan-partial-authority", "plan-readback",
+      "plan-reinstall", "plan-repair", "plan-runtime", "plan-source-recovery",
+    ]);
+    // Every derived name really is admitted by the real guard in the bare lifecycleArgv
+    // shape -- the derivation is load-bearing, not decoration.
+    for (const command of derived) {
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}'`, path), true, command);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --runner codex --intent session`, path), true, command);
+      // ...and the SHAPE stays as narrow as before: only the exact automated nextAction
+      // argv, never the wider human-invoked CLI surface these same commands accept.
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --profile epic --source canonical-fresh-v3`, path), false, command);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${command} --root '${path}' --activate`, path), false, command);
+    }
+    // Conversely: a registered subcommand the derivation does NOT select gets no bare
+    // lifecycleArgv admission from this branch. `inspect` is excluded from the sweep
+    // because it has its own separate, older admission branch of the same shape, which
+    // this change deliberately leaves byte-identical rather than folding in.
+    for (const entry of ONBOARDING_SUBCOMMANDS) {
+      if (derived.includes(entry.name) || entry.name === "inspect") continue;
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${entry.name} --root '${path}'`, path), false, entry.name);
+      assert.equal(isSanctionedLifecycleCommand(`node '${ONBOARDING_SCRIPT}' ${entry.name} --root '${path}' --runner claude --intent session`, path), false, entry.name);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("GUARDDERIVE-1: the derivation keys on the declared properties, never on the plan name prefix", () => {
+  // The correctness hazard the backlog item names explicitly: a future WRITING subcommand
+  // that happens to share the `plan` prefix must not be admitted just for matching the
+  // naming convention -- and a read-only command whose automated invocation is not the
+  // bare lifecycle argv must not be admitted either. Driven through a synthetic table so
+  // the real registration is untouched.
+  const synthetic = [
+    { name: "plan-writes-things", flat: true, mutates: true, automatedArgvShape: "lifecycle" },
+    { name: "plan-no-automated-shape", flat: true, mutates: false, automatedArgvShape: null },
+    { name: "plan-legitimate", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+    // No `plan` prefix at all: selection follows the declared properties, so this IS chosen.
+    { name: "diagnose-legitimate", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  ];
+  assert.deepEqual(automatedLifecycleArgvCommands(synthetic), ["plan-legitimate", "diagnose-legitimate"]);
+  // Both declared properties are required, and neither is inferred from the other.
+  assert.deepEqual(automatedLifecycleArgvCommands([{ name: "plan-x", flat: true, mutates: true, automatedArgvShape: null }]), []);
+  assert.deepEqual(automatedLifecycleArgvCommands([]), []);
+});
+
+test("GUARDDERIVE-1: every registered onboarding subcommand declares both properties explicitly", () => {
+  // A subcommand added to the CLI table without deciding these two fields must fail loudly
+  // here rather than defaulting into (or silently out of) the guard's admitted set. This is
+  // the mechanism that replaces "remember to also edit the guard".
+  const names = new Set();
+  for (const entry of ONBOARDING_SUBCOMMANDS) {
+    assert.equal(typeof entry.name, "string", JSON.stringify(entry));
+    assert.equal(names.has(entry.name), false, entry.name);
+    names.add(entry.name);
+    assert.equal(typeof entry.flat, "boolean", entry.name);
+    assert.equal(typeof entry.mutates, "boolean", entry.name);
+    assert.equal([null, "lifecycle"].includes(entry.automatedArgvShape), true, entry.name);
+    // A command that may write can never also declare the automated read-only shape the
+    // guard admits -- the two declarations would contradict each other.
+    assert.equal(entry.mutates === true && entry.automatedArgvShape === "lifecycle", false, entry.name);
+  }
+  assert.equal(names.size > 0, true);
 });
 
 /**

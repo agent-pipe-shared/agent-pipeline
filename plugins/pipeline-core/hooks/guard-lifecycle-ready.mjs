@@ -23,6 +23,7 @@ import {
   inspectProjectOnboardingV3,
   PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
 } from "../lib/project-onboarding-v3.mjs";
+import { automatedLifecycleArgvCommands } from "../scripts/project-onboarding-v3.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import {
   hasCodexExistingGitControlMount,
@@ -125,6 +126,11 @@ const RESTART_RESUME_HINT_INPUT_PATH = "project/.resume-hint-input.json";
 const PARTIAL_LIFECYCLE_SCRATCH_DIR = "scratch";
 const PARTIAL_LIFECYCLE_INCIDENT_REPORT_PATH = join(PARTIAL_LIFECYCLE_SCRATCH_DIR, "incident-report.md");
 const HEX = /^[a-f0-9]{64}$/u;
+// GUARDDERIVE-1: resolved once at module load from the onboarding CLI's own registered
+// subcommand table (ONBOARDING_SUBCOMMANDS in scripts/project-onboarding-v3.mjs), not
+// restated here. See sanctionedOnboardingArgs() below for what this set does and does
+// NOT relax.
+const AUTOMATED_LIFECYCLE_ARGV_COMMANDS = automatedLifecycleArgvCommands();
 const VALID_RUNNERS = new Set(["claude", "codex"]);
 // Every write-capable tool this gate admits. NotebookEdit was absent from both this list
 // and from every hooks.json matcher until 2026-08-06, so a .ipynb write returned verdict(0)
@@ -1448,13 +1454,26 @@ function sanctionedOnboardingArgs(rawArgs, root) {
         && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[4])))) return true;
   if (args[0] === "continuity" && args[1] === "inspect"
     && exactRoot(args, root, 2) && args.length === 4) return true;
-  // GUARDALLOW-1 (backlog: 2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md).
-  // `plan-partial-authority` is a read-only planner -- absent from APPLY_SHAPED_COMMANDS
-  // (scripts/project-onboarding-v3.mjs:28-32) and passed through commandAction(..., false, ...)
-  // (lib/project-onboarding-v3.mjs:3436) -- built through the same lifecycleArgv(argv, runner,
-  // intent) helper as every sibling here, so it emits the identical `--root <root> [--runner
-  // <runner>] [--intent <value>]` shape and belongs in this exact branch, not a new one.
-  if (["plan", "plan-runtime", "plan-reinstall", "plan-repair", "plan-readback", "plan-source-recovery", "plan-manifest-repair", "plan-partial-authority"].includes(args[0])
+  // GUARDDERIVE-1 (backlog:
+  // 2026-08-16-guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table.md).
+  // This branch used to carry a hand-maintained array of plan* names, and it had gone stale
+  // three separate times against the CLI it gates (backlog items 2026-08-08, 2026-08-09,
+  // 2026-08-16 -- each a real read-only subcommand the inspection prescribed and the guard
+  // refused). The set is now DERIVED from ONBOARDING_SUBCOMMANDS, the onboarding CLI's own
+  // registered subcommand table, keyed on two declared properties (`mutates: false` and
+  // `automatedArgvShape: "lifecycle"`) -- never on the `plan` name prefix, so a future
+  // WRITING subcommand that happens to be named plan-* is not admitted just for matching
+  // the naming convention.
+  //
+  // What is deliberately NOT derived: the argv SHAPE below. The guard still admits only the
+  // exact automated nextAction argv -- `--root <root> [--runner <runner>] [--intent <value>]`
+  // as lifecycleArgv(argv, runner, intent) emits it -- and never the wider human-invoked CLI
+  // surface those same commands accept (plan-partial-authority's --profile/--source stay
+  // refused here, pinned by this file's own tests). That narrowness is twice-Critic-reviewed
+  // defense-in-depth (backlog:
+  // 2026-08-17-plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags.md),
+  // not an oversight, so deriving the NAME set never widens the SHAPE set.
+  if (AUTOMATED_LIFECYCLE_ARGV_COMMANDS.includes(args[0])
     && exactRoot(args, root, 1)
     && (args.length === 3
       || (args.length === 5 && args[3] === "--intent"
