@@ -32,6 +32,7 @@ import {
 } from "../lib/afk-capability-worker.mjs";
 import { executeAfkEntryHostTransaction } from "../lib/afk-transaction-host.mjs";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 const MAX_INPUT = 512 * 1024;
 const SHA256 = /^[0-9a-f]{64}$/u;
@@ -135,10 +136,18 @@ function storePrepared(root, request) {
   fsyncFile(dirname(path));
 }
 
-function loadPrepared(root, requestId) {
+function loadPrepared(root, requestId, { platform = process.platform, assessWindowsPrivate = assessWindowsPrivatePath } = {}) {
   const path = requestPath(root, requestId);
   const info = lstatSync(path);
-  if (!info.isFile() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o777) !== 0o600) {
+  if (!info.isFile() || info.isSymbolicLink() || realpathSync(path) !== path) {
+    throw new Error("unsafe prepared request");
+  }
+  // Node synthesizes `.mode` on native Windows from the read-only attribute
+  // alone, so a bare mode-bit comparison is meaningless there and fails
+  // closed unconditionally; on win32 this defers to the shared native
+  // DACL/owner assurance instead, mirroring afk-ledger.mjs:336-340.
+  const secure = platform === "win32" ? assessWindowsPrivate(path).status === "secure" : (info.mode & 0o777) === 0o600;
+  if (!secure) {
     throw new Error("unsafe prepared request");
   }
   const value = parseCanonical(readFileSync(path));
@@ -219,7 +228,10 @@ export async function finalizeClaudeWorker(rawResult, requestId, dependencies = 
   let observed;
   try {
     root = resolve(dependencies.root ?? process.cwd());
-    request = await (dependencies.loadPrepared ?? ((id) => loadPrepared(root, id)))(requestId);
+    request = await (dependencies.loadPrepared ?? ((id) => loadPrepared(root, id, {
+      platform: dependencies.platform,
+      assessWindowsPrivate: dependencies.assessWindowsPrivate,
+    })))(requestId);
     definition = dependencies.adapterBytes ?? adapterBytes(root, dependencies.readFile);
     observed = dependencies.observeCurrent
       ? await dependencies.observeCurrent(request, root)

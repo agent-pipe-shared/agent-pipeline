@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: SUL-1.0
 import test from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +18,7 @@ import {
   sha256Raw,
 } from "../lib/afk-assumption-mode.mjs";
 import { createAfkWorkerResult } from "../lib/afk-capability-worker.mjs";
+import { mkdtempTestScratch } from "../lib/test-tmpdir.mjs";
 import {
   finalizeClaudeWorker,
   prepareClaudeWorker,
@@ -193,4 +195,64 @@ test("host passes shell-looking file content only as inert base64 proposal data"
   }, stored);
   assert.equal(recreated.ok, true);
   assert.equal(Buffer.from(recreated.result.writes[0].resultContentBase64, "base64").equals(hostile), true);
+});
+
+// Windows: Node synthesizes `.mode` on native Windows from the read-only
+// attribute alone, so the bare `(info.mode & 0o777) !== 0o600` comparison in
+// the real (unstubbed) loadPrepared() failed closed unconditionally there
+// (backlog/items/2026-08-18-windows-posix-mode-bit-checks-are-meaningless-
+// on-ntfs.md). Every other test above stubs `loadPrepared` entirely, so
+// these exercise the real function -- against a real git repository, since
+// loadPrepared's own requestPath() shells out to `git rev-parse
+// --git-common-dir` -- via `finalizeClaudeWorker`'s own `platform`/
+// `assessWindowsPrivate` dependency seam.
+function realRepo(prefix) {
+  const root = mkdtempTestScratch(prefix);
+  const init = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(init.status, 0, init.stderr);
+  return root;
+}
+
+function writeRealPreparedRequest(root, request, mode) {
+  const dir = join(root, ".git", "agent-pipeline", "afk", "worker-requests");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  chmodSync(dir, 0o700);
+  const path = join(dir, `${request.requestSha256}.json`);
+  writeFileSync(path, canonicalJsonFile(request), { mode });
+  chmodSync(path, mode);
+  return path;
+}
+
+test("win32: a POSIX-insecure prepared request file is admitted via the injected DACL assurance instead of failing closed (POSIX unchanged)", async () => {
+  const { stored } = await prepared();
+  const result = proposal(stored);
+  const root = realRepo("afk-claude-host-win32-secure-");
+  // Exactly what the old bare `(info.mode & 0o777) !== 0o600` comparison
+  // would have failed closed on unconditionally, on every platform.
+  writeRealPreparedRequest(root, stored, 0o644);
+
+  const posix = await finalizeClaudeWorker(canonicalJsonFile(result), stored.requestSha256, {
+    root, adapterBytes: DEFINITION, observeCurrent: async () => structuredClone(CURRENT),
+    entryTransaction: async () => ({ ok: true, status: "entry-applied" }),
+  });
+  assert.equal(posix.code, "AFK-WORKER-PREPARED-REQUEST-UNAVAILABLE");
+
+  const win32Secure = await finalizeClaudeWorker(canonicalJsonFile(result), stored.requestSha256, {
+    root, adapterBytes: DEFINITION, observeCurrent: async () => structuredClone(CURRENT),
+    entryTransaction: async () => ({ ok: true, status: "entry-applied" }),
+    platform: "win32", assessWindowsPrivate: () => ({ status: "secure" }),
+  });
+  assert.equal(win32Secure.ok, true);
+  assert.equal(win32Secure.status, "entry-applied");
+});
+
+test("win32: an insecure DACL assessment on the prepared request file still fails closed", async () => {
+  const { stored } = await prepared();
+  const root = realRepo("afk-claude-host-win32-insecure-");
+  writeRealPreparedRequest(root, stored, 0o600);
+  const win32Insecure = await finalizeClaudeWorker(canonicalJsonFile(proposal(stored)), stored.requestSha256, {
+    root, adapterBytes: DEFINITION, observeCurrent: async () => structuredClone(CURRENT),
+    platform: "win32", assessWindowsPrivate: () => ({ status: "insecure" }),
+  });
+  assert.equal(win32Insecure.code, "AFK-WORKER-PREPARED-REQUEST-UNAVAILABLE");
 });
