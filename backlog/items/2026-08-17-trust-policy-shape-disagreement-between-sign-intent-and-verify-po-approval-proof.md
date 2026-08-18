@@ -3,9 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "this session's own feature-package-reconcile ceremony for R-AC-06's acceptance.md digest drift"
+closed_at: 2026-08-18
+closure_commit: 4c2f04cb
 ---
 
 # trust-policy.json shape disagreement between po-human-approval.mjs and po-approval-proof.mjs
@@ -71,12 +73,22 @@ one silently rejecting the other's valid output.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** deferred
-- **Rationale:** discovered and worked around mid-ceremony this session
-  (reconcile succeeded using the pre-upgrade backup file); the underlying
-  inconsistency is real but narrow in blast radius (only affects operators
-  who ran `setup --human-name` on an already-verifying key), not urgent
-  enough to fix same-session alongside unrelated Phoenix acceptance work.
-- **Assignment (if accepted):** a future increment; owner `pipeline`, no
-  expiry set.
-- **Date:** 2026-08-17
+- **Decision:** closed (implemented)
+- **Rationale:** implemented proposal option (a) in commit `4c2f04cb`
+  (`fix(po-approval-proof): accept the 3-key named trust-policy shape`).
+  `verifyPoApprovalProof`'s `trustPolicy` check now accepts either the
+  2-key legacy shape or the 3-key named shape (`humanName` treated as
+  optional/additive, exactly as it already is everywhere else in
+  `po-human-approval.mjs`), via a new `trustPolicy`-specific
+  `ownTrustPolicy()` helper that leaves the general `own()` helper and
+  `proof`'s own strict check untouched. Any OTHER unrecognised extra key on
+  `trustPolicy` still fails closed with `PO-APPROVAL-PROOF-INVALID` — only
+  `humanName` specifically is tolerated. Covered by new real-crypto tests in
+  `plugins/pipeline-core/lib/po-approval-proof.test.mjs` (3-key accepted,
+  2-key regression still accepted, missing required fields still rejected
+  with/without `humanName`, an unrelated extra key still rejected, and
+  `proof`'s own `own()` check confirmed unaffected). No workaround (the
+  `.pre-humanname` backup file) is needed going forward.
+- **Assignment:** implemented this session (task
+  `PHX-WP-TRUSTPOLICY-HUMANNAME`); owner `pipeline`.
+- **Date:** 2026-08-18
