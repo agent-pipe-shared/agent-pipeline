@@ -40,10 +40,10 @@ no PTY wait, and no model attempt.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — minimal targeted reorder: move the codex-executable check before consent/evidence-bundle in `codex-advisory-bootstrap.mjs`, and add an equivalent cheap non-spawning pre-check to `advisor-consult/SKILL.md`'s trigger gate.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation. Must stay inside ADR-0062's frozen boundary (no new authority store, no change to `pipeline.control-execution-exchange.v1`).
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

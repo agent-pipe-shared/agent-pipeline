@@ -39,10 +39,10 @@ and the PO sees at most a completion note, not a selection question.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** PO's own modified design (neither offered option as-is): full auto-execute across ALL SIX recovery kinds (not just the non-composite bind-orphan/retire-orphans subset) — but every file the auto-recovery touches must first get a `.bak` backup copy written before modification, as a rollback safety net replacing the human-confirmation gate.
+- **Rationale:** PO 2026-08-18 — accepted the broader automation across all six recovery kinds but paired it with a cheap, purely mechanical safety net (pre-modification backup) instead of relying on a human checkpoint; addresses the analyst's caution about the riskiest composite kind and the two related open defects in the same subsystem without needing a human in the loop.
+- **Assignment (if accepted):** Nova Wave 4 implementation — `session-cleanup-recovery.mjs`'s planner: set `requiresConfirmation: false` across all recovery kinds, and add a `.bak` write of each touched file immediately before its recovery action executes. Backup naming/location and any old-backup cleanup policy is left to the implementing dispatch's own design — not further specified by the PO.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

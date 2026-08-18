@@ -39,10 +39,10 @@ happy-path SLOs were met, without exporting any content or private data.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — hybrid: do the minimal `usage-ledger.mjs`/phase-history extension now (cheap, unblocks the sibling Sprint-Alfred-assigned dispatch-bootstrap-cost item), but fold guard-denial/signature-attempt telemetry into Sprint Alfred rather than building it standalone here.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation (the phase-history + usage-ledger extension only); guard-denial/signature telemetry is explicitly out of scope for Nova, tracked under Sprint Alfred instead.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

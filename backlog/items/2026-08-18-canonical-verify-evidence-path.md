@@ -44,10 +44,10 @@ settings, must produce exactly the file that the push guard consumes.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — ship the minimal default-path fix: shared constant, `verify-evidence-producer.mjs` defaults to it, `guard-push.mjs`/`push-prepare.mjs` import it instead of independent literals; defer the "restrict override" policy question to a follow-on item.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

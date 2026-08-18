@@ -39,10 +39,10 @@ in CI as argv fixtures against the real parser.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — Option 2, narrowly scoped to `docs/push-release-flow.md`'s push/recovery examples: contract-test the documented commands as argv fixtures against the real parser, reusing the fixture pattern already established in `pipeline-state-result-case-migration.test.mjs`. Decline the full declarative-parser-schema rearchitecture for Nova Wave 4.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation. Before dispatch, cross-check against the two already-closed items on the same CLI-doc-drift class (`2026-08-09-push-approval-skill-reference-predates-adr-0061.md`, `2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md`) — confirm this item supersedes/consolidates rather than duplicating tracked work, per the design proposal's own flagged risk.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

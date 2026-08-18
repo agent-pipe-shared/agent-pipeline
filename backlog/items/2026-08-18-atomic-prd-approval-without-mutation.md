@@ -45,10 +45,10 @@ rebind, or signature step, and continuity is immediately valid.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — extend the existing `po-authority-rebind` family with an acknowledge-plan/apply pair (real fix), done alongside the cheap promotion-admission-check extension — not the full merge-into-one-step option, which stays a separate, explicit future PO product decision.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18

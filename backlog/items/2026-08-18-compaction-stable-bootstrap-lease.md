@@ -41,10 +41,10 @@ not re-run as long as the lease and digests remain unchanged.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted — fix `codex-session-start-hint.mjs`/`codex-hooks.json` to reuse `post-compact-reground.mjs`'s existing exported projection logic on `source==='compact'`; do not build a new lease schema.
+- **Rationale:** PO 2026-08-18 accepted the analyst's recommendation as-is.
+- **Assignment (if accepted):** Nova Wave 4 implementation.
+- **Date:** 2026-08-18
 
 
 ## Design proposal (Wave-4 prep), 2026-08-18
