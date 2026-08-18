@@ -8020,6 +8020,64 @@ implementation where feasible, a queued/dispatched fix where the work
 genuinely needs its own dispatch, never a re-deferral without a named
 future sprint and PO-legible rationale.
 
+## Bucket C/E parallel-sweep completion (2026-08-18)
+
+Per the PO's explicit direction to parallelize the remaining backlog work
+hard via the Workflow tool: `isolation: "worktree"` was tried first and hit
+a confirmed infrastructure bug (worktrees provisioned from the stale local
+`stable` branch, 552 commits behind — see the sharpened
+`feedback-agent-worktree-isolation-can-branch-off-wrong-base` memory) —
+worked around by switching to a two-phase design: 10 parallel *read-only*
+cluster agents (no isolation needed, no shared-write race) each proposed
+full new content for their assigned items, then this session applied every
+proposal sequentially, single-writer, in the main checkout.
+
+**All 92 remaining open/in_progress items were covered across the 10
+clusters** (authority-guard, critic-verify, human-approval-push,
+onboarding-bootstrap-kickoff, codex-cross-repo-runner,
+dispatch-goldfish-orchestration, docs-handover-design,
+gmw-windows-fs-scratch, process-cost-recovery-misc,
+sentinel-cyborg-residual-po-only). Disposition breakdown:
+
+- **3 closed, implemented same-pass:** `plan-partial-authority-guard-
+  allowlist-does-not-admit-its-own-profile-source-flags` (closed as
+  not-a-defect — the narrower admission is deliberate, twice-Critic-
+  reviewed defense-in-depth; no code change needed), `no-gate-is-tested-
+  end-to-end-for-satisfiability` (QG-11 added to
+  `guardrails/quality-gates.md`: "test what the change altered, not only
+  what it was meant to fix"), `prd-spec-depth-collapses-relative-to-
+  design-input` (one sentence added to `kickoff-design.md` operationalizing
+  the PO-accepted "short goal → ask more" decision).
+- **~40 already correctly deferred to a named, still-open sprint** (Alfred,
+  Nightwing, Phoenix) with real, dated, PO-legible rationale — confirmed,
+  left untouched, do not count against the release bar per the PO's own
+  rule.
+- **~45 decided and queued for a dedicated implementation dispatch**, each
+  with a bounded, concrete scope written into the item's own Triage (not
+  left "unassigned" or vaguely deferred) — most newly assigned to Sprint
+  Alfred where no sprint was previously named, since "Nova A/B" is this
+  same release, not a separate one.
+- **2 confirmed genuinely PO-only**, cannot be closed from any session
+  (`two-guards-block-an-unrelated-file-via-substring-name-matching` part B,
+  `unregistered-suite-is-red-and-invisible-to-verify` — both need an
+  out-of-session attended-author repair ceremony or signature only the PO
+  can perform).
+- **0 "rejected but never closed"** bookkeeping gaps found.
+
+Applied across 9 commits (one per cluster, `9fa8a025`..`18b6d8bd`), plus a
+closure_commit-placeholder-resolution commit (`74dabb23`), a
+closure_evidence bare-path-format fix (`d923c035`, the checker rejects a
+fragment anchor or line range in that field), and a ledger-regeneration
+commit (`a3519ed4`). Fresh Full Verify at `a3519ed4`: clean except the one
+known `HGO-EXTERNAL-MARKETPLACE` host-local exception, unchanged.
+
+**Honest remaining count:** `backlog/STATUS.md` — 81 open + 9 in_progress =
+90 not-closed (down from 96 at the start of this session's full-backlog
+sweep), 164 closed. The 90 are now ALL either (a) correctly deferred to a
+named still-open sprint with real rationale, or (b) decided with a bounded,
+concrete dispatch scope recorded in their own Triage, or (c) confirmed
+genuinely PO-only — none are silently unassigned or unexamined.
+
 ## Recovery
 
 No persisted in-flight dispatch, rollback action or public human-gate acceptance
