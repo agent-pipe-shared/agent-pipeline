@@ -926,6 +926,75 @@ test("drift, expiry and concurrent consumption fail closed", () => {
   }
 });
 
+test("NVA-W3-16: a rejected drift audit entry names exactly which checks diverged", () => {
+  // Regression for backlog/items/2026-08-18-pipeline-author-repair-signature-
+  // mode-never-actually-admits-the-edit.md's recommended diagnostic step:
+  // the coarse pre-filter (toolName/toolInputSha256/denials/status) cannot
+  // distinguish WHICH of the finer-grained drift checks below it actually
+  // failed on. Here the coarse filter still matches (same tool/input/denials)
+  // but the repository itself changes between authorize and consume, so the
+  // capability reaches the drift computation and rejects on "repository".
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "bounded\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 1000,
+      ttlMs: 10000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      nowMs: 2000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    const reason = "Exact attended retry";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      reason,
+      nowMs: 2500,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    authorizeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: reasonDigest(reason),
+      activate: true,
+      nowMs: 3000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    git(root, "commit", "--allow-empty", "-q", "-m", "repository drifts after authorization");
+    assert.deepEqual(consumeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 4000,
+    }), { status: "replan", code: "HGO-DRIFT" });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const auditPath = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
+    const lines = readFileSync(auditPath, "utf8").trim().split("\n");
+    const rejected = lines.map((line) => JSON.parse(line)).find((entry) => entry.event?.code === "HGO-DRIFT");
+    assert.ok(rejected, "expected one HGO-DRIFT audit entry");
+    assert.deepEqual(rejected.event.driftedChecks, ["repository"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("security and authority boundaries return typed recovery without an ambient bypass", () => {
   const root = fixture();
   try {

@@ -2722,14 +2722,19 @@ export function consumeHumanGuardOverride({
         ? localPluginInstallSourceObservation(repo, { spawn: codexSpawn })
         : repositoryObservation(repo.root, spawn);
       const expired = new Date(capability.expiresAt).getTime() <= nowMs;
-      const drifted = capability.status !== "armed" || capability.root !== repo.root
-        || capability.toolName !== toolName || capability.toolInputSha256 !== toolInputSha256
-        || canonical(capability.denials) !== canonical(denialDigests)
-        || canonical(capability.plugin) !== canonical(plugin)
-        || canonical(capability.policy) !== canonical(policy)
-        || canonical(capability.repository) !== canonical(repository)
-        || (capability.mode === "pipeline-author-repair"
-          && authorEligiblePaths(repo.root, capability.eligiblePaths, capability.authorSourceRoot) === null);
+      const driftChecks = {
+        status: capability.status !== "armed",
+        root: capability.root !== repo.root,
+        toolName: capability.toolName !== toolName,
+        toolInputSha256: capability.toolInputSha256 !== toolInputSha256,
+        denials: canonical(capability.denials) !== canonical(denialDigests),
+        plugin: canonical(capability.plugin) !== canonical(plugin),
+        policy: canonical(capability.policy) !== canonical(policy),
+        repository: canonical(capability.repository) !== canonical(repository),
+        authorEligiblePaths: capability.mode === "pipeline-author-repair"
+          && authorEligiblePaths(repo.root, capability.eligiblePaths, capability.authorSourceRoot) === null,
+      };
+      const drifted = Object.values(driftChecks).some(Boolean);
       if (expired || drifted) {
         appendAudit(paths, {
           type: expired ? "expired" : "rejected",
@@ -2738,6 +2743,9 @@ export function consumeHumanGuardOverride({
           planSha256,
           reasonSha256: capability.reasonSha256,
           code: expired ? "HGO-EXPIRED" : "HGO-DRIFT",
+          ...(drifted && !expired
+            ? { driftedChecks: Object.keys(driftChecks).filter((key) => driftChecks[key]) }
+            : {}),
         });
         if (expired) {
           replanRequired = true;

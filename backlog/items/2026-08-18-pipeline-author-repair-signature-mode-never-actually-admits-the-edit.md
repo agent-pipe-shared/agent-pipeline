@@ -139,3 +139,50 @@ ceremony attempt with that instrumentation in place: that turns the next
 attempt into a one-shot diagnosis instead of a third blind burn of PO
 TTL. Only after that log confirms the exact failing check should a
 correctness fix be written.
+
+### PO decision, 2026-08-18 (20-item decision batch) -- diagnostic instrumentation landed
+
+PO decision: A -- schedule a diagnostic ceremony now. Landed the
+recommended instrumentation directly (turned out NOT to need a TP-3
+ceremony -- `plugins/pipeline-core/lib/human-guard-override.mjs` itself
+admitted the edit normally; only its own `.test.mjs` companion has ever
+been observed as protected in this repo's guard classification, and
+that too admitted the new regression test without a refusal):
+
+- `consumeHumanGuardOverride()`'s `drifted` boolean (the SECOND,
+  lock-protected re-validation check at ~line 2725, distinct from the
+  coarse first-pass filter at ~line 2700 that produces a silent
+  `{status:"absent"}` for a request that never matched at all) is now
+  computed from a named `driftChecks` object (`status`, `root`,
+  `toolName`, `toolInputSha256`, `denials`, `plugin`, `policy`,
+  `repository`, `authorEligiblePaths`). On a genuine drift-after-match
+  rejection, the appended `HGO-DRIFT` audit entry now carries a new
+  `driftedChecks` array naming exactly which of those keys diverged --
+  purely additive to the audit event object, no control-flow or return-
+  value change (`consumeHumanGuardOverride()`'s own return shape is
+  unchanged, confirmed by the full pre-existing suite staying green).
+- New regression test `NVA-W3-16` in `human-guard-override.test.mjs`
+  drives a real (not raw-file-tampered) drift-after-match case: commits
+  an empty commit between `authorizeHumanGuardOverride()` and
+  `consumeHumanGuardOverride()` so the coarse pre-filter still matches
+  (same tool/input/denials) but the repository observation differs at
+  the deeper check, asserts the audit entry's `driftedChecks` deep-
+  equals `["repository"]`.
+- `node --test human-guard-override.test.mjs`: 72/73 pass (71
+  pre-existing + this new one); the one remaining failure is the
+  already-tracked, pre-existing `HGO-EXTERNAL-MARKETPLACE` marketplace-
+  staleness case (unrelated).
+
+**What this does NOT do:** it does not fix the live OT09/C2f failure
+mode itself, and it does not add coverage for the specific
+`authorEligiblePaths` drift key (the prime suspect for pipeline-author-
+repair + signature mode specifically) -- constructing that exact
+reproduction synthetically was out of scope for this dispatch and is
+still the open diagnostic question. **Next step, per the item's own
+recommendation:** the NEXT live ceremony attempt against a real
+pipeline-author-repair + signature-mode denial will now have this
+instrumentation in place; if it fails again, `driftedChecks` in the
+resulting audit entry (`.git/agent-pipeline/human-guard-overrides/audit.jsonl`)
+tells the Elephant exactly which named check to fix, turning the third
+attempt into a one-shot diagnosis as intended. Status stays `open`.
+- **Date:** 2026-08-18
