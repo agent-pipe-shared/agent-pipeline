@@ -1931,6 +1931,12 @@
       "member": "session-cleanup-binding-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-cleanup-owner-nonce-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-cleanup-owner-nonce-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2115,6 +2121,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "workflow-writer-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:worktree-create-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "worktree-create-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
@@ -2507,6 +2519,7 @@
         "verify-phase:harness/scripts/verify.mjs:security-scan",
         "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-cleanup-owner-nonce-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
         "verify-phase:harness/scripts/verify.mjs:session-power-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:session-power-controller-tests",
@@ -2538,6 +2551,7 @@
         "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-writer-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:worktree-create-tests",
         "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:wsl-ipc-compatibility-tests",
         "verify-phase:harness/scripts/verify.mjs:yaml-lite-tests"
