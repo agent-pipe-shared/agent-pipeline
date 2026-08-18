@@ -4,6 +4,7 @@ import { chmodSync, existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, 
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { admitLocalSupervisorCleanup, localSupervisorStateDigest, planLocalSupervisorFilesystemRepair, repairLocalSupervisorState, resolveLocalSupervisorRoot, validateLocalSupervisorState } from "./local-supervisor-state.mjs";
+import { mkdtempTestScratch } from "./test-tmpdir.mjs";
 const D = "a".repeat(64), C = "b".repeat(64), owner = { nonce: "owner-1", pid: 42, processStartSha256: "c".repeat(64), bootSha256: "d".repeat(64) };
 let passed = 0; const check = (name, fn) => { fn(); passed += 1; console.log(`ok ${passed} - ${name}`); };
 const fixture = (fn) => { const root = mkdtempSync(join(homedir(), ".local-supervisor-")); try { fn(root); } finally { rmSync(root, { recursive: true, force: true }); } };
@@ -28,4 +29,58 @@ check("a non-regular state root is unavailable", () => fixture((base) => { const
 check("state, journal and lock symlinks are rejected without following them", () => fixture((root) => { const target = join(root, "target"); writeFileSync(target, "{}\n"); for (const name of ["state.json", "prepared.json", "repair.lock"]) { symlinkSync(target, join(root, name)); assert.equal(repairLocalSupervisorState({ root, repositoryFingerprint: D, candidate: C, subject: "d1" }).disposition, "recovery-required"); rmSync(join(root, name)); } }));
 check("oversized state, journal and lock files are rejected before parsing", () => fixture((root) => { for (const name of ["state.json", "prepared.json", "repair.lock"]) { writeFileSync(join(root, name), "x".repeat(65_537)); assert.equal(repairLocalSupervisorState({ root, repositoryFingerprint: D, candidate: C, subject: "d1" }).disposition, "recovery-required"); rmSync(join(root, name)); } }));
 check("cleanup requires a manifest member and an unexpired complete owner lease", () => fixture((root) => { const state = repairLocalSupervisorState({ root, repositoryFingerprint: D, candidate: C, subject: "d1" }).state; const live = { ...state, status: "recovery-required", owner, lease: { heartbeatMs: 1, expiresAtMs: 2, leaseSha256: "e".repeat(64) } }; live.recordSha256 = localSupervisorStateDigest(live); const admitted = { record: live, owner, leaseSha256: "e".repeat(64), manifest: [live.recordSha256], nowMs: 1 }; assert.equal(admitLocalSupervisorCleanup(admitted).ok, true); assert.equal(admitLocalSupervisorCleanup({ ...admitted, manifest: [] }).ok, false); assert.equal(admitLocalSupervisorCleanup({ ...admitted, nowMs: 2 }).ok, false); assert.equal(admitLocalSupervisorCleanup({ ...admitted, owner: { ...owner, pid: 43 } }).ok, false); }));
+
+// Windows: Node synthesizes `.mode` on native Windows from the read-only
+// attribute alone, so the bare `(mode & 0o022)`/`uid` comparisons in
+// trustedAncestor/ownedStateDirectory/ownedStateFile were meaningless there
+// and failed closed unconditionally (backlog/items/2026-08-18-windows-posix-
+// mode-bit-checks-are-meaningless-on-ntfs.md). These checks inject
+// `platform: "win32"` plus a stubbed DACL assessor to prove the win32 branch
+// decides the outcome, not the bare mode/uid bits. `scratchFixture` uses this
+// repo's own scratch/test-tmp convention rather than a host-temp path.
+const scratchFixture = (fn) => { const root = mkdtempTestScratch("local-supervisor-win32-"); try { fn(root); } finally { rmSync(root, { recursive: true, force: true }); } };
+
+check("win32: a POSIX-insecure state root is admitted via the injected DACL assurance instead of failing closed", () => scratchFixture((root) => {
+  chmodSync(root, 0o755); // would fail the old bare `(mode & 0o022) === 0` comparison unconditionally
+  try {
+    const result = planLocalSupervisorFilesystemRepair({
+      root, repositoryFingerprint: D, candidate: C, subject: "d1",
+      platform: "win32", assessWindowsPrivate: () => ({ status: "secure" }),
+    });
+    assert.equal(result.disposition, "create");
+  } finally {
+    chmodSync(root, 0o700);
+  }
+}));
+
+check("win32: an insecure DACL assessment on the state root still fails closed", () => scratchFixture((root) => {
+  const result = planLocalSupervisorFilesystemRepair({
+    root, repositoryFingerprint: D, candidate: C, subject: "d1",
+    platform: "win32", assessWindowsPrivate: () => ({ status: "insecure" }),
+  });
+  assert.equal(result.disposition, "unavailable");
+}));
+
+check("win32: an insecure DACL assessment on the state file still fails closed even though its directory is secure", () => scratchFixture((root) => {
+  const created = repairLocalSupervisorState({ root, repositoryFingerprint: D, candidate: C, subject: "d1" });
+  assert.equal(created.disposition, "create");
+  const statePath = join(root, "state.json");
+  const result = repairLocalSupervisorState({
+    root, repositoryFingerprint: D, candidate: C, subject: "d1",
+    platform: "win32", assessWindowsPrivate: (path) => ({ status: path === statePath ? "insecure" : "secure" }),
+  });
+  assert.equal(result.disposition, "recovery-required");
+}));
+
+check("win32: a secure directory and state file replay as a genuine no-op, not merely skipped", () => scratchFixture((root) => {
+  const created = repairLocalSupervisorState({ root, repositoryFingerprint: D, candidate: C, subject: "d1" });
+  assert.equal(created.disposition, "create");
+  const result = repairLocalSupervisorState({
+    root, repositoryFingerprint: D, candidate: C, subject: "d1",
+    platform: "win32", assessWindowsPrivate: () => ({ status: "secure" }),
+  });
+  assert.equal(result.disposition, "noop");
+  assert.equal(result.state.recordSha256, created.state.recordSha256);
+}));
+
 console.log(`1..${passed}`);
