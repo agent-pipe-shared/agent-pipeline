@@ -47,6 +47,45 @@ function validContext(value) {
     && validTextList(value.scope, 4) && validTextList(value.constraints, 4) && validTextList(value.questions, 3);
 }
 
+/**
+ * Which field a rejected card actually failed on, as one short clause.
+ *
+ * Ported from the sibling Nova checkout's diagnostic-half fix (backlog item
+ * `pipeline.resume-hint-opaque-token-rejects-hyphenated-english`, 2026-08-09):
+ * `RH-SCHEMA` on its own is the whole answer a caller used to get, and a card
+ * can be rejected for a reason the caller cannot see -- including a
+ * false-positive `opaqueToken()` match on an ordinary hyphenated English
+ * compound word (e.g. `documentation-reconciliation`,
+ * `checked-and-divergence-filed`; both 28 characters, no digit, no case
+ * mixing, yet long-and-hyphenated is enough to match the detector). The
+ * detector itself is untouched by this function -- only the diagnosis is
+ * improved. The verdict does not become permissive; it becomes answerable.
+ *
+ * Deliberately shape-only. It never echoes a value: a field can be rejected
+ * for carrying a secret or an opaque token, and repeating it in a diagnostic
+ * would print the exact thing the validator refused to persist.
+ */
+export function resumeHintContextDetail(value) {
+  if (!object(value)) return "context must be an object";
+  const missing = CONTEXT_KEYS.filter((key) => !Object.hasOwn(value, key));
+  const unexpected = Object.keys(value).filter((key) => !CONTEXT_KEYS.includes(key));
+  if (missing.length > 0 || unexpected.length > 0) {
+    return `context keys must be exactly ${CONTEXT_KEYS.join(", ")}`
+      + `${missing.length > 0 ? `; missing: ${missing.join(", ")}` : ""}`
+      + `${unexpected.length > 0 ? `; unexpected: ${unexpected.join(", ")}` : ""}`;
+  }
+  if (!validText(value.intent)) {
+    return "intent must be one non-empty single-line string, free of secrets and opaque tokens";
+  }
+  for (const [key, maximum] of [["scope", 4], ["constraints", 4], ["questions", 3]]) {
+    if (validTextList(value[key], maximum)) continue;
+    return Array.isArray(value[key])
+      ? `${key} must be at most ${maximum} non-empty single-line strings, free of secrets and opaque tokens`
+      : `${key} must be an ARRAY of at most ${maximum} short strings, not a ${typeof value[key]}`;
+  }
+  return "context is not accepted in this shape";
+}
+
 export function validateResumeHint(value) {
   if (!exact(value, ["schema", "nonAuthoritative", "context", "createdAt", "basis", "contentSha256"])
     || value.schema !== RESUME_HINT_SCHEMA || value.nonAuthoritative !== true
@@ -60,7 +99,11 @@ export function buildResumeHint({ context, basis = null, createdAt = new Date().
   const unsigned = { schema: RESUME_HINT_SCHEMA, nonAuthoritative: true, context, createdAt, basis };
   const candidate = { ...unsigned, contentSha256: digest(unsigned) };
   const checked = validateResumeHint(candidate);
-  if (!checked.ok) throw new Error(checked.code);
+  // The code stays the contract; the clause after it is what makes a rejection
+  // actionable -- see resumeHintContextDetail() above.
+  if (!checked.ok) {
+    throw new Error(checked.code === "RH-SCHEMA" ? `${checked.code}: ${resumeHintContextDetail(context)}` : checked.code);
+  }
   return candidate;
 }
 

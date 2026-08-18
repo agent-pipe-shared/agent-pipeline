@@ -1,24 +1,12 @@
 {
-  "taskId": "PHX-WP-DISPATCH-RACE",
+  "taskId": "PHX-WP-RESUME-HINT-DIAG",
   "model": "claude-sonnet-5",
   "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
   "dispatcher": "goldfish",
   "outcome": "passed",
   "log": [
-    {
-      "phase": "start",
-      "toolUseCount": 3,
-      "note": "Opening dispatch record written before reading context files."
-    },
-    {
-      "phase": "edits-complete",
-      "toolUseCount": 9,
-      "note": "Added GF-07 item 6 (roles/goldfish.md) and mirrored stop-condition wording (templates/prompts/goldfish-task.md field 5); replaced dispatch-record.json fixed filename with per-task dispatch-record-{{TASK_ID}}.json in field 6."
-    },
-    {
-      "phase": "verify",
-      "toolUseCount": 10,
-      "note": "rg -n dispatch-record templates/prompts/goldfish-task.md: only intentional parenthetical mention of the old fixed name remains, explicitly labelled as forbidden. Manual re-read of both files confirms consistent wording."
-    }
+    {"phase": "start", "toolUseCount": 1},
+    {"phase": "context-read", "toolUseCount": 4, "note": "backlog item, resume-hint.mjs, resume-hint.test.mjs already contained the diagnostic-half fix uncommitted in the working tree"},
+    {"phase": "verify", "toolUseCount": 8, "note": "node --test plugins/pipeline-core/lib/resume-hint.test.mjs: 6 passed, 0 failed, exit 0"}
   ]
 }
