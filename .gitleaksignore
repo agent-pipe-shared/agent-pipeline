@@ -120,3 +120,17 @@ content-v1:3f92b55300f17b30c9158d8d89cbb0a17dce9bb189d986658933a57044aace1f:back
 content-v1:5c1cb466a2e6dd255bcd67ddd85807418e36d27b0c8b76fcdbd2ab09c882b8a7:backlog/transitions.ndjson:sentry-access-token:217:519
 content-v1:b90d0367efc95f146c2fe7c734aba1773db159d59e62570bf242ca2dcca58be9:backlog/transitions.ndjson:sentry-access-token:218:536
 content-v1:7f4a6eb6eb7abcb42eb8f728c8c5cad714173f4fb84a4759615b42506a551c7a:backlog/transitions.ndjson:sentry-access-token:219:536
+# PHX-WP-GITLEAKS-FALSEPOS-IGNORE (2026-08-19): 4 confirmed false positives from the clean-
+# candidate run at commit 7fc34e0baeade3244f43158e7b2d5cdc57703204, each verified by direct
+# content inspection (not by rule/pattern alone) before being added.
+content-v1:591a0d0aa52775edfc81169216da539bc951ed05474538058314d046d0cb6a70:harness/scripts/security-adapters/gitleaks.test.mjs:sentry-access-token:206:10
+# ^ deliberate, already-commented test fixture (see the file's own comment above this line):
+# "the literal that trips gitleaks' sentry-access-token rule (empirically confirmed while
+# designing this fix)" -- a bare 64-hex-character digest used to exercise gitleaks' own
+# detection while testing this adapter, never a real Sentry access token.
+content-v1:6c0dc9ecc312edfbecdad6ee8a127ea75679e25658380f4a676feca7e4cf03ef:specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-rb-101a16a2069fcbb0947ee8af2bde5a6a.json:generic-api-key:1:106
+content-v1:d4e82b80465dcd26ba20032db952d6fc26cc214dda0c61d61a8591bc87af45a8:specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-rb-70b188a86f6e1f868e6b03c8e4099202.json:generic-api-key:1:106
+content-v1:ee35fd882218d795d28f7f4a61ffb7114ffb57f16ee09bcfbf779ecd44008431:specs/sprint-phoenix-epic/evidence/lifecycle/feature-package-rb-dc14a907b76a589945a32444437c2fa4.json:generic-api-key:1:106
+# ^ these 3: ordinary pipeline.feature-package-lifecycle-receipt.v1 JSON. The matched value in
+# each is the record's own idempotencyKey field (identical to the file's own name suffix), not
+# a credential of any kind.
