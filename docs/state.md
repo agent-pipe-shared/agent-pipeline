@@ -7981,6 +7981,45 @@ as a standing, host-local exception, not re-litigated per candidate going
 forward — this entry is the one-time explicit disclosure the Critic's
 QG-01 finding required.
 
+## Full-backlog completeness sweep (2026-08-18, PO hard bar: "otherwise no 0.6")
+
+PO instruction, verbatim intent: items already deferred to a named,
+still-open future sprint (not Sentinel/Cyborg, which are closed) do not
+block 0.6; everything else in the 96 open/in_progress backlog items
+(86 open + 10 in_progress out of ~254 total) must be genuinely resolved
+now — decided AND, where feasible same-session, implemented — not
+deferred again.
+
+A systematic audit (read every item's own Triage section directly, no
+sampling) classified the 96 into five buckets: **A** genuinely untriaged,
+7 items; **B** deferred to a named future sprint with real PO/Elephant
+rationale, ~34 items (does not block, per the PO's own rule above); **C**
+accepted, in scope, not yet implemented, ~40 items; **D** rejected but
+never closed, 0 found; **E** partially landed, deliberately still open,
+~15 items.
+
+**Bucket A (7) resolved this block, commits `00bd47c1`/`df60eea4`/`5c0ab668`:**
+- `goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths` — CLOSED, implemented (standing DoD-checks line in `goldfish-task.md`).
+- `elephant-direct-implementation-under-afk-authorization` — CLOSED, implemented (PO-waived direct-implementation light path in `close-block/SKILL.md` step 6b, with a mandatory follow-up-Critic-review obligation).
+- `two-handover-rotation-mechanisms-use-different-archive-conventions` — CLOSED, implemented (both scripts' headers now state the naming-convention split is a permanent decision, citing the item).
+- `backlog-delivery-status-reconciliation` — stays `in_progress`: this item IS Nova A issue #57 (issue-acceptance-matrix row `#57`), closes with that gate chain, not separately.
+- `test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention` — stays `open`: real bounded decision recorded (shared `scratch/test-tmp/` helper + verify-surfaced budget check + two highest-offender suites migrated; full repo-wide migration explicitly deferred as a separate follow-up), implementation queued for a `goldfish-deep` dispatch — not yet dispatched.
+- `managed-onboarding-success-contract` and `managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits` — left untouched: both were miscategorized as bucket A by the audit; both already carry a real, PO-legible deferral-to-Sprint-Alfred decision (the second item's own Triage records the first item's decision too, since the first item's file is byte-pinned by a ledger repair and cannot be edited without breaking `check-backlog-state.mjs`). Genuine bucket B, not bucket A.
+
+**QG-01 process fix, same block:** the comprehensive Critic review of the
+Nova A candidate (`41d7e8c2..92039bbb`) FAILed on a pure evidence-disclosure
+gap (see the entry above this one) — fixed via an explicit per-candidate
+disclosure commit (`ea42d6d7`) and a corrected, contamination-free
+re-dispatch (`92039bbb..ea42d6d7`, strict positional-token `args`) — round 2
+in flight as of this entry.
+
+**Next: bucket C (~40) and E (~15).** Per the PO's hard bar these are not
+optional follow-ups — they are release-blocking. Working through them
+systematically next, same pattern as bucket A: real decision + same-session
+implementation where feasible, a queued/dispatched fix where the work
+genuinely needs its own dispatch, never a re-deferral without a named
+future sprint and PO-legible rationale.
+
 ## Recovery
 
 No persisted in-flight dispatch, rollback action or public human-gate acceptance
