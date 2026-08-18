@@ -4,7 +4,7 @@
   "files": [
     {
       "path": "harness/review-protocol.md",
-      "rawSha256": "624852e54024328c41cecb7f3f6decb331d10708398cd069826693762b79ebf5"
+      "rawSha256": "184a5140552476a96b394db7334db69df977663e9b07793e6c4d8522e4b95c57"
     },
     {
       "path": "plugins/pipeline-core/agents/critic.md",
@@ -12,7 +12,7 @@
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
-      "rawSha256": "ccca8d8111cdae40dd7b164649cf546229771cc1794b67863aeaeb7d9e4a0476"
+      "rawSha256": "1d447929e9f3f3c86dd8698e7bbcf7c9d8e428d3f7ddca20118a838bd4b76e3d"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
@@ -20,7 +20,7 @@
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-host.mjs",
-      "rawSha256": "73a0204d4fd1d3898d43e08500c1ecc478d78b7866e5059196b504fcdc741c9f"
+      "rawSha256": "387563e93e08b6b503a4c751faa44c38cf6046ecfd7542ee10968083f85e4f26"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
