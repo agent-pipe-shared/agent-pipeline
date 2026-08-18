@@ -54,7 +54,7 @@
 | pipeline.continuity-repair-has-no-case-for-an-established-project-missing-only-pipeline-state-json | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.contract-suite-borrows-its-fixture-by-importing-a-109-test-file | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | in_progress | defect | pipeline | 2026-08-10 | — |
-| pipeline.critic-context-isolation | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | 2026-08-09 | — |
@@ -183,7 +183,7 @@
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-authority-test-fixture-races-under-a-full-directory-parallel-sweep | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.project-reset-does-not-classify-the-proof-policy-artifact | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.project-scoped-github-issue-operations | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.project-settings-enabled-two-pipeline-core-plugin-instances-at-once | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.promotion-freezes-a-prd-the-po-gate-will-reject | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff | closed | defect | pipeline | 2026-08-09 | — |
@@ -262,5 +262,5 @@
 ## Counts
 
 - open: 92
-- in_progress: 21
-- closed: 140
+- in_progress: 19
+- closed: 142

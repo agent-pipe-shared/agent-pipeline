@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3fec7b160de129d3defb49e911ad041e406e82e079971a2bfb7d3f16bdb36e83"
+    "transitionHead": "72fc38f703853d8f853d37e6cc4e5f3a01dc00574e83f04d75821db2557f9bd2"
   },
   "counts": {
     "open": 92,
-    "in_progress": 21,
-    "closed": 140
+    "in_progress": 19,
+    "closed": 142
   },
   "items": [
     {
@@ -514,11 +514,15 @@
     },
     {
       "id": "pipeline.critic-context-isolation",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context"
+      "source": "Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "47c6d7fcfafde2823be4111234a8e8482408fcab",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-dispatch.test.mjs"
     },
     {
       "id": "pipeline.critic-review-has-no-defined-path-for-a-root-commit",
@@ -1831,11 +1835,15 @@
     },
     {
       "id": "pipeline.project-scoped-github-issue-operations",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "user-requested feature expansion after the first public observation publication"
+      "source": "user-requested feature expansion after the first public observation publication",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "5d5153e594f8e3c4bcbb6b7c748f4ab28faa0373",
+      "closureEvidence": "plugins/pipeline-core/scripts/github-issue-operations.test.mjs"
     },
     {
       "id": "pipeline.project-settings-enabled-two-pipeline-core-plugin-instances-at-once",

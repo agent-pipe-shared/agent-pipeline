@@ -3,8 +3,12 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.project-scoped-github-issue-operations"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-20"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "5d5153e594f8e3c4bcbb6b7c748f4ab28faa0373"
+closure_evidence: "plugins/pipeline-core/scripts/github-issue-operations.test.mjs"
 source: "user-requested feature expansion after the first public observation publication"
 due: "2026-08-10"
 expires: "2026-08-17"
@@ -73,7 +77,27 @@ evidence before implementation or prioritization.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Renewal (2026-08-18):** expired 2026-08-17, never triaged — found
+  during a systematic sweep for the same expired-unread-item pattern
+  caught repeatedly tonight. Renewed with current evidence.
+- **Decision:** accepted, closed. The described capability was already
+  built (`plugins/pipeline-core/skills/github-issue-operations/`,
+  `plugins/pipeline-core/scripts/github-issue-operations.mjs`,
+  `docs/github-issue-operations.md`) and substantially matched this item's
+  Proposal/Acceptance criteria. A dedicated Critic review
+  (`00fcc336..8ae6567e`) found one real major gap: `validateIssueReadback()`
+  never checked the "stable URL" the Acceptance criteria, `SKILL.md` step
+  6, and `docs/github-issue-operations.md` all required — **FAIL**. Fixed
+  as `NVA-GHOFIX-1` (commit `5d5153e5`): reproduce-first (RED confirmed:
+  `GHO-READBACK-URL expected, got undefined`), a new `GHO-READBACK-URL`
+  check deriving and requiring the exact `https://github.com/<owner>/<repo>/issues/<number>`
+  form, plus repair of two pre-existing test fixtures that would otherwise
+  have silently mis-asserted after the new check's insertion point. A
+  fix-verification Critic re-review (`9ce8901b..5d5153e5`) returned
+  **PASS, no findings** — independently re-ran the suite (5/5) and traced
+  the fix's check placement relative to the existing validation order.
+- **Rationale:** the capability was real and mostly correct; the one real
+  gap the review found was fixed and independently re-verified before
+  closing, rather than closed on the strength of "mostly implemented."
+- **Assignment:** closed, no further work.
+- **Date:** 2026-08-18
