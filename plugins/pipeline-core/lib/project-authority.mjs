@@ -40,6 +40,31 @@ export const LEGACY_STATE = ".claude/pipeline-state.json";
 export const LEGACY_CALIBRATION = ".claude/pipeline.json";
 export const LEGACY_GUARD_CONFIG = ".claude/guard-config.json";
 export const LEGACY_GUARD_AUDIT = ".claude/guard-override.log.jsonl";
+// A fresh Claude-runner project onboarded by project-onboarding-v3.mjs
+// legitimately WRITES exactly two of these five legacy paths on day one --
+// LEGACY_MANIFEST and LEGACY_CALIBRATION, byte-identical to their NEUTRAL_*
+// counterpart -- never LEGACY_STATE, LEGACY_GUARD_CONFIG or LEGACY_GUARD_AUDIT.
+// This is not the "mixed-tier" defect a brand-new repository was once thought
+// to fall into (backlog: greenfield-onboarding-writes-mixed-authority-tiers):
+// `.claude/pipeline.yaml`/`.claude/pipeline.json` are ADR-0054's own Reader
+// Classification category C, "deliberate legacy-tier projection writers" whose
+// write side "belongs to step 3, not step 1" of that ADR's implementation
+// order. Until step 3 (moving writes to the new top tier) lands, `.claude/`
+// stays the Claude Code runtime's own live surface for model routing
+// (`modelRouting`, `runnerRoutes`, `criticExport`) and the PO display label
+// (`humanRoles.po.displayLabel`), seeded ALONGSIDE -- not instead of -- the
+// neutral authority record. Two both-tiers-populated regressions confirm the
+// resolver still reads this cleanly: readProjectAuthority() resolves
+// `status: "ready", source: "neutral"`, never `"mixed"`, and the seeded bytes
+// are identical across tiers either way (project-onboarding-v3.test.mjs: "an
+// ordinary consumer project's runtime initialization never seeds the private
+// overlay's own calibration", "a fresh greenfield onboarding populates both
+// manifest tiers without ever reaching a mixed authority status";
+// runner-profile-migration-v3.test.mjs: "a freshly onboarded project seeds
+// both manifest tiers byte-identically"). Retiring the byte-identity
+// invariant commit 7a99a18 added would remove a check that protects this
+// real property -- it stays.
+
 export const PROJECT_AUTHORITY_TRANSACTION_DIR = ".pipeline-project-authority-migration";
 const JOURNAL_FILE = "journal.json";
 const JOURNAL_SCHEMA = "pipeline.project-authority-journal.v1";

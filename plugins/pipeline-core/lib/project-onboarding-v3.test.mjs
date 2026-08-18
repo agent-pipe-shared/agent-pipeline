@@ -5813,6 +5813,50 @@ test("an ordinary consumer project's runtime initialization never seeds the priv
   } finally { dispose(path); }
 });
 
+// Backlog: greenfield-onboarding-writes-mixed-authority-tiers. Both prior
+// regressions above prove PIECES of this in isolation -- that the seeded
+// legacy manifest/calibration are honest, and (in runner-profile-migration-
+// v3.test.mjs) that the two manifest tiers are byte-identical. Neither one
+// asks the actual question the backlog item raised: once a fresh greenfield
+// onboarding has populated BOTH tiers with live files, does the authority
+// RESOLVER still read it as one coherent authority, or does it fall into the
+// `mixed` status the resolver is designed to reject (project-authority.mjs,
+// `readLayer`/`classify`)? This exercises the exact real sequence (portable
+// seed, then runtime initialization) and asks the resolver directly, instead
+// of inferring an answer from what got written.
+test("a fresh greenfield onboarding populates both manifest tiers without ever reaching a mixed authority status", () => {
+  const path = root();
+  try {
+    initializeClaudeOnboardedRoot(path);
+
+    // Enumerate exactly what runtime initialization left under .claude/: the
+    // two dual-owned authority mirrors (manifest, calibration) plus Claude
+    // Code's own settings file, which project-authority.mjs never tracks at
+    // all -- never the lifecycle State or guard files onboarding does not own.
+    const legacyManifestPath = join(path, ".claude", "pipeline.yaml");
+    const legacyCalibrationPath = join(path, ".claude", "pipeline.json");
+    assert.equal(existsSync(legacyManifestPath), true);
+    assert.equal(existsSync(legacyCalibrationPath), true);
+    assert.equal(existsSync(join(path, ".claude", "settings.json")), true);
+    assert.equal(existsSync(join(path, ".claude", "pipeline-state.json")), false, "onboarding must never write legacy lifecycle State");
+    assert.equal(existsSync(join(path, ".claude", "guard-config.json")), false, "onboarding must never write the legacy guard config");
+    assert.equal(existsSync(join(path, ".claude", "guard-override.log.jsonl")), false, "onboarding must never write the legacy guard audit log");
+
+    // Both dual-owned files are byte-identical across tiers, not merely
+    // present at both -- the actual invariant commit 7a99a18 protects.
+    assert.equal(readFileSync(legacyManifestPath, "utf8"), readFileSync(join(path, "project", "pipeline.yaml"), "utf8"));
+    assert.equal(readFileSync(legacyCalibrationPath, "utf8"), readFileSync(join(path, "project", "pipeline.json"), "utf8"));
+
+    // The question this test exists to answer: the resolver, not an inference
+    // from what got written.
+    const authority = readProjectAuthority({ rootDir: path });
+    assert.equal(authority.status, "ready");
+    assert.equal(authority.source, "neutral");
+    assert.equal(authority.manifest, "project/pipeline.yaml");
+    assert.equal(authority.calibration, "project/pipeline.json");
+  } finally { dispose(path); }
+});
+
 if (RUNNING_AS_SUITE) {
   console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);
   if (failures.length) { console.error(failures.join("\n")); process.exitCode = 1; }
