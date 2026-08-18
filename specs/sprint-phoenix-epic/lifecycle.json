@@ -25,10 +25,15 @@
     {
       "class": "acceptance",
       "path": "specs/sprint-phoenix-epic/acceptance.md",
-      "sha256": "8597b8236ef936f90d16fad4b9983a38b039b05bfe52a6c2d14273ea97e05640",
+      "sha256": "f59128d00837f5a14b5310740913896d0a745b14bb25c77b645e3c41ce6415cb",
       "authority": true,
       "mutability": "mutable",
-      "retention": "active"
+      "retention": "active",
+      "amendment": {
+        "at": "2026-08-18T21:32:46.019Z",
+        "reason": "auto-rebind: mutable-class artifact digest resynced to current file bytes (non-PO-gated)",
+        "previousSha256": "8597b8236ef936f90d16fad4b9983a38b039b05bfe52a6c2d14273ea97e05640"
+      }
     },
     {
       "class": "design",
