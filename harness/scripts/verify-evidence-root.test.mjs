@@ -49,8 +49,6 @@ import { spawnSync } from "node:child_process";
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
 const currentVerifyScriptPath = join(scriptDir, "verify.mjs");
-const realEvidenceDir = join(repoRoot, "evidence");
-const realEvidencePath = join(realEvidenceDir, "verify-latest.json");
 
 function git(cwd, args) {
   const r = spawnSync("git", args, { cwd, encoding: "utf8", shell: false });
@@ -61,6 +59,26 @@ function git(cwd, args) {
 function tryGit(cwd, args) {
   try { return git(cwd, args); } catch { return null; }
 }
+
+// Mirror verify.mjs's own primaryRoot resolution (harness/scripts/verify.mjs,
+// gitCommonDirectory()/primaryRoot near line 84-104) exactly, instead of a
+// naive scriptDir-relative guess: the evidence path this test backs up,
+// restores, and asserts against must be computed the SAME way verify.mjs
+// computes it. The two diverge whenever THIS test file itself is executing
+// from inside a worktree other than the actual primary checkout -- which is
+// exactly what happens on every real full-Verify run launched through the
+// prescribed clean-candidate route (clean-candidate-run.mjs always runs
+// verify.mjs, and therefore this suite, from inside a detached worktree,
+// never from the primary checkout directly, since the primary checkout's
+// permanently-runtime-modified tracked files make it fail the same candidate
+// preflight this test exercises). A standalone `node --test` invocation run
+// directly from the primary checkout has repoRoot === primaryRoot, which is
+// exactly why this fixture passed standalone yet failed inside every full
+// clean-candidate batch run: the assertion checked the wrong file.
+const gitCommonDir = tryGit(repoRoot, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+const primaryRoot = gitCommonDir !== null ? dirname(gitCommonDir) : repoRoot;
+const realEvidenceDir = join(primaryRoot, "evidence");
+const realEvidencePath = join(realEvidenceDir, "verify-latest.json");
 
 const primaryHeadCommit = tryGit(repoRoot, ["rev-parse", "HEAD"]);
 const fixtureCommit = tryGit(repoRoot, ["rev-parse", "HEAD~1"]);
