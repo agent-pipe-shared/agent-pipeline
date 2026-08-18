@@ -45,6 +45,19 @@
  * wrong as a blanket commit rule. The two are not unified here because doing so would edit
  * a file under review in the same breath; unifying them is a follow-up, and this module is
  * the single definition for the commit lane meanwhile.
+ *
+ * GIT-01 (commit-message TYPE vocabulary), added separately below `commitTypeFindings`/
+ * `commitTypeFindingsForRange`. Backstory: a Critic delta re-review found `6decf59` using
+ * commit type `design`, which `guardrails/git.md:16` does not admit, and nothing
+ * deterministic caught it — this module unit-tested GIT-03 only, and nothing walked a
+ * commit range checking subjects at all
+ * (`backlog/items/2026-08-08-orchestrator-authored-production-commits-have-no-deterministic-control.md`).
+ * Deliberately a PURE function over a subject string (or an already-enumerated
+ * `{sha, subject}` set for the range form) rather than a PreToolUse command-line check like
+ * `commitMessageFindings` above: the type is decidable from the finished message alone, so
+ * there is no reason to couple it to argv-tokenizing a `git commit` invocation, and it lets
+ * a range walker (Critic, `verify.mjs`, or a future `commit-msg` hook) call it against
+ * commits that already exist without re-deriving a shell command for each one.
  */
 import { tokenizeArgv } from "./git-cmd.mjs";
 
@@ -192,6 +205,59 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false } =
     findings.push({ code: "GIT-03-MARKER-MISSING", detail: "no `AI-Assisted: true` line" });
   }
   return { inspected: true, sources: [...sources, ...unreadable.map((entry) => entry.path)], findings };
+}
+
+/** GIT-01's admitted Conventional Commit types (`guardrails/git.md:16`), verbatim. */
+export const GIT01_COMMIT_TYPES = Object.freeze([
+  "feat", "fix", "docs", "refactor", "test", "chore", "build", "ci", "perf", "style",
+]);
+
+// `type` or `type(scope)`, an optional breaking-change `!` (Conventional Commits core,
+// not itself a GIT-01 vocabulary item), then `: ` and at least one more character. Anchored
+// at the start of the (trimmed) subject -- GIT-01 constrains how the subject STARTS, not
+// the rest of the line.
+const TYPE_PREFIX = new RegExp(`^(?:${GIT01_COMMIT_TYPES.join("|")})(?:\\([^)]*\\))?!?:\\s+\\S`);
+
+/**
+ * GIT-01 type-vocabulary check, pure and decidable: does the subject start with an admitted
+ * Conventional Commit type? Nothing here reads a file, runs git, or depends on caller state.
+ *
+ * @param {string} subject the commit subject line (first line of the message)
+ * @returns {{findings: {code: string, detail: string}[]}}
+ */
+export function commitTypeFindings(subject) {
+  const trimmed = typeof subject === "string" ? subject.trim() : "";
+  if (trimmed === "") {
+    return { findings: [{ code: "GIT-01-EMPTY-SUBJECT", detail: "the commit subject is empty" }] };
+  }
+  if (TYPE_PREFIX.test(trimmed)) return { findings: [] };
+  return {
+    findings: [{
+      code: "GIT-01-UNKNOWN-TYPE",
+      detail: `subject "${trimmed}" does not start with an admitted Conventional Commit type (${GIT01_COMMIT_TYPES.join(", ")})`,
+    }],
+  };
+}
+
+/**
+ * Range-mode entry point. Deliberately takes an already-enumerated commit set rather than
+ * walking `git log` itself -- enumerating "the range" (delivery range, review range, a
+ * single PR's commits) is the caller's own concern with its own edge cases, and a range
+ * walker belongs in whatever wires this in (Critic tooling, `verify.mjs`, a future
+ * `commit-msg` hook), not in this pure module. This function stays pure over data: same
+ * input, same output, nothing observed but the array.
+ *
+ * @param {{sha: string, subject: string}[]} commits
+ * @returns {{sha: string, subject: string, findings: {code: string, detail: string}[]}[]}
+ *   one entry per input commit, in the same order, entries with findings=[] are clean
+ */
+export function commitTypeFindingsForRange(commits) {
+  if (!Array.isArray(commits)) return [];
+  return commits.map(({ sha, subject }) => ({
+    sha,
+    subject,
+    findings: commitTypeFindings(subject).findings,
+  }));
 }
 
 export const COMMIT_MESSAGE_POLICY_MODES = Object.freeze(["off", "warn", "blocking"]);
