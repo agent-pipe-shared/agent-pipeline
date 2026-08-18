@@ -172,7 +172,7 @@
 | pipeline.po-approval-request-verify-still-rejects-a-fresh-setup1-authority | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | closed | defect | pipeline | 2026-07-25 | — |
-| pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.po-gate-worktree-authority | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | closed | defect | pipeline | 2026-08-08 | — |
@@ -262,5 +262,5 @@
 ## Counts
 
 - open: 85
-- in_progress: 13
-- closed: 155
+- in_progress: 12
+- closed: 156

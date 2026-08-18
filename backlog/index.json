@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "622861f1e9b7a384ddb06a16364cd40250ed765ab05bffae32b0d40d3310b634"
+    "transitionHead": "da0fb6d27bc74cf1f400052f72789de920f681f6febb3024dc7cbb801ed2fde9"
   },
   "counts": {
     "open": 85,
-    "in_progress": 13,
-    "closed": 155
+    "in_progress": 12,
+    "closed": 156
   },
   "items": [
     {
@@ -1750,12 +1750,16 @@
     },
     {
       "id": "pipeline.po-gate-worktree-authority",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; no completion claim.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "21cf1e08",
+      "closureEvidence": "plugins/pipeline-core/lib/po-gate-authority.test.mjs"
     },
     {
       "id": "pipeline.po-human-approval-outside-check-uses-a-posix-only-separator-on-windows",
