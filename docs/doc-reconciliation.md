@@ -1786,7 +1786,7 @@ subject-sha256). Additive checkpoint prose only, same as every other entry in
 this file that reconciles ADR-0012; the canonical-handover decision (one
 versioned file, memory mirror-only) is untouched.
 
-## Candidate fb3b0ec3 — 2026-08-18, range 8a92d377..fb3b0ec3, adds only the checkpoint-30 correction note (the entry above's own `077b64ff` and a short append recording it)
+## Candidate fb3b0ec31cee0c2b0ef235331aa71d6982f08b4b — 2026-08-18, range 8a92d377..fb3b0ec3, adds only the checkpoint-30 correction note (the entry above's own `077b64ff` and a short append recording it)
 
 - ADR-0012: checked, no change needed.
 - ADR-0045: checked, no change needed.
