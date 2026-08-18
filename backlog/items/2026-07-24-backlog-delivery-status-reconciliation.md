@@ -12,3 +12,24 @@ tracking: "Nova A / issue #57"
 # Canonical backlog delivery/status reconciliation
 
 Use the sanctioned append-only reconciliation writer to bind reviewed delivery intent, authority, evidence, and the canonical backlog projection. Repair historical evidence only through authority-backed amendments; this record is Sprint Nova A assignment, not completion or closure.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** not a standalone task — this item IS Nova A issue #57,
+  tracked in `specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md`
+  row `#57 / Nova A1 canonical reconciliation`. Its substance (checker-green,
+  events-39/40 amendment readback) was proven 2026-08-06; the row's own
+  remaining gap ("Freeze a Nova A candidate, run a fresh Critic pass that
+  actually covers the 08-06 ledger-reconciliation change, then bind Full
+  Verify/Security/Critic and the PO increment gate") is exactly what this
+  session's candidate-freeze + comprehensive Critic-review dispatch
+  (candidate `92039bbb`/`ea42d6d7`) is doing. Stays `in_progress`, closes
+  automatically when that gate chain clears — filing a second, separate
+  closure path for the same work would fork the evidence trail.
+- **Rationale:** the item's own frontmatter (`tracking: "Nova A / issue #57"`)
+  already binds it to the matrix row; duplicating that tracking inside a
+  second independent workflow would violate the "sanctioned append-only
+  reconciliation writer" instruction this item itself states.
+- **Assignment:** tracked via Nova A issue #57 / current candidate gate
+  chain — no separate assignment.
+- **Date:** 2026-08-18

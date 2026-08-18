@@ -72,13 +72,21 @@ Not designed here. Candidates, explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** not yet triaged.
-- **Rationale:** filed same-day as discovery; not urgent (no correctness
-  bug — the two conventions don't collide, they're just inconsistent to
-  browse), and neither existing mechanism has actually been run with
-  `--apply` against the real `docs/state.md` yet (both wait on ADR-0066
-  Decision 7's extraction pass), so there is no live archive content to
-  migrate yet either — the cheapest time to decide is before either
-  mechanism has real output on disk.
-- **Assignment (if accepted):** unassigned.
-- **Date:** 2026-08-17
+- **Decision:** accepted, resolved via Proposal option 2 ("keep both
+  conventions, document the split explicitly as a permanent, intentional
+  design"), not options 1 or 3 — cheapest, matches this item's own
+  observation that there is no correctness bug and no live archive
+  content yet to migrate, and preserves each mechanism's own justified
+  reason to exist (heuristic close-time archiving vs. explicit
+  forced-rotation-of-an-open-block).
+- **Rationale:** both scripts' own header comments already explained
+  *why* two mechanisms exist but called the naming-convention split an
+  "open follow-up" rather than a decided design — that framing is what
+  this item flagged as inconsistent-to-browse. Making the split an
+  explicit, cited, permanent decision (rather than leaving both headers
+  implying eventual convergence) closes the item without new rotation
+  machinery or a risky mid-flight convention migration.
+- **Assignment (if accepted):** done — both `rotate-handover-sections.mjs`
+  and `handover-rotate.mjs` header comments now state the split is by
+  decision and cite this item; no code behavior changed.
+- **Date:** 2026-08-18

@@ -20,9 +20,12 @@
  * `--section-heading` selection, one archive file per rotation event named
  * `<ISO-date>--<short-slug>.md`, a table-based "Archived history" index, and
  * the one-time-extraction acknowledgment gate below. The two mechanisms
- * currently coexist in this repository; reconciling them is an open
- * follow-up, not something this script resolves on its own (out of this
- * dispatch's scope -- see the NVA-HANDOVER-ROT-1 dispatch report).
+ * coexist in this repository BY DECISION, not as an unresolved gap: they
+ * answer genuinely different questions ("what closed content can I safely
+ * auto-archive" vs. "rotate exactly this, right now, on purpose" against a
+ * still-open block) and keep their own archive-naming/index conventions
+ * rather than converging -- see
+ * `backlog/items/2026-08-17-two-handover-rotation-mechanisms-use-different-archive-conventions.md`.
  *
  * ADR-0066 Decision 6 (the one-time extraction gate): this script REFUSES to
  * run any rotation -- typed error, zero mutation -- unless a

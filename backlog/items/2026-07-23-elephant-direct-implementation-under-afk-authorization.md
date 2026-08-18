@@ -52,7 +52,18 @@ follow-up item rather than a bullet that can be missed.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, implemented, narrower than the full Proposal
+  text: a defined "PO-waived direct implementation" light path added to
+  the close ritual itself (`close-block/SKILL.md` step 6b) rather than a
+  new standalone operating-model section, since the authorship check is
+  where this gap actually surfaces and where the follow-up obligation
+  needs to be enforced.
+- **Rationale:** the Proposal's core requirement — a defined light path
+  that still *requires* (not just flags) a follow-up fresh-context
+  Critic review as the first action of the next session — is fully met
+  by amending the authorship-check step directly: a PO waiver is no
+  longer either a silent gap or a full INCIDENT, it is a recorded
+  exception with a mandatory named follow-up.
+- **Assignment (if accepted):** done — `plugins/pipeline-core/skills/close-block/SKILL.md`
+  step 6b, new bullet ("PO-waived direct implementation").
+- **Date:** 2026-08-18

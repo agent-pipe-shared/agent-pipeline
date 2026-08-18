@@ -29,6 +29,17 @@
  * against the canonical `docs/state.md` from a session whose own work is
  * still open — only close-block's own rotation step (6c) does that, after
  * this block's close.
+ *
+ * Coexists by design with `handover-rotate.mjs` (close-block step 6d,
+ * ADR-0066) rather than duplicating it: this script auto-selects "what
+ * closed content can I safely archive" (heuristic, monthly-bucketed
+ * `docs/state-archive/<YYYY-MM>.md`, pointer-line index) at ordinary close
+ * time; `handover-rotate.mjs` answers "rotate exactly this section, right
+ * now, on purpose" (explicit `--section-heading`, one dated file per event,
+ * table-based index) for a still-OPEN block this script can never touch by
+ * construction. The two archive-naming/index conventions are an accepted,
+ * documented split, not an inconsistency to converge — see
+ * `backlog/items/2026-08-17-two-handover-rotation-mechanisms-use-different-archive-conventions.md`.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

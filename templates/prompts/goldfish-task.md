@@ -129,6 +129,14 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
   proves the code was written, not that it works, and is NOT sufficient for
   this class of criterion. A marker check remains entirely appropriate for
   non-behavioral facts (a config value, a constant, a doc string).
+- If this dispatch touches any file under `plugins/pipeline-core/`, ALSO run
+  `node --test harness/scripts/check-consumer-safe-paths.test.mjs` before the
+  final report — that plugin ships to consumer projects where Pipeline-source-only
+  paths (`harness/...`, `specs/sprint-nova-epic/...`) named in a doc comment or
+  string do not exist; this check is cheap and sub-second, run it every time,
+  not only when a path feels risky (twice, `NVA-A1214-SUCCESS-1` and
+  `NVA-RETRYECON-1`, a dispatch's own DoD checks missed exactly this and it was
+  only caught by a later, separate Full Verify run).
 - {{ADDITIONAL_CHECKS or delete this line}}
 
 ### 4. Forbidden

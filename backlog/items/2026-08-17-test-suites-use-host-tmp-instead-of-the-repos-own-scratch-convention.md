@@ -75,11 +75,28 @@ Not designed here. Candidates, explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** not yet triaged.
-- **Rationale:** filed same-day as the incident; the PO has already worked
-  around the immediate symptom (tmpfs remount + manual cleanup), so this is
-  not urgent, but the accumulation will recur at the same rate on the next
-  long test-heavy session unless the root cause (test fixtures bypassing
-  `scratch/`) is addressed.
-- **Assignment (if accepted):** unassigned.
-- **Date:** 2026-08-17
+- **Decision:** accepted, bounded scope for this release: Proposal
+  options 1+4 combined — a shared `scratch/test-tmp/` helper as the
+  sanctioned pattern for NEW/touched suites going forward, plus a
+  lightweight size/count budget check surfaced through `verify.mjs`
+  (mirroring `bootstrap-payload-budget.mjs`'s pattern) so the next
+  accumulation fails loudly long before host exhaustion. A full
+  repo-wide migration of every existing `mkdtempSync(tmpdir())` call
+  site (option 1 taken to its limit) is explicitly OUT of this release's
+  bounded scope — too large and too risky (dozens of suites, including
+  deliberately-non-cleaning crash-simulation fixtures) to land safely in
+  one dispatch; tracked as a follow-up once the helper/guard exist and
+  the highest-offender suites (`onboarding-continuity`,
+  `pipeline-state-inspection-contract`) have proven the pattern.
+- **Rationale:** the PO already worked around the acute symptom (tmpfs
+  remount); the root cause is real and will recur, but the safe fix is a
+  new shared helper + guard, not a same-day mass rewrite of every test
+  suite's fixture setup — that class of change needs its own dispatch
+  and its own Critic review (test-authorship, `goldfish-deep` tier), not
+  a same-breath decision-plus-implementation.
+- **Assignment (if accepted):** queued for a `goldfish-deep` dispatch
+  this release (test-infrastructure/guardrail-adjacent work) — helper
+  module + budget check + the two highest-offender suites migrated as
+  the worked example; remaining suites tracked separately, not silently
+  dropped.
+- **Date:** 2026-08-18

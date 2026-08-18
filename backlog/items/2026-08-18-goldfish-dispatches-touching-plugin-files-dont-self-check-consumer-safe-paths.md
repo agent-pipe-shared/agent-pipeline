@@ -59,9 +59,19 @@ Not designed here. Two candidate shapes for whoever picks this up:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** open, not triaged this session — filed live while fixing
-  the second occurrence, deliberately not decided in the same breath as the
-  fix (this item's own existence is more valuable than a rushed triage).
-- **Rationale:** n/a (untriaged).
-- **Assignment:** unassigned.
+- **Decision:** accepted, implemented (Proposal option 1: the cheap
+  template-line addition, not the new hook machinery of option 2 — a
+  deterministic, sub-second, already-existing check is worth requiring
+  by template line now; the more robust always-enforced hook is a
+  separate future item if the template line still proves forgettable).
+- **Rationale:** two occurrences in one night already cost two extra
+  Elephant round-trips; `templates/prompts/goldfish-task.md`'s DoD-checks
+  section (§3) is the exact place this repository's own dispatch
+  discipline already lives, and it is copied verbatim into every
+  dispatch, so a standing line there reaches every future
+  `plugins/pipeline-core/`-touching dispatch without new machinery.
+- **Assignment:** done — `templates/prompts/goldfish-task.md`, DoD-checks
+  §3, added a standing conditional line requiring
+  `node --test harness/scripts/check-consumer-safe-paths.test.mjs`
+  whenever a dispatch touches any `plugins/pipeline-core/` file.
 - **Date:** 2026-08-18
