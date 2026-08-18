@@ -109,7 +109,13 @@ export function run(argv = process.argv.slice(2)) {
       policyRevision: GMW_POLICY_REVISION,
       livePluginRoot,
     });
-    return { ok: true, value: { request, intent, subject } };
+    // The candidate commit this signature is bound to lives in intent.value.candidate
+    // (set by createPoApprovalIntent in lib/po-approval-proof.mjs), not on `subject` --
+    // `subject` itself carries no `candidate` field. See backlog item
+    // 2026-08-08-a-prepared-maintenance-window-dies-at-the-next-commit.md, option 1:
+    // disclose the binding here so the human knows before spending a signature.
+    const warning = `This signature is valid only while HEAD stays at ${intent.value.candidate.commit}. Commit nothing between signing and installing.`;
+    return { ok: true, value: { request, intent, subject, warning } };
   }
 
   if (args.command === "install") {
