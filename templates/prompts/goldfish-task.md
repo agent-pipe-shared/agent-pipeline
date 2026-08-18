@@ -129,6 +129,18 @@ can silently include an extra commit that slipped in between.
 - {{FILE_2 + one-line why}}
 - {{FILE_3 + one-line why}}
 
+**Backlog-item citation rule (dispatch-construction side, PO decision
+2026-08-18 #19):** if a context/spec file above is a backlog item
+(`backlog/items/*.md`), strip it first — `node
+plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.mjs --item
+<path> --out <stripped-path>` — and list the STRIPPED copy's path here, never
+the raw item path. An item's own Triage/Closure/PO-decision-implementation
+prose records a prior human/Critic decision ABOUT that item, not spec
+content; handing the raw item to a Goldfish as background risks the same
+contamination a prior verdict caused for a later Critic (the "circular
+measuring stick" incident,
+`backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md`).
+
 For a `light`-profile dispatch (field 6): inline the 3–5 governing rule snippets VERBATIM here instead of pointing at large canon files (reference-inlining, speed) — the goldfish should not need to re-read canon for context.
 
 ### 3. DoD checks

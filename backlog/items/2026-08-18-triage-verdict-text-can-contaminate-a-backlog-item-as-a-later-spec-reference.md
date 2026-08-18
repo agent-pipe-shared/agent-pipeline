@@ -64,3 +64,71 @@ explicit rather than relying on the Critic to notice on its own).
   the one observed incident was caught, not landed as a bad outcome — worth
   a considered fix, not an inline patch.
 - **Date:** 2026-08-18
+
+### PO-decision implementation, 2026-08-18 (wave 3, dispatch NVA-W3-13)
+
+PO decision (2026-08-18, decision #19): **A** — a dispatch-side stripping
+rule (option (a) from the Proposal above), not a Critic-side disregard
+instruction (option (b)).
+
+Implemented:
+
+- `plugins/pipeline-core/lib/backlog-dispatch-reference.mjs` — pure-function
+  helper `stripBacklogVerdictProse(body)` / `stripBacklogItemForDispatch(rawText)`
+  that removes everything from the earliest verdict-shaped heading onward
+  (`## Triage`, `## Closure`, `## PO-decision implementation`, matched
+  case-insensitively at any heading level) and replaces it with a fixed,
+  self-explaining fence comment (`BACKLOG_STRIP_FENCE`), pointing back at
+  this item. Frontmatter and all spec-shaped sections (Description,
+  Triggering situation, Affected artifact, Proposal) are preserved verbatim.
+  An item with no verdict-shaped heading yet (not triaged) is returned
+  unchanged.
+- `plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.mjs` — CLI
+  wrapper: `node ... --item <path> --out <path>` (or stdout), for the
+  Elephant to run before naming a backlog item's path in a dispatch.
+- Unit tests: `plugins/pipeline-core/lib/backlog-dispatch-reference.test.mjs`
+  (9 cases — untriaged passthrough, Triage stripped, an appended
+  Closure/PO-decision-implementation section after Triage also stripped
+  because the earliest match wins, heading-level/case matching, non-string
+  input rejected, frontmatter preserved, purity/non-mutation, malformed
+  frontmatter rejected) and
+  `plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.test.mjs`
+  (3 cases — CLI strips and writes `--out`, missing `--item` rejected,
+  unknown flag rejected). All 12 tests pass:
+  `node --test plugins/pipeline-core/lib/backlog-dispatch-reference.test.mjs
+  plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.test.mjs`
+  (exit 0). `harness/scripts/check-consumer-safe-paths.test.mjs` also passes
+  (9/9) since these new files touch `plugins/pipeline-core/`.
+- Dispatch-construction rule wired into both templates that build a
+  dispatch citing a backlog item as a spec/context reference:
+  `templates/prompts/critic-review.md` (§ usage item 2, the admissible-
+  reference rules) and `templates/prompts/goldfish-task.md` (field 2,
+  Context files) — both now require the stripped copy's path, never the
+  raw item path, when the cited artifact is `backlog/items/*.md`.
+  `backlog/README.md`'s Triage rules section gained a matching pointer
+  (new rule 6).
+
+Deviation (smallest reasonable judgment call, per this dispatch's field 5):
+the item's own Affected-artifact list named `templates/prompts/critic-
+review.md` as the primary candidate location and `backlog/README.md` as a
+possible secondary one; this implementation also wires the identical rule
+into `templates/prompts/goldfish-task.md`, because the Description
+explicitly frames the risk as contaminating "a downstream Critic **or
+Goldfish**" — a Goldfish reading a backlog item's Triage as spec content is
+the same failure shape, and the two templates are the only two places a
+dispatch is constructed from (`CLAUDE.md`: "Dispatch from the template,
+never freehand").
+
+Status: **left as `status: open`**, not moved to `closed`. This dispatch's
+own DoD explicitly permits deferring the status flip when unsure; closing a
+backlog item through this repository's sanctioned path additionally updates
+`backlog/STATUS.md`, `backlog/index.json`, and appends a hash-chained event
+to `backlog/transitions.ndjson` (observed on a recent closed item, commit
+`f8e8ff14`) — a distinct, higher-risk ledger operation this dispatch's scope
+(implement the PO-decided direction) does not cover, and getting the
+hash-chain/index update wrong is not something to risk inside an
+already-green, narrowly-scoped implementation dispatch. The Elephant of the
+next Pipeline session can run the sanctioned ledger writer
+(`plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs` or the
+matching skill) to formally close this item, citing this section and commit
+as closure evidence.

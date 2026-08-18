@@ -76,6 +76,7 @@ Per [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop):
    for a worked example).
 4. When scope is unclear (architecture/guardrail impact, cost, irreversibility): the PO decides, not the Elephant alone (operating-model §2.1).
 5. The triage decision is documented **in the item itself** (section "Triage" in the template) — never only verbally or in chat.
+6. **If this item is later cited as a spec/reference input to a Goldfish or Critic dispatch**, its Triage section (and any appended Closure/PO-decision-implementation section) MUST be stripped first via `plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.mjs` before the path is named in the dispatch — never the raw item path. Triage prose records a prior human/Critic decision *about* the item, and handing it over unstripped lets a later reviewer read that verdict as background about the very thing it is independently judging (PO decision 2026-08-18 #19; see `templates/prompts/critic-review.md`/`goldfish-task.md` and `backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md`).
 
 ## Release cycle (SHA phase)
 

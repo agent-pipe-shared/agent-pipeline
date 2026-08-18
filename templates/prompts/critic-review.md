@@ -56,6 +56,19 @@ USAGE (Elephant)
    disclosed" — pre-signals the verdict you want from the Critic. Disclosures
    belong in the dispatch as **bare facts only**: the WHAT of a deviation,
    never who noticed it, never how it should be judged.
+   **Backlog-item citation rule (dispatch-construction side, PO decision
+   2026-08-18 #19):** if a spec/reference path below is a backlog item file
+   (`backlog/items/*.md`), strip it first — `node
+   plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.mjs --item
+   <path> --out <stripped-path>` — and name the STRIPPED copy's path in the
+   dispatch, never the raw item path. An item's own Triage/Closure/
+   PO-decision-implementation prose records a prior human/Critic verdict
+   ABOUT that item, not spec content; handing it to a later Critic as
+   background lets that Critic read a verdict about the very thing it is
+   independently supposed to judge (the "circular measuring stick" incident,
+   `backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md`).
+   The stripping is the Elephant's job before dispatch, not a disregard
+   instruction asked of the Critic.
    <!-- CRITIC-FAIL-CLOSED: reference-only-stop -->
    The only admissible material is a reference to the spec, an enumerated
    diff or archived diff snapshot, guardrails/constraints, machine evidence,
