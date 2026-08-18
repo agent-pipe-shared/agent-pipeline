@@ -284,4 +284,4 @@ Evidence throughout is POINTERS ONLY — exact command + exit code + artifact pa
 4. **"Deliberately NOT changed"** — adjacent oddities you saw and intentionally
    left alone (rubric for writing roles).
 5. Deviations from the spec — reported, never silently built in.
-6. Open items / triggered stop conditions / remaining manual work for the PO.
+6. **Open items** / triggered stop conditions / remaining manual work for the PO. Name every outstanding review/manual check explicitly, by category — `verify: pending`, `independent review: pending/deferred`, `manual/browser check: pending`, `PO acceptance: open` (omit a category only when it genuinely does not apply) — never collapse them into a bare "done". Only PO-accepted work is described as fully "done" (`docs/operating-model.md` §10 Glossary: Implementation complete / PO-accepted; `roles/goldfish.md` §6 GF-09).

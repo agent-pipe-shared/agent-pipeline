@@ -51,7 +51,14 @@ HARD RULES (checkable)
     - `branchModel: pr-flow` (real merge commits): a literal line
       "Pre-Merge-SHA: <merge-sha>^1" recorded in this file at merge time.
   A row with an open 🟡 and no anchor in the matching form is a Critic/
-  Elephant finding, not a stylistic gap.
+  Elephant finding, not a stylistic gap. This anchor mandate is scoped to 🟡
+  ONLY — it does not extend to the 🔵 marker (implementation complete, PO
+  acceptance pending): 🔵 marks a row where verification already passed
+  (nothing merged ahead of it), so it never requires a rollback anchor. The
+  two markers are not interchangeable: 🟡 = merged ahead of pending human/
+  browser verification; 🔵 = verification done, only the PO's explicit
+  acceptance is outstanding (`docs/operating-model.md` §10 Glossary:
+  Implementation complete / PO-accepted).
 - Drift check, run at session bootstrap: warn when BOTH hold —
   (a) the newest commit is more than 1 calendar day newer than "Letzte
   Aktualisierung" below, AND (b) the repo is more than 3 commits ahead of
@@ -77,7 +84,7 @@ HARD RULES (checkable)
 
 ## Status
 
-> Each row = one work package in progress or recently completed. Markers: ✅ done · 🟡 human verification pending (does NOT block the merge under "🟡-Merge v2", but keeps counting against the WIP limit) · 🔄 in progress. **Rollback anchor is mandatory for 🟡** — form depends on `branchModel`, see the header comment.
+> Each row = one work package in progress or recently completed. Markers: ✅ done (PO-accepted) · 🔵 implementation complete, PO acceptance pending (verify + any required independent review/manual checks already passed; no rollback anchor required — that is the 🟡 rule only, see below) · 🟡 human verification pending (does NOT block the merge under "🟡-Merge v2", but keeps counting against the WIP limit) · 🔄 in progress. **Rollback anchor is mandatory for 🟡 only, never for 🔵** — form depends on `branchModel`, see the header comment.
 
 | # | Work package | Status | Rollback anchor | Note |
 |---|---|---|---|---|

@@ -297,7 +297,14 @@ bounded triage content; it is not briefing context for a Goldfish or Critic.
 - **Evidence:** a machine or receipt-bound record of an observed check/result.
 - **Goldfish:** fresh-context executor for one bounded dispatch.
 - **Elephant:** long-lived orchestrator for the project lifecycle.
+- **Implementation complete:** the Goldfish/Elephant-visible DoD and verify
+  checks passed; independent (Critic) review, manual/browser checks, and PO
+  acceptance may still be open. Never reported as a bare "done" — see
+  PO-accepted, and the hard rule in `CLAUDE.md` ("Hard rules").
 - **Phase:** lifecycle state such as design or execution.
+- **PO-accepted:** the PO has given explicit sign-off on the delivered work.
+  Only PO-accepted work may be described as fully "done" in a completion
+  report or handover status.
 - **Profile:** `mini`, `feature` or `epic` process shape.
 - **Rigor:** required depth of written definition (0, 1 or 2).
 - **Risk:** required review depth; independent of diff size.
