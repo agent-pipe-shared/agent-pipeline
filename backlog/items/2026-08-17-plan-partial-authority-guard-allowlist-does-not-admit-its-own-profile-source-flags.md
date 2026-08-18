@@ -8,7 +8,7 @@ created: 2026-08-17
 closed_at: "2026-08-18"
 closure_repository: "self"
 closure_commit: "9fa8a025f500333e47856b4b5f5f705b6cc12fc2"
-closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs:1448-1451"
+closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
 source: "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing. One of three examples from that report; the other two were checked and found already fixed/admitted (see Triage)."
 ---
 
