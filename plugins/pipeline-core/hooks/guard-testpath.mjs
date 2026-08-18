@@ -269,10 +269,13 @@ if (matched) {
             `${process.execPath} ${JSON.stringify(script)} authorize --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --selection-sha256 <selection-sha256> --reason "<human-reason>" --reason-sha256 <reason-sha256> --activate`,
           ].join("\n")
           : [
-            `Then, outside this session (presence of a valid, correctly-bound Ed25519 ` +
-              `signature IS the authorization -- there is no in-session activate step for this mode):`,
+            `Then, in this session (pure digest computation against data already in the ` +
+              `repository -- neither step needs the external key, ADR-0059 Decision 1):`,
             `${process.execPath} ${JSON.stringify(script)} prepare-authorization --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256-from-plan> --reason "<fixed HGO_SIGNATURE_REASON text>"`,
             `${process.execPath} ${JSON.stringify(script)} emit-signature-digest --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256>`,
+            `Then, outside this session (only the signature itself needs the external Ed25519 ` +
+              `key; presence of a valid, correctly-bound signature IS the authorization -- ` +
+              `there is no in-session activate step for this mode):`,
             `${process.execPath} ${JSON.stringify(script)} authorize-by-signature --repo ${JSON.stringify(projectDir)} --request-sha256 ${planned.requestSha256} --plan-sha256 <plan-sha256> --proof <external-proof.json>`,
           ].join("\n");
         overrideGuidance = [

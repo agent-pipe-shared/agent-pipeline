@@ -278,20 +278,26 @@ Once bootstrap is ready and the required plan gate is recorded, continue the
 approved implementation autonomously: scoped edits, focused tests, state
 readback, one-line commits, Verify, Critic preparation and ordinary block
 continuation are agent work. A standing approval is not a fresh human touch.
+**"Agent work" here means Goldfish-dispatched work, starting with the very
+first implementation edit of the plan — not this Elephant session writing
+the diff itself.** Implementation work under an `epic`- or `feature`-profile
+plan is dispatched to a Goldfish subagent (via the Agent/Task tool,
+optionally fanned out with the Workflow tool) rather than written directly
+by this session; a `mini`-profile plan is the sole exception and may be
+implemented directly. This is a followed instruction, not a technically
+guard-enforced rule — no guard blocks or detects a non-dispatched write, so
+skipping the dispatch right here produces no refusal to catch it: get this
+right by reading this paragraph now, not by expecting a later guard to stop
+a miss.
 A feature's implementation is not complete until a Critic review
 (`critic-review` skill) has been dispatched against it and returned a
 result — pass, or a documented fail-then-fix cycle; this is a requirement to
 satisfy before treating the block as done, not an optional or ambient step.
-Implementation work under an `epic`- or `feature`-profile plan is dispatched
-to a Goldfish subagent (via the Agent/Task tool, optionally fanned out with
-the Workflow tool) rather than written directly by this session; a
-`mini`-profile plan may be implemented directly. This is a followed
-instruction, not a technically guard-enforced rule — no guard blocks or
-detects a non-dispatched write. The Workflow tool and the Agent tool's own
-fan-out capability are Elephant-only — never delegate them to a fork or
-`general-purpose` subagent, which inherit the full parent toolset unlike the
-tool-scoped `goldfish-*`/`critic` roles; see `references/workflow-dispatch.md`
-before using either.
+The Workflow tool and the Agent tool's own fan-out capability are
+Elephant-only — never delegate them to a fork or `general-purpose` subagent,
+which inherit the full parent toolset unlike the tool-scoped
+`goldfish-*`/`critic` roles; see `references/workflow-dispatch.md` before
+using either.
 
 A recorded PRD/Spec approval is an execution mandate for its accepted scope.
 Choose implementation details, sequencing, bounded recovery, test fixes and

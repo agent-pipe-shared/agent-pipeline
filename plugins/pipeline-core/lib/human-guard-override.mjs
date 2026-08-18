@@ -1608,8 +1608,28 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
     for (const redirect of parsed.redirects) {
       if (redirect.target === "/dev/null" || redirect.target?.toLowerCase() === "nul") continue;
       const classified = classifyPath(root, redirect.target);
-      if (classified.kind === "refused") return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [redirect.target] };
-      if (classified.kind === "cross-boundary") return crossBoundaryEligible(paths, classified.target);
+      // PO decision 2026-08-18 #7 (backlog/items/2026-08-12-cross-repository-redirect-
+      // eligibility-does-not-consult-the-sensitive-path-boundary.md): a TOOL-BASED check
+      // (an allowlist of permitted target types), not a broader path-content heuristic.
+      // A Bash redirect target is never a "permitted target type" for the
+      // cross-repository-target liftable class at all -- unlike an Edit/Write file_path,
+      // an apply_patch path, or a `git -C`/`--work-tree`/`--git-dir` pointer argument
+      // (each of which names a single, deliberate write/repository target the tool call
+      // itself structurally identifies), a shell redirect's target is incidental output
+      // plumbing that can point at ANY absolute path with no enumerable "sensitive"
+      // pattern to check it against -- hardBoundaryPath()'s own pattern
+      // (secrets/credentials/tokens/.git/.codex/.agent-pipeline) is deliberately scoped
+      // to THIS project's internal sensitive paths and was never meant to, and cannot be
+      // broadened to, enumerate every sensitive path on every OS (`/etc/passwd`,
+      // `/etc/shadow`, ...). So an out-of-root redirect target is refused outright here,
+      // exactly like a "refused" classifyPath() result -- never routed through
+      // crossBoundaryEligible() -- regardless of whether the specific target matches
+      // hardBoundaryPath()'s pattern. This narrows only the redirect-target loop; the
+      // git pointer-argument and Edit/Write/apply_patch call sites below are unaffected,
+      // since those ARE permitted target types for this eligible class.
+      if (classified.kind === "refused" || classified.kind === "cross-boundary") {
+        return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [redirect.target] };
+      }
       const path = classified.path;
       if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
       paths.push(path.relative);

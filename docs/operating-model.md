@@ -194,6 +194,11 @@ first hunts for defects, then reports only findings it can support. “No
 findings” is valid. The Elephant decides whether each finding is fixed,
 accepted with a reason, or escalated; it must not silently discard one.
 
+A Critic round that ends in a blocking finding gets at most one re-review
+round after rework; a further blocking finding on the same package is
+self-verified directly rather than dispatched a third time
+(`guardrails/quality-gates.md` QG-13).
+
 If a duty is unavailable, a precondition drifts, evidence is stale, a stop
 condition fires or the same attempt repeatedly fails, stop the affected work.
 Recover from the named artifact or start a newly briefed task; do not continue

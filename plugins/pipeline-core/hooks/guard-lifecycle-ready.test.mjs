@@ -3308,11 +3308,18 @@ test("NVA-BL-75: the guard-classification corpus measures override reachability,
       // Narrowness controls: neither is stderr suppression, so both stay cross-repository.
       ["which a b c &>/dev/null", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
       ["which a b c >/dev/null 2>&1", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
-      // Genuine writes outside the root: still cross-repository, and (ADR-0059 Decision 6)
-      // routable through the narrowed class whose plan states what it cannot prove.
-      ["printf implementation 2>/etc/passwd", "GUARD-CROSS-REPO-MUTATION", "liftable-by-signature:cross-repository-target"],
-      ["printf implementation 2>/dev/null > /tmp/elsewhere/out.txt", "GUARD-CROSS-REPO-MUTATION", "liftable-by-signature:cross-repository-target"],
+      // Genuine writes outside the root via a non-redirect argument (cp): still
+      // cross-repository, and (ADR-0059 Decision 6) routable through the narrowed class
+      // whose plan states what it cannot prove.
       ["cp /etc/hosts /tmp/elsewhere/hosts", "GUARD-CROSS-REPO-MUTATION", "liftable-by-signature:cross-repository-target"],
+      // PO decision 2026-08-18 #7 (backlog/items/2026-08-12-cross-repository-redirect-
+      // eligibility-does-not-consult-the-sensitive-path-boundary.md): a Bash REDIRECT
+      // target is not a permitted target type for the cross-repository-target liftable
+      // class at all (tool-based allowlist, not a broader path-content heuristic) -- so
+      // BOTH rows below moved from liftable to never-liftable, regardless of whether the
+      // specific target happens to match hardBoundaryPath()'s sensitive-pattern regex.
+      ["printf implementation 2>/etc/passwd", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-PROJECT-BOUNDARY"],
+      ["printf implementation 2>/dev/null > /tmp/elsewhere/out.txt", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-PROJECT-BOUNDARY"],
       // A suppressor standing next to a real external write launders neither the code nor the
       // class: composition removes the route the same command would otherwise have had.
       ["printf implementation 2>/dev/null > /tmp/elsewhere/out.txt; printf done", "GUARD-CROSS-REPO-MUTATION", "never-liftable:external-operator-required:HGO-EXTERNAL-ADAPTER-BOUNDARY"],
