@@ -4923,6 +4923,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           const transition = enterPlanImplementation({
             state: observed,
             expectedStateSha256: sha256CanonicalJson(observed),
+            at: now(),
           });
           return transition.ok
             ? { ...transition, state: { ...transition.state, updatedAt: now() } }
