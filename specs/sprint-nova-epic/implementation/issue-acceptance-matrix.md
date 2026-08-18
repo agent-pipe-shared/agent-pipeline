@@ -22,12 +22,24 @@ candidate.
 | Candidate commit | Candidate tree | Branch | Matrix preimage SHA-256 | Created at |
 | --- | --- | --- | --- | --- |
 | `8ce8d5d3601feed226333451092b8fc06b6dd4a2` | `41a495f2cda4eaa4617e74581a3b094fe56b9ce6` | `feat/sprint-nova-codex-v046` | `3efaf5094617b212baf5f9e28a78dc8874812d87a0bea94fdf31502b90baf2b3` | `2026-08-01T12:11:03+02:00` |
+| `92039bbbc834e69d8474d2da87d5510bb55ca522` | `f24e6f45e4d1c841a7acd6446f9b9ea0e04edd00` | `feat/sprint-nova-codex-v046` | `10d0ab426f1b6edb4c0abbb75c72b5e6dcb498c79e0ecfd6fe4497a9912a6936` | `2026-08-18T09:20:11+02:00` |
 
-This record binds the immutable code candidate before this documentation-only
-append. Its exact Verify and Security evidence are
-`evidence/verify-latest.json` and `evidence/security-latest.json`; both bind
-the commit/tree pair above and finished cleanly. A Critic, PO-gate or
-publication record must repeat the same pair and this matrix preimage digest.
+The 2026-08-01 record above is superseded, not deleted (immutable
+history). This second record binds the exact code candidate — including
+the `0.6.0` version bump, the full Sentinel/Cyborg backlog reconciliation
+(7 items closed, one real two-round security fix cycle), and the
+closure_commit format regression Verify caught and this same block
+fixed — a fresh clean Full Verify (268/269, only the known,
+separately-tracked `human-guard-override-tests` host-config exception)
+ran against exactly this commit/tree; `evidence/verify-latest.json` binds
+it. This record binds the immutable code candidate before this
+documentation-only append. A Critic, PO-gate or publication record must
+repeat the same pair and this matrix preimage digest. **Not yet
+sealed:** no candidate-bound zero-findings comprehensive Critic evidence
+and no PO release-preflight consent exist yet for this exact commit —
+both remain open per every issue row's own "Only the candidate-freeze +
+gate chain remains" language above; NVA-A8-5's pilot execution stays
+genuinely PO-gated regardless of this freeze.
 
 The record above is historical only. Later Nova commits, including the B0
 payload-budget and close-boundary corrections, invalidate it as a current
