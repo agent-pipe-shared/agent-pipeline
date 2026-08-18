@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critical-human-proof-not-wired-to-push-and-prd-gates
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
 source: "PO question during Sprint Nova session, 2026-08-05: asked whether the ed25519 human-proof mechanism (built for Sprint Cyborg) needed one-time setup before this session's branch push. Investigation found it exists but is not enforced for either of the two human gates it was meant to secure."
 due: 2026-09-05
@@ -139,3 +139,20 @@ call, not something to resolve by just porting the push mechanism over.
 - **Assignment (if accepted):** next available Alfred slot, PO design call
   first.
 - **Date:** 2026-08-17
+
+### PO decision, 2026-08-18 (20-item decision batch) — resolved, no
+
+PO decision: B — no, PRD approval does NOT get the same Ed25519
+signature requirement as push. PRD approval is already SHA-bound and
+less security-critical than a push; adding a signature requirement
+would violate the "minimize PO gates" line already established for the
+HGO ceremony. The open design question this item was waiting on is now
+answered; no further Alfred work is needed for step 3.
+
+## Closure
+
+- **Outcome:** rejected — step 3 (Ed25519 proof binding for
+  PRD/`approve-plan`) will not be implemented.
+- **Rationale:** PO decision, 2026-08-18 (see above). Steps 1/2/4 remain
+  delivered via ADR-0055/ADR-0056.
+- **Date:** 2026-08-18

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; verified against source -- accurately described, and this repository's own gate-strength design is deliberately fail-closed here (see docstring cited below), so this is a feature-gap/enhancement request, not a defect."
 ---
@@ -62,3 +62,16 @@ narrow bootstrap-consent case must not regress.
 - **Assignment:** queued for a future design/PO-decision session; not this
   candidate's scope, not agent-dispatchable as-is.
 - **Date:** 2026-08-17
+
+### PO decision, 2026-08-18 (20-item decision batch) — resolved, no
+
+PO decision: B — keep GS-1..GS-5 unchanged. Maximum security is
+preferred over convenience; even a trivial, chat-approved config edit
+keeps the full signature ceremony. No light path will be built.
+
+## Closure
+
+- **Outcome:** rejected — no light path; GS-1..GS-5 stay as designed.
+- **Rationale:** PO decision, 2026-08-18 (see above) — explicit
+  security-over-convenience tradeoff.
+- **Date:** 2026-08-18

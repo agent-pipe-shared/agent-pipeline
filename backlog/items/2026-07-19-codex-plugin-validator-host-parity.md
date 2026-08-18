@@ -3,7 +3,7 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.codex-plugin-validator-host-parity"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-19"
 source: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md"
 tracking: "Sentinel recovery baseline; no completion claim."
@@ -49,3 +49,16 @@ No re-decision needed this pass. This is real design+implementation
 work needing Verify against live fixtures, so it is not attempted
 here either. **Status unchanged (`in_progress`, not closed).**
 **Date:** 2026-08-18
+
+### PO decision, 2026-08-18 (20-item decision batch) — dropped
+
+PO decision: drop this item entirely; revisit only if it ever becomes
+relevant again. No parity-strategy design will be pursued. Closing.
+
+## Closure
+
+- **Outcome:** rejected/dropped.
+- **Rationale:** PO decision, 2026-08-18 — the real native-vs-generic
+  Codex host-parity gap is acknowledged but not worth a dedicated
+  design+implementation package at this time.
+- **Date:** 2026-08-18

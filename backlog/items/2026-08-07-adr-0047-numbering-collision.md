@@ -56,3 +56,10 @@ session-scoped plan file rather than the versioned work queue.
   colliding with whatever Phoenix's own resolution does.
 - **Assignment (if accepted):** n/a — tracked in the Phoenix sprint, not Nova.
 - **Date:** 2026-08-11
+
+### PO re-confirmation, 2026-08-18
+
+Re-asked as part of the 20-item decision batch. PO confirmed: "A — reine
+Bestätigung, dass die alte Anweisung noch gilt" (pure confirmation that
+the old instruction still stands). No Nova action; stays with Phoenix.
+- **Date:** 2026-08-18

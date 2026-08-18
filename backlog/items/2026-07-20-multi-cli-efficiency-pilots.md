@@ -204,3 +204,13 @@ either pilot's first real run should log its cost-unit measurements from
 the very first use (no retroactive estimation), per the item's own "observed
 route and cost evidence... estimates or receipt reuse alone are
 insufficient" rule.
+
+### PO decision, 2026-08-18 (20-item decision batch) — go
+
+PO decision: A — authorize both pilots now (wave-review and
+remote-mini-train). Both are cleared to run for real, cost-unit
+measurement starting from the first live use per the rule above. Status
+stays `in_progress` pending an actual pilot run and its measured
+outcome; this item closes only once at least one real run's
+cost-unit result has been recorded against its stated success
+threshold.
