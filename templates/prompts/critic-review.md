@@ -120,6 +120,15 @@ USAGE (Elephant)
    its hunt already framed: the resume message must not characterise the review
    object, name a suspicion, or hint at what you want the outcome to be. Every
    rule of item 2 applies to a resume message unchanged.
+7. This template applies VERBATIM inside a Workflow-tool `agent()` prompt
+   string too — do not hand-build these fields from memory for that execution
+   mode; it is the identical freehand failure via a different mechanism
+   (CLAUDE.md, "Dispatch from the template, never freehand").
+   `plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`
+   documents the ADDITIVE Workflow-specific requirements (the `pipeline-core:`
+   `agentType` prefix, a stated tool-call budget, the worktree self-heal block
+   where isolation is used) layered on top of this template, not a replacement
+   for it.
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->

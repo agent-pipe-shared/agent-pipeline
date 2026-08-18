@@ -54,6 +54,27 @@ plugin/hook surface. Codex has its own plugin manifest and pre-tool guard
 adapter. Other runtimes can use the methodology, but must not claim equivalent
 hook, tool, isolation or model-routing enforcement without their own evidence.
 
+### Dispatch briefing fields
+
+A Goldfish or Critic dispatch is built from a fixed six-field briefing, never
+freehand, whether issued directly (Agent tool) or fanned out through the
+Workflow tool's `agent()` call: **Goal** (one observable outcome, not a step
+list), **Context files** (the explicit, exhaustive input — nothing else is
+assumed known), **DoD checks** (the fixed, non-negotiable acceptance
+contract), **Forbidden** (scope boundaries and no-go paths), **Stop
+conditions** (when to halt and report instead of guessing or iterating past a
+failure), and **Dispatch metadata** (ruleset SHA, model/effort and
+justification, worktree, profile, tool budget). The concrete
+fill-in-the-blank shape lives in
+[`templates/prompts/goldfish-task.md`](../templates/prompts/goldfish-task.md)
+and
+[`templates/prompts/critic-review.md`](../templates/prompts/critic-review.md);
+this list is the field contract those templates instantiate, and a
+hand-written briefing that skips the template — including one hand-built
+inside a Workflow `agent()` prompt string — is the freehand failure mode
+CLAUDE.md's "Dispatch from the template, never freehand" rule exists to
+prevent.
+
 ## 3. V3 routing: profiles, duties and phases
 
 `pipeline.user.v3` is the routing authority. Generated runtime projections are

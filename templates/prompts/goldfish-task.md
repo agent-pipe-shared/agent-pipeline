@@ -2,9 +2,10 @@
 ═══════════════════════════════════════════════════════════════════════════
 PROMPT TEMPLATE: Goldfish task briefing (6 mandatory fields) — Agent-Pipeline
 v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
-Source of truth: docs/operating-model.md §2.3 — the canonical briefing field
-list. The six fields below are: Goal, Context files, DoD checks, Forbidden,
-Stop conditions, and Dispatch metadata (per operating-model.md §2.3).
+Source of truth: docs/operating-model.md §2 ("Dispatch briefing fields"
+subsection) — the canonical briefing field list. The six fields below are:
+Goal, Context files, DoD checks, Forbidden, Stop conditions, and Dispatch
+metadata (per operating-model.md §2, "Dispatch briefing fields").
 Also: harness/session-bootstrap.md §6.2 (Goldfish bootstrap), model-policy
 MP-02/MP-05 (model/effort, escalation justification), the no-memory rule and the
 two-failed-attempts rule.
@@ -62,6 +63,15 @@ USAGE (Elephant)
    Tell the goldfish (see the field-4/field-6 text below) to split its work into
    commits as each piece is verified, instead of a single commit at the very
    end.
+10. **This template applies VERBATIM inside a Workflow-tool `agent()` prompt
+    string too** — do not hand-build the 6-field shape from memory for that
+    execution mode; it is the identical freehand failure via a different
+    mechanism (CLAUDE.md, "Dispatch from the template, never freehand").
+    `plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`
+    documents the ADDITIVE Workflow-specific requirements layered on top (the
+    `pipeline-core:` `agentType` prefix, a stated tool-call budget, the
+    worktree self-heal block where isolation is used) — read it before
+    building a Workflow dispatch; it does not replace this template.
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->
