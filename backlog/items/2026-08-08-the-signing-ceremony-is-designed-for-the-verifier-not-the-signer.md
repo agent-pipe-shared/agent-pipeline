@@ -273,3 +273,20 @@ new orchestrating script, not a message fix) and was explicitly out of
 scope for both NVA-SIGENTRY-1 and NVA-SIGDISCLOSE-1.
 
 - **Date:** 2026-08-17
+
+### Release-gate decision, 2026-08-18
+
+- **Decision:** confirmed and queued for dispatch — deferred to Sprint
+  Alfred.
+- **Rationale:** the only remaining piece, Direction step 1 (a new,
+  standalone orchestrating entry-point script for prepare/present/sign/
+  install/verify), is a real build needing dispatch plus Verify to trust,
+  not a triage-pass fix. Matches Alfred's confirmed "control integrity"
+  scope (`docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17
+  amendment), the same scope sibling signing-ceremony items in this
+  cluster were deferred to on 2026-08-17.
+- **Assignment (if accepted):** next available Alfred slot; pair with
+  `pipeline.human-approval-ux-directory-clarity-and-single-command`'s
+  remaining `sign-intent --request` work if scheduled together, since both
+  touch `po-human-approval.mjs`.
+- **Date:** 2026-08-18

@@ -144,3 +144,22 @@ Related, same family: the confirmation prompt is English-only
   goldfish-deep dispatch (signing-ceremony code); not fixed in this triage
   pass (docs/backlog-only).
 - **Date:** 2026-08-17
+
+### Release-gate decision, 2026-08-18
+
+- **Decision:** confirmed and queued for dispatch — deferred to Sprint
+  Alfred.
+- **Rationale:** the remaining scope (a `sign-intent --request <path>` flag
+  cross-checked against `--intent-sha256`) is signing-ceremony code that
+  needs a real dispatch plus Verify to trust, not a triage-pass fix — it
+  matches Alfred's confirmed "control integrity" scope
+  (`docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17 amendment)
+  exactly, the same scope sibling signing-ceremony items in this cluster
+  were deferred to on 2026-08-17
+  (e.g. `pipeline.critical-human-proof-not-wired-to-push-and-prd-gates`,
+  `pipeline.lifecycle-guard-does-not-know-the-human-signing-commands`). This
+  makes the already-recorded but previously undated decision a genuinely
+  resolved (decided) item for the 0.6.0 release bar rather than a dangling
+  one.
+- **Assignment (if accepted):** next available Alfred slot.
+- **Date:** 2026-08-18

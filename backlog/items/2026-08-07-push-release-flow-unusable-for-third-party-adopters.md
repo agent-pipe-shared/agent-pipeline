@@ -278,3 +278,22 @@ commitment to any of them:
   already documented in this item, is exactly what this decision closes).
   Substantial enough for its own design pass, not a quick fix.
 - **Date:** 2026-08-11
+
+### Release-gate decision, 2026-08-18
+
+- **Decision:** confirmed and queued for dispatch — deferred to Sprint
+  Alfred.
+- **Rationale:** the 2026-08-11 PO decision ("human intent captured once,
+  applies to all gates") already answers the design question but the
+  actual redesign of the push/release approval binding — closing the
+  structural sign→fix→invalidate→sign-again loop (7a/7c) and folding in
+  candidate #3 (narrowing `prepare-critical`'s cross-repo refusal) — was
+  left unassigned and undated. This is guardrail/security-class code
+  needing a real dispatch plus Verify to trust, matching Alfred's
+  confirmed "agent-first architecture, mechanical governance... control
+  integrity" scope (`docs/adr/0043-post-go-live-sprint-model.md`,
+  2026-08-17 amendment) exactly, the same scope sibling signing-ceremony
+  items in this cluster were deferred to on 2026-08-17.
+- **Assignment (if accepted):** next available Alfred slot, unassigned;
+  candidate #3 folds into the same design pass per the 2026-08-11 note.
+- **Date:** 2026-08-18
