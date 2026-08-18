@@ -1668,6 +1668,33 @@ try {
             forCommit ?? null,
           )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node ${pipelineStateScriptRef()} approve-push --by <name> --remote <remote> --destination <full-ref>. NOTE: with gates.push.approval "required" this state record is NECESSARY BUT NOT SUFFICIENT -- the critical-proof check below is independent and also applies. A pushApproval in mutable state is never executable authority on its own.`,
         );
+      } else if (approval?.remote !== pushBinding.remote || approval?.destination !== pushBinding.destination) {
+        // PUSHBIND-1 (backlog: push-approval-general-mode-lane-does-not-bind-remote-or-destination,
+        // 2026-08-18): this general-mode check used to test `forCommit` alone. The
+        // stricter `authorizeRecordedPush` call below already binds remote/destination
+        // for the non-waived lane, but a waived/chat approval (the fallthrough a few
+        // lines down, once `pushWaiver.waived` is true and the record names it) never
+        // reaches that call, so the SAME approved commit could authorize a push to a
+        // DIFFERENT remote/destination than the one it was actually approved for.
+        // `approve-push` always records `remote`/`destination` (chat mode included --
+        // see pipeline-state.mjs's approve-push case), so this binding check is always
+        // meaningful once `forCommit` itself already matches. Mirrors the identical
+        // binding `attestedMainPublication`'s own chat fallback already performs for
+        // `refs/heads/main` specifically (`approval?.remote === binding.remote &&
+        // approval?.destination === binding.destination`), now enforced for every
+        // destination, not only main.
+        //
+        // Operand text is deliberately NOT interpolated here, for the same SEC-01 reason
+        // documented at the `authorizeRecordedPush` call below: `remote` is any positional
+        // the command supplied, so it can be a credential-bearing URL that must not travel
+        // into stderr/session transcript. The operator does not need the values echoed
+        // back -- they are in the command and the approval record they already hold.
+        failures.push(
+          "Push approval is bound to a different remote or destination than this push: " +
+          "state.pushApproval.lastApproved.remote/destination do not match this push's target. " +
+          `Record a fresh approval bound to this exact remote and destination: node ${pipelineStateScriptRef()} ` +
+          "approve-push --by <name> --remote <remote> --destination <full-ref>.",
+        );
       }
       // ADR-0055: the project may stand the private-key proof down for `push` with an
       // explicit, reasoned waiver. The human gate itself still applies — the approval
