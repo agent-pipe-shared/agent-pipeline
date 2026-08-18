@@ -3,10 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
 source: "Found 2026-08-16 when two dispatches in one session correctly refused to force-add their dispatch records, and the Critic separately flagged that the evidence artifact it was given sat under scratch/ rather than the calibration's canonical evidence/ location. Verified with git check-ignore before filing."
 due: 2026-09-15
+closed_at: 2026-08-18
+closure_commit: 00350b2d
 ---
 
 # `.gitignore`'s `evidence/` rule is unanchored, so it also swallows the Spec packages' durable audit artifacts
@@ -82,6 +84,13 @@ with a curation pass that decides, per file, tracked or ignored:
 
 Do it as one briefed dispatch with the curation list fixed up front, not as an
 opportunistic edit inside another work package.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** closed (implemented)
+- **Rationale:** the pattern was anchored (`/evidence/`) in commit `13811594` (2026-08-17), and the resulting curation pass landed 2026-08-18 in commit `00350b2d` (138 files, reviewed by pattern, secret-scanned first — see `backlog/items/2026-08-17-evidence-gitignore-left-dozens-of-durable-artifacts-untracked.md`'s own closure for the full accounting). No machine-specific absolute paths found in the committed set.
+- **Assignment (if accepted):** n/a — implemented this session.
+- **Date:** 2026-08-18
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

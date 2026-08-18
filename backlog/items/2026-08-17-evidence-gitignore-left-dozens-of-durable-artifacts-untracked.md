@@ -3,10 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "Found 2026-08-17 while trying to commit a fresh acceptance-evidence-map snapshot: git silently refused to see the new file. Traced to .gitignore's unanchored `evidence/` rule matching specs/sprint-phoenix-epic/evidence/ too, fixed in commit 13811594."
 due: 2026-08-24
+closed_at: 2026-08-18
+closure_commit: 00350b2d
 ---
 
 # Fixing the evidence/ gitignore anchor revealed dozens of previously-untracked durable artifacts under specs/sprint-phoenix-epic/evidence/
@@ -53,7 +55,7 @@ risks committing something that should not be in history without a look.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed (implemented)
+- **Rationale:** grew to 145 untracked files by 2026-08-18 (up from "dozens" at filing) before being addressed. Reviewed by pattern per this item's own proposal, not blanket-added: every file matched an expected durable-evidence shape (dispatch records, `.tap` test-run output, verify/security-scan snapshots, feature-package reconcile requests/proposals, Critic-review diff snapshots, one PO key-setup helper script with no embedded key material) — nothing looked like disposable scratch output that landed in the wrong place. Secret-scanned first (private-key/token/password/secret patterns across the whole directory): zero findings, one false-positive-pattern hit that was prose ("contains no secret"), independently read and confirmed clean. Committed in one deliberate pass, `git add -- specs/sprint-phoenix-epic/evidence` (scoped to this one directory, not `-A`), commit `00350b2d`. Excluded from that commit: the small set of dispatch-record.json files this repo deliberately leaves perpetually uncommitted as working state (already-tracked, routinely-modified — a different, pre-existing pattern this item does not touch), and two dispatch-record.json files from goldfish agents still running at commit time (left for those dispatches' own commits).
+- **Assignment (if accepted):** n/a — implemented this session.
+- **Date:** 2026-08-18
