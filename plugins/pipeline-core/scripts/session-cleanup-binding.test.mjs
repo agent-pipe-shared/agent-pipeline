@@ -760,7 +760,10 @@ test("legacy post-close binding is recovered only from exact Git and closure pro
     assert.equal(plan.recovery, "release-closed-feature");
     assert.equal(plan.closure.status, "closed");
     assert.match(plan.closure.receiptSha256, /^[a-f0-9]{64}$/u);
-    assert.equal(plan.applyAction.requiresConfirmation, true);
+    // NVA-W4-2C, 2026-08-18 PO decision: release-closed-feature is one of the
+    // six recovery kinds readyRecoveryPlan() now auto-executes without a
+    // human confirmation step (paired with a .bak snapshot safety net).
+    assert.equal(plan.applyAction.requiresConfirmation, false);
     const applied = invoke([
       "apply-recovery", "--repo", fixtureState.root,
       "--plan-sha256", plan.planSha256,
@@ -1409,7 +1412,10 @@ test("a single unbound descriptor requires an activated digest-bound rebind", ()
       sessionId: orphan.sessionId,
       descriptorSha256: orphan.descriptorSha256,
     });
-    assert.equal(plan.applyAction.requiresConfirmation, true);
+    // NVA-W4-2C, 2026-08-18 PO decision: bind-orphan is one of the six
+    // recovery kinds readyRecoveryPlan() now auto-executes without a human
+    // confirmation step (paired with a .bak snapshot safety net).
+    assert.equal(plan.applyAction.requiresConfirmation, false);
     assert.deepEqual(plan.applyAction.expected.statuses, ["rebound"]);
     assert.throws(
       () => invoke([
@@ -1473,7 +1479,10 @@ test("multiple empty legacy orphans require one exact activated Human retirement
         ownerStatus: "unobserved",
       },
     ]);
-    assert.equal(plan.applyAction.requiresConfirmation, true);
+    // NVA-W4-2C, 2026-08-18 PO decision: retire-orphans is one of the six
+    // recovery kinds readyRecoveryPlan() now auto-executes without a human
+    // confirmation step (paired with a .bak snapshot safety net).
+    assert.equal(plan.applyAction.requiresConfirmation, false);
     assert.deepEqual(plan.applyAction.expected.statuses, ["retired"]);
     assert.throws(
       () => invoke([
@@ -1576,7 +1585,10 @@ test("unknown descriptor loss requires an exact activated PO recovery plan", () 
     assert.equal(plan.status, "ready");
     assert.equal(plan.closure, "unknown");
     assert.equal(plan.activeDescriptorCount, 0);
-    assert.equal(plan.applyAction.requiresConfirmation, true);
+    // NVA-W4-2C, 2026-08-18 PO decision: this typed plan (readyRecoveryPlan())
+    // is also one of the six recovery kinds now auto-executed without a
+    // human confirmation step (paired with a .bak snapshot safety net).
+    assert.equal(plan.applyAction.requiresConfirmation, false);
     assert.equal(plan.applyAction.argv.at(-1), "--activate");
     assert.throws(
       () => invoke([

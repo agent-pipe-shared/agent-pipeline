@@ -61,7 +61,7 @@ import {
   runtimeRestartBindingCurrent,
 } from "./codex-onboarding-runtime.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
-import { planSessionCleanupRecovery } from "./session-cleanup-recovery.mjs";
+import { applySessionCleanupRecovery, planSessionCleanupRecovery } from "./session-cleanup-recovery.mjs";
 import {
   LEGACY_CALIBRATION,
   LEGACY_STATE,
@@ -1275,11 +1275,45 @@ function partialCleanupRecoveryResult({
       rootDir: root,
       scriptPath: SESSION_CLEANUP_SCRIPT,
     });
-    const nextAction = recovery.status === "ready"
-      ? recovery.applyAction
-      : new Set(["cleanup-required", "release-ready"]).has(recovery.status)
-        ? recovery.nextAction ?? null
-        : null;
+    // Per the PO's explicit 2026-08-18 decision (backlog item
+    // pipeline.self-healing-local-cleanup-recovery), a "ready" typed recovery
+    // plan is auto-applied here rather than surfaced as a PO selection
+    // question -- readyRecoveryPlan()'s applyAction now carries
+    // requiresConfirmation: false for all six typed recovery kinds. Only an
+    // apply failure (the plan's own digest/readback proofs did not hold) or
+    // the untyped plan-human-recovery path below still asks a human.
+    if (recovery.status === "ready") {
+      const applyCleanupRecovery = deps.applySessionCleanupRecovery
+        ?? applySessionCleanupRecovery;
+      try {
+        applyCleanupRecovery({
+          rootDir: root,
+          expectedPlanSha256: recovery.planSha256,
+          activate: true,
+          scriptPath: SESSION_CLEANUP_SCRIPT,
+        });
+        return null;
+      } catch {
+        return lifecycleResult({
+          status: "partial",
+          root,
+          runner,
+          intent,
+          repository,
+          runtime,
+          nextAction: cleanupHumanRecoveryAction(root),
+          diagnostics: [lifecycleDiagnostic(
+            "$.authority.sessionCleanup",
+            "cleanup_recovery_apply_failed",
+            "an automatic, digest-bound cleanup recovery attempt did not converge",
+            "retain the state and request an explicit authority decision; do not guess, replace, or delete a descriptor",
+          )],
+        });
+      }
+    }
+    const nextAction = new Set(["cleanup-required", "release-ready"]).has(recovery.status)
+      ? recovery.nextAction ?? null
+      : null;
     if (nextAction !== null) {
       return lifecycleResult({
         status: "partial",

@@ -274,6 +274,123 @@ function writeAtomicPrivate(path, bytes, security = {}) {
   }
 }
 
+function resolveGitCommonDirectoryForBackup(root, deps) {
+  const spawn = deps.spawn ?? spawnSync;
+  const result = spawn("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    timeout: 5000,
+  });
+  if (result?.status !== 0 || result?.error) {
+    fail("WT-SESSION-RECOVERY-BACKUP", "Git common directory is unavailable");
+  }
+  const raw = String(result.stdout ?? "").trim();
+  const common = realpathSync(isAbsolute(raw) ? raw : resolve(root, raw));
+  const info = lstatSync(common);
+  if (!info.isDirectory() || info.isSymbolicLink()) {
+    fail("WT-SESSION-RECOVERY-BACKUP", "Git common directory is unsafe");
+  }
+  return common;
+}
+
+/**
+ * Safety net paired with removing PO confirmation for the six auto-executed
+ * recovery kinds (2026-08-18 PO decision, backlog item
+ * pipeline.self-healing-local-cleanup-recovery): every private file a
+ * recovery is about to mutate is snapshotted here FIRST, unconditionally,
+ * before the underlying mutating call runs. Backups live in a directory this
+ * module already owns and secures -- deliberately never inside a directory a
+ * DIFFERENT module readdir-scans and fails closed on an unexpected entry
+ * (e.g. worktree-lifecycle.mjs's session-descriptors/active/, which throws
+ * WT-SESSION-DESCRIPTOR-DIRECTORY on any non-`.json` entry) -- and are named
+ * by a caller-supplied label, one rolling backup per label: a second recovery
+ * attempt overwrites the first rather than accumulating unbounded history,
+ * since the backup's only job is "restore the immediately-prior state", not
+ * an audit trail. Design choice, left unspecified by the PO.
+ */
+function recoveryBackupDirectory(root, deps) {
+  const common = resolveGitCommonDirectoryForBackup(root, deps);
+  const directory = join(common, "agent-pipeline", "session-cleanup-recovery", "backups");
+  const security = {
+    platform: deps.platform ?? process.platform,
+    assessWindowsPrivatePathFn: deps.assessWindowsPrivatePathFn ?? assessWindowsPrivatePath,
+    hardenWindowsPrivateDirectoryFn: deps.hardenWindowsPrivateDirectoryFn ?? hardenWindowsPrivateDirectory,
+  };
+  securePrivateDirectory(directory, security);
+  return { directory, security };
+}
+
+/**
+ * Back up exactly one file's pre-recovery bytes to `<label>.bak` under
+ * recoveryBackupDirectory(). A no-op (returns null) when the source does not
+ * exist yet -- nothing to preserve, and several recovery kinds legitimately
+ * mutate a file that is absent going in (e.g. a fresh private binding write).
+ * Fails closed (never silently skips) if the source exists but is not a
+ * plain regular file, since that is exactly the shape a symlink attack or a
+ * damaged private store would take.
+ */
+function backupBeforeMutation(root, deps, label, sourcePath) {
+  if (!existsSync(sourcePath)) return null;
+  const info = lstatSync(sourcePath);
+  if (!info.isFile() || info.isSymbolicLink()) {
+    fail("WT-SESSION-RECOVERY-BACKUP", "cleanup recovery backup source is unsafe");
+  }
+  const bytes = readFileSync(sourcePath);
+  const { directory, security } = recoveryBackupDirectory(root, deps);
+  const backupPath = join(directory, `${label}.bak`);
+  writeAtomicPrivate(backupPath, bytes, security);
+  return backupPath;
+}
+
+/**
+ * Back up every regular file currently in the private onboarding store
+ * (`agent-pipeline/onboarding/`, the same directory
+ * onboarding-continuity.mjs's resolvePrivate(root, "local", ...) resolves to)
+ * before a recovery kind that goes on to call into that module's binding/
+ * receipt writers (bind-orphan, release-lost-binding, release-closed-feature,
+ * quarantine-private-receipt, and the release half of
+ * retire-orphans-release-lost-binding). A directory sweep rather than named
+ * basenames deliberately: the private binding/key/release-receipt basenames
+ * are internal to onboarding-continuity.mjs (not exported), so backing up by
+ * name here would either duplicate them as magic strings or require touching
+ * that file -- both worse than backing up whatever is actually present.
+ */
+function backupOnboardingPrivateState(root, deps) {
+  const common = resolveGitCommonDirectoryForBackup(root, deps);
+  const onboardingDirectory = join(common, "agent-pipeline", "onboarding");
+  if (!existsSync(onboardingDirectory)) return [];
+  const info = lstatSync(onboardingDirectory);
+  if (!info.isDirectory() || info.isSymbolicLink()) {
+    fail("WT-SESSION-RECOVERY-BACKUP", "onboarding private state directory is unsafe");
+  }
+  const backedUp = [];
+  for (const name of readdirSync(onboardingDirectory).sort()) {
+    const path = join(onboardingDirectory, name);
+    const entryInfo = lstatSync(path);
+    if (!entryInfo.isFile() || entryInfo.isSymbolicLink()) continue;
+    const backupPath = backupBeforeMutation(root, deps, `onboarding-private.${name}`, path);
+    if (backupPath) backedUp.push(backupPath);
+  }
+  return backedUp;
+}
+
+/**
+ * Back up the external-archive cleanup manifest retireExternallyArchivedSession
+ * is about to delete. `session-cleanup/active/<sessionId>.json` under the Git
+ * common dir is worktree-lifecycle.mjs's own un-exported cleanupManifestPath()
+ * convention (confirmed by direct source read, not guessed); reconstructed
+ * here rather than exported because widening that module's surface is outside
+ * this change's file scope. Only reached by retire-externally-archived-orphans
+ * / retire-mixed-orphans, and only for descriptors requiring external
+ * retirement -- disclosed, deliberate coupling, not an oversight.
+ */
+function backupExternalRetirementManifest(root, deps, sessionId) {
+  const common = resolveGitCommonDirectoryForBackup(root, deps);
+  const manifestPath = join(common, "agent-pipeline", "session-cleanup", "active", `${sessionId}.json`);
+  return backupBeforeMutation(root, deps, `external-manifest.${sessionId}`, manifestPath);
+}
+
 function validateCompositeJournal(value, expectedPlanSha256) {
   const keys = Object.keys(value ?? {}).sort();
   const expected = [
@@ -549,6 +666,7 @@ function applyCompositeSessionCleanupRecovery({
           const descriptor = loadDescriptor(plan.root, expected.sessionId, {
             expectedDescriptorSha256: expected.descriptorSha256,
           });
+          backupBeforeMutation(plan.root, deps, `session-descriptor.${descriptor.sessionId}`, descriptor.path);
           retireDescriptor(plan.root, {
             sessionId: descriptor.sessionId,
             descriptorSha256: descriptor.descriptorSha256,
@@ -587,6 +705,7 @@ function applyCompositeSessionCleanupRecovery({
         fail("WT-SESSION-RECOVERY-READBACK", "composite release preimage changed");
       }
       journal = updateCompositeJournal(paths, journal, { phase: "releasing" }, journalSecurity);
+      backupOnboardingPrivateState(plan.root, deps);
       const release = deps.releaseOnboardingSessionCleanupFn
         ?? releaseOnboardingSessionCleanup;
       const released = release({
@@ -662,7 +781,18 @@ function readyRecoveryPlan(partial, scriptPath) {
       "--activate",
     ],
     mutation: true,
-    requiresConfirmation: true,
+    // Auto-executed per the PO's explicit 2026-08-18 decision (backlog item
+    // pipeline.self-healing-local-cleanup-recovery): ALL SIX typed recovery
+    // kinds this function backs (bind-orphan; retire-orphans /
+    // retire-externally-archived-orphans / retire-mixed-orphans;
+    // retire-orphans-release-lost-binding; release-lost-binding;
+    // release-closed-feature; quarantine-private-receipt) share this one
+    // applyAction construction site, so flipping this flag here covers all
+    // of them at once. The safety net required in place of the removed gate
+    // is `.bak` snapshotting every private file a recovery is about to
+    // mutate -- see backupBeforeMutation/backupOnboardingPrivateState below,
+    // called unconditionally before each underlying mutating call.
+    requiresConfirmation: false,
     executionBoundary: "local-process",
     expected: {
       schema: SESSION_CLEANUP_RECOVERY_APPLY_SCHEMA,
@@ -742,13 +872,25 @@ function planExactOrphanRetirement({
 
 /**
  * Plan only closed crash residues. A single validated unbound active
- * descriptor can be rebound through explicit PO confirmation. Multiple exact
- * descriptors may be retired only when each one either has no cleanup manifest
- * and is independently retirable, or carries the separate external-archive
- * proof. The legacy V1 owner case is therefore a Human-only, digest-bound
- * recovery rather than an automatic cleanup. A bound handle whose private
- * descriptor and closure receipt are both absent can be released. Active bound
- * descriptors still require ordinary cleanup and closed ones release-binding.
+ * descriptor can be rebound. Multiple exact descriptors may be retired only
+ * when each one either has no cleanup manifest and is independently
+ * retirable, or carries the separate external-archive proof. A bound handle
+ * whose private descriptor and closure receipt are both absent can be
+ * released. Active bound descriptors still require ordinary cleanup and
+ * closed ones release-binding.
+ *
+ * SUPERSEDED 2026-08-18 (PO decision, backlog item
+ * pipeline.self-healing-local-cleanup-recovery): this comment used to call
+ * the single-unbound-descriptor (bind-orphan) case above "a Human-only,
+ * digest-bound recovery rather than an automatic cleanup." That no longer
+ * controls. All six typed recovery kinds readyRecoveryPlan() produces --
+ * including bind-orphan -- now carry requiresConfirmation: false and
+ * auto-execute, deliberately wider than a prior design analysis's narrower
+ * recommendation. The safety net required in its place is a `.bak` snapshot
+ * of every private file about to be mutated, written unconditionally before
+ * the mutating call (backupBeforeMutation / backupOnboardingPrivateState,
+ * defined below). Only the untyped plan-human-recovery escape hatch --
+ * reached when no typed plan exists at all -- remains a human decision.
  */
 export function planSessionCleanupRecovery({
   rootDir,
@@ -1114,6 +1256,7 @@ export function applySessionCleanupRecovery({
     fail("WT-SESSION-RECOVERY-PLAN", "cleanup recovery plan digest does not match");
   }
   if (plan.recovery === "quarantine-private-receipt") {
+    backupOnboardingPrivateState(plan.root, deps);
     const quarantine = deps.quarantineClosedPrivateCleanupReleaseReceiptFn
       ?? quarantineClosedPrivateCleanupReleaseReceipt;
     const result = quarantine({
@@ -1147,6 +1290,7 @@ export function applySessionCleanupRecovery({
     const descriptor = loadDescriptor(plan.root, plan.sessionCleanup.sessionId, {
       expectedDescriptorSha256: plan.sessionCleanup.descriptorSha256,
     });
+    backupOnboardingPrivateState(plan.root, deps);
     const result = bind({
       rootDir: plan.root,
       expectedStateSha256: plan.stateSha256,
@@ -1213,6 +1357,7 @@ export function applySessionCleanupRecovery({
       });
     });
     for (const descriptor of prepared) {
+      backupBeforeMutation(plan.root, deps, `session-descriptor.${descriptor.sessionId}`, descriptor.path);
       const requiresExternalRetirement = plan.recovery === "retire-externally-archived-orphans"
         || (plan.recovery === "retire-mixed-orphans" && externalById.has(descriptor.sessionId));
       if (requiresExternalRetirement) {
@@ -1229,6 +1374,7 @@ export function applySessionCleanupRecovery({
           || canonicalJson(observed.resources) !== canonicalJson(expected.resources)) {
           fail("WT-SESSION-RECOVERY-PLAN", "external retirement proof changed since planning");
         }
+        backupExternalRetirementManifest(plan.root, deps, descriptor.sessionId);
         retireExternal(plan.root, {
           sessionId: descriptor.sessionId,
           descriptorSha256: descriptor.descriptorSha256,
@@ -1267,6 +1413,7 @@ export function applySessionCleanupRecovery({
     };
   }
   if (plan.recovery === "release-closed-feature") {
+    backupOnboardingPrivateState(plan.root, deps);
     const recordRelease = deps.recordClosedOnboardingSessionCleanupReleaseFn
       ?? recordClosedOnboardingSessionCleanupRelease;
     const result = recordRelease({
@@ -1303,6 +1450,7 @@ export function applySessionCleanupRecovery({
   if (plan.recovery !== "release-lost-binding") {
     fail("WT-SESSION-RECOVERY-PLAN", "cleanup recovery plan mode is invalid");
   }
+  backupOnboardingPrivateState(plan.root, deps);
   const release = deps.releaseOnboardingSessionCleanupFn
     ?? releaseOnboardingSessionCleanup;
   const result = release({

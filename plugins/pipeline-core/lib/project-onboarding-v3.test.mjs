@@ -51,7 +51,9 @@ import {
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import { readOnboardingSessionCleanupBinding } from "./onboarding-continuity.mjs";
-import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
+import {
+  cleanupSession, listActiveSessionDescriptors, retireSessionDescriptor, startSessionDescriptor,
+} from "./worktree-lifecycle.mjs";
 import {
   applyProjectAuthoritySessionCleanupRecovery,
   planProjectAuthoritySessionCleanupRecovery,
@@ -588,25 +590,25 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     const barrier = initializeRestartRequiredRoot(path);
     clearRuntimeBarrier(path, barrier);
     completeKickoff(path);
-    const applyAction = {
+    const humanRecoveryAction = {
       kind: "command",
       executable: "node",
-      argv: [
-        "/fixture/session-cleanup.mjs",
-        "apply-recovery",
-        "--repo",
-        path,
-        "--plan-sha256",
-        "a".repeat(64),
-        "--activate",
-      ],
-      mutation: true,
-      requiresConfirmation: true,
+      argv: [SESSION_CLEANUP_SCRIPT, "plan-human-recovery", "--repo", path],
+      mutation: false,
+      requiresConfirmation: false,
       expected: {
-        schema: "pipeline.session-cleanup-recovery-apply.v1",
-        statuses: ["retired"],
+        schema: "pipeline.session-cleanup-human-recovery-plan.v1",
+        statuses: ["decision-required"],
       },
     };
+    // Per the PO's explicit 2026-08-18 decision (backlog item
+    // pipeline.self-healing-local-cleanup-recovery), a "ready" typed plan is
+    // now auto-applied rather than surfaced as a selection question.
+    // Ordering (cleanup recovery precedes App Server) is proven here through
+    // the apply-failure fallback: `observeOnboardingAppServer` throws if it
+    // is ever reached, and it never is, because the auto-apply attempt
+    // itself fails first and returns "partial" with the human recovery
+    // action -- never the raw apply command.
     const observed = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
       intent: "bootstrap",
@@ -622,15 +624,63 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
             schema: "pipeline.session-cleanup-recovery-plan.v1",
             status: "ready",
             recovery: "retire-orphans",
-            applyAction,
+            planSha256: "a".repeat(64),
           };
+        },
+        applySessionCleanupRecovery({ rootDir, expectedPlanSha256, activate, scriptPath }) {
+          assert.equal(rootDir, path);
+          assert.equal(expectedPlanSha256, "a".repeat(64));
+          assert.equal(activate, true);
+          assert.equal(scriptPath.endsWith("/scripts/session-cleanup.mjs"), true);
+          throw new Error("simulated apply failure -- plan digest did not hold");
         },
       },
     });
     assert.equal(observed.status, "partial");
     assert.equal(observed.runtime.status, "readback-current");
-    assert.deepEqual(observed.nextAction, applyAction);
-    assertDiagnostic(observed, "cleanup_recovery_required");
+    assert.deepEqual(observed.nextAction, humanRecoveryAction);
+    assertDiagnostic(observed, "cleanup_recovery_apply_failed");
+
+    // A "ready" plan whose auto-apply SUCCEEDS never surfaces any next
+    // action or diagnostic at all -- it converges silently, at most a
+    // completion note in the diagnostics, and the flow proceeds straight to
+    // App Server exactly like "not-needed" -- never a selection question.
+    let readyApplyCalls = 0;
+    let readyAppServerCalls = 0;
+    const readyAndApplied = inspectProjectOnboardingV3({ runner: "codex",
+      rootDir: path,
+      intent: "session",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer(options) {
+          readyAppServerCalls += 1;
+          return fakeAppServer(options);
+        },
+        planSessionCleanupRecovery() {
+          return {
+            schema: "pipeline.session-cleanup-recovery-plan.v1",
+            status: "ready",
+            recovery: "retire-orphans",
+            planSha256: "b".repeat(64),
+          };
+        },
+        applySessionCleanupRecovery({ expectedPlanSha256, activate }) {
+          readyApplyCalls += 1;
+          assert.equal(expectedPlanSha256, "b".repeat(64));
+          assert.equal(activate, true);
+          return {
+            schema: "pipeline.session-cleanup-recovery-apply.v1",
+            status: "retired",
+            root: path,
+            planSha256: "b".repeat(64),
+          };
+        },
+      },
+    });
+    assert.equal(readyApplyCalls, 1);
+    assert.equal(readyAppServerCalls, 1);
+    assert.equal(readyAndApplied.status, "ready");
+    assert.equal(readyAndApplied.nextAction, null);
 
     let activeSessionAppServerCalls = 0;
     const activeSession = inspectProjectOnboardingV3({ runner: "codex",
@@ -653,18 +703,6 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(activeSession.status, "ready");
     assert.equal(activeSession.nextAction, null);
     assert.equal(activeSessionAppServerCalls, 1);
-
-    const humanRecoveryAction = {
-      kind: "command",
-      executable: "node",
-      argv: [SESSION_CLEANUP_SCRIPT, "plan-human-recovery", "--repo", path],
-      mutation: false,
-      requiresConfirmation: false,
-      expected: {
-        schema: "pipeline.session-cleanup-human-recovery-plan.v1",
-        statuses: ["decision-required"],
-      },
-    };
 
     const unavailable = inspectProjectOnboardingV3({ runner: "codex",
       rootDir: path,
@@ -703,6 +741,39 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(unobserved.status, "partial");
     assert.deepEqual(unobserved.nextAction, humanRecoveryAction);
     assertDiagnostic(unobserved, "cleanup_recovery_observation_unavailable");
+  } finally { dispose(path); }
+});
+
+// End-to-end proof of the same 2026-08-18 PO decision, driven through the
+// REAL `planSessionCleanupRecovery`/`applySessionCleanupRecovery` wiring
+// against a real Git repository -- not a mocked plan/apply pair. A single
+// unbound active descriptor (bind-orphan) is repaired by the top-level
+// bootstrap inspection itself, with no next action ever asking anyone to
+// pick a recovery (never `requiresConfirmation:true` anywhere in the
+// result), at most a completion note.
+test("a real orphaned descriptor is repaired automatically through the top-level bootstrap inspection, never as a selection question", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "--initial-branch=main"]);
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const orphan = startSessionDescriptor(path, { sessionId: "session-e2e-bind-orphan" });
+    // Unset the suite-wide fakeDeps stub (which always reports "not-needed")
+    // so this one test exercises the REAL cleanup-recovery module instead.
+    const realCleanupDeps = { ...fakeDeps, planSessionCleanupRecovery: undefined };
+    const observed = inspectProjectOnboardingV3({ runner: "codex",
+      rootDir: path,
+      intent: "session",
+      deps: realCleanupDeps,
+    });
+    assert.equal(JSON.stringify(observed).includes('"requiresConfirmation":true'), false);
+    assert.deepEqual(listActiveSessionDescriptors(path), [
+      { sessionId: orphan.sessionId, descriptorSha256: orphan.descriptorSha256 },
+    ]);
+    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: path }).sessionCleanup, {
+      sessionId: orphan.sessionId, descriptorSha256: orphan.descriptorSha256,
+    });
   } finally { dispose(path); }
 });
 
