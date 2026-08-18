@@ -130,3 +130,59 @@ extraction pass over that remainder is still needed before rotation can run
 without risking destroying an un-extracted rule (the exact failure mode this
 item's own Description warns against). Item stays open; needs its own
 dedicated session given the remaining scale.
+
+### Progress note — 2026-08-19, round 2 (safety-gated build, no live execution)
+
+A follow-up dispatch (`PHX-WP-STATE-ROTATION-EXTRACT-AND-BUILD`, commit `c898536b`)
+made substantial further progress, explicitly scoped to never modify
+`docs/state.md` itself (a prior attempt to also EXECUTE a rotation in the same
+pass was correctly blocked by a safety review as an unreviewed irreversible-
+destruction risk against the canonical handover file — this round respected
+that boundary throughout, confirmed: `docsStateModified: false`).
+
+**Extraction:** 7 more durable rules extracted (beyond the prior round's 3):
+`guardrails/quality-gates.md` gained a QG-08 addendum (source-text blast-radius
++ retroactive schema-consumer check) and a new QG-09 (critical-action/HGO
+ceremony commit-exact binding discipline); `roles/elephant.md` gained two
+EL-22 addenda (Elephant-vs-background-dispatch concurrent commit hazard;
+shared non-code tracking-file hazard), an EL-01 addendum (a GMW guard-lift
+does not substitute for the stage-0 fast-path conjunction), and two EL-09
+addenda (Critic delta-review base-ref computation; exact-commit-list not a
+range in a multi-track session). Coverage: a comprehensive multi-pattern grep
+sweep across the full (now 19,072-line) file plus full-context reads around
+every hit, plus one genuinely full sequential read of the one zone
+(lines 13387-13686) the prior round's targeted search never reached. **Not**
+a literal line-by-line read of all 19,072 lines — the dispatch calculated
+this alone would cost 35-70 additional tool calls beyond what fit in the
+combined read+build+test budget, and documented the grep-sweep substitute as
+a deliberate, ADR-0064-consistent scope decision, not a shortcut taken
+silently.
+
+**Real, unexpected discovery:** `plugins/pipeline-core/skills/close-block/SKILL.md`
+already carries a step 6c "Handover rotation (head-size discipline)"
+procedural ritual — predating ADR-0064 (written 2026-08-18), which did not
+know about it. The gap this item describes was never "zero rotation
+mechanism," only "no automated/structural one, plus growth outpacing the
+manual procedure."
+
+**Mechanism built, deliberately not runnable yet:** `plugins/pipeline-core/scripts/handover-rotate.mjs`
+(11/11 tests pass, synthetic fixtures only, never the real file) implements
+`parseSections`/`computePlan`/`runCli` around a structural safety gate: a
+section can NEVER enter an archive plan — in `--dry-run` OR `--execute` — 
+without an explicit `pipeline.handover-rotation-extraction-ack.v2` marker.
+**`--execute` is currently an unconditional-throw stub, unreachable from any
+sanctioned call today** — a deliberate second gate on top of the marker
+requirement. `--check-size` (read-only byte-budget check) is wired into
+close-block's step 6c as an automated backstop to the existing manual size
+judgment. A real dry-run against the actual `docs/state.md` correctly
+produced an EMPTY proposal (0 sections) — expected, since no section carries
+the ack marker, and adding that marker would itself be an edit to
+`docs/state.md` this round correctly refused to make.
+
+**What a live rotation still needs, as its own deliberate, human-reviewed
+step:** (1) a decision on which specific checkpoint sections are safe to
+mark ack'd/archivable; (2) actually adding those markers to `docs/state.md`
+(the one edit type this round would not make unreviewed); (3) implementing
+`--execute` for real (currently a stub); (4) the remaining ~13,700 lines of
+`docs/state.md` never literally read line-by-line, only grep-swept — a fully
+exhaustive extraction pass, if wanted, is further work beyond this round.
