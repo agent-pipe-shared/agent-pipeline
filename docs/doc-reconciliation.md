@@ -47,6 +47,28 @@ something to do here without review.
 
 ## Entries
 
+## Candidate a07ef670c2aac2abad17848006442cc7342fd0c1 — 2026-08-18, range 51ed4826..a07ef670, checkpoint 36: broad Workflow-triage of 84 backlog items, 36 disposed, 5 real fixes on the PO signing-ceremony surface
+
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` remains the single canonical handover file; this range
+  only appends checkpoint 36 in the established format (newest entry at the
+  top, "Last updated" line bumped). No competing handover artifact was
+  introduced.
+- ADR-0045: checked, no change needed.
+
+  The new evidence directories this range adds
+  (`specs/sprint-phoenix-epic/evidence/PHX-WP-ARPROOF-HUMANNAME/`,
+  `PHX-WP-BACKLOG-BULK-DISPOSE/`, `PHX-WP-LAC08-CANCELFIX/`,
+  `PHX-WP-POHUMAN-SIGNING-ERGO/`, `PHX-WP-RECONCILE-LOCK-REALPATH/`) all sit
+  under the existing, already-enumerated `specs/sprint-phoenix-epic/evidence/`
+  location — no new root-level artifact and no divergence from the topology
+  ADR-0045's own enumeration describes. The pre-existing `prd_phoenix-epic.md`
+  vs. `prd.md` naming divergence this ADR already has an open, PO-gated
+  backlog item for
+  (`2026-08-09-adr-0045-topology-divergence-from-package-and-skill.md`,
+  status open) is unchanged by this range — not touched, not worsened.
+
 ## Candidate 1cb00e72117c09f8c23293043da92e9bc6724701 — 2026-08-16, range 8a92d377..1cb00e72, the whole overnight session: v3 trust-anchor port, the GMW/reconcile signing ceremony, A-AC-01's field, and the resulting Verify repair
 
 - ADR-0012: checked, no change needed.
