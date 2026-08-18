@@ -3,10 +3,14 @@ schema: pipeline.backlog-item.v1
 id: pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-15
 source: "Reported as a deviation by the PUSHBOUND-1 dispatch, 2026-08-08, and verified against guard-testpath.mjs:70-79. The dispatch disclosed the route honestly; the gap is the guard's, not the dispatch's."
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "9e477150ac87b2ec1d5d96753c4af79bf1a8876c"
+closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
 ---
 
 # `guard-testpath` blocks Edit/Write and is walked around with Bash
@@ -117,4 +121,32 @@ implementation plus mandatory Critic review required (MP-07, design-tier
 model), not attempted in this read-only triage pass. This entry does not
 change the decision, only reconfirms it is not stale and remains queued for
 the 0.6.0 pass.
+- **Date:** 2026-08-18
+
+### Closure, 2026-08-18
+
+**Verified implemented.** `guard-lifecycle-ready.mjs` now routes
+`Bash|PowerShell` (`hooks/hooks.json` matcher, both wired to
+`guard-lifecycle-ready.mjs --runner claude`) through the same protected-
+test-path authority as `Edit|Write|NotebookEdit`, via
+`protectedTestPathShellRefusalHit()`/`protectedTestPathShellBlocked()`
+(guard-lifecycle-ready.mjs:822-862) — direction 1-2. A signature-or-chat
+human-override route runs through `humanOverrideRoute()` at the same call
+site (guard-lifecycle-ready.mjs:2385-2396) before the block is emitted —
+direction 3 plus the PO's override addition.
+
+A residual gap in that same mechanism — the shell classifier's own inner
+`catch` swallowed a raised exception and returned `null` (fail OPEN)
+instead of failing closed per GL-09 — was found by a full-Verify Critic
+pass this session and fixed in commit `9e477150` (new `{ fault: true,
+error }` sentinel, `protectedTestPathShellFaultBlocked()`, fault-injection
+test `TPSHELL-7`). Critic-reviewed against the correctly-scoped range
+`9fab42cf..a6f1bcbf` (5th dispatch attempt after 2 malformed/wrong-scope
+attempts and 2 dispatch-construction defects on missing governance/`verdict:`
+tokens — all Elephant-side, none a review outcome): **PASS**, no findings,
+112/112 + 13/13 + 19/19 + 12/12 suites independently rerun and matched.
+Sibling item `2026-08-08-a-permitted-edit-drops-the-session-into-an-
+unrecoverable-readiness-class.md` was included in the same dispatch as
+context only — the Critic itself flagged that this diff touches none of
+that item's own (unrelated, unimplemented) scope; it stays open separately.
 - **Date:** 2026-08-18

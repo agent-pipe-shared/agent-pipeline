@@ -25,7 +25,7 @@
 | pipeline.approved-not-implementing-is-a-silent-trap | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-decision-apply-defaults-to-codex | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-decision-candidate-is-a-literal | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-gate-verdict-need-not-survive-checkout | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-baseline-migration-commit-unreachable | closed | defect | pipeline | 2026-08-11 | — |
@@ -275,6 +275,6 @@
 
 ## Counts
 
-- open: 86
+- open: 85
 - in_progress: 9
-- closed: 172
+- closed: 173

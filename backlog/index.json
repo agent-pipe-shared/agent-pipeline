@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "80d8fbfc0124b8b80bebf98bd859de18708e282e9579b0b34ba67cf7a0897bcb"
+    "transitionHead": "54ed304d4f066c7ef84d3f14e9e7905877e372d09a2a96ac8d09214d8361e982"
   },
   "counts": {
-    "open": 86,
+    "open": 85,
     "in_progress": 9,
-    "closed": 172
+    "closed": 173
   },
   "items": [
     {
@@ -218,11 +218,15 @@
     },
     {
       "id": "pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Reported as a deviation by the PUSHBOUND-1 dispatch, 2026-08-08, and verified against guard-testpath.mjs:70-79. The dispatch disclosed the route honestly; the gap is the guard's, not the dispatch's."
+      "source": "Reported as a deviation by the PUSHBOUND-1 dispatch, 2026-08-08, and verified against guard-testpath.mjs:70-79. The dispatch disclosed the route honestly; the gap is the guard's, not the dispatch's.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "9e477150ac87b2ec1d5d96753c4af79bf1a8876c",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.authority-gate-verdict-need-not-survive-checkout",
