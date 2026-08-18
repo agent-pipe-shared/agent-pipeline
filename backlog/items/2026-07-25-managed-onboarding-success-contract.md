@@ -36,9 +36,15 @@ asserts the public inspect/plan/apply/readback transaction, exact allowed
 write set, and preservation of all host controls. A rejection-only test is
 valid solely for an explicitly unsupported layout.
 
-## Triage (filled in by the Elephant of the next Pipeline session)
+## Triage, 2026-08-18
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+**Decision:** deferred to Sprint Alfred — matches its confirmed scope
+(mechanical governance, measurable rigor, and control integrity,
+docs/adr/0043-post-go-live-sprint-model.md, 2026-08-17 amendment).
+Identified as a good match during the 2026-08-17 full-backlog triage
+pass but could not be recorded directly in this file at the time
+because the ledger-repair byte-pin (sequence 41) blocked the edit --
+see backlog/items/2026-08-17-managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits.md
+for that mechanism and its fix.
+**Assignment:** Sprint Alfred, unassigned within it.
+**Date:** 2026-08-18
