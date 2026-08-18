@@ -131,3 +131,87 @@ Not designed here. Candidates, in the order they should be considered:
   needed before this item can close. Candidate 2 (the stale-pin fix) remains
   a prerequisite step inside candidate 3's work.
 - **Date:** 2026-08-17
+
+### Investigation/Implementation, 2026-08-18 (wave 2, dispatch NVA-W2-8)
+
+Scope for this dispatch: candidate 2 (fix the three remaining stale pins so
+`codex-isolated-critic-protected-preimage.test.mjs` is actually green) plus
+preparing candidate 3's registration for THIS item's own named suite only.
+The other 83 unregistered suites the detector reports are explicitly out of
+scope here (separate follow-up, see below).
+
+**Candidate 2 — stale-pin fix, done.** Ran
+`node plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs`
+against HEAD `7eca44ca`: exits 1 after 2 passing checks, with three stale
+pins — `harness/review-protocol.md`, `codex-critic-dispatch.schema.json`,
+`codex-critic-host.mjs` — confirming the 2026-08-17 update's characterization
+still held (the fourth previously-known stale entry, `roles/critic.md`, was
+already re-pinned same-day in `0bae45d3`, which is why only three remained).
+
+Per the item's own instruction ("confirm the current bytes are the *intended*
+bytes rather than reflexively re-pinning"), each of the three was reviewed
+before re-pinning:
+
+- `harness/review-protocol.md`: sole drift since the prior pin is commit
+  `de9de37a` ("docs(canon): stop telling agents to read the legacy
+  calibration path", 2026-08-06), a one-line wording change from a hardcoded
+  `.claude/pipeline.json` path to tier-neutral "the project calibration" —
+  reviewed, intended, in scope for a doc-canon fix.
+- `plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json`: sole
+  drift since the prior pin is commit `bec91102` ("fix(cyborg): bind critic
+  task authority", 2026-08-02), which added the `task_authority` schema
+  field (`manifest`/`request` authority objects) — reviewed via
+  `git diff e32f34c5 HEAD`, intended, matches the task-authority binding
+  feature.
+- `plugins/pipeline-core/scripts/codex-critic-host.mjs`: drift accumulated
+  across `bec91102`, `538a6cf5`, `fe472132`, `a8bd954d`, `f5e41744`,
+  `e1f4902b` (task-authority validation, Windows DACL/fsync/path-separator
+  portability, sandbox-preflight readiness gate, `isDirectInvocation`
+  routing) — reviewed via `git diff e32f34c5 HEAD`, all intended, reviewed
+  feature/hardening commits, nothing unreviewed or unexplained.
+
+All three new digests were computed independently via a standalone
+`node -e` sha256 script (not copied from the test's own assertion output) and
+matched exactly. Re-pinned in
+`plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json`.
+Re-ran the suite: `ok 1..4`, exit 0 — green.
+
+**Candidate 3 — registration, prepared but not applied (TP-3 boundary).**
+`harness/scripts/verify.mjs`'s own header documents itself as
+"TP-3-protected" (line 11: "...under explicit PO approval since this file is
+TP-3-protected"). Per this dispatch's explicit instruction, the edit was
+**not attempted** (no Edit tool call against `verify.mjs` was issued) — the
+exact needed change is reported below as `pendingProtectedEdit` for the
+orchestrator to apply via a signed ceremony. Confirmed via
+`plugins/pipeline-core/scripts/check-suite-registration.mjs`'s
+`DELIBERATELY_UNREGISTERED` opt-out list (currently `Object.freeze([])`,
+empty) that this suite is not deliberately excluded — it is genuinely
+unaccounted for.
+
+The needed edit, in `harness/scripts/verify.mjs`'s `TEST_SUITES` array,
+immediately after the `codex-isolated-critic-contract-tests` entry (adjacent
+to the other `codex-critic-*`/`codex-isolated-critic-*` entries, alphabetical
+locality):
+
+```
+old_string:
+  { name: "codex-isolated-critic-contract-tests", file: join(pluginScriptsDir, "codex-isolated-critic-contract.test.mjs") },
+  { name: "claude-critic-host-tests", file: join(pluginScriptsDir, "critic-claude-host.test.mjs") },
+
+new_string:
+  { name: "codex-isolated-critic-contract-tests", file: join(pluginScriptsDir, "codex-isolated-critic-contract.test.mjs") },
+  { name: "codex-isolated-critic-protected-preimage-tests", file: join(pluginScriptsDir, "codex-isolated-critic-protected-preimage.test.mjs") },
+  { name: "claude-critic-host-tests", file: join(pluginScriptsDir, "critic-claude-host.test.mjs") },
+```
+
+**Explicitly out of scope for this dispatch (follow-up needed):** the
+detector's live run (per the 2026-08-17 update) found 84 further genuinely-
+unaccounted suites beyond this item's own named one. Registering those is a
+separate, larger TP-3 ceremony/sweep and was not attempted here — this
+dispatch touched only the one suite this item's own title names. That sweep
+remains the outstanding piece of candidate 4 (once candidate 1 landed) and of
+this item's own candidate 3 for the other 83 suites; recommend a dedicated
+follow-up item/dispatch scoped to that full sweep rather than folding it into
+this item's remaining registration work.
+
+- **Date:** 2026-08-18
