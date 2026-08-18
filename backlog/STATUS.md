@@ -65,7 +65,7 @@
 | pipeline.cross-repository-override-ledger-binding | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | open | defect | pipeline | 2026-08-12 | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
-| pipeline.dispatch-provenance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-does-not-bind-to-its-commit | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-reported-creating-a-record-it-never-created | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.dispatched-agents-return-truncated-mid-step | closed | defect | pipeline | 2026-08-07 | — |
@@ -262,5 +262,5 @@
 ## Counts
 
 - open: 92
-- in_progress: 19
-- closed: 142
+- in_progress: 18
+- closed: 143

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "72fc38f703853d8f853d37e6cc4e5f3a01dc00574e83f04d75821db2557f9bd2"
+    "transitionHead": "29ca6d34b588a24b14d2d1b06e17b92fbd6449ed3ee4c052c7aae28ff3177e40"
   },
   "counts": {
     "open": 92,
-    "in_progress": 19,
-    "closed": 142
+    "in_progress": 18,
+    "closed": 143
   },
   "items": [
     {
@@ -622,11 +622,15 @@
     },
     {
       "id": "pipeline.dispatch-provenance",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
+      "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "e7d729042a1dfdf6439c74959b143eade6d7870c",
+      "closureEvidence": "plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs"
     },
     {
       "id": "pipeline.dispatch-record-does-not-bind-to-its-commit",
