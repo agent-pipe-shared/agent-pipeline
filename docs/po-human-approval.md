@@ -120,6 +120,39 @@ it cannot describe the specific action any more precisely than the digest and
 its consequence class; check the digest against the one the agent showed you
 before confirming.
 
+## Signing a GMW/HGO reconcile request from `scratch/`
+
+A GMW/HGO reconcile leaves its intent digest in a request file inside this
+repository's own `scratch/` tree instead of handing you a bare digest string.
+Point `sign-intent` at that file with `--request` instead of
+`--intent-sha256` — the two are mutually exclusive: exactly one must be
+supplied, and supplying both (even a malformed digest alongside `--request`)
+is rejected outright:
+
+```sh
+node "$REPO/plugins/pipeline-core/scripts/po-human-approval.mjs" sign-intent \
+  --repo-root "$REPO" --directory "$PO_DIR" \
+  --request scratch/reconcile-request-42.json
+```
+
+The request path must resolve inside this repository's own `scratch/`
+directory (never elsewhere in the repository, never outside it, and never
+via a symlink that points outside `scratch/`), and its JSON content must
+carry an `intentSha256` field — 64 lowercase hexadecimal characters. Its
+basename must contain the literal word `request` (for example
+`scratch/reconcile-request-42.json`), because that word is what gets
+substituted to derive the sibling proof/signer filenames below.
+
+On success the durable proof still lands at `$PO_DIR/proof-manual.json` as
+before, and this command additionally mirrors that proof and its signer
+record back into `scratch/`, next to the request, under the request's own
+basename with `request` replaced by `proof` and `signer` respectively —
+`scratch/reconcile-proof-42.json` and `scratch/reconcile-signer-42.json` for
+the example above. The requesting agent session finds both waiting in its own
+repository root on its next turn: this collapses what used to be "sign, then
+manually `cp` the request and proof files into place" into the one command
+above.
+
 ## Control-plane integration
 
 Agents, runners, and desktop applications use this public-only command before

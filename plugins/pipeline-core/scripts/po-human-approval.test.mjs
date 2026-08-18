@@ -30,7 +30,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -338,6 +338,107 @@ test("NVA-SWEEP-F2: sign-intent --request fails closed on malformed JSON, a miss
     assert.throws(
       () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/unnamed-42.json"], dependencies),
       /must contain "request" so sibling proof\/signer paths can be derived/,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+// NVA-SWEEP-F2f-REWORK (Critic finding 1): the same symlink/hardlink hardening
+// artifactPath() already applies to every other write target of this command must also
+// cover the two new scratch/ mirror write targets, and the --request READ path must be
+// symmetrically hardened against a symlink pointing outside the repository's scratch/
+// tree. Both fixture symlinks below point at a file OUTSIDE the repository (a separate
+// tmpdir, never `dirs.repoRoot`/`dirs.directory`), so each test removes that tmpdir
+// itself in its own `finally` -- `cleanup()` only knows about the two `fixtureDirs()`
+// paths and would otherwise leave a dangling symlink target behind.
+test("NVA-SWEEP-F2f-REWORK: sign-intent --request refuses to follow a symlink planted at the derived scratch proof/signer sibling path", () => {
+  const dirs = fixtureDirs();
+  const outsideDir = mkdtempSync(join(tmpdir(), "po-sign-intent-outside-target-"));
+  try {
+    keyFixture(dirs.directory);
+    const intentSha256 = createHash("sha256").update("pipeline.gmw-reconcile-symlink-sibling-fixture").digest("hex");
+    const scratchDir = join(dirs.repoRoot, "scratch");
+    mkdirSync(scratchDir, { recursive: true });
+    const requestPath = join(scratchDir, "reconcile-request-99.json");
+    writeFileSync(requestPath, `${JSON.stringify({ intentSha256 }, null, 2)}\n`);
+
+    const victimPath = join(outsideDir, "victim.json");
+    writeFileSync(victimPath, "original content, must not be overwritten");
+    // Plant a symlink at the exact DERIVED sibling path, pointing outside the repository.
+    symlinkSync(victimPath, join(scratchDir, "reconcile-proof-99.json"));
+
+    assert.throws(
+      () => runHumanApproval(
+        ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/reconcile-request-99.json"],
+        { readConfirmation: () => "approve" },
+      ),
+      /scratch mirror artifacts must be unlinked regular files/,
+    );
+    assert.equal(readFileSync(victimPath, "utf8"), "original content, must not be overwritten", "the symlink target outside the repository must not be overwritten");
+  } finally {
+    cleanup(dirs);
+    rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-SWEEP-F2f-REWORK: sign-intent --request rejects a symlink planted at the --request path itself, pointing outside scratch/", () => {
+  const dirs = fixtureDirs();
+  const outsideDir = mkdtempSync(join(tmpdir(), "po-sign-intent-outside-request-"));
+  try {
+    keyFixture(dirs.directory);
+    const outsideRequestPath = join(outsideDir, "planted-request.json");
+    writeFileSync(outsideRequestPath, `${JSON.stringify({ intentSha256: "a".repeat(64) }, null, 2)}\n`);
+    const scratchDir = join(dirs.repoRoot, "scratch");
+    mkdirSync(scratchDir, { recursive: true });
+    // The --request path itself is a symlink resolving outside this repository entirely.
+    symlinkSync(outsideRequestPath, join(scratchDir, "reconcile-request-77.json"));
+
+    assert.throws(
+      () => runHumanApproval(
+        ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/reconcile-request-77.json"],
+        { readConfirmation: () => "approve" },
+      ),
+      /--request must be a path inside this repository's own scratch\/ directory/,
+    );
+  } finally {
+    cleanup(dirs);
+    rmSync(outsideDir, { recursive: true, force: true });
+  }
+});
+
+test("NVA-SWEEP-F2f-REWORK: sign-intent --request fails with the pre-existing message, not a raw exception, when the request path does not exist yet", () => {
+  const dirs = fixtureDirs();
+  try {
+    keyFixture(dirs.directory);
+    mkdirSync(join(dirs.repoRoot, "scratch"), { recursive: true });
+    assert.throws(
+      () => runHumanApproval(
+        ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--request", "scratch/reconcile-request-missing-entirely.json"],
+        { readConfirmation: () => "approve" },
+      ),
+      /--request could not be read/,
+    );
+  } finally {
+    cleanup(dirs);
+  }
+});
+
+test("NVA-SWEEP-F2f-REWORK: sign-intent rejects a malformed --intent-sha256 supplied together with --request as \"both flags together\", while the standalone malformed-digest rejection (no --request) still works", () => {
+  const dirs = fixtureDirs();
+  try {
+    assert.throws(
+      () => runHumanApproval(
+        ["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", "z".repeat(64), "--request", "scratch/reconcile-request-1.json"],
+        {},
+      ),
+      /Usage:/,
+      "a malformed --intent-sha256 supplied together with --request must be rejected as both flags together, not silently discarded",
+    );
+    assert.throws(
+      () => runHumanApproval(["sign-intent", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--intent-sha256", "z".repeat(64)], {}),
+      /Usage:/,
+      "a standalone malformed --intent-sha256 (no --request) must still be rejected",
     );
   } finally {
     cleanup(dirs);

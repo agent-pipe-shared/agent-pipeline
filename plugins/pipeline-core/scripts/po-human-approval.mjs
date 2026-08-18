@@ -329,14 +329,23 @@ function externalDirectory(repository, directory, { create = false, source = "--
   if (create) chmodSync(canonicalDirectory, 0o700);
   return canonicalDirectory;
 }
-function artifactPath(directory, name) {
-  const path = join(directory, name);
+// NVA-SWEEP-F2f-REWORK (Critic finding 1): the symlink/hardlink/non-regular-file guard
+// every artifactPath() write target already got, factored out so the sign-intent
+// scratch/ mirror targets (below) can apply the identical check immediately before each
+// write rather than drifting from it. A path that does not exist yet is fine -- there is
+// nothing there to reject; anything already present that is not an unlinked regular file
+// fails closed via fail(message).
+function assertUnlinkedRegularFileOrAbsent(path, message) {
   try {
     const metadata = lstatSync(path);
-    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 1) fail("approval artifacts must be unlinked regular files outside the repository");
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.nlink !== 1) fail(message);
   } catch (error) {
     if (error?.code !== "ENOENT") throw error;
   }
+}
+function artifactPath(directory, name) {
+  const path = join(directory, name);
+  assertUnlinkedRegularFileOrAbsent(path, "approval artifacts must be unlinked regular files outside the repository");
   return path;
 }
 
@@ -421,15 +430,20 @@ export function parseHumanArgs(argv, dependencies = {}) {
   // NVA-SWEEP-F2 (backlog/items/2026-08-16-gmw-reconcile-still-needs-a-manual-copy-after-
   // the-po-signs.md, Triage confirmation 2026-08-18, direction b): `--request` is an
   // ALTERNATIVE source for the digest, never a second one accepted alongside
-  // `--intent-sha256` -- exactly one of the two must be supplied. A caller-supplied
-  // `--intent-sha256` that is present but malformed (wrong length/hex) still yields the
-  // pre-existing usage error here, unchanged: `hasIntentSha` is false either way, and
-  // `hasRequest` stays false when `--request` was never passed, so the two agree and this
-  // still refuses exactly as it always did.
+  // `--intent-sha256` -- exactly one of the two must be supplied.
+  // NVA-SWEEP-F2f-REWORK (Critic finding 3): mutual exclusion is decided on PRESENCE of
+  // `--intent-sha256` (`hasIntentSha = text(...)`), never on whether it happens to be a
+  // well-formed digest -- a malformed digest supplied TOGETHER with `--request` must be
+  // rejected here as "both flags together", not silently treated as absent because
+  // `SHA.test()` made it look that way. The pre-existing standalone-malformed-digest
+  // rejection (no `--request` supplied) is preserved by the explicit format check right
+  // below, which only runs once the presence-based mutual-exclusion check has already
+  // passed (i.e. exactly one of the two was supplied).
   if (command === "sign-intent") {
-    const hasIntentSha = SHA.test(values.intentSha256 ?? "");
+    const hasIntentSha = text(values.intentSha256);
     const hasRequest = text(values.request);
     if (hasIntentSha === hasRequest) return { error: USAGE };
+    if (hasIntentSha && !SHA.test(values.intentSha256)) return { error: USAGE };
   }
   return values;
 }
@@ -945,16 +959,27 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     let scratchProofPath = null; let scratchSignerPath = null;
     if (text(args.request)) {
       const requestPath = resolve(repository, args.request);
-      const scratchRel = repoScratchRelativePath(repository, requestPath);
+      // NVA-SWEEP-F2f-REWORK (Critic finding 1): canonicalize both the repository root
+      // and the request path with realpathSync BEFORE computing repoScratchRelativePath,
+      // mirroring externalDirectory()'s own pattern -- so a symlink planted AT the
+      // --request path itself, pointing outside scratch/, is caught by the scratch-
+      // membership check below instead of silently followed. A request path that does
+      // not exist yet cannot be canonicalized; that is the ordinary "not written yet"
+      // case, not a security failure, so it falls through to the pre-existing "--request
+      // could not be read" message rather than a raw exception.
+      let canonicalRepository; let canonicalRequestPath;
+      try { canonicalRepository = realpathSync(repository); } catch { fail("--request could not be read"); }
+      try { canonicalRequestPath = realpathSync(requestPath); } catch { fail("--request could not be read"); }
+      const scratchRel = repoScratchRelativePath(canonicalRepository, canonicalRequestPath);
       if (scratchRel === null) fail("--request must be a path inside this repository's own scratch/ directory");
       let raw;
-      try { raw = read(requestPath, "utf8"); } catch { fail("--request could not be read"); }
+      try { raw = read(canonicalRequestPath, "utf8"); } catch { fail("--request could not be read"); }
       let record;
       try { record = JSON.parse(raw); } catch { fail("--request must contain valid JSON"); }
       if (!SHA.test(record?.intentSha256 ?? "")) fail("--request JSON must carry an intentSha256 field (64 lowercase hexadecimal characters)");
       args.intentSha256 = record.intentSha256;
-      scratchProofPath = scratchSiblingPath(requestPath, "proof");
-      scratchSignerPath = scratchSiblingPath(requestPath, "signer");
+      scratchProofPath = scratchSiblingPath(canonicalRequestPath, "proof");
+      scratchSignerPath = scratchSiblingPath(canonicalRequestPath, "signer");
       if (scratchProofPath === null || scratchSignerPath === null) {
         fail('--request file name must contain "request" so sibling proof/signer paths can be derived (e.g. reconcile-request-<id>.json)');
       }
@@ -1006,7 +1031,13 @@ export function runHumanApproval(argv = process.argv.slice(2), dependencies = {}
     // finds the proof waiting in its OWN root on its next turn with no PO-run `cp`
     // step in between.
     if (scratchProofPath !== null) {
+      // NVA-SWEEP-F2f-REWORK (Critic finding 1): the same symlink/hardlink/regular-file
+      // hardening artifactPath() applies to every OTHER write target of this command,
+      // applied here immediately before each scratch/ mirror write -- refuses rather than
+      // following a symlink or overwriting a hardlinked file planted at either derived path.
+      assertUnlinkedRegularFileOrAbsent(scratchProofPath, "scratch mirror artifacts must be unlinked regular files inside this repository's own scratch/ directory");
       write(scratchProofPath, `${JSON.stringify(signed.proof, null, 2)}\n`, { mode: 0o600 });
+      assertUnlinkedRegularFileOrAbsent(scratchSignerPath, "scratch mirror artifacts must be unlinked regular files inside this repository's own scratch/ directory");
       write(scratchSignerPath, `${JSON.stringify(signed.signer, null, 2)}\n`, { mode: 0o600 });
     }
     return {
