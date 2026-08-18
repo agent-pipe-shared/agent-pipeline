@@ -99,3 +99,10 @@ it says. They are independent and can land in either order.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:** 2026-08-07
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option A — scope anchor collection to only the English half of bilingual docs (above the DE-reference marker); the two known planted aliases and `backlog/README.md`'s 4 links must be fixed in the same commit.
+- **Rationale:** PO's direct choice, matching the Elephant's recommendation.
+- **Assignment:** Dispatch-ready.
+- **Date:** 2026-08-18

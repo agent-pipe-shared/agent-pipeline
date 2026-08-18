@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.concurrent-session-prevention-supersedes-a-ac-01
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "PO ruling, Sprint Phoenix closure sweep, 2026-08-18: A-AC-01's remaining ordering-seam gap (main-session-route.mjs needing a Claude host adapter for pipelineMainSessionRoute) is struck rather than built, because the clean fix for the underlying risk is preventing two sessions from ever operating concurrently against the same repository root (same or different runner) in the first place — see specs/sprint-phoenix-epic/acceptance.md A-AC-01's 2026-08-18 amendment."
 ---
@@ -54,3 +54,10 @@ assigned.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option C — no dedicated concurrent-session-prevention mechanism is built; the existing advisory `observeConcurrentSessionWarning` is judged sufficient. The PO additionally notes this concern is already tracked/assigned elsewhere.
+- **Rationale:** PO's direct choice.
+- **Assignment:** Closed.
+- **Date:** 2026-08-18

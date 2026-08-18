@@ -95,3 +95,10 @@ introduced.
   adoption-enforcement check, Passkey/WebAuthn/other adapters,
   cross-platform conformance) unassigned.
 - **Date:** 2026-08-06
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option A — pursue the FULL remaining scope now: PRD-approval migration, publication unification, a formal gate/intent inventory, an adoption-enforcement check, and additional adapters (Passkey/WebAuthn).
+- **Rationale:** PO's direct choice, going further than the Elephant's staged recommendation (PRD-approval migration first) — the PO wants the complete remaining program scoped and pursued together.
+- **Assignment:** Dispatch-ready — large, multi-session program; needs its own scoping/sequencing pass before implementation dispatch begins (not a single bounded task).
+- **Date:** 2026-08-18

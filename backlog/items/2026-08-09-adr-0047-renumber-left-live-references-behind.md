@@ -116,3 +116,10 @@ at most a human German pass, explicitly not a defect blocking anything.
   rather than closed-as-accepted-drift, because the ADR path in the live Spec
   is still wrong.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option B — bundle the one-line ADR-path fix into the next Spec-authority work that already needs the `implementation`→`design` phase transition, rather than paying that cost standalone.
+- **Rationale:** PO's direct choice, matching the Elephant's recommendation.
+- **Assignment:** Deferred, bundled — no standalone dispatch; the next Spec-rebind-triggering change should carry this fix along, quoting the hash-binding warning verbatim per this item's own prior guidance.
+- **Date:** 2026-08-18

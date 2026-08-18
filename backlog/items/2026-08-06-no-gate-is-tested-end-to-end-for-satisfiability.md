@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-gate-is-tested-end-to-end-for-satisfiability
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-06
 source: "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
 due: 2026-09-06
@@ -104,3 +104,10 @@ red test, which is agent work, instead of an apparent decision point.
   `c92eaca`. Generalizing steps 1-3 across every configured gate/action
   chain, and adding the step-4 QG rule, remains unassigned.
 - **Date:** 2026-08-06
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option C — prioritize the highest-risk 2-3 gates (push/release path, plan-gate) over a full systemic build or leaving the item fully unbounded. The PO additionally directs this item be marked CLOSED now rather than kept open pending that future build.
+- **Rationale:** PO's direct choice; the scoping decision itself is treated as resolving this item — any actual gate-walk-test construction for the named highest-risk gates is a separate future initiative if pursued, not tracked under this ticket.
+- **Assignment:** Closed.
+- **Date:** 2026-08-18

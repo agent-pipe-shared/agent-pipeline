@@ -105,3 +105,10 @@ Candidates, explicitly not a commitment:
   `docs/state.md`, which by then may be considerably larger) closes this
   item; the file's own continued growth is a live cost of leaving it open.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option E — adopt Nova's already-shipped direction (extraction pass + archive + hard size gate, essentially porting ADR-0066), re-derived against Phoenix's own much larger file. PO confirms this is a feature Nova already built for exactly this purpose and this session should port/adapt it, not design fresh.
+- **Rationale:** PO's direct choice, matching the Elephant's recommendation.
+- **Assignment:** Dispatch-ready — real, nontrivial work (the extraction pass runs first, then the archive/gate mechanism).
+- **Date:** 2026-08-18

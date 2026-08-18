@@ -145,3 +145,10 @@ of implicit behavior this guard family has elsewhere refused to guess at.
   design-tier dispatch against `guard-push.mjs`'s `parsePushBinding`; no
   assignment made here.
 - **Date:** 2026-08-16
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option B — `guard-push.mjs` resolves a bare branch name's implicit push destination itself (mirroring git's own remote push-refspec resolution) before the approval/proof check runs.
+- **Rationale:** PO's direct choice, choosing the code-level fix over leaving the documentation-only state.
+- **Assignment:** Dispatch-ready.
+- **Date:** 2026-08-18

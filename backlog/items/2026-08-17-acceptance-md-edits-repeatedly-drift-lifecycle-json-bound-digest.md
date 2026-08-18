@@ -65,3 +65,10 @@ process).
 - **Assignment (if accepted):** before `sprint_phoenix` is next pushed to
   `origin`; owner `pipeline`, no calendar expiry.
 - **Date:** 2026-08-17
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option B — build a lightweight, non-PO-gated auto-rebind path specifically for `mutable`-class artifacts; the PO-signed `feature-package-reconcile` ceremony stays required only for `immutable`/`authority`-class artifacts.
+- **Rationale:** PO's direct choice, matching the Elephant's recommendation.
+- **Assignment:** Dispatch-ready — real design/implementation work with its own review bar (an insufficiently-scrutinized rebind path could become an unintended ceremony bypass).
+- **Date:** 2026-08-18

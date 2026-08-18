@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critical-human-proof-not-wired-to-push-and-prd-gates
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-05
 source: "PO question during Sprint Nova session, 2026-08-05: asked whether the ed25519 human-proof mechanism (built for Sprint Cyborg) needed one-time setup before this session's branch push. Investigation found it exists but is not enforced for either of the two human gates it was meant to secure."
 due: 2026-09-05
@@ -125,3 +125,10 @@ call, not something to resolve by just porting the push mechanism over.
   Sprint Nova session, 2026-08-06. Step 3 unassigned — needs the PO design
   call above before dispatch.
 - **Date:** 2026-08-06
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option B — the existing PO-gate-authority path/profile/SHA binding is a deliberate, sufficient control for PRD/plan approval; no Ed25519 proof mechanism is added to `approve-plan`.
+- **Rationale:** PO's direct choice, accepting the existing binding as sufficient rather than porting the push/deploy Ed25519 mechanism.
+- **Assignment:** Closed — accepted scope boundary, no further dispatch.
+- **Date:** 2026-08-18

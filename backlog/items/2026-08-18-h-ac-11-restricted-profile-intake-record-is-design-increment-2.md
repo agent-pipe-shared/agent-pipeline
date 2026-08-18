@@ -50,3 +50,10 @@ name one, before this item is assigned.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:**
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option C — since D-1's design is already complete and narrow, check whether it fits as a small, bounded dispatch at the tail end of the CURRENT sprint rather than waiting for or naming a whole new future sprint.
+- **Rationale:** PO's direct choice.
+- **Assignment:** Candidate for a bounded dispatch before this sprint closes — not deferred to a named future sprint.
+- **Date:** 2026-08-18

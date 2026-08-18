@@ -93,3 +93,10 @@ establishes.
 - **Rationale:**
 - **Assignment (if accepted):**
 - **Date:** 2026-08-07
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option B — build both parts now: strict failure for citations resolving to a nonexistent section (the 230 hard cases), warn-only for citations resolving to the wrong existing section (the harder ~51 kind-B cases).
+- **Rationale:** PO's direct choice, going further than the Elephant's staged recommendation (minimum form first) — both halves are built in the same round.
+- **Assignment:** Dispatch-ready.
+- **Date:** 2026-08-18

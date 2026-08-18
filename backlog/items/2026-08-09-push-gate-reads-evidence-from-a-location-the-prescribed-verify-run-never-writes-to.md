@@ -129,3 +129,10 @@ is worth a deliberate call, not a default.
 - **Refined options:** (a) confirm the full-`repoRoot` redirect is intended and separately re-architect `candidateIdentity()`'s dirty-check to tolerate the primary's permanent-dirty state when invoked from a worktree other than the one whose status is being checked; or (b) narrow the fix so only `evidenceDir`/`evidencePath` and `gitCommonDirectory()`'s bootstrap move to the primary root, while `candidateIdentity()` and any other `repoRoot` consumer stay on the invoking worktree.
 - **Assignment:** needs a PO choice between (a) and (b) before re-dispatch.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Of the two refined options in the sharper finding above: Option B — narrow the fix so only `evidenceDir`/`evidencePath` and `gitCommonDirectory()`'s bootstrap move to the primary worktree root; `candidateIdentity()` and every other `repoRoot` consumer stay on the invoking worktree.
+- **Rationale:** PO's direct choice, matching the Elephant's recommendation — closes the original evidence-location bug without breaking the `.git/phx-verify` clean-candidate route.
+- **Assignment:** Dispatch-ready.
+- **Date:** 2026-08-18

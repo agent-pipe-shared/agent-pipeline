@@ -262,3 +262,10 @@ Candidate #4 (a deliberate PO cost/benefit review) is the one this
 occurrence most directly speaks to: the ceremony took four rounds and three
 distinct wrong-path corrections to complete even with an attentive PO
 present at the keyboard throughout.
+
+### PO Decision — 2026-08-18
+
+- **Decision:** Option A — port ADR-0061 (origin/main's single-command `authorize-critical` ceremony, replacing the two-step `prepare-critical`/`approve-critical` split) into Phoenix now.
+- **Rationale:** PO's direct choice. Bounded, already proven on origin/main, closes the "two commands, one decision" complaint and its already-demonstrated stale-request failure mode.
+- **Assignment:** Dispatch-ready.
+- **Date:** 2026-08-18
