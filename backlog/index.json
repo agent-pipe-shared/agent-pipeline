@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "cdb27105d765696c50e7fdbb88129543d259196a6b581bacb79ed48e75adfbbf"
+    "transitionHead": "06eaa278fd8683e430f21bd80f2fa073092f4f7faf6f8ba62d600421f837245a"
   },
   "counts": {
-    "open": 86,
-    "in_progress": 9,
-    "closed": 173
+    "open": 79,
+    "in_progress": 8,
+    "closed": 181
   },
   "items": [
     {
@@ -238,12 +238,16 @@
     },
     {
       "id": "pipeline.backlog-delivery-status-reconciliation",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-25",
       "source": "Approved Nova A1 issue #57 bootstrap authority and reviewed canonical backlog intake.",
-      "tracking": "Nova A / issue #57"
+      "tracking": "Nova A / issue #57",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "c2f8cd13dcb8a570dd44156e108629200096bc78",
+      "closureEvidence": "specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md"
     },
     {
       "id": "pipeline.backlog-ledger-baseline-migration-commit-unreachable",
@@ -437,11 +441,15 @@
     },
     {
       "id": "pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Disclosed by NVA-CROSSREPOLEDGER-1's own final report (2026-08-18) as a real, separate finding outside its briefed scope."
+      "source": "Disclosed by NVA-CROSSREPOLEDGER-1's own final report (2026-08-18) as a real, separate finding outside its briefed scope.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "56e696a21e7d00b058cad93efa68aae056e8a20c",
+      "closureEvidence": "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs"
     },
     {
       "id": "pipeline.codex-read-only-steps-escalate-individually-instead-of-once",
@@ -474,11 +482,15 @@
     },
     {
       "id": "pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Reported by the PO on 2026-08-17, relaying a live diagnosis from a downstream consumer-project session (Windows, D:\\Dev\\Web\\Toolbox) whose own guard-recovery command used --root \"$PWD\" and failed. Independently confirmed against this repository's own source before filing; no fix proposed yet, see Proposal."
+      "source": "Reported by the PO on 2026-08-17, relaying a live diagnosis from a downstream consumer-project session (Windows, D:\\Dev\\Web\\Toolbox) whose own guard-recovery command used --root \"$PWD\" and failed. Independently confirmed against this repository's own source before filing; no fix proposed yet, see Proposal.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "c0d772f21686311a1b1da5b150250055c47e8248",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.compare-three-parallel-happy-path-tests-in-detail",
@@ -1061,11 +1073,15 @@
     },
     {
       "id": "pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-16",
-      "source": "Critic review of commit 15cf0e58, 2026-08-16: governance checklist item 8 requires a named owner and expiry date for the deferred Direction 2 systemic fix named in backlog/items/2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md"
+      "source": "Critic review of commit 15cf0e58, 2026-08-16: governance checklist item 8 requires a named owner and expiry date for the deferred Direction 2 systemic fix named in backlog/items/2026-08-16-lifecycle-guard-omits-the-partial-authority-repair-it-prescribes.md",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "c9c271d2ed614ce2b4369fbcf1902faa69d273fa",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.guard-lifecycle-ready-blocks-claude-memory-writes",
@@ -1782,11 +1798,15 @@
     },
     {
       "id": "pipeline.permitted-edit-drops-session-into-unrecoverable-readiness",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, unhappy-path transcript from a fresh Claude session on a greenfield project against the 0.5.4 local candidate. The session edited a bound PRD, lost session readiness, and could not act again until the human ran `sed -i`."
+      "source": "PO, 2026-08-08, unhappy-path transcript from a fresh Claude session on a greenfield project against the 0.5.4 local candidate. The session edited a bound PRD, lost session readiness, and could not act again until the human ran `sed -i`.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "0130513fea987b181abc3bee184e86f1e38d49eb",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit",
@@ -2305,11 +2325,15 @@
     },
     {
       "id": "pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Live-reproduced on that machine: po-gate-profile-repair.mjs apply failed repeatedly with PO-PROFILE-RECEIPT-WRITE-FAILED until the reporting session manually ran hardenWindowsPrivateDirectory('.git/agent-pipeline') from a diagnostic script, which fixed the ACL and let the repair succeed immediately after. Not currently blocking Toolbox (worked around live)."
+      "source": "Relayed by the PO 2026-08-17 from a Windows (D:\\Dev\\Web\\Toolbox) session's handover after completing Toolbox's pipeline bootstrap through plan approval. Live-reproduced on that machine: po-gate-profile-repair.mjs apply failed repeatedly with PO-PROFILE-RECEIPT-WRITE-FAILED until the reporting session manually ran hardenWindowsPrivateDirectory('.git/agent-pipeline') from a diagnostic script, which fixed the ACL and let the repair succeed immediately after. Not currently blocking Toolbox (worked around live).",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "a98bcb988fc4256da8e3eedf326ea8f358a6bc2e",
+      "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
     },
     {
       "id": "pipeline.security-scan-cross-branch-gitleaks-findings",
@@ -2652,11 +2676,15 @@
     },
     {
       "id": "pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Surfaced by NVA-MICRO-3's fix to codex-isolated-critic-protected-preimage.test.mjs's assertion loop (fail-fast -> accumulate-all-mismatches, closing 2026-08-10-preimage-repin-disclosure-incomplete-for-roles-critic), 2026-08-18. The accumulate fix's own designed effect exposed two more mismatches beyond the one it was written to find."
+      "source": "Surfaced by NVA-MICRO-3's fix to codex-isolated-critic-protected-preimage.test.mjs's assertion loop (fail-fast -> accumulate-all-mismatches, closing 2026-08-10-preimage-repin-disclosure-incomplete-for-roles-critic), 2026-08-18. The accumulate fix's own designed effect exposed two more mismatches beyond the one it was written to find.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "d5e5fed754098037f7142d786a122128880c2459",
+      "closureEvidence": "backlog/items/2026-08-12-four-critic-preimage-pins-drifted-or-never-valid.md"
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
@@ -2754,11 +2782,15 @@
     },
     {
       "id": "pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; the report's own mechanism claim ('silently skipped') was checked against source and found imprecise -- the real gap is narrower but still real, confirmed by direct code reading."
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover; the report's own mechanism claim ('silently skipped') was checked against source and found imprecise -- the real gap is narrower but still real, confirmed by direct code reading.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "b8f28a792dd6eb192a26b109231ceee304260ccb",
+      "closureEvidence": "plugins/pipeline-core/lib/worktree-lifecycle.test.mjs"
     },
     {
       "id": "pipeline.windows-directory-durability",

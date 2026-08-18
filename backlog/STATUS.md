@@ -27,7 +27,7 @@
 | pipeline.authority-decision-candidate-is-a-literal | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-gate-verdict-need-not-survive-checkout | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.backlog-delivery-status-reconciliation | in_progress | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
+| pipeline.backlog-delivery-status-reconciliation | closed | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-baseline-migration-commit-unreachable | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | closed | defect | pipeline | 2026-08-17 | — |
@@ -45,11 +45,11 @@
 | pipeline.closed-input-channel-review-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | open | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | 2026-08-10 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | 2026-08-09 | — |
@@ -105,7 +105,7 @@
 | pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table | open | workflow-improvement | pipeline | 2026-08-16 | — |
+| pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | closed | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-runner-allowlist-incomplete | closed | defect | pipeline | 2026-08-09 | — |
@@ -173,7 +173,7 @@
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
@@ -219,7 +219,7 @@
 | pipeline.runner-neutrality-before-third-runner | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | 2026-07-27 | — |
 | pipeline.scratch-cleanup-mechanism-not-wired-to-any-event | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | 2026-08-08 | — |
@@ -253,7 +253,7 @@
 | pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.two-manifest-literals-bypass-the-single-seed-owner | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
-| pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.vendored-dispatch-templates-drift-from-canon | open | defect | pipeline | 2026-08-18 | — |
@@ -263,7 +263,7 @@
 | pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.warn-security-gate-hard-blocks-every-push | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.windows-directory-durability | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.windows-private-state-assurance | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
@@ -276,6 +276,6 @@
 
 ## Counts
 
-- open: 86
-- in_progress: 9
-- closed: 173
+- open: 79
+- in_progress: 8
+- closed: 181
