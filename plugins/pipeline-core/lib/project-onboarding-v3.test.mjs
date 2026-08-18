@@ -57,7 +57,7 @@ import {
   planProjectAuthoritySessionCleanupRecovery,
   readProjectAuthority,
 } from "./project-authority.mjs";
-import { gateConfig } from "./manifest.mjs";
+import { gateConfig, loadManifest, validateManifest } from "./manifest.mjs";
 import { captureResumeHint, discardResumeHint, inspectResumeHint } from "./resume-hint.mjs";
 import { inspectObservationGovernanceBootstrap } from "./observation-governance-bootstrap.mjs";
 import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
@@ -4738,6 +4738,68 @@ test("an invalid generated manifest is never accepted as a current fresh authori
     const disposition = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
     assert.equal(disposition.status, "unrepairable");
     assertDiagnostic(disposition, "canonical_manifest_requires_owner_repair");
+  } finally { dispose(path); }
+});
+
+// Backlog: a-schema-less-project-pipeline-yaml-has-no-known-repair-path. loadManifest()'s
+// own unit-level self-heal coverage lives here (project-onboarding-v3.test.mjs, already
+// registered in harness/scripts/verify.mjs) rather than a new, separately-registered test
+// file, since manifest.mjs otherwise has zero dedicated test coverage of its own.
+test("validateManifest offers a repair for a schema-less-but-otherwise-valid manifest, and self-heals only when asked", () => {
+  const schemaLess = { language: { human_facing: "en" }, modelRouting: { legacy: { model: "legacy", effort: "low" } } };
+
+  const surfaced = validateManifest(schemaLess);
+  assert.equal(surfaced.status, "invalid");
+  assert.equal(surfaced.errors.some((e) => e.path === "schema"), true);
+  assert.equal(surfaced.repair?.available, true);
+  assert.equal(surfaced.repair.kind, "missing-schema-field");
+  assert.equal(surfaced.repair.normalizedManifest.schema, "pipeline.manifest.v0");
+  assert.equal(surfaced.repair.normalizedManifest.language.human_facing, "en");
+  // Read-only offer: the object passed in is never mutated in place.
+  assert.equal(Object.hasOwn(schemaLess, "schema"), false);
+
+  const healed = validateManifest(schemaLess, { selfHeal: true });
+  assert.equal(healed.status, "ok");
+  assert.equal(healed.manifest.schema, "pipeline.manifest.v0");
+  assert.equal(healed.errors.length, 0);
+  assert.equal(healed.warnings.some((w) => typeof w === "string" && w.includes("schema")), true);
+  assert.equal(healed.repair.available, true);
+});
+
+test("validateManifest never offers a repair when a second, unrelated defect survives adding schema", () => {
+  const result = validateManifest({ not: "a canonical pipeline manifest" });
+  assert.equal(result.status, "invalid");
+  assert.equal(result.repair, undefined);
+
+  const healedAttempt = validateManifest({ not: "a canonical pipeline manifest" }, { selfHeal: true });
+  assert.equal(healedAttempt.status, "invalid");
+  assert.equal(healedAttempt.repair, undefined);
+});
+
+test("loadManifest offers the same repair from an on-disk schema-less file, and plan-manifest-repair surfaces it instead of the generic dead end", () => {
+  const path = root();
+  try {
+    const plan = planProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+
+    // Exactly the real generator's own output, minus its schema line -- the same class of
+    // file the backlog item's traced repair chain produces (a byte-preserved legacy file
+    // that never had `schema:` copied verbatim into project/pipeline.yaml).
+    const schemaLessBytes = freshManifestBytes().replace("schema: pipeline.manifest.v0\n", "");
+    assert.equal(schemaLessBytes.includes("schema:"), false);
+    writeFileSync(join(path, "project", "pipeline.yaml"), schemaLessBytes);
+
+    const readback = loadManifest(path, { manifestRelPath: join("project", "pipeline.yaml") });
+    assert.equal(readback.status, "invalid");
+    assert.equal(readback.repair?.available, true);
+
+    const healed = loadManifest(path, { manifestRelPath: join("project", "pipeline.yaml"), selfHeal: true });
+    assert.equal(healed.status, "ok");
+    assert.equal(healed.manifest.schema, "pipeline.manifest.v0");
+
+    const disposition = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps, runner: "codex" });
+    assert.equal(disposition.status, "unrepairable");
+    assertDiagnostic(disposition, "canonical_manifest_schema_missing_repairable");
   } finally { dispose(path); }
 });
 

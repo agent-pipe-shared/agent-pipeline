@@ -680,6 +680,49 @@ function checkSemantics(manifest, rootDir, now) {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Schema-less self-heal (backlog: a-schema-less-project-pipeline-yaml-has-no-known-repair-path).
+//
+// A manifest that fails validation ONLY because it has no own `schema` property, but validates
+// cleanly in EVERY other respect once `schema: pipeline.manifest.v0` is added, is a narrow, safe,
+// additive normalization -- never a guess at repairing anything else. This is exactly the dead
+// end the backlog item root-caused: `replaceClaudeTarget()`'s owned-span renderer
+// (runtime-projection-v3.mjs) never owns `schema:`, so a legacy `.claude/pipeline.yaml` missing
+// it is copied byte-for-byte into `project/pipeline.yaml` by `changedTargets()`
+// (project-authority.mjs) with no validation, and this loader then rejected it permanently with
+// no repair path back through plan-manifest-repair.
+//
+// Detected ONCE here so validateManifest() and loadManifest() share one definition of
+// "repairable" instead of drifting onto separate notions of it (same "one place" principle the
+// file header already states for the three-stage validation pipeline).
+// ---------------------------------------------------------------------------------------------
+const MISSING_SCHEMA_REPAIR_MESSAGE =
+  "manifest is missing the required top-level 'schema: pipeline.manifest.v0' field; every other " +
+  "field validates against the current schema, so this is a normalizing repair (add the missing " +
+  "field), not a content defect";
+
+/**
+ * Returns `{ available: true, kind: "missing-schema-field", normalizedManifest, message }` when
+ * `manifest` is a plain object with no own `schema` property AND adding
+ * `schema: "pipeline.manifest.v0"` makes it validate cleanly (schema + semantics, zero errors).
+ * Returns `null` for every other case -- not a plain object, already carries its own `schema`
+ * key, or still has unrelated errors once `schema` is added (this function never claims a
+ * manifest with a SECOND, unrelated defect is safely repairable).
+ */
+function detectSchemaLessRepair(manifest, { schemaPath, rootDir, now }) {
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) return null;
+  if (Object.hasOwn(manifest, "schema")) return null;
+  const normalizedManifest = { schema: "pipeline.manifest.v0", ...manifest };
+  const candidate = validateManifest(normalizedManifest, { schemaPath, rootDir, now });
+  if (candidate.status !== "ok") return null;
+  return {
+    available: true,
+    kind: "missing-schema-field",
+    normalizedManifest,
+    message: MISSING_SCHEMA_REPAIR_MESSAGE,
+  };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------------------------
 
@@ -687,10 +730,20 @@ function checkSemantics(manifest, rootDir, now) {
  * Validates an already-parsed manifest through the same schema and semantic authority used by
  * loadManifest(). Compiler call sites use this before writing a generated runtime projection,
  * so generated and file-loaded manifests cannot drift onto separate validation paths.
+ *
+ * SELF-HEAL (opt-in, default OFF -- every existing caller keeps today's exact status/errors
+ * shape with zero behavior change): when the manifest is invalid, this ALWAYS attempts to
+ * detect the narrow schema-less-but-otherwise-valid class (see detectSchemaLessRepair above)
+ * and, if found, attaches a `repair` field to the returned result -- visible even when
+ * `selfHeal` is false, so a caller that never opts in still SEES that a repair is available
+ * instead of a bare "invalid" dead end. Only when `selfHeal: true` is explicitly passed does
+ * the result actually become `status: "ok"` (using the in-memory normalized manifest); the
+ * `warnings` array always carries the repair message in that case, so accepting the healed
+ * manifest is never silent.
  */
 export function validateManifest(
   manifest,
-  { schemaPath = DEFAULT_SCHEMA_PATH, rootDir = process.cwd(), now = new Date() } = {},
+  { schemaPath = DEFAULT_SCHEMA_PATH, rootDir = process.cwd(), now = new Date(), selfHeal = false } = {},
 ) {
   try {
     const schema = loadSchema(schemaPath);
@@ -699,8 +752,20 @@ export function validateManifest(
     const { errors: semanticErrors, warnings } = checkSemantics(manifest, rootDir, now);
     errors.push(...semanticErrors);
 
-    if (errors.length > 0) return { status: "invalid", manifest, errors, warnings };
-    return { status: "ok", manifest, errors: [], warnings };
+    if (errors.length === 0) return { status: "ok", manifest, errors: [], warnings };
+
+    const repair = detectSchemaLessRepair(manifest, { schemaPath, rootDir, now });
+    if (!repair) return { status: "invalid", manifest, errors, warnings };
+    if (selfHeal) {
+      return {
+        status: "ok",
+        manifest: repair.normalizedManifest,
+        errors: [],
+        warnings: [...warnings, repair.message],
+        repair,
+      };
+    }
+    return { status: "invalid", manifest, errors, warnings, repair };
   } catch (err) {
     return {
       status: "invalid",
@@ -719,13 +784,20 @@ export function validateManifest(
 /**
  * Loads and validates the manifest at `<rootDir>/<manifestRelPath>` (default
  * `.claude/pipeline.yaml`). Returns `{ status: "absent"|"ok"|"invalid", manifest?, errors,
- * warnings }` -- `warnings` is present on EVERY status, including "absent" (the channel must
- * not be shaped differently just because there was nothing to load). Never throws -- every
+ * warnings, repair? }` -- `warnings` is present on EVERY status, including "absent" (the channel
+ * must not be shaped differently just because there was nothing to load). Never throws -- every
  * failure mode becomes `status: "invalid"` plus structured `errors`.
+ *
+ * `repair` (see validateManifest's doc comment) is attached whenever an invalid manifest is
+ * schema-less-but-otherwise-valid, REGARDLESS of `selfHeal` -- so `plan-manifest-repair` and
+ * every other caller can see a normalizing repair is available even without opting in.
+ * `selfHeal: true` opts into actually returning `status: "ok"` with the in-memory normalized
+ * manifest for that one narrow class; default `false` keeps every existing caller's exact
+ * "invalid" fail-closed behavior unchanged.
  */
 export function loadManifest(
   rootDir,
-  { manifestRelPath = undefined, schemaPath = DEFAULT_SCHEMA_PATH, now = new Date() } = {},
+  { manifestRelPath = undefined, schemaPath = DEFAULT_SCHEMA_PATH, now = new Date(), selfHeal = false } = {},
 ) {
   try {
     let selectedManifest = manifestRelPath;
@@ -759,7 +831,7 @@ export function loadManifest(
       throw err;
     }
 
-    return validateManifest(manifest, { schemaPath, rootDir, now });
+    return validateManifest(manifest, { schemaPath, rootDir, now, selfHeal });
   } catch (err) {
     return {
       status: "invalid",

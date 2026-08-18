@@ -2857,16 +2857,29 @@ export function planProjectOnboardingManifestRepairV4({
   // malformed canonical project manifest.
   const canonicalManifest = loadManifest(root);
   if (canonicalManifest.status !== "ok") {
-    return manifestRepairResult({
-      status: "unrepairable",
-      root,
-      source: { path: SOURCE, sha256: inspection.sourceSha256 },
-      diagnostics: [lifecycleDiagnostic(
+    // A schema-less-but-otherwise-valid canonical manifest (backlog:
+    // a-schema-less-project-pipeline-yaml-has-no-known-repair-path) is a normalizing repair,
+    // not an owner-repair dead end -- loadManifest() surfaces that via `.repair`, and this
+    // diagnostic must say so, never fall back to the generic "absent or invalid" code that
+    // gives an operator no actionable next step for this specific, safely-detectable class.
+    const manifestDiagnostic = canonicalManifest.repair?.available
+      ? lifecycleDiagnostic(
+        "$.authority.manifest",
+        "canonical_manifest_schema_missing_repairable",
+        "the canonical project manifest is missing the required top-level 'schema: pipeline.manifest.v0' field, but every other field validates",
+        "normalize project/pipeline.yaml by adding 'schema: pipeline.manifest.v0' as a top-level key (loadManifest(..., { selfHeal: true }) confirms this is sufficient); apply the normalization through project/pipeline.yaml's owning authority workflow, then repair the runtime projection again",
+      )
+      : lifecycleDiagnostic(
         "$.authority.manifest",
         "canonical_manifest_requires_owner_repair",
         "the canonical project manifest is absent or invalid",
         "repair project/pipeline.yaml through its owning authority workflow before repairing a runtime projection",
-      )],
+      );
+    return manifestRepairResult({
+      status: "unrepairable",
+      root,
+      source: { path: SOURCE, sha256: inspection.sourceSha256 },
+      diagnostics: [manifestDiagnostic],
     });
   }
   let intent;
