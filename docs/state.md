@@ -3,7 +3,21 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-18 (checkpoint 33)
+**Last updated:** 2026-08-18 (checkpoint 34)
+
+---
+
+## CHECKPOINT — 2026-08-18 (34): A-AC-01/H-AC-11 formally disposed per PO ruling — and that edit re-triggered the known acceptance.md/lifecycle.json digest drift, adding a second PO-signed ceremony to the push sequence (READ THIS FIRST)
+
+**PO ruling on A-AC-01 (chat, 2026-08-18):** the remaining ordering-seam gap (a Claude host adapter for `pipelineMainSessionRoute`) is struck, not deferred pending the adapter — the PO's own reasoning: preventing two sessions (same or different runner) from ever operating concurrently against the same repository root closes the underlying risk more cleanly than journaling around it after the fact. Recorded as an amendment on `A-AC-01` in `specs/sprint-phoenix-epic/acceptance.md`, with a new backlog item (`backlog/items/2026-08-18-concurrent-session-prevention-supersedes-a-ac-01s-remaining-gap.md`, owner `pipeline`, named trigger: any future increment hardening the existing `observeConcurrentSessionWarning` warning into real prevention).
+
+**Separately found while doing this: `H-AC-11`'s O-4 scoping decision (already made by the PO on 2026-08-17) had never been given the backlog item EPIC-AC-05's `disposed` bar requires** (owner + calendar-expiry-or-named-trigger). Filed now (`backlog/items/2026-08-18-h-ac-11-restricted-profile-intake-record-is-design-increment-2.md`), naming the design document's own already-existing "increment 2 (D-1)" as the trigger — formalizing existing scope, not adding new. Both `acceptance.md` amendments and the matching `acceptance-evidence-map.mjs` POINTERS updates landed in commit `d48251da`. Neither criterion's verdict changed (both stay `partial`); only their EPIC-AC-05 disposition status improved.
+
+**GitHub issue comments:** posted a status comment to all 8 `sprint:phoenix` issues (#5, #9, #17, #23, #24, #30, #31, #32) at the PO's explicit request ("darfst sie gerne mit einer erledigungsmeldung kommentieren") summarizing each issue's live-acceptance-bullet closeability from `acceptance-evidence-map.mjs`'s `--mode default` Per-issue/Summary section. #30 and #31 (the two with 1 blocked bullet each, `H-AC-11`/`A-AC-01`) got the detailed blocker explanation; the other 6 got a plain "0 blocked" status. The PO will do the actual closing.
+
+**New finding, not yet fixed: editing `acceptance.md` re-triggered the already-documented recurring drift bug.** `node plugins/pipeline-core/scripts/pipeline-state.mjs feature-package-status --root . --manifest specs/sprint-phoenix-epic/lifecycle.json` now reports exactly 1 finding: `FTP-ARTIFACT-2: digest does not bind file bytes` for the `acceptance` class artifact (`specs/sprint-phoenix-epic/acceptance.md`) — the exact same class of bug already tracked in `backlog/items/2026-08-17-acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest.md` and fixed once before this session (checkpoint reference: `EPIC-AC-01` pointer, `feature-package-reconcile`, commit `8e91872e`). **This means the checkpoint 33 push sequence's step 1 (Full Verify green) now depends on a SECOND PO-signed ceremony, not just the TP-7/OT09 fix:** `feature-package-reconcile` needs the PO's `po-human-approval.mjs sign-intent` (the same Ed25519 signing infrastructure as the push itself, confirmed by precedent — `prepare-critical`/`approve-critical` refuse this command kind, so the request is hand-built to the identical shape and signed via the kind-unrestricted `sign-intent` primitive). This is a second, separate thing that needs the PO physically present with their key — worth bundling into the same "when you're home" session as the push signing rather than a separate trip.
+
+**Updated next steps (supersedes checkpoint 33's step 1 in isolation):** once the plugin-authoring session's OT09/TP-7 fix lands here AND this session's `acceptance.md` edits are done for the day, run, in order: (a) `feature-package-reconcile` for the current candidate (needs PO `sign-intent`), (b) Full Verify (should then show 383/383, or confirm whatever the true final baseline is), (c) Layer 1b doc-reconciliation, (d) recompute `subject-sha256`, (e) Layer 2/3 signing (PO, physically present) — (a) and (e) can both happen in the same PO-present session since both need the same key.
 
 ---
 
