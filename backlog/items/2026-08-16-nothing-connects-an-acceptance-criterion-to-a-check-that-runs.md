@@ -58,3 +58,20 @@ seeded placeholder and nothing else.
 - **Rationale:** self-scoped as "Direction, not a design"; the proposed shape (acceptance criteria carry check identifiers, verify registration derived from them, unregistered-but-named checks hard-fail) changes the plan gate and the Spec/PRD authoring contract — Design-phase work per MP-22 (interview/spec/readiness), not an execution-phase patch. The item itself says the consumer-project half matters more than the Pipeline's own, which argues for Spec-level design (how a hosted project's PRD/Spec template carries check identifiers) before any code changes, exactly as the compaction-point survey already flagged ("needs Spec/ADR work first").
 - **Assignment (if accepted):** a future dedicated design session (Spec/ADR authorship on the check-identifier chain), likely paired with `docs/pending-verify-registrations.md`'s existing parking-lot mechanism and `2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md`. Not folded into the 0.5.5 candidate.
 - **Date:** 2026-08-16
+
+### Update, 2026-08-18 — named to a specific still-open Sprint, per the release bar
+
+The existing Triage decision ("a future dedicated design session") did not
+name a specific still-open planning window, which the 0.6.0 release bar
+requires for an item to stay open without being resolved now. Naming it: this
+item's scope (a plan-gate/Spec-authoring-contract change connecting acceptance
+criteria to check identifiers) matches **Sprint Alfred**'s confirmed scope —
+"Agent-first architecture, mechanical governance, measurable rigor, and
+control integrity" (`docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17
+amendment) — not Nightwing (product experience/onboarding) or Batman
+(optional capabilities/adapters). No implementation attempted here; the
+existing rationale (Design-phase work per MP-22, not an execution-phase
+patch) stands unchanged.
+- **Assignment (if accepted):** next available Alfred slot — Spec/ADR
+  authorship on the check-identifier chain, as already scoped above.
+- **Date:** 2026-08-18

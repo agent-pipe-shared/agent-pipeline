@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-gate-is-tested-end-to-end-for-satisfiability
 type: workflow-improvement
 owner: pipeline
-status: open
+status: "closed"
 created: 2026-08-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "PENDING"
+closure_evidence: "guardrails/quality-gates.md#QG-11"
 source: "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
 due: 2026-09-06
 ---
@@ -128,3 +132,25 @@ what the change altered, not only what it was meant to fix". QG-07
 are the nearest neighbors and neither covers it. Step 4 is confirmed still
 not implemented. Stays open, current-scope: small, well-scoped, already
 PO-decided — not deferred.
+
+## Closure, 2026-08-18
+
+Step 4 (the only currently-decided, currently-in-scope task) is implemented:
+`guardrails/quality-gates.md` gained a new **QG-11 — Test what the change
+altered, not only what it was meant to fix** entry, citing this item's own
+heredoc-regression example as its "Why." That closes everything this item
+had an active PO decision to do.
+
+Steps 2 and 3 (the broader systematic generalization — a repository-wide
+gate-walk/remediation-executability framework across every configured gate
+and emitted action chain) remain genuinely undecided since 2026-08-11 ("NOT
+picked and remain open, undecided either way"). That is real, unassigned
+architecture work on gate/guard mechanics, not a same-session patch — it is
+now deferred to the named, still-open **Sprint Alfred** ("Agent-first
+architecture, mechanical governance, measurable rigor, and control
+integrity", `docs/adr/0043-post-go-live-sprint-model.md`, 2026-08-17
+amendment), matching the sprint already used for the closely related
+preimage-baseline and shared-evidence-slot items filed in the same period.
+Closing this item now that its one decided, in-scope task is done; the
+deferred remainder is tracked as new follow-on scope under Sprint Alfred
+rather than left open against this closed item.

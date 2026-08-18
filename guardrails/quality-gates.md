@@ -107,3 +107,9 @@ Rule IDs: `QG-xx`.
 - **MUST NOT** widen the push gate itself to interpret or tolerate partial check failures; the rejected alternative was teaching the gate to distinguish blocking from non-blocking findings post hoc. Classification happens once, at the source (the check), not twice.
 - **Why:** A gate that has to second-guess a check's exit code duplicates the check's own judgment in a second place — the exact "two truths" failure QG-02 names for diverging check chains, applied to severity instead of command identity.
 - **Verification:** `node harness/scripts/verify.mjs` exits 0 iff no check reports a genuinely blocking finding; a check's own report/log distinguishes blocking findings from reported-but-non-blocking ones in its own output, not in the gate's interpretation of that output.
+
+## QG-11 — Test what the change altered, not only what it was meant to fix
+
+- A bugfix's or feature change's own regression tests **MUST** cover the code paths the diff actually touched, not only the originally reported symptom; a test that re-checks solely the intended repair does not prove the altered surface is otherwise safe.
+- **Why:** a heredoc-stripping fix to the push gate shipped tests covering the intended repair (allow a commit message mentioning the phrase) but not the altered surface (a command placed after the terminator) — the change made the gate fail-open, its own tests were green throughout, and an independent Critic caught the regression, not Verify (`backlog/items/2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md`).
+- **Verification:** Critic review checks that a change's added/modified tests exercise the diff's changed branches and surfaces, not solely the reported symptom; a diff that alters conditional logic without a test for the new or changed branch is a QG-11 finding.

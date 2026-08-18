@@ -68,3 +68,28 @@ today, so this blocks nothing, same as its siblings.
 - **Assignment (if accepted):** candidate for a goldfish-implementor
   dispatch — not yet dispatched.
 - **Date:** 2026-08-18
+
+### Re-triaged, 2026-08-18 (0.6.0 release sweep)
+
+- **Decision:** accepted, open — not a new problem: both files this item
+  names (`codex-critic-dispatch.schema.json`, `codex-critic-host.mjs`) are
+  the exact same two "never-valid" entries
+  `pipeline.four-critic-preimage-pins-drifted-or-never-valid`
+  (`backlog/items/2026-08-12-four-critic-preimage-pins-drifted-or-never-valid.md`)
+  already identified and scoped its own Sprint-Alfred-deferred investigation
+  around (see that item's "Direction, not a design" step 1). The
+  accumulate-fix (NVA-MICRO-3) gave a second, independent confirmation of a
+  defect already inventoried there — it did not surface a new file.
+- **Rationale:** avoids double-tracking the same two-file remediation in two
+  places. `pipeline.four-critic-preimage-pins-drifted-or-never-valid`'s
+  Sprint Alfred assignment ("dedicated goldfish-deep investigation plus
+  Critic review, per the item's own Direction section") already covers
+  investigating and re-pinning exactly these two files (deliberate vs.
+  undisclosed drift, per this item's own "Proposal"). No independent
+  dispatch needed for this item.
+- **Assignment (if accepted):** none separate from
+  `2026-08-12-four-critic-preimage-pins-drifted-or-never-valid.md`'s
+  existing Sprint Alfred assignment — close this item as a duplicate
+  instance once that item's investigation lands, rather than dispatching it
+  on its own.
+- **Date:** 2026-08-18 (re-triaged)

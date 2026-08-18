@@ -112,3 +112,21 @@ improved and the mechanism has not.
   loud, it does not close the ceremony-cost question this item is actually
   about.
 - **Date:** 2026-08-17
+
+### Update, 2026-08-18 — directions 1/2 named to a specific still-open Sprint
+
+Directions 1 and 2 (whether suite registration is the same risk class as
+editing `verify.mjs`'s logic, and if so making the TP-3 ceremony batchable)
+were recorded as "fully open" with no assignment or target window, which the
+0.6.0 release bar requires naming. This is real architecture/governance work
+on a TP-3-protected control-integrity surface — matches **Sprint Alfred**'s
+confirmed scope ("Agent-first architecture, mechanical governance, measurable
+rigor, and control integrity", `docs/adr/0043-post-go-live-sprint-model.md`,
+2026-08-17 amendment), the same window already used for the closely related
+`2026-08-12-shared-verify-evidence-slot-corrupted-by-concurrent-dispatches.md`
+and `2026-08-12-four-critic-preimage-pins-drifted-or-never-valid.md`. No
+implementation attempted here.
+- **Assignment (if accepted):** next available Alfred slot, unassigned —
+  directions 1/2 as already scoped above; the detector (direction 3) is
+  already shipped per the 2026-08-17 update.
+- **Date:** 2026-08-18
