@@ -203,7 +203,8 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
 
 - **Requirement:** check that the project's **one** verify script exists and is basically runnable (existence + callability, e.g. a dry run/help call — not a full gate run at bootstrap).
 - **Why:** without a runnable verify, the evidence duty can't be fulfilled — a Goldfish that can't deliver evidence later is wasted token budget; this should surface at session start, not at task end.
-- **Verification:** path/command comes from the calibration file (Step 3); existence check passed. If the script is missing → treat like F4 (STOP for write work, offer to create it).
+- **Phase-aware severity (reuses `activeFeature.phase` from `plugins/pipeline-core/lib/plan-spec-state-v2.mjs`):** if there is currently NO active feature, or the active feature's `phase` is `'design'`, a missing/broken verify script is a **WARNING**, not a STOP — the design phase does not yet need a runnable verify gate, and blocking pure design/read-only work on it would be a false stop. If the active feature's `phase` is `'implementation'`, today's STOP behavior applies unchanged.
+- **Verification:** path/command comes from the calibration file (Step 3); existence check passed. If the script is missing: with an active feature in `phase: 'implementation'` → treat like F4 (STOP for write work, offer to create it); with no active feature or `phase: 'design'` → emit a WARNING (name the missing/broken script), continue bootstrap normally.
 
 ### Step 5b — Explicit operator update reminder
 
