@@ -68,5 +68,17 @@
       "ownedKeys": ["name", "description", "model", "model_reasoning_effort", "developer_instructions", "sandbox_mode"],
       "cell": { "kind": "duty", "dutyId": "advisory" }
     }
+  ],
+  "neutralAuthorityMirrors": [
+    {
+      "path": "project/pipeline.yaml",
+      "format": "yaml",
+      "mirrorOf": ".claude/pipeline.yaml"
+    },
+    {
+      "path": "project/pipeline.json",
+      "format": "json",
+      "mirrorOf": ".claude/pipeline.json"
+    }
   ]
 }

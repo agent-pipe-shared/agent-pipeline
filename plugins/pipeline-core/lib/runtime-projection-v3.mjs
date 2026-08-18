@@ -9,7 +9,9 @@
  * route.
  */
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import {
+  closeSync, existsSync, fsyncSync, lstatSync, openSync, readFileSync, writeFileSync,
+} from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -731,6 +733,36 @@ function projectValidatedIntent(intent, { source, baselines }) {
       intent,
       baselineBytes(baselines?.[".claude/pipeline.json"]),
     ));
+    // ADR-0054 step 3: keep the neutral authority tier (`project/*`) in sync
+    // with whatever the compiler already owns at the legacy tier, but ONLY
+    // for a project that has already adopted the neutral tier (baseline
+    // present). A project without `project/*` gets none created here --
+    // `project-authority.mjs`'s migration is the sole creator of that tier;
+    // this loop is exclusively a keep-in-sync mirror for an existing one, so
+    // an ordinary project untouched by that migration sees no behavior
+    // change at all.
+    for (const mirror of committedOwnedKeys.manifest.neutralAuthorityMirrors ?? []) {
+      const mirrorBytes = baselineBytes(baselines?.[mirror.path]);
+      if (typeof mirrorBytes !== "string") continue;
+      const sourceManifestTarget = manifestTargets[mirror.mirrorOf];
+      if (!sourceManifestTarget) throw new Error(`V3 neutral authority mirror has no source target: ${mirror.mirrorOf}`);
+      if (sourceManifestTarget.projection === "claude-model-routing-v3") {
+        targets.push(replaceClaudeTarget(
+          { path: mirror.path, format: mirror.format, before: describeBytes(mirrorBytes) },
+          sourceManifestTarget,
+          intent,
+          mirrorBytes,
+        ));
+      } else if (sourceManifestTarget.projection === "human-role-display-v3") {
+        targets.push(replaceHumanRoleCalibrationTarget(
+          { ...sourceManifestTarget, path: mirror.path, format: mirror.format },
+          intent,
+          mirrorBytes,
+        ));
+      } else {
+        throw new Error(`V3 neutral authority mirror projection is not supported: ${sourceManifestTarget.projection}`);
+      }
+    }
   } catch (error) {
     return emptyPlan("invalid-baseline", source, [{
       path: ".claude/pipeline.json:humanRoles.po.displayLabel",
@@ -824,5 +856,57 @@ export function readRuntimeProjectionV3Baselines(rootDir) {
       ? { status: "present", bytes: readFileSync(path, "utf8") }
       : { status: "absent" };
   }
+  // Read the neutral authority mirror baselines too, absent-safe: a project
+  // that never adopted `project/*` (ADR-0054) reports them absent here, and
+  // `planRuntimeProjectionV3` treats an absent mirror baseline as "nothing to
+  // keep in sync" rather than a fault.
+  for (const mirror of frozenOwnedKeys().manifest.neutralAuthorityMirrors ?? []) {
+    const path = resolve(root, mirror.path);
+    if (!isPhysicalPathContained(root, path)) throw new Error(`Unsafe owned target path: ${mirror.path}`);
+    baselines[mirror.path] = existsSync(path)
+      ? { status: "present", bytes: readFileSync(path, "utf8") }
+      : { status: "absent" };
+  }
   return baselines;
+}
+
+/**
+ * Durably write ONLY the neutral authority mirror targets (`project/*`) a
+ * ready V3 plan computed, and ONLY where they already exist on disk and the
+ * plan marks them changed. This never creates `project/*` from nothing --
+ * that tier's sole creator is `project-authority.mjs`'s migration -- and it
+ * never touches any `.claude/*`/`.codex/*` target; those remain the existing
+ * onboarding/migration apply path's (`runner-profile-migration-v3.mjs`)
+ * responsibility, unchanged by this function.
+ *
+ * Re-validates the on-disk bytes against the plan's own `before` digest
+ * immediately before writing (refusing a target that changed since planning)
+ * and reads the write back to confirm it landed, matching the durability
+ * pattern this codebase otherwise uses for authority-tier writes
+ * (`project-authority.mjs`'s `durableWrite`).
+ */
+export function applyRuntimeProjectionV3NeutralMirrors(plan, { rootDir = process.cwd() } = {}) {
+  if (!plan || plan.status !== "ready") {
+    return { schema: "pipeline.runtime-projection-neutral-mirror-apply.v3", status: "not-ready", applied: [] };
+  }
+  const mirrorPaths = new Set((frozenOwnedKeys().manifest.neutralAuthorityMirrors ?? []).map((mirror) => mirror.path));
+  const root = resolve(rootDir);
+  const applied = [];
+  for (const entry of plan.targets) {
+    if (!mirrorPaths.has(entry.path) || !entry.changed) continue;
+    const path = resolve(root, entry.path);
+    if (!isPhysicalPathContained(root, path)) throw new Error(`Unsafe neutral authority mirror path: ${entry.path}`);
+    if (!existsSync(path)) throw new Error(`neutral authority mirror target is missing: ${entry.path}`);
+    const info = lstatSync(path);
+    if (!info.isFile() || info.isSymbolicLink()) throw new Error(`neutral authority mirror target is not a regular file: ${entry.path}`);
+    const onDisk = readFileSync(path, "utf8");
+    if (sha256(onDisk) !== entry.before.sha256) throw new Error(`neutral authority mirror target changed since planning: ${entry.path}`);
+    writeFileSync(path, entry.after.bytes, { encoding: "utf8", mode: 0o600 });
+    const fd = openSync(path, "r+");
+    try { fsyncSync(fd); } finally { closeSync(fd); }
+    const readback = readFileSync(path, "utf8");
+    if (sha256(readback) !== entry.after.sha256) throw new Error(`neutral authority mirror write readback failed: ${entry.path}`);
+    applied.push(entry.path);
+  }
+  return { schema: "pipeline.runtime-projection-neutral-mirror-apply.v3", status: "applied", applied };
 }

@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -12,6 +12,7 @@ import { main as planRuntimeProjectionV3Cli } from "../scripts/plan-runtime-proj
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 import {
   CODEX_CUSTOM_AGENT_METADATA,
+  applyRuntimeProjectionV3NeutralMirrors,
   codexCustomAgentSeed,
   loadRuntimeProjectionV3OwnedKeys,
   planRuntimeProjectionV3,
@@ -86,6 +87,13 @@ function fixtureRoot(options) {
   const root = mkdtempSync(join(tmpdir(), "runtime-projection-v3-test-"));
   writeFixture(root, options);
   return root;
+}
+
+/** Seed the neutral authority tier (ADR-0054) so mirror projection has something to sync. */
+function writeNeutralMirror(root, { pipelineYaml, pipelineJson } = {}) {
+  mkdirSync(join(root, "project"), { recursive: true });
+  writeFileSync(join(root, "project/pipeline.yaml"), pipelineYaml ?? `${PREFIX}${OWNED}onlyAtNeutralTier: true\n`);
+  writeFileSync(join(root, "project/pipeline.json"), pipelineJson ?? "{\n  \"pipelineUpdateChannel\": \"alpha\",\n  \"unowned\": true\n}\n");
 }
 
 function target(plan, path) {
@@ -541,6 +549,151 @@ test("the committed owned-key manifest default parameter resolves at call time",
     assert.equal(byDefault.status, "ready");
     assert.deepEqual(explicit, byDefault);
     assert.equal(byDefault.ownedKeyManifest.schema, loadRuntimeProjectionV3OwnedKeys().schema);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// ADR-0054 step 3: the compiler keeps the neutral authority tier
+// (`project/pipeline.yaml`/`project/pipeline.json`) in sync with whatever it
+// already owns at the legacy tier, but only once that neutral tier exists --
+// `project-authority.mjs`'s migration remains the sole creator of it.
+// ---------------------------------------------------------------------------
+
+test("V3 owned-key manifest declares the neutral authority mirrors additively", () => {
+  const manifest = loadRuntimeProjectionV3OwnedKeys();
+  assert.deepEqual(manifest.neutralAuthorityMirrors.map((entry) => entry.path).sort(), ["project/pipeline.json", "project/pipeline.yaml"]);
+  const yamlMirror = manifest.neutralAuthorityMirrors.find((entry) => entry.path === "project/pipeline.yaml");
+  assert.equal(yamlMirror.mirrorOf, ".claude/pipeline.yaml");
+  const jsonMirror = manifest.neutralAuthorityMirrors.find((entry) => entry.path === "project/pipeline.json");
+  assert.equal(jsonMirror.mirrorOf, ".claude/pipeline.json");
+  // Every existing consumer of loadRuntimeProjectionV3OwnedKeys() (guard hooks,
+  // onboarding, private-overlay runtime, project-reset) reads ONLY `.targets`;
+  // this additive field must never leak into that fixed, unconditional set.
+  assert.equal(manifest.targets.some((entry) => entry.path.startsWith("project/")), false);
+});
+
+test("V3 plan has no neutral authority mirror targets when project/* does not exist", () => {
+  const root = fixtureRoot();
+  try {
+    const baselines = readRuntimeProjectionV3Baselines(root);
+    assert.equal(baselines["project/pipeline.yaml"].status, "absent");
+    assert.equal(baselines["project/pipeline.json"].status, "absent");
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines });
+    assert.equal(plan.status, "ready");
+    assert.equal(target(plan, "project/pipeline.yaml"), undefined);
+    assert.equal(target(plan, "project/pipeline.json"), undefined);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("V3 keeps an existing neutral authority mirror synced while preserving tier-local unowned content", () => {
+  const root = fixtureRoot();
+  try {
+    writeNeutralMirror(root);
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    assert.equal(plan.status, "ready");
+
+    const neutralManifest = target(plan, "project/pipeline.yaml");
+    assert.ok(neutralManifest, "project/pipeline.yaml must be projected once it exists");
+    assert.equal(neutralManifest.changed, true);
+    assert.match(neutralManifest.after.bytes, /onlyAtNeutralTier: true/u, "tier-local unowned bytes at the neutral tier must survive");
+    assert.match(neutralManifest.after.bytes, /elephant_epic_design/u, "the same compiler-owned routing is projected at the neutral tier");
+    const claudeManifest = target(plan, ".claude/pipeline.yaml");
+    assert.notEqual(
+      neutralManifest.after.bytes,
+      claudeManifest.after.bytes,
+      "the two tiers keep their own distinct unowned bytes -- this is a per-tier owned-key sync, never a byte copy",
+    );
+
+    const neutralCalibration = target(plan, "project/pipeline.json");
+    assert.ok(neutralCalibration, "project/pipeline.json must be projected once it exists");
+    const parsed = JSON.parse(neutralCalibration.after.bytes);
+    assert.equal(parsed.pipelineUpdateChannel, "alpha", "a neutral-only key (this repo's real defect) must survive the sync");
+    assert.equal(parsed.unowned, true);
+    assert.deepEqual(parsed.humanRoles, { po: { displayLabel: "PO" } });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("V3 neutral authority mirror is a no-change plan once it already matches", () => {
+  const root = fixtureRoot();
+  try {
+    writeNeutralMirror(root);
+    const first = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    const projected = Object.fromEntries(first.targets.map((entry) => [entry.path, { status: "present", bytes: entry.after.bytes }]));
+    const second = planRuntimeProjectionV3(completeIntent(), { baselines: projected });
+    assert.equal(second.status, "ready");
+    assert.equal(target(second, "project/pipeline.yaml").changed, false);
+    assert.equal(target(second, "project/pipeline.json").changed, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("applyRuntimeProjectionV3NeutralMirrors writes only a changed, already-existing mirror and verifies the readback", () => {
+  const root = fixtureRoot();
+  try {
+    writeNeutralMirror(root);
+    const beforeClaudeYaml = readFileSync(join(root, ".claude/pipeline.yaml"), "utf8");
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    const result = applyRuntimeProjectionV3NeutralMirrors(plan, { rootDir: root });
+    assert.equal(result.status, "applied");
+    assert.deepEqual(result.applied.sort(), ["project/pipeline.json", "project/pipeline.yaml"]);
+    assert.equal(readFileSync(join(root, "project/pipeline.yaml"), "utf8"), target(plan, "project/pipeline.yaml").after.bytes);
+    const written = JSON.parse(readFileSync(join(root, "project/pipeline.json"), "utf8"));
+    assert.equal(written.pipelineUpdateChannel, "alpha");
+    assert.deepEqual(written.humanRoles, { po: { displayLabel: "PO" } });
+    // Never touches the legacy tier: that remains runner-profile-migration-v3.mjs's job.
+    assert.equal(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), beforeClaudeYaml);
+
+    // Idempotent: re-planning against the just-written bytes and re-applying is a no-op.
+    const second = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    const secondResult = applyRuntimeProjectionV3NeutralMirrors(second, { rootDir: root });
+    assert.equal(secondResult.status, "applied");
+    assert.deepEqual(secondResult.applied, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("applyRuntimeProjectionV3NeutralMirrors never creates project/* from nothing", () => {
+  const root = fixtureRoot();
+  try {
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    const result = applyRuntimeProjectionV3NeutralMirrors(plan, { rootDir: root });
+    assert.equal(result.status, "applied");
+    assert.deepEqual(result.applied, []);
+    assert.equal(existsSync(join(root, "project")), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("applyRuntimeProjectionV3NeutralMirrors refuses a mirror target that changed on disk since planning", () => {
+  const root = fixtureRoot();
+  try {
+    writeNeutralMirror(root);
+    const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
+    writeFileSync(join(root, "project/pipeline.yaml"), "concurrent-edit: true\n");
+    assert.throws(() => applyRuntimeProjectionV3NeutralMirrors(plan, { rootDir: root }), /changed since planning/u);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("applyRuntimeProjectionV3NeutralMirrors reports not-ready for a non-ready plan without touching disk", () => {
+  const root = fixtureRoot();
+  try {
+    writeNeutralMirror(root);
+    const before = readFileSync(join(root, "project/pipeline.yaml"), "utf8");
+    const result = applyRuntimeProjectionV3NeutralMirrors({ status: "invalid-intent", targets: [] }, { rootDir: root });
+    assert.equal(result.status, "not-ready");
+    assert.deepEqual(result.applied, []);
+    assert.equal(readFileSync(join(root, "project/pipeline.yaml"), "utf8"), before);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
