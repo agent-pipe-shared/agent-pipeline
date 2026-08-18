@@ -1,0 +1,10 @@
+feat(pipeline-core): nudge PO toward a less identifying key-reference on fresh setup
+
+setup's fresh-key-creation branch now prints one advisory stdout line when
+the operator supplied a custom --key-reference, recommending a value that
+does not uniquely identify them as a natural person (H-AC-11 O-4). Advisory
+only: it never blocks, fails, or changes the returned result object, and it
+does not fire on the recovered or already-exists branches.
+
+Dispatch: PHX-WP-HAC11-NUDGE (goldfish)
+AI-Assisted: true

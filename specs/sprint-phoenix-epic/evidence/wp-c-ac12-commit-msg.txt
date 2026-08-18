@@ -1,0 +1,16 @@
+feat(change-control): close C-AC-12's advisory-vs-mandatory ITSM policy gap
+
+Add reviewPolicy ("mandatory" | "advisory") to the change-control profile
+schema, orthogonal to changeClass/mandatory and present only when mandatory
+is true (null otherwise, mirroring standardTemplate's present/null-by-class
+shape). An advisory profile still requires ITSM review when the external
+receipt is available, but when it is unreachable the gate now returns
+allowed/reconciliation-required instead of blocking -- a distinct,
+operator-visible signal modeled on projectChangeControlState's existing
+reconciliation-required pattern, never silently identical to
+composed-authority. All three pre-existing gate behaviors stay unchanged;
+pipeline-authority and emergency-authority checks remain additive, never
+bypassed, under advisory. 15/15 change-control-tests pass.
+
+Dispatch: WP-C-AC12 (goldfish)
+AI-Assisted: true

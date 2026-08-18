@@ -1,0 +1,15 @@
+{
+  "taskId": "WP-C-AC12",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "done",
+  "log": [
+    { "phase": "context-read", "toolCount": 4, "note": "read change-control.mjs (full), change-control.test.mjs (full); scratchpad write blocked by guard-lifecycle-ready GUARD-CROSS-REPO-MUTATION" },
+    { "phase": "design", "toolCount": 13, "note": "chose orthogonal field reviewPolicy: 'mandatory'|'advisory', present only when mandatory=true (null otherwise), mirroring standardTemplate present/null-by-class pattern; advisory+unavailable -> allowed/reconciliation-required" },
+    { "phase": "implement", "toolCount": 21, "note": "edited validateChangeControlProfile + evaluateChangeControlGate in change-control.mjs; updated profile() fixture default, one not-required override, C-AC-11 key-list assertion, added 4 new tests in change-control.test.mjs; extended DELTA entry for C-AC-12 in acceptance-evidence-map.mjs" },
+    { "phase": "verify", "toolCount": 27, "note": "node --test change-control.test.mjs: 15/15 pass, exit 0 (TAP output machine-written via --test-reporter-destination to evidence/wp-c-ac12-verify.txt); acceptance-evidence-map.mjs --out confirmed C-AC-12 renders 'implemented'/'WP-C-AC12'" },
+    { "phase": "commit", "toolCount": 32, "note": "commit cb0c26d, exact pathspecs for change-control.mjs, change-control.test.mjs, acceptance-evidence-map.mjs only; external-command-offer.* and .claude/settings.json / project state files left untouched (concurrent dispatch / pre-existing dirty state)" }
+  ],
+  "report": "see final chat response to Elephant"
+}

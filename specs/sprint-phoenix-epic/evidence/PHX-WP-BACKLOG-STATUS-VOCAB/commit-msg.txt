@@ -1,0 +1,17 @@
+feat(pipeline-core): extend backlog status vocabulary with rejected/deferred
+
+backlog/README.md's Triage rules instructed status: rejected/deferred as
+triage outcomes, but BACKLOG_STATUSES and reconcile-backlog-ledger.mjs's
+ORDER only ever accepted open/in_progress/closed, making the documented
+process unimplementable and leaving one real item schema-invalid.
+
+Extend BACKLOG_STATUSES and the FORWARD_TRANSITIONS graph so open branches
+to in_progress/rejected/deferred (backlog/README.md: triage applies only to
+open items, never mid-execution); update reconcile-backlog-ledger.mjs with
+the matching triage-branch reachability rule, keeping the existing
+open-in_progress-closed backbone stepping unchanged; reconcile the real
+repository's drifted items via --activate. Align README's Status lifecycle
+section with the Triage rules section.
+
+Dispatch: PHX-WP-BACKLOG-STATUS-VOCAB (goldfish)
+AI-Assisted: true

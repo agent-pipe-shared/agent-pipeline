@@ -1,0 +1,9 @@
+fix(evidence): wrap regex literal in backticks in 17 snapshot files
+
+The bare regex (/^[a-z][a-z0-9-]{0,63}$/u) in the PX0-AC-05 row was
+misparsed as a broken reference-style markdown link by the doc-contract
+scanner. Matches the fix already applied in acceptance-evidence-map.mjs
+(commit 824e02d2).
+
+Dispatch: PHX-WP-DOCCONTRACT-SNAPSHOTS (goldfish)
+AI-Assisted: true

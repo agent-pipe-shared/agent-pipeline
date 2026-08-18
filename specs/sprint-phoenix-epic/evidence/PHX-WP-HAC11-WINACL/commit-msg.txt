@@ -1,0 +1,15 @@
+fix(pipeline-core): wire Windows DACL assurance into the restricted governance-event root
+
+assertRestrictedRoot's owner-only guarantee was enforced only via POSIX
+mode bits and process.getuid(), both silent no-ops on win32. It now
+consults the same Windows DACL assurance primitive sibling modules
+(afk-ledger.mjs, etc.) already use: harden a newly-created restricted
+root, assess-only (never harden) a pre-existing one, fail closed on any
+non-secure result. The platform and assess/harden functions are
+injectable (io seam, mirroring afk-ledger.mjs's resolveIo pattern) so the
+win32 branch is unit-testable on this host. Also corrects the module's
+stale docstring, which claimed it does not implement the restricted-
+machine-local profile it in fact implements in the same file.
+
+Dispatch: PHX-WP-HAC11-WINACL (goldfish)
+AI-Assisted: true

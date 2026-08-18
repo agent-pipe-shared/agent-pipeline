@@ -1,0 +1,46 @@
+From: Agent-Pipeline Elephant (sprint_phoenix)
+Subject: [PATCH] chore(verify): register the six unregistered suites and protect the allowlist test
+
+Two guard-blocked changes an agent session cannot make, bundled for a direct PO apply:
+
+1. harness/scripts/verify.mjs (TP-3 protected) -- six test suites exist on this
+   branch but are registered in no Verify gate, so they have never run there:
+   WP5/PHX-2's external push ledger (2), the Guard Maintenance Window (3), and
+   WP2-WP3 Part A's origin allowlist (1). Inserted next to their nearest sibling,
+   public-core-observation-tests, in the same style as every other entry.
+
+2. project/guard-config.json (GS-4 protected) -- adds TP-11 so the allowlist
+   suite's own pinning assertions get the same protection GS-8 already gives the
+   constant module it pins. Closes Critic finding F6 of the WP2-WP3 Part A
+   implementation review.
+
+--- a/harness/scripts/verify.mjs
++++ b/harness/scripts/verify.mjs
+@@ -327,6 +327,12 @@
+   { name: "sbom-release-binding-tests", file: join(libDir, "sbom-release-binding.test.mjs") },
+   { name: "po-gate-authority-fixture-tests", file: join(libDir, "po-gate-authority.test.mjs") },
+   { name: "public-core-observation-tests", file: join(libDir, "public-core-observation.test.mjs") },
++  { name: "public-core-origin-allowlist-tests", file: join(libDir, "public-core-origin-allowlist.test.mjs") },
++  { name: "external-push-ledger-tests", file: join(libDir, "external-push-ledger.test.mjs") },
++  { name: "guard-maintenance-window-tests", file: join(libDir, "guard-maintenance-window.test.mjs") },
++  { name: "guard-push-external-ledger-tests", file: join(hooksDir, "guard-push-external-ledger.test.mjs") },
++  { name: "guard-gate-strength-gmw-tests", file: join(hooksDir, "guard-gate-strength-gmw.test.mjs") },
++  { name: "guard-testpath-gmw-tests", file: join(hooksDir, "guard-testpath-gmw.test.mjs") },
+   { name: "private-overlay-activation-tests", file: join(libDir, "private-overlay-activation.test.mjs") },
+   { name: "private-overlay-runtime-projection-tests", file: join(libDir, "private-overlay-runtime-projection.test.mjs") },
+   { name: "po-gate-profile-publisher-tests", file: join(libDir, "po-gate-profile-publisher.test.mjs") },
+--- a/project/guard-config.json
++++ b/project/guard-config.json
+@@ -48,6 +48,11 @@
+     {
+       "id": "TP-10",
+       "pattern": "plugins/pipeline-core/hooks/notebook-write-coverage\\.test\\.mjs$",
+       "reason": "notebook-write suite pins that every write matcher covers NotebookEdit and that its notebook_path target is read (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
++    },
++    {
++      "id": "TP-11",
++      "pattern": "plugins/pipeline-core/lib/public-core-origin-allowlist\\.test\\.mjs$",
++      "reason": "this suite pins the two-URL self-application origin allowlist's own exact assertions (exact-2, exact-URLs); GS-8 protects the constant module but not the test that pins it (Critic finding F6, WP2-WP3 Part A implementation review, E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
+     }
+   ]
+ }

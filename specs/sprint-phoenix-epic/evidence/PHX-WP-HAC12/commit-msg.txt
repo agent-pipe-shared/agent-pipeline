@@ -1,0 +1,30 @@
+feat(pipeline-core): dual-evaluate a decision reference in guard-push and pipeline-state
+
+H-AC-12's remaining two direct readers of human authority now reference and
+validate the canonical decision ID before the transition becomes effective,
+via the shared `dualEvaluateDecisionReference` primitive the two already-closed
+readers use — same opt-in shape as `lib/change-control.mjs`:
+
+- `hooks/guard-push.mjs` check (c): when the recorded `pushApproval
+  .lastApproved` carries a `decisionReference` at all, the pre-existing
+  commit-bound record verdict is dual-evaluated against the reference's own
+  binding to the candidate commit AND tree plus the governed session root's
+  repository fingerprint. Disagreement in either direction fails closed with
+  its own operator-visible reason, never a fallback to the legacy verdict.
+- `scripts/pipeline-state.mjs` `approve-push` / `approve-deploy`: an optional
+  `--decision-reference <repo-relative-json>` is evaluated after every
+  pre-existing check and before the first mutation, and recorded on the
+  approval so the read side can re-validate it. `parseExactFlags` requires
+  every named flag to be present, so the flag is admitted into the exact set
+  only when actually passed — absent, both commands are byte-for-byte what
+  they were.
+
+The shared `MIGRATION_COMPAT` owner/expiry is read off every evaluation result
+and named in each refusal, per the criterion's second sentence.
+
+Tests are new sibling suites, not edits to the TP-5-protected
+`pipeline-state.test.mjs` / `guard-push.test.mjs` — the pattern
+`guard-push-external-ledger.test.mjs` already established.
+
+Dispatch: PHX-WP-HAC12 (goldfish)
+AI-Assisted: true

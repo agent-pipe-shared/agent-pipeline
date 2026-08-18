@@ -1,0 +1,44 @@
+{
+  "schema": "pipeline.continuity.v0",
+  "featureId": "sprint-phoenix-epic",
+  "revision": 4,
+  "runtime": {
+    "humanFacingLanguage": "en",
+    "activeDuty": "Coordinator",
+    "sessionCleanup": null
+  },
+  "authority": {
+    "prd": {
+      "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+      "sha256": "93cef81e4d80c8f9adf1854fc90466d1a627afdf4557e4d3fd0bc42716914d5c"
+    },
+    "spec": {
+      "path": "specs/sprint-phoenix-epic/spec.md",
+      "sha256": "4bb3bbc47aade0d7c9c71fc4a43dafe196573c222c4d5643c8ee1be7686e2c3e"
+    },
+    "result": null
+  },
+  "queueHead": {
+    "packageId": "phoenix-design",
+    "actionId": "audit-handoff-design-revision",
+    "nextAction": "review",
+    "productRetryCount": 0,
+    "environmentRerouteCount": 0,
+    "dispatch": null
+  },
+  "blocker": null,
+  "acknowledgedFinal": null,
+  "resume": {
+    "mode": "immediate",
+    "sourceRevision": 3,
+    "reasonCode": "active-turn"
+  },
+  "recovery": null,
+  "decisionTxn": null,
+  "capacity": {
+    "concurrencyLimit": 4,
+    "reservedCriticSlots": 1,
+    "reservedRecoverySlots": 1,
+    "fallbackPolicy": "defer"
+  }
+}

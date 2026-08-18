@@ -1,0 +1,30 @@
+{
+  "schema": "pipeline.phoenix-continuity-repair.v1",
+  "featureId": "sprint-phoenix-epic",
+  "actor": "Product Owner",
+  "authorizedAt": "2026-08-01",
+  "reason": "Explicit Product Owner authorization for the narrowly bound Phoenix lifecycle repair after Result authority was already bound while the idle queue head remained in review.",
+  "candidate": {
+    "commit": "15888116c5f44dd1e5dbb21215aedf5a50cca8c6",
+    "tree": "00bc75740c5d0285fb37dbf477c396d895b45064"
+  },
+  "preimage": {
+    "stateSha256": "a0b90fffd2373e53a03a22f6d129d215b25efc163caedac5c31b231fc5ff4109",
+    "continuityRevision": 14,
+    "nextAction": "review",
+    "result": {
+      "path": "specs/sprint-phoenix-epic/result.md",
+      "sha256": "708d9293ad8ec13bb58e39ffd857c0a624d93e17b35cde380f242d26de6d9198"
+    }
+  },
+  "postimage": {
+    "stateSha256": "667e63007d42cf461a1e667bf49d876e243d7180f901cbf27a1e410830842c05",
+    "continuityRevision": 15,
+    "nextAction": "close",
+    "result": {
+      "path": "specs/sprint-phoenix-epic/result.md",
+      "sha256": "708d9293ad8ec13bb58e39ffd857c0a624d93e17b35cde380f242d26de6d9198"
+    }
+  },
+  "readback": "State re-read and validated immediately after the atomic CAS; no remote action was performed."
+}

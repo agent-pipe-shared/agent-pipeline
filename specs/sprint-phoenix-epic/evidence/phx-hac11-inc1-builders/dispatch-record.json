@@ -1,0 +1,47 @@
+{
+  "taskId": "PHX-HAC11-INC1-BUILDERS",
+  "model": "claude-opus-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "Elephant",
+  "outcome": "succeeded-with-disclosed-deviations",
+  "commit": "994f3116",
+  "routePreCheck": {
+    "requested": "claude-opus-5 / xhigh",
+    "observedEffectiveIdentity": "claude-opus-5[1m]",
+    "evidence": "this dispatch's own runtime prompt: 'You are powered by the model named Opus 5 (1M context). The exact model ID is claude-opus-5[1m].'",
+    "result": "no contradiction"
+  },
+  "log": [
+    { "phase": "bootstrap", "toolUses": 2, "note": "dispatch record created as opening act; readback confirmed" },
+    { "phase": "read-design", "toolUses": 7, "note": "design doc read for the bound sections (5.5, 7.2-7.5, 11 rows 1-2, 12 U-1..U-10, 13)" },
+    { "phase": "verify-cited-sources", "toolUses": 18, "note": "GMW line citations hold; HGO and governance-event-store line citations drifted positionally, all cited symbols/shapes verified unchanged" },
+    { "phase": "implement", "toolUses": 24, "note": "guard-authority-ledger-intake.mjs written: id helpers, GMW builders, HGO builders, buildAppendIntent" },
+    { "phase": "author-tests", "toolUses": 25, "note": "guard-authority-ledger-intake.test.mjs written: U-1..U-10 as separate traceable cases plus three support cases" },
+    { "phase": "verify", "toolUses": 27, "note": "node --test green on first run, 13/13 pass, exit 0" },
+    { "phase": "verify", "toolUses": 28, "note": "no-clock/no-random/no-IO grep over the builder module: zero hits" },
+    { "phase": "evidence", "toolUses": 32, "note": "TAP artifact written by the node reporter to the conventional evidence path" },
+    { "phase": "commit", "toolUses": 39, "note": "994f3116, two lib paths by pathspec; GIT-03 forced dropping the environment's provider co-author/session trailers in favour of AI-Assisted: true" }
+  ],
+  "dodResults": {
+    "U-1..U-10": "passed",
+    "verify-command": "passed",
+    "no-io-no-clock-no-randomness": "passed",
+    "AC-1": "not verifiable in this dispatch (needs the CLI/store wiring)",
+    "AC-2": "passed (builder half: U-3 and U-7)",
+    "AC-3": "passed (builder half: U-1 plus the store's own assertIntent shape check)",
+    "AC-4": "passed (U-5)",
+    "AC-6": "not verifiable in this dispatch (needs the CLI/store wiring)",
+    "AC-8": "not verifiable in this dispatch (deferred: needs a rendered fixture over a real stream)",
+    "AC-10": "passed (U-7)",
+    "AC-12": "passed (U-10)",
+    "AC-13": "passed (U-10)"
+  },
+  "evidence": {
+    "artifact": "specs/sprint-phoenix-epic/evidence/phx-hac11-inc1-builders/unit-U1-U10.tap",
+    "command": "node --test --test-reporter=tap --test-reporter-destination=specs/sprint-phoenix-epic/evidence/phx-hac11-inc1-builders/unit-U1-U10.tap plugins/pipeline-core/lib/guard-authority-ledger-intake.test.mjs",
+    "exitCode": 0,
+    "plainCommand": "node --test plugins/pipeline-core/lib/guard-authority-ledger-intake.test.mjs",
+    "plainExitCode": 0
+  },
+  "report": "1. DoD RESULTS. U-1..U-10: all passed, each a separate test case named with its U-number. Verify command `node --test plugins/pipeline-core/lib/guard-authority-ledger-intake.test.mjs`: passed, exit 0, 13/13 (10 U-cases + 3 support cases). No-I/O/no-clock/no-randomness: passed (grep over the module for Date.now|new Date|Math.random|randomBytes|readFile|writeFile|existsSync|node:fs|node:child_process|process.env returned zero hits). AC-2 passed (builder half, U-3 free-text and U-7 anchor-derivative). AC-3 passed (builder half: every output validates, and buildAppendIntent runs the store's own assertIntent shape check before returning). AC-4 passed (U-5). AC-10 passed (U-7, preimage recomputed from a literal written into the test). AC-12 and AC-13 passed (U-10). AC-1 and AC-6 NOT VERIFIABLE in this dispatch: both are append-then-arm / re-install properties that exist only across the CLI-store boundary, which is out of scope here. AC-8 NOT VERIFIABLE and deferred as the briefing permits: the reconstruction render needs a real stream, and a hand-built fixture would only re-assert the builder outputs already asserted by U-1.\n\n2. EVIDENCE. specs/sprint-phoenix-epic/evidence/phx-hac11-inc1-builders/unit-U1-U10.tap, written by node's own TAP reporter (--test-reporter-destination), exit code 0. Command in the `evidence` field above.\n\n3. CHANGED FILES. plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs (created: the pure builders, id helpers and append-intent wrapper of design 7.2/7.3/7.4/7.5). plugins/pipeline-core/lib/guard-authority-ledger-intake.test.mjs (created: U-1..U-10 plus three support cases). Evidence and this record under specs/sprint-phoenix-epic/evidence/phx-hac11-inc1-builders/ (left untracked, matching the majority local convention). Commit 994f3116, two paths by pathspec.\n\n4. DELIBERATELY NOT CHANGED. guard-maintenance-window.mjs including NEVER_LIFTABLE_KERNEL_PATHS (11 says no change; a later dispatch owns it). Every scripts/ and hooks/ file. The scripts-level integration test file. ledgerConfirmsLiveGmwGrant and the memo surface (15.2.3/15.3) - no stub, no TODO left. The design doc's own stale line citations (see deviations) were not edited: 4 forbids touching spec/acceptance files and the design doc is not mine to rebind.\n\n5. DEVIATIONS FROM SPEC. (a) Line-citation drift, verified not substance drift: guard-maintenance-window.mjs citations all still hold exactly (LIFTABLE_RULE_IDS :104, LIFTABLE_TP_PREFIX :105, isLiftableRuleId :108-110, NEVER_LIFTABLE_KERNEL_PATHS :120-128, MAX_WINDOW_TTL_MS :175, storagePaths :258-261). human-guard-override.mjs and governance-event-store.mjs citations drifted positionally: policyIdentity is at :417 not :369-396, repositoryObservation at :472 not :424-434, localPluginInstallSourceObservation at :242 not :231-232 (its head/tree are still null), CAPABILITY_KEYS at :1220 not :1066-1089 (still the exact 22 keys listed), INTENT_OMITTED_FIELDS at :38 not :36, appendPortableGovernanceEvent at :676 not :629, the idempotency-before-assertAppend branch at :703-708 not :638-651. Every cited symbol, shape and behaviour is unchanged, so I proceeded and report the positions rather than stopping. (b) DESIGN CONTRADICTION, reported and deliberately NOT resolved in either direction: 4 gives HGO scope.action the two exact values GUARD.OVERRIDE.CONSUME.SIGNATURE|CHAT, while 7.5 says the action comes 'from the consumption mode' - but HGO's `mode` is standard|pipeline-author-repair|global-plugin-install, never signature/chat. Signature-vs-chat is HGO's authorization CHANNEL (authorizeHumanGuardOverrideBySignature vs the in-session activation gated on gates.push_approval === 'chat', human-guard-override.mjs:1687-1690), and the capability carries no channel field. I therefore made `authorizationChannel` a required caller parameter over the closed set {signature, chat} and encoded no mapping from `mode`; the derivation belongs to the CLI dispatch that is out of scope here. (c) Design gaps filled, disclosed: the design requires a lazy `expired` disposition for a window but names no reason code - I used GUARD.MAINTENANCE.EXPIRED, completing the GUARD.MAINTENANCE.CLOSED/NOT_ARMED family; and 7.3 specifies identifiers only for GMW, so the HGO path uses the same scheme under an `hgo-` producer prefix (the helpers keep `gmw` as default, so 7.3's literal contract is unchanged) plus a fifth helper denyDecisionId for the `denied` event 7.5 requires and 7.3 gives no id for. (d) A GMW subject carrying a `reasonCode` that fails the CODE pattern fails closed (GAL-REASON-CODE) rather than degrading to WINDOW_UNATTESTED; 5.3's fallback is for a subject with no such field. (e) Layer-1 HGO artifacts are a caller-supplied [{path,sha256}] set because reading bytes is I/O; the builder intersects it with capability.eligiblePaths so a caller cannot inject an unbound artifact (test pins this). (f) Commit discipline: the briefing asks for staging+commit as ONE bundled shell call, but the project's own guard grammar rejects `&&`, so it was two pathspec-scoped calls. The environment's mandated commit trailers (Co-Authored-By provider trailer and Claude-Session URL) were rejected by git-guard GIT-03, which offers no override; the message uses `AI-Assisted: true` instead.\n\n6. OPEN ITEMS. (i) The 4-vs-7.5 action-source contradiction in (b) needs a design decision before the guard-human-override.mjs CLI dispatch can derive the channel. (ii) GUARD.MAINTENANCE.EXPIRED and the hgo-* id scheme should be pinned in the design (or corrected) before the reconcile dispatch depends on them. (iii) buildAppendIntent maps an absent featureId to the typed state {state:'unavailable'}; 7.2 names that state only for policy digests, so confirm it rather than 'not-applicable' for the HGO path. (iv) AC-1/AC-6/AC-8 remain open for the wiring and integration dispatches. (v) The design's stale line citations in 3.3/5.5/7.3/10.2 should be refreshed at the next rebind. (vi) No stop condition was triggered; no attempt failed; the verify suite was green on its first run."
+}

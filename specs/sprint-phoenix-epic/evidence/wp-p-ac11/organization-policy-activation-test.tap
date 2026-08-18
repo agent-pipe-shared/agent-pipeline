@@ -1,0 +1,22 @@
+TAP version 13
+# Subtest: activates exactly the planned effective policy only after a bound authority readback
+ok 1 - activates exactly the planned effective policy only after a bound authority readback
+  ---
+  duration_ms: 6.462306
+  type: 'test'
+  ...
+# Subtest: rejects an unbound authority response and stale plan preimage
+ok 2 - rejects an unbound authority response and stale plan preimage
+  ---
+  duration_ms: 3.039419
+  type: 'test'
+  ...
+1..2
+# tests 2
+# suites 0
+# pass 2
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 52.832285

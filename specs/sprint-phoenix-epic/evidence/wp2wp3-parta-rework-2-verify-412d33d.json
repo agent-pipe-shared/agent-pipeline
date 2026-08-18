@@ -1,0 +1,10 @@
+{
+  "schema": "pipeline.elephant-verified-checks.v1",
+  "note": "Elephant-run (not verify.mjs, not script-written) — same honesty disclosure QG-03 requires: this is a direct, individually-run reproduction, not a substitute claimed as verify.mjs-equivalent, run directly against HEAD after the WP2-WP3-partA-rework-2 dispatch landed all 4 commits.",
+  "candidate": { "commit": "412d33d2f96b62f3e7710063747d9492dd417222", "tree": "f96af49817720a2c247a58930be2011991716e40" },
+  "checks": [
+    { "command": "node plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs", "exitCode": 0, "resultSummary": "32/32 passed, including F2/F4's unstubbed-observer cases and F-C's now-canonicalized fixture." },
+    { "command": "node harness/scripts/check-doc-contracts.mjs", "exitCode": 0, "resultSummary": "Documentation contracts valid: 476 Markdown file(s), 776 link(s), 13 anchor check(s)." }
+  ],
+  "notCovered": "harness/scripts/verify.mjs was not run directly (the same pre-existing VERIFY-CLEANUP-REGISTRATION-REQUIRED infra gap disclosed for every prior candidate this session in a plain checkout); F3/F6 remain unregistered/unprotected by design (structurally blocked, not a verification gap); F-B is a backlog record, not code, and has no verify command of its own."
+}

@@ -1,0 +1,12 @@
+{
+  "schema": "pipeline.neutral-findings-registry.v1",
+  "priorReview": "specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-2-delta-critic-review-412d33d.md",
+  "priorReviewVerdict": "FAIL (3 major + 1 minor)",
+  "baseCommit": "5c12a8d",
+  "findings": [
+    { "id": "F1", "severity": "major", "gap": "the new 'this gap is tracked' citation (asserted three times) resolves to a backlog item that does not track the claimed content — a link that resolves but whose target carries a different subject, which no link checker can detect; the disclosed limitation therefore had no owner, no next step and no tracking item anywhere", "claimedStatus": "fixed", "claimedResolvingCommit": "ca2d66a" },
+    { "id": "F2", "severity": "major", "gap": "the rescoping fixed §A.1/§A.5/§A.7 and left §A.6 plus four further anchors asserting the refuted 'a real marketplace-git install preserves a .git directory' premise and an 'every session, every project' blast radius, creating a new intra-document contradiction that misinforms a still-open PO question", "claimedStatus": "fixed", "claimedResolvingCommit": "2e48cbd" },
+    { "id": "F3", "severity": "major", "gap": "the design-document rework ran below the Design tier, undisclosed, breaching the commitment this same document makes that any further dispatch authoring or reworking it is dispatched on the Design-tier model", "claimedStatus": "fixed", "claimedResolvingCommit": "7583893" },
+    { "id": "F4", "severity": "minor", "gap": "the document's header 'DESIGN ONLY — no .mjs/.json/.yaml file was changed' claim and §A.5's 'None of these three files is touched by this design-document revision itself' claim are both falsified by the revision that carried them", "claimedStatus": "fixed", "claimedResolvingCommit": "138e2e3" }
+  ]
+}

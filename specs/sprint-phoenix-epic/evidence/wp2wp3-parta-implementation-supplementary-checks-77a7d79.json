@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.wp2wp3-parta-supplementary-checks.v1",
+  "note": "Supplementary to the real verify.mjs run at wp2wp3-parta-implementation-verify-real-77a7d79.json — these are individually-invoked commands, NOT a substitute for or equivalent to that run.",
+  "candidate": {
+    "commit": "77a7d7999a998e455f26ad0952d4a4105e2edd47",
+    "tree": "8cf29ccbbc59a9579e13e0ca89c822c33f77a78e"
+  },
+  "generatedAt": "2026-08-07T15:14:30Z",
+  "checks": [
+    {
+      "command": "node plugins/pipeline-core/lib/public-core-origin-allowlist.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "tests 3, pass 3, fail 0. All three assertions passed: allowlist contains exactly the two reviewed Public-Core origins byte-identical to the pre-merge constant; module exports only the allowlist Set and its URL constant with no shaping logic; an arbitrary fork or private origin is not admitted."
+    },
+    {
+      "command": "node plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "tests 27, pass 27, fail 0. All 27 named assertions passed (identity/no-handoff reporting, runner declaration, envelope measurement, WSL capability boundary, handoff completeness, refresh handoff, local marketplace source detection/ambiguity handling, registry manifest parsing for both Claude and Codex sources, version-mismatch refresh, plugin-refresh-required advisory folding, self-referential observe call, plugin-identity-unavailable hard-fail paths)."
+    },
+    {
+      "command": "node plugins/pipeline-core/hooks/guard-gate-strength.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "guard-gate-strength: 19 passed, 0 failed (GST01-GST19). Covers refusal of every gate-strength path (absolute/relative), single sanctioned escape with no override, untouched ordinary files, repository-escape non-claim, PreToolUse wiring for every write tool, this repo's own gate not weakened, GS-6 non-agent-writable enforcement, shell-lane refusal parity, and legacy-tier guard config defense."
+    },
+    {
+      "command": "node plugins/pipeline-core/hooks/guard-gate-strength-gmw.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "File present in this worktree (from earlier same-day unrelated work). guard-gate-strength-gmw: 1 passed, 0 failed (GST20: a real armed GS-6 window lifts an ordinary plugin file but a kernel path stays refused)."
+    },
+    {
+      "command": "node harness/scripts/check-doc-contracts.mjs",
+      "exitCode": 0,
+      "resultSummary": "Documentation contracts valid: 472 Markdown file(s), 776 link(s), 13 anchor check(s)."
+    },
+    {
+      "command": "node harness/scripts/check-observation-governance.mjs",
+      "exitCode": 0,
+      "resultSummary": "Observation governance valid: 132 document(s) classified."
+    },
+    {
+      "command": "node harness/scripts/security-scan.mjs",
+      "exitCode": 2,
+      "resultSummary": "First attempt without --root resolved the repo root to the MAIN checkout (/home/skar667/src/agent-pipeline-share_phoenix), not the worktree, and failed all four scanners (gitleaks, osv-scanner, semgrep, license-check) with 'working-tree-not-clean' because the main checkout has its 3 conventionally-dirty files. Verdict: BLOCKING -> exit 2. This is not a result for the candidate; see the --root retry below for the actual candidate-scoped result."
+    },
+    {
+      "command": "node harness/scripts/security-scan.mjs --root <worktree>",
+      "exitCode": 0,
+      "resultSummary": "Retried with --root explicitly pointed at the detached worktree (clean tree at candidate 77a7d79). gitleaks: OK (0 findings). osv-scanner: SKIPPED (no package sources found in project, exit 128 from the tool itself, treated as non-blocking skip). semgrep: OK (0 findings). license-check: OK (0 findings). Verdict: CLEAN (thresholds: critical, high) -> exit 0. v2 policy-complete verdict (reporting-only): clean (0 offending required capabilities)."
+    }
+  ]
+}

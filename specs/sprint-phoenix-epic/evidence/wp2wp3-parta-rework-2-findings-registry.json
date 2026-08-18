@@ -1,0 +1,12 @@
+{
+  "schema": "pipeline.neutral-findings-registry.v1",
+  "priorReview": "specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md",
+  "priorReviewVerdict": "PASS (F1/F2/F4/F5 resolved; 4 non-blocking findings F-A/F-B/F-C/F-D surfaced)",
+  "baseCommit": "7aa84f0",
+  "findings": [
+    { "id": "F-A", "severity": "major", "gap": "the design contract still says a non-git flat-copy install should fold into plugin-refresh-required; after the F2 fix that case falls through to ready with attestation never attempted, and the design doc was not amended to match, while a new code comment cites a §A.7 exclusion that does not exist there", "claimedStatus": "fixed", "claimedResolvingCommit": "ac8bd06" },
+    { "id": "F-B", "severity": "minor", "gap": "the new gate-deciding line (whether attestation runs at all) in pipeline-start-preflight.mjs is not GS-8-class protected -- the exact hole GS-8 was added to close is reopened one level up", "claimedStatus": "backlogged (deliberately not code-fixed; needs its own PO scoping decision)", "claimedResolvingCommit": "412d33d" },
+    { "id": "F-C", "severity": "minor", "gap": "the new unstubbed test fixture (buildSelfApplicationGitFixture) assumes os.tmpdir() is already its own realpath, a portability risk on macOS/Windows tmp layouts", "claimedStatus": "fixed", "claimedResolvingCommit": "627d053" },
+    { "id": "F-D", "severity": "minor", "gap": "the pluginRootHasSelfApplicationGit JSDoc claims layout-equivalence to resolveSourceLayout() that it does not implement", "claimedStatus": "fixed", "claimedResolvingCommit": "4e1ac8a" }
+  ]
+}

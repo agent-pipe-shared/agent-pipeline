@@ -1,0 +1,24 @@
+{
+  "taskId": "PHX-WP-AAC04-FIX2",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "ce50d74d16fdbcd0b9f8b3b606297e88af3d2f139b3cd14b692f4ea15599b023",
+  "dispatcher": "elephant",
+  "outcome": "closed",
+  "log": [
+    { "phase": "briefing-read + initial file read (human-authority-grant.mjs)", "toolUseCount": 3 },
+    { "phase": "read test file + guard-git-phoenix-authority-grant.test.mjs fixture check", "toolUseCount": 6 },
+    { "phase": "implemented N1/F1-residual fix (repo.primaryRoot for trust anchor, capture-policy digest, ledger append), F3 docstring correction, N2 flag removal, added N1 regression test", "toolUseCount": 17 },
+    { "phase": "GREEN verify (13/13 unit tests)", "toolUseCount": 18 },
+    { "phase": "break-proof N1 test: reverted fix, confirmed RED for right reason (Missing expected rejection), persisted transcript, restored fix, reconfirmed GREEN", "toolUseCount": 22 },
+    { "phase": "ran e2e + regression suites (guard-git-phoenix-authority-grant, guard-git-phoenix, human-governance-ledger) all green", "toolUseCount": 24 },
+    { "phase": "committed as new commit f3eeb3e (via -F message file due to shell-grammar guard on multi-line -m and on the literal trust-anchor filename)", "toolUseCount": 29 },
+    { "phase": "final verify re-run against committed state, both exit 0", "toolUseCount": 31 }
+  ],
+  "commit": "f3eeb3ed379873c1fc080614332c2025754c29a4",
+  "verify": {
+    "human-authority-grant.test.mjs": { "tests": 13, "pass": 13, "fail": 0 },
+    "guard-git-phoenix-authority-grant.test.mjs": { "tests": 1, "pass": 1, "fail": 0 },
+    "guard-git-phoenix.test.mjs + human-governance-ledger.test.mjs (regression)": { "tests": 25, "pass": 25, "fail": 0 }
+  },
+  "report": "See final assistant message of dispatch PHX-WP-AAC04-FIX2 for the full 6-section report (DoD results, evidence, changed files, deliberately not changed, deviations, open items). Summary: F1-residual/N1 closed (repo.primaryRoot now the only root for the trust-anchor read, capture-policy digest read, and ledger append inside runInstall; new named N1 test added and break-proofed with a persisted RED transcript at red-transcript-n1.txt). F3 closed (docstring claim corrected to name the discovered-root resolution explicitly, now literally true). N2 closed (--event-id/--idempotency-key removed from prepare's grammar, usage strings, and docstring; runInstall already ignored them). All 12 pre-existing unit assertions plus the 1 e2e assertion still pass; 1 new unit assertion added (13 total). No forbidden files touched. Committed as new commit f3eeb3e, not amended."
+}

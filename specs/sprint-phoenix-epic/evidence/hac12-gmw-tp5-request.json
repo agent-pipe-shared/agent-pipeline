@@ -1,0 +1,28 @@
+{
+  "schema": "pipeline.guard-maintenance-window-request.v1",
+  "subject": {
+    "scopeRuleIds": ["TP-5"],
+    "expiresAtMs": 1786970742735,
+    "reason": "H-AC-12: wire dualEvaluateDecisionReference into guard-push.mjs and pipeline-state.mjs readers",
+    "repoFingerprintSha256": "c560733114a7924ff8ba8fc2516217c638d0ad5664198d2511d1ec75672102ac",
+    "openingTreeSha256": "d6a7460d65562470e119b267d5e4917b39433439b61a0ce3c5e91a313f8ca08d",
+    "nonce": "f0751bcf605a134e83b2596e9331416e"
+  },
+  "intent": {
+    "value": {
+      "schema": "pipeline.po-approval-intent.v1",
+      "kind": "guard-lift",
+      "featureId": "sprint-phoenix-epic",
+      "planSha256": "8b820ea5907c24061eeab1a8f2255939401f5a2002792c5f16d39836712b3177",
+      "specSha256": "f7e32bb764d408ec21d6578d72b4729d8d5931bcf840ebac2198a2d652233d4f",
+      "candidate": {
+        "commit": "2b5b9d2a5a7c892b77bfd037769d8dfbea9366ae",
+        "tree": "8e6208205caf0a6fce403d7e920d88036ebed067"
+      },
+      "policyRevision": "guard-maintenance-window-v1",
+      "subjectSha256": "28dfb72d8f4ee62fc48b2ecbe31a402f370fa3d119e397ab74391d445c4a818f",
+      "decision": "lift"
+    },
+    "sha256": "aa11b06884940715d0b090c0d008d6320f9ba05445f64d1975ba309bd53a86cc"
+  }
+}

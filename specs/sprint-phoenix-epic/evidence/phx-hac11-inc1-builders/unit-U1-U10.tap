@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: U-1 every builder output validates, and one extra key fails HGL-SHAPE
+ok 1 - U-1 every builder output validates, and one extra key fails HGL-SHAPE
+  ---
+  duration_ms: 3.522812
+  type: 'test'
+  ...
+# Subtest: U-2 granted without links.requestDecisionId fails HGL-LIFECYCLE; each disposition needs exactly its own link
+ok 2 - U-2 granted without links.requestDecisionId fails HGL-LIFECYCLE; each disposition needs exactly its own link
+  ---
+  duration_ms: 0.481051
+  type: 'test'
+  ...
+# Subtest: U-3 reason codes are pinned; free text never appears in and is never hashed into any output
+ok 3 - U-3 reason codes are pinned; free text never appears in and is never hashed into any output
+  ---
+  duration_ms: 1.67891
+  type: 'test'
+  ...
+# Subtest: U-4 identifiers are deterministic; g moves only the disposition ids; installedAtMs moves no id at all
+ok 4 - U-4 identifiers are deterministic; g moves only the disposition ids; installedAtMs moves no id at all
+  ---
+  duration_ms: 0.526657
+  type: 'test'
+  ...
+# Subtest: U-5 identityAssurance is locally-attributed and timeAssurance locally-observed in every record
+ok 5 - U-5 identityAssurance is locally-attributed and timeAssurance locally-observed in every record
+  ---
+  duration_ms: 1.046195
+  type: 'test'
+  ...
+# Subtest: U-6 validity is min(signed, installedAtMs + MAX_WINDOW_TTL_MS); the catalogue pin agrees with isLiftableRuleId
+ok 6 - U-6 validity is min(signed, installedAtMs + MAX_WINDOW_TTL_MS); the catalogue pin agrees with isLiftableRuleId
+  ---
+  duration_ms: 0.218668
+  type: 'test'
+  ...
+# Subtest: U-7 policyDigest is verified constructively; the trust anchor is absent at every depth
+ok 7 - U-7 policyDigest is verified constructively; the trust anchor is absent at every depth
+  ---
+  duration_ms: 0.612538
+  type: 'test'
+  ...
+# Subtest: U-8 no builder can emit corrected or superseded
+ok 8 - U-8 no builder can emit corrected or superseded
+  ---
+  duration_ms: 0.483021
+  type: 'test'
+  ...
+# Subtest: U-9 the HGO denial builder produces requested + denied with GUARD.OVERRIDE.DENIED and requestDecisionId
+ok 9 - U-9 the HGO denial builder produces requested + denied with GUARD.OVERRIDE.DENIED and requestDecisionId
+  ---
+  duration_ms: 0.385341
+  type: 'test'
+  ...
+# Subtest: U-10 HGO representability follows §7.5's order: layer 0 first, then layers 1-3
+ok 10 - U-10 HGO representability follows §7.5's order: layer 0 first, then layers 1-3
+  ---
+  duration_ms: 1.213297
+  type: 'test'
+  ...
+# Subtest: U-1/U-5 support: buildAppendIntent yields exactly §7.2's 24 keys and a store-valid envelope
+ok 11 - U-1/U-5 support: buildAppendIntent yields exactly §7.2's 24 keys and a store-valid envelope
+  ---
+  duration_ms: 2.333533
+  type: 'test'
+  ...
+# Subtest: §7.4 support: an artifact digest that disagrees with the signed intent fails closed
+ok 12 - §7.4 support: an artifact digest that disagrees with the signed intent fails closed
+  ---
+  duration_ms: 0.150445
+  type: 'test'
+  ...
+# Subtest: §7.3 support: a disposition must belong to the request digest and generation it names
+ok 13 - §7.3 support: a disposition must belong to the request digest and generation it names
+  ---
+  duration_ms: 0.181322
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 60.331797

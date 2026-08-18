@@ -1,0 +1,30 @@
+{
+  "taskId": "PHX-WP-AAC01-MULTISESSION",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "complete",
+  "log": [
+    {
+      "phase": "bootstrap",
+      "toolUseCount": 3,
+      "note": "Opening record written; about to read context files."
+    },
+    {
+      "phase": "implementation",
+      "toolUseCount": 24,
+      "note": "pipeline-start-preflight.mjs edited: added CONCURRENT_SESSION_WARNING_SCHEMA, observeConcurrentSessionWarning() (read-only, try/catch-safe scan via listActiveSessionDescriptors + inspectSessionOwnerRuntime, only 'live'-on-a-different-session counts), wired currentSessionId option and concurrentSessionWarning field into observePipelineStartPreflight (additive, no existing field changed), and an explicit OPEN-FOLLOW-UP comment: ordinary bootstrap does not register its own descriptor because no end-of-session retirement hook is reachable from this file alone. About to write/run tests."
+    },
+    {
+      "phase": "verify",
+      "toolUseCount": 36,
+      "note": "node --test plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs: 40/40 pass, exit 0 (subprocess-reported). node --test plugins/pipeline-core/lib/worktree-lifecycle.test.mjs (untouched file, ran anyway for confidence): 34/34 pass, exit 0."
+    },
+    {
+      "phase": "commit",
+      "toolUseCount": 41,
+      "note": "Committed 645de988 (only the two briefed files staged and committed by exact pathspec, verified via git status before commit); commit-msg.txt written to this evidence dir as the -F source since the guard requires a file for a multi-line message."
+    }
+  ],
+  "report": "1. DoD results: (a) new additive concurrentSessionWarning field on pipeline.start-preflight.v1 -- passed (test: exact-keys assertion updated + dedicated tests). (b) status/nextAction/every other field unchanged by the warning -- passed (dedicated field-by-field comparison test; bootstrapPayload's own size/digest measurement is deliberately excluded from that comparison since it mechanically reflects total payload size by design, not a decision output -- explained in-line in the test). (c) never a positive warning for not-live/reused/unavailable/unobserved -- passed (dedicated test covering all four, using the same descriptor-mutation technique worktree-lifecycle.test.mjs already uses). (d) real end-to-end two-descriptor test -- passed. (e) descriptor-cleanup handling or honest open-follow-up -- passed, decision: NOT registering (see Deviations). (f) A-AC-01 scope -- passed (mitigation only; main-session-route.mjs gap untouched). (g) verify commands -- passed, both exit 0.\n2. Evidence: `node --test plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs` -> 40/40 pass, exit 0 (captured via a wrapping `node -e` subprocess call that prints the real spawnSync exit status, since the shell guard here disallows redirect-to-file). `node --test plugins/pipeline-core/lib/worktree-lifecycle.test.mjs` -> 34/34 pass, exit 0 (untouched file; run for confidence only, not required by field 4).\n3. Changed files: `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` -- added CONCURRENT_SESSION_WARNING_SCHEMA + observeConcurrentSessionWarning() + currentSessionId option + concurrentSessionWarning field + an explicit open-follow-up comment. `plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs` -- updated the exact-keys assertion, added 4 new tests (positive warning + status/nextAction invariance, all 4 negative statuses, no-descriptors-at-all, unresolvable cwd never throws).\n4. Deliberately NOT changed: `worktree-lifecycle.mjs` and `codex-onboarding-capabilities.mjs` (scope-forbidden; only imported existing exports). The pre-existing `startSessionDescriptor`/`retireSessionDescriptor` single-call-site pattern in codex-onboarding-capabilities.mjs (register-then-immediately-retire) was left exactly as-is. Numerous unrelated dirty/untracked files already present in the working tree (other dispatches' evidence, `.pipeline/`, `.claude/tmp/`, `project/pipeline-state.json`, `plugins/pipeline-core/scripts/dispatch-record.json`) were left untouched and excluded from staging/commit by exact pathspec.\n5. Deviations (design latitude, as pre-authorized by field 5): chose NOT to have observePipelineStartPreflight register a session descriptor for ordinary bootstrap. Reasoning: (a) the DoD's own test spec has the TEST register both 'this session' and 'another session' descriptors directly via startSessionDescriptor, which only requires an optional currentSessionId exclusion parameter on the read side -- no auto-registration needed to satisfy it; (b) registering one here would require a real end-of-session retirement hook, which this file (invoked once at the START of bootstrap) does not have reachable from itself alone, and inventing one under time pressure was explicitly discouraged; (c) mutating filesystem state from what is otherwise a pure identity-observation function used by many callers/tests was judged riskier than the benefit. Net effect, honestly stated: the mechanism is real, wired, additive, and covered end-to-end by tests, but stays structurally dormant in today's real production bootstrap until a follow-up task adds registration-at-a-real-entry-point plus matching retirement-at-a-real-session-end-hook. Warning field shape: { schema: 'pipeline.concurrent-session-warning.v1', sessionId, descriptorSha256, status: 'live' } -- exactly the shape inspectSessionOwnerRuntime already exposes, nothing added (no nonce/PID/processStartId/conversation data).\n6. Open items: descriptor registration + retirement for ordinary bootstrap sessions is an OPEN FOLLOW-UP (explicitly permitted by field 5), documented in-line in pipeline-start-preflight.mjs and here -- not silently left unaddressed. No stop conditions were triggered. No manual PO action required for this task itself; a future task should decide where registration belongs (likely the calling skill/script, not this preflight library file) and what session-end hook retires it."
+}

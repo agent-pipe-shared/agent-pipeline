@@ -1,0 +1,88 @@
+TAP version 13
+# Subtest: accepts a closed compatible policy pack
+ok 1 - accepts a closed compatible policy pack
+  ---
+  duration_ms: 1.5126
+  type: 'test'
+  ...
+# Subtest: rejects floor weakening, duplicate document ownership, unknown fields, and incompatible core
+ok 2 - rejects floor weakening, duplicate document ownership, unknown fields, and incompatible core
+  ---
+  duration_ms: 0.38503
+  type: 'test'
+  ...
+# Subtest: resolves compatible packs without last-write-wins and unions approval requirements
+ok 3 - resolves compatible packs without last-write-wins and unions approval requirements
+  ---
+  duration_ms: 4.806811
+  type: 'test'
+  ...
+# Subtest: P-AC-05 refuses credential, endpoint, coordinate, actor-mapping and signing-key fields at every portable policy level
+ok 4 - P-AC-05 refuses credential, endpoint, coordinate, actor-mapping and signing-key fields at every portable policy level
+  ---
+  duration_ms: 0.279502
+  type: 'test'
+  ...
+# Subtest: rejects duplicate pack bindings and incompatible modes instead of choosing a winner
+ok 5 - rejects duplicate pack bindings and incompatible modes instead of choosing a winner
+  ---
+  duration_ms: 0.295542
+  type: 'test'
+  ...
+# Subtest: P-AC-11 rejects a document class mode outside the closed reference-only/projection/controlled-publication set
+ok 6 - P-AC-11 rejects a document class mode outside the closed reference-only/projection/controlled-publication set
+  ---
+  duration_ms: 0.119066
+  type: 'test'
+  ...
+# Subtest: P-AC-11 unions approval requirements so a later pack cannot downgrade an earlier pack's required approval
+ok 7 - P-AC-11 unions approval requirements so a later pack cannot downgrade an earlier pack's required approval
+  ---
+  duration_ms: 0.194994
+  type: 'test'
+  ...
+# Subtest: P-AC-11 represents a closed provider-neutral targetBinding and rejects a non-closed value
+ok 8 - P-AC-11 represents a closed provider-neutral targetBinding and rejects a non-closed value
+  ---
+  duration_ms: 0.339701
+  type: 'test'
+  ...
+# Subtest: P-AC-11 leaves targetBinding an optional key: a document class without one still validates and resolves with no targetBinding key present
+ok 9 - P-AC-11 leaves targetBinding an optional key: a document class without one still validates and resolves with no targetBinding key present
+  ---
+  duration_ms: 0.238564
+  type: 'test'
+  ...
+# Subtest: P-AC-11 refuses to merge a mismatched targetBinding for the same document class instead of choosing one
+ok 10 - P-AC-11 refuses to merge a mismatched targetBinding for the same document class instead of choosing one
+  ---
+  duration_ms: 0.250503
+  type: 'test'
+  ...
+# Subtest: P-AC-11 refuses to merge a declared targetBinding with an undeclared one for the same document class
+ok 11 - P-AC-11 refuses to merge a declared targetBinding with an undeclared one for the same document class
+  ---
+  duration_ms: 0.195135
+  type: 'test'
+  ...
+# Subtest: P-AC-11 records which pack(s) and revision(s) contributed each effective document class
+ok 12 - P-AC-11 records which pack(s) and revision(s) contributed each effective document class
+  ---
+  duration_ms: 0.171536
+  type: 'test'
+  ...
+# Subtest: P-AC-10 rejects a compliance or regulatory-assessment claim field on a portable policy pack
+ok 13 - P-AC-10 rejects a compliance or regulatory-assessment claim field on a portable policy pack
+  ---
+  duration_ms: 0.129227
+  type: 'test'
+  ...
+1..13
+# tests 13
+# suites 0
+# pass 13
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 49.897722

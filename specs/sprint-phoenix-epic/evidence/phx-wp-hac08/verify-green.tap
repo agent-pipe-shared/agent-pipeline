@@ -1,0 +1,226 @@
+TAP version 13
+# Subtest: accepts a bounded observational agent assumption
+ok 1 - accepts a bounded observational agent assumption
+  ---
+  duration_ms: 0.962094
+  type: 'test'
+  ...
+# Subtest: rejects free text, authority-shaped fields, and unbound supersession
+ok 2 - rejects free text, authority-shaped fields, and unbound supersession
+  ---
+  duration_ms: 0.347628
+  type: 'test'
+  ...
+# Subtest: accepts a closed command-offer journal event while preserving raw command omissions
+ok 3 - accepts a closed command-offer journal event while preserving raw command omissions
+  ---
+  duration_ms: 0.211258
+  type: 'test'
+  ...
+# Subtest: rejects command text, omitted privacy omissions, and authority-required offers without a decision
+ok 4 - rejects command text, omitted privacy omissions, and authority-required offers without a decision
+  ---
+  duration_ms: 0.149799
+  type: 'test'
+  ...
+# Subtest: R-AC-05 refuses every enumerated private field and every untyped digest at both journal boundaries
+ok 5 - R-AC-05 refuses every enumerated private field and every untyped digest at both journal boundaries
+  ---
+  duration_ms: 1.469301
+  type: 'test'
+  ...
+# Subtest: A-AC-11 preserves each enumerated assumption state as a distinct typed value
+ok 6 - A-AC-11 preserves each enumerated assumption state as a distinct typed value
+  ---
+  duration_ms: 0.197489
+  type: 'test'
+  ...
+# Subtest: A-AC-11 rejects unknown assumption states and keeps the two vocabularies unmerged
+ok 7 - A-AC-11 rejects unknown assumption states and keeps the two vocabularies unmerged
+  ---
+  duration_ms: 0.399537
+  type: 'test'
+  ...
+# Subtest: A-AC-11 leaves the assumption state optional and independent of the claim lifecycle
+ok 8 - A-AC-11 leaves the assumption state optional and independent of the claim lifecycle
+  ---
+  duration_ms: 0.271989
+  type: 'test'
+  ...
+# Subtest: A-AC-11 keeps the published schema closed and in step with the validator
+ok 9 - A-AC-11 keeps the published schema closed and in step with the validator
+  ---
+  duration_ms: 0.319689
+  type: 'test'
+  ...
+# Subtest: A-AC-05 accepts a well-formed identity record on each identity-material kind
+ok 10 - A-AC-05 accepts a well-formed identity record on each identity-material kind
+  ---
+  duration_ms: 0.364698
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects identity present on assumption with ADJ-IDENTITY-SCOPE
+ok 11 - A-AC-05 rejects identity present on assumption with ADJ-IDENTITY-SCOPE
+  ---
+  duration_ms: 0.233568
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects identity present on verification-scope with ADJ-IDENTITY-SCOPE
+ok 12 - A-AC-05 rejects identity present on verification-scope with ADJ-IDENTITY-SCOPE
+  ---
+  duration_ms: 0.137549
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects two identity entries sharing the same dimension
+ok 13 - A-AC-05 rejects two identity entries sharing the same dimension
+  ---
+  duration_ms: 0.10127
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects an empty identity array
+ok 14 - A-AC-05 rejects an empty identity array
+  ---
+  duration_ms: 0.129139
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects an identity array exceeding the seven-dimension bound
+ok 15 - A-AC-05 rejects an identity array exceeding the seven-dimension bound
+  ---
+  duration_ms: 0.138749
+  type: 'test'
+  ...
+# Subtest: A-AC-05 rejects an unrecognized dimension, provenance, or assurance value
+ok 16 - A-AC-05 rejects an unrecognized dimension, provenance, or assurance value
+  ---
+  duration_ms: 0.150089
+  type: 'test'
+  ...
+# Subtest: A-AC-05 leaves every observational kind accepted with no identity key at all, unchanged
+ok 17 - A-AC-05 leaves every observational kind accepted with no identity key at all, unchanged
+  ---
+  duration_ms: 0.07283
+  type: 'test'
+  ...
+# Subtest: A-AC-05 keeps the published identity schema closed and in step with the validator
+ok 18 - A-AC-05 keeps the published identity schema closed and in step with the validator
+  ---
+  duration_ms: 0.167329
+  type: 'test'
+  ...
+# Subtest: A-AC-02 accepts a linked follow-up event for every assumption lifecycle transition, and end-to-end preserves the original event unchanged when one is appended
+ok 19 - A-AC-02 accepts a linked follow-up event for every assumption lifecycle transition, and end-to-end preserves the original event unchanged when one is appended
+  ---
+  duration_ms: 67.85215
+  type: 'test'
+  ...
+# Subtest: A-AC-13 rejects a duplicate journal submission deterministically and preserves canonical history exactly once, while an exact idempotent replay is a typed no-write outcome
+ok 20 - A-AC-13 rejects a duplicate journal submission deterministically and preserves canonical history exactly once, while an exact idempotent replay is a typed no-write outcome
+  ---
+  duration_ms: 61.149443
+  type: 'test'
+  ...
+# Subtest: A-AC-12 keeps downstream export/projection policy independently configurable and structurally unable to weaken what capture already admitted
+ok 21 - A-AC-12 keeps downstream export/projection policy independently configurable and structurally unable to weaken what capture already admitted
+  ---
+  duration_ms: 0.980844
+  type: 'test'
+  ...
+# Subtest: A-AC-12 fails closed before persistence for a narrower-than-portable boundary, and the restricted profile stays separate, owner-authenticated, and outside the repository
+ok 22 - A-AC-12 fails closed before persistence for a narrower-than-portable boundary, and the restricted profile stays separate, owner-authenticated, and outside the repository
+  ---
+  duration_ms: 61.559641
+  type: 'test'
+  ...
+# Subtest: A-AC-13 gives agent-kind submissions the same deterministic interrupted, concurrent, and out-of-order outcomes as the generic store
+ok 23 - A-AC-13 gives agent-kind submissions the same deterministic interrupted, concurrent, and out-of-order outcomes as the generic store
+  ---
+  duration_ms: 107.889394
+  type: 'test'
+  ...
+# Subtest: A-AC-14 verification-scope-change is a representable, distinctly named scenario
+ok 24 - A-AC-14 verification-scope-change is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.196209
+  type: 'test'
+  ...
+# Subtest: A-AC-14 escalation is a representable, distinctly named scenario
+ok 25 - A-AC-14 escalation is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.079509
+  type: 'test'
+  ...
+# Subtest: A-AC-14 fallback is a representable, distinctly named scenario
+ok 26 - A-AC-14 fallback is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.05643
+  type: 'test'
+  ...
+# Subtest: A-AC-14 redaction is a representable, distinctly named scenario
+ok 27 - A-AC-14 redaction is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.066209
+  type: 'test'
+  ...
+# Subtest: A-AC-14 retry is a representable, distinctly named scenario
+ok 28 - A-AC-14 retry is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.08186
+  type: 'test'
+  ...
+# Subtest: A-AC-14 missing-journal-availability is a representable, distinctly named scenario
+ok 29 - A-AC-14 missing-journal-availability is a representable, distinctly named scenario
+  ---
+  duration_ms: 0.056849
+  type: 'test'
+  ...
+# Subtest: H-AC-08 accepts a well-formed legacy-import-observation via the dispatched kind and the direct validator, across representative legacySourceClass/authorityProofStatus/sourceReference combinations
+ok 30 - H-AC-08 accepts a well-formed legacy-import-observation via the dispatched kind and the direct validator, across representative legacySourceClass/authorityProofStatus/sourceReference combinations
+  ---
+  duration_ms: 0.323688
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects an unrecognized legacySourceClass with ADJ-LEGACY-SHAPE
+ok 31 - H-AC-08 rejects an unrecognized legacySourceClass with ADJ-LEGACY-SHAPE
+  ---
+  duration_ms: 0.10608
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects an unrecognized authorityProofStatus
+ok 32 - H-AC-08 rejects an unrecognized authorityProofStatus
+  ---
+  duration_ms: 0.062599
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects a superseded legacy-import-observation with no supersedesEventId, with ADJ-SUPERSESSION
+ok 33 - H-AC-08 rejects a superseded legacy-import-observation with no supersedesEventId, with ADJ-SUPERSESSION
+  ---
+  duration_ms: 0.07066
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects an extra/unknown key on a legacy-import-observation
+ok 34 - H-AC-08 rejects an extra/unknown key on a legacy-import-observation
+  ---
+  duration_ms: 0.057579
+  type: 'test'
+  ...
+# Subtest: H-AC-08 rejects a sourceReferencePath escaping the repository or shaped as an absolute path
+ok 35 - H-AC-08 rejects a sourceReferencePath escaping the repository or shaped as an absolute path
+  ---
+  duration_ms: 0.09298
+  type: 'test'
+  ...
+# Subtest: H-AC-08 keeps the published legacy-import-observation schema closed and in step with the validator
+ok 36 - H-AC-08 keeps the published legacy-import-observation schema closed and in step with the validator
+  ---
+  duration_ms: 0.165339
+  type: 'test'
+  ...
+1..36
+# tests 36
+# suites 0
+# pass 36
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 362.476135

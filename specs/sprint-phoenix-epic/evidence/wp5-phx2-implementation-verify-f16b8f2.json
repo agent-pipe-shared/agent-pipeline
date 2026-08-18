@@ -1,0 +1,43 @@
+{
+  "schema": "pipeline.wp5-implementation-evidence.v1",
+  "candidate": { "commit": "f16b8f239a62f6a48d048d4b720bc1c8237ddfb2", "tree": "61816c4e9c8ac36672002a08ba64fb07bbf51b2a" },
+  "base": "7e8983f8c56c39c6d30a691849f7850a54ce0159",
+  "generatedAt": "2026-08-07T14:25:48Z",
+  "checks": [
+    {
+      "command": "node plugins/pipeline-core/lib/external-push-ledger.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "20/20 checks passed."
+    },
+    {
+      "command": "node plugins/pipeline-core/hooks/guard-push-external-ledger.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "6/6 passed."
+    },
+    {
+      "command": "node harness/scripts/pipeline-state-external-push-ledger.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "5/5 checks passed."
+    },
+    {
+      "command": "node plugins/pipeline-core/lib/worktree-lifecycle.test.mjs",
+      "exitCode": 0,
+      "resultSummary": "34/34 checks passed."
+    },
+    {
+      "command": "node harness/scripts/check-doc-contracts.mjs",
+      "exitCode": 0,
+      "resultSummary": "Documentation contracts valid: 471 Markdown file(s), 776 link(s), 13 anchor check(s)."
+    },
+    {
+      "command": "node harness/scripts/check-observation-governance.mjs",
+      "exitCode": 0,
+      "resultSummary": "Observation governance valid: 132 document(s) classified."
+    },
+    {
+      "command": "node harness/scripts/security-scan.mjs --root <worktree>",
+      "exitCode": 0,
+      "resultSummary": "First attempt without --root exited 2 (BLOCKING): all four scanners reported working-tree-not-clean because root resolution followed the shared git-common-dir back to the main checkout, which has 3 permanently-dirty convention files by repo convention. Retried with --root pointing explicitly at the detached worktree: gitleaks OK (0 findings), osv-scanner SKIPPED (no package sources found -- expected, repo has no package.json/npm deps), semgrep OK (0 findings), license-check OK (0 findings). Verdict: CLEAN -> exit 0."
+    }
+  ]
+}

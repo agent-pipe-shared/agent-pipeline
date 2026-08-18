@@ -1,0 +1,15 @@
+feat(pipeline-core): detect cursor rollback in the governance export outbox cross-state write path
+
+E-AC-08 names 8 defect classes that must fail typed; cursor rollback was
+the one gap. persistGovernanceExportOutbox now rejects a genuine
+next.cursor < current.cursor decrease with a new GEOS-CURSOR-ROLLBACK
+code, additive alongside the existing GEOS-TRUNCATION check. Cursor
+staying the same or advancing by any amount remains fully legal.
+
+11/11 governance-export-outbox-store-tests pass (5 new cases); 12/12
+governance-export-outbox-tests pass unchanged (untouched sibling
+module). Evidence map E-AC-08 flipped partial->implemented; snapshot
+totals sum to 157.
+
+Dispatch: PHX-WP-EAC08 (goldfish)
+AI-Assisted: true
