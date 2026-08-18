@@ -89,5 +89,17 @@ check("a schema failure unrelated to the context (e.g. wrong top-level shape) st
   assert.equal(checked.code, "RH-SCHEMA");
 });
 
+// RH-SCHEMA-DIAG-2. A fully-valid `context` with an invalid `createdAt` must NOT
+// be blamed on context: resumeHintContextDetail() would find nothing wrong and
+// fall through to its generic "context is not accepted in this shape", which is
+// false -- context WAS accepted; createdAt was the actual problem.
+check("RH-SCHEMA-DIAG-2: an invalid createdAt with a fully-valid context does not blame context", () => {
+  assert.throws(() => buildResumeHint({ context: BASE, createdAt: "not-a-date" }), (error) => {
+    assert.doesNotMatch(error.message, /context is not accepted in this shape/u, "must not falsely blame a valid context");
+    assert.equal(error.message, "RH-SCHEMA", "falls back to the bare code since the cause is createdAt, not context");
+    return true;
+  });
+});
+
 console.log(`\nresume-hint: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

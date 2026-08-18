@@ -88,9 +88,15 @@ export function resumeHintContextDetail(value) {
 
 export function validateResumeHint(value) {
   if (!exact(value, ["schema", "nonAuthoritative", "context", "createdAt", "basis", "contentSha256"])
-    || value.schema !== RESUME_HINT_SCHEMA || value.nonAuthoritative !== true
-    || !validContext(value.context) || Buffer.byteLength(canonical(value.context), "utf8") > RESUME_HINT_MAX_BYTES
-    || !validTimestamp(value.createdAt) || !validBasis(value.basis) || !SHA256.test(value.contentSha256)) return { ok: false, code: "RH-SCHEMA" };
+    || value.schema !== RESUME_HINT_SCHEMA || value.nonAuthoritative !== true) {
+    return { ok: false, code: "RH-SCHEMA", cause: "shape" };
+  }
+  if (!validContext(value.context) || Buffer.byteLength(canonical(value.context), "utf8") > RESUME_HINT_MAX_BYTES) {
+    return { ok: false, code: "RH-SCHEMA", cause: "context" };
+  }
+  if (!validTimestamp(value.createdAt)) return { ok: false, code: "RH-SCHEMA", cause: "createdAt" };
+  if (!validBasis(value.basis)) return { ok: false, code: "RH-SCHEMA", cause: "basis" };
+  if (!SHA256.test(value.contentSha256)) return { ok: false, code: "RH-SCHEMA", cause: "contentSha256" };
   const { contentSha256, ...unsigned } = value;
   return digest(unsigned) === contentSha256 ? { ok: true, code: "RH-VALID" } : { ok: false, code: "RH-DIGEST" };
 }
@@ -100,9 +106,14 @@ export function buildResumeHint({ context, basis = null, createdAt = new Date().
   const candidate = { ...unsigned, contentSha256: digest(unsigned) };
   const checked = validateResumeHint(candidate);
   // The code stays the contract; the clause after it is what makes a rejection
-  // actionable -- see resumeHintContextDetail() above.
+  // actionable -- see resumeHintContextDetail() above. Only a genuinely
+  // context-caused RH-SCHEMA gets the context-specific detail clause; every
+  // other cause (createdAt, basis, top-level shape, contentSha256 shape) falls
+  // back to the bare code rather than a false "context is not accepted" claim.
   if (!checked.ok) {
-    throw new Error(checked.code === "RH-SCHEMA" ? `${checked.code}: ${resumeHintContextDetail(context)}` : checked.code);
+    throw new Error(checked.code === "RH-SCHEMA" && checked.cause === "context"
+      ? `${checked.code}: ${resumeHintContextDetail(context)}`
+      : checked.code);
   }
   return candidate;
 }
