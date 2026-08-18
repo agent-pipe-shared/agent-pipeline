@@ -1,0 +1,8 @@
+fix(phoenix): drop stale cancellation kind from published lifecycle-event schema
+
+Removes the third hand-duplicated cancellation value from the published
+kind enum so it matches the canonical KINDS Set in
+lifecycle-governance-events.mjs. Closes the backlog item tracking this drift.
+
+Dispatch: PHX-WP-LAC08-CANCELFIX (goldfish)
+AI-Assisted: true

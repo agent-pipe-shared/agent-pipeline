@@ -1,0 +1,11 @@
+docs(backlog): defer 7 items confirmed out of Phoenix's own epic scope
+
+Mechanical disposition transcription per PO-decided triage table
+(PHX-WP-BACKLOG-BULK-DISPOSE): each item's frontmatter status set to
+deferred and its Triage section filled with the pre-decided rationale
+and revisit condition. 6 further Group B items were skipped because
+their on-disk Triage sections already carried a conflicting prior
+decision (stop condition, not silently overwritten).
+
+Dispatch: PHX-WP-BACKLOG-BULK-DISPOSE (goldfish)
+AI-Assisted: true

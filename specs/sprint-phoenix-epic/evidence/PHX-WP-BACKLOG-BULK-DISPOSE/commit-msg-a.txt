@@ -1,0 +1,11 @@
+docs(backlog): close 14 items already fixed in Phoenix or superseded by Nova
+
+Mechanical disposition transcription per PO-decided triage table
+(PHX-WP-BACKLOG-BULK-DISPOSE): each item's frontmatter status set to
+closed and its Triage section filled with the pre-decided rationale.
+8 further Group A items were skipped because their on-disk Triage
+sections already carried a conflicting prior decision (stop condition,
+not silently overwritten).
+
+Dispatch: PHX-WP-BACKLOG-BULK-DISPOSE (goldfish)
+AI-Assisted: true

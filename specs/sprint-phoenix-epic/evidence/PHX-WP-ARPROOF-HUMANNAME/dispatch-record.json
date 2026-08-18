@@ -1,0 +1,17 @@
+{
+  "taskId": "PHX-WP-ARPROOF-HUMANNAME",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "goldfish",
+  "outcome": "done",
+  "log": [
+    { "phase": "read context files", "toolUses": 4 },
+    { "phase": "applied fix to authority-revision-proof.mjs (ownTrustPolicy helper + call site swap)", "toolUses": 6 },
+    { "phase": "extended authority-revision-proof.test.mjs with 5 mirrored test cases", "toolUses": 7 },
+    { "phase": "ran node --test authority-revision-proof.test.mjs: 11/11 pass, 0 fail", "toolUses": 9 },
+    { "phase": "wrote new backlog item 2026-08-18-authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had.md", "toolUses": 10 },
+    { "phase": "commit a3d3f345: fix + tests + backlog item", "toolUses": 13 },
+    { "phase": "follow-up commit 0ab1bcdb: record closure commit SHA in backlog item (SHA only knowable after the first commit)", "toolUses": 16 }
+  ],
+  "report": "See final assistant message for the full 6-field report."
+}
