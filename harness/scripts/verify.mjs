@@ -281,6 +281,7 @@ const TEST_SUITES = [
   { name: "host-advisor-workspace-tests", file: join(pluginScriptsDir, "host-advisor-workspace.test.mjs") },
   { name: "codex-plugin-validator-parity-tests", file: join(pluginScriptsDir, "codex-plugin-validator-parity.test.mjs") },
   { name: "worktree-lifecycle-tests", file: join(libDir, "worktree-lifecycle.test.mjs") },
+  { name: "worktree-create-tests", file: join(pluginScriptsDir, "worktree-create.test.mjs") },
   { name: "lifecycle-ready-enforcement-tests", file: join(pluginScriptsDir, "lifecycle-ready-enforcement.test.mjs") },
   // Walks the gate: mandatory AND satisfiable, for both runners. Unit suites were
   // green while the gate was unwired on Claude and its own remediation was refused.
