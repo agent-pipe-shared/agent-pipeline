@@ -245,7 +245,7 @@
 | pipeline.unregistered-suite-is-red-and-invisible-to-verify | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.verify-authorship-defaults-to-source-markers-not-behavior | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.verify-evidence-has-no-producer | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.verify-gate-scoped-registration | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.verify-gate-scoped-registration | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.warn-security-gate-hard-blocks-every-push | closed | defect | pipeline | 2026-08-09 | — |
@@ -262,5 +262,5 @@
 ## Counts
 
 - open: 85
-- in_progress: 15
-- closed: 153
+- in_progress: 14
+- closed: 154

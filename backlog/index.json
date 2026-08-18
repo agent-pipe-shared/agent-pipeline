@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "661b97ad89b990f3b26ad262fe0fe3b19a73bb5839f99054b4b624edaa01c9ca"
+    "transitionHead": "d21aa30e7df353cccb2d3af09bda9547570a9a2e05a95c1a8278ef50fcaf42c3"
   },
   "counts": {
     "open": 85,
-    "in_progress": 15,
-    "closed": 153
+    "in_progress": 14,
+    "closed": 154
   },
   "items": [
     {
@@ -2521,12 +2521,16 @@
     },
     {
       "id": "pipeline.verify-gate-scoped-registration",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; no completion claim.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "60dc7e34",
+      "closureEvidence": "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs"
     },
     {
       "id": "pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls",

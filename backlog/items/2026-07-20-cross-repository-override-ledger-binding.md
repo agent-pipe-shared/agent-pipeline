@@ -115,3 +115,19 @@ evidence rather than silently retained.
   consumption, and ledger append to one physical target repository; fail
   closed if the target ledger cannot be written).
 - **Date:** 2026-08-18
+
+### Ownership reconciliation, 2026-08-18 — resolved: this item is Nova-owned, dispatched
+
+Cyborg is a closed sprint; investigated directly rather than left
+ambiguous. `CYB-5c` does NOT supersede this item: `git show fdbcf61`/
+`72c1e83` ("bind override ledger to command target", "reject git
+environment target overrides") patch `guard-git.mjs`, an older, different
+mechanism — not `human-guard-override.mjs`, the file this item's own
+2026-08-18 trace confirmed still carries the exact live bug
+(`recordHumanGuardDenial()`/`consumeHumanGuardOverride()` computing
+`topology()`'s root from the coordinator's `rootDir` before the
+cross-repository target is resolved). Since Cyborg will never be
+revisited, this is now unambiguously Nova/pipeline-owned. Dispatched
+`NVA-CROSSREPOLEDGER-1` (goldfish-deep, guardrail-tier: touches
+`human-guard-override.mjs`, the ledger-binding kernel this session's own
+GMW work spent all night hardening).
