@@ -226,11 +226,20 @@ acknowledgment that extraction is complete.
   the `--acknowledge-extraction-done` refusal fires for an un-acknowledged
   repository. `close-block/SKILL.md` gained step 6d pointing at the new
   script. **Not done:** the guard hook is NOT wired into `hooks.json` (TP-4
-  protected, no in-session override) — the exact wiring snippet is recorded
+  protected, no in-session override) — the exact wiring snippet was recorded
   in `evidence/dispatch-record-NVA-HANDOVER-ROT-1.json`'s `report` field,
   awaiting an authorized session. **Owner:** pipeline. **Due:** 2026-09-08
   (three weeks out; a TP-4 wiring ceremony, not tied to any other sprint
   milestone).
+- **Correction, 2026-08-18 (`NVA-W2-7`):** the pointer above is now stale —
+  `evidence/` is gitignored (ADR-0063, machine-regenerated evidence), so
+  that dispatch record does not survive into a fresh checkout of this
+  repository and no longer exists. `NVA-W2-7` re-attempted the identical
+  wiring edit, confirmed the same live TP-4 refusal, and the current exact
+  edit is recorded in that dispatch's own report (`pendingProtectedEdit`)
+  and in the backlog item's `2026-08-18 (wave 2, dispatch NVA-W2-7)`
+  section — read those for the exact snippet, not the now-missing evidence
+  file. Still not wired; still awaiting an authorized/signed ceremony.
 - **New, discovered during the above (see Correction section):** reconcile
   `rotate-handover-sections.mjs` (candidate 2, heuristic/close-time,
   monthly archive buckets) and `handover-rotate.mjs` (this ADR's own
