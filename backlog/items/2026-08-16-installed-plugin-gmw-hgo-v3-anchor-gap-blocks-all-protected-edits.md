@@ -3,10 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-16
 source: "Found 2026-08-16 overnight: a real, correctly-signed, correctly-scoped GMW window (TP-1..TP-12, ~3.7h TTL) was installed, but every single edit it should have covered was refused by the live guard hooks. Traced to source, not guessed."
 due: 2026-08-20
+closed_at: 2026-08-18
+closure_repository: nova
+closure_evidence: "confirmed directly against ~/agent-pipeline-local-marketplace/plugins/pipeline-core/lib/{guard-maintenance-window,human-guard-override}.mjs (NVA-GMWFIX-2 / NVA-HGOFIX-1)"
 ---
 
 # The installed plugin's GMW window and HGO override ceremonies cannot clear ANY protected-path edit in this repository, because their trust-anchor read is unpatched for schema v3
@@ -102,7 +105,7 @@ re-investigation needed once this unblocks.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed (superseded, resolved elsewhere)
+- **Rationale:** confirmed 2026-08-18 by directly reading the CURRENT installed marketplace distribution: `~/agent-pipeline-local-marketplace/plugins/pipeline-core/lib/guard-maintenance-window.mjs` now checks `Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0` (no remaining `policy.trustAnchor === null` singular-only path), and `lib/human-guard-override.mjs` carries a v3-array-first read with a v2-singular fallback, its own comment naming the exact fix: "NVA-HGOFIX-1: this used to read the legacy SINGULAR `policy.trustAnchor` field only". The Nova branch (`origin/feat/sprint-nova-codex-v046`) authored and shipped this fix under `NVA-GMWFIX-2`/`NVA-HGOFIX-1`; this machine's installed distribution has since been refreshed from that work. The gap this item reported no longer exists.
+- **Assignment (if accepted):** n/a — not accepted, already resolved by Nova's own fix.
+- **Date:** 2026-08-18
