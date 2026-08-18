@@ -100,7 +100,26 @@ Not designed here. Candidates, explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
+- **Decision:** Deferred in Phoenix, not implemented here. The design
+  question this item asks (candidate 3: a fail-closed route pre-check before
+  substantive review, extended from Critic to `goldfish-deep`) has already
+  been decided and proven out — but in the sibling Nova checkout, not this
+  one.
+- **Rationale:** The PO's standing instruction for this session was to do
+  further Phoenix work "but only things not already solved in Nova, or
+  already implemented there." Nova's `plugins/pipeline-core/agents/critic.md`
+  carries a "Route pre-check before substantive review (A/G/S dispatches...)"
+  block (commit `08684e78`, "fix(agents): stop A/G/S dispatches before review
+  on an evidenced route mismatch") that is not on this branch — confirmed:
+  `git merge-base --is-ancestor 08684e78 HEAD` exits 1 here, and Phoenix's own
+  `critic.md` still jumps straight from the identity-disclosure line to
+  `## Two-phase protocol` with no route pre-check. Porting that fix into
+  Phoenix would be exactly the duplicate work the standing instruction asked
+  to skip. The frontmatter model pin itself is unchanged by design in both
+  repos (candidate 2, removing the pin, was deliberately not chosen).
+- **Assignment (if accepted):** Not assigned in Phoenix. If Phoenix and Nova
+  are ever reconciled/merged, porting Nova's `08684e78` (or re-deriving the
+  same fix independently) closes this item; until then it stays open here as
+  a known, deliberately-unported gap rather than a rediscovered one.
+- **Date:** 2026-08-18
 - **Date:**
