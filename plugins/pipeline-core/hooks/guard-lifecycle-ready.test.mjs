@@ -2971,6 +2971,47 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
 });
 
+// NVA-W4-01B: the flat per-command chain above stays exactly as pinned by the assertions in
+// the previous test -- the bounded, copy-safe rendering is appended AFTER it, never in place
+// of it, so a terminal that wrapped a line mid-path or mid-digest still has a copy-safe
+// alternative to fall back to.
+test("NVA-W4-01B: the denial also carries a bounded copy-safe rendering of the ceremony steps, appended after the flat chain", () => {
+  const roots = [];
+  try {
+    const command = "rg -n lifecycle . && touch output.txt";
+
+    const sigRoot = hgoGitFixture("signature");
+    roots.push(sigRoot);
+    const sigResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: sigRoot });
+    assert.equal(sigResult.exitCode, 2);
+    assert.match(sigResult.stderr, /Bounded copy-safe rendering of the plan step/u);
+    assert.match(sigResult.stderr, /Bounded copy-safe rendering of the prepare-authorization step/u);
+    assert.match(sigResult.stderr, /Bounded copy-safe rendering of the emit-signature-digest step/u);
+    assert.match(sigResult.stderr, /Bounded copy-safe rendering of the authorize-by-signature step/u);
+    assert.doesNotMatch(sigResult.stderr, /Bounded copy-safe rendering of the authorize step/u,
+      "signature mode has no in-session activate step; nothing to bound-render for it");
+    assert.match(sigResult.stderr, /eval "\$CMD"/u);
+    // The bounded block sits strictly after the flat chain, not interleaved with it: the
+    // last flat-chain command (authorize-by-signature's full argv) still appears before the
+    // first "Bounded copy-safe rendering" headline.
+    const flatIndex = sigResult.stderr.indexOf("authorize-by-signature --repo");
+    const boundedIndex = sigResult.stderr.indexOf("Bounded copy-safe rendering");
+    assert.ok(flatIndex !== -1 && boundedIndex !== -1 && flatIndex < boundedIndex,
+      `expected the flat chain before the bounded block:\n${sigResult.stderr}`);
+
+    const chatRoot = hgoGitFixture("chat");
+    roots.push(chatRoot);
+    const chatResult = evaluateLifecycleReadyGuard(bash(command), { projectDir: chatRoot });
+    assert.equal(chatResult.exitCode, 2);
+    assert.match(chatResult.stderr, /Bounded copy-safe rendering of the plan step/u);
+    assert.match(chatResult.stderr, /Bounded copy-safe rendering of the prepare-authorization step/u);
+    assert.match(chatResult.stderr, /Bounded copy-safe rendering of the authorize step/u);
+    assert.doesNotMatch(chatResult.stderr, /Bounded copy-safe rendering of the authorize-by-signature step/u,
+      "chat mode has no signing step; nothing to bound-render for it");
+    assert.doesNotMatch(chatResult.stderr, /Bounded copy-safe rendering of the emit-signature-digest step/u);
+  } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
+});
+
 test("NOVA-LCR-HGO-1: an unusable override store leaves the plain grammar refusal exactly as it was", () => {
   const path = root();
   try {

@@ -30,6 +30,7 @@ import {
 // module. See pushRecoveryTarget() below for the bounded local equivalent.
 import { stripQuotedSegments, tokenizeArgv } from "./git-cmd.mjs";
 import { createPoApprovalIntent } from "./po-approval-proof.mjs";
+import { boundedOpaqueCopyCommand } from "./project-onboarding-v3.mjs";
 import {
   LEGACY_STATE,
   NEUTRAL_STATE,
@@ -1418,11 +1419,25 @@ function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
           kind: "external-operator",
           executionBoundary: "separate-session-rooted-at-exact-target",
           invocation: "user-copy-only",
+          // NVA-W4-01B: by the time `code` reaches this branch, eligibility() has already
+          // run its secret screen (it returns HGO-NONOVERRIDABLE-SECRET first, before ever
+          // reaching HGO-NONOVERRIDABLE-PATH/CROSS-BOUNDARY) -- so a Bash command's literal
+          // text is safe to disclose here exactly like commandDisclosureFields() in
+          // codex-pretool-guard.mjs already does for its own class of denial. Non-Bash tools
+          // (Edit/Write) have no `command` field at all; `toolInputSha256` above stays the
+          // only disclosure for those, unchanged.
           action: {
             toolName,
             toolInputSha256: sha(toolInput),
             sourceRepositoryRoot: root,
             targetPaths: paths,
+            ...(toolName === "Bash" && command.length > 0
+              ? (() => {
+                let copyCommand = null;
+                try { copyCommand = boundedOpaqueCopyCommand(command); } catch { copyCommand = null; }
+                return { command, copyCommand };
+              })()
+              : { command: null, copyCommand: null }),
           },
           reason: "the target is outside this project's physical authority boundary",
         },

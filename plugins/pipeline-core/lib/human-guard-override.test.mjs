@@ -1072,6 +1072,66 @@ test("security and authority boundaries return typed recovery without an ambient
   }
 });
 
+// NVA-W4-01B: HGO-EXTERNAL-PROJECT-BOUNDARY's `nextAction.action` used to disclose only
+// `toolInputSha256` for a Bash command reaching this branch, leaving the human operator no
+// way to reconstruct the exact denied command without independently re-deriving it. It now
+// also carries the literal `command` plus a bounded, copy-safe `copyCommand` rendering of it
+// (boundedOpaqueCopyCommand()), mirroring codex-pretool-guard.mjs's own commandDisclosureFields()
+// for its equivalent denial class. Non-Bash tools (Edit/Write) have no `command` field at
+// all and keep the unchanged toolInputSha256-only disclosure.
+test("NVA-W4-01B: HGO-EXTERNAL-PROJECT-BOUNDARY discloses a bounded copy-safe rendering of the exact denied Bash command", () => {
+  const root = fixture();
+  try {
+    // Same in-root-symlink-escape shape as the "security and authority boundaries" test's
+    // `linked/escape.txt` Write row above (a symlink whose real target stays inside root,
+    // so it fails safePath()'s walk without qualifying as a genuine cross-repository
+    // target) -- here reached through `node --check <path>`, the one Bash shape that
+    // routes a single argument through classifyPath() the same way. `cat .git/config`
+    // was tried first and does NOT reach this branch: protectedPath() matches every
+    // `.git/`-prefixed path (human-guard-override.mjs:920), so recoveryRoute() always
+    // takes the OTHER half of the `protectedTarget` branch (narrower-recovery-required,
+    // HGO-NARROWER-WRITER-REQUIRED) for it, never HGO-EXTERNAL-PROJECT-BOUNDARY.
+    mkdirSync(join(root, "physical"), { recursive: true });
+    symlinkSync(join(root, "physical"), join(root, "linked"), "dir");
+    writeFileSync(join(root, "physical", "escape.txt"), "shared\n");
+    const toolInput = { command: "node --check linked/escape.txt" };
+    const observed = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Bash",
+      toolInput,
+      denials: denial,
+    });
+    assert.equal(observed.status, "external-operator-required");
+    assert.equal(observed.code, "HGO-EXTERNAL-PROJECT-BOUNDARY");
+    assert.equal(observed.nextAction.action.command, toolInput.command);
+    assert.equal(typeof observed.nextAction.action.copyCommand, "object");
+    assert.equal(observed.nextAction.action.copyCommand.maxColumns > 0, true);
+    assert.equal(typeof observed.nextAction.action.copyCommand.posix, "string");
+    assert.match(observed.nextAction.action.copyCommand.posix, /eval "\$CMD"/u);
+
+    // A non-Bash tool (no `command` field at all) keeps the pre-existing disclosure shape:
+    // both new fields present but explicitly null, never omitted or invented. Same hardlink
+    // fixture the "security and authority boundaries" test above uses to reach this exact
+    // status for a Write.
+    mkdirSync(join(root, "physical"), { recursive: true });
+    writeFileSync(join(root, "physical", "linked-source.txt"), "shared\n");
+    linkSync(join(root, "physical", "linked-source.txt"), join(root, "hardlinked.txt"));
+    const writeObserved = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput: { file_path: "hardlinked.txt", content: "x" },
+      denials: denial,
+    });
+    assert.equal(writeObserved.status, "external-operator-required");
+    assert.equal(writeObserved.nextAction.action.command, null);
+    assert.equal(writeObserved.nextAction.action.copyCommand, null);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("every push-guard denial routes to an exact publication preflight even through an alias", () => {
   const root = fixture();
   try {
