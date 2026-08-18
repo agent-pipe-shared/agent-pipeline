@@ -680,6 +680,78 @@ test("closed command grammar preserves native Windows paths and direct node.exe 
   ), true);
 });
 
+// backlog: 2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-
+// tool-shell.md. Claude's Bash tool always runs through Git-Bash/POSIX, never natively
+// through cmd.exe/PowerShell, even on a Windows host -- so guard-lifecycle-ready.mjs's own
+// un-optioned parseGuardCommand() call sites must select the POSIX dialect (and therefore
+// expand `$PWD`/`${PWD}`) regardless of what `process.platform` reports. `process.platform`
+// is forced to "win32" for the duration of each assertion below (restored in `finally`,
+// mirroring lib/po-gate-profile-publisher.test.mjs) precisely to prove that: this is the
+// actual reported regression (a real Windows-host session), not merely a hypothetical.
+test("Claude/Bash-path command parsing ignores a win32 host: $PWD expands and POSIX grammar governs", () => {
+  const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
+  Object.defineProperty(process, "platform", { value: "win32", configurable: true });
+  const path = root();
+  try {
+    // retryActionsForDeniedCommand() (guard-lifecycle-ready.mjs) exposes the parsed argv
+    // directly: a bare `$PWD` token must resolve to the guard's own root, not survive as the
+    // literal 4-character string "$PWD" -- the exact silent-failure shape the backlog item
+    // reports (docs' own `--root "$PWD"` recovery commands).
+    assert.deepEqual(retryActionsForDeniedCommand(`pwd -P; sha256sum "$PWD"`, path), [
+      {
+        executable: "pwd",
+        argv: ["-P"],
+        mutation: false,
+        requiresConfirmation: false,
+        executionBoundary: "separate-tool-call",
+        expected: { exitCodes: [0, 1] },
+      },
+      {
+        executable: "sha256sum",
+        argv: [path],
+        mutation: false,
+        requiresConfirmation: false,
+        executionBoundary: "separate-tool-call",
+        expected: { exitCodes: [0, 1] },
+      },
+    ]);
+
+    // The main Bash grammar gate (evaluateLifecycleReadyGuard) must keep applying POSIX
+    // expansion rules too: a non-`$PWD` variable reference is refused with
+    // GUARD-PARSE-UNSUPPORTED under the POSIX dialect (parseGuardCommand()'s own closed
+    // grammar only ever substitutes the literal `$PWD`/`${PWD}` token, denying every other
+    // `$`-expansion). Under the windows-direct dialect this bug selects from a bare win32
+    // host, `$` is never treated as an expansion trigger at all, so the same command would
+    // parse as an ordinary (wrong) literal argument instead of being denied -- this
+    // assertion would not hold without the fix.
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const result = evaluateLifecycleReadyGuard(bash('echo "$FOO"'), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u);
+
+    // Named follow-on effect 1 (Proposal): the bounded rg/head diagnostic pipeline's
+    // `.exe`-naming exception is untouched by this fix -- it is selected by dialectFor()'s
+    // own CONTENT-based heuristic (a literal `.exe`-suffixed executable in the command
+    // text), not by the platform argument this fix hardcodes, so it still fires correctly
+    // through this same patched call site (isReadOnlyDiagnosticCommand) even though the
+    // platform value it now passes is never "win32".
+    assert.equal(
+      isReadOnlyDiagnosticCommand("rg.exe -n lifecycle . 2>NUL | head.exe -n 20", path),
+      true,
+    );
+    // Named follow-on effect 2 (Proposal): `2>/dev/null` on the ordinary (non-`.exe`) POSIX
+    // shape -- the shape Claude's actual Git-Bash-run commands use -- keeps working
+    // identically through the same patched call site.
+    assert.equal(
+      isReadOnlyDiagnosticCommand("rg -n lifecycle . 2>/dev/null | head -n 20", path),
+      true,
+    );
+  } finally {
+    Object.defineProperty(process, "platform", originalPlatform);
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
 test("only bounded rg search pipelines and platform null redirect are read-only", () => {
   const path = root();
   try {

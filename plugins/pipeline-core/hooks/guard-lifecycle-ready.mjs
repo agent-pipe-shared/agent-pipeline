@@ -134,6 +134,20 @@ const WRITE_TOOLS = ["Edit", "Write", "NotebookEdit"];
 // Both shells this hook is wired for. PowerShell was named in the matcher but in no
 // decision, which made the whole gate a no-op on the runner that uses it.
 const SHELL_TOOLS = ["Bash", "PowerShell"];
+// backlog: 2026-08-17-command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-
+// tool-shell.md. Claude's Bash tool always executes through Git-Bash/POSIX, on every host
+// including Windows -- process.platform reflects the HOST operating system, never the
+// actual shell dialect the tool runs commands through. parseGuardCommand()'s own default
+// (guard-command-grammar.mjs: `{ platform = process.platform } = {}`) is therefore the
+// wrong signal for every call site below that parses a raw Bash command string; each now
+// threads this fixed, never-"win32" value explicitly instead of falling through to that
+// default. dialectFor()'s own CONTENT-based Windows heuristics (a drive-letter prefix, an
+// `.exe`-suffixed executable, a `Get-Content` prefix) are untouched by this -- they still
+// select a Windows dialect for a literal Windows-shaped command string regardless of this
+// constant. Scoped to guard-lifecycle-ready.mjs's own un-optioned parseGuardCommand() call
+// sites only; codex-pretool-guard.mjs already threads its own explicit platform and is out
+// of this item's scope.
+const CLAUDE_BASH_SHELL_DIALECT_PLATFORM = "linux";
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
   "repository-control-path-invalid",
@@ -937,7 +951,7 @@ export function isRestartResumeHintCapture(command, root, options = {}) {
  * substitution.
  */
 export function isReadOnlyDiagnosticCommand(command, root) {
-  const parsed = parseGuardCommand(command, root);
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   if (isBoundedReadOnlyPipeline(parsed, root, BOUNDED_PIPELINE_ADDITIONAL_ROOTS)) return true;
   const words = simpleWords(command, root);
   if (!words || words.length === 0) return false;
@@ -1094,7 +1108,7 @@ export function retryActionsForDeniedCommand(command, root) {
   if (parts.some((part) => part === "")) return [];
   const actions = [];
   for (const part of parts) {
-    const parsed = parseGuardCommand(part, root);
+    const parsed = parseGuardCommand(part, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
     if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
       || parsed.operators.length !== 0 || parsed.redirects.length !== 0
       || !isReadOnlyDiagnosticCommand(part, root)) return [];
@@ -1292,7 +1306,7 @@ function isHumanPoSigningCommand(command, root) {
  * allowlist; unknown commands do not gain mutation authority from this helper.
  */
 export function isForbiddenCrossRepositoryMutation(command, root, dependencies = {}) {
-  const parsed = parseGuardCommand(command, root);
+  const parsed = parseGuardCommand(command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
   if (isAgentPoPublicCommand(command, root)) return false;
   const poArgs = poApprovalArgs(command, root, PO_APPROVAL_GATE_SCRIPT);
   if (poArgs !== null) {
@@ -2212,7 +2226,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   // file. A capability spent on a command later refused downstream stays spent; its
   // consumption is surfaced in the denial below rather than left to vanish silently.
   if (toolName === "Bash") {
-    const parsed = parseGuardCommand(input.tool_input.command, root);
+    const parsed = parseGuardCommand(input.tool_input.command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
     if (parsed.parseStatus !== "accepted") {
       const code = "GUARD-PARSE-UNSUPPORTED";
       const route = humanOverrideRoute(
