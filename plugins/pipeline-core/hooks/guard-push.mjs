@@ -168,6 +168,7 @@ function projectCalibrationRelPath(rootDir) {
   return projectAuthorityRelPath(rootDir, "calibration", NEUTRAL_CALIBRATION, LEGACY_CALIBRATION);
 }
 import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
+import { VERIFY_EVIDENCE_DEFAULT_PATH } from "../lib/verify-evidence-path.mjs";
 
 // The plugin root this guard is itself running from -- same self-location resolution
 // guard-lifecycle-ready.mjs / guard-human-override.mjs already use (`resolve(dirname(
@@ -1607,7 +1608,7 @@ try {
   }
 
   // (a) verify evidence -- always checked once the push gate is active.
-  failures.push(...checkEvidenceFreshness("evidence/verify-latest.json"));
+  failures.push(...checkEvidenceFreshness(VERIFY_EVIDENCE_DEFAULT_PATH));
 
   // (b) security evidence -- only when a security gate is configured and not "off".
   // PUSHWARN-1: pushed into securityFailures, NOT failures -- this bucket is dispatched
