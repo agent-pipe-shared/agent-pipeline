@@ -11,6 +11,7 @@ import { gateConfig } from "./manifest.mjs";
 import {
   applyProjectOnboardingLifecycleV4,
   applyProjectOnboardingV3,
+  freshManifestBytes,
   planProjectOnboardingLifecycleV4,
   planProjectOnboardingV3,
 } from "./project-onboarding-v3.mjs";
@@ -136,6 +137,40 @@ record("legacy migration seeds every absent Claude runtime subset without wideni
         assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /session:\n  keep_awake: true\n/u);
       } finally { rmSync(root, { recursive: true, force: true }); }
     }
+  }
+});
+
+record("legacy first materialization of an absent .claude/pipeline.yaml resolves gates from the single fresh-manifest owner", () => {
+  // Regression for backlog/items/2026-08-08-two-manifest-literals-still-bypass-
+  // the-single-seed-owner.md (wave-2 investigation, 2026-08-18): a legacy
+  // (v0/v1/v2) source whose ".claude/pipeline.yaml" runtime target has never
+  // been materialized, and which has not adopted the neutral
+  // "project/pipeline.yaml" tier either, is a genuinely reachable branch where
+  // a second manifest literal used to actually reach disk (unlike the
+  // host-managed-Codex branch, whose ".claude/*" targets are filtered out
+  // before writing -- see the "a host-managed-Codex fresh-project apply..."
+  // test above). Before this fix, this branch wrote a manifest with NO gates
+  // chapter at all.
+  const expectedGate = gateConfig(parseYaml(freshManifestBytes()), "dev-plan");
+  assert.notEqual(expectedGate, null, "freshManifestBytes() must itself seed a live dev-plan gate");
+  const sources = [
+    ["v0", () => yaml(publicLegacyIntent())],
+    ["v1", () => renderUserYaml(buildDefaultAnswers())],
+    ["v2", () => yaml(v2Intent())],
+  ];
+  for (const [sourceKind, source] of sources) {
+    const root = fixture(source(), { omitRuntime: [".claude/pipeline.yaml"] });
+    try {
+      const plan = planRunnerProfileMigrationV3({ rootDir: root });
+      assert.equal(plan.status, "ready", `${sourceKind} must plan with .claude/pipeline.yaml absent`);
+      assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+      const written = readFileSync(join(root, ".claude/pipeline.yaml"), "utf8");
+      assert.deepEqual(
+        gateConfig(parseYaml(written), "dev-plan"),
+        expectedGate,
+        `${sourceKind} first materialization must resolve the same gate chapter as freshManifestBytes()`,
+      );
+    } finally { rmSync(root, { recursive: true, force: true }); }
   }
 });
 function snapshot(root) { return Object.fromEntries([...runtimePaths, "pipeline.user.yaml"].map((path) => {

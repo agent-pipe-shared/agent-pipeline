@@ -98,3 +98,51 @@ separate, unconfirmed finding surfaced during the same investigation (see
 `2026-08-12-host-managed-codex-apply-may-fail-its-own-target-boundary-invariant.md`)
 that should be resolved or ruled out before this item is fully closed.
 - **Date:** 2026-08-12
+
+### Design/Implementation, 2026-08-18 (wave 2, dispatch NVA-W2-5)
+
+Checked the named sibling finding
+(`2026-08-12-host-managed-codex-apply-may-fail-its-own-target-boundary-invariant.md`)
+first, per this item's own dependency note: unresolved and out of scope
+for this dispatch — does not block Direction 3, which is independent of
+it (Direction 3 is about the seed dictionaries, not the target-boundary
+invariant).
+
+**Direction 3 (assert the invariant structurally) implemented for the
+`.claude/pipeline.yaml` key**, the one both remaining literals name:
+`runner-profile-migration-v3.mjs` gained `resolveLegacyRuntimeSeed()`, a
+single function both the `legacy` (v0/v1/v2 first-materialization) and
+`hostManagedCodex` branches of `runtimeBaselines()` now call instead of
+indexing `LEGACY_V3_RUNTIME_SEEDS[".claude/pipeline.yaml"]` directly; for
+that one key it resolves through `freshManifestBytes()` (the same single
+owner `slimRuntimeSeed()` already uses), for every other key it still
+returns the literal dictionary entry unchanged.
+
+This closes the actually-reachable gap: the `legacy` branch (a v0/v1/v2
+source with no prior `.claude/pipeline.yaml`, an intentionally supported
+"cold" first materialization) was NOT covered by the 2026-08-12
+measurement above — that measurement covered only the `hostManagedCodex`
+branch, on which the write is filtered out before reaching disk. On the
+`legacy` branch nothing filters the write, so the old gates-less literal
+did reach disk for any legacy project materializing `.claude/pipeline.yaml`
+for the first time. The `hostManagedCodex` call site is also routed
+through the same function for structural consistency (Direction 3's own
+"one dictionary, one owner" ask), even though that branch's write is
+still filtered and therefore inert either way.
+
+Direction 2 (separating fresh-vs-repair manifest semantics) remains
+open — not attempted, genuinely a separate design question this fix does
+not resolve.
+
+New regression test
+(`runner-profile-migration-v3.test.mjs`, "legacy first materialization of
+an absent .claude/pipeline.yaml resolves gates from the single
+fresh-manifest owner") drives all three legacy source kinds (v0/v1/v2)
+through a fixture with `.claude/pipeline.yaml` omitted and asserts the
+written manifest's `dev-plan` gate chapter matches
+`freshManifestBytes()`'s own. Full suite re-run:
+`runner-profile-migration-v3.test.mjs` — 44/44 pass (43 pre-existing + 1
+new). No guard/protected-file boundary reached; no TP-3/TP-4 stop.
+Status left `open` (Direction 2 still unresolved; no Closure section
+added per DoD).
+- **Date:** 2026-08-18
