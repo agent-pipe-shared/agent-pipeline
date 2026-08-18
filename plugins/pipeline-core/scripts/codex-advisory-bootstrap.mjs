@@ -87,6 +87,9 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
     intent: "dispatch",
     runner: "codex",
   });
+  const resolveExecutable = dependencies.resolveExecutableFn ?? resolveSystemExecutable;
+  const resolvedCodex = resolveExecutable("codex");
+  if (typeof resolvedCodex !== "string") throw new Error("Codex executable is unavailable");
   const source = parseYaml(readFileSync(join(repoRoot, "pipeline.user.yaml"), "utf8"));
   const authority = validatePipelineUserV3(source, { source: "pipeline.user.yaml" });
   if (!authority.ok || authority.advisoryExport?.consent === "declined") throw new Error("pipeline.user.v3 advisor_export is explicitly declined");
@@ -97,9 +100,6 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   if (evidenceSha256 !== args.evidenceSha256) throw new Error("advisory evidence digest does not match the physical allowlisted bundle");
   const questionBytes = await (dependencies.readQuestionBytesFn ?? readQuestionBytes)(process.stdin);
   const question = decodeQuestion(questionBytes);
-  const resolveExecutable = dependencies.resolveExecutableFn ?? resolveSystemExecutable;
-  const resolvedCodex = resolveExecutable("codex");
-  if (typeof resolvedCodex !== "string") throw new Error("Codex executable is unavailable");
   const codexPath = realpathSync(resolvedCodex);
   // Codex selects the compatible sandbox helper itself.  If the bundled file
   // is present, pass it only as diagnostic evidence; it is never placed in

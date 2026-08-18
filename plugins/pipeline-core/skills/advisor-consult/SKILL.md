@@ -23,11 +23,19 @@ Before any child, model request, prompt export or timeout:
    even its own consent check). If that check fails (`PORG-NOT-READY`), do not
    request consent and do not proceed to the steps below — surface it to the
    human as "the Advisor isn't reachable right now" and stop.
-2. Require profile `epic` or `feature`, repository Advisor-export consent that
+2. For runner `codex`, resolve the `codex` executable next, still ahead of any
+   consent request or evidence-bundle assembly: the same cheap, non-spawning
+   existence check `codex-advisory-bootstrap.mjs` performs immediately after
+   its onboarding-readiness check (before its consent read). A missing or
+   unresolvable executable is not a consultation to prepare — surface it to
+   the human as "the Advisor isn't reachable right now" and stop, same as
+   step 1's failure, before requesting consent or reading/hashing any
+   evidence file.
+3. Require profile `epic` or `feature`, repository Advisor-export consent that
    is not `declined`, exactly one bounded UTF-8 question, bounded allowlisted
    evidence and exactly one reason:
    `architecture-tradeoff|decision-ambiguity|evidence-conflict|recovery-choice|risk-review`.
-3. Bind runner, profile, reason, question SHA-256, evidence SHA-256, dispatch
+4. Bind runner, profile, reason, question SHA-256, evidence SHA-256, dispatch
    ID/revision, candidate commit/tree, V2 policy digest and frozen V3 route
    digest in one closed `pipeline.advisory-demand.v2`. Never persist the raw
    question or answer in that demand.
@@ -39,10 +47,10 @@ Before any child, model request, prompt export or timeout:
    Symlinks, path escapes, malformed UTF-8, duplicate or unsorted paths,
    content drift and a supplied digest mismatch fail before any child or model
    effect.
-4. Reject session start, profile selection, restart, resume, re-entry, Compact,
+5. Reject session start, profile selection, restart, resume, re-entry, Compact,
    unchanged handover, a configured route or consent alone. They are not
    consultation reasons.
-5. Compare any prior `pipeline.advisory-consultation-record.v2`. The same
+6. Compare any prior `pipeline.advisory-consultation-record.v2`. The same
    `reuseKeySha256` is `reuse-no-repeat`: launch no child and make no model
    request. A changed question, reason, evidence, candidate or route-policy
    digest is material drift and requires a new demand.

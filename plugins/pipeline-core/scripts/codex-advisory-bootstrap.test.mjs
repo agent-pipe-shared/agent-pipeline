@@ -99,9 +99,29 @@ test("physical evidence digest mismatch stops before question or host consultati
   ], {
     requireProjectOnboardingReadyFn: () => ({ status: "ready" }),
     readQuestionBytesFn: async () => { questions += 1; return Buffer.from("must not read"); },
+    resolveExecutableFn: () => process.execPath,
     runAdvisoryHostBridgeFn: async () => { consults += 1; return 0; },
   }), /physical allowlisted bundle/u);
   assert.deepEqual({ questions, consults }, { questions: 0, consults: 0 });
+});
+
+test("executable-resolution failure precedes consent read and evidence-bundle assembly", async () => {
+  // The evidence-sha256 argument below is deliberately mismatched
+  // ("f".repeat(64), as in the digest-mismatch test above). If the
+  // executable check ran after consent/evidence-bundle assembly (the old
+  // order), this would reject with the digest-mismatch message instead.
+  // Asserting the executable-unavailable message proves the new order.
+  await assert.rejects(runCodexAdvisoryBootstrap([
+    "--profile", "feature", "--reason", "risk-review", "--evidence-sha256", "f".repeat(64),
+    "--dispatch-id", "bootstrap-executable-first", "--queue-revision", "0",
+    "--session-id", "session-test", "--expected-descriptor-sha256", "a".repeat(64),
+    "--receipt", "/tmp/bootstrap-executable-first-receipt.json", "--reference", REFERENCE,
+  ], {
+    requireProjectOnboardingReadyFn: () => ({ status: "ready" }),
+    resolveExecutableFn: () => undefined,
+    readQuestionBytesFn: async () => { throw new Error("question must not be read"); },
+    runAdvisoryHostBridgeFn: async () => { throw new Error("host bridge must not run"); },
+  }), /Codex executable is unavailable/u);
 });
 
 test("dispatch readiness failure precedes question, temporary input, executable resolution, and host consult", async () => {
