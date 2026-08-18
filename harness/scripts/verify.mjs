@@ -480,6 +480,7 @@ const TEST_SUITES = [
   { name: "governance-replay-viewer-tests", file: join(pluginScriptsDir, "governance-replay-viewer.test.mjs") },
   { name: "governance-replay-cli-tests", file: join(pluginScriptsDir, "governance-replay.test.mjs") },
   { name: "phoenix-governance-threat-model-tests", file: join(pluginScriptsDir, "phoenix-governance-threat-model.test.mjs") },
+  { name: "phoenix-authority-approval-tests", file: join(pluginScriptsDir, "phoenix-authority-approval.test.mjs") },
   { name: "critical-human-proof-gate-tests", file: join(pluginScriptsDir, "critical-human-proof-gate.test.mjs") },
   { name: "guard-human-override-tests", file: join(pluginScriptsDir, "guard-human-override.test.mjs") },
   { name: "po-human-approval-tests", file: join(pluginScriptsDir, "po-human-approval.test.mjs") },
