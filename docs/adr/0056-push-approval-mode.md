@@ -88,10 +88,18 @@ the soft configuration knowingly accepts.
 ### 5. For `push`, the source wins; a contradiction fails closed
 
 `pipeline.user.yaml` is the operator-facing control for `push`. A policy-file waiver
-for `push` alongside an explicit `signature` in the source is an ambiguous
-configuration and is refused with `CRITICAL-PROOF-MODE-CONFLICT` rather than resolved
-by precedence — two files disagreeing about a gate's strength is exactly the class of
-defect ADR-0054 was written about, one level up.
+for `push` alongside a source whose mode could not be established as `chat` is an
+ambiguous configuration and is refused with `CRITICAL-PROOF-MODE-CONFLICT` rather than
+resolved by precedence — two files disagreeing about a gate's strength is exactly the
+class of defect ADR-0054 was written about, one level up. The conflict is not scoped to
+an *explicit* `signature` value only: it fires for every source value except `default`
+(no file, or a file without the key — the one case where the source genuinely has no
+opinion) — that is, for an explicit `signature`, and equally for `uncommitted`,
+`unsafe`, `invalid`, and `unreadable`, since each of those means "could not be
+established as `chat`," which is exactly the ambiguity this rule exists to refuse.
+Enumerating the one safe value (`default`) rather than the unsafe ones is what makes a
+future source value fail closed by default (T4 Critic finding; see also `readGateApprovalMode()`'s
+own `source` values in `plugins/pipeline-core/lib/critical-human-proof-policy.mjs`).
 
 `deploy` and `publication` keep ADR-0055's policy-file waiver: they have no
 `pipeline.user.yaml` key, and inventing two more would widen the operator surface
@@ -226,12 +234,12 @@ this sprint has already paid for twice.
   for one, the shape is already proven here.
 - The `chat` mode makes a session-level attestation plausible (a signed session
   transcript reference, say). Not built, not needed for the ask.
-- **Open, from the T5 Critic (F4).** Decision 5 describes the conflict rule as "a
-  policy-file waiver alongside an explicit `signature` in the source". The implementation
-  is deliberately wider: it refuses whenever the mode could not be *established* — every
-  source except `default` — because enumerating the one safe value is what makes a future
-  source value fail closed instead of open. The prose and the code therefore disagree in
-  the safe direction, and the prose is the one that should move.
+- **Closed, from the T5 Critic (F4), 2026-08-18.** Decision 5 used to describe the
+  conflict rule as "a policy-file waiver alongside an explicit `signature` in the
+  source", narrower than the implementation, which refuses whenever the mode could not
+  be *established* — every source except `default`. Decision 5's prose now states the
+  full trigger set explicitly (backlog:
+  2026-08-18-adr-0056-conflict-scope-text-narrower-than-code.md).
 - `publication` keeps its own external-verification route through the fixed executor and
   was not brought onto decision 7's rebuild-and-verify. It is not weaker for it — the
   executor verifies externally at consumption — but the two now differ in shape, and one

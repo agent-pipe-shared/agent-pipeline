@@ -113,3 +113,9 @@ Rule IDs: `QG-xx`.
 - A bugfix's or feature change's own regression tests **MUST** cover the code paths the diff actually touched, not only the originally reported symptom; a test that re-checks solely the intended repair does not prove the altered surface is otherwise safe.
 - **Why:** a heredoc-stripping fix to the push gate shipped tests covering the intended repair (allow a commit message mentioning the phrase) but not the altered surface (a command placed after the terminator) — the change made the gate fail-open, its own tests were green throughout, and an independent Critic caught the regression, not Verify (`backlog/items/2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md`).
 - **Verification:** Critic review checks that a change's added/modified tests exercise the diff's changed branches and surfaces, not solely the reported symptom; a diff that alters conditional logic without a test for the new or changed branch is a QG-11 finding.
+
+## QG-12 — A new `docs/**` file needs a matching governance registry entry
+
+- Any commit that adds a new file under `docs/**` **MUST** also add a matching entry to `governance/observation-doc-governance.json`'s documentation inventory; `check-observation-governance.mjs` refuses an unregistered new doc with `OG-DOC-UNCLASSIFIED`.
+- **Why:** a new `docs/**` file (e.g. an ADR, a handover-rotation archive file) that skips this registration step fails the gate mechanically, and the lesson was previously captured only in a personal AI cross-session memory file rather than any repo-committed artifact — a gap this session hit twice independently before it was named here (`backlog/items/2026-08-18-new-docs-file-needs-governance-registry-rule-has-no-repo-level-home.md`).
+- **Verification:** `check-observation-governance.mjs` (run via `harness/scripts/verify.mjs`) exits non-zero with `OG-DOC-UNCLASSIFIED` for any `docs/**` file present in the tree but absent from the registry.
