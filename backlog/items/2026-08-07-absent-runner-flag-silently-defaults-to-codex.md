@@ -77,7 +77,26 @@ the second time the question has been reached and deferred. Do not adopt option
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Deferred in Phoenix, not implemented here. The decision this
+  item asks for has been made and shipped — candidate 1, fail closed — in the
+  sibling Nova checkout, not this one.
+- **Rationale:** The PO's standing instruction for this session was to skip
+  work already solved in Nova. Nova's own copy of this item records "accept —
+  candidate 1, fail closed" and its `project-onboarding-v3.mjs` now defines a
+  `requireRunner(runner, caller)` helper (line 208) called at every site this
+  item's Affected-artifact section and its own regression test touch —
+  `freshIntent` (line 860, explicitly commented "decided fix (backlog:
+  absent-runner-flag-silently-defaults-to-codex...)") plus roughly twenty more
+  call sites. Phoenix's own copy of the file still has nine bare
+  `runner = "codex"` defaults (confirmed: `grep -n 'runner = "codex"'
+  plugins/pipeline-core/lib/project-onboarding-v3.mjs` → 9 hits) and no
+  `requireRunner` helper. Porting Nova's fix — which also required inverting
+  the "omitting `--runner` keeps the historical Codex App-Server requirement"
+  regression test and auditing every call site, real work, not a
+  find-and-replace — into Phoenix would be exactly the duplicate work the
+  standing instruction asked to skip.
+- **Assignment (if accepted):** Not assigned in Phoenix. Porting Nova's
+  `requireRunner()` pattern (or independently re-deriving candidate 1 against
+  Phoenix's own call sites and its own copy of the regression test) closes
+  this item.
+- **Date:** 2026-08-18
