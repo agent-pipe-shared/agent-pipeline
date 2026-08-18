@@ -56,6 +56,13 @@ function entry(overrides = {}) {
   };
 }
 
+/** Mirrors harness/scripts/verify-evidence-root.test.mjs's own minimal git wrapper. */
+function git(cwd, args) {
+  const r = spawnSync("git", args, { cwd, encoding: "utf8", shell: false });
+  if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${r.stderr}`);
+  return (r.stdout || "").trim();
+}
+
 function accepts(value) {
   try {
     return validateScopedVerifyRegistration(value)?.ok === true;
@@ -177,6 +184,19 @@ function scopedRegistrationFailureFixture() {
   const evidencePath = join(fixtureRoot, "evidence", "verify-latest.json");
 
   try {
+    // Real git topology, not a bare tmpdir: the copied verify.mjs's own
+    // gitCommonDirectory() call must resolve, or it throws
+    // VERIFY-GIT-COMMON-DIR-UNAVAILABLE before writing any evidence at all
+    // (backlog 2026-08-19-verify-registration-check-fixtures-lack-real-git-topology.md).
+    // Deliberately a fresh, UNCOMMITTED `git init` (never `git worktree add` off this
+    // checkout): candidateIdentity()'s `git rev-parse HEAD` then fails (unborn HEAD),
+    // so startedCandidate.status is "unavailable", not "dirty" -- verify.mjs only
+    // takes its fast candidate-preflight exit on "dirty", so this keeps the fixture
+    // reaching the scoped registration check under test (SVR28). It also keeps this
+    // fixture root as its own primary root (gitCommonDirectory()'s parent), so
+    // evidence still lands at THIS root's evidence/verify-latest.json, never at the
+    // real checkout's shared evidence file.
+    git(fixtureRoot, ["init", "--quiet"]);
     mkdirSync(dirname(writer), { recursive: true });
     mkdirSync(dirname(registration), { recursive: true });
     mkdirSync(dirname(prd), { recursive: true });

@@ -70,6 +70,13 @@ function writeVerifyFixture(root, { testSuites = [], scoped = [], windows = [] }
 
 function verifyPathFor(root) { return join(root, "harness", "scripts", "verify.mjs"); }
 
+/** Mirrors harness/scripts/verify-evidence-root.test.mjs's own minimal git wrapper. */
+function git(cwd, args) {
+  const r = spawnSync("git", args, { cwd, encoding: "utf8", shell: false });
+  if (r.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${r.stderr}`);
+  return (r.stdout || "").trim();
+}
+
 // -- Fixture 1: an unregistered file is detected. ---------------------------
 check("an unregistered *.test.mjs file under a registered root is detected", () => {
   const root = buildRoot();
@@ -470,21 +477,24 @@ check("duplicateSuiteIds: a duplicate spanning two of verify.mjs's registration 
 // it into a temp root, injects the duplicate into THAT copy's TEST_SUITES, and spawns it.
 // "Did any suite run?" is answered by the child's own evidence artifact (its `steps` list and
 // its `verifyRun` field), never by this file's opinion and never by the journal stub below --
-// that stub's body is unreachable here; see JOURNAL_STUB_TRIPWIRE.
+// that stub's body is unreachable in the injectDuplicate:true case (the duplicate check
+// short-circuits before the else branch that would call it); see JOURNAL_STUB_TRIPWIRE.
 const VERIFY_REL_PATH = "harness/scripts/verify.mjs";
 const REPO_ROOT = resolve(here, "..", "..");
 const DUPLICATE_FIXTURE_ID = "phx-duplicate-registration-fixture-tests";
 /** The copied verify.mjs STATICALLY imports runVerifyJournal from this path, so the file must
  *  EXIST or the child dies at module load (ERR_MODULE_NOT_FOUND) before writing any evidence.
- *  Its BODY, by contrast, never runs in this fixture: verify.mjs evaluates `gitCommonDirectory()`
- *  while assembling runVerifyJournal's arguments (verify.mjs ~605), and that throws in a non-Git
- *  temp root, so the else branch fails before the call. The tripwire string is therefore INERT
- *  today -- no assertion depends on it and it is evidence of nothing. It is kept only so that,
- *  if that argument assembly ever becomes lazy, the stub names itself in stderr instead of the
- *  fixture failing anonymously. Both halves were demonstrated by machine (PHX-F2, 2026-08-08):
- *  point this constant at a name that is never written and the child dies with
- *  ERR_MODULE_NOT_FOUND before any evidence exists; instrument the else branch and the
- *  diagnostic reads VERIFY-GIT-COMMON-DIR-UNAVAILABLE, never the tripwire. */
+ *  Its BODY runs only in the injectDuplicate:false (negative-control) case below, now that the
+ *  fixture root carries real git topology (2026-08-19 fix): the duplicate check finds nothing,
+ *  so the else branch calls runVerifyJournal, the stub throws this tripwire, and
+ *  VERIFY-JOURNAL-FAILED: PHX-FIXTURE-JOURNAL-STUB-CALLED is what confirms the journal branch
+ *  was actually entered (see the negative-control check below, which deliberately still does
+ *  not pin the exact text -- only that some VERIFY-JOURNAL-FAILED line appears). In the
+ *  injectDuplicate:true case the duplicate check short-circuits first, so the stub's body stays
+ *  unreachable there. Before the git-topology fix, gitCommonDirectory() itself was unreachable
+ *  from either case in a meaningful way: it is evaluated unconditionally at verify.mjs's module
+ *  top level and threw VERIFY-GIT-COMMON-DIR-UNAVAILABLE in the then-non-Git temp root before
+ *  any of this file's own registration/duplicate logic ran at all. */
 const JOURNAL_STUB_REL_PATH = "plugins/pipeline-core/scripts/verify-journal.mjs";
 const JOURNAL_STUB_TRIPWIRE = "PHX-FIXTURE-JOURNAL-STUB-CALLED";
 /** Every module the copied verify.mjs imports, transitively — minus the journal, stubbed above.
@@ -517,6 +527,19 @@ const FIXTURE_REGISTERED_TARGETS = Object.freeze([
 
 function buildVerifyFixtureRoot({ injectDuplicate }) {
   const root = buildRoot();
+  // Real git topology, not a bare tmpdir: the copied verify.mjs's own
+  // gitCommonDirectory() call (`git rev-parse --git-common-dir`) must resolve, or
+  // it throws VERIFY-GIT-COMMON-DIR-UNAVAILABLE before writing any evidence at all
+  // (backlog 2026-08-19-verify-registration-check-fixtures-lack-real-git-topology.md).
+  // Deliberately a fresh, UNCOMMITTED `git init` (never `git worktree add` off this
+  // checkout): candidateIdentity()'s `git rev-parse HEAD` then fails (unborn HEAD),
+  // so startedCandidate.status is "unavailable", not "dirty" -- verify.mjs only
+  // takes its fast candidate-preflight exit on "dirty", so this keeps the fixture
+  // reaching the registration/duplicate checks under test. It also keeps this
+  // fixture root as its own primary root (gitCommonDirectory()'s parent), so
+  // evidence still lands at THIS root's evidence/verify-latest.json, never at the
+  // real checkout's shared evidence file.
+  git(root, ["init", "--quiet"]);
   for (const relPath of [...FIXTURE_MODULES, ...FIXTURE_AUTHORITY]) {
     const target = join(root, ...relPath.split("/"));
     mkdirSync(dirname(target), { recursive: true });
