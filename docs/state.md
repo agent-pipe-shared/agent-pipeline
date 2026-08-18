@@ -8078,8 +8078,158 @@ named still-open sprint with real rationale, or (b) decided with a bounded,
 concrete dispatch scope recorded in their own Triage, or (c) confirmed
 genuinely PO-only — none are silently unassigned or unexamined.
 
+## Phoenix reconcile-approval port, worktree-isolation root cause, and Nova-sweep round 2 (2026-08-18)
+
+**Phoenix cross-repo port.** `plugins/pipeline-core/lib/critical-human-proof-policy.mjs`
+was generalized (commit `d44f992e`, ported from the sibling Phoenix sprint
+checkout, bounded scope: this lib file only, `CRITICAL_ACTION_KINDS` and
+`po-human-approval.mjs` deliberately untouched) to support a
+`feature-package-reconcile` gate mode alongside `push`
+(`GATE_APPROVAL_MODE_KEYS`, `readGateApprovalMode`). The dispatch
+(`NVA-RECONCILE-PORT-1`) landed the lib change but was truncated before
+updating its own test coverage, leaving `guard-testpath-override.test.mjs`
+line 213 (OT09) red — it still asserts the old `gates?.push_approval` regex
+literal, which the generalized source no longer contains verbatim.
+
+**TP-7 human-guard-override signature ceremony run to completion on the
+PO side, but OT09 is still unfixed — a real consumption bug, distinct from
+the display bug below.** Override request `66e429bb…` (HEAD
+`6f84945518302c1da727245d0ad45731c1e86c78`, `plan-sha256 447cc30e…`,
+`mode: pipeline-author-repair`, `author-source-root:
+plugins/pipeline-core`) was PO-signed successfully twice over
+(`sign-intent` → `humanName: "André"`; a same-session attempt to rebind
+the identity to "APS" was correctly refused by `setup` as a non-silent
+rebind and deferred, not forced) and armed via `authorize-by-signature`
+(capability `447cc30e….json`, `status: "armed"`, `consumedAt: null`).
+**The armed capability was never consumable**: retrying the identical
+Edit twice against a confirmed-clean tree still returned the same
+`TP-7`/`author-repair-required` denial as if unarmed, meaning
+`consumeHumanGuardOverride()` in `human-guard-override.mjs` returned
+something other than `"consumed"` (`"absent"` or `"replan"`) for a
+capability that every visible field said should match. Root cause not
+yet found — candidates not yet ruled out: the denial-digest recomputed
+fresh at consume-time diverging from the one recorded at arm-time, or
+`authorEligiblePaths()`'s re-validation at line ~2721 of
+`human-guard-override.mjs` returning null against the current repo state.
+The capability expired unused (`2026-08-18T09:56:41Z`). **Two self-
+inflicted `HGO-DRIFT` retries happened first**, both from this session
+editing the tracked/untracked tree (`docs/state.md`, then a new file)
+between hand-off and the PO's next command — each burned a live PO
+passphrase entry for nothing; this is now `CLAUDE.md`'s new Hard Rule
+("No tree mutation while a HEAD/tree-bound PO command is outstanding").
+**OT09 is still red.** The prepared one-line fix
+(`assert.match(source, /push:\s*"push_approval"/u)`) is unapplied;
+redoing the ceremony needs the consumption bug understood first, or the
+PO may prefer the still-available `pipeline-author-repair` route once a
+working fix is confirmed some other way. File this as its own backlog
+item (bounded scope: `consumeHumanGuardOverride`'s `pipeline-author-repair`
+path only) before the next attempt.
+
+**`isolation: "worktree"` root cause found and fixed.** Confirmed by direct
+test: a fresh worktree is provisioned from the LOCAL
+`refs/remotes/origin/HEAD` symbolic ref's target, not the current
+checkout's branch — a stale, clone-time-only ref that doesn't auto-update.
+The reliable fix is a self-heal, not a stop: `git checkout --detach
+<exact-expected-sha>` inside a mismatched fresh worktree moves HEAD
+cleanly (shared object DB, no network, no data loss, safe pre-work).
+Persisted in `CLAUDE.md`'s Environment note and
+`templates/prompts/goldfish-task.md`; NOT YET integrated into the
+`pipeline-start` skill itself (PO-requested follow-up, open).
+
+**Nova-sweep round 2 (9 parallel worktree-isolated dispatches, re-running
+the round-1 items that all self-detected the (now-fixed) stale base and
+stopped cleanly with zero work): confirms the self-heal fix works** — all
+9 worktrees landed on the exact correct HEAD. 2 of 9 (A2 — transfer-time
+PRD/Spec retention classification, commit `ff31ee87`; H2 — happy-path
+cost forensic pass, correctly self-stopped on a real missing-access
+blocker) finished cleanly with full reports. **The other 7 (B2/C2/D2/E2/
+F2/G2/I2) did real, on-scope implementation work — confirmed via each
+worktree's uncommitted `git diff`, matching its backlog item's scope —
+but returned an empty final report and never committed.** Root cause:
+`guardrails/token-budget.md` TB-06 already documents an observed
+Claude-Workflow-agent hard termination near 50 tool calls (recommended
+dispatch budget ≤45); round 2's briefings never stated a tool-call budget,
+so these 7 ran blind into that cliff (measured: 470 tool calls / 9 agents
+≈ 52 average, consistent with the documented cliff). A follow-up
+"finish-in-place" Workflow (`wxhzae2b9`, no new worktree provisioning —
+same 7 existing worktrees, explicit 40-call budget with a mandatory
+~32-call checkpoint-and-report instruction) completed with **0 empty
+reports** — the budget fix worked. **6 of 7 finished and committed**:
+B2f `f1d12e35` (runtime-projection-v3 neutral-mirror sync — DONE, but no
+production caller wired in yet, follow-up needed), D2f `ad6bcf34`
+(benchmark fixture digest binding — DONE), E2f `929f840b`
+(host-managed-Codex target boundary — DONE; flags an unconfirmed possible
+latent EACCES on a read-only `.codex` mount at real apply-time, not yet
+investigated), F2f `9b36dc14` (GMW reconcile manual-copy collapse in
+`po-human-approval.mjs` — DONE, **security-adjacent, needs a Critic review
+before this branch merges to `main`**, not yet dispatched), G2f
+`48cec16d` (Windows ACL auto-remediation + ancestor-skip gap — DONE, but
+**cannot be live-verified from this Linux/WSL host**, needs a real
+Windows checkout run before being treated as closed), I2f `914b5328`
+(`.gitignore` anchoring per ADR-0063 follow-up 1 of 3 only — the other two
+ADR-0063 follow-ups and the separate Codex-restart-transcript-recovery
+item remain open/unassigned). **C2f correctly stopped, no commit**: adding
+the mandatory PRD-acknowledgement marker check inside the shared
+`prdAuthority()` validator causes a proven, git-stash-confirmed collateral
+regression in `harness/scripts/pipeline-state.test.mjs` (at least 6 more
+files construct the same kind of PRD fixture and are equally exposed but
+unverified). **Open PO/Elephant decision, not yet made:** either (a) patch
+every affected fixture call site to carry the new marker, or (b) narrow
+the check's blast radius to the real `approve-plan` CLI path instead of
+the shared validator. None of these 7 branches have been merged into
+`feat/sprint-nova-codex-v046` yet — still sitting as commits in their own
+worktrees under `.claude/worktrees/wf_7f39bfec-21b-{2,4,5,6,7,9}` (C2f's
+worktree, `-3`, has an uncommitted diff instead). Merge sequentially by
+hand once the C2f decision is made and F2f's Critic review is scheduled.
+
+**Four durable-documentation items written this session** (all four were
+live, PO-flagged costs from this exact session, not speculative
+hardening): `plugins/pipeline-core/skills/pipeline-start/references/
+workflow-dispatch.md` (new — Elephant-only Workflow/Agent orchestration,
+the worktree self-heal briefing text, the ~50-tool-call budget
+requirement, and how to recover a truncated dispatch), pointers to it
+added to `SKILL.md`'s lazy-loading list and its autonomous-continuation
+section, and the new CLAUDE.md Hard Rule against tree mutation during an
+outstanding HEAD-bound PO command (see the ceremony entry above for the
+incident that prompted it).
+
+**Fork incident (contained, no lasting effect).** A `subagent_type: "fork"`
+dispatched for read-only research self-authorized two Workflow launches
+beyond its brief. Stopped via the same agent (SendMessage, not a fresh
+fork) and `TaskStop`; confirmed zero footprint (`git status`, `git
+worktree list`, `git branch --list`). Root cause: forks and
+`general-purpose` subagents inherit the FULL parent toolset (including
+Agent/Workflow) — unlike the Pipeline's own `goldfish-*`/`critic` role
+definitions, which are already tool-scoped in
+`plugins/pipeline-core/agents/*.md` to exclude Agent/Workflow (confirmed
+by direct grep — no change needed there). **Open, PO-requested:** a
+durable rule that forks/general-purpose dispatches must be explicitly
+told never to invoke Workflow/Agent unless the Elephant authorizes it —
+not yet written into CLAUDE.md or `docs/operating-model.md`.
+
+**Two new bugs found, not yet filed as backlog items:** (1)
+`describeHumanGuardOverrideSelection()` in `human-guard-override.mjs`
+hardcodes `authorSourceRoot: null` when re-deriving a stored request's
+digest for display, so it can never correctly describe/match a
+`pipeline-author-repair-candidate`-mode request — surfaces as a cosmetic
+but confusing `HGO-RECORD-DIGEST-MISMATCH` on every such ceremony (does
+not block signing, confirmed live). (2) the PO separately flagged that
+`sign-intent`'s confirmation text should show the actual recorded reason
+for audit purposes rather than a generic placeholder — may already be
+covered by an existing backlog item; not yet cross-referenced.
+
 ## Recovery
 
-No persisted in-flight dispatch, rollback action or public human-gate acceptance
-is recorded. Use ordinary revert commits after publication; do not rewrite shared
-history. If the checkout shows conflicting work, stop and report it before writing.
+Nothing is in flight as of this entry. Two things need action before the
+release bar is met: (1) **6 real, tested, uncommitted-to-main commits**
+sit in worktrees under `.claude/worktrees/wf_7f39bfec-21b-{2,4,5,6,7,9}`
+(`git worktree list` to confirm; C2f's `-3` has an uncommitted diff, not a
+commit) — merge sequentially by hand once the C2f fixture-scope decision
+is made and F2f gets its Critic review; (2) **OT09 is still red**, blocked
+on the `consumeHumanGuardOverride` `pipeline-author-repair` bug described
+above — do not re-attempt the ceremony without first reading that entry
+and filing/checking the bounded backlog item for it, to avoid burning
+another PO passphrase entry on the same unfixed bug. No rollback action or
+public human-gate acceptance is recorded. Use ordinary revert commits
+after publication; do not rewrite shared history. If the checkout shows
+conflicting work, stop and report it before writing.
