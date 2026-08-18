@@ -247,6 +247,17 @@ your own subdirectory; if you find pre-existing scratch state from a prior or
 concurrent dispatch, name it as a disclosure item rather than silently
 building evidence on top of it.
 
+**Directory contract, beyond your own scratch subdirectory (ADR-0063):**
+`docs/adr/0063-repository-directory-contract.md`'s directory-kinds table
+governs where a repository's OTHER files belong — durable, gate-cited
+evidence in `backlog/evidence/` or `specs/*/evidence/` (tracked);
+machine-regenerated evidence in the ignored root `evidence/`; decision
+records in `docs/adr/`; specifications in `specs/<feature-id>/` (ADR-0045).
+When your review surfaces a file sitting somewhere that table does not name,
+or an unanchored directory-name `.gitignore` pattern, that is a legitimate
+finding in the reference-boundary/quality-gates category — not a tidiness
+aside.
+
 ---
 
 ## Phase A — Adversarial hunt (be harsh; report nothing yet)

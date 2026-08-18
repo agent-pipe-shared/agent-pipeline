@@ -89,6 +89,17 @@ root, and there is no exception for one — do not fall back to guessing at one
 when a write is refused); never `.git/` either (that is pipeline-owned private
 state, not a scratch location for you).
 
+**Directory contract for anything that isn't scratch (ADR-0063):** where a
+durable deliverable belongs — evidence a gate or backlog `closure_evidence`
+field will cite, a spec package, a decision record — is governed by
+`docs/adr/0063-repository-directory-contract.md`'s directory-kinds table, not
+invented per dispatch. Condensed: decision records → `docs/adr/`;
+specifications → `specs/<feature-id>/` (ADR-0045); durable, gate-cited
+evidence → `backlog/evidence/` or `specs/*/evidence/` (tracked);
+machine-regenerated evidence → the ignored root `evidence/`; agent-authored
+temporary material → the ignored `scratch/` above. Never invent a new
+top-level directory for a kind this table already names a home for.
+
 **Commit as soon as a suite goes green, not only at the very end:** split your
 work into commits as each verified piece lands, rather than holding everything
 for one commit after the last DoD check. A commit that exists survives a
