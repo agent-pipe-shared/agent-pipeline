@@ -128,6 +128,25 @@ per-file evidence:
 **Owner: PO**, for assignment. Two repairs left, not five, because the groups
 differ (Group 1's third member is closed by deletion, Group 3 by repair).
 
+**UPDATE 2026-08-18: all five now pass standalone, re-confirmed live, not assumed.**
+Ran each of the five directly (`node --test <file>`) rather than trusting this
+item's own stale claims:
+- `harness/lib/plan-spec-state-v2.test.mjs` — 8/8 pass. `bindPlanSpecApprovalWithHumanDecision`
+  now exists in `plugins/pipeline-core/lib/plan-spec-state-v2.mjs:932`; Group 1's premise
+  (missing export) no longer holds.
+- `harness/scripts/recovery-bridge-approval.test.mjs` — 1/1 pass.
+- `plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs` — 1/1 pass.
+- `plugins/pipeline-core/scripts/afk-activation.test.mjs` — 13/13 pass.
+- `plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs` — 4/4 pass.
+
+None of these fixes are visible in this item's own history — they were repaired
+piecemeal elsewhere in the epic without this item being updated. **Registration
+(step 4 of this proposal) is the only remaining step**, and it is blocked on the
+same constraint as everything else touching `harness/scripts/verify.mjs` (TP-3):
+needs a PO-signed GMW window, not available from an unattended session. Not
+closing this item yet — repair is done, registration is not — but reducing scope
+to exactly that one remaining, mechanical, already-scoped step.
+
 1. ~~**Group 3 first.** It is a statement about the verify entry point and it is
    currently false.~~ **Done 2026-08-09** — the suite was stale, not the entry
    point; repaired in `afa00fd` and registered thereafter.
