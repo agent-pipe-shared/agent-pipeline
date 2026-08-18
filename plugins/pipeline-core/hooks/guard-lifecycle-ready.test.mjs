@@ -2946,10 +2946,26 @@ test("NOVA-LCR-HGO-1: with nothing armed, the grammar denial names the mode-appr
     // to sign anything out-of-band -- i.e. between prepare-authorization and
     // authorize-by-signature, not merely somewhere in the guidance text.
     assert.match(sigResult.stderr, /emit-signature-digest --repo/u);
+    // PO decision 2026-08-18 #12: prepare-authorization/emit-signature-digest are now
+    // labelled "in this session" and authorize-by-signature "outside this session" (ADR-0059
+    // Decision 1 -- neither of the first two touches the external key). The inserted mode-
+    // change label line between emit-signature-digest and authorize-by-signature is allowed
+    // for by the optional group below; order and the in-session/outside-this-session split
+    // are still pinned.
     assert.match(
       sigResult.stderr,
-      /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+      /prepare-authorization --repo[^\n]*\n[^\n]*emit-signature-digest --repo[^\n]*\n(?:[^\n]*\n)?[^\n]*authorize-by-signature --repo/u,
       "emit-signature-digest must sit between prepare-authorization and authorize-by-signature",
+    );
+    assert.match(
+      sigResult.stderr,
+      /Then, in this session[^\n]*\n[^\n]*prepare-authorization --repo/u,
+      "prepare-authorization must be labelled as running in this session",
+    );
+    assert.match(
+      sigResult.stderr,
+      /Then, outside this session[^\n]*\n[^\n]*authorize-by-signature --repo/u,
+      "authorize-by-signature must be labelled as running outside this session",
     );
     assert.doesNotMatch(sigResult.stderr, /--activate/u, "signature mode must not offer the in-session activate step");
   } finally { for (const entry of roots) rmSync(entry, { recursive: true, force: true }); }
