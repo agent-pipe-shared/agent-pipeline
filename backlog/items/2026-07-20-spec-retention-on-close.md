@@ -3,8 +3,12 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.spec-retention-on-close"
 type: "defect"
 owner: "pipeline"
-status: "open"
+status: "closed"
 created: "2026-07-20"
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "98b173f03b294e48914467d76803234c9677891e"
+closure_evidence: "plugins/pipeline-core/lib/transfer-classification.test.mjs"
 source: "Sentinel recovery audit after Public close/transfer"
 due: "2026-07-27"
 expires: "2026-08-03"
@@ -108,6 +112,23 @@ report a missing active plan.
   `close-block/SKILL.md`'s transfer step. Scope stays exactly criterion 2 —
   criteria 1/3/4/5 stay delivered and are not to be touched or re-verified
   by that dispatch.
+- **Date:** 2026-08-18
+
+### Closure, 2026-08-18 (evening)
+
+**Decision:** Closed. Implemented by an earlier same-day dispatch
+(`NVA-SWEEP-A2`, commit `98b173f0`, 11:32) before this item's own
+wave-1 re-dispatch ran: `classifyTransfer()` in
+`plugins/pipeline-core/lib/transfer-classification.mjs` reads the same
+`governance/spec-retention.json` inventory `checkSpecRetention` already
+validates, fails closed on an omitted active authority lacking both a
+durable archive and a recorded PO disposition, and is wired into
+`close-block/SKILL.md` as transfer sub-step 3b. Verified live:
+`node --test plugins/pipeline-core/lib/transfer-classification.test.mjs`
+→ 7/7 pass (TC01-TC07), covering exactly criterion 2's blocked/cleared
+matrix. A parallel wave-1 dispatch built the identical mechanism
+independently and did not find the already-landed one; its diff was not
+merged.
 - **Date:** 2026-08-18
 
 AI-Assisted: true

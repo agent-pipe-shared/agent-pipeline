@@ -103,3 +103,24 @@ named still-open sprint and the 0.6.0 release bar requires a real decision:
   merges it should have it re-run on a real Windows checkout before this is
   treated as closed.
 - **Date:** 2026-08-18
+
+### Implementation landed, closure withheld pending live-Windows re-verify (2026-08-18, evening)
+
+Both points above are implemented, tested (mocked Windows behavior, this
+suite's existing pattern), and merged to `feat/sprint-nova-codex-v046` via
+an earlier same-day dispatch (commit `b8f28a792dd6eb192a26b109231ceee304260ccb`,
+"fix(windows-acl): auto-remediate pre-existing insecure directories and
+close ancestor-skip gap"). Verified live:
+`node --test plugins/pipeline-core/lib/worktree-lifecycle.test.mjs` →
+39/39 pass, including `WT-LOCAL-WINDOWS-ASSURANCE` auto-remediation,
+still-fails-closed-when-unremediable, and ancestor-skip-gap cases. A
+parallel wave-1 dispatch confirmed this same finding independently
+(no-op, nothing further to implement) rather than duplicating the fix.
+
+**Kept open, not closed:** per this item's own Triage above, live
+verification on a real Windows checkout is the explicit precondition for
+treating this as closed, and this session runs on Linux/WSL only. The
+sibling item (`securedirectory-only-acl-hardens-the-leaf-of-a-recursive-
+mkdir-not-shared-intermediates`) carries the identical caveat. Both need
+the same PO-driven live-Windows confirmation step before closure — a
+single Windows session re-running both suites once would clear both.

@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-promoted-feature-can-never-pass-the-plan-gate
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-08-21
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "72a293d59694e6184f190bb3c141f7b2d509b8da"
+closure_evidence: "plugins/pipeline-core/lib/po-gate-authority.test.mjs"
 source: "PO, live greenfield onboarding with the Claude runner, 2026-08-07: 'der status wird initial falsch gesetzt und es gibt keinen sauberen lauf zum PRD und Freigabe'. The session located both halves in code before reporting."
 ---
 
@@ -186,4 +190,39 @@ plus a test run to trust (gate-tier code) — not attempted in this read-only
 triage pass. Q2 (gate-less-project defaults) and Q3 (systematic
 gate-satisfiability testing) remain tracked as already noted, out of this
 dispatch's bounded scope.
+- **Date:** 2026-08-18
+
+### Closure, 2026-08-18 (evening)
+
+**Decision:** Closed. Between the dispatch decision above being written and
+its dispatch actually running, a separate same-day dispatch
+(`NVA-SWEEP-C2`, commit `72a293d5`) independently delivered exactly the
+scope this item's Triage decided: `po-gate-authority.mjs` now exports
+`PRD_ACKNOWLEDGEMENT_MARKER` and gates its check on `requireAcknowledgement`
+(true only for an ACTIVE `expectedPlanSha256`/`expectedSpecSha256`
+validation, never a passive diagnostic read). Confirmed by direct read that
+`pipeline-state.mjs`'s `approve-plan` (and `submit-plan`) already call
+`poGateAuthority()` with both expected digests in their `beforeCommit` step,
+so the marker requirement is live at the real approval path today, not
+merely defined. Confirmed by running `harness/scripts/pipeline-state.test.mjs`
+against the current tip: 314/314 cases pass, including `PS06a approve-plan
+exit 0` — no regression.
+
+A parallel wave-1 dispatch against this same item (queued from the
+"Dispatch decision, 2026-08-18" entry above, before this closure was known)
+independently built a second, CLI-flag-based enforcement mechanism
+(`--content-sound-and-spec-consistent <token>` on `approve-plan`) without
+finding the marker mechanism already existed. Its diff was **not merged**:
+it would have required both mechanisms simultaneously (confusing, redundant)
+and its own report confirmed it broke `harness/scripts/pipeline-state.test.mjs`
+(314-case canonical suite, ~8 `approve-plan` call sites not updated for the
+new flag) in a way requiring a TP-3 signed ceremony to fix — a regression
+the already-landed marker mechanism does not have, since it reuses the
+digest-revalidation step `approve-plan` already performed. Discarded in
+favor of the existing, cleaner, already-tested implementation.
+
+Q2 (gate-less-project defaults) and Q3 (systematic gate-satisfiability
+testing) remain open, tracked in
+`2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md` — this
+item's own scope is fully resolved.
 - **Date:** 2026-08-18

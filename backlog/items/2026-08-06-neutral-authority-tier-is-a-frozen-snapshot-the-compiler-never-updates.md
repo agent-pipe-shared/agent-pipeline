@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-06
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "958019482046a0b126b5d396e8adbaeb44fb76ae"
+closure_evidence: "plugins/pipeline-core/lib/runtime-projection-v3.test.mjs"
 source: "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
 due: 2026-09-06
 ---
@@ -157,4 +161,33 @@ needing a Verify run (the tier-agreement check from step 4 is already in
 place to confirm the fix) to trust — not attempted in this read-only triage
 pass. The overdue flag against its own "after 0.5.2" sequencing note stands;
 this entry does not change scope, only reconfirms it for the 0.6.0 pass.
+
+### Closure, 2026-08-18 (evening)
+
+**Decision:** Closed. Step 3 landed via commit `95801948` ("feat(runtime-
+projection-v3): keep the neutral authority tier synced"), timestamped
+11:50, same day as but before the "Dispatch confirmation" entry above was
+written — a separate, earlier dispatch on this same branch delivered it
+before this item's own wave-1 re-dispatch ran. Its design generalizes the
+fix beyond the item's own literal proposal: `runtime-projection-v3-owned-
+keys.json` gained a declarative `neutralAuthorityMirrors` list (additive,
+keyed by `mirrorOf` back to the existing legacy-tier target), and the V3
+compiler mirrors any already-migrated `project/*` file from the same intent
+that projects its legacy counterpart — never creating `project/*` from
+nothing, matching this item's own scope note that the migration itself
+stays `project-authority.mjs`'s job alone. Verified live:
+`node --test plugins/pipeline-core/lib/runtime-projection-v3.test.mjs` →
+31/31 pass, including the step-4 tier-agreement checks this item's own
+"Assignment" section named as the confirming check, plus new tests for the
+mirror mechanism itself ("V3 keeps an existing neutral authority mirror
+synced while preserving tier-local unowned content", "applyRuntime
+ProjectionV3NeutralMirrors never creates project/* from nothing").
+
+A parallel wave-1 dispatch against this same item independently built a
+second, hardcoded (`project/pipeline.json`/`project/pipeline.yaml` named
+directly) implementation of the identical goal, without finding the
+already-landed generalized one — the two conflicted textually on cherry-
+pick. Discarded in favor of the existing, more general, already-tested
+implementation; nothing from the wave-1 diff was merged.
+- **Date:** 2026-08-18
 - **Date:** 2026-08-18

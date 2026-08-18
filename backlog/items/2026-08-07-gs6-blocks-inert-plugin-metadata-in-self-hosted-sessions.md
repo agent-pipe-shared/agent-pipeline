@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "586f59edcffb9cebca139f1f4394a3c9ed9a66f9"
+closure_evidence: "plugins/pipeline-core/hooks/guard-gate-strength.test.mjs"
 source: "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
 due: 2026-09-06
 expires: 2026-09-06
@@ -113,3 +117,46 @@ close. Not attempted here — it is guard-wiring code (`guard-gate-strength.mjs`
 `human-guard-override.mjs`) that this session's read-only scope does not
 authorize touching, and needs an independent Critic round per the item's own
 rationale.
+
+### Closure, 2026-08-18 (evening) — superseded by ADR-0058, not the proposed route
+
+**Decision:** Closed. A wave-1 dispatch against this item found the
+underlying need already resolved, but by a different, already-shipped,
+already-Critic-reviewed mechanism than this item's own Proposal —
+ADR-0058's Guard Maintenance Window (`docs/adr/0058-guard-maintenance-
+window.md`, accepted `586f59ed`), which explicitly names this exact item
+(2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md)
+as one of its two motivating incidents and explicitly evaluates and
+**rejects** the item's proposed HGO-based route: HGO's `chat`-mode
+activation is "an ordinary in-session command a ready session can simply
+run itself" — not a real human gate for GS-6.
+
+Implementing this item's literal Proposal today would mean either
+weakening `hooks/**`'s already-tested override-free posture (regression
+against `GST27`/`GST28`, which pin "GS-6 is never lifted by this path,
+even with a real, valid, exactly-matching armed capability" as an
+invariant) or wiring a second, less-audited lift path GMW's own design
+process already considered and turned down. Neither is a same-session
+mechanical patch.
+
+**The underlying need — a real human-authorized route for the
+`plugin.json` version-bump case, without a detached manual edit — is
+satisfied today via GMW's heavier, time-boxed, PO-signed ceremony.**
+`NEVER_LIFTABLE_KERNEL_PATHS` hard-blocks only ~7 kernel files
+(`guard-gate-strength.mjs`, `hooks.json`, `guard-lifecycle-ready.mjs`,
+`guard-command-grammar.mjs`, `tool-write-target.mjs`, `guard-maintenance-
+window.mjs`, `project/critical-human-proof.json`); `.claude-plugin/
+plugin.json` and `.codex-plugin/plugin.json` are not in that list and are
+already reachable through an armed GMW window. Verified live:
+`node --test plugins/pipeline-core/hooks/guard-gate-strength.test.mjs` →
+36/36 pass, including `GST20` ("a real armed GS-6 window lifts an
+ordinary plugin file but a kernel path stays refused") — proving exactly
+the split this item asked for, just through GMW rather than HGO.
+
+The one thing NOT delivered relative to the item's original ask: GMW's
+ceremony is heavier (time-boxed window, not the lighter one-shot HGO
+flow envisioned here). That is a legitimate remaining "is this the right
+amount of friction for a two-line version bump" design question, but it
+is a GMW-ergonomics question, not this item's own defect — left open
+only if a future session wants to raise it as its own, narrower item.
+- **Date:** 2026-08-18

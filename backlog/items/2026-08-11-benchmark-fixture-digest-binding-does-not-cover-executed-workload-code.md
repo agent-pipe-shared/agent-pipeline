@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-11
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "e3e521834f45f3733f597932ab1693bcdfaeb721"
+closure_evidence: "plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs"
 source: "Critic review (F4, minor) of NVA-A8-4's real benchmark implementation, dispatched against commits 7132c5c7..de0b16fc, 2026-08-11."
 due: 2026-08-25
 ---
@@ -97,4 +101,17 @@ briefed for.
   unassigned.
 - **Assignment:** next available Nova/pipeline implementation dispatch;
   scope is fully specified above and in the item's own Direction section.
+- **Date:** 2026-08-18
+
+### Closure, 2026-08-18 (evening)
+
+**Decision:** Closed. Implemented by an earlier same-day dispatch
+(`NVA-SWEEP-D2f`, commit `e3e52183`, 11:47) before this item's own
+wave-1 re-dispatch ran: `BENCHMARK_WORKLOAD_DIGESTS` plus
+`validWorkloadDigests()`, additive and optional per this item's own
+scope, covering each class's `task.mjs` and feature's sibling `lib.mjs`.
+Verified live: `node --test plugins/pipeline-core/lib/multi-cli-benchmark.test.mjs`
+→ 7/7 pass, including `MCB07` pinning exactly this binding. A parallel
+wave-1 dispatch built the identical mechanism independently and did not
+find the already-landed one; its diff was not merged.
 - **Date:** 2026-08-18

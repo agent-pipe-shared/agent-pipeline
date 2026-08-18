@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-12
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "d8fd9a37e686c5b469328860464f18db770e92e8"
+closure_evidence: "plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs"
 source: "NVA-BL-67, 2026-08-12, surfaced while measuring an unrelated manifest-seed divergence (backlog/items/2026-08-08-two-manifest-literals-still-bypass-the-single-seed-owner.md). Explicitly flagged as unconfirmed, not asserted as a production defect."
 ---
 
@@ -90,3 +94,20 @@ its severity. It therefore stays a same-release dispatch target. Not
 attempted here — it is transaction-integrity code (`validateTargetBoundary()`
 / `prepare()`) that needs a regression test proving both the fixed
 host-managed-Codex branch and the unfiltered branch stay correct.
+
+### Closure, 2026-08-18 (evening)
+
+**Decision:** Closed. Implemented by an earlier same-day dispatch
+(commit `d8fd9a37`, 11:53, same commit title as this item's own
+Direction) before this item's own wave-1 re-dispatch ran:
+`validateTargetBoundary()` now derives its expected set from an explicit
+`{ hostManagedCodex }` option matched against the recomputed runtime
+count, rather than the unfiltered `runtimePaths()` alone. Verified live:
+`node --test plugins/pipeline-core/lib/runner-profile-migration-v3.test.mjs`
+→ 43/43 pass, including "a host-managed-Codex fresh-project apply
+satisfies its own target boundary invariant" — exactly this item's
+acceptance criterion, both branches covered. A parallel wave-1 dispatch
+built a differently-shaped but functionally equivalent fix independently
+and did not find the already-landed one; its diff conflicted on
+cherry-pick and was not merged.
+- **Date:** 2026-08-18

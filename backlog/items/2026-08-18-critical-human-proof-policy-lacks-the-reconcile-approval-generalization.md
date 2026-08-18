@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critical-human-proof-policy-lacks-the-reconcile-approval-generalization
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
+closed_at: "2026-08-18"
+closure_repository: "self"
+closure_commit: "d44f992eb60120005a4a02950af1356e2484d719"
+closure_evidence: "plugins/pipeline-core/lib/critical-human-proof-policy.test.mjs"
 source: "PO, 2026-08-18, relayed live from the sibling agent-pipeline-share_phoenix session: Phoenix's local `plugins/pipeline-core/lib/critical-human-proof-policy.mjs` was legitimately generalized (ADR-0056's 2026-08-11 Follow-up, PHX-WP-PAC08-RECONCILE-APPROVAL) to a `GATE_APPROVAL_MODE_KEYS` lookup table supporting a second gate (`gates.reconcile_approval`, kind `feature-package-reconcile`), multi-round Critic-reviewed (T2-T5 findings referenced in its own comments). Phoenix's TP-7-protected `guard-testpath-override.test.mjs` OT09 still pins the pre-generalization literal `gates?.push_approval`, which no longer appears in the generalized source, blocking Phoenix's own Verify/push. TP-7 requires the fix at an explicit author source root, which Phoenix's own session cannot self-select or write to. Confirmed by direct read of both repos: neither this repo (Nova) nor the local marketplace copy has the generalization yet -- Nova and marketplace currently agree with each other (both pre-generalization), only Phoenix has moved ahead."
 ---
 
@@ -62,4 +66,35 @@ TP-7-protected pinned assertion that must track the new source shape).
   step, not part of this item's own closure.
 - **Dispatch:** `goldfish-deep` (security-adjacent gate-strength code,
   protected-test-path handling), with a fresh Critic review before merge.
+
+### Closure, 2026-08-18 (evening)
+
+**Decision:** Closed. Implemented by an earlier same-day dispatch (commit
+`d44f992e`, before this item's own wave-1 re-dispatch ran) and the OT09
+pin fix landed separately (`467a92bc`, via a completed signed HGO
+author-repair ceremony — the TP-7 route this item's source paragraph
+says Phoenix's own session could not self-select). Verified live:
+`node --test plugins/pipeline-core/lib/critical-human-proof-policy.test.mjs`
+→ 31/31 pass; `guard-testpath-override.test.mjs` OT09 already matches the
+generalized shape. `feature-package-reconcile` correctly does not appear
+in `CRITICAL_ACTION_KINDS`, and `po-human-approval.mjs` carries no
+reconcile references — the ported surface stays dormant/unused exactly
+as scoped. A parallel wave-1 dispatch confirmed this same finding
+independently (no-op, nothing further to implement).
+
+**Known gap, not blocking this closure:** this item's own Triage asked
+for "a fresh Critic review before merge" specifically for the Nova port;
+no dedicated Critic-review commit is visible near `d44f992e` in this
+repo's history (the design itself was multi-round Critic-reviewed in
+Phoenix before the port, per the source paragraph, but that is a
+different repository's review, not this one's). Closing anyway because
+the ported surface is genuinely dormant — no new call site makes it
+reachable, `readReconcileApprovalMode`/the generalized
+`criticalProofWaiverFor` branch affect nothing until a future dispatch
+wires `feature-package-reconcile` into `CRITICAL_ACTION_KINDS` — so the
+review gap carries no live risk today. Whoever does that future wiring
+dispatch should treat a Critic review of this ported surface as a
+prerequisite, not an optional nicety, since that is the point it stops
+being dormant.
+- **Date:** 2026-08-18
 

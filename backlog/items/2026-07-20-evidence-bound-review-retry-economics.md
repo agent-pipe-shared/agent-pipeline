@@ -181,4 +181,29 @@ designed, triaged, and lands.
   can move toward closure — matching the same two-step pattern
   (build-in-isolation, then wire-and-review) `NVA-RETRYECON-1`'s own
   Triage already used successfully.
+
+### Wave-1 dispatch attempt, 2026-08-18 (evening) — stopped clean, genuinely blocked, re-queued
+
+A wave-1 dispatch against this item stopped clean with no commit: its
+worktree was provisioned from a stale `origin/HEAD`-tracked base
+(`2eb4466c`, ~100 commits behind `feat/sprint-nova-codex-v046`'s tip),
+so `review-retry-planner.mjs` did not exist anywhere in that checkout —
+correctly recognized as a source contradiction with the briefing's own
+"already built" premise, and correctly NOT rebuilt from scratch (would
+have created a second, divergent, unreviewed implementation). Confirmed
+from the primary checkout: the module is real, at `4d23d8c2`
+("feat(pipeline-core): add a standalone evidence-bound review-retry
+planner") plus a doc-comment follow-up `9fe6e730`, both already on
+`feat/sprint-nova-codex-v046`'s tip. The wiring into
+`harness/scripts/verify.mjs`/`publication-executor.mjs` and the
+suite-enumeration registration — this item's actual remaining scope —
+is still genuinely not done. Status stays `in_progress`, not closed.
+Re-queued for a wave-2 dispatch with an explicit expected base SHA in
+its briefing (the missing ingredient that let the staleness go
+unnoticed until the dispatch's own stop-clean report caught it), and the
+same TP-3 (`verify.mjs`) constraint as before: prepare and test the
+wiring as ready-to-integrate without editing `verify.mjs` itself unless
+a signed ceremony is available, and stop clean naming exactly what
+remains blocked otherwise.
+- **Date:** 2026-08-18
 - **Date:** 2026-08-18
