@@ -99,3 +99,69 @@ incident cannot recur silently.
   `onboarding-continuity.mjs`, not a rushed patch while recovering from
   the incident it caused.
 - **Date:** 2026-08-18
+
+### PO-decision implementation, 2026-08-18 (wave 3, dispatch NVA-W3-10)
+
+**PO decision implemented:** decision #15, direction A — minimal
+patch, changing ONLY the one root-caused call site in
+`plugins/pipeline-core/lib/onboarding-continuity.mjs`, rather than a
+full call-site audit across the file.
+
+**What was changed:**
+
+- `plugins/pipeline-core/lib/onboarding-continuity.mjs`, inside
+  `observeDetailed()` (the function `classifyOnboardingContinuity()`
+  calls internally — the exact site that stranded the session in this
+  incident, ~line 588 after the edit, ~line 581 before it): the
+  `calibration.handover` read now resolves the same dual shape
+  `plugins/pipeline-core/lib/handover-rotation.mjs`'s
+  `resolveHandoverConfig()` already supports — a plain string names
+  the path directly (pre-ADR-0066 shape); an ADR-0066 Decision 5
+  `{ path, maxBytes }` object names it via its `.path` field
+  (`maxBytes` is not read at this call site, which never needed it).
+  Anything else — including an object with no usable `.path` — still
+  reaches `safeRelativePath()` and fails closed with
+  `KICKOFF-PATH-UNSAFE`, exactly as before this fix; only the two
+  sanctioned shapes are newly accepted.
+- `plugins/pipeline-core/lib/onboarding-continuity.test.mjs`: added two
+  regression checks next to the existing "custom configured handover"
+  check — one confirming an object-shaped `{ path, maxBytes }` handover
+  is now observed (`damaged` status, matching the plain-string
+  equivalent, instead of throwing/`unavailable`), and one confirming an
+  object without a usable `.path` still fails closed to `unavailable`
+  (the pre-existing safety behavior is preserved, not loosened).
+
+**Deviation (judgment call, not a re-decision):** the exact code
+pattern the PO decision quotes verbatim
+(`calibration.handover === undefined ? "docs/state.md" :
+safeRelativePath(calibration.handover, ...)`) actually occurs at TWO
+places in this file, byte-for-byte identical: the one above (inside
+`observeDetailed()`, confirmed root cause of the live incident) and a
+second one inside `syncStateMdNextAction()` (~line 3430). The decision
+text names "the one call site" singular; this item's own "Affected
+artifact" section also names only the ~line-578 site as the
+confirmed-broken one, explicitly leaving siblings unaudited. I treated
+the `observeDetailed()` site as the intended target (it is the one that
+actually broke and stranded the session) and left
+`syncStateMdNextAction()` untouched, per the decision's explicit
+"rather than a full call-site audit across the codebase." Note for
+whoever reviews this: `syncStateMdNextAction()`'s occurrence is wrapped
+in a catch-all `try/catch` that falls back to `"docs/state.md"` on ANY
+error, so an object-shaped `handover` there does NOT strand a session
+the way the fixed site did — it silently resyncs the wrong (default)
+file instead of the configured one. Different, milder symptom; still
+the same underlying dual-shape gap. Left open for a possible follow-up
+item if the PO wants that call site closed too.
+
+**Evidence:** `node --test
+plugins/pipeline-core/lib/onboarding-continuity.test.mjs` — 160/160
+checks passed (158 pre-existing + 2 new), exit code 0.
+
+**Closure:** left `status: open`. The confirmed-broken, session-
+stranding call site is fixed and regression-tested per the PO's
+explicit minimal-patch decision, but the sibling occurrence identified
+above shares the same underlying dual-shape gap (milder symptom, not
+audited or fixed here) and the decision text's own wording ("the one
+call site") is ambiguous between the two byte-identical occurrences.
+Leaving this open rather than guessing at closure, per the dispatch
+briefing's own instruction to leave status as-is when unsure.
