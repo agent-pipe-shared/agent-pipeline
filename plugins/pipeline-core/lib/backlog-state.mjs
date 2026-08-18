@@ -14,6 +14,7 @@ export const ITEM_SCHEMA = "pipeline.backlog-item.v1";
 export const TRANSITION_SCHEMA = "pipeline.backlog-transition.v1";
 export const TRANSITION_V2_SCHEMA = "pipeline.backlog-transition.v2";
 export const EVIDENCE_AMENDMENT_SCHEMA = "pipeline.backlog-evidence-amendment.v1";
+export const ITEM_HASH_RESCOPE_AMENDMENT_SCHEMA = "pipeline.backlog-item-hash-rescope-amendment.v1";
 export const INDEX_SCHEMA = "pipeline.backlog-index.v1";
 export const SENTINEL_RECOVERY_CATALOG_SCHEMA = "pipeline.sentinel-backlog-recovery.v1";
 export const PROJECT_CLOSURE_READBACK_SCHEMA = "pipeline.project-closure-readback.v1";
@@ -38,6 +39,8 @@ const V2_EVIDENCE_AMENDMENT_KEYS = new Set(["schema", "kind", "targetSequence", 
 const V2_ORDINARY_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "legacyStatus"]);
 const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
 const MANAGED_ONBOARDING_REPAIR_ID = "pipeline.managed-onboarding-success-contract";
+const ITEM_HASH_RESCOPE_AMENDMENT_KEYS = new Set(["kind", "amendsSequence", "itemId", "scope", "itemSha256", "rationale"]);
+const ITEM_HASH_RESCOPE_SCOPES = Object.freeze(["pre-triage"]);
 const REACHABILITY_REPAIR_ACTOR = "hotfix-047-reachability-repair";
 const REACHABILITY_REPAIR_TARGETS = Object.freeze({
   "pipeline.elephant-direct-implementation-under-afk-authorization": Object.freeze({
@@ -286,6 +289,20 @@ export function transitionHash(event) {
   return createHash("sha256").update(canonicalJson(copy)).digest("hex");
 }
 
+const TRIAGE_HEADING_PATTERN = /^## Triage\b/mu;
+
+/**
+ * Everything in a backlog item's file bytes strictly before its `## Triage`
+ * heading line (frontmatter + body up to that point). Used to narrow a
+ * missing-initial-ledger-repair byte pin so routine Triage edits do not
+ * invalidate it once an `item-hash-rescope-amendment` event exists.
+ */
+export function itemPreTriageContent(text) {
+  if (typeof text !== "string") return text;
+  const match = TRIAGE_HEADING_PATTERN.exec(text);
+  return match ? text.slice(0, match.index) : text;
+}
+
 /** Validate the closed, authority-bound evidence repair carried by v2 events. */
 export function validateBacklogEvidenceAmendment(evidence, { label = "evidence amendment", readDispositionBytes = null, authorizeAmendment = null } = {}) {
   const errors = [];
@@ -497,7 +514,8 @@ export function validateTransitionShape(event, label, { readDispositionBytes = n
   const v2Amendment = isV2EvidenceAmendment(event);
   const afkRepair = event.id === AFK_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
   const managedRepair = event.id === MANAGED_ONBOARDING_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
-  if (event.from === event.to && !amendment && !reachabilityAmendment) errors.push(`${label}: transition must change status`);
+  const hashRescopeAmendment = event.from === event.to && event?.evidence?.kind === "item-hash-rescope-amendment";
+  if (event.from === event.to && !amendment && !reachabilityAmendment && !hashRescopeAmendment) errors.push(`${label}: transition must change status`);
   if (!validDate(asString(event.at))) errors.push(`${label}: at must be an ISO calendar date`);
   if (!ITEM_ID.test(asString(event.actor))) errors.push(`${label}: actor must be a lowercase stable identifier`);
   if (asString(event.reason).trim().length === 0) errors.push(`${label}: reason must be non-empty`);
@@ -530,10 +548,12 @@ export function validateTransitionShape(event, label, { readDispositionBytes = n
           ? AFK_REPAIR_EVIDENCE_KEYS
           : managedRepair
             ? new Set(["kind", "commit", "reference", "itemSha256"])
-            : new Set(["kind", "commit", "legacyStatus", "reference"]);
+            : hashRescopeAmendment
+              ? ITEM_HASH_RESCOPE_AMENDMENT_KEYS
+              : new Set(["kind", "commit", "legacyStatus", "reference"]);
     for (const key of Object.keys(event.evidence)) if (!evidenceKeys.has(key)) errors.push(`${label}: evidence has unsupported field ${key}`);
     if (typeof event.evidence.kind !== "string" || event.evidence.kind.length === 0) errors.push(`${label}: evidence.kind must be non-empty`);
-    if (!OID.test(asString(event.evidence.commit))) errors.push(`${label}: evidence.commit must be a full lowercase Git commit OID`);
+    if (!hashRescopeAmendment && !OID.test(asString(event.evidence.commit))) errors.push(`${label}: evidence.commit must be a full lowercase Git commit OID`);
     if (own(event.evidence, "legacyStatus") && typeof event.evidence.legacyStatus !== "string") errors.push(`${label}: evidence.legacyStatus must be a string`);
     if (own(event.evidence, "reference") && !SAFE_REPOSITORY_PATH.test(asString(event.evidence.reference))) errors.push(`${label}: evidence.reference must be a safe repository-relative path`);
     if (amendment) {
@@ -565,6 +585,13 @@ export function validateTransitionShape(event, label, { readDispositionBytes = n
     }
     if (afkRepair && !HASH.test(asString(event.evidence.sourceSha256))) errors.push(`${label}: sourceSha256 must be a SHA-256 hex digest`);
     if (managedRepair && !HASH.test(asString(event.evidence.itemSha256))) errors.push(`${label}: itemSha256 must be a SHA-256 hex digest`);
+    if (hashRescopeAmendment) {
+      if (!Number.isSafeInteger(event.evidence.amendsSequence) || event.evidence.amendsSequence < 1) errors.push(`${label}: amendsSequence must be a positive integer`);
+      if (event.evidence.itemId !== event.id) errors.push(`${label}: itemId must match the event id`);
+      if (!ITEM_HASH_RESCOPE_SCOPES.includes(event.evidence.scope)) errors.push(`${label}: scope must be a supported item-hash-rescope-amendment scope`);
+      if (!HASH.test(asString(event.evidence.itemSha256))) errors.push(`${label}: itemSha256 must be a SHA-256 hex digest`);
+      if (typeof event.evidence.rationale !== "string" || event.evidence.rationale.trim().length === 0 || event.evidence.rationale.length > 512) errors.push(`${label}: rationale must be a non-empty string of at most 512 characters`);
+    }
   }
   if (!(event.previousHash === null || HASH.test(asString(event.previousHash)))) errors.push(`${label}: previousHash must be null or a SHA-256 hex digest`);
   if (!HASH.test(asString(event.entryHash))) errors.push(`${label}: entryHash must be a SHA-256 hex digest`);
@@ -640,6 +667,12 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
     if (!itemById.has(event.id)) mark(index, `${label}: id does not name a current backlog item`);
     const item = itemById.get(event.id);
     if (event?.evidence?.kind === "missing-initial-ledger-repair" && event.evidence.sourceSha256 && event.evidence.sourceSha256 !== createHash("sha256").update(asString(item?.metadata?.source)).digest("hex")) errors.push(`${label}: sourceSha256 does not bind the current item source`);
+    if (event?.evidence?.kind === "item-hash-rescope-amendment") {
+      const rescopeTarget = events[event.evidence.amendsSequence - 1];
+      if (!isPlainObject(rescopeTarget) || rescopeTarget.id !== event.id || rescopeTarget.sequence !== event.evidence.amendsSequence || rescopeTarget?.evidence?.kind !== "missing-initial-ledger-repair") {
+        errors.push(`${label}: item-hash-rescope-amendment amendsSequence does not identify a missing-initial-ledger-repair event for this item`);
+      }
+    }
     const prior = stateById.get(event.id);
     const v2Amendment = isV2EvidenceAmendment(event);
     if (prior === undefined) {
@@ -652,14 +685,17 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
       if (prior === "closed") {
         const closureAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment";
         const reachabilityAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "reachability-amendment";
+        const hashRescopeAmendmentClosed = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "item-hash-rescope-amendment";
         if (v2Amendment) {
           if (event.to !== "closed") mark(index, `${label}: evidence amendment must preserve closed status`);
-        } else if (!closureAmendment && !reachabilityAmendment) errors.push(`${label}: closed must never transition to another status`);
+        } else if (!closureAmendment && !reachabilityAmendment && !hashRescopeAmendmentClosed) errors.push(`${label}: closed must never transition to another status`);
         else if (closureAmendment && event.evidence.previousClosureCommit !== closureCommitById.get(event.id)) errors.push(`${label}: previousClosureCommit does not bind the prior closure`);
       } else if (v2Amendment) {
         if (event.to !== prior) mark(index, `${label}: evidence amendment must not mutate status`);
       } else if (event?.evidence?.kind === "reachability-amendment") {
         if (event.to !== prior) errors.push(`${label}: reachability amendment must preserve status`);
+      } else if (event?.evidence?.kind === "item-hash-rescope-amendment") {
+        if (event.to !== prior) errors.push(`${label}: item hash rescope amendment must preserve status`);
       } else if (FORWARD_TRANSITIONS[prior] !== event.to) errors.push(`${label}: ${prior} may only move to ${FORWARD_TRANSITIONS[prior]}`);
     }
     if (BACKLOG_STATUSES.includes(event.to)) stateById.set(event.id, event.to);
@@ -1051,6 +1087,47 @@ export function planManagedOnboardingLedgerRepair(items, events, input) {
   if (events.some((event) => event?.id === MANAGED_ONBOARDING_REPAIR_ID)) errors.push("managed onboarding ledger repair event already exists");
   if (errors.length) return { ok: false, errors, items, events, projection: null };
   const event = { schema: TRANSITION_SCHEMA, sequence: events.length + 1, id: MANAGED_ONBOARDING_REPAIR_ID, from: null, to: "open", at: input.at, actor: input.actor, reason: "Admit the existing open 0.4.7 managed-onboarding success-contract item; no implementation or closure is claimed.", evidence: { kind: "missing-initial-ledger-repair", commit: input.evidenceCommit, reference: record.path, itemSha256: input.itemSha256 }, previousHash: events.at(-1)?.entryHash ?? null, entryHash: "" };
+  event.entryHash = transitionHash(event);
+  const nextEvents = [...events, event];
+  errors.push(...validateTransitionLedger(nextEvents, items));
+  return { ok: errors.length === 0, errors, items, events: nextEvents, event, projection: errors.length ? null : projectBacklog(items, nextEvents) };
+}
+
+/**
+ * Narrow a missing-initial-ledger-repair byte pin to the item's pre-Triage
+ * content, without mutating the amended event or the item's status. The
+ * amended event stays byte-for-byte intact; `check-backlog-state.mjs` uses
+ * the latest matching amendment (by `amendsSequence`) instead once one
+ * exists (backlog/items/2026-08-17-managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits.md).
+ */
+export function planBacklogItemHashRescopeAmendment(items, events, input) {
+  const errors = [];
+  const { id, at, actor, reason, amendsSequence, scope, itemSha256, rationale } = input ?? {};
+  const index = items.findIndex((entry) => entry?.metadata?.id === id);
+  if (index === -1) return { ok: false, errors: [`item hash rescope amendment: unknown item id ${id}`], items, events, projection: null };
+  const original = items[index];
+  const target = events[amendsSequence - 1];
+  if (!isPlainObject(target) || target.id !== id || target.sequence !== amendsSequence || target?.evidence?.kind !== "missing-initial-ledger-repair") {
+    errors.push("item hash rescope amendment: amendsSequence does not identify a missing-initial-ledger-repair event for this item");
+  }
+  if (!validDate(asString(at)) || !ITEM_ID.test(asString(actor)) || asString(reason).trim().length === 0) errors.push("item hash rescope amendment: actor/date/reason is invalid");
+  if (!ITEM_HASH_RESCOPE_SCOPES.includes(scope)) errors.push("item hash rescope amendment: scope is not a supported value");
+  if (!HASH.test(asString(itemSha256))) errors.push("item hash rescope amendment: itemSha256 must be a SHA-256 hex digest");
+  if (typeof rationale !== "string" || rationale.trim().length === 0) errors.push("item hash rescope amendment: rationale must be non-empty");
+  if (errors.length) return { ok: false, errors, items, events, projection: null };
+  const event = {
+    schema: TRANSITION_SCHEMA,
+    sequence: events.length + 1,
+    id,
+    from: original.metadata.status,
+    to: original.metadata.status,
+    at,
+    actor,
+    reason,
+    evidence: { kind: "item-hash-rescope-amendment", amendsSequence, itemId: id, scope, itemSha256, rationale },
+    previousHash: events.at(-1)?.entryHash ?? null,
+    entryHash: "",
+  };
   event.entryHash = transitionHash(event);
   const nextEvents = [...events, event];
   errors.push(...validateTransitionLedger(nextEvents, items));

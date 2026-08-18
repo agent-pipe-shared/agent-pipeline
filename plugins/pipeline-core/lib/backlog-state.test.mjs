@@ -16,10 +16,12 @@ import {
   TRANSITION_V2_SCHEMA,
   canonicalJson,
   classifyBacklogFindings,
+  itemPreTriageContent,
   LEDGER_DRIFT_CUTOFF_SEQUENCE,
   parseBacklogItem,
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
+  planBacklogItemHashRescopeAmendment,
   planBacklogReachabilityRepair,
   planBacklogTransition,
   planElephantAfkLedgerRepair,
@@ -35,6 +37,7 @@ import {
 } from "./backlog-state.mjs";
 import {
   applyBacklogEvidenceAmendment,
+  applyBacklogItemHashRescopeAmendment,
   applyBacklogTransition,
   applyElephantAfkLedgerRepair,
   applyManagedOnboardingLedgerRepair,
@@ -390,6 +393,35 @@ function managedRepairInput(root, overrides = {}) {
   const itemSha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
   return { id: MANAGED_REPAIR_ID, at: "2026-07-29", actor: "hotfix-047-missing-initial-ledger-repair", evidenceCommit: "a".repeat(40), itemSha256, ...overrides };
 }
+const MANAGED_ITEM_PATH = "backlog/items/2026-07-25-managed-onboarding-success-contract.md";
+const PRE_TRIAGE_BODY = "\n# Managed onboarding success contract\n\nSome details before triage.\n\n## Triage\n\nOriginal triage placeholder.\n";
+function rescopeFixture(body = PRE_TRIAGE_BODY) {
+  const root = fixtureRoot();
+  const other = item();
+  write(root, "backlog/items/example.md", renderBacklogItem(other));
+  write(root, "backlog/transitions.ndjson", `${canonicalJson(event())}\n`);
+  writeBacklogProjections(root, { checkCommit: false });
+  const missing = item({ id: MANAGED_REPAIR_ID, type: "workflow-improvement", created: "2026-07-25", source: "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix" });
+  missing.path = MANAGED_ITEM_PATH;
+  missing.body = body;
+  write(root, missing.path, renderBacklogItem(missing));
+  return root;
+}
+function rescopeInput(root, amendsSequence, overrides = {}) {
+  const path = join(root, MANAGED_ITEM_PATH);
+  const itemSha256 = createHash("sha256").update(itemPreTriageContent(readFileSync(path, "utf8"))).digest("hex");
+  return {
+    id: MANAGED_REPAIR_ID,
+    at: "2026-08-18",
+    actor: "hotfix-047-item-hash-rescope",
+    reason: "Narrow the missing-initial-ledger-repair byte pin to pre-Triage content so a routine Triage edit does not invalidate it.",
+    amendsSequence,
+    scope: "pre-triage",
+    itemSha256,
+    rationale: "Allow the item's Triage section to be filled in without re-deriving the original ledger repair.",
+    ...overrides,
+  };
+}
 
 {
   const source = renderBacklogItem(item({ source: "A source: with punctuation" }));
@@ -628,6 +660,45 @@ function managedRepairInput(root, overrides = {}) {
   const failedApply = applyManagedOnboardingLedgerRepair(root, input, { checkCommit: false, atomicWrite(path, content) { writeFileSync(path, content); if (++writes === 2) throw new Error("simulated interruption"); } });
   const after = paths.map((path) => readFileSync(join(root, path), "utf8"));
   check("BS21 managed repair interruption restores all preimages", !failedApply.ok && JSON.stringify(before) === JSON.stringify(after) && !existsSync(join(root, "backlog/.state-transaction.json")), failedApply.findings.join("; "));
+}
+
+{
+  const root = rescopeFixture();
+  const applied = applyManagedOnboardingLedgerRepair(root, managedRepairInput(root), { checkCommit: false });
+  const afterRepair = checkBacklogState(root, { checkCommit: false });
+  const rescopeApplied = applyBacklogItemHashRescopeAmendment(root, rescopeInput(root, applied.transition?.sequence), { checkCommit: false });
+  const afterRescope = checkBacklogState(root, { checkCommit: false });
+  const itemPath = join(root, MANAGED_ITEM_PATH);
+  write(root, MANAGED_ITEM_PATH, readFileSync(itemPath, "utf8").replace("Original triage placeholder.", "Filled-in triage decision text."));
+  const afterEdit = checkBacklogState(root, { checkCommit: false });
+  check("BS30 item-hash-rescope-amendment admits a post-Triage-only edit once the amendment exists",
+    applied.ok && afterRepair.ok && rescopeApplied.ok && afterRescope.ok && afterEdit.ok,
+    [...afterRepair.findings, ...rescopeApplied.findings, ...afterRescope.findings, ...afterEdit.findings].join("; "));
+}
+
+{
+  const root = rescopeFixture();
+  const applied = applyManagedOnboardingLedgerRepair(root, managedRepairInput(root), { checkCommit: false });
+  const rescopeApplied = applyBacklogItemHashRescopeAmendment(root, rescopeInput(root, applied.transition?.sequence), { checkCommit: false });
+  const itemPath = join(root, MANAGED_ITEM_PATH);
+  write(root, MANAGED_ITEM_PATH, readFileSync(itemPath, "utf8").replace("Some details before triage.", "Materially different pre-Triage details."));
+  const afterEdit = checkBacklogState(root, { checkCommit: false });
+  check("BS31 item-hash-rescope-amendment still rejects a pre-Triage content change",
+    applied.ok && rescopeApplied.ok && !afterEdit.ok
+      && afterEdit.findings.some((finding) => finding.includes("item-hash-rescope-amendment itemSha256 does not bind")),
+    afterEdit.findings.join("; "));
+}
+
+{
+  const root = rescopeFixture();
+  const applied = applyManagedOnboardingLedgerRepair(root, managedRepairInput(root), { checkCommit: false });
+  const itemPath = join(root, MANAGED_ITEM_PATH);
+  write(root, MANAGED_ITEM_PATH, readFileSync(itemPath, "utf8").replace("Original triage placeholder.", "Filled-in triage decision text."));
+  const afterEdit = checkBacklogState(root, { checkCommit: false });
+  check("BS32 without an amendment, a missing-initial-ledger-repair item still pins the full file (regression guard)",
+    applied.ok && !afterEdit.ok
+      && afterEdit.findings.includes(`ledger event ${applied.transition?.sequence}: itemSha256 does not bind the current item bytes`),
+    afterEdit.findings.join("; "));
 }
 
 {

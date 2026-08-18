@@ -23,9 +23,11 @@ import {
   TRANSITION_V2_SCHEMA,
   canonicalJson,
   classifyBacklogFindings,
+  itemPreTriageContent,
   parseBacklogItem,
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
+  planBacklogItemHashRescopeAmendment,
   planBacklogReachabilityRepair,
   planBacklogTransition,
   planElephantAfkLedgerRepair,
@@ -530,7 +532,11 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
   for (const event of ledger.events) {
     if (event?.id === "pipeline.managed-onboarding-success-contract" && event?.evidence?.kind === "missing-initial-ledger-repair") {
       const bytes = itemBytes.get(event.id);
-      if (typeof bytes !== "string" || event.evidence.itemSha256 !== createHash("sha256").update(bytes).digest("hex")) findings.push(`ledger event ${event.sequence}: itemSha256 does not bind the current item bytes`);
+      const rescope = [...ledger.events].reverse().find((candidate) => candidate?.evidence?.kind === "item-hash-rescope-amendment" && candidate.id === event.id && candidate.evidence.amendsSequence === event.sequence);
+      if (rescope) {
+        const preTriage = typeof bytes === "string" ? itemPreTriageContent(bytes) : null;
+        if (preTriage === null || rescope.evidence.itemSha256 !== createHash("sha256").update(preTriage).digest("hex")) findings.push(`ledger event ${event.sequence}: item-hash-rescope-amendment itemSha256 does not bind the current item's pre-Triage bytes`);
+      } else if (typeof bytes !== "string" || event.evidence.itemSha256 !== createHash("sha256").update(bytes).digest("hex")) findings.push(`ledger event ${event.sequence}: itemSha256 does not bind the current item bytes`);
     }
     if (event?.evidence?.kind === "reachability-amendment") {
       findings.push(...reachabilityAmendmentFindings(root, event));
@@ -889,6 +895,24 @@ export function applyManagedOnboardingLedgerRepair(root = DEFAULT_ROOT, input, o
   const managedBytes = managedItem ? readFileSync(join(root, managedItem.path)) : null;
   if (!managedBytes || createHash("sha256").update(managedBytes).digest("hex") !== input?.itemSha256) return { ...current, ok: false, findings: ["managed onboarding ledger repair item bytes changed"], wrote: false, transition: null };
   const planned = planManagedOnboardingLedgerRepair(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const item = current.items.find((entry) => entry.metadata.id === input.id);
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    { path: item.path, after: readFileSync(join(root, item.path), "utf8") },
+    { path: LEDGER_PATH, after: `${ledgerBefore}${JSON.stringify(planned.event)}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+}
+
+/** Append one item-hash-rescope-amendment; never touches the amended event or the item file. */
+export function applyBacklogItemHashRescopeAmendment(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  if (!current.ok) return { ...current, wrote: false, transition: null };
+  const planned = planBacklogItemHashRescopeAmendment(current.items, current.events, input);
   if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
   const item = current.items.find((entry) => entry.metadata.id === input.id);
   const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
