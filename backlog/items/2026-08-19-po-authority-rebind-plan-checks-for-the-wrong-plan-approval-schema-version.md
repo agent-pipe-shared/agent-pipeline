@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "2dd82be31765992217e6a3eecab4aab38d2cc49b"
+closure_evidence: "backlog/items/2026-08-19-po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version.md"
 source: "Found live while recovering from a real GUARD-LIFECYCLE-NOT-READY session-wide incident on 2026-08-19 (spec.md/PRD authority drift caused by an ADR-0047 reference fix); see backlog/items/2026-08-09-adr-0047-renumber-left-live-references-behind.md's 2026-08-19 closing triage for the full recovery record."
 ---
 
@@ -101,7 +105,18 @@ real approval defect), which is itself the bug to fix.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Closed. Implemented candidate 1 (widen `validRebindApproval()` to
+  accept v4, mirroring `validPriorAuthority()`'s own already-working v2/v4
+  dual-handling pattern in the same file) — `PHX-WP-REBIND-V4-SCHEMA`, commit
+  `2dd82be3`. `buildPoAuthorityRebindPlan` itself needed no change: its own
+  downstream v4-branch code was already present and simply dead because this
+  function blocked it upstream.
+- **Rationale:** Independently re-verified by the Elephant: new v4 regression
+  suite 7/7 pass (`pipeline-state-rebind-runner.test.mjs`, both a genuinely
+  stale v4 case succeeding and a not-stale v4 case still correctly returning
+  `PO-REBIND-NOT-STALE`), and the full pre-existing v2-path suite 46/46 pass
+  unchanged (`PIPELINE_STATE_PS53_ONLY=1 node harness/scripts/pipeline-state.test.mjs`).
+  Candidate 3 (fix `guard-lifecycle-ready.mjs`'s guidance) is now moot — the
+  guidance already points at the command this fix makes actually work.
+- **Assignment:** none remaining.
+- **Date:** 2026-08-19
