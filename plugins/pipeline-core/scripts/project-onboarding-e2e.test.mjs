@@ -229,7 +229,7 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(planned.json.nextAction.argv[1], "apply-portable-seed");
     const applied = run(onboarding, actionArgs(planned.json), path);
     assert.equal(applied.status, 0);
-    assert.equal(applied.json.status, "kickoff-required");
+    assert.equal(applied.json.status, "intake-required");
     assert.equal(applied.json.runtime.status, "plugin-managed-unattested");
     assert.equal(applied.json.nextAction.kind, "collect-input");
     const goal = "Build one small HTML game from the supplied design";

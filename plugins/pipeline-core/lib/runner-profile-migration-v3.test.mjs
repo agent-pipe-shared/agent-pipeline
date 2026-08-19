@@ -1416,7 +1416,7 @@ function freshlyOnboardedRoot() {
       planSha256: argv[argv.indexOf("--plan-sha256") + 1],
       activate: true,
     });
-    assert.equal(initialized.status, "kickoff-required", "runtime initialization must seed the compatibility tier");
+    assert.equal(initialized.status, "intake-required", "runtime initialization must seed the compatibility tier");
     return root;
   } catch (error) { rmSync(root, { recursive: true, force: true }); throw error; }
 }
