@@ -1050,6 +1050,94 @@ if (inspection.message !== null) {
   }
 }
 
+// ---- GG-22: a commit must not leave an earlier backlog status-flip unreconciled since ----
+// the last backlog/transitions.ndjson touch -------------------------------------------------
+//
+// Stateless, recomputed fresh every invocation from repository STATE (staged diff + recent
+// history) -- shells out to git via spawnSync exactly like the GG-03 push-verification code
+// above (`gitObjectId`), never a regex against the raw command text. Debt detection is bounded
+// to commits since the last reconciliation, never a scan of the whole item corpus. This is a
+// plain deny, never wired into the override-arming machinery: the fix is always cheap and
+// mechanical (run reconcile-backlog-ledger.mjs --activate, then commit its output), so there
+// is no legitimate reason an agent would need to bypass it with `OVERRIDE GG-22`.
+//
+// Gated on `inspection.message !== null` (already computed above for GIT-03/GIT-01) rather
+// than a fresh isGitCommit() call: that helper is private to ../lib/commit-message-policy.mjs
+// (not exported), so re-deriving "is this a git commit" here would duplicate GIT-01's already-
+// landed detection instead of reusing it. Same accepted edge case GIT-01 already lives with one
+// block above: an editor-invoked commit with no -m/-F/heredoc message is not inspected
+// (`inspection.message === null`) and is therefore not gated by GG-22 either -- this
+// repository's own commit discipline (guard-lifecycle-ready's one-simple-command grammar)
+// already requires -m/-F for every agent-issued commit, so this is not a practical gap for the
+// agents this guard governs.
+if (inspection.message !== null) {
+  try {
+    const root = resolve(projectDir);
+    const run = (args) => spawnSync("git", ["-C", root, ...args], { encoding: "utf8", shell: false, timeout: 5000 });
+
+    const lastReconcileRun = run(["log", "-1", "--format=%H", "--", "backlog/transitions.ndjson"]);
+    if (lastReconcileRun.error) throw lastReconcileRun.error;
+    // Bootstrap case: the ledger file has never been touched in this repository's history --
+    // no-op the rule entirely until it exists once, rather than diffing against an empty ref.
+    const lastReconcile = lastReconcileRun.status === 0 ? String(lastReconcileRun.stdout ?? "").trim() : "";
+    if (lastReconcile !== "") {
+      const range = `${lastReconcile}..HEAD`;
+      const touchedRun = run(["diff", "--name-only", range, "--", "backlog/items/"]);
+      if (touchedRun.error) throw touchedRun.error;
+      const itemsTouchedSinceReconcile = touchedRun.status === 0
+        ? String(touchedRun.stdout ?? "").split("\n").map((line) => line.trim()).filter(Boolean)
+        : [];
+
+      // Mirrors the frontmatter `status:` key check-backlog-state.mjs/reconcile-backlog-ledger.mjs
+      // already parse; a `-status: <old>` line paired with a differently-valued `+status: <new>`
+      // line in the same file's diff is a real status change. A Triage-only edit never touches
+      // this line, so it never creates debt.
+      const STATUS_DIFF_LINE = /^([+-])status:\s*(.+?)\s*$/;
+      const debtPaths = [];
+      for (const path of itemsTouchedSinceReconcile) {
+        const fileDiffRun = run(["diff", range, "--", path]);
+        if (fileDiffRun.error) throw fileDiffRun.error;
+        if (fileDiffRun.status !== 0) continue;
+        let removedStatus = null;
+        let addedStatus = null;
+        for (const line of String(fileDiffRun.stdout ?? "").split("\n")) {
+          const match = STATUS_DIFF_LINE.exec(line);
+          if (!match) continue;
+          if (match[1] === "-") removedStatus = match[2];
+          else addedStatus = match[2];
+        }
+        if (removedStatus !== null && addedStatus !== null && removedStatus !== addedStatus) debtPaths.push(path);
+      }
+
+      if (debtPaths.length > 0) {
+        const stagedRun = run(["diff", "--cached", "--name-only"]);
+        if (stagedRun.error) throw stagedRun.error;
+        const stagedPaths = stagedRun.status === 0
+          ? String(stagedRun.stdout ?? "").split("\n").map((line) => line.trim()).filter(Boolean)
+          : [];
+        const LEDGER_PATHS = new Set(["backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"]);
+        // Allowed set = every backlog/items/*.md path (any item, not just debtPaths -- batched
+        // multi-item closures across several commits before one shared reconciliation commit
+        // are an established, legitimate pattern) UNION the ledger files themselves.
+        const disallowed = stagedPaths.filter((path) => !path.startsWith("backlog/items/") && !LEDGER_PATHS.has(path));
+        if (disallowed.length > 0) {
+          emit(2, [
+            `BLOCKED (git-guard GG-22, plugin pipeline-core): an earlier commit changed ` +
+              `${debtPaths.join(", ")}'s status without a matching ledger reconciliation since ` +
+              `${lastReconcile || "repository start"}.`,
+            "Run: node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate",
+            "Then commit the resulting backlog/STATUS.md / backlog/index.json / backlog/transitions.ndjson changes before any other commit.",
+          ]);
+        }
+      }
+    }
+  } catch {
+    // fail-open: guard is a safety net, not a prison (matches this file's existing discipline) --
+    // any spawnSync error, timeout, or unexpected git output must never itself become a source
+    // of an unrecoverable stuck repository.
+  }
+}
+
 const matched = [];
 for (const rule of UNION_BLOCKERS) if (rule.re.test(normalizedC)) matched.push(rule);
 for (const rule of RAW_BLOCKERS) if (rule.re.test(rawForQuoteRules)) matched.push(rule);
