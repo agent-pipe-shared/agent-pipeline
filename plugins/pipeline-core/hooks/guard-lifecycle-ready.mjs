@@ -25,6 +25,10 @@ import {
   PO_AUTHORITY_REBIND_UNAVAILABLE_DIAGNOSTICS,
 } from "../lib/project-onboarding-v3.mjs";
 import { automatedLifecycleArgvCommands } from "../scripts/project-onboarding-v3.mjs";
+import {
+  INTAKE_FEATURE_ID_PATTERN,
+  INTAKE_STAGING_DIRNAME,
+} from "../lib/onboarding-continuity.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import {
   hasCodexExistingGitControlMount,
@@ -2470,6 +2474,42 @@ function isPartialLifecycleIncidentReportWrite(input, root) {
 }
 
 /**
+ * NVA-BL-INTAKEBIND-1 (backlog: 2026-08-19-material-intake-bootstrap-bind-has-
+ * no-sanctioned-path-to-a-passing-plan-gate.md; design.md SSa.4/SSc.3). A
+ * session observed at `bootstrap-binding-required` (checkpoint
+ * transactionState "generated") has a freshly generated, explicitly unreviewed
+ * staging PRD/spec (SSa.4's own table: "staging is explicitly unbound, freely
+ * regenerable") that must be authored/reviewed and marked
+ * `po-plan-acknowledged` before `bootstrap-bind-apply` can bind it -- exactly
+ * the design's own intended review step. Without this admission no tool can
+ * ever perform that edit: `guard-lifecycle-ready.mjs` refuses every Edit/Write
+ * while onboarding isn't `ready`, with no override route (ADR-0059 Decision 5
+ * below). Narrow by construction, exactly like every sibling admission in this
+ * file: EXACTLY the two staging targets `intake-generate-apply` itself writes
+ * that are meant to be hand-authored before binding -- `prd_<featureId>.md`
+ * (featureId matched against INTAKE_FEATURE_ID_PATTERN, the exact shape
+ * onboarding-continuity.mjs's deriveIntakeFeatureId() produces, never a
+ * wildcard) and `spec.md`, both resolved directly under
+ * INTAKE_STAGING_DIRNAME. `design-input.md` is deliberately never matched --
+ * it is an immutable verbatim capture (design.md SSb "Explicitly excluded").
+ * Edit/Write only (never NotebookEdit, which none of these `.md` paths could
+ * legitimately name). The caller (evaluateAfterGrammarAdmission() below) is
+ * the one that gates this on `lifecycleStatus === "bootstrap-binding-required"`.
+ */
+function isBootstrapBindingStagingAuthoringWrite(input, root) {
+  const toolName = String(input?.tool_name ?? "");
+  if (toolName !== "Edit" && toolName !== "Write") return false;
+  const filePath = writeTargetPath(input?.tool_input, toolName);
+  if (filePath === "") return false;
+  const resolved = resolve(root, filePath);
+  const stagingDirectory = join(root, INTAKE_STAGING_DIRNAME);
+  if (resolved === join(stagingDirectory, "spec.md")) return true;
+  if (dirname(resolved) !== stagingDirectory) return false;
+  const prdMatch = basename(resolved).match(/^prd_(.+)\.md$/u);
+  return prdMatch !== null && INTAKE_FEATURE_ID_PATTERN.test(prdMatch[1]);
+}
+
+/**
  * ADR-0059 Decision 5 / NOVA-LCR-HGO-2: everything below -- the LAUNCH_SCRIPT
  * external-restart refusal and the onboarding-readiness gate (denial code
  * GUARD-LIFECYCLE-NOT-READY) -- stays outside HGO's authority no matter how the
@@ -2526,6 +2566,17 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       || (toolName === "Bash" && isRestartResumeHintCapture(input.tool_input.command, root)))) {
       return verdict(0);
     }
+    // NVA-BL-INTAKEBIND-1: the one narrow Edit/Write admission that lets a real
+    // session perform the design's own intended staging-PRD/spec review step
+    // (isBootstrapBindingStagingAuthoringWrite() above), gated on the exact
+    // lifecycleStatus a repo sitting at checkpoint transactionState "generated"
+    // observes.
+    const bootstrapBindingStagingAuthoringWrite = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && error.lifecycleStatus === "bootstrap-binding-required"
+      && isBootstrapBindingStagingAuthoringWrite(input, root);
+    if (bootstrapBindingStagingAuthoringWrite) return verdict(0);
     const exactPoAuthorityRebindRecovery = error instanceof ProjectOnboardingReadyError
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"

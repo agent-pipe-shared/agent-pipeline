@@ -5440,6 +5440,13 @@ export function applyOnboardingIntakeDesignQuestions({
 export const INTAKE_GENERATE_PLAN_SCHEMA = "pipeline.onboarding-intake-generate-plan.v1";
 export const INTAKE_GENERATE_APPLY_SCHEMA = "pipeline.onboarding-intake-generate-apply.v1";
 export const INTAKE_STAGING_DIRNAME = "project/.onboarding-staging";
+// Exported so guard-lifecycle-ready.mjs's narrow bootstrap-binding-required
+// staging-authoring admission (NVA-BL-INTAKEBIND-1) can recognize a real
+// `prd_<featureId>.md` target by the exact shape deriveIntakeFeatureId()
+// below produces, without re-deriving or independently guessing it -- single
+// source of truth for the shape, mirroring how INTAKE_STAGING_DIRNAME above
+// is already shared the same way.
+export const INTAKE_FEATURE_ID_PATTERN = /^onboarding-[a-f0-9]{12}$/u;
 const INTAKE_GENERATE_READY_STATES = new Set(["ready-to-generate", "generated"]);
 
 class SimulatedIntakeGenerateCrash extends Error {}
@@ -5539,8 +5546,22 @@ function buildIntakeDesignInputContent(checkpoint, chunks) {
   ].join("\n");
 }
 
-function buildIntakePrdContent(checkpoint, featureId, chunks) {
+// NVA-BL-INTAKEBIND-1: the two mechanical PO-gate markers (po-language,
+// technical-spec-sha256) are written on this content's first two lines,
+// mirroring initialPrdContent()'s exact marker-line format/position, so a
+// freshly-generated staging PRD -- no hand edit at all -- already carries
+// valid values for both. `specSha256` must be the ALREADY-COMPUTED sha256 of
+// the neighboring generated spec.md content (see
+// buildOnboardingIntakeGeneratePlan, which computes spec content/sha256
+// before calling this so the two never drift apart). The one marker that
+// remains a genuine judgment call -- po-plan-acknowledged -- is deliberately
+// NOT written here; see guard-lifecycle-ready.mjs's bootstrap-binding-required
+// staging-authoring admission for the sanctioned real edit path that adds it.
+function buildIntakePrdContent(checkpoint, featureId, chunks, specSha256) {
   return [
+    `<!-- po-language: ${checkpoint.values.language} -->`,
+    `<!-- technical-spec-sha256: ${specSha256} -->`,
+    "",
     intakeStagingGeneratedBanner(checkpoint),
     "",
     `# PRD -- ${featureId} (staging draft)`,
@@ -5609,8 +5630,13 @@ function buildOnboardingIntakeGeneratePlan({
   const chunks = readIntakeMaterialInputChunks(observed.paths, checkpoint);
   const featureId = deriveIntakeFeatureId(checkpoint);
   const designInputContent = buildIntakeDesignInputContent(checkpoint, chunks);
-  const prdContent = buildIntakePrdContent(checkpoint, featureId, chunks);
+  // NVA-BL-INTAKEBIND-1: spec content (and its sha256) must be computed BEFORE
+  // the PRD, because the PRD's own technical-spec-sha256 marker (AC-1) must
+  // bind to the real generated spec's bytes -- the same sha256 the spec
+  // target below carries, never re-derived independently.
   const specContent = buildIntakeSpecContent(checkpoint, featureId, chunks);
+  const specSha256 = sha256(Buffer.from(specContent, "utf8"));
+  const prdContent = buildIntakePrdContent(checkpoint, featureId, chunks, specSha256);
   const targets = {
     designInput: {
       path: `${INTAKE_STAGING_DIRNAME}/design-input.md`,
@@ -5624,7 +5650,7 @@ function buildOnboardingIntakeGeneratePlan({
     },
     spec: {
       path: `${INTAKE_STAGING_DIRNAME}/spec.md`,
-      afterSha256: sha256(Buffer.from(specContent, "utf8")),
+      afterSha256: specSha256,
       content: specContent,
     },
   };

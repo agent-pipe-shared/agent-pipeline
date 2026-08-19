@@ -2709,6 +2709,78 @@ test("NVA-LCREADONLY-2: partial denial names the diagnosis lane; other statuses 
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// NVA-BL-INTAKEBIND-1 (backlog: 2026-08-19-material-intake-bootstrap-bind-has-no-sanctioned-
+// path-to-a-passing-plan-gate.md): the narrow bootstrap-binding-required staging-authoring
+// admission -- proves it admits EXACTLY the two staging targets meant for hand-authored
+// review (prd_<featureId>.md, spec.md), never design-input.md (an immutable verbatim
+// capture), never a different path/tool/lifecycleStatus, and never widens any other lane.
+test("NVA-BL-INTAKEBIND-1: bootstrap-binding-required admits exactly the staging PRD/spec authoring writes, nothing wider", () => {
+  const path = root();
+  const featureId = "onboarding-0123456789ab";
+  const prdPath = `project/.onboarding-staging/prd_${featureId}.md`;
+  const specPath = "project/.onboarding-staging/spec.md";
+  const designInputPath = "project/.onboarding-staging/design-input.md";
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const bindingDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("bootstrap-binding-required"); } };
+
+    // AC-1: both admitted staging targets, for both Edit and Write.
+    for (const input of [write(prdPath), edit(prdPath), write(specPath), edit(specPath)]) {
+      assert.equal(evaluateLifecycleReadyGuard(input, bindingDeps).exitCode, 0, `${input.tool_name}:${input.tool_input.file_path}`);
+    }
+
+    // AC-2: design-input.md is NEVER admitted -- it must stay an immutable verbatim capture.
+    for (const input of [write(designInputPath), edit(designInputPath)]) {
+      const result = evaluateLifecycleReadyGuard(input, bindingDeps);
+      assert.equal(result.exitCode, 2, `${input.tool_name}:${input.tool_input.file_path}`);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u);
+    }
+
+    // AC-3: no other path, no glob, no directory-wide admission -- a malformed featureId
+    // shape, a nested path, and an unrelated staging-adjacent file all still refuse.
+    for (const filePath of [
+      "project/.onboarding-staging/prd_not-a-real-feature-id.md",
+      "project/.onboarding-staging/prd_onboarding-0123456789ab.md.bak",
+      "project/.onboarding-staging/nested/prd_onboarding-0123456789ab.md",
+      "project/.onboarding-staging/other.md",
+      "project/other-file.md",
+    ]) {
+      const result = evaluateLifecycleReadyGuard(edit(filePath), bindingDeps);
+      assert.equal(result.exitCode, 2, filePath);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, filePath);
+    }
+
+    // AC-4: never a tool other than Edit/Write -- Bash (a write-shaped, non-read-only-
+    // diagnostic command, so it does not accidentally hit the unrelated read-only lane) and
+    // NotebookEdit both still refuse.
+    for (const input of [bash(`rm ${prdPath}`), notebookEdit(prdPath)]) {
+      const result = evaluateLifecycleReadyGuard(input, bindingDeps);
+      assert.equal(result.exitCode, 2, input.tool_name);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_name);
+    }
+
+    // AC-5: never a lifecycleStatus other than bootstrap-binding-required -- the identical
+    // admitted shapes stay refused under a different PORG-NOT-READY status.
+    const restartDeps = { projectDir: path, requireProjectOnboardingReadyFn() { deny("restart-required"); } };
+    for (const input of [write(prdPath), write(specPath)]) {
+      const result = evaluateLifecycleReadyGuard(input, restartDeps);
+      assert.equal(result.exitCode, 2, input.tool_input.file_path);
+      assert.match(result.stderr, /GUARD-LIFECYCLE-NOT-READY/u, input.tool_input.file_path);
+    }
+
+    // AC-6: an exactly-ready session's behaviour is unchanged -- the new branch lives inside
+    // evaluateAfterGrammarAdmission()'s catch block, unreachable unless
+    // requireProjectOnboardingReadyFn() throws.
+    const readyDeps = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        return { schema: "pipeline.project-onboarding-ready-gate.v1", status: "ready", intent: "session" };
+      },
+    };
+    assert.equal(evaluateLifecycleReadyGuard(write(prdPath), readyDeps).exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 // NVA-MICRO-1 (backlog: 2026-08-09-restart-resume-hint-write-misses-the-project-prefix.md):
 // a resume-hint-input write missing exactly the `project/` prefix (same basename, wrong
 // directory) is a narrow, diagnosable margin -- the denial must name the one correct path
