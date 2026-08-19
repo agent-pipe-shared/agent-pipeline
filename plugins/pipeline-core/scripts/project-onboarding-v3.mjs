@@ -8,11 +8,14 @@ import {
   applyOnboardingIntakeDesignQuestions,
   applyOnboardingIntakeGenerate,
   planOnboardingIntakeGenerate,
+  planOnboardingBootstrapBind,
+  applyOnboardingBootstrapBind,
   INTAKE_CONSENT_APPLY_SCHEMA,
   INTAKE_CAPTURE_APPLY_SCHEMA,
   INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
   INTAKE_GENERATE_PLAN_SCHEMA,
   INTAKE_GENERATE_APPLY_SCHEMA,
+  KICKOFF_PROMOTION_APPLY_SCHEMA,
 } from "../lib/onboarding-continuity.mjs";
 import {
   applyProjectOnboardingManifestRepairV4,
@@ -116,6 +119,15 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   // backlog/items/2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md).
   { name: "intake-generate-plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
   { name: "intake-generate-apply", flat: true, mutates: true, automatedArgvShape: null },
+  // Wave 4 onboarding coordinator, step 5 (NVA-W5-COORD-STEP5-2, design.md SSa.5 point 5, SSc.3).
+  // A plan/apply pair like intake-generate's, same reasoning: bootstrap-bind-plan needs no operand
+  // beyond the bare lifecycle argv (every input -- profile/featureId/prdPath/specPath/designInputPath
+  // -- is derived from the already-durable intake checkpoint, resolveBootstrapBindInputs() in
+  // lib/onboarding-continuity.mjs), so it is `automatedArgvShape: "lifecycle"`, covered automatically
+  // by GUARDDERIVE-1's derived admission. bootstrap-bind-apply mutates, so it needs its own
+  // sanctionedOnboardingArgs() branch, added alongside intake-generate-apply's.
+  { name: "bootstrap-bind-plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "bootstrap-bind-apply", flat: true, mutates: true, automatedArgvShape: null },
 ].map((entry) => Object.freeze(entry)));
 
 export { ONBOARDING_SUBCOMMANDS };
@@ -357,6 +369,12 @@ export function main(args = process.argv.slice(2), {
     else if (options.command === "intake-generate-apply") output = applyOnboardingIntakeGenerate({
       rootDir: options.root, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
     });
+    else if (options.command === "bootstrap-bind-plan") output = planOnboardingBootstrapBind({
+      rootDir: options.root, runner: options.runner, deps,
+    });
+    else if (options.command === "bootstrap-bind-apply") output = applyOnboardingBootstrapBind({
+      rootDir: options.root, runner: options.runner, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
+    });
     else {
       const operation = options.command === "initialize-runtime"
         ? "runtime"
@@ -400,6 +418,17 @@ export function main(args = process.argv.slice(2), {
     INTAKE_CONSENT_APPLY_SCHEMA, INTAKE_CAPTURE_APPLY_SCHEMA, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
     INTAKE_GENERATE_APPLY_SCHEMA,
   ].includes(output.schema)) return 0;
+  // Wave 4 onboarding coordinator, step 5 (NVA-W5-COORD-STEP5-2): bootstrap-bind-apply calls
+  // applyOnboardingBootstrapBind(), which calls applyOnboardingKickoffPromotion() DIRECTLY --
+  // bypassing the v4Inspection wrapper kickoff-promote-apply goes through
+  // (applyProjectOnboardingKickoffPromotionV4 re-wraps its result as the shared
+  // "pipeline.project-onboarding.v4" shape below; this command's own output never does). Its
+  // schema is KICKOFF_PROMOTION_APPLY_SCHEMA with `status: "applied"|"replayed"` -- neither
+  // value is in restingStatuses below, and it never will be (that set is v4Inspection's own
+  // vocabulary). fail() throws on every non-success path (see applyOnboardingKickoffPromotion),
+  // so reaching this line with this schema always means the apply succeeded, exactly like the
+  // intake-checkpoint apply commands immediately above.
+  if (output.schema === KICKOFF_PROMOTION_APPLY_SCHEMA) return 0;
   if (output.schema === "pipeline.project-onboarding-remote-adoption-plan.v1") return output.status === "ready" || output.status === "activation-required" ? 0 : 1;
   // `runtime-attestation-required` is a legitimate resting point for an
   // inspect/plan command: it names what the caller still needs before it can
