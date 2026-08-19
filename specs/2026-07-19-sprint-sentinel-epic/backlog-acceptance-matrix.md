@@ -11,15 +11,21 @@ Classifications are evidence-sensitive: `partial` means at least one AC block
 remains; `delivered-but-unproven` means code/tests exist without the complete
 candidate-bound AC/Verify/Critic/close chain; `closed` requires canonical
 ledger and closure evidence. File presence or one green focused test cannot
-close an item.
+close an item. The 2026-07-24 PO disposition records all Sentinel/HAW-E
+implementation and tests as functionally complete; it does not manufacture
+machine evidence or a canonical transition. The HAW-E PO-disposition rows below
+therefore use `PO-disposition: functionally complete, release-pending` rather
+than `open`; their formal batch transition remains gated by the exact release
+candidate and remote authorization.
 
 ## Candidate re-baseline
 
-The current tree contains the production and test paths cited below. Full
-Verify and security evidence must be regenerated after the final corrective
-commit and bound to that commit; previously generated evidence is historical
-only. Native platform attestations, human gates, and remote effects are never
-inferred from local fixtures.
+The current tree contains the production and test paths cited below. The PO
+has accepted the Sentinel/HAW-E implementation/test completion disposition.
+Full Verify and Security evidence must still be regenerated for the final
+candidate and an independent final Critic must bind that same candidate;
+previous evidence is historical only. Native platform attestations, human
+gates, and remote effects are never inferred from local fixtures.
 
 | Canonical item and state | Current AC assessment | Production/test/Verify evidence | Remaining sanctioned gate |
 | --- | --- | --- | --- |
@@ -27,14 +33,14 @@ inferred from local fixtures.
 | `pipeline.canonical-worktree-lifecycle` — **open**, delivered-but-unproven | Lifecycle/cleanup and recovery mechanisms exist; both close profiles and post-commit cleanliness are not fully dispositioned. | `lib/worktree-lifecycle.{mjs,test.mjs}`, session cleanup tests, Full Verify registration. | Prove both close profiles and recovery on the candidate; dedicated transition. |
 | `pipeline.codex-plugin-validator-host-parity` — **open**, partial | Local parity classification exists, but it is not a host/version-bound native-versus-generic A/B on identical fixtures. | `scripts/codex-plugin-validator-parity.{mjs,test.mjs}` and Verify suite. | Produce native same-host/version/fixture evidence; `unavailable` is not success. |
 | `pipeline.codex-sandbox-critic-longterm` — **open**, partial | Host/preflight/select/runtime contracts cover the intermediate lane; strong input-confined/network-denied assurance remains unproved. | Critic host, isolation, shadow, preflight, selection, and runtime modules/tests. | Original upstream, shadow, T1, isolation, and PO evidence for the strong lane. |
-| `pipeline.documentation-information-architecture` — **open**, delivered-but-unproven | Capability and language checks exist. The inventory now records an explicit pending Critic gate instead of a fabricated digest. | `docs/product-capability-inventory.json`; inventory/language checks and Verify registration. | Final candidate-bound Critic receipt, operator journeys, EN/DE front-door acceptance, exact HAW-E batch. |
-| `pipeline.dual-channel-publication` — **open**, partial | Planning, bundle, authority, and journal surfaces exist; no fresh shared authorization and four-effect fetch-back exists. | Publication bundle/authority modules and release/publication scripts/tests. | Execute complete two-channel HAW-E release/readback chain. |
+| `pipeline.documentation-information-architecture` — **PO-disposition: functionally complete, release-pending** | The PO confirms the implementation and tests are functionally complete. This does not assert a final candidate Critic receipt or a canonical batch transition. | `docs/product-capability-inventory.json`; inventory/language checks and Verify registration. | Bind final-candidate Verify/Security/independent Critic, then obtain the authorized HAW-E batch transition and remote readback. |
+| `pipeline.dual-channel-publication` — **PO-disposition: functionally complete, release-pending** | The PO confirms the release implementation and tests are functionally complete. No shared remote authorization, publication, tag, or fetch-back is claimed. | Publication bundle/authority modules and release/publication scripts/tests. | Execute the authorized final-candidate two-channel HAW-E observation, consent, publication, and readback chain. |
 | `pipeline.execution-model-switchback` — **open**, partial | Desired/actual reconciliation and post-compact requests exist; real main-session attestation remains missing. | `lib/main-session-route.mjs`, `lib/interaction-continuity.mjs`, post-compact hook and tests. | Candidate-bound host attestation and drift/return-request evidence. |
 | `pipeline.nonblocking-interaction-continuity` — **open**, delivered-but-unproven | Trajectory, compact, resume, state, host, and status surfaces exist without complete AC-to-close mapping. | Continuity modules/CLI and registered tests. | Map and prove all trajectory/compact/resume ACs; dedicated close. |
 | `pipeline.po-gate-worktree-authority` — **open**, delivered-but-unproven | Primary readback and linked-worktree/cardinality/digest negative cases exist. | PO-gate authority/publisher modules and tests. | Complete candidate-bound AC disposition and dedicated transition. |
 | `pipeline.push-guard-worktree-target` — **in_progress**, delivered-but-unproven | Target binding and negative cases exist; no authorized regular target-worktree push/fetch-back is bound. | Push guard, worktree target-binding suite, Full Verify registration. | Exact authorized target-worktree push plus fetch-back, then dedicated close. |
-| `pipeline.regulated-document-hooks` — **open**, partial | ID, binding, policy, impact, renderer, and lifecycle foundations exist; the complete private receipt/review/rationale/recovery vertical is not proved. | Document hook/identifier/lifecycle/adapter/binding/render modules and suites. | Every mandatory `(bindingId,event)` chain reaches current receipt plus review/rationale or typed blocker; HAW-E batch only. |
-| `pipeline.session-keep-awake` — **open**, delivered-but-unproven | Projection, controller, cleanup, and platform classification exist; supported-host evidence and HAW-E acceptance are incomplete. | Session-power core/controller/helper/cleanup modules and tests. | Native lease/expiry/cleanup evidence per supported host; HAW-E batch. |
+| `pipeline.regulated-document-hooks` — **PO-disposition: functionally complete, release-pending** | The PO confirms the implementation and tests are functionally complete. This remains distinct from private receipt evidence, the formal Result, and the canonical HAW-E batch writer. | Document hook/identifier/lifecycle/adapter/binding/render modules and suites. | Bind final-candidate Verify/Security/independent Critic, then complete the authorized HAW-E batch and remote readback. |
+| `pipeline.session-keep-awake` — **PO-disposition: functionally complete, release-pending** | The PO confirms the implementation and tests are functionally complete. No native-host attestation, release authorization, or canonical HAW-E transition is inferred here. | Session-power core/controller/helper/cleanup modules and tests. | Bind final-candidate Verify/Security/independent Critic, then complete the authorized HAW-E batch and remote readback. |
 | `pipeline.source-available-commercial-licensing` — **closed**, corrective activation recorded | Canonical sequence 15 closed the original item. André Twachtmann is now recorded as legal rightsholder for Agent-Pipeline project-authored content, recipient of contributor grants, and CLA contracting party, with inventoried third-party material excluded; he supplied the named-human activation approval on 2026-07-23. The active process requires DCO plus the Contributor's personally checked current CLA digest; no proxy acceptance. Closure and CLA activation are not release approval. | `LICENSE`, `LICENSE-DOCS`, `NOTICE`, `CONTRIBUTING.md`, `CONTRIBUTOR_LICENSE_AGREEMENT.md`, PR template, `contributor-gates` workflow/checker/tests, SPDX/plugin metadata, `third-party-licenses.json`, license-contract checker; canonical closure evidence remains historical. | Require `contributor-gates / cla-and-dco` plus up-to-date-with-main in server branch protection and read it back; bind fresh Verify/security/Critic. Do not invent or reopen ledger history by hand. |
 | `pipeline.stateful-design-contract-template` — **open**, delivered-but-unproven | Nine required design fields are enforced; no concrete stateful design has completed candidate-bound closure. | Documentation contract checker/tests and implementation plan. | Map fields to a concrete design and create dedicated closure evidence. |
 | `pipeline.t1-governance-path-preflight` — **open**, partial | Governance packet and writer-preflight code exists without complete path/ETA/tool-setup disposition. | Critic packet governance, workflow preflight/writer modules and tests. | Specify, register, and prove remaining T1 ACs, then close. |
