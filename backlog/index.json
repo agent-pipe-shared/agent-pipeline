@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8b3b0e80c7b0c31e11ae192afa0ba22b1a3d6b09d7c5d77cfb73fd826884e46a"
+    "transitionHead": "e8a6c166bf8b4725e9487a4c34be7059308c77f930dec74e58a7c9d02500a08d"
   },
   "counts": {
-    "open": 12,
+    "open": 11,
     "in_progress": 25,
-    "closed": 116,
+    "closed": 118,
     "rejected": 1,
     "deferred": 11
   },
@@ -39,11 +39,15 @@
     },
     {
       "id": "pipeline.absent-runner-flag-silently-defaults-to-codex",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md."
+      "source": "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "370e014b78fe3bc54de18bb6ccd8cac861cc0fc1",
+      "closureEvidence": "backlog/items/2026-08-07-absent-runner-flag-silently-defaults-to-codex.md"
     },
     {
       "id": "pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest",
@@ -95,11 +99,15 @@
     },
     {
       "id": "pipeline.adr-0047-renumber-left-live-references-behind",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Filed as the deliberate follow-up named by commit 88a7133 (\"fix(adr): give the three ADRs numbered 0047 real numbers, and move two records to the code\"), which resolved the docs/adr/ corpus and docs/adr/README.md but explicitly left three classes of out-of-corpus reference untouched. Commit message: \"Two things this deliberately does not do... Both are filed rather than smuggled in.\""
+      "source": "Filed as the deliberate follow-up named by commit 88a7133 (\"fix(adr): give the three ADRs numbered 0047 real numbers, and move two records to the code\"), which resolved the docs/adr/ corpus and docs/adr/README.md but explicitly left three classes of out-of-corpus reference untouched. Commit message: \"Two things this deliberately does not do... Both are filed rather than smuggled in.\"",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "3cebf36dce46bfc6b120d564b2ed476d22517d6f",
+      "closureEvidence": "backlog/items/2026-08-09-adr-0047-renumber-left-live-references-behind.md"
     },
     {
       "id": "pipeline.adr-0051-follow-up-gaps-untracked",
@@ -1173,6 +1181,14 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Found live on 2026-08-08 while recovering this repository's own PO authority drift, after an edit to the bound PRD reopened the plan gate. Promised as a filing in that recovery and filed here. Observed against plugins/pipeline-core/scripts/pipeline-state.mjs in this tree."
+    },
+    {
+      "id": "pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Found live while recovering from a real GUARD-LIFECYCLE-NOT-READY session-wide incident on 2026-08-19 (spec.md/PRD authority drift caused by an ADR-0047 reference fix); see backlog/items/2026-08-09-adr-0047-renumber-left-live-references-behind.md's 2026-08-19 closing triage for the full recovery record."
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",
