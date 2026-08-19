@@ -1,0 +1,25 @@
+{
+  "taskId": "PHX-WP-HANDOVER-SIZE-GATE-HOOK",
+  "model": "claude-sonnet-5",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "elephant",
+  "outcome": "success",
+  "log": [
+    {
+      "phase": "context-read",
+      "note": "read ADR-0064, handover-rotate.mjs, project/pipeline.json, guard-testpath.mjs, hooks.json, tool-write-target.mjs, handover-rotate.test.mjs; confirmed handover key is a plain string path in project/pipeline.json and in lib/onboarding-continuity.mjs usage, not an object with maxBytes -- readCalibratedMaxBytes falls through to DEFAULT_MAX_BYTES=12000 in this repo",
+      "toolUseCount": 14
+    },
+    {
+      "phase": "build",
+      "note": "created plugins/pipeline-core/hooks/guard-handover-size.mjs (fail-open PreToolUse guard, imports handover-rotate.mjs's runCli in-process, no child process) and guard-handover-size.test.mjs; node --check clean on both",
+      "toolUseCount": 22
+    },
+    {
+      "phase": "verify",
+      "note": "node --test guard-handover-size.test.mjs: 14/14 pass, exit 0. Standalone decide()/checkHandoverSize() run against this repo's real docs/state.md (read-only, cwd=repo root, HEAD a52d5465): bytes=530402, maxBytes=12000, over=true, decision=deny -- disclosed as genuine current-repo fact.",
+      "toolUseCount": 27
+    }
+  ],
+  "report": null
+}
