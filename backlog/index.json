@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7245c18f7d770c34fa9f2d48c9fa7b3c15cdba1b8589efda056a2cd0e5003dc3"
+    "transitionHead": "5e2790fd7e18bfabd60406e21a43ecdf376fc6dd122fe9a6493414bda7d8efa5"
   },
   "counts": {
-    "open": 42,
+    "open": 41,
     "in_progress": 3,
-    "closed": 256
+    "closed": 257
   },
   "items": [
     {
@@ -2007,12 +2007,16 @@
     },
     {
       "id": "pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
       "source": "PO live external test transcript (2026-08-19), project D:\\Dev\\Rune_Test1_Claude_060_56 on Windows/WSL, Claude runner, plugin 0.6.0+claude.20260819163512.ca18e0c. Full material-design-input onboarding (consent -> capture x6 -> design-questions -> generate-plan/-apply) completed cleanly, then bootstrap-bind-plan refused with KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID -- a dead end for the entire material-intake happy path.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "3fedc770a8a8196d49376f3c033558eaf51bf057",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
     },
     {
       "id": "pipeline.merged-into-frontmatter-key-documented-but-unsupported",
