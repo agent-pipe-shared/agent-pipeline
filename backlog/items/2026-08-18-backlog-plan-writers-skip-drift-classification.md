@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 5e34c0b55321d2332eec641c1e881e6bd73fe5d3
+closure_evidence: backlog/items/2026-08-18-backlog-plan-writers-skip-drift-classification.md
 source: "self-observation during Wave-3 dispatches NVA-W3-R4E/R4F, 2026-08-18 (Nova A backlog finalization sprint)"
 ---
 

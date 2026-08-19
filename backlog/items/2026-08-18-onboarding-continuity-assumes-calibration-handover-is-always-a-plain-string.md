@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 5e34c0b55321d2332eec641c1e881e6bd73fe5d3
+closure_evidence: backlog/items/2026-08-18-onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string.md
 source: "Live incident, 2026-08-18, this session: setting project/pipeline.json's `handover` key to the ADR-0066-Decision-5-sanctioned `{ path, maxBytes }` object shape (already fully supported by handover-rotate.mjs/lib/handover-rotation.mjs) dropped the session into an unrecoverable continuity-observation-unavailable readiness class, blocking every Edit/Write/mutating-Bash tool call. Recovered only via an out-of-session `! git checkout -- project/pipeline.json` run by the PO directly (bypassing the tool-call hook chain), since even the guard's own suggested recovery command was itself blocked by the same gate."
 ---
 

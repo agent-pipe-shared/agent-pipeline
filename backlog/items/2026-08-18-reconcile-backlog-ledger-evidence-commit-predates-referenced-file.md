@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 5e34c0b55321d2332eec641c1e881e6bd73fe5d3
+closure_evidence: backlog/items/2026-08-18-reconcile-backlog-ledger-evidence-commit-predates-referenced-file.md
 source: "Critic review of Wave-3 diff (dispatch: T1 guardrail-tier, functional-equivalent-read-only, opus), 2026-08-18, finding F4"
 ---
 
