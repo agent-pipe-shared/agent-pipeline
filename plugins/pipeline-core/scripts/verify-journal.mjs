@@ -325,6 +325,16 @@ const TIER_B_DECLARATIONS = Object.freeze({
       "plugins/pipeline-core/lib/human-role-labels.test.mjs",
     ]),
   }),
+  // ADR-0065 candidate (c): same shape as human-role-label-tests above. Confirmed live before
+  // this dispatch: recovery-preview-attestation.mjs has zero imports of its own (pure module,
+  // no fs/child_process), so its test's entire real input is these two files; no --allow-fs-write
+  // needed.
+  "recovery-preview-attestation-tests": Object.freeze({
+    reads: Object.freeze([
+      "plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
+      "plugins/pipeline-core/lib/recovery-preview-attestation.test.mjs",
+    ]),
+  }),
 });
 
 function tierBDeclaredFiles({ suite, rel, implementationSha256, repoRoot, declaration }) {
