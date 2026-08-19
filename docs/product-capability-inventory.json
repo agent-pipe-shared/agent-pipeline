@@ -227,6 +227,12 @@
       "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\""
     },
     {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\""
+    },
+    {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
@@ -239,10 +245,10 @@
       "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\""
     },
     {
-      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
-      "member": "PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\""
+      "member": "PreToolUse:Task|Agent|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\""
     },
     {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
@@ -591,6 +597,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "advisory-receipt-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:afk-activation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "afk-activation-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:afk-assumption-mode-tests",
@@ -987,6 +999,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "codex-sandbox-preflight-host-control-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-plugin-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-sandbox-preflight-plugin-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
@@ -2633,6 +2651,12 @@
       "member": "state-budget-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "state-numeric-claims-check"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2817,7 +2841,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
@@ -2946,6 +2970,7 @@
         "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:afk-assumption-mode-tests",
         "verify-phase:harness/scripts/verify.mjs:afk-capability-worker-tests",
         "verify-phase:harness/scripts/verify.mjs:afk-claude-host-tests",
@@ -3012,6 +3037,7 @@
         "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-host-control-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-plugin-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
@@ -3284,6 +3310,7 @@
         "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
         "verify-phase:harness/scripts/verify.mjs:state-budget-check",
         "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
+        "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-check",
         "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-tests",
         "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
         "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
@@ -3430,7 +3457,8 @@
       "benefit": "A PreToolUse guard refuses a growing write at or over a configured byte cap, while always admitting a shrinking (rotation) write, once activated.",
       "status": "planned",
       "surfaceIds": [
-        "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size"
+        "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\""
       ],
       "runners": [
         "claude"
