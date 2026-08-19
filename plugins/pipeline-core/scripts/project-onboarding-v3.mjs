@@ -443,6 +443,11 @@ export function main(args = process.argv.slice(2), {
     "portable-seed-required", "runtime-initialization-required", "runtime-attestation-required",
     "restart-required", "kickoff-required", "host-repository-init-required", "ready",
     "migration-required", "adoption-required", "projection-drift",
+    // Wave 4 onboarding coordinator, step 6 (NVA-W5-COORD-STEP6-1): the three
+    // new v4Inspection statuses a genuinely fresh repo now settles into are
+    // exactly as legitimate a resting point for inspect/plan as
+    // kickoff-required always was.
+    "intake-required", "intake-design-questions-required", "bootstrap-binding-required",
   ]);
   if (APPLY_SHAPED_COMMANDS.has(options.command)) restingStatuses.delete("runtime-attestation-required");
   return restingStatuses.has(output.status) ? 0 : 1;

@@ -35,11 +35,14 @@ import {
   applyOnboardingKickoff,
   applyOnboardingKickoffPromotion,
   classifyOnboardingContinuity,
+  INTAKE_GENERATE_PLAN_SCHEMA,
   KICKOFF_GOAL_MAX_BYTES,
+  KICKOFF_PROMOTION_PLAN_SCHEMA,
   planOnboardingContinuityRepair,
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
   planOnboardingSessionCleanupPrivatization,
+  readOnboardingIntakeCheckpoint,
   reconstructOnboardingKickoffPlan,
   reconstructOnboardingKickoffPromotionPlan,
 } from "./onboarding-continuity.mjs";
@@ -80,6 +83,14 @@ import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3 } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
+
+// Wave 4 onboarding coordinator, step 6 (design SSa.4/SSe; NVA-W5-COORD-STEP6-1).
+// The three new v4Inspection statuses a genuinely fresh repo now settles into
+// instead of "kickoff-required" -- every existing status-set gate that used
+// "kickoff-required" as a proxy for "fresh repo, about to need onboarding
+// conversation input" is widened to also admit these, additively, alongside
+// the original.
+const INTAKE_COORDINATOR_STATUSES = ["intake-required", "intake-design-questions-required", "bootstrap-binding-required"];
 
 const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
@@ -1998,6 +2009,96 @@ function collectGoalAction() {
   };
 }
 
+// Wave 4 onboarding coordinator, step 6 (design SSa.4/SSa.5 point 1;
+// NVA-W5-COORD-STEP6-1): the `intake-required` nextAction offered when no
+// intake checkpoint exists yet, or one exists with no recorded consent.
+// Same `collect-input` shape as `collectAuthorIdentityAction()` below,
+// asking once for consent plus whichever of the git author/language/profile
+// values are not already known -- `intake-consent-apply` itself is
+// idempotent and only fills fields still null, so re-asking an already-
+// answered field costs nothing.
+function intakeConsentAction() {
+  return {
+    kind: "collect-input",
+    inputs: [
+      { name: "gitAuthorName", encoding: "utf8", trim: true, minBytes: 1, maxBytes: AUTHOR_IDENTITY_FIELD_MAX_BYTES, singleLine: true, rejectNul: true },
+      { name: "gitAuthorEmail", encoding: "utf8", trim: true, minBytes: 1, maxBytes: AUTHOR_IDENTITY_FIELD_MAX_BYTES, singleLine: true, rejectNul: true },
+      { name: "language", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 2, singleLine: true, rejectNul: true },
+      { name: "profile", encoding: "utf8", trim: true, minBytes: 4, maxBytes: 7, singleLine: true, rejectNul: true },
+    ],
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "no private intake checkpoint exists yet (or one exists with no recorded consent); ask the PO once, in plain language, for explicit affirmative consent to begin the intake conversation, plus their git author name and email, human-facing language (de or en), and profile (epic, feature, or mini) for whichever of those the PO has not already stated. Then call intake-consent-apply with --granted plus whichever of --git-author-name/--git-author-email/--language/--profile were answered -- omit any the PO has not stated yet, they can be filled on a later call.",
+    expected: { schema: SCHEMA, statuses: ["intake-required"] },
+  };
+}
+
+// Mirrors the private INTAKE_MAX_MATERIAL_BYTES bound enforced by
+// applyOnboardingIntakeCapture() in onboarding-continuity.mjs (not exported
+// there, so restated here rather than imported).
+const INTAKE_MATERIAL_TEXT_MAX_BYTES = 1_000_000;
+
+// Wave 4 onboarding coordinator, step 6: the `intake-required` nextAction
+// offered once consent is recorded but no material input has been captured
+// yet (checkpoint transactionState still "collecting"). Unlike every other
+// collect-input action in this file, the collected text is genuinely
+// multi-line prose (a PO message), so singleLine is false here -- no
+// consumer in this file validates that flag; it is descriptive metadata for
+// the caller collecting the value.
+function intakeCaptureAction() {
+  return {
+    kind: "collect-input",
+    input: { name: "text", encoding: "utf8", trim: false, minBytes: 1, maxBytes: INTAKE_MATERIAL_TEXT_MAX_BYTES, singleLine: false, rejectNul: true },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "consent is already recorded; ask the PO for their next message containing project requirements, goals, constraints, or existing decisions, then call intake-capture-apply with --text set to exactly what they wrote. Call this once per PO message, repeatedly, until the PO indicates they are done describing the project.",
+    expected: { schema: SCHEMA, statuses: ["intake-required"] },
+  };
+}
+
+// Wave 4 onboarding coordinator, step 6: the `intake-design-questions-
+// required` nextAction offered once at least one material-input chunk is
+// captured but the one bundled design-question round has not been answered
+// yet (checkpoint transactionState "design-questions-pending").
+function intakeDesignQuestionsAction() {
+  return {
+    kind: "collect-input",
+    input: { name: "answersJson", encoding: "utf8", trim: true, minBytes: 2, maxBytes: 65_536, singleLine: false, rejectNul: true },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: "at least one material-input chunk is captured; ask the PO the ONE bundled round of design questions this project still needs answered (never a second round -- intake-design-questions-apply refuses a different answer set once the round is answered), then call intake-design-questions-apply with --answers-json set to a JSON array of {question, answer} objects covering everything asked.",
+    expected: { schema: SCHEMA, statuses: ["intake-design-questions-required"] },
+  };
+}
+
+// Wave 4 onboarding coordinator, step 6: the `intake-design-questions-
+// required` nextAction offered once the design-question round is answered
+// (checkpoint transactionState "ready-to-generate") -- a real, ready-to-run
+// command like `portable-seed-required`'s own nextAction just below,
+// because intake-generate-plan needs no PO-supplied value: it deterministically
+// derives the staging bytes from the checkpoint's own already-durable content.
+function intakeGeneratePlanAction(root, runner, intent) {
+  return commandAction(
+    lifecycleArgv([ONBOARDING_SCRIPT, "intake-generate-plan", "--root", root], runner, intent),
+    false, false,
+    INTAKE_GENERATE_PLAN_SCHEMA,
+    ["intake-design-questions-required"],
+  );
+}
+
+// Wave 4 onboarding coordinator, step 6: the `bootstrap-binding-required`
+// nextAction offered once staging is generated (checkpoint transactionState
+// "generated") -- same reasoning as intakeGeneratePlanAction() above:
+// bootstrap-bind-plan needs no PO-supplied value either.
+function bootstrapBindPlanAction(root, runner, intent) {
+  return commandAction(
+    lifecycleArgv([ONBOARDING_SCRIPT, "bootstrap-bind-plan", "--root", root], runner, intent),
+    false, false,
+    KICKOFF_PROMOTION_PLAN_SCHEMA,
+    ["bootstrap-binding-required"],
+  );
+}
+
 const RESTART_EXPECTED_STATUSES = [
   "portable-seed-required", "runtime-initialization-required", "kickoff-required", "host-repository-init-required", "ready", "partial", "invalid", "unsafe",
   "migration-required", "adoption-required", "repository-mount-read-only", "repository-control-path-invalid", "git-capability-unavailable",
@@ -2310,6 +2411,106 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
     });
   }
   if (continuity.status === "absent-pristine") {
+    // Wave 4 onboarding coordinator, step 6 (design SSa.4/SSe;
+    // NVA-W5-COORD-STEP6-1). `applyOnboardingKickoff`'s own precondition is
+    // exactly this continuity status (KICKOFF-NOT-PRISTINE,
+    // onboarding-continuity.mjs), and it transitions continuity to "valid"
+    // the moment it writes the provisional state -- so a repository already
+    // mid-kickoff under the OLD model (kickoff-apply already ran,
+    // kickoff-promote has not) structurally never reaches this branch at
+    // all; it already carries `continuity.status === "valid"` and is routed
+    // by the branches below, completely untouched by anything here. SSe's
+    // "keep the old track alive and unchanged for mid-kickoff repos" is
+    // therefore already true by construction -- this branch only ever sees
+    // a repository the old kickoff machinery never started for, so it is
+    // routed into the new intake-*/bootstrap-bind-* coordinator instead of
+    // the old `kickoff-required` status, based on the private intake
+    // checkpoint's own transactionState (private, checkpoint-internal;
+    // never itself exposed as the public v4Inspection status -- SSa.4's
+    // table).
+    const checkpoint = (fs.readOnboardingIntakeCheckpoint ?? readOnboardingIntakeCheckpoint)({
+      rootDir: root,
+      repositoryCapability: repository.mode,
+      spawn: fs.spawnSync,
+    });
+    const consentMissing = checkpoint.status === "absent" || checkpoint.value.consent === null;
+    const transactionState = checkpoint.status === "present" ? checkpoint.value.transactionState : null;
+    if (consentMissing) {
+      return lifecycleResult({
+        status: "intake-required",
+        root, runner, intent, repository, runtime, continuity, appServer,
+        nextAction: intakeConsentAction(),
+        diagnostics: [lifecycleDiagnostic(
+          "$.continuity",
+          "intake_required",
+          checkpoint.status === "absent"
+            ? "no private intake checkpoint exists yet"
+            : "an intake checkpoint exists but consent has not been recorded",
+          "collect consent (and any still-missing git author/language/profile values), then review the read-only intake-consent-apply action",
+        )],
+      });
+    }
+    if (transactionState === "collecting") {
+      return lifecycleResult({
+        status: "intake-required",
+        root, runner, intent, repository, runtime, continuity, appServer,
+        nextAction: intakeCaptureAction(),
+        diagnostics: [lifecycleDiagnostic(
+          "$.continuity",
+          "intake_required",
+          "consent is recorded but no material input has been captured yet",
+          "capture the PO's next message of project material via the read-only intake-capture-apply action",
+        )],
+      });
+    }
+    if (transactionState === "design-questions-pending") {
+      return lifecycleResult({
+        status: "intake-design-questions-required",
+        root, runner, intent, repository, runtime, continuity, appServer,
+        nextAction: intakeDesignQuestionsAction(),
+        diagnostics: [lifecycleDiagnostic(
+          "$.continuity",
+          "intake_design_questions_required",
+          "material input is captured but the bundled design-question round has not been answered",
+          "ask the PO the one bundled design-question round, then review the read-only intake-design-questions-apply action",
+        )],
+      });
+    }
+    if (transactionState === "ready-to-generate") {
+      return lifecycleResult({
+        status: "intake-design-questions-required",
+        root, runner, intent, repository, runtime, continuity, appServer,
+        nextAction: intakeGeneratePlanAction(root, runner, intent),
+        diagnostics: [lifecycleDiagnostic(
+          "$.continuity",
+          "intake_design_questions_required",
+          "the design-question round is answered; staging generation has not run yet",
+          "review the read-only intake-generate-plan action, then apply it",
+        )],
+      });
+    }
+    if (transactionState === "generated") {
+      return lifecycleResult({
+        status: "bootstrap-binding-required",
+        root, runner, intent, repository, runtime, continuity, appServer,
+        nextAction: bootstrapBindPlanAction(root, runner, intent),
+        diagnostics: [lifecycleDiagnostic(
+          "$.continuity",
+          "bootstrap_binding_required",
+          "staging PRD/spec/design-input are generated but not yet bound as authority",
+          "review the read-only bootstrap-bind-plan action, then apply it",
+        )],
+      });
+    }
+    // transactionState "bound" (or any other value SSa.4's table does not
+    // name) would mean the checkpoint has already moved past this
+    // coordinator's own scope while continuity itself somehow still reads
+    // absent-pristine -- a drifted state this design does not describe
+    // (SSa.4's table ends at "generated"; "bound" is supposed to coincide
+    // with continuity becoming "valid", which is a completely different
+    // branch, never this one). Falling back to the pre-existing
+    // `kickoff-required` behaviour keeps this an unreachable-in-practice
+    // safety net rather than a guess at a new, undesigned status.
     return lifecycleResult({
       status: "kickoff-required",
       root,
@@ -4475,7 +4676,7 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner, op
     if (!["portable-seed-required", "adoption-required"].includes(observed.status)) return observed;
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: observed.runner });
     if (plan.status !== "ready") return observed;
-    return { ...observed, nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "apply-portable-seed", "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], observed.runner, intent), true, true, SCHEMA, ["runtime-initialization-required", "restart-required", "kickoff-required"]) };
+    return { ...observed, nextAction: commandAction(lifecycleArgv([ONBOARDING_SCRIPT, "apply-portable-seed", "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], observed.runner, intent), true, true, SCHEMA, ["runtime-initialization-required", "restart-required", "kickoff-required", ...INTAKE_COORDINATOR_STATUSES]) };
   }
   if (operation === "repair" && observed.status === "continuity-damaged") {
     const plan = planOnboardingContinuityRepair({
@@ -4540,11 +4741,11 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner, op
     // the apply can never satisfy.
     const runtimeStatuses = requiresNativeRuntimeReadback(observed.runner)
       ? ["restart-required"]
-      : ["kickoff-required", "ready"];
+      : ["kickoff-required", ...INTAKE_COORDINATOR_STATUSES, "ready"];
     const statuses = operation === "runtime"
       ? runtimeStatuses
       : operation === "repair"
-        ? ["restart-required", "kickoff-required", "ready"]
+        ? ["restart-required", "kickoff-required", ...INTAKE_COORDINATOR_STATUSES, "ready"]
         : ["restart-required"];
     const applyCommand = operation === "runtime"
       ? "initialize-runtime"
@@ -4581,7 +4782,7 @@ function planLifecycle(rootDir, fs, operation, intent = "onboarding", runner, op
 // replay-identity test (`assert.deepEqual(portableReplayed, portableApplied)`)
 // requires both call shapes to compute this field identically -- a captured,
 // one-shot value would desync the second call from the first.
-const PORTABLE_APPLY_IDENTITY_ASK_STATUSES = ["runtime-initialization-required", "restart-required", "kickoff-required"];
+const PORTABLE_APPLY_IDENTITY_ASK_STATUSES = ["runtime-initialization-required", "restart-required", "kickoff-required", ...INTAKE_COORDINATOR_STATUSES];
 function withPendingAuthorIdentityAsk(observed, fs) {
   if (observed.repository?.mode !== "local") return observed;
   if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
@@ -4846,6 +5047,10 @@ export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), dep
   return applyLifecycle(rootDir, deps(overrides), operation, planSha256, activate, intent, runner, operatorAuthority);
 }
 
+// Wave 4 onboarding coordinator, step 6 (design SSe; NVA-W5-COORD-STEP6-1).
+// See the two usage sites below for the full rationale.
+const KICKOFF_PLAN_ADMITTED_STATUSES = new Set(["kickoff-required", ...INTAKE_COORDINATOR_STATUSES]);
+
 // The kickoff entry points inspect on the caller's behalf, so they must inspect
 // as the caller's runner. Substituting one here is the same identity loss the
 // consumer chain guards against (ADR-0051, ADR-0057 R1): a runner without a
@@ -4863,7 +5068,21 @@ export function planProjectOnboardingKickoffV4({
   requireRunner(runner, "planProjectOnboardingKickoffV4");
   const fs = deps(overrides);
   const observed = v4Inspection(rootDir, fs, "onboarding", runner);
-  if (observed.status !== "kickoff-required") return observed;
+  // Wave 4 onboarding coordinator, step 6 (design SSe; NVA-W5-COORD-STEP6-1,
+  // widened per explicit PO-equivalent decision after the narrow version
+  // broke 53 pre-existing tests that use kickoff-plan/apply purely as an
+  // unrelated fixture-setup mechanism): a real session now reaches
+  // kickoff-required only through the drift fallback in the absent-pristine
+  // branch; every genuinely fresh repo instead reports one of the three new
+  // intake-*/bootstrap-binding-required statuses. Kickoff stays alive and
+  // reachable exactly as designed (SSe: "not deleted") for a direct/manual/
+  // test-fixture caller by accepting those three alongside the original
+  // kickoff-required -- `applyOnboardingKickoff`'s own inner precondition
+  // (KICKOFF-NOT-PRISTINE, onboarding-continuity.mjs) independently still
+  // requires continuity.status === "absent-pristine", which is exactly what
+  // all four of these statuses share, so this widening adds no new case the
+  // inner layer would not already accept on its own terms.
+  if (!KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status)) return observed;
   return planOnboardingKickoff({
     rootDir: observed.root,
     goal,
@@ -4887,7 +5106,10 @@ export function applyProjectOnboardingKickoffV4({
   requireRunner(runner, "applyProjectOnboardingKickoffV4");
   const fs = deps(overrides);
   const observed = v4Inspection(rootDir, fs, "onboarding", runner);
-  if (!["kickoff-required", "ready"].includes(observed.status)
+  // See KICKOFF_PLAN_ADMITTED_STATUSES above (design SSe; NVA-W5-COORD-STEP6-1):
+  // "ready" is kept for the exact same replay-after-apply case it always
+  // covered, unrelated to this widening.
+  if ((!KICKOFF_PLAN_ADMITTED_STATUSES.has(observed.status) && observed.status !== "ready")
     || !["absent-pristine", "valid"].includes(observed.continuity.status)) {
     return observed;
   }

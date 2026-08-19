@@ -1769,13 +1769,13 @@ test("a runner without a native runtime readback publishes no barrier and procee
     const plan = planProjectOnboardingLifecycleV4({ rootDir: path, deps: observingDeps, operation: "runtime", runner: "claude" });
     assert.equal(plan.status, "runtime-initialization-required");
     // The plan must not promise a state its own apply can never reach.
-    assert.deepEqual(plan.nextAction.expected.statuses, ["kickoff-required", "ready"]);
+    assert.deepEqual(plan.nextAction.expected.statuses, ["kickoff-required", "intake-required", "intake-design-questions-required", "bootstrap-binding-required", "ready"]);
     const digest = plan.nextAction.argv[plan.nextAction.argv.indexOf("--plan-sha256") + 1];
     const initialized = applyProjectOnboardingLifecycleV4({
       rootDir: path, deps: observingDeps, operation: "runtime", planSha256: digest, activate: true, runner: "claude",
     });
     assert.equal(initialized.runner, "claude");
-    assert.equal(initialized.status, "kickoff-required");
+    assert.equal(initialized.status, "intake-required");
     // Structural, not textual: nothing was bound and nothing was published, so
     // there is no artifact a launch ticket could ever be required to clear.
     assert.deepEqual(bindings, []);
@@ -1816,7 +1816,7 @@ test("a pending Codex restart barrier never gates a Claude session, and that ses
     assert.equal(barrier.status, "present");
     const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" });
     assert.equal(observed.runner, "claude");
-    assert.equal(observed.status, "kickoff-required");
+    assert.equal(observed.status, "intake-required");
     assert.equal(observed.runtime.status, "readback-not-applicable");
     assert.equal(observed.runtime.barrierSha256, null);
     assert.equal(observed.nextAction.kind, "collect-input");
@@ -2431,7 +2431,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
     const portableDigest = portable.nextAction.argv[portable.nextAction.argv.indexOf("--plan-sha256") + 1];
     assert.match(assertSingleLineAction(portable.nextAction, applyAction(
       [ONBOARDING_SCRIPT, "apply-portable-seed", "--root", portableRoot, "--plan-sha256", portableDigest, "--activate", "--runner", "codex"],
-      ["runtime-initialization-required", "restart-required", "kickoff-required"],
+      ["runtime-initialization-required", "restart-required", "kickoff-required", "intake-required", "intake-design-questions-required", "bootstrap-binding-required"],
     )), /'[^']*with spaces[^']*'/u);
 
     const seed = planProjectOnboardingV3({ runner: "codex", rootDir: runtimeRoot, deps: fakeDeps });
@@ -2468,7 +2468,7 @@ test("every lifecycle plan exposes the exact digest-bound apply status contract 
     const repairDigest = repair.nextAction.argv[repair.nextAction.argv.indexOf("--plan-sha256") + 1];
     assertSingleLineAction(repair.nextAction, applyAction(
       [ONBOARDING_SCRIPT, "apply-repair", "--root", runtimeRoot, "--plan-sha256", repairDigest, "--activate", "--runner", "codex"],
-      ["restart-required", "kickoff-required", "ready"],
+      ["restart-required", "kickoff-required", "intake-required", "intake-design-questions-required", "bootstrap-binding-required", "ready"],
     ));
   } finally {
     dispose(portableRoot); dispose(runtimeRoot);
@@ -2927,7 +2927,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     const barrier = initializeRestartRequiredRoot(path);
     clearRuntimeBarrier(path, barrier);
     const pristine = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
-    assert.equal(pristine.status, "kickoff-required");
+    assert.equal(pristine.status, "intake-required");
     assert.equal(pristine.continuity.status, "absent-pristine");
     assert.equal(pristine.nextAction.kind, "collect-input");
 
@@ -2954,7 +2954,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     ]);
     assert.match(renderProjectOnboardingAction(planned.result.applyAction), /'Ship safely; keep \$\(touch nope\) as text'/u);
     assert.equal(existsSync(join(path, "nope")), false);
-    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "kickoff-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "intake-required");
 
     const changedGoal = invoke([
       "kickoff", "apply", "--root", path, "--goal", `${goal} changed`, "--language", "en",
@@ -2962,7 +2962,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     ]);
     assert.equal(changedGoal.code, 2);
     assert.match(stderr, /KICKOFF-PLAN-DIGEST/u);
-    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "kickoff-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "intake-required");
 
     const wrongDigest = invoke([
       "kickoff", "apply", "--root", path, "--goal", goal, "--language", "en",
@@ -2970,7 +2970,7 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     ]);
     assert.equal(wrongDigest.code, 2);
     assert.match(stderr, /KICKOFF-PLAN-DIGEST/u);
-    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "kickoff-required");
+    assert.equal(inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps }).status, "intake-required");
 
     const applied = invoke(planned.result.applyAction.argv.slice(1));
     assert.equal(applied.code, 0, stderr);
@@ -3726,7 +3726,7 @@ function initializeClaudeOnboardedRoot(path, deps = fakeDeps) {
     rootDir: path, deps, operation: "runtime", planSha256: digest, activate: true, runner: "claude",
   });
   assert.equal(initialized.runner, "claude");
-  assert.equal(initialized.status, "kickoff-required");
+  assert.equal(initialized.status, "intake-required");
   return initialized;
 }
 
@@ -4034,7 +4034,7 @@ test("a kickoff plan produced for one runner does not validate an apply for anot
     assert.throws(() => applyProjectOnboardingKickoffV4({
       rootDir: path, goal, runner: "codex", planSha256: claudePlanned.planSha256, activate: true, deps: fakeDeps,
     }), /kickoff plan digest/u);
-    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" }).status, "kickoff-required");
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "claude" }).status, "intake-required");
     const applied = applyProjectOnboardingKickoffV4({
       rootDir: path, goal, runner: "claude", planSha256: claudePlanned.planSha256, activate: true, deps: fakeDeps,
     });
@@ -4318,7 +4318,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
       intent: "onboarding",
       deps: fakeDeps,
     });
-    assert.equal(kickoff.status, "kickoff-required");
+    assert.equal(kickoff.status, "intake-required");
     assert.equal(kickoff.continuity.status, "absent-pristine");
     assert.equal(kickoff.appServer.status, "not-requested");
     assert.equal(kickoff.nextAction.kind, "collect-input");
@@ -4656,7 +4656,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
       },
     });
     const freshProcess = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps, intent: "bootstrap" });
-    assert.equal(freshProcess.status, "kickoff-required");
+    assert.equal(freshProcess.status, "intake-required");
     assert.equal(freshProcess.runtime.status, "readback-current");
     assert.notEqual(freshProcess.runtime.barrierSha256, freshProcess.runtime.readbackSha256);
     const afterHostAuthority = validateV3BootstrapAuthority({ rootDir: path, deps: fakeDeps });
@@ -4739,7 +4739,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
       rootDir: path,
       deps: cleanupNotNeededDeps,
     });
-    assert.equal(postSeed.status, "kickoff-required");
+    assert.equal(postSeed.status, "intake-required");
     assert.equal(postSeed.runtime.status, "plugin-managed-unattested");
     assert.equal(postSeed.nextAction.kind, "collect-input");
     const kickoff = completeKickoff(
@@ -5098,7 +5098,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
       activate: true,
       deps: fakeDeps,
     });
-    assert.equal(repaired.status, "kickoff-required");
+    assert.equal(repaired.status, "intake-required");
     assert.equal(readFileSync(manifestPath, "utf8").includes("human_facing: en"), true);
   } finally { dispose(path); }
 });
