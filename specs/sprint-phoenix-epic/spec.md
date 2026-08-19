@@ -404,7 +404,7 @@ files are excepted only when their path is already declared here.
 | `plugins/pipeline-core/scripts/governance-event.mjs` | create preview/append/verify/query CLI | Sanctioned operator/consumer surface. |
 | `plugins/pipeline-core/scripts/governance-event.test.mjs` | create CLI and sanitized-output tests | End-to-end boundary. |
 | `docs/governance-events.md` | create model, operator, retention, recovery guide | Maintained contract. |
-| `docs/adr/0047-governance-event-kernel.md` | create architectural decision | Durable rationale and rejected options. |
+| `docs/adr/0062-governance-event-kernel.md` | create architectural decision | Durable rationale and rejected options. |
 
 ### 7.4 Human ledger and authority integration
 
