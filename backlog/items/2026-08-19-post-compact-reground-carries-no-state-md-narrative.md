@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.post-compact-reground-carries-no-state-md-narrative
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: a035723503ea62562c95fad80976fc375cad2f19
+closure_evidence: backlog/items/2026-08-19-post-compact-reground-carries-no-state-md-narrative.md
 created: 2026-08-19
 source: "PO question this session (2026-08-19 afternoon): why did the Elephant not know its own state after /compact. Diagnosed live by reading plugins/pipeline-core/hooks/post-compact-reground.mjs directly, not inferred."
 ---
@@ -90,5 +94,35 @@ lines and the "Archived history" table's date ranges.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged — filed same-session as discovery, PO aware, decision on
-scope/priority and which option(s) to build still open.
+- **Decision:** accepted, Option 2 (mechanical). PO chose the mechanical
+  enforcement level explicitly, with two hard requirements: the excerpt
+  must cover the live-open-state section generously (not just the newest
+  crumb), and the emitted message must always tell the reader to read
+  `docs/state.md` directly when in doubt, before risking duplicate work.
+- **Rationale:** matches the item's own recommended starting point;
+  compliance-only (Option 1) already failed once this same session, and
+  Option 3 (a technical read-gate) was not requested and would add real
+  new guard-family scope beyond what the PO asked for.
+- **Assignment:** `NVA-COMPACTSTATE-1` (goldfish-deep, worktree-isolated).
+- **Date:** 2026-08-19
+
+## Closure, 2026-08-19
+
+`NVA-COMPACTSTATE-1` landed in two commits (`fb57c6b4` feature, `a0357235`
+tests, cherry-picked to trunk, independently re-verified — not trusted from
+the dispatch's own result text). `post-compact-reground.mjs` gained
+`extractLiveStateNarrative()`/`loadStateNarrativeExcerptSafe()` (pure
+boundary detection: top-of-file to the `## Archived history` heading) and
+`bootstrap-payload-budget.mjs` gained `boundedNarrativeExcerpt()`
+(paragraph-granular, oldest-first truncation with an explicit
+machine-checkable marker, reusing the existing budget/measurement schema
+rather than a second concept). Both PO requirements verified directly: the
+excerpt covers the full live-open-state section up to the archive boundary
+(not just the newest paragraph), and the bilingual "read docs/state.md
+directly if in doubt" instruction is always appended in both `en`/`de`
+branches. `codex-session-start-hint.mjs`'s `compactStdout()` picks this up
+for free through the shared `decideOutput()` export (one-line `{ rootDir }`
+pass-through). 27/27 `post-compact-reground.test.mjs` (24 pre-existing + 3
+new), 27/27 `codex-session-start-hint.test.mjs`, 9/9
+`check-consumer-safe-paths.test.mjs`, all independently re-run on trunk.
+**Item closed.**
