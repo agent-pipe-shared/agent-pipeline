@@ -8,8 +8,8 @@ created: 2026-08-16
 source: "Found 2026-08-16 overnight: a real, correctly-signed, correctly-scoped GMW window (TP-1..TP-12, ~3.7h TTL) was installed, but every single edit it should have covered was refused by the live guard hooks. Traced to source, not guessed."
 due: 2026-08-20
 closed_at: 2026-08-18
-closure_repository: nova
-closure_evidence: "confirmed directly against ~/agent-pipeline-local-marketplace/plugins/pipeline-core/lib/{guard-maintenance-window,human-guard-override}.mjs (NVA-GMWFIX-2 / NVA-HGOFIX-1)"
+closure_repository: self
+closure_evidence: "backlog/items/2026-08-16-installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits.md"
 closure_commit: "8e8dd393fd7eba110f85ecf5ce69be5f41f6bd6b"
 ---
 
