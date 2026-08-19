@@ -3,9 +3,21 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 56)
+**Last updated:** 2026-08-19 (checkpoint 57)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
+
+---
+
+## CHECKPOINT — 2026-08-19 (57): HGO fail-closed-arming Parts A+B implemented, Critic-reviewed, one major finding fixed and independently re-verified; Part C (CLI wiring) is next (READ THIS FIRST)
+
+**Implementation landed in two commits.** `7473f6c9` (Parts A+B: persisted-plan get-or-create store, narrowed 3a/3b/3c arm-time checks with new `HGO-PLUGIN-DRIFT`, `signedCandidate`/`HGO-CANDIDATE-DRIFT` on the signature path, `refreezeHumanGuardOverridePlan`, Part B's digest-withholding comment correction) — took 3 dispatch attempts to land cleanly (2 truncated by the ~50-tool-call cliff mid-verify, recovered via finish-in-place dispatches per `references/workflow-dispatch.md`'s recovery pattern), plus one Elephant-caught, Elephant-fixed gap during finish-in-place verification: the design's Revision 2 had silently dropped an existing production check (fresh `pluginIdentity()` vs. `request.plugin` at the very first `plan()` call) — closed as design Revision 3 (`6a7c9e9a`) before the implementing dispatch added the missing check; the pre-existing test this regression would have broken passed unmodified once fixed, strong confirmation the fix was exactly right.
+
+**First Critic review of the implementation (round 1, full, guardrail-tier): FAIL, 1 major + 2 minor findings.** The major finding: `refreezeHumanGuardOverridePlan` (the design's OWN second write path into the persisted-plan store) inherited the identical class of gap Revision 3 had just closed for first-plan-creation — it adopted a fresh `pluginIdentity()` reading into the refrozen baseline with no verification at all. Closed as design Revision 4 (`e028f18f`) + implementation fix `a143d6f3` (mirrors the Revision-3 check exactly, positioned before the refreshed payload is built, with a dedicated regression test proving both the failure AND that the persisted plan is never poisoned). The two minor findings (missing tamper-test coverage for 2 of `pluginIdentity()`'s six hashed files; missing `authorSourceRoot`-collision regression test) were fixed in the same commit.
+
+**Delta Critic re-review (round 2, bounded to the fix) did not return a verdict — twice, both for infrastructure/budget reasons, not a finding.** First attempt got lost recovering from a closed-shell-grammar rejection near its tool-call budget; second attempt spent its whole budget gathering context before ever reaching Phase B. Per the standing round-cap policy (~2 Critic rounds; a 3rd is already too many — dispose findings directly once fixed rather than re-reviewing), the Elephant personally verified the fix instead of a third dispatch attempt: read the actual `a143d6f3` diff directly against the Critic's Finding 1 evidence and the design's Revision 4 text — the check is byte-for-byte the same pattern as the already-validated Revision 3 check, correctly placed before the plan is overwritten, uses the correct `HGO-DRIFT` code (not `HGO-PLUGIN-DRIFT`), and the new regression test explicitly re-reads the plan after a failed refreeze to prove it was never poisoned. Full suite independently re-run on primary: 39/39 green.
+
+**Next step:** dispatch Part C (`prepare-for-signature`/`refreeze-plan` CLI subcommands in `scripts/guard-human-override.mjs`) — now fully unblocked, Part A's persisted-plan mechanism is complete and hardened. After Part C lands and its own Critic review passes: the promised final-gates sequence — fresh full Verify → `security-scan.mjs` → new push-approval ceremony (the prior one is stale) → push. Remaining Phoenix-scope backlog after Part C: re-attempt `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger`'s CLI-side "granted" wiring (checkpoint 55's disclosed gap — this design's narrowed arm-time checks should no longer trip false-positive `HGO-DRIFT` on a ledger append before arm, worth a 4th attempt), then the deliberately-deferred `closed-shell-grammar-still-rejects-common-readonly-composition` item. The Nova-B-scope `lifecycle-event-schema-has-no-non-dispatch-correlation-shape` item was rejected here as duplicate-of-Nova (`fd40a897`) — Nova now tracks it exclusively.
 
 ---
 
