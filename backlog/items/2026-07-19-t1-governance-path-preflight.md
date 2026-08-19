@@ -3,7 +3,11 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.t1-governance-path-preflight"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "0b5544f1150ed9788e2e391c42cc328e9ee87c3c"
+closure_evidence: "backlog/items/2026-07-19-t1-governance-path-preflight.md"
 created: "2026-07-19"
 source: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md"
 tracking: "Sentinel recovery baseline; no completion claim."
@@ -156,3 +160,15 @@ ritual (status flip, closure metadata, ledger reconciliation) citing
 this scoping note plus the two prior dispatch results as closure
 evidence. Not closed here: closing was out of this scoping pass's
 directive.
+
+## Closure, 2026-08-19
+
+Standard close ritual run, per this item's own instruction above: no new
+design or dispatch needed, both AC clauses resolved (clause 1 proven,
+clause 2 retired by PO decision #18), and no separate "tool-setup" AC
+clause exists anywhere in the epic's spec files to prove. Closure
+evidence is this item's own 2026-08-19 scoping section plus the two
+prior dispatch results it cites (`NVA-T1GOVPREFLIGHT-1`, `NVA-W3-12`).
+`status:` was stale at `in_progress` in `backlog/STATUS.md` despite the
+scoping section's own conclusion — the STATUS.md/index.json ledger was
+simply never regenerated after that note landed.
