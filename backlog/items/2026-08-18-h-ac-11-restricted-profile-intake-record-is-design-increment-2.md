@@ -77,3 +77,16 @@ on increment 1's own portable-side CLI wiring for that script, which does
 not exist in this checkout yet. Item stays open for that one remaining,
 genuinely-blocked-on-a-prerequisite piece; the design and core producer are
 done.
+
+### Investigation — 2026-08-19, checked against the sibling Nova checkout
+
+PO asked whether Nova has already built increment 1's portable-side CLI
+wiring and could be ported. Checked directly:
+`rg -n "human-decision-attribution|subject.reason|proof.keyReference|attribution"
+/home/skar667/src/agent-pipeline-share_nova/plugins/pipeline-core/lib/guard-maintenance-window.mjs`
+— zero hits. Nova's `guard-maintenance-window.mjs prepare|install|status|close`
+CLI surface is the same shape as Phoenix's own (confirmed via `--help`
+usage string comparison); neither carries the increment-1 attribution
+wiring this item's remaining piece depends on. There is nothing to port —
+this is a genuine gap in both checkouts, not a Phoenix-specific one Nova
+already solved. Stays open, blocked exactly as before; no action taken.
