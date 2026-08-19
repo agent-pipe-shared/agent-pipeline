@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-19
 closed_at: "2026-08-19"
 closure_repository: "self"
-closure_commit: "77e28eda"
+closure_commit: "77e28eda2a51c5f60d140ee0f4e5a9387b52e80a"
 closure_evidence: "docs/adr/0066-publication-approval-time-signature-accepted-tradeoff.md"
 source: "Noted as a remaining gap during PHX-WP-PUBLICATION-UNIFICATION (commit 41c7711d, 2026-08-19), which proved the publication-authority approve/authorize migration onto the shared pipeline.po-approval-proof.v1 contract was already functionally complete; recorded as a to-be-filed follow-up in backlog/items/2026-08-02-unified-human-authorization-ux.md's 2026-08-19 progress note. This item is that filing, backed by a fresh full read of both code paths."
 ---

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "398490419593ec92e077be9ae35acf16fd567d70d181721c0613b0b035f1e725"
+    "transitionHead": "6cd4eb7053c466aef552f2b3cf8db331a87b2853f12f2112690af00c7a96579e"
   },
   "counts": {
-    "open": 18,
+    "open": 16,
     "in_progress": 25,
-    "closed": 110,
+    "closed": 112,
     "rejected": 1,
     "deferred": 11
   },
@@ -1225,11 +1225,15 @@
     },
     {
       "id": "pipeline.product-capability-inventory-two-guard-hooks-uncategorized",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Found by PHX-WP-BACKLOG-OBSGOV-MISC-TRIAGE while diagnosing product-capability-inventory-tests failure from a full clean-candidate Verify run, 2026-08-18/19."
+      "source": "Found by PHX-WP-BACKLOG-OBSGOV-MISC-TRIAGE while diagnosing product-capability-inventory-tests failure from a full clean-candidate Verify run, 2026-08-18/19.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "897a4466a4c446838801527a00bd0bd2d65fb044",
+      "closureEvidence": "docs/product-capability-inventory.json"
     },
     {
       "id": "pipeline.project-authority-dual-state-repair-and-failclosed-gate",
@@ -1253,11 +1257,15 @@
     },
     {
       "id": "pipeline.publication-authority-lacks-execution-time-criticalproof-reverification",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Noted as a remaining gap during PHX-WP-PUBLICATION-UNIFICATION (commit 41c7711d, 2026-08-19), which proved the publication-authority approve/authorize migration onto the shared pipeline.po-approval-proof.v1 contract was already functionally complete; recorded as a to-be-filed follow-up in backlog/items/2026-08-02-unified-human-authorization-ux.md's 2026-08-19 progress note. This item is that filing, backed by a fresh full read of both code paths."
+      "source": "Noted as a remaining gap during PHX-WP-PUBLICATION-UNIFICATION (commit 41c7711d, 2026-08-19), which proved the publication-authority approve/authorize migration onto the shared pipeline.po-approval-proof.v1 contract was already functionally complete; recorded as a to-be-filed follow-up in backlog/items/2026-08-02-unified-human-authorization-ux.md's 2026-08-19 progress note. This item is that filing, backed by a fresh full read of both code paths.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "77e28eda2a51c5f60d140ee0f4e5a9387b52e80a",
+      "closureEvidence": "docs/adr/0066-publication-approval-time-signature-accepted-tradeoff.md"
     },
     {
       "id": "pipeline.published-lifecycle-event-schema-still-enumerates-cancellation",

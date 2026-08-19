@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-19
 closed_at: "2026-08-19"
 closure_repository: "self"
-closure_commit: "897a4466"
+closure_commit: "897a4466a4c446838801527a00bd0bd2d65fb044"
 closure_evidence: "docs/product-capability-inventory.json"
 source: "Found by PHX-WP-BACKLOG-OBSGOV-MISC-TRIAGE while diagnosing product-capability-inventory-tests failure from a full clean-candidate Verify run, 2026-08-18/19."
 ---

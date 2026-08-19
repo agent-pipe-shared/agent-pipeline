@@ -118,10 +118,10 @@
 | pipeline.prepared-maintenance-window-dies-at-the-next-commit | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive | deferred | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.product-capability-inventory-two-guard-hooks-uncategorized | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.product-capability-inventory-two-guard-hooks-uncategorized | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.project-authority-dual-state-repair-and-failclosed-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.publication-authority-lacks-execution-time-criticalproof-reverification | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.publication-authority-lacks-execution-time-criticalproof-reverification | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.published-lifecycle-event-schema-still-enumerates-cancellation | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -173,8 +173,8 @@
 
 ## Counts
 
-- open: 18
+- open: 16
 - in_progress: 25
-- closed: 110
+- closed: 112
 - rejected: 1
 - deferred: 11
