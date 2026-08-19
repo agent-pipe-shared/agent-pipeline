@@ -588,6 +588,9 @@ const TEST_SUITES = [
   { name: "onboarding-consent-marker-tests", file: join(libDir, "onboarding-consent-marker.test.mjs") },
   { name: "clean-candidate-run-tests", file: join(pluginScriptsDir, "clean-candidate-run.test.mjs") },
   { name: "verify-evidence-root-tests", file: join(scriptDir, "verify-evidence-root.test.mjs") },
+  { name: "human-decision-attribution-tests", file: join(libDir, "human-decision-attribution.test.mjs") },
+  { name: "handover-rotate-tests", file: join(pluginScriptsDir, "handover-rotate.test.mjs") },
+  { name: "pipeline-state-rebind-mutable-tests", file: join(pluginScriptsDir, "pipeline-state-rebind-mutable.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects that carry a manifest at
