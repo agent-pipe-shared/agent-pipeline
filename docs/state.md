@@ -3,13 +3,27 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 54)
+**Last updated:** 2026-08-19 (checkpoint 55)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
 ---
 
-## CHECKPOINT — 2026-08-19 (54): both checkpoint-53 PO decisions acted on; both hooks landed; the `hooks.json` wiring ceremony hit an unexpected control and was correctly stopped, not routed around (READ THIS FIRST)
+## CHECKPOINT — 2026-08-19 (55): HGO's CLI-side `granted` wiring hit a real architectural conflict, correctly reverted rather than shipped broken; accepted as a disclosed gap (READ THIS FIRST)
+
+`PHX-WP-HGO-LEDGER-EMISSION-V3` (dispatched to finish `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger`'s last piece) built the CLI-side `granted` wiring, then found by live empirical proof — a full deny→authorize→consume round-trip test — that design §8.1's fail-closed-at-arming requirement is unsatisfiable as briefed: appending to the ledger before arming dirties the tracked worktree, and `authorizeHumanGuardOverride()`/`authorizeHumanGuardOverrideBySignature()` (`lib/human-guard-override.mjs`, out of scope) independently re-derive `repositoryObservation`/`statusSha256` at arm time and refuse `HGO-DRIFT` the instant that status differs from denial time. **Correctly reverted rather than shipped** (`git diff` against pre-dispatch state on the touched files: empty) — this is the briefing's own stop condition firing as intended.
+
+**What DID land:** new direct test coverage for the two previously-untested hook-side helpers landed by the prior dispatch (`appendOverrideDeniedLedgerEvent`/`appendOverrideConsumedLedgerEvent`), commit `5c459eaa` cherry-picked as `bce05e53`, 2/2 pass, independently re-verified; all pre-existing suites re-confirmed unchanged (31/1/19).
+
+**Decision: accept the CLI-side gap as disclosed, not chase a 4th dispatch.** Three dispatches have now worked this exact HGO ledger topic. The remaining piece needs a real design review of how the drift check should interact with a ledger append (candidate directions: exclude `governance/events/**` from the drift preimage; atomic-commit the append; thread the pre-append observation through to arm time) — not a tighter goldfish briefing. `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger` closes this round as: GMW — fully done; HGO hook-side (denied+consumed) — fully done and tested; HGO CLI-side (granted) — disclosed architectural gap, mirroring the design doc's own §14 precedent for accepted gaps. Full account in the backlog item's own progress notes.
+
+**`handover-file-has-no-rotation-obligation`** — unchanged from checkpoint 54: hook built and merged, `hooks.json` wiring still blocked on the author-repair ceremony question, still needs PO input.
+
+**Final gates still unattempted** — PO-only reconcile-signature ceremony not run this round.
+
+---
+
+## CHECKPOINT — 2026-08-19 (54): both checkpoint-53 PO decisions acted on; both hooks landed; the `hooks.json` wiring ceremony hit an unexpected control and was correctly stopped, not routed around
 
 **PO decisions received and acted on:** (a) for `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger`, expand scope to cover `hooks/guard-gate-strength.mjs` too, landing a bigger coordinated change; (b) for `handover-file-has-no-rotation-obligation`'s remaining piece, "dann zeremonie machen" — do the `hooks.json` wiring ceremony.
 
