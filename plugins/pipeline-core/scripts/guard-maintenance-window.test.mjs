@@ -36,16 +36,19 @@ import { livePluginRoots } from "../hooks/guard-gate-strength.mjs";
 import { prepareGuardMaintenanceWindowRequest } from "../lib/guard-maintenance-window.mjs";
 import { run } from "./guard-maintenance-window.mjs";
 
-// The CLI's own `prepare` command does not (pre-existing, unrelated to this dispatch's
-// briefed install/close scope -- see this dispatch's final report) forward
-// `authorshipMode`/`stage0Selfcheck` to `prepareGuardMaintenanceWindowRequest`, which
-// PHX-WP-STAGE0-SELFCHECK made a mandatory field; `run(["prepare", ...])` therefore
-// always throws GMW-AUTHORSHIP-MODE-INVALID today, independently of this dispatch's
-// changes. These tests build the signed request directly through the library function
-// instead (exactly `lib/guard-maintenance-window.test.mjs`'s own fixture pattern),
-// stopping at the same "currently-enforcing live plugin root" resolution the CLI's
-// `install`/`close` branches use internally (`livePluginRoots()[0]`, unchanged by this
-// dispatch), so the two paths still agree on `openingTreeSha256`.
+// PHX-WP-GMW-PREPARE-AUTHORSHIP fixed the CLI's own `prepare` command to forward
+// `authorshipMode`/`stage0Selfcheck` to `prepareGuardMaintenanceWindowRequest` (see
+// that file's own top-of-file note and the "prepare" describe block below, which
+// exercises `run(["prepare", ...])` directly). The install/close fixtures in THIS file
+// predate that fix and still build the signed request directly through the library
+// function (exactly `lib/guard-maintenance-window.test.mjs`'s own fixture pattern) --
+// left as-is since re-routing them through the CLI's `prepare` is out of this dispatch's
+// briefed scope (CLI wiring + its own test coverage, not a fixture-pattern rewrite of
+// unrelated install/close tests) and would only re-prove the same thing the new
+// "prepare" tests below already cover directly. They still stop at the same
+// "currently-enforcing live plugin root" resolution the CLI's `install`/`close`
+// branches use internally (`livePluginRoots()[0]`), so the two paths still agree on
+// `openingTreeSha256`.
 function currentLivePluginRoot() {
   return livePluginRoots()[0];
 }
@@ -140,6 +143,91 @@ async function installedWindow({ root, keys, ttlSeconds = 120, reason = FREE_TEX
   const installed = await run(["install", "--repo-root", root, "--request", requestPath, "--proof", proofPath, "--plan", "plan.md", "--spec", "spec.md"]);
   return { installed, external, requestPath, proofPath, intent, request };
 }
+
+// ---------------------------------------------------------------------------------
+// PHX-WP-GMW-PREPARE-AUTHORSHIP: `prepare`'s own `--authorship-mode`/stage-0-selfcheck
+// CLI wiring, exercised through `run(["prepare", ...])` itself -- not the library
+// function directly -- since this is what was previously always broken.
+// ---------------------------------------------------------------------------------
+
+test("prepare with --authorship-mode goldfish-dispatch succeeds and carries stage0Selfcheck: null", async (t) => {
+  const { root } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const prepared = await run([
+    "prepare", "--repo-root", root, "--scope", "GS-6,TP-1", "--ttl-seconds", "120",
+    "--reason", FREE_TEXT_REASON, "--authorship-mode", "goldfish-dispatch",
+    "--plan", "plan.md", "--spec", "spec.md",
+  ]);
+  assert.equal(prepared.ok, true);
+  assert.equal(prepared.value.request.authorshipMode, "goldfish-dispatch");
+  assert.equal(prepared.value.request.stage0Selfcheck, null);
+});
+
+test("prepare with --authorship-mode elephant-direct and a qualifying stage-0 self-check succeeds and carries the full object", async (t) => {
+  const { root } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const prepared = await run([
+    "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "120",
+    "--reason", FREE_TEXT_REASON, "--authorship-mode", "elephant-direct",
+    "--files-changed", "1", "--diff-lines", "10", "--touches-test-file", "false",
+    "--plan", "plan.md", "--spec", "spec.md",
+  ]);
+  assert.equal(prepared.ok, true);
+  assert.deepEqual(prepared.value.request.authorshipMode, "elephant-direct");
+  assert.deepEqual(prepared.value.request.stage0Selfcheck, { filesChanged: 1, diffLines: 10, touchesTestFile: false });
+});
+
+test("prepare with --authorship-mode elephant-direct and a non-qualifying stage-0 self-check still fails, with the library's own not-qualified code", async (t) => {
+  const { root } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await assert.rejects(
+    () => run([
+      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "120",
+      "--reason", FREE_TEXT_REASON, "--authorship-mode", "elephant-direct",
+      "--files-changed", "5", "--diff-lines", "100", "--touches-test-file", "false",
+      "--plan", "plan.md", "--spec", "spec.md",
+    ]),
+    (error) => error.code === "GMW-STAGE0-NOT-QUALIFIED",
+  );
+});
+
+test("prepare with --authorship-mode elephant-direct but no stage-0 self-check flags fails on the CLI's own usage check", async (t) => {
+  const { root } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await assert.rejects(
+    () => run([
+      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "120",
+      "--reason", FREE_TEXT_REASON, "--authorship-mode", "elephant-direct",
+      "--plan", "plan.md", "--spec", "spec.md",
+    ]),
+    (error) => error.message.startsWith("Usage:"),
+  );
+});
+
+test("prepare with an invalid --authorship-mode value still fails, matching the library's closed-set check", async (t) => {
+  const { root } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await assert.rejects(
+    () => run([
+      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "120",
+      "--reason", FREE_TEXT_REASON, "--authorship-mode", "not-a-real-mode",
+      "--plan", "plan.md", "--spec", "spec.md",
+    ]),
+    (error) => error.code === "GMW-AUTHORSHIP-MODE-INVALID",
+  );
+});
+
+test("prepare with no --authorship-mode at all fails on the CLI's own usage check", async (t) => {
+  const { root } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await assert.rejects(
+    () => run([
+      "prepare", "--repo-root", root, "--scope", "GS-6", "--ttl-seconds", "120",
+      "--reason", FREE_TEXT_REASON, "--plan", "plan.md", "--spec", "spec.md",
+    ]),
+    (error) => error.message.startsWith("Usage:"),
+  );
+});
 
 test("install appends requested+granted to the portable ledger and arms the window", async (t) => {
   const { root, fingerprint, keys } = await fixture();

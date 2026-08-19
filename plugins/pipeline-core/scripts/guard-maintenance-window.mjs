@@ -20,7 +20,9 @@
  *
  * Usage:
  *   guard-maintenance-window.mjs prepare --repo-root <path> --scope <ids> \
- *     --ttl-seconds <n> --reason <text> [--feature-id <id>] [--plan <path>] [--spec <path>]
+ *     --ttl-seconds <n> --reason <text> --authorship-mode <goldfish-dispatch|elephant-direct> \
+ *     [--files-changed <n> --diff-lines <n> --touches-test-file <true|false>] \
+ *     [--feature-id <id>] [--plan <path>] [--spec <path>]
  *   guard-maintenance-window.mjs install --repo-root <path> --request <path> \
  *     --proof <external-public-json> --plan <repo-path> --spec <repo-path> \
  *     [--authority <external-public-json>] [--attribution-key-file <external-path>]
@@ -59,6 +61,19 @@
  * best-effort appends a `revoked` disposition; a ledger append failure at `close` never
  * blocks or reverses the file-level narrowing itself (§8.1's "fail open toward
  * narrowing").
+ *
+ * PHX-WP-GMW-PREPARE-AUTHORSHIP (backlog/items/2026-08-19-gmw-prepare-cli-authorship-mode-invalid-on-every-call.md):
+ * `prepare` now forwards `authorshipMode`/`stage0Selfcheck` to
+ * `prepareGuardMaintenanceWindowRequest`, which PHX-WP-STAGE0-SELFCHECK made mandatory
+ * (`lib/guard-maintenance-window.mjs`'s `assertStage0Declaration`) -- before this change
+ * `prepare` failed `GMW-AUTHORSHIP-MODE-INVALID` on every real invocation because the CLI
+ * never supplied either field. `--authorship-mode` is now required and must be exactly
+ * `"goldfish-dispatch"` or `"elephant-direct"` (`AUTHORSHIP_MODES`, unchanged library
+ * closed set). `--files-changed`/`--diff-lines`/`--touches-test-file` carry EL-01's
+ * stage-0 self-check shape and are required only when `--authorship-mode
+ * elephant-direct` is given -- for `goldfish-dispatch` they are ignored (the library
+ * itself records `stage0Selfcheck: null` for that mode). This is CLI wiring only; the
+ * library's own validation logic (`assertStage0Declaration`) is untouched.
  */
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -102,13 +117,13 @@ const DEFAULT_FEATURE_ID = "sprint-nova-epic";
 const DEFAULT_PLAN = "specs/sprint-nova-epic/prd_sprint-nova-epic.md";
 const DEFAULT_SPEC = "specs/sprint-nova-epic/spec.md";
 
-const usage = "Usage: guard-maintenance-window.mjs prepare --repo-root <path> --scope <ids> --ttl-seconds <n> --reason <text> [--feature-id <id>] [--plan <path>] [--spec <path>] | install --repo-root <path> --request <path> --proof <external-public-json> --plan <repo-path> --spec <repo-path> [--authority <external-public-json>] [--attribution-key-file <external-path>] | status --repo-root <path> | close --repo-root <path>";
+const usage = "Usage: guard-maintenance-window.mjs prepare --repo-root <path> --scope <ids> --ttl-seconds <n> --reason <text> --authorship-mode <goldfish-dispatch|elephant-direct> [--files-changed <n> --diff-lines <n> --touches-test-file <true|false>] [--feature-id <id>] [--plan <path>] [--spec <path>] | install --repo-root <path> --request <path> --proof <external-public-json> --plan <repo-path> --spec <repo-path> [--authority <external-public-json>] [--attribution-key-file <external-path>] | status --repo-root <path> | close --repo-root <path>";
 
 export function parseArgs(argv) {
   const [command, ...tokens] = argv;
   const values = { command, repoRoot: process.cwd() };
   const supplied = new Set();
-  const known = new Set(["featureId", "plan", "spec", "repoRoot", "scope", "ttlSeconds", "reason", "request", "authority", "proof", "attributionKeyFile"]);
+  const known = new Set(["featureId", "plan", "spec", "repoRoot", "scope", "ttlSeconds", "reason", "request", "authority", "proof", "attributionKeyFile", "authorshipMode", "filesChanged", "diffLines", "touchesTestFile"]);
   for (let index = 0; index < tokens.length; index += 1) {
     const key = tokens[index];
     if (!key.startsWith("--")) return { error: usage };
@@ -281,12 +296,28 @@ export async function run(argv = process.argv.slice(2)) {
   const rootDir = resolve(args.repoRoot);
 
   if (args.command === "prepare") {
-    if (!args.scope || !args.ttlSeconds || !args.reason) throw new Error(usage);
+    if (!args.scope || !args.ttlSeconds || !args.reason || !args.authorshipMode) throw new Error(usage);
     const scopeRuleIds = args.scope.split(",").map((entry) => entry.trim()).filter((entry) => entry !== "");
     const ttlSeconds = Number(args.ttlSeconds);
     const featureId = args.featureId ?? DEFAULT_FEATURE_ID;
     const planPath = args.plan ?? DEFAULT_PLAN;
     const specPath = args.spec ?? DEFAULT_SPEC;
+    const authorshipMode = args.authorshipMode;
+    // stage0Selfcheck is only meaningful (and only required) for "elephant-direct" --
+    // mirrors lib/guard-maintenance-window.mjs's own conditional requirement
+    // (assertStage0Declaration); for "goldfish-dispatch" these three flags are simply
+    // ignored even if supplied, exactly as the library records `stage0Selfcheck: null`
+    // for that mode regardless of what is passed in.
+    let stage0Selfcheck = null;
+    if (authorshipMode === "elephant-direct") {
+      if (args.filesChanged === undefined || args.diffLines === undefined || args.touchesTestFile === undefined) throw new Error(usage);
+      if (args.touchesTestFile !== "true" && args.touchesTestFile !== "false") throw new Error(usage);
+      stage0Selfcheck = {
+        filesChanged: Number(args.filesChanged),
+        diffLines: Number(args.diffLines),
+        touchesTestFile: args.touchesTestFile === "true",
+      };
+    }
     const livePluginRoot = currentLivePluginRoot();
     if (livePluginRoot === null) throw new Error("GMW-PLUGIN-SOURCE: no currently-enforcing live plugin root could be identified");
     const { intent, subject, request } = prepareGuardMaintenanceWindowRequest({
@@ -299,6 +330,8 @@ export async function run(argv = process.argv.slice(2)) {
       specSha256: sha256(readPublicRepositoryFile(rootDir, specPath)),
       policyRevision: GMW_POLICY_REVISION,
       livePluginRoot,
+      authorshipMode,
+      stage0Selfcheck,
     });
     // The candidate commit this signature is bound to lives in intent.value.candidate
     // (set by createPoApprovalIntent in lib/po-approval-proof.mjs), not on `subject` --
