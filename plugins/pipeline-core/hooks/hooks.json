@@ -84,6 +84,16 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\"",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
