@@ -134,3 +134,11 @@ content-v1:ee35fd882218d795d28f7f4a61ffb7114ffb57f16ee09bcfbf779ecd44008431:spec
 # ^ these 3: ordinary pipeline.feature-package-lifecycle-receipt.v1 JSON. The matched value in
 # each is the record's own idempotencyKey field (identical to the file's own name suffix), not
 # a credential of any kind.
+# PHX-WP-GITLEAKS-ATTRIBUTION-KEY-FP (2026-08-19): confirmed false positive, verified by direct
+# content inspection, not by rule/pattern alone (see backlog/items/2026-08-19-gitleaks-false-
+# positive-in-guard-maintenance-window-attribution-key-generation-tag.md).
+content-v1:dd4c651733fc54fa15348f7bb3dc75465a6327a2cd8e0e6b6cafc590f04fb43f:plugins/pipeline-core/scripts/guard-maintenance-window.mjs:generic-api-key:172:8
+# ^ the ATTRIBUTION_KEY_GENERATION constant at that line -- a pinned key-generation version tag
+# (the restricted attribution store's own keyGeneration shape check requires a string), not a
+# secret or credential. Deliberately not quoting the assigned literal here -- see the source
+# line itself -- because the exact "KEY... = "..."" shape is what trips this rule.

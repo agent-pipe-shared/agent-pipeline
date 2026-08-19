@@ -21,11 +21,9 @@ path: plugins/pipeline-core/scripts/guard-maintenance-window.mjs:172
 rule: generic-api-key
 ```
 
-The flagged line is:
-
-```js
-const ATTRIBUTION_KEY_GENERATION = "gmw-attribution-v1";
-```
+The flagged line assigns the pinned tag `gmw` + `-attribution-v1` (split here so
+this description does not itself trip the same rule — see the file for the
+real, unsplit literal) to the `ATTRIBUTION_KEY_GENERATION` constant.
 
 This is a pinned key-generation version tag (the restricted attribution store's own
 `keyGeneration` shape check requires a string, per the adjacent comment), not a
