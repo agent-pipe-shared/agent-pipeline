@@ -113,3 +113,35 @@ specific claim (which commit, which suites) before closing this item, since
 this dispatch's own report did not cite one -- but treat the underlying
 work as done pending that confirmation, not as still-open implementation
 work for a future wave.
+
+### Verification, 2026-08-19 (Wave 5)
+
+Directly confirmed all three pieces named above: `plugins/pipeline-core/lib/test-tmpdir.mjs`
+(the shared helper, 11/11 tests pass) and `plugins/pipeline-core/lib/test-tmpdir-budget.mjs`
+(the size/count budget check, 16/16 tests pass) both exist; `onboarding-continuity.test.mjs`
+and `pipeline-state-inspection-contract.test.mjs` (the two named highest-offender
+suites) both use the shared helper (`grep -l "test-tmpdir"` confirms both).
+
+**The budget check is not registered in `harness/scripts/verify.mjs`**
+(TP-3-protected; the module's own header explicitly documents this as a
+deliberate, undone-pending-ceremony step, not an oversight) — one real gap
+against the original decision's "surfaced through verify.mjs" wording,
+otherwise unchanged from NVA-W1-12's finding.
+
+**Running the check live found a real, current accumulation** (not
+hypothetical): `scratch/test-tmp/` had grown to 154,880 entries against a
+20,000 max — this session's own heavy test-suite usage across many Wave
+3/4/5 dispatch rounds, exactly the accumulation class this item exists to
+catch, just now bounded inside the repo's own gitignored tree instead of
+host `/tmp`. Cleaned up directly (`rm -rf scratch/test-tmp`, safe: gitignored,
+disposable, no tracked content) and re-verified the check reports clean
+(0 bytes, 0 entries) and all affected suites still pass. This is direct,
+live proof the check does exactly what it was built for.
+
+**Status: stays `open`.** The bounded-scope decision's implementation is
+verified complete and working; the sole remaining piece is registering
+`test-tmpdir-budget.mjs`/`.test.mjs` into `verify.mjs`'s `TEST_SUITES`
+array (TP-3), which needs a maintenance-window or signature ceremony, not
+a routine dispatch. The exact registration snippet is already documented
+in `test-tmpdir-budget.mjs`'s own header comment, mirroring the existing
+`state-budget-tests`/`state-budget-check` pair.
