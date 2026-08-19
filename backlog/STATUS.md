@@ -37,6 +37,7 @@
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | closed | idea | pipeline | 2026-08-05 | — |
 | pipeline.close-spec-retention-and-consent | closed | workflow-improvement | pipeline | 2026-07-21 | — |
 | pipeline.closed-input-channel-review-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.closed-shell-grammar-still-rejects-common-readonly-composition | open | workflow-improvement | pipeline | 2026-08-19 | — |
 | pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head | deferred | defect | pipeline | 2026-08-07 | — |
 | pipeline.codex-plugin-validator-host-parity | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -77,8 +78,10 @@
 | pipeline.guard-testpath-not-kernel-protected | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.guard-testpath-override-ot09-stale-literal-pattern | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2 | closed | requirement | pipeline | 2026-08-18 | — |
-| pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
+| pipeline.handover-file-has-no-rotation-obligation | closed | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step | open | workflow-improvement | pipeline | 2026-08-19 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-legible-approval-record | closed | requirement | pipeline | 2026-08-06 | — |
@@ -86,7 +89,7 @@
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | open | requirement | pipeline | 2026-08-17 | — |
+| pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | rejected | requirement | pipeline | 2026-08-17 | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify | closed | defect | pipeline | 2026-08-06 | — |
@@ -175,8 +178,8 @@
 
 ## Counts
 
-- open: 8
+- open: 9
 - in_progress: 25
-- closed: 122
-- rejected: 1
+- closed: 123
+- rejected: 2
 - deferred: 11

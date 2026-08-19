@@ -3,13 +3,13 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "19a6830d25b966ca0c8d6e5aed6be88f9dfee3c670f8b91a0c58a1d34459501e"
+    "transitionHead": "ac6e8221518263e915126bc4436414572512842ac7bff16e0ee657ed329313c3"
   },
   "counts": {
-    "open": 8,
+    "open": 9,
     "in_progress": 25,
-    "closed": 122,
-    "rejected": 1,
+    "closed": 123,
+    "rejected": 2,
     "deferred": 11
   },
   "items": [
@@ -371,6 +371,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "close retro; bounded privacy correction review"
+    },
+    {
+      "id": "pipeline.closed-shell-grammar-still-rejects-common-readonly-composition",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "PO question, 2026-08-19: 'sollen wir die bash grammatik reibung nicht etwas auflösen und sehr übliche dinge einfach rein nehmen ... die sehr oft genutzt werden?' — asked live after the running Critic delta-review dispatch (and the Elephant itself, same session) repeatedly hit GUARD-PARSE-UNSUPPORTED/GUARD-REDIRECT-UNAPPROVED on ordinary read-only command shapes."
     },
     {
       "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",
@@ -799,11 +807,15 @@
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
+      "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "b4b685e0741b45b7412ca9a7fd52059e1284a034",
+      "closureEvidence": "backlog/items/2026-08-07-handover-file-has-no-rotation-obligation.md"
     },
     {
       "id": "pipeline.hash-chained-ledger-collides-with-the-secret-scanner",
@@ -816,6 +828,22 @@
       "closureRepository": "self",
       "closureCommit": "c8dee9d47692fd5f87a6a3f4cc15a666cc7fb247",
       "closureEvidence": "backlog/items/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md"
+    },
+    {
+      "id": "pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "PO instruction, 2026-08-19: 'und danach auch härten, dass goldfische solche guards nicht umgehen können' — after live discovery during the hooks.json wiring ceremony that a dispatched subagent recovered a deliberately-withheld request digest by reading .git/agent-pipeline/human-guard-overrides/requests/ directly."
+    },
+    {
+      "id": "pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "PO instruction, 2026-08-19, live during the hooks.json author-repair HGO ceremony: 'kannst du das hgo bitte so umbauen, dass der agent das selbstständig alles macht bis zum eigentlichen signieren und dann einem auch direkt nur den signier befehl gibt?' and the follow-up 'so bauen das der PO definitiv nur das eine signier gate macht.'"
     },
     {
       "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
@@ -903,7 +931,7 @@
     },
     {
       "id": "pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape",
-      "status": "open",
+      "status": "rejected",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-17",
