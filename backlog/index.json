@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4ee3b8e3efaa619e53cb2e1cc832cd21bb5cb10126f001fe639882869192ffd9"
+    "transitionHead": "20d46d71bcb3fa0e618268a12979fac389ac65cc1bdde4a1d793791cd7b741c2"
   },
   "counts": {
-    "open": 51,
+    "open": 50,
     "in_progress": 7,
-    "closed": 239
+    "closed": 240
   },
   "items": [
     {
@@ -1257,11 +1257,15 @@
     },
     {
       "id": "pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "self-observation during Wave-3 dispatch NVA-W3-R3, 2026-08-18 (Nova A backlog finalization sprint)"
+      "source": "self-observation during Wave-3 dispatch NVA-W3-R3, 2026-08-18 (Nova A backlog finalization sprint)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "130948c15fee0afe389cf787772f11b75b6dad72",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
     },
     {
       "id": "pipeline.guard-dispatch-has-no-workflow-tool-awareness",

@@ -116,7 +116,7 @@
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal | open | defect | pipeline | 2026-08-09 | — |
-| pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.guard-dispatch-has-no-workflow-tool-awareness | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table | closed | workflow-improvement | pipeline | 2026-08-16 | — |
@@ -305,6 +305,6 @@
 
 ## Counts
 
-- open: 51
+- open: 50
 - in_progress: 7
-- closed: 239
+- closed: 240
