@@ -2633,6 +2633,12 @@
       "member": "state-budget-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "state-numeric-claims-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -3278,6 +3284,7 @@
         "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
         "verify-phase:harness/scripts/verify.mjs:state-budget-check",
         "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
+        "verify-phase:harness/scripts/verify.mjs:state-numeric-claims-tests",
         "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
         "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
         "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
