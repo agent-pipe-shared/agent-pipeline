@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: "2026-08-19"
 closure_repository: "self"
-closure_commit: "0000000000000000000000000000000000000000"
+closure_commit: "6b34ed12d7ac9fe61723157e72c527518a0af6ff"
 closure_evidence: "backlog/items/2026-08-02-unified-human-authorization-ux.md"
 created: 2026-08-02
 source: "PO product-direction decision during Sprint Cyborg CYB-4 PO-proof UX review, 2026-08-02"
