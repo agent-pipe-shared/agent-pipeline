@@ -143,6 +143,12 @@
       "member": "guard-dispatch"
     },
     {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-el01-tripwire.mjs:guard-el01-tripwire",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-el01-tripwire.mjs",
+      "member": "guard-el01-tripwire"
+    },
+    {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-gate-strength.mjs",
@@ -159,6 +165,12 @@
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
       "member": "guard-lifecycle-ready"
+    },
+    {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs:guard-onboarding-consent-lock",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs",
+      "member": "guard-onboarding-consent-lock"
     },
     {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
@@ -215,6 +227,12 @@
       "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\""
     },
     {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-el01-tripwire.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-el01-tripwire.mjs\""
+    },
+    {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\"",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
@@ -225,6 +243,12 @@
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
       "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude"
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs\""
     },
     {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
@@ -1619,6 +1643,12 @@
       "member": "guard-testpath-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:handover-rotate-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "handover-rotate-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1635,6 +1665,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "human-authority-grant-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-decision-attribution-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "human-decision-attribution-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
@@ -2049,6 +2085,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "pipeline-state-lifecycle-event-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-mutable-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-state-rebind-mutable-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-runner-tests",
@@ -2920,16 +2962,20 @@
         "guard:plugins/pipeline-core/hooks/guard-apply-patch.mjs:guard-apply-patch",
         "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
         "guard:plugins/pipeline-core/hooks/guard-dispatch.mjs:guard-dispatch",
+        "guard:plugins/pipeline-core/hooks/guard-el01-tripwire.mjs:guard-el01-tripwire",
         "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
         "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
+        "guard:plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs:guard-onboarding-consent-lock",
         "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-el01-tripwire.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
@@ -2966,8 +3012,10 @@
         "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
         "plugins/pipeline-core/hooks/guard-devplan.mjs",
         "plugins/pipeline-core/hooks/guard-dispatch.mjs",
+        "plugins/pipeline-core/hooks/guard-el01-tripwire.mjs",
         "plugins/pipeline-core/hooks/guard-git.mjs",
         "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+        "plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs",
         "plugins/pipeline-core/hooks/guard-push.mjs",
         "plugins/pipeline-core/hooks/guard-testpath.mjs",
         "plugins/pipeline-core/hooks/hooks.json"
@@ -3231,9 +3279,11 @@
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-gmw-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
+        "verify-phase:harness/scripts/verify.mjs:handover-rotate-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
         "verify-phase:harness/scripts/verify.mjs:human-authority-grant-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-decision-attribution-tests",
         "verify-phase:harness/scripts/verify.mjs:human-governance-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:human-guard-override-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
@@ -3302,6 +3352,7 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-decision-reference-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-external-push-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-lifecycle-event-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-mutable-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-rebind-runner-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-reopen-design-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-revocation-tests",
