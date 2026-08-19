@@ -213,6 +213,111 @@ suite to be trusted"). A follow-up item/dispatch is needed for that
 enforcement wiring, scoped to include the `guard-git.test.mjs` coverage the
 `guard-git.mjs` route would need.
 
+### Direction 1 design, 2026-08-19
+
+**Root cause of the earlier "breaks 5 locked fixtures" finding: those fixtures
+assert on `commitMessageFindings()`'s `findings` array via a `codes()` helper
+that reads only `.findings` — never a full-object `deepEqual` (confirmed:
+zero hits for `deepEqual(run(` / `deepEqual(result,` in
+`commit-message-policy.test.mjs`).** The earlier investigation's plan A
+(merge GIT-01 into the SAME `findings` array `commitMessageFindings`
+returns) genuinely would have broken CMP5/CMP8/CMP12/12b/12c, because
+`codes()` returns every code in that array and those five fixtures' commit
+subjects (`"x"`, etc.) don't start with an admitted GIT-01 type. But that
+is not the only way to reuse the extraction logic — decision below avoids
+it entirely.
+
+**Decision: (a) revised — add an additive `message` field to
+`commitMessageFindings`'s return value; keep GIT-01 as a fully separate,
+independent check/block in `guard-git.mjs`, never merged into the GIT-03
+`findings` array.** This reuses the already-tested argv/heredoc/`-F`
+extraction (avoiding option (b)'s "duplicate untested parsing" cost) while
+leaving every existing fixture's assertions untouched, because none of them
+inspect a `message` field that doesn't exist yet.
+
+**Part A — commit-time enforcement in `guard-git.mjs` (NOT TP-3-protected;
+dispatchable directly, no ceremony needed):**
+
+1. `plugins/pipeline-core/lib/commit-message-policy.mjs`,
+   `commitMessageFindings()` (line 155): add one line to the return
+   statement (line 207) — `message: parts.length > 0 ? parts.join("\n") : null`.
+   Purely additive; `inspected`, `sources`, `findings` are byte-identical to
+   today for every existing caller and every existing fixture.
+2. `plugins/pipeline-core/hooks/guard-git.mjs`: import `commitTypeFindings`
+   alongside the existing `commitMessageFindings`/`markerPolicyMode` import
+   (line 262). Immediately after the existing GIT-03 block closes (after
+   line 1031, `}`), add a new, independent block:
+   ```js
+   if (inspection.message !== null) {
+     const subjectLine = inspection.message.split("\n")[0];
+     const typeCheck = commitTypeFindings(subjectLine);
+     if (typeCheck.findings.length > 0) {
+       emit(2, [
+         `BLOCKED (git-guard GIT-01, plugin pipeline-core): ${typeCheck.findings.map((f) => f.detail).join(" and ")}.`,
+         `Codes: ${typeCheck.findings.map((f) => f.code).join(", ")}.`,
+         "guardrails/git.md GIT-01: the subject line must start with an admitted Conventional Commit type.",
+         "Rewrite the message with an admitted type prefix (feat/fix/docs/refactor/test/chore/build/ci/perf/style).",
+       ]);
+     }
+   }
+   ```
+   `emit()` calls `process.exit()` (confirmed, line 933-936), so this block
+   only runs at all when the GIT-03 block above did not already exit — no
+   double-emit risk, no reordering needed elsewhere in the file.
+   `inspection.message === null` correctly skips the check for an editor
+   commit (CMP7's "not looked at, never clean" case) and needs no new
+   special-casing.
+3. New regression coverage in `guard-git.test.mjs` (additive cases, do not
+   touch the existing GIT03-* cases): a `feat: x`-shaped commit passes; the
+   exact `6decf59`/`design: ...` regression shape is blocked with GIT-01;
+   a commit that is BOTH GIT-03- and GIT-01-violating still blocks on GIT-03
+   first (unchanged behavior — GIT-01 never runs because GIT-03 already
+   exited); the global-options/env-wrapper/`-F`-file cases (mirroring
+   CMP12/12b/12c) still reach the type check through the same extraction
+   path; an editor commit (`git commit`, no message) is not blocked by
+   GIT-01.
+
+**Part B — range-mode check for `verify.mjs` (IS TP-3-protected; needs its
+own signed HGO ceremony, separate from and after Part A):**
+
+Mirror the `backlog-state-check` / checker-vs-tests split pattern
+correctly this time — register the CHECKER script as the verify suite
+entry, not only its test file (this is the exact class of gap the final
+Nova-A T1 Critic review just flagged as its F1 finding against a sibling
+item; do not repeat it here).
+
+1. New script `plugins/pipeline-core/scripts/check-commit-type-range.mjs`:
+   exports a pure-ish `auditCommitTypeRange({ root, base, head, gitOperations })`
+   (injectable git adapter for its own tests, same pattern as
+   `check-product-capability-inventory.mjs`'s `_testGitOperations`) that
+   walks `git log --format=%H%x00%s base..head`, builds the `{sha,
+   subject}[]` array `commitTypeFindingsForRange` already expects, and
+   returns `{ok, findings}`. Direct invocation (`process.argv[1] ===`
+   this file) exits 2 on any finding, matching
+   `check-state-numeric-claims.mjs`'s live-mode entry point shape.
+2. **Default range source (open sub-question, small — confirm during
+   implementation, does not block starting):** parse the short SHA embedded
+   in `plugins/pipeline-core/.claude-plugin/plugin.json`'s `version` field
+   (e.g. `f047f63` from `0.6.0+claude.20260819081848.f047f63`, the same
+   anchor this session has used by hand for every Critic-dispatch diff
+   range this sprint) as the default `base`, resolved to a full SHA via
+   `git rev-parse`; `head` defaults to `HEAD`. If the field is absent or
+   unparsable, the checker must report `{ok: true, findings: [], skipped:
+   "no resolvable base"}` rather than crash or block — a missing anchor is
+   "not looked at", not "clean", consistent with CMP7's own honesty rule.
+3. New `check-commit-type-range.test.mjs`, fixture-driven against the
+   injected `gitOperations`, no real `git log` walk in tests.
+4. Register `check-commit-type-range.mjs` itself (not just its test file)
+   as a `harness/scripts/verify.mjs` suite entry — this is the step that
+   needs the fresh signed TP-3 HGO ceremony.
+
+**Sequencing:** Part A can be dispatched to a `goldfish-implementor` today,
+no PO/ceremony gate. Part B needs its own follow-up dispatch (build script
++ tests) followed by a separate TP-3 ceremony to register it — do not
+bundle the two; Part A alone already closes this item's most valuable
+piece (the type check actually *blocking* a bad commit, not just being
+theoretically available).
+
 ### Note, 2026-08-19 — NOT resolved by the 2026-08-19 TP-3 consolidation ceremony
 
 Stays **open**. The 2026-08-19 signed TP-3 ceremony (commit `92bb2a08`)
