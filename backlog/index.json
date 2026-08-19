@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0196d44b077b5098eea818571228df9205cbfb14037b862b70144c3958d5fe59"
+    "transitionHead": "a824248d77a158c08b2c2920e59a303b0af99dc1d728a4707cfee17bfcec275a"
   },
   "counts": {
     "open": 68,
     "in_progress": 7,
-    "closed": 218
+    "closed": 219
   },
   "items": [
     {
@@ -3049,11 +3049,15 @@
     },
     {
       "id": "pipeline.vendored-dispatch-templates-drift-from-canon",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch, preamble narrative (2026-08-11 'NOVA-CLOSING-ALLOWANCE-01' entry). Finding surfaced by a read-only research fork, verified against current source before filing."
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch, preamble narrative (2026-08-11 'NOVA-CLOSING-ALLOWANCE-01' entry). Finding surfaced by a read-only research fork, verified against current source before filing.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0080b64019955ad2edfabfe50f5678aa1b556e2f",
+      "closureEvidence": "backlog/items/2026-08-18-vendored-dispatch-templates-drift-from-canon.md"
     },
     {
       "id": "pipeline.verify-authorship-defaults-to-source-markers-not-behavior",
@@ -3123,6 +3127,14 @@
       "closureRepository": "self",
       "closureCommit": "635f348b4c29d52ab2db0672719421abd96ba4f7",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Self-observation, 2026-08-19, this session: a manual sweep of the Wave-5-scope work list found 12 of 54 items already explicitly deferred to another sprint by their own Triage text, none of which the automated categorization pass had excluded."
     },
     {
       "id": "pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory",
