@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape
 type: requirement
 owner: pipeline
-status: open
+status: rejected
 created: 2026-08-17
 source: "L-AC-01 investigation (PHX-WP-LAC01-REMAINING, 2026-08-17) plus this session's own re-check of validateLifecycleGovernanceEvent and the approve-push call site, specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['L-AC-01']"
 ---
@@ -86,16 +86,24 @@ in this epic).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** deferred
-- **Rationale:** genuine schema-design work with multi-file blast radius
-  (validator, ≥5 candidate producer call sites, ≥2 consumers); not safely
-  attemptable as a same-session extension without a reviewed design doc,
-  the same standard already applied to H-AC-11/PX0-AC-13 in this epic.
-- **Assignment (if accepted):** **Nova B** (PO decision, 2026-08-17) — the
-  sprint that rebases Phoenix's own work onto it; not an unnamed future
-  increment. Owner `pipeline`, review trigger = Nova B's own planning
-  (Phoenix is already building toward this shape, so a same-night Phoenix
-  extension would likely be redone there anyway). Phoenix's own L-AC-01
-  stays formally `partial` at 2/9 in the meantime, per the acceptance.md
-  amendment this item is referenced from.
-- **Date:** 2026-08-17
+- **Decision:** deferred (2026-08-17), superseded 2026-08-19 — rejected here as
+  duplicate tracking.
+- **Rationale (2026-08-17):** genuine schema-design work with multi-file blast
+  radius (validator, ≥5 candidate producer call sites, ≥2 consumers); not
+  safely attemptable as a same-session extension without a reviewed design
+  doc, the same standard already applied to H-AC-11/PX0-AC-13 in this epic.
+- **Assignment (2026-08-17):** **Nova B** (PO decision) — the sprint that
+  rebases Phoenix's own work onto it; not an unnamed future increment. Owner
+  `pipeline`, review trigger = Nova B's own planning (Phoenix is already
+  building toward this shape, so a same-night Phoenix extension would likely
+  be redone there anyway). Phoenix's own L-AC-01 stays formally `partial` at
+  2/9 in the meantime, per the acceptance.md amendment this item is
+  referenced from.
+- **Superseded (2026-08-19, PO):** this item is now actively tracked in
+  Nova's own backlog (commit `cacb9fb5` on the Nova checkout), status
+  open/deferred, same Nova B assignment as the 2026-08-17 triage above.
+  `status: rejected` here per this repo's own never-delete/merge-duplicates
+  convention (`backlog/README.md` — Merge duplicates) — the Nova copy is the
+  sole tracked instance from this point forward; this Phoenix copy is
+  historical record only, not an open item.
+- **Date:** 2026-08-19
