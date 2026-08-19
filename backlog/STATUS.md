@@ -33,6 +33,7 @@
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.backlog-plan-writers-skip-drift-classification | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | closed | defect | pipeline | 2026-08-17 | — |
+| pipeline.backlog-status-drifts-from-code-across-compaction-with-no-hardening | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | closed | workflow-improvement | pipeline | 2026-08-11 | — |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
@@ -107,6 +108,7 @@
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.greenfield-ask-before-install-duty-ignored-live | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.greenfield-seeded-with-private-overlay-calibration | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit | closed | idea | pipeline | 2026-08-17 | — |
@@ -260,6 +262,7 @@
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.spec-retention-on-close | closed | defect | pipeline | 2026-07-20 | — |
 | pipeline.stale-checkout-runs-outdated-human-approval-ceremony-against-current-trust-policy | open | defect | pipeline | 2026-08-12 | — |
+| pipeline.staleness-check-unsettled-top-level-await-warning | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.stateful-design-contract-template | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.t1-governance-path-preflight | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | open | workflow-improvement | pipeline | 2026-08-07 | — |
@@ -298,6 +301,6 @@
 
 ## Counts
 
-- open: 91
+- open: 94
 - in_progress: 7
 - closed: 192
