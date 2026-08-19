@@ -3,9 +3,20 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 52)
+**Last updated:** 2026-08-19 (checkpoint 53)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
+
+---
+
+## CHECKPOINT — 2026-08-19 (53): the other 3 items checkpoint 52 named as confirmed-open are down to 1 — 2 closed, 1 correctly re-scoped and left for a PO decision (READ THIS FIRST)
+
+- **`gmw-prepare-cli-authorship-mode-invalid-on-every-call` — closed.** `PHX-WP-GMW-PREPARE-AUTHORSHIP` (commit `66240d8b`): `prepare` now requires `--authorship-mode` and, for `elephant-direct`, `--files-changed`/`--diff-lines`/`--touches-test-file`, forwarding both to the library exactly as it already required. 15/15 tests pass, independently re-verified.
+- **`po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version` — closed.** `PHX-WP-REBIND-V4-SCHEMA` (commit `2dd82be3`): `validRebindApproval()` now accepts this repository's live `pipeline.plan-approval.v4` schema, mirroring `validPriorAuthority()`'s own already-working v2/v4 dual-handling pattern in the same file — this is the exact mechanism that, being broken, forced the 2026-08-19 9-field hand reconciliation earlier this session. Independently re-verified: 7/7 new v4 cases pass, 46/46 pre-existing v2-path cases pass unchanged.
+- **`gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger` — stays open, re-scoped, needs a PO decision.** `PHX-WP-HGO-LEDGER-EMISSION` correctly stopped before writing any code: its briefing wrongly assumed HGO's denial/consumption transitions live in `scripts/guard-human-override.mjs`; they actually live in `hooks/guard-gate-strength.mjs`, a synchronous PreToolUse hook. Wiring only `authorize`/`authorize-by-signature` would append `granted` events whose `links.requestDecisionId` points at a `requested` record that would never exist (only created at denial time) — a permanent dangling reference in an append-only ledger, worse than no emission. Full finding in the backlog item's own 2026-08-19 progress note. **PO decision needed:** (a) re-scope a follow-up to cover the hook too, landing all three transitions together, or (b) accept HGO's portable wiring as a disclosed increment-1 gap.
+- **`handover-file-has-no-rotation-obligation` stays open** exactly as checkpoint 52 described — no new work this round.
+
+**Final gates still unattempted.** `security-scan.mjs` still needs the reconcile-signature ceremony (`gates.reconcile_approval`, no override configured → default `signature`, external Ed25519, same shape as push) before a meaningful run — this is PO-only, external-terminal work this session cannot perform. Not attempted this round.
 
 ---
 
