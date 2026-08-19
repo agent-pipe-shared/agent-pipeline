@@ -2,9 +2,10 @@
 ═══════════════════════════════════════════════════════════════════════════
 PROMPT TEMPLATE: Goldfish task briefing (6 mandatory fields) — Agent-Pipeline
 v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
-Source of truth: docs/operating-model.md §2.3 — the canonical briefing field
-list. The six fields below are: Goal, Context files, DoD checks, Forbidden,
-Stop conditions, and Dispatch metadata (per operating-model.md §2.3).
+Source of truth: docs/operating-model.md §2 ("Dispatch briefing fields"
+subsection) — the canonical briefing field list. The six fields below are:
+Goal, Context files, DoD checks, Forbidden, Stop conditions, and Dispatch
+metadata (per operating-model.md §2, "Dispatch briefing fields").
 Also: harness/session-bootstrap.md §6.2 (Goldfish bootstrap), model-policy
 MP-02/MP-05 (model/effort, escalation justification), the no-memory rule and the
 two-failed-attempts rule.
@@ -62,6 +63,29 @@ USAGE (Elephant)
    Tell the goldfish (see the field-4/field-6 text below) to split its work into
    commits as each piece is verified, instead of a single commit at the very
    end.
+10. **This template applies VERBATIM inside a Workflow-tool `agent()` prompt
+    string too** — do not hand-build the 6-field shape from memory for that
+    execution mode; it is the identical freehand failure via a different
+    mechanism (CLAUDE.md, "Dispatch from the template, never freehand").
+    `plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`
+    documents the ADDITIVE Workflow-specific requirements layered on top (the
+    `pipeline-core:` `agentType` prefix, a stated tool-call budget, the
+    worktree self-heal block where isolation is used) — read it before
+    building a Workflow dispatch; it does not replace this template.
+11. **Checking current phase/approval state while composing a briefing:** run
+    `node plugins/pipeline-core/scripts/pipeline-state.mjs inspect` (read-only,
+    zero writes) rather than hand-reading `docs/state.md`'s "## Next action"
+    section or re-deriving phase/approval from
+    `project/pipeline-state.json` yourself. It returns one structured JSON
+    payload — `activeFeature`, `phase`, `planApproved`, `lifecycle`,
+    `pushApproval`, and `nextAction` (the exact text the mutating
+    subcommands, e.g. `set-feature`/`approve-plan`, already keep in sync in
+    `docs/state.md`) — reusing the `continuity-result-rebind`/
+    `continuity-result-bootstrap` family's richer structured-JSON pattern
+    rather than the terse one-line writer-subcommand shape. NOT for the
+    briefing's field 2 (Context files) itself — `inspect`'s output is a tool
+    result for the Elephant's own pre-dispatch orientation, never something to
+    paste into PO-facing chat text as a message-budget shortcut.
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->
@@ -128,6 +152,18 @@ can silently include an extra commit that slipped in between.
 - {{SPEC_PATH}} (the contract — sections {{RELEVANT_SECTIONS}})
 - {{FILE_2 + one-line why}}
 - {{FILE_3 + one-line why}}
+
+**Backlog-item citation rule (dispatch-construction side, PO decision
+2026-08-18 #19):** if a context/spec file above is a backlog item
+(`backlog/items/*.md`), strip it first — `node
+plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.mjs --item
+<path> --out <stripped-path>` — and list the STRIPPED copy's path here, never
+the raw item path. An item's own Triage/Closure/PO-decision-implementation
+prose records a prior human/Critic decision ABOUT that item, not spec
+content; handing the raw item to a Goldfish as background risks the same
+contamination a prior verdict caused for a later Critic (the "circular
+measuring stick" incident,
+`backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md`).
 
 For a `light`-profile dispatch (field 6): inline the 3–5 governing rule snippets VERBATIM here instead of pointing at large canon files (reference-inlining, speed) — the goldfish should not need to re-read canon for context.
 
@@ -262,4 +298,4 @@ Evidence throughout is POINTERS ONLY — exact command + exit code + artifact pa
 4. **"Deliberately NOT changed"** — adjacent oddities you saw and intentionally
    left alone (rubric for writing roles).
 5. Deviations from the spec — reported, never silently built in.
-6. Open items / triggered stop conditions / remaining manual work for the PO.
+6. **Open items** / triggered stop conditions / remaining manual work for the PO. Name every outstanding review/manual check explicitly, by category — `verify: pending`, `independent review: pending/deferred`, `manual/browser check: pending`, `PO acceptance: open` (omit a category only when it genuinely does not apply) — never collapse them into a bare "done". Only PO-accepted work is described as fully "done" (`docs/operating-model.md` §10 Glossary: Implementation complete / PO-accepted; `roles/goldfish.md` §6 GF-09).
