@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "8fcd369c91ad97f11ccf47d0e18290768e8e24cf"
+closure_evidence: "plugins/pipeline-core/hooks/hooks.json"
 source: "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
 due: 2026-09-06
 expires: 2026-09-06
@@ -71,4 +75,10 @@ instruction.
 
 - **Decision:** stays open — partial progress landed, real blocker remains.
 - **Rationale:** The onboarding-consent marker + PreToolUse lock guard file landed (commit `286673e2`), matching this item's own Proposal. Its `hooks.json` registration step is explicitly blocked by TP-4 per the commit's own message — needs a TP-4-scoped HGO ceremony (the PO's Ed25519 key, outside this session) to complete wiring. Not closeable until that ceremony runs.
+- **Date:** 2026-08-19
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `hooks.json` registration turned out not to need the HGO signature ceremony at all: the guard's own override planner refuses even the `plan` step for any edit under `plugins/pipeline-core/**` (`HGO-EXTERNAL-ADAPTER-BOUNDARY`, "must be carried out by an attended operator outside this session") — confirmed live. The PO applied the exact, pre-drafted, anchor-verified registration diff directly outside the guarded session (commit `8fcd369c`), wiring `guard-onboarding-consent-lock.mjs` into `hooks.json`'s `PreToolUse`/`Edit|Write|NotebookEdit` family. `node --test plugins/pipeline-core/hooks/guard-onboarding-consent-lock.test.mjs` passes 10/10 with the live hooks.json in place.
 - **Date:** 2026-08-19

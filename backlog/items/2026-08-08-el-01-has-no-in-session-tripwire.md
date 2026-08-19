@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.el-01-has-no-in-session-tripwire
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "8fcd369c91ad97f11ccf47d0e18290768e8e24cf"
+closure_evidence: "plugins/pipeline-core/hooks/hooks.json"
 source: "Critic finding F-A, Phoenix gate-integrity delta re-review round 2, 2026-08-08: the orchestrator-authored commit e7f6e96 was caught after the fact, not at write time."
 due: 2026-09-07
 ---
@@ -89,4 +93,10 @@ and restore rather than asserted.
 
 - **Decision:** stays open — partial progress landed, real blocker remains.
 - **Rationale:** The EL-01 write-time tripwire guard file landed (commit `27b4867d`), matching this item's own Proposal. Its `hooks.json` registration step is explicitly blocked by TP-4 per the commit's own message — needs the SAME TP-4-scoped HGO ceremony as the sibling onboarding-consent-lock item to complete wiring. Not closeable until that ceremony runs.
+- **Date:** 2026-08-19
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `hooks.json` registration turned out not to need the HGO signature ceremony at all: the guard's own override planner refuses even the `plan` step for any edit under `plugins/pipeline-core/**` (`HGO-EXTERNAL-ADAPTER-BOUNDARY`, "must be carried out by an attended operator outside this session") — confirmed live. The PO applied the exact, pre-drafted, anchor-verified registration diff directly outside the guarded session (commit `8fcd369c`), wiring `guard-el01-tripwire.mjs` into `hooks.json`'s `PreToolUse`/`Edit|Write|NotebookEdit` family. `node --test plugins/pipeline-core/hooks/guard-el01-tripwire.test.mjs` passes 20/20 with the live hooks.json in place; the break-and-restore acceptance test this item's own Proposal names is satisfied by that suite.
 - **Date:** 2026-08-19
