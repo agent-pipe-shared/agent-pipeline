@@ -411,6 +411,7 @@ const TEST_SUITES = [
   // The ledger drifted for weeks because nothing gated it. Remedy when this goes red:
   // node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate
   { name: "backlog-state-check", file: join(pluginScriptsDir, "check-backlog-state.mjs") },
+  { name: "state-numeric-claims-tests", file: join(pluginScriptsDir, "check-state-numeric-claims.test.mjs") },
   { name: "parallel-dispatch-planner-tests", file: join(libDir, "parallel-dispatch-planner.test.mjs") },
   { name: "parallel-sprint-integration-tests", file: join(libDir, "parallel-sprint-integration.test.mjs") },
   { name: "continuity-status-tests", file: join(libDir, "continuity-status.test.mjs") },
