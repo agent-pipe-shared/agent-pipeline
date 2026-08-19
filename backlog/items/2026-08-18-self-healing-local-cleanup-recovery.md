@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.self-healing-local-cleanup-recovery
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-5 (priority P1)"
 ---
@@ -208,3 +208,16 @@ gap (F2's still-uncovered piece, needs a coordinator-close-shaped fixture)
 and `backupOnboardingPrivateState`'s silent-skip of non-regular directory
 entries (a separate, smaller, already-disclosed F3 sibling gap, not
 touched by any round so far). Status stays `open` for these two.
+
+## Closure, 2026-08-19
+
+Both remaining gaps landed in commit `3beb9788` ("fix(session-cleanup-recovery):
+close the quarantine-private-receipt and non-regular-entry gaps"), cherry-picked
+to trunk earlier this session: `session-cleanup-recovery.test.mjs:551` has the
+`quarantine-private-receipt` regression test (reached through a genuine
+coordinator-close release + corrupted receipt bytes, matching the fixture
+shape this item's own note asked for), and `backupOnboardingPrivateState`
+now distinguishes symlinks (fail closed) from legitimate directories (skip)
+from other non-regular entries (fail closed) instead of silently skipping
+all three alike. Both confirmed present by direct grep against the current
+tree. Closing.

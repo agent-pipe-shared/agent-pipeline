@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.greenfield-onboarding-writes-mixed-authority-tiers
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-08-21
 source: "PO, live greenfield onboarding of an empty repository with the Claude runner, 2026-08-07: 'da liegen trotz frischem repo wieder dateien auf die sich die pipeline bezieht im .claude ordner und nicht in .arbetheon'."
@@ -174,3 +174,14 @@ Not closed here — leaving open one more cycle in case the live symptom
 that opened this item (PO's 2026-08-07 observation, calibration/manifest
 sourced from different tiers) still needs independent re-confirmation
 against current code before this is marked resolved.
+
+## Closure, 2026-08-19
+
+The independent re-confirmation this item was left open for: re-ran a
+read-only investigation against current code and confirmed the regression
+test from commit `3764265a` — "a fresh greenfield onboarding populates
+both manifest tiers without ever reaching a mixed authority status"
+(`plugins/pipeline-core/lib/project-onboarding-v3.test.mjs:5993`) — is
+still present and still the exact behavioral guarantee this item's
+Description worried about. No new instance of the original symptom has
+been reported since. Closing.

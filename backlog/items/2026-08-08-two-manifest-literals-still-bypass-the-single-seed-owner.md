@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.two-manifest-literals-bypass-the-single-seed-owner
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-22
 source: "Self-reported by the implementing dispatch of commit 7a99a18 and independently confirmed as finding F7 of the second Critic round on the 2026-08-08 hardening block."
@@ -168,3 +168,12 @@ change (comment-only per DoD). Verified unaffected:
 this dispatch; `check-consumer-safe-paths.test.mjs` — 9/9 pass. Status left
 `open` (this item's own Triage/status is reserved for the Elephant).
 - **Date:** 2026-08-19
+
+## Closure, 2026-08-19
+
+All three Directions confirmed independently: Direction 1 (measurement,
+2026-08-12), Direction 3 (`resolveLegacyRuntimeSeed()`, NVA-W2-5,
+`runner-profile-migration-v3.mjs:124`, 44/44 tests), Direction 2
+(the `overlayCalibration` documentation comment, NVA-W5-08,
+`runner-profile-migration-v3.mjs:177-222`). Re-verified live via grep that
+both functions/comments are present in the current tree. Closing.

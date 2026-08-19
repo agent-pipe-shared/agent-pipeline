@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Elephant, 2026-08-18, live during the OT09 (guard-testpath-override.test.mjs line 213) repair ceremony for the Phoenix reconcile-approval port regression (see backlog/items/2026-08-18-critical-human-proof-policy-lacks-the-reconcile-approval-generalization.md and docs/state.md's 2026-08-18 entry). A full `pipeline-author-repair` signature ceremony was walked end to end with the PO: plan, prepare-authorization, emit-signature-digest, PO sign-intent (succeeded), authorize-by-signature (succeeded, capability armed, status: armed, consumedAt: null, correct authorSourceRoot recorded). Retrying the byte-identical original Edit twice against a confirmed-clean working tree still returned the exact same TP-7/author-repair-required denial as if the capability had never been armed. The capability expired unused (DEFAULT_TTL_MS 30 min) before a root cause was found; OT09 is still red as of this entry."
 ---
@@ -186,3 +186,32 @@ resulting audit entry (`.git/agent-pipeline/human-guard-overrides/audit.jsonl`)
 tells the Elephant exactly which named check to fix, turning the third
 attempt into a one-shot diagnosis as intended. Status stays `open`.
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19
+
+The root cause was found the same day, later in the session, and codified
+as a CLAUDE.md Hard Rule (commit `18dc9ab9`): the denial is a
+`toolInputSha256` byte-identity mismatch between the exact tool call that
+seeded the plan/request and the one retried after the PO signs — any
+difference (a re-derived `old_string`/`new_string`, a different absolute
+path spelling, an optional field present in one call and not the other)
+silently fails `consumeHumanGuardOverride()`'s match. The commit message
+states this was "confirmed empirically fixing OT09 and C2f" — OT09 being
+this item's own triggering ceremony. This item's own diagnostic
+instrumentation (`NVA-W3-16`, `driftedChecks`) was built in parallel but
+was not what ultimately diagnosed it; the byte-identity preflight
+(seed a fresh request via an intentionally-denied dry run of the exact
+intended retry, build the ceremony from that request's own hash, replay
+the identical call) is now the documented, repeatable fix.
+
+One small, separately-confirmed residual bug found by the triage pass
+that investigated this closure: `describeHumanGuardOverrideSelection()`
+hardcodes `authorSourceRoot: null`, causing a non-blocking
+`HGO-RECORD-DIGEST-MISMATCH` warning specifically in author-repair
+mode. Cosmetic (does not block admission), not filed as its own item —
+worth a one-line fix + test whenever someone next touches this file.
+
+Closing; the byte-identity discipline is now durable in CLAUDE.md and has
+already prevented a repeat of this failure mode later in the same
+session (the OT09/C2f TP-3 ceremonies this session ran cleanly on the
+first attempt using the seed-then-replay protocol).
