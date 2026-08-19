@@ -32,6 +32,7 @@ import {
   humanGuardRouteUnavailableReason,
   planHumanGuardOverride,
   prepareHumanGuardOverrideAuthorization,
+  prepareHumanGuardOverrideForSignature,
   recordHumanGuardDenial,
   refreezeHumanGuardOverridePlan,
   verifyHumanGuardOverrideAudit,
@@ -287,6 +288,43 @@ test("ADR-0059 Decision 1: the global-plugin-install denial class is refused for
         scriptPath,
       }),
       (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-SIGNATURE-UNSUPPORTED-MODE",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("Part C: prepareHumanGuardOverrideForSignature() fails closed on the global-plugin-install denial class with HGO-SIGNATURE-INTENT-INVALID (not a silent pass-through)", () => {
+  // Regression for a documented-but-untested claim (Critic finding, PHX-WP-HGO-FAILCLOSED-IMPL-C
+  // round 1): the function's own docstring asserts createPoApprovalIntent()'s candidate
+  // validation already throws for this mode because its repository observation carries no
+  // head/tree -- this test is that discriminating check, not just the reasoning.
+  const root = fixtureSignature();
+  try {
+    mkdirSync(join(root, "harness", "scripts"), { recursive: true });
+    mkdirSync(join(root, "plugins", "pipeline-core", ".codex-plugin"), { recursive: true });
+    mkdirSync(join(root, ".claude-plugin"), { recursive: true });
+    writeFileSync(join(root, "harness", "scripts", "verify.mjs"), "// verify\n");
+    writeFileSync(join(root, "plugins", "pipeline-core", ".codex-plugin", "plugin.json"), JSON.stringify({
+      name: "pipeline-core",
+      version: "0.0.0-test",
+    }));
+    writeFileSync(join(root, ".claude-plugin", "marketplace.json"), JSON.stringify({
+      name: "agent-pipeline",
+      plugins: [{ name: "pipeline-core", source: "./plugins/pipeline-core" }],
+    }));
+    const toolInput = { command: "codex plugin add pipeline-core@agent-pipeline-local" };
+    const noGit = () => ({ status: null, error: { code: "EPERM" }, stdout: "" });
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const request = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial, nowMs: 1_000, spawn: noGit,
+    });
+    assert.equal(request.status, "planned");
+    assert.throws(
+      () => prepareHumanGuardOverrideForSignature({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, nowMs: 2_000, scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-SIGNATURE-INTENT-INVALID",
     );
   } finally {
     rmSync(root, { recursive: true, force: true });
