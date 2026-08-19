@@ -188,6 +188,12 @@ code changed.
    value), narrowing this item's scope to model-identity-only
    attestation with `effort` explicitly out of scope, or finding a
    host signal not yet discovered.
+
+   **Decided 2026-08-19 (PO):** narrow scope to model-identity-only —
+   `effort` stays explicitly out of scope for this item; no
+   `main-session-route.mjs` contract change, no fabricated value. A
+   future item may revisit `effort` if either runner ever exposes a
+   real reasoning-effort signal.
 2. TP-4: wire `statusLine` live and empirically confirm its real field
    names against an actual running host (not the defensive guess
    `statusline-context.mjs` currently ships with).
