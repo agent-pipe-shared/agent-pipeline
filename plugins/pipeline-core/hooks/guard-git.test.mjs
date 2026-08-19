@@ -235,7 +235,7 @@ check("GAP allow  non-recursive secret deletion (parity gap)", "rm secrets.yaml"
 
 // ---- Quote-stripping (<PROJECT_A> incident, review case A2) --------------------------------------
 check("QS  allow  commit message mentions git push --force", 'git commit -m "docs: explain why git push --force is blocked"', ALLOW);
-check("QS  allow  single-quoted mention of reset --hard", "git commit -m 'never run git reset --hard here'", ALLOW);
+check("QS  allow  single-quoted mention of reset --hard", "git commit -m 'chore: never run git reset --hard here'", ALLOW);
 check("QS  block  force flag OUTSIDE quotes still fires", 'git push --force origin main -m "harmless text"', BLOCK);
 
 // ---- Segment scoping (hardened [^|&;]* instead of .*) -----------------------------------------
@@ -497,7 +497,7 @@ check(
 
 // Allow counter-cases: a recognized global option on an otherwise harmless command stays allowed.
 check("GO-allow  -C interposed harmless status", "git -C sub status", ALLOW);
-check("GO-allow  -c interposed harmless commit", 'git -c user.name=x commit -m "msg"', ALLOW);
+check("GO-allow  -c interposed harmless commit", 'git -c user.name=x commit -m "chore: msg"', ALLOW);
 
 // AR-2: the same normalization feeds guard-config extraDenyPatterns matching.
 const CFG_GITOPT_DIR = mkdtempSync(join(tmpdir(), "guard-test-cfg-gitopt-"));
@@ -665,7 +665,7 @@ check(
 );
 check(
   "R17 allow  commit message quotes --no-verify (prose, no actual flag)",
-  'git commit -m "avoid --no-verify"',
+  'git commit -m "chore: avoid --no-verify"',
   ALLOW,
 );
 
@@ -679,7 +679,7 @@ check("R18 allow  push -n origin main (=--dry-run, not a hook-skip)", "git push 
 check("R18 allow  push --dry-run", "git push --dry-run", ALLOW);
 check("R18 allow  merge -n (=--no-stat, not a hook-skip)", "git merge -n", ALLOW);
 check("R18 allow  commit --no-edit (long flag, double-dash excluded)", "git commit --no-edit", ALLOW);
-check("R18 allow  commit -m normal message", 'git commit -m "normal message"', ALLOW);
+check("R18 allow  commit -m normal message", 'git commit -m "chore: normal message"', ALLOW);
 
 // ---- Rule 19: -c / --config-env core.hooksPath transient rebind (hook-bypass enforcement,
 // 2026-07-09) --- the ONLY rule matched against the pre-normalization bucket `c` (PRENORM_BLOCKERS);
@@ -702,7 +702,7 @@ check(
 );
 check(
   "R19 allow  commit message quotes core.hooksPath (prose, no actual -c)",
-  'git commit -m "set core.hooksPath here"',
+  'git commit -m "chore: set core.hooksPath here"',
   ALLOW,
 );
 // Documented NOT-BLOCKED trade-off (guard header): quote-stripping empties the -c VALUE
@@ -730,7 +730,7 @@ check("R20 block  config set core.hooksPath /tmp/x (git >= 2.46 form)", "git con
 });
 check(
   "R20 allow  commit message quotes git config core.hooksPath (prose, no actual git config)",
-  'git commit -m "run git config core.hooksPath"',
+  'git commit -m "chore: run git config core.hooksPath"',
   ALLOW,
 );
 
@@ -786,6 +786,17 @@ check("GIT03-7 block  a -F file outside the project root, even with clean conten
     projectDir: GIT03_DIR,
     stderrIncludes: ["GIT-03-UNREADABLE-MESSAGE-FILE", "no override for this rule"],
   });
+
+// ---- GIT-01: commit subject must start with an admitted Conventional Commit type ----------
+//
+// commitTypeFindings() itself is exhaustively unit-tested in commit-message-policy.test.mjs
+// (CMT1-CMT11) -- these cases only prove guard-git.mjs's wiring actually calls it.
+check("GIT01-1 block  inadmissible type", 'git commit -m "wip: something"', BLOCK, {
+  stderrIncludes: ["GIT-01"],
+});
+check("GIT01-2 allow  admitted type", 'git commit -m "feat: add x"', ALLOW);
+check("GIT01-3 allow  editor commit (no -m/-F) is never false-blocked by GIT-01", "git commit", ALLOW);
+check("GIT01-4 allow  a non-commit git command is untouched by GIT-01", "git status", ALLOW);
 
 // ---- Change 1 (design R1, ADR-0061 Decision 0): a verified push signature IS the GG-03
 // confirmation --------------------------------------------------------------------------
