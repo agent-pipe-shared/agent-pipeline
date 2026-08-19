@@ -129,107 +129,263 @@ past the ledger case to the unrelated-commit case). §1.4 below is this candidat
 thread the **plan-time** observation, persisted once, reused for the rest of the ceremony, and
 narrow what is still compared live.
 
-### 1.4 Decision: persist the plan snapshot once; narrow what stays checked live
+### 1.4 Decision: persist the plan snapshot once; narrow what stays checked live — without decoupling the recorded candidate from what was actually signed, and without dropping the machinery's own code-integrity check
 
-Mirror GMW's actual pattern (§1.2) rather than inventing a new one:
+Mirror GMW's actual pattern (§1.2), but the mirror has to be exact, not approximate: GMW's
+arm-time check (`installGuardMaintenanceWindow`, `guard-maintenance-window.mjs:503-533`)
+re-verifies **two** things fresh, every time — `repoFingerprintSha256` (`:527-528`) and,
+critically, `openingTreeSha256` (`:530-532`, `pluginTreeSha256(livePluginRoot)`), i.e. the
+**plugin's own source-tree hash**, a code-tamper check on the machinery itself — and it *never*
+re-derives the signed `candidate` (commit/tree), which is reused frozen from
+`prepareGuardMaintenanceWindowRequest` (`:473-474`, folded into `intent` `:475-484`) all the way
+through (`:537-546`, `rebuiltIntent` built from `request.intent.value?.candidate`). Revision 1 of
+this section (§1.8) copies both of those properties; the version superseded below copied only the
+first.
 
 1. **`planHumanGuardOverride` becomes get-or-create, not pure.** On the *first* successful call
    for a given `(requestSha256, authorSourceRoot)` pair, take `repositoryObservation()` once,
    check it against `request.repository` (frozen at denial) **narrowly** — `fingerprintSha256`
    and `policyIdentity` only, not `statusSha256`/`head`/`tree`/`state` — and persist the full
-   plan payload to a new store (`storage()` gains a `plans` directory alongside `requests`/
-   `capabilities`, written with the same `writeExclusive` discipline). Every later call for the
-   same pair reads the persisted plan back unchanged (no new observation, no new comparison) —
-   the same idempotency callers already rely on today, just backed by a file instead of
-   recomputation.
+   plan payload, including `plugin: pluginIdentity(pluginRoot)` (`:377-415`) in the same shape the
+   payload already carries it today, to a new store (`storage()` gains a `plans` directory
+   alongside `requests`/`capabilities`, written with the same `writeExclusive` discipline). Every
+   later call for the same pair reads the persisted plan back unchanged (no new observation, no
+   new comparison) — the same idempotency callers already rely on today, just backed by a file
+   instead of recomputation.
 2. **`prepareHumanGuardOverrideAuthorization`, `authorizeHumanGuardOverride`, and
    `authorizeHumanGuardOverrideBySignature` stop calling `planHumanGuardOverride` for a fresh
-   observation.** They read the persisted plan (validating the supplied `planSha256` against its
-   own stored digest, same defense they apply today). `repository`/`policy`/`plugin` — and, for
-   the signed path, the intent's `candidate: {commit, tree}` — are therefore identical from
-   `plan` through the PO's actual external signature, by construction, with zero opportunity for
-   drift in between regardless of how long the external signing step takes.
+   *repository* observation.** They read the persisted plan (validating the supplied `planSha256`
+   against its own stored digest, same defense they apply today). `repository`/`policy`/`plugin`
+   — and, for the signed path, the intent's `candidate: {commit, tree}` — are therefore identical
+   from `plan` through the PO's actual external signature, by construction, with zero opportunity
+   for drift in between regardless of how long the external signing step takes.
 3. **A separate, narrow freshness check runs at the moment of arming** (inside
    `authorizeHumanGuardOverride`/`authorizeHumanGuardOverrideBySignature`, after signature
-   verification succeeds for the signed path): take **one** fresh `repositoryObservation()`,
-   check only `fingerprintSha256` + `policyIdentity` against the persisted plan's values (exactly
-   the same narrow shape as step 1), and use *this* fresh observation — not the plan-frozen one —
-   as `capabilityCore.repository`. This keeps `capability.repository`'s meaning exactly what it
-   is today ("what was live right when the capability armed"), which is what
-   `consumeHumanGuardOverride`'s own drift check (`:2030-2037`) compares against next, and that
-   comparison window (arm → the guard hook's own immediate retry) stays as tight as it is today —
-   **`consumeHumanGuardOverride` needs no change at all**, matching ADR-0059 Decision 2's own
-   standing principle ("the consuming side is untouched").
+   verification succeeds for the signed path) — **revised to check three things, not two**,
+   distinguishing what is safe to stop re-checking from what is not:
+   - **(3a) The calling repository's working-tree state — safe to narrow; this is what caused
+     HGO-DRIFT.** Take one fresh `repositoryObservation()` and compare only `fingerprintSha256`
+     against the persisted plan's value; `statusSha256`/`head`/`tree`/`state` are not compared
+     here.
+   - **(3b) The project's guard/policy configuration — unchanged narrow check.** A fresh
+     `policyIdentity(root, pluginRoot, denials)` (`:417-444`) compared against the persisted
+     plan's `policy` field.
+   - **(3c) NEW — the override machinery's OWN code identity — not safe to stop re-checking;
+     restores Finding 2.** A fresh `pluginIdentity(pluginRoot)` (`:377-415`, hashing the plugin
+     manifest, the Codex PreTool adapter, the guard-command grammar, `human-guard-override.mjs`
+     itself, `windows-private-state.mjs`, and the CLI) compared against the persisted plan's
+     `plugin` field. A mismatch fails closed with a new, distinct code, `HGO-PLUGIN-DRIFT`
+     (deliberately not the reused `HGO-DRIFT`, so an audit reader can tell a machinery-tamper
+     refusal apart from a repository-freshness refusal). This is exactly GMW's own
+     `openingTreeSha256` check (`:530-532`) — a supply-chain integrity check on the code enforcing
+     the ceremony, unrelated to the calling repository's HEAD/tree/status, and therefore free of
+     the HGO-DRIFT problem for the same reason GMW's is: `pluginIdentity()` never reads the
+     calling repository's git state at all (`repo`/`pluginRoot` are separate arguments; `:377-378`
+     resolves only `pluginRoot`). Restoring this closes the gap the version superseded below
+     opened: once step 2 stopped re-observing at every step, nothing re-verified
+     `pluginIdentity()` between the first `plan` call and the final arm — an agent with any
+     legitimately-obtained, still-live write channel to the plugin root (e.g. a prior GMW window)
+     could have modified the override machinery's own code in that gap and gone undetected. It is
+     now re-verified at the one point that matters most: immediately before arming.
+
+   This one fresh `repositoryObservation()` (captured for 3a, full shape including
+   `head`/`tree`/`statusSha256`/`state`) is what becomes `capabilityCore.repository` — this keeps
+   `capability.repository`'s meaning "what was live right when the capability armed", which is
+   what `consumeHumanGuardOverride`'s own drift check (`:2030-2037`) compares against next, and
+   that comparison window (arm → the guard hook's own immediate retry) stays as tight as it is
+   today — **`consumeHumanGuardOverride` needs no change at all**, matching ADR-0059 Decision 2's
+   own standing principle ("the consuming side is untouched").
 4. **The signed intent's `candidate` always uses the plan-persisted commit/tree, never a fresh
    one at arm time.** This is required, not optional: the PO's signature is over an intent built
    from a specific `(commit, tree)` pair; rebuilding the intent for verification from a
    *different*, freshly-observed pair would either spuriously fail verification (if HEAD moved
-   during signing — arguably correct, but for the wrong reason: today's code fails this as
-   `HGO-DRIFT` inside the `planHumanGuardOverride` call nested in `authorizeHumanGuardOverrideBySignature`,
-   before signature verification is even attempted) or, worse, silently rebind an already-signed
-   intent to a commit the PO never saw. Reusing the frozen candidate is the only construction
-   under which "presence of a valid, correctly-bound signature IS the authorization" (ADR-0059
-   Decision 1) stays true independent of ceremony duration.
+   during signing) or, worse, silently rebind an already-signed intent to a commit the PO never
+   saw. Reusing the frozen candidate is the only construction under which "presence of a valid,
+   correctly-bound signature IS the authorization" (ADR-0059 Decision 1) stays true independent of
+   ceremony duration.
+5. **NEW — closes Finding 1: `capabilityCore` for the signature path additionally persists the
+   exact candidate the PO's signature covers, and arming refuses rather than silently substitutes
+   if it no longer matches the live repository.** Add a field, `signedCandidate: { commit, tree }
+   | null`, to `CAPABILITY_SCHEMA`'s record shape — populated, for
+   `authorizeHumanGuardOverrideBySignature`, from the same plan-persisted values already used to
+   build the verified intent in step 4 (`planned.repository.head`/`.tree` — i.e. what the PO
+   actually signed, byte-identical by construction, no new observation); `null` for
+   `authorizeHumanGuardOverride` (the chat path has no signed-intent concept — Finding 1 is scoped
+   to the signature path only). Immediately after signature verification succeeds and the step-3
+   fresh `repositoryObservation()` is taken, **for the signature path only**, compare that fresh
+   observation's `head`/`tree` against `signedCandidate.commit`/`.tree`. If they diverge — meaning
+   at least one commit landed on HEAD after the PO's signature was computed but before this arm
+   call — fail closed with a new code, `HGO-CANDIDATE-DRIFT`, instructing the operator to re-run
+   `prepare-for-signature` (§3) against the new HEAD and obtain a fresh signature; the capability
+   is not written. If they match — the common case, since the tolerated ledger append (failure
+   mode 1) never touches `head`/`tree` at all — arming proceeds exactly as before, and
+   `capability.repository.head`/`.tree` is now **guaranteed by construction, not by hope,** to be
+   bit-identical to `capability.signedCandidate`. This closes the gap at
+   `gmw-hgo-evidence-intake-into-the-human-ledger.md:1121`: that document sources the ledger's
+   permanent `scope.candidate` from `capability.repository.head`/`.tree` and (`:1138-1143`)
+   forbids substituting anything else into it; with this refusal in place,
+   `capability.repository.head`/`.tree` can never diverge from what was actually signed and
+   survive to arming, so the ledger can never permanently name a commit the PO did not review and
+   sign. `capability.signedCandidate` also stays in the persisted record after arming (not
+   discarded), giving an independent auditor a self-evident, checkable invariant
+   (`repository.head === signedCandidate.commit`) rather than only a runtime refusal to trust.
 
-### 1.5 Checked against both failure modes
+### 1.5 Checked against both failure modes (Revision 1)
 
-- **Ledger append before arm:** with the fix, `plan`/`prepare-authorization`/(the new
-  `prepare-for-signature`, §3) never re-observe after the persisted plan exists, and the arm-time
-  freshness check (step 3) compares only `fingerprintSha256`+`policyIdentity` — neither of which
-  `governance/events/**` touches (it is not part of physical-identity hashing and not one of
-  `policyIdentity`'s five named project files, `:428-434`). A `requested`+`granted` ledger append
-  placed between the persisted plan and the arm call, mirroring GMW's own sequence
-  (`guard-maintenance-window.mjs:396-419`), can no longer trip a drift refusal. This directly
-  closes the V3 blocker and makes design §8.1's fail-closed-at-arming wiring for HGO's `granted`
-  transition buildable.
-- **Unrelated commit between ceremony steps:** after the first successful `plan` call, no step
-  before arming re-observes HEAD/tree/status at all (step 2); the one live check that remains
-  (step 3, at arm time) does not look at HEAD/tree/status either — only physical identity and
-  policy-file integrity, both of which an unrelated commit to, e.g., `docs/` or `backlog/` never
-  touches. A commit landing between `plan` and `authorize`, or during the external signing wait,
-  no longer forces a restart.
+- **Ledger append before arm:** unchanged in effect from the superseded design — `plan`/
+  `prepare-authorization`/`prepare-for-signature` (§3) never re-observe after the persisted plan
+  exists, and the step-3 checks (3a `fingerprintSha256`, 3b `policyIdentity`, 3c `pluginIdentity`)
+  never look at `governance/events/**` (not part of physical identity, not one of `policyIdentity`'s
+  five named project files, `:428-434`, and not part of the override machinery's own code tree
+  `pluginIdentity()` hashes, `:377-415`). The new step-5 candidate check (`HGO-CANDIDATE-DRIFT`)
+  compares only `head`/`tree`, which an uncommitted working-tree append never changes either. A
+  `requested`+`granted` ledger append placed between the persisted plan and the arm call, mirroring
+  GMW's own sequence (`guard-maintenance-window.mjs:396-419`), still cannot trip any refusal. This
+  still closes the V3 blocker and still makes design §8.1's fail-closed-at-arming wiring for HGO's
+  `granted` transition buildable.
+- **Unrelated commit between ceremony steps:** for the **chat-mode** path, unchanged from the
+  superseded design — no step before arming re-observes HEAD/tree/status at all (step 2), and step
+  3's checks (3a/3b/3c) never look at HEAD/tree/status either, so an unrelated commit to, e.g.,
+  `docs/` or `backlog/` never forces a restart at any point, including at arm time (chat-mode has no
+  `signedCandidate`, so step 5 does not apply to it).
+  For the **signature** path, this needs a narrower statement than the superseded design gave: an
+  unrelated commit landing **before** the PO signs (i.e., before `prepare-for-signature` freezes the
+  candidate that gets signed) is still fully tolerated — nothing re-observes HEAD/tree/status during
+  that sequencing, exactly as for chat-mode. An unrelated commit landing **after** the PO has already
+  signed a specific `(commit, tree)` pair but **before** the final `authorize-by-signature` arm call
+  now correctly triggers `HGO-CANDIDATE-DRIFT` (step 5) instead of either the old, opaque,
+  whole-ceremony `HGO-DRIFT` (the original bug) or a silent substitution of an unsigned commit into
+  the permanent ledger (Finding 1's gap). This is not a reopening of the original problem: it is a
+  materially narrower, later, and unavoidable consequence of what a commit-bound cryptographic
+  signature *means* — the PO's signature cannot retroactively cover a commit it never saw, no matter
+  how the ceremony is otherwise relaxed, and step 4 (unchanged) already relies on this same
+  principle for verification. The operator-facing cost is a re-sign against the new HEAD, not a full
+  restart of the ceremony from denial.
 
-A fix that only handled one of these (candidates 1 or 2 above) would fail the DoD's explicit
-dual-failure-mode check; this one is verified against the actual mechanism behind both, not
-against either symptom individually.
+A fix that only handled one of these (candidates 1 or 2 above) would still fail the DoD's explicit
+dual-failure-mode check; this revision is still verified against the actual mechanism behind both,
+not against either symptom individually, and additionally closes the two gaps the superseded
+version of this section left open (see §1.8).
 
-### 1.6 What does not change (the security property this exists for)
+### 1.6 What does not change (the security property this exists for) (Revision 1)
 
-- The thing actually being authorized — `toolName`, `toolInputSha256`, `denials`, `commandClass`,
-  `eligiblePaths`, the rendered `decisionPreview` — is still taken unchanged from `request`
-  (denial time) all the way through. Narrowing the *repository-freshness* check does not touch
-  *what* the PO is asked to authorize, only *which live-repository snapshot* the arming decision
-  is allowed to tolerate.
-- `consumeHumanGuardOverride` is untouched: the tight, full-fidelity comparison right before the
-  guarded action actually executes (`:2030-2037`, still comparing every field including
-  `statusSha256`/`head`/`tree`) is exactly as strict as it is today. That is the correct place for
-  the strict check — it is a short, same-session window, unlike the human-ceremony window the
-  fix relaxes.
-- `authorizeHumanGuardOverride`'s in-session `chat`-mode gate (`readPushApprovalMode` !== "chat"
-  refusal, `:1684-1692`) is untouched.
-- No capability arms without a durable record of the decision: the persisted `plan` file is
-  itself a new durable artifact (written before any signing happens), and the fix is precisely
-  what makes the *ledger* append-before-arm buildable, which is the stronger version of that
-  property design §8.1 actually asks for.
+- *(Unchanged from the superseded design.)* The thing actually being authorized — `toolName`,
+  `toolInputSha256`, `denials`, `commandClass`, `eligiblePaths`, the rendered `decisionPreview` —
+  is still taken unchanged from `request` (denial time) all the way through. Narrowing the
+  *repository-freshness* check does not touch *what* the PO is asked to authorize, only *which
+  live-repository snapshot* the arming decision is allowed to tolerate.
+- *(Unchanged, strengthened.)* `consumeHumanGuardOverride` is untouched: the tight, full-fidelity
+  comparison right before the guarded action actually executes (`:2030-2037`, still comparing
+  every field including `statusSha256`/`head`/`tree`) is exactly as strict as it is today, and now
+  compares against a `capability.repository` that, for the signature path, is additionally
+  guaranteed (step 5) to equal what was actually signed — a strictly stronger guarantee than the
+  superseded design gave, not a weaker one.
+- *(Unchanged.)* `authorizeHumanGuardOverride`'s in-session `chat`-mode gate
+  (`readPushApprovalMode` !== "chat" refusal, `:1684-1692`) is untouched.
+- *(Unchanged.)* No capability arms without a durable record of the decision: the persisted `plan`
+  file is itself a new durable artifact (written before any signing happens), and the fix is
+  precisely what makes the *ledger* append-before-arm buildable, which is the stronger version of
+  that property design §8.1 actually asks for.
+- **NEW, restored by this revision:** the override machinery's own code identity
+  (`pluginIdentity()`) is re-verified fresh at every arm, not only at the first `plan` call —
+  closing the window (Finding 2) in which the superseded design's step 2 had silently also stopped
+  re-verifying the one thing GMW's own precedent (`installGuardMaintenanceWindow`'s
+  `openingTreeSha256` check, `:530-532`) treats as *never* safe to stop checking; see also
+  ADR-0058's own "recursive-verifier hole" concern (`docs/adr/0058-guard-maintenance-window.md:47-48`)
+  — the window's/ceremony's own verifying code must itself stay permanently un-liftable from live
+  re-verification — restored here for HGO's arm-time check.
+- **NEW, restored by this revision:** `capability.repository.head`/`.tree` (the field
+  `gmw-hgo-evidence-intake-into-the-human-ledger.md:1121` sources the ledger's `scope.candidate`
+  from) can no longer diverge from what the PO's signature actually covers and still arm —
+  enforced structurally by step 5's refusal, not left as a documented residual risk.
 
-### 1.7 Residual risk / open questions for the PO (Part A)
+### 1.7 Residual risk / open questions for the PO (Part A) (Revision 1)
 
-- The persisted `plans` store is a new artifact type. It needs its own retention/GC story
-  (natural candidate: the same `expiresAt` the request already carries) — not designed here,
-  flagged for the implementing dispatch.
-- Keying: a plan should be looked up by `(requestSha256, authorSourceRoot)`, since
-  `authorSourceRoot` changes `mode`/`sourceRoot` in the payload (`:1533-1541`). The implementing
-  dispatch needs explicit test coverage for "same request, different `authorSourceRoot` values"
-  not colliding.
-- This is a deliberate loosening of a previously-strict check. It needs a regression test in both
-  directions: (a) a `statusSha256`/`head`/`tree` change alone, with `fingerprintSha256` and
-  `policyIdentity` unchanged, must **not** block `plan` (proves the fix); (b) a `policyIdentity`
-  change must **still** block `plan` (proves the narrowing did not become "no check at all").
-- The actual CLI-level wiring of append-before-arm for HGO's `granted` transition (a script-level
-  orchestration mirroring `guard-maintenance-window.mjs`'s `install` case: append, call
-  `authorize`/`authorize-by-signature`, catch and best-effort-revoke on arm failure) is not
-  designed in full here — this document resolves the *architectural blocker* the V3 dispatch
-  hit; the orchestration itself is the natural next implementation dispatch, now unblocked.
+- *(Unchanged from the superseded design, still open.)* The persisted `plans` store is a new
+  artifact type. It needs its own retention/GC story (natural candidate: the same `expiresAt` the
+  request already carries) — not designed here, flagged for the implementing dispatch.
+- *(Unchanged, still open.)* Keying: a plan should be looked up by `(requestSha256,
+  authorSourceRoot)`, since `authorSourceRoot` changes `mode`/`sourceRoot` in the payload
+  (`:1533-1541`). The implementing dispatch needs explicit test coverage for "same request,
+  different `authorSourceRoot` values" not colliding.
+- *(Unchanged, still open.)* This is a deliberate loosening of a previously-strict check. It
+  needs a regression test in both directions: (a) a `statusSha256`/`head`/`tree` change alone,
+  with `fingerprintSha256` and `policyIdentity` unchanged, must **not** block `plan` (proves the
+  fix); (b) a `policyIdentity` change must **still** block `plan` (proves the narrowing did not
+  become "no check at all").
+- *(Unchanged, still open.)* The actual CLI-level wiring of append-before-arm for HGO's `granted`
+  transition (a script-level orchestration mirroring `guard-maintenance-window.mjs`'s `install`
+  case: append, call `authorize`/`authorize-by-signature`, catch and best-effort-revoke on arm
+  failure) is not designed in full here — this document resolves the *architectural blocker* the
+  V3 dispatch hit; the orchestration itself is the natural next implementation dispatch, now
+  unblocked.
+- **NEW:** `HGO-PLUGIN-DRIFT` and `HGO-CANDIDATE-DRIFT` need their own explicit, both-directions
+  regression tests in the implementing dispatch: (a) a benign `statusSha256`/`head`/`tree`-only
+  change between plan and arm must **not** trip either new code (proves steps 3c/5 stayed narrow);
+  (b) a hand-tampered byte in any of `pluginIdentity()`'s six hashed files between plan and arm
+  must trip `HGO-PLUGIN-DRIFT`; (c) a commit landing on HEAD between signing and arming, for the
+  signature path only, must trip `HGO-CANDIDATE-DRIFT`, and the chat path must never be able to
+  trip it (it has no `signedCandidate`).
+- **NEW:** the operator-facing re-sign flow after an `HGO-CANDIDATE-DRIFT` refusal (re-run
+  `prepare-for-signature` against the new HEAD, obtain a fresh signature) is not designed in
+  CLI/UX detail here — a natural companion to the append-before-arm orchestration already flagged
+  above, not blocking this document.
+- **NEW:** adding `signedCandidate` is an additive field on the existing
+  `pipeline.human-guard-override-capability.v2` shape (`CAPABILITY_SCHEMA`). Whether that warrants
+  a `v3` schema bump or ships as a backward-compatible additive field on `v2` is a decision for the
+  implementing dispatch, not resolved here; either way, existing `v2` readers that do not know the
+  field must not fail on records that carry it.
+
+### 1.8 Revision 1 — response to Critic round 1 findings
+
+This subsection documents exactly what changed in §1.4 (and the downstream §1.5-§1.7) versus the
+version reviewed in Critic round 1, mapped to the two blocker findings by the exact labels the
+review used, so a re-reviewer can map this revision to what it fixes without re-deriving it.
+
+**Finding 1 (blocker, signature path)** — "the design decouples the arm-time-fresh
+`capabilityCore.repository`... from the plan-time-frozen signed-intent `candidate`... nothing in
+the persisted `capabilityCore`... retains the actually-signed `candidate` for comparison... the
+ledger's `granted` record can permanently name a commit the PO never reviewed or signed, with no
+compensating detection."
+
+Closed by revised §1.4 step 5: `capabilityCore` now carries a `signedCandidate: {commit, tree} |
+null` field (signature path only), copied from the exact plan-persisted values already used to
+build the verified intent (§1.4 step 4, unchanged) — never re-derived, so it is byte-identical to
+what the PO signed by construction. Immediately after signature verification succeeds, the fresh
+arm-time `repositoryObservation()` (already being taken for step 3a) is additionally compared,
+`head`/`tree` only, against `signedCandidate`; a mismatch fails arming closed with a new code,
+`HGO-CANDIDATE-DRIFT`, rather than arming with — and permanently recording, via
+`gmw-hgo-evidence-intake-into-the-human-ledger.md:1121`'s `scope.candidate` sourcing — a commit the
+PO never reviewed. On the match case (the common one), `capability.repository.head`/`.tree` is
+bit-identical to `signedCandidate` by construction. This is the "detect and refuse" resolution the
+finding explicitly accepted as sufficient; it is a structural refusal, not a documented residual
+risk, and it is not listed in §1.7/§5's residual-risk sets.
+
+**Finding 2 (blocker, both chat and signature paths)** — "`pluginIdentity()`... the check that
+detects tampering with the override machinery's own code... [is] dropped... entirely after the
+first `plan` call... an agent with any legitimately-obtained, still-live write channel to the
+plugin root... could modify the override machinery's own code between plan-time and the final arm
+call, and nothing would catch it."
+
+Closed by revised §1.4 step 3c: a fresh `pluginIdentity(pluginRoot)` is now re-verified at every
+arm call (both `authorizeHumanGuardOverride` and `authorizeHumanGuardOverrideBySignature`),
+compared against the plan-persisted `plugin` field, failing closed with a new, distinct code
+`HGO-PLUGIN-DRIFT` on mismatch. This restores, at arm time specifically, the exact property GMW's
+own `installGuardMaintenanceWindow` re-verifies at every install via `openingTreeSha256`
+(`guard-maintenance-window.mjs:530-532`) — a supply-chain check on the code enforcing the ceremony,
+not on the calling repository's working tree, and therefore free of the HGO-DRIFT problem (§1.2)
+for the identical reason GMW's is. §1.4 step 3 is now explicit that "the calling repository's
+working-tree state" (3a — safe to narrow, correctly dropped, the actual HGO-DRIFT cause) and "the
+override machinery's own code identity" (3c — never safe to drop) are two different things; the
+superseded step 3 conflated them into one narrowing that dropped both together.
+
+**What did not change:** §1.1-1.3 (problem statement, GMW precedent analysis, candidates
+considered) are untouched by this revision — it does not reopen or reargue the original conflict,
+only the mechanism that resolves it. §1.4 steps 1, 2, and 4 are unchanged from the superseded
+design (still get-or-create plan persistence, still no fresh repository re-observation between
+plan and arm, still the frozen candidate for signature verification). Part B (§2), Part C
+(§3.1-3.3, 3.5) and Part D (§4) are untouched; §3.4 gets one clarifying addendum (below) for
+consistency with the revised §1.4, not a rewrite.
 
 ## 2. Part B — the digest-withholding comment
 
@@ -430,6 +586,15 @@ plan was instead created by a direct, un-collapsed `plan` call (still supported,
 `authorize-by-signature` both read — one persistence implementation, not two, is an explicit
 implementation invariant for whoever builds this.
 
+**Revision 1 addendum:** the persisted plan `prepare-for-signature` creates is also the exact
+source of `signedCandidate` (§1.4 step 5, §1.8) — no new call or artifact is needed;
+`authorizeHumanGuardOverrideBySignature` populates `capabilityCore.signedCandidate` from the same
+persisted-plan `repository.head`/`.tree` it already reads for intent verification (§1.4 step 4). If
+`authorize-by-signature` fails with the new `HGO-CANDIDATE-DRIFT` code (a commit landed on HEAD
+between signing and arming), the correct recovery is to re-run `prepare-for-signature` against the
+new HEAD and obtain a fresh signature — retrying `authorize-by-signature` against the stale proof
+cannot succeed.
+
 ### 3.5 What does not change
 
 - Who holds the private key: unchanged. `sign-intent` (`po-human-approval.mjs`) is untouched,
@@ -496,6 +661,11 @@ commands are blocked, ordinary commands are not, and the discriminator is unknow
   (mirroring `guard-maintenance-window.mjs`'s `install` case) is not designed here in
   implementation detail — this document closes the architectural blocker; the orchestration is
   the natural next dispatch.
+- **(A, Revision 1)** `HGO-PLUGIN-DRIFT`/`HGO-CANDIDATE-DRIFT` both-directions regression tests,
+  and the operator-facing re-sign UX after an `HGO-CANDIDATE-DRIFT` refusal, are flagged for the
+  implementing dispatch, not designed in full here (§1.7, §1.8).
+- **(A, Revision 1)** Whether `signedCandidate` ships as a `v3` schema bump or an additive `v2`
+  field on `CAPABILITY_SCHEMA` is left to the implementing dispatch (§1.7).
 - **(B)** No behavior change; only the risk of an implementing dispatch treating this as "nothing
   to verify" — a `node --check` pass on the touched file plus a fresh read-through confirming the
   corrected wording matches this document is the right bar, since there is no test to gate a
@@ -507,19 +677,33 @@ commands are blocked, ordinary commands are not, and the discriminator is unknow
 
 ## 6. Citations re-verified against the pinned commit (`ec7c11d0`) before finalizing this document
 
+**Revision 1 addendum:** the citations below marked "(Revision 1)" were newly introduced by
+`PHX-WP-HGO-FAILCLOSED-DESIGN-REWORK1` and were opened and confirmed directly against this
+checkout at commit `56cf4c43a46025a4b0ec814143e0e13dca837962` (the base this rework dispatch was
+pinned to) before this revision was finalized; all other citations below were carried forward
+unchanged from the original dispatch's own `ec7c11d0` verification.
+
 `lib/human-guard-override.mjs`: `repositoryObservation` `:472-482`; `recordHumanGuardDenial`
 `:1376`, request persistence `:1449-1471`; comment block `:1300-1321`; `humanGuardRouteUnavailableReason`
-`:1357-1374`; `planHumanGuardOverride` `:1492`, drift fail `:1529`; `prepareHumanGuardOverrideAuthorization`
-`:1590`, reason check `:1601-1604`; `authorizeHumanGuardOverride` `:1661`, chat-mode gate
-`:1675-1692`; `authorizeHumanGuardOverrideBySignature` `:1827`, docstring recipe `:1811-1818`,
-intent build `:1862-1874`, trust-anchor resolution `:1882-1893`; `consumeHumanGuardOverride`
-drift check `:2030-2037`; `HGO_SIGNATURE_REASON` `:68`; `storage()` `:315-330`; `requestPath`
-`:1002-1005`; `git()` disclosure comment `:128`.
+`:1357-1374`; `planHumanGuardOverride` `:1492`, drift fail `:1526-1529`; `prepareHumanGuardOverrideAuthorization`
+`:1590`, reason check `:1601-1604`, nested plan call `:1605-1613` (Revision 1); `pluginIdentity`
+`:377-415` (Revision 1); `policyIdentity` `:417-444` (Revision 1); `authorizeHumanGuardOverride`
+`:1661`, chat-mode gate `:1675-1692`, nested prepare call `:1697-1707` (Revision 1), nested plan
+call `:1712-1720` (Revision 1), capabilityCore build `:1725-1747` (Revision 1), reuse/write path
+`:1748-1793` (Revision 1); `authorizeHumanGuardOverrideBySignature` `:1827`, docstring recipe
+`:1811-1818`, nested prepare call `:1839-1849` (Revision 1), nested plan call `:1850-1858`
+(Revision 1), intent build `:1862-1874`, trust-anchor resolution `:1882-1893`, verification
+`:1894-1895` (Revision 1), capabilityCore build `:1902-1924` (Revision 1), reuse/write path
+`:1925-1969` (Revision 1); `consumeHumanGuardOverride` drift check `:2030-2037`;
+`HGO_SIGNATURE_REASON` `:68`; `storage()` `:315-330`; `requestPath` `:1002-1005`; `git()`
+disclosure comment `:128`.
 
 `lib/guard-maintenance-window.mjs`: `pluginTreeSha256` `:264`; `repoFingerprint` `:284`;
 `prepareGuardMaintenanceWindowRequest` `:427-499`, commit/tree capture `:473-474`;
 `installGuardMaintenanceWindow` `:503-533`, drift checks `:527-528`, `:530-532`, frozen-candidate
 reuse `:537-546`.
+
+`docs/adr/0058-guard-maintenance-window.md`: "recursive-verifier hole" `:47-48` (Revision 1).
 
 `scripts/guard-maintenance-window.mjs`: append-before-install sequence `:371-434`, ledger append
 `:396-409`, install call `:419`, best-effort revoke `:420-433`.
