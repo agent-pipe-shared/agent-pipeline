@@ -12,10 +12,10 @@
  * copies at `plugins/pipeline-core/templates/prompts/{goldfish-task,critic-review}.md` for
  * installed-plugin use, and nothing previously enforced byte-equality between the two -- they
  * drifted silently, with the vendored copy missing safety/discipline content the canonical copy
- * already had. This guard is built as a STANDALONE diagnostic (deliberately NOT wired into
- * `harness/scripts/verify.mjs` -- a future, TP-protected-ceremony dispatch's job, per the
- * `tmp-leak-guard.mjs` precedent) that compares each canonical/vendored pair byte-for-byte and
- * fails loud on any divergence.
+ * already had. This guard is built as a STANDALONE diagnostic (deliberately NOT wired into the
+ * Pipeline source repository's own test-registration file -- a future, TP-protected-ceremony
+ * dispatch's job, per the `tmp-leak-guard.mjs` precedent) that compares each canonical/vendored
+ * pair byte-for-byte and fails loud on any divergence.
  *
  * CLI: `node plugins/pipeline-core/scripts/check-vendored-template-sync.mjs [--out <path>]`
  *   --out   evidence file to write (default: none -- prints the receipt to stdout only).
