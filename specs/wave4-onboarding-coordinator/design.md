@@ -530,3 +530,85 @@ condition — not "new repos only, silently."**
 6. §e — the retirement condition for the old kickoff/promote track is named
    but not scheduled; needs its own follow-up backlog item once this
    coordinator has shipped.
+
+---
+
+## Implementation status
+
+**2026-08-19 (NVA-W5-COORD-STEP5-1, NVA-W5-COORD-STEP5-2) — step 5 (§a.5 point 5, §c.3, §c.4) landed.**
+
+Two dispatches completed step 5 end to end:
+
+- **NVA-W5-COORD-STEP5-1** (library-level logic, commits `11c457ff`,
+  `7c1bb415`): the additive "coordinator-sourced, no kickoff predecessor"
+  branch through `validateHistory`/`validatePromotionPlan`/
+  `promotionApplyAction`/`buildKickoffPromotionPlan`; the exported
+  `planOnboardingBootstrapBind`/`applyOnboardingBootstrapBind` adapter pair
+  over `buildKickoffPromotionPlan`/`applyOnboardingKickoffPromotion`, deriving
+  every input from the intake checkpoint rather than caller-supplied paths.
+- **NVA-W5-COORD-STEP5-2** (this dispatch, commits `e83b895b`, `32bfe508`,
+  `ac1cf0d6`, `d08ab73e`): the remaining CLI/guard wiring and the §c.4 crash-
+  safety open item, closing the gap between "the library logic works" and
+  "the CLI subcommands are actually reachable":
+  - `bootstrap-bind-plan`/`bootstrap-bind-apply` registered in
+    `ONBOARDING_SUBCOMMANDS` and `main()`'s dispatch
+    (`project-onboarding-v3.mjs`), calling the already-implemented library
+    functions. `bootstrap-bind-plan` is `automatedArgvShape: "lifecycle"`
+    (covered by GUARDDERIVE-1's derived guard admission automatically);
+    `bootstrap-bind-apply` mutates and needed its own exit-status wiring:
+    `KICKOFF_PROMOTION_APPLY_SCHEMA` added to the apply-only "reaching this
+    line means success" check, since `applyOnboardingBootstrapBind` calls
+    `applyOnboardingKickoffPromotion()` directly, bypassing the v4Inspection
+    wrapper `kickoff-promote-apply` goes through — its `status` values
+    (`applied`/`replayed`) are never in the shared `restingStatuses` set.
+  - `guard-lifecycle-ready.mjs`'s `sanctionedOnboardingArgs()` gained a
+    `bootstrap-bind-apply` admission branch, mirroring `intake-generate-apply`'s
+    exact `--plan-sha256`/`--activate` shape (the live nextAction command
+    also carries a `--runner <runner>` pair, stripped generically by
+    `withoutRunnerFlag()` before any branch runs).
+  - §c.4's crash-safety gap: read `onboarding-continuity.test.mjs`'s existing
+    promotion-crash coverage in full and confirmed it was narrower than
+    `KICKOFF_FAULT_STAGES`' per-target-per-boundary standard — only four
+    coarse commit-boundary hooks existed (one per target, firing after
+    temp-write+rename+directory-fsync all complete). Extended
+    `applyOnboardingKickoffPromotion` with the two missing earlier boundaries
+    (temp-fsync, rename) for the three targets with an inline write sequence
+    in its own body: `history`, `handover`, `state`. Purely additive; the
+    four pre-existing `promotion-<target>-published` hooks are unchanged in
+    name and position. **Deliberately left at the coarser single hook:**
+    `cleanupBinding` — its write goes through
+    `replacePromotedPrivateCleanupBinding()`'s own `try`/`catch`, which remaps
+    any exception that is not a `KickoffError` into
+    `KICKOFF-PROMOTION-PRIVATE-WRITE` (`SimulatedKickoffCrash extends Error`,
+    not `KickoffError`); finer-grained injection there would need to
+    restructure that shared helper, also used by the unrelated
+    `applyOnboardingKickoffPromotionCleanupRecovery` apply path, and was out
+    of this dispatch's scope (prohibited from touching kickoff-sourced
+    validation/CAS logic). A disclosed, scoped gap, not a silent one.
+  - CLI-level integration tests added
+    (`project-onboarding-v3-argv-closure.test.mjs`): the full intake →
+    generate → bootstrap-bind chain driven through `main()` end to end
+    (never the library functions directly), plus a precondition-reachability
+    test proving the two subcommands dispatch to their own library error
+    rather than falling through to "unknown argument".
+
+Final counts: `onboarding-continuity.test.mjs` 229/229 (217 baseline + 12
+crash-safety), `guard-lifecycle-ready.test.mjs` 125/125 (123 baseline + 2
+admission), `project-onboarding-v3-argv-closure.test.mjs` 6/6 (4 baseline +
+2 integration).
+
+**What remains, explicitly out of scope for both dispatches:**
+
+- §a.3's additive `intakeCheckpoint: {path, sha256}` resume-hint schema
+  field (open item 3) — not touched.
+- **§a.4's three new `v4Inspection` status names and step 6's CLI
+  retirement/migration routing (open item 4, §a.4, §e) were explicitly
+  OUT OF SCOPE for NVA-W5-COORD-STEP5-2 and were not attempted, even
+  partially.** A fresh repo still has no `v4Inspection` route into the new
+  `intake-*`/`bootstrap-bind-*` subcommands this design adds — that wiring
+  is a separate, future dispatch.
+- §d.1's plan-gate-contract regression test (open item 5) — landed in
+  NVA-W5-COORD-STEP5-1 (`11c457ff`/`7c1bb415`), see that dispatch's commit
+  history; not repeated here.
+- §e's retirement condition for the old kickoff/promote track (open item 6)
+  — still named but not scheduled; needs its own follow-up backlog item.
