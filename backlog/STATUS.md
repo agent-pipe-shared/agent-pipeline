@@ -70,7 +70,7 @@
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag | open | defect | pipeline | 2026-08-19 | — |
-| pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | open | requirement | pipeline | 2026-08-07 | — |
+| pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | closed | requirement | pipeline | 2026-08-07 | — |
 | pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | closed | defect | pipeline | 2026-08-07 | — |
@@ -83,6 +83,7 @@
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step | open | workflow-improvement | pipeline | 2026-08-19 | — |
+| pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check | open | requirement | pipeline | 2026-08-19 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-legible-approval-record | closed | requirement | pipeline | 2026-08-06 | — |
@@ -183,6 +184,6 @@
 
 - open: 12
 - in_progress: 20
-- closed: 128
+- closed: 129
 - rejected: 2
 - deferred: 11

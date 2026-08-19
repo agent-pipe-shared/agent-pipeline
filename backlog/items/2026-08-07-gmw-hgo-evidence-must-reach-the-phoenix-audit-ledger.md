@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "bce05e53506c9fbad8c87dbd717a05a5ccab7e13"
+closure_evidence: "plugins/pipeline-core/hooks/guard-gate-strength-ledger.test.mjs"
 source: "PO requirement (APS, 2026-08-07) — the finalized GMW and HGO modules in the next plugin version must write their evidence cleanly into the audit ledger Phoenix delivers; the information to log is \"what was approved, when, why, by whom\". Recorded with the concrete gaps the Elephant found on verification against the bound Phoenix acceptance criteria."
 due: 2026-09-06
 ---
@@ -359,3 +363,17 @@ first — matches the earlier PO-approved precedent (option (b) in this
 item's own history) of accepting a documented increment-1 gap when the
 alternative is unbounded further dispatching on the same file.
 - **Date:** 2026-08-19
+
+### Closed — 2026-08-19
+
+- **Delivered:** H-AC-12 amendment (`b1c57d2c`); GMW install/close portable
+  ledger emission (`3504b707`, docs `bdd4517c`); HGO hook-side denial/
+  consumption emission (`025f9e1a`) with dedicated regression coverage
+  (`bce05e53`) — all independently re-verified by the Elephant against the
+  bound acceptance criteria, not just trusted from dispatch reports.
+- **Not delivered, split out:** HGO's CLI-side `granted` wiring — a proven
+  architectural conflict between fail-closed-arming (design §8.1) and the
+  arm-time `HGO-DRIFT` check, not a scoping gap. Tracked separately at
+  `backlog/items/2026-08-19-hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check.md`
+  so this item's genuinely-delivered majority isn't held open behind a
+  design decision only the PO can make.

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b339d700c47c1526c13f74cb5e220492bb72676d303e557a0c08461d890d6866"
+    "transitionHead": "8d32f161632a61d8fcde3583599395af8fd44beaa7121f2d1ff5ac3f5cde6fdb"
   },
   "counts": {
     "open": 12,
     "in_progress": 20,
-    "closed": 128,
+    "closed": 129,
     "rejected": 2,
     "deferred": 11
   },
@@ -715,11 +715,15 @@
     },
     {
       "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO requirement (APS, 2026-08-07) — the finalized GMW and HGO modules in the next plugin version must write their evidence cleanly into the audit ledger Phoenix delivers; the information to log is \"what was approved, when, why, by whom\". Recorded with the concrete gaps the Elephant found on verification against the bound Phoenix acceptance criteria."
+      "source": "PO requirement (APS, 2026-08-07) — the finalized GMW and HGO modules in the next plugin version must write their evidence cleanly into the audit ledger Phoenix delivers; the information to log is \"what was approved, when, why, by whom\". Recorded with the concrete gaps the Elephant found on verification against the bound Phoenix acceptance criteria.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "bce05e53506c9fbad8c87dbd717a05a5ccab7e13",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-gate-strength-ledger.test.mjs"
     },
     {
       "id": "pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call",
@@ -856,6 +860,14 @@
       "owner": "pipeline",
       "created": "2026-08-19",
       "source": "PO instruction, 2026-08-19, live during the hooks.json author-repair HGO ceremony: 'kannst du das hgo bitte so umbauen, dass der agent das selbstständig alles macht bis zum eigentlichen signieren und dann einem auch direkt nur den signier befehl gibt?' and the follow-up 'so bauen das der PO definitiv nur das eine signier gate macht.'"
+    },
+    {
+      "id": "pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Split out of backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md at its close (2026-08-19) -- that item's HGO hook-side (denial+consumption) ledger emission landed and is tested; its CLI-side (granted) wiring hit a genuine architectural conflict, was correctly reverted, and needs a design review rather than a fourth goldfish-scale dispatch on the same file."
     },
     {
       "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
