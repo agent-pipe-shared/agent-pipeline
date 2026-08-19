@@ -95,6 +95,7 @@ function promotedKickoffFixture(name, options = {}) {
   writeFileSync(join(directory, "prd_promoted.md"), [
     "<!-- po-language: en -->",
     `<!-- technical-spec-sha256: ${createHash("sha256").update(specBytes).digest("hex")} -->`,
+    "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->",
     `# ${name} PRD`,
     "",
   ].join("\n"));
