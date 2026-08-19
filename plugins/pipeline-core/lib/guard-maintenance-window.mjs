@@ -125,6 +125,7 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/lib/tool-write-target.mjs",
   "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
   "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+  "plugins/pipeline-core/lib/guard-devplan-policy.mjs",
   "project/critical-human-proof.json",
   // F2 (NVA-A7FIX-1): the two modules THIS file itself imports and calls
   // (createPoApprovalIntent above; readCriticalHumanProofPolicy/
