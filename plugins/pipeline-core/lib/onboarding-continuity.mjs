@@ -5205,6 +5205,358 @@ export function applyOnboardingIntakeDesignQuestions({
   return { schema: INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA, root: result.paths.root, mutated: result.mutated, checkpoint: result.value };
 }
 
+// ---------------------------------------------------------------------------
+// Intake staging generation (Wave 4 onboarding coordinator, step 4 --
+// specs/wave4-onboarding-coordinator/design.md SSa.5 point 4 / SSc.2 --
+// NVA-W4-COORD-2). Deterministically derives design-input.md/prd_<id>.md/
+// spec.md staging bytes as a PURE function of the intake checkpoint's own
+// already-durable content -- no enumerated fault-stage list is needed (SSc.2):
+// a crash at any point still leaves a state from which the NEXT
+// intake-generate-apply call safely re-derives the identical bytes and either
+// no-ops (already matching) or converges (write-if-different corrects them).
+// Staging is never authoritative; binding (step 5, bootstrap-bind-*) is a
+// separate, later dispatch this module does not implement or call into.
+
+export const INTAKE_GENERATE_PLAN_SCHEMA = "pipeline.onboarding-intake-generate-plan.v1";
+export const INTAKE_GENERATE_APPLY_SCHEMA = "pipeline.onboarding-intake-generate-apply.v1";
+export const INTAKE_STAGING_DIRNAME = "project/.onboarding-staging";
+const INTAKE_GENERATE_READY_STATES = new Set(["ready-to-generate", "generated"]);
+
+class SimulatedIntakeGenerateCrash extends Error {}
+
+// Stable across every regeneration: createdAt is written once by
+// defaultIntakeCheckpoint() and never rewritten by any mutation (SSa.1/SSa.2),
+// so re-deriving the same checkpoint at any later revision always yields the
+// same featureId -- staging never accumulates orphaned prd_<old-id>.md files
+// as later captures/answers change the checkpoint's other fields. Design SSb
+// names "prd_<id>.md" without resolving where <id> comes from; this
+// derivation is the implementation-time design choice that resolves it
+// (reported as a deviation, per the briefing's stop-condition guidance).
+function deriveIntakeFeatureId(checkpoint) {
+  return `onboarding-${sha256(Buffer.from(checkpoint.createdAt, "utf8")).slice(0, 12)}`;
+}
+
+// The staging plan/content must be a pure function of the fields that
+// actually determine what gets rendered (consent/values/materialInput/
+// designQuestions) -- NEVER checkpoint.contentSha256, .revision, or
+// .updatedAt directly. Those three change as a side effect of recording
+// `generated` on the checkpoint itself (applyOnboardingIntakeGenerate's own
+// mutation bumps revision/updatedAt, which changes contentSha256), so basing
+// the plan digest or the rendered banner on them would make the very act of
+// applying a generate change what the next plan/apply computes -- an
+// observer-effect bug that defeats "two calls against the same intake data
+// always produce the identical plan" (this file's own stated invariant just
+// above buildOnboardingIntakeGeneratePlan). This digest intentionally
+// excludes revision/updatedAt/generated/transactionState for exactly that
+// reason; transactionState is gated separately (INTAKE_GENERATE_READY_STATES)
+// and does not affect rendered content.
+function intakeDataSha256(checkpoint) {
+  return canonicalSha256({
+    consent: checkpoint.consent,
+    values: checkpoint.values,
+    materialInput: checkpoint.materialInput,
+    designQuestions: checkpoint.designQuestions,
+  });
+}
+
+function readIntakeMaterialInputChunks(paths, checkpoint) {
+  return checkpoint.materialInput.map((entry) => {
+    const absolute = join(paths.directory, entry.evidencePath);
+    const bytes = readPhysicalFile(absolute, "intake checkpoint evidence");
+    if (sha256(bytes) !== entry.sha256) {
+      fail("INTAKE-GENERATE-EVIDENCE-MISMATCH", "intake checkpoint evidence content changed since capture");
+    }
+    return { sha256: entry.sha256, byteLength: entry.byteLength, receivedAt: entry.receivedAt, text: bytes.toString("utf8") };
+  });
+}
+
+function renderIntakeMaterialInputSection(chunks) {
+  if (chunks.length === 0) return "(no material input captured)\n";
+  return chunks.map((chunk, index) => [
+    `### Chunk ${index + 1} -- sha256:${chunk.sha256}, ${chunk.byteLength} bytes, received ${chunk.receivedAt}`,
+    "",
+    chunk.text.endsWith("\n") ? chunk.text : `${chunk.text}\n`,
+  ].join("\n")).join("\n");
+}
+
+function renderIntakeDesignQuestionsSection(designQuestions) {
+  if (!designQuestions || designQuestions.length === 0) return "(no design questions answered)\n";
+  return designQuestions.map((entry, index) => [
+    `### Q${index + 1}: ${entry.question}`,
+    "",
+    `A: ${entry.answer}`,
+  ].join("\n")).join("\n\n");
+}
+
+// The banner and section headers below reference only the STABLE intake-data
+// digest (intakeDataSha256) -- NEVER checkpoint.revision/.updatedAt directly,
+// and never the apply call's own wall-clock time. Both would make every
+// call's content differ from the last (revision/updatedAt shift as a side
+// effect of the generate-apply's own checkpoint write; a fresh timestamp
+// shifts on every call by construction), defeating write-if-different and
+// turning a true no-op replay into a write every time.
+function intakeStagingGeneratedBanner(checkpoint) {
+  return [
+    "<!-- GENERATED by intake-generate-apply from the onboarding intake checkpoint.",
+    `     Pure function of intake data sha256:${intakeDataSha256(checkpoint)}.`,
+    "     Regenerate via intake-generate-apply if the checkpoint changes; do not",
+    "     hand-edit -- this staging file is NOT yet bound as project authority",
+    "     (specs/wave4-onboarding-coordinator/design.md SSa.4). -->",
+  ].join("\n");
+}
+
+function buildIntakeDesignInputContent(checkpoint, chunks) {
+  return [
+    intakeStagingGeneratedBanner(checkpoint),
+    "",
+    "# Design input",
+    "",
+    `- Intake data: sha256:${intakeDataSha256(checkpoint)}`,
+    "",
+    "## Captured material input (verbatim, in capture order)",
+    "",
+    renderIntakeMaterialInputSection(chunks),
+  ].join("\n");
+}
+
+function buildIntakePrdContent(checkpoint, featureId, chunks) {
+  return [
+    intakeStagingGeneratedBanner(checkpoint),
+    "",
+    `# PRD -- ${featureId} (staging draft)`,
+    "",
+    `- Intake data: sha256:${intakeDataSha256(checkpoint)}`,
+    `- Profile: ${checkpoint.values.profile ?? "(not yet set)"}`,
+    `- Language: ${checkpoint.values.language ?? "(not yet set)"}`,
+    "",
+    "## Captured material input (verbatim, in capture order)",
+    "",
+    renderIntakeMaterialInputSection(chunks),
+    "## Design questions and answers",
+    "",
+    renderIntakeDesignQuestionsSection(checkpoint.designQuestions),
+    "",
+    "## Notes",
+    "",
+    "This is a deterministic staging draft: product framing (What/Why/Scope/",
+    "Non-goals/Risks/Alternatives/DoD) has not been synthesized and must be",
+    "authored and reviewed before binding (bootstrap-bind-apply, step 5).",
+    "",
+  ].join("\n");
+}
+
+function buildIntakeSpecContent(checkpoint, featureId, chunks) {
+  return [
+    intakeStagingGeneratedBanner(checkpoint),
+    "",
+    `# Spec -- ${featureId} (staging draft)`,
+    "",
+    `- Intake data: sha256:${intakeDataSha256(checkpoint)}`,
+    "",
+    "## Captured material input (verbatim, in capture order)",
+    "",
+    renderIntakeMaterialInputSection(chunks),
+    "## Design questions and answers",
+    "",
+    renderIntakeDesignQuestionsSection(checkpoint.designQuestions),
+    "",
+    "## Notes",
+    "",
+    "This is a deterministic staging draft: acceptance criteria (EARS),",
+    "detailed implementation, and alternatives have not been synthesized and",
+    "must be authored and reviewed before binding (bootstrap-bind-apply, step 5).",
+    "",
+  ].join("\n");
+}
+
+/**
+ * Pure, deterministic reconstruction -- no mkdir, lock, temporary file, or
+ * write of any kind. Two calls against the SAME checkpoint content always
+ * produce the identical plan (and therefore the identical planSha256),
+ * whether across a plan/apply pair or a full regeneration replay.
+ */
+function buildOnboardingIntakeGeneratePlan({
+  rootDir, repositoryCapability = "local", spawn = defaultGitSpawn,
+} = {}) {
+  const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
+  if (observed.status !== "present") {
+    fail("INTAKE-GENERATE-PRECONDITION", "intake staging generation requires an existing checkpoint");
+  }
+  const checkpoint = observed.value;
+  if (!INTAKE_GENERATE_READY_STATES.has(checkpoint.transactionState)) {
+    fail("INTAKE-GENERATE-PRECONDITION", "intake staging generation requires transactionState ready-to-generate or generated");
+  }
+  const chunks = readIntakeMaterialInputChunks(observed.paths, checkpoint);
+  const featureId = deriveIntakeFeatureId(checkpoint);
+  const designInputContent = buildIntakeDesignInputContent(checkpoint, chunks);
+  const prdContent = buildIntakePrdContent(checkpoint, featureId, chunks);
+  const specContent = buildIntakeSpecContent(checkpoint, featureId, chunks);
+  const targets = {
+    designInput: {
+      path: `${INTAKE_STAGING_DIRNAME}/design-input.md`,
+      afterSha256: sha256(Buffer.from(designInputContent, "utf8")),
+      content: designInputContent,
+    },
+    prd: {
+      path: `${INTAKE_STAGING_DIRNAME}/prd_${featureId}.md`,
+      afterSha256: sha256(Buffer.from(prdContent, "utf8")),
+      content: prdContent,
+    },
+    spec: {
+      path: `${INTAKE_STAGING_DIRNAME}/spec.md`,
+      afterSha256: sha256(Buffer.from(specContent, "utf8")),
+      content: specContent,
+    },
+  };
+  const binding = {
+    schema: INTAKE_GENERATE_PLAN_SCHEMA,
+    root: observed.paths.root,
+    repositoryCapability,
+    featureId,
+    checkpointDataSha256: intakeDataSha256(checkpoint),
+    targets,
+  };
+  const planSha256 = canonicalSha256(binding);
+  return { ...binding, planSha256 };
+}
+
+export function planOnboardingIntakeGenerate(options = {}) {
+  return buildOnboardingIntakeGeneratePlan(options);
+}
+
+function ensureIntakeStagingDirectory(root) {
+  const projectDirectory = join(root, "project");
+  if (!existsSync(projectDirectory)) {
+    fail("INTAKE-GENERATE-PROJECT-DIRECTORY-MISSING", "intake staging generation requires the project/ directory to already exist");
+  }
+  const stagingDirectory = join(root, INTAKE_STAGING_DIRNAME);
+  if (existsSync(stagingDirectory)) return stagingDirectory;
+  mkdirSync(stagingDirectory, { mode: 0o755 });
+  fsyncDirectory(projectDirectory);
+  return stagingDirectory;
+}
+
+/**
+ * Single-target, content-addressed write-if-different for one staging file.
+ * Reuses writeExclusiveSynced()/fsyncDirectory()/unlinkOwned() unchanged
+ * (SSc.1's building block, applied here to project/.onboarding-staging/
+ * instead of the private checkpoint directory). `key` names the fault-hook
+ * points ("designInput"/"prd"/"spec") independently of the target's actual
+ * basename, which for the PRD varies with the derived featureId.
+ */
+function writeIntakeStagingTargetIfDifferent(root, stagingDirectory, key, target, deps = {}) {
+  const absolute = join(root, target.path);
+  const bytes = Buffer.from(target.content, "utf8");
+  const fault = (point) => {
+    if (deps.crashAt === point) throw new SimulatedIntakeGenerateCrash(point);
+    (deps.fault ?? (() => {}))(point);
+  };
+  if (existsSync(absolute)) {
+    const current = readPhysicalFile(absolute, "intake staging target");
+    if (sha256(current) === target.afterSha256) return { path: target.path, wrote: false };
+  }
+  const suffixSource = (deps.randomUUID ?? randomUUID)();
+  if (typeof suffixSource !== "string" || !/^[a-f0-9-]{32,64}$/iu.test(suffixSource)) {
+    fail("INTAKE-CHECKPOINT-RANDOM-UNAVAILABLE", "intake staging temporary-name source is invalid");
+  }
+  const temporary = join(stagingDirectory, `.${basename(target.path)}.staging-${suffixSource.replaceAll("-", "")}.tmp`);
+  let temporaryRecord;
+  let renamed = false;
+  try {
+    temporaryRecord = writeExclusiveSynced(temporary, bytes, 0o644);
+    fault(`${key}-temp-fsync`);
+    renameSync(temporary, absolute);
+    temporaryRecord = null;
+    renamed = true;
+    fault(`${key}-rename`);
+    fsyncDirectory(stagingDirectory);
+    fault(`${key}-directory-fsync`);
+    return { path: target.path, wrote: true };
+  } catch (error) {
+    if (error instanceof SimulatedIntakeGenerateCrash) {
+      throw new KickoffError("INTAKE-GENERATE-SIMULATED-CRASH", `simulated crash at ${error.message}`, {
+        committed: renamed ? true : (temporaryRecord ? null : false),
+      });
+    }
+    if (temporaryRecord) { try { unlinkOwned(temporaryRecord); } catch {} }
+    if (error instanceof KickoffError) throw error;
+    fail("INTAKE-GENERATE-WRITE-FAILED", "intake staging target write failed");
+  }
+}
+
+/**
+ * Step 4: reads the checkpoint, deterministically derives staging bytes, and
+ * write-if-different's each of the three targets before recording `generated`
+ * on the checkpoint (design SSa.5 point 4). Ordered like capture's own
+ * evidence-before-entry discipline: staging bytes are written FIRST (harmless
+ * if a crash strands the checkpoint update, since the very next call
+ * recomputes the identical bytes and finds them already correct), the
+ * checkpoint mutation is the sole commit point.
+ */
+export function applyOnboardingIntakeGenerate({
+  rootDir, repositoryCapability = "local", expectedPlanSha256, activate = false, deps = {},
+} = {}) {
+  if (activate !== true) fail("INTAKE-GENERATE-ACTIVATION-REQUIRED", "intake staging generation requires explicit activation");
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const plan = buildOnboardingIntakeGeneratePlan({ rootDir, repositoryCapability, spawn });
+  if (!SHA256_RE.test(expectedPlanSha256 ?? "") || plan.planSha256 !== expectedPlanSha256) {
+    fail("INTAKE-GENERATE-PLAN-DIGEST", "intake staging generation plan digest does not match");
+  }
+  const stagingDirectory = ensureIntakeStagingDirectory(plan.root);
+  const targets = {
+    designInput: writeIntakeStagingTargetIfDifferent(plan.root, stagingDirectory, "designInput", plan.targets.designInput, deps),
+    prd: writeIntakeStagingTargetIfDifferent(plan.root, stagingDirectory, "prd", plan.targets.prd, deps),
+    spec: writeIntakeStagingTargetIfDifferent(plan.root, stagingDirectory, "spec", plan.targets.spec, deps),
+  };
+  const nowIso = deps.now ? deps.now() : new Date().toISOString();
+  const nextGenerated = {
+    designInputSha256: plan.targets.designInput.afterSha256,
+    prdSha256: plan.targets.prd.afterSha256,
+    specSha256: plan.targets.spec.afterSha256,
+    generatedAt: nowIso,
+  };
+  const result = applyIntakeCheckpointMutation({
+    rootDir, repositoryCapability, deps,
+    mutate: (observed) => {
+      if (observed.status !== "present") fail("INTAKE-GENERATE-PRECONDITION", "intake staging generation requires an existing checkpoint");
+      const base = observed.value;
+      if (intakeDataSha256(base) !== plan.checkpointDataSha256) {
+        fail("INTAKE-GENERATE-CAS-DRIFT", "intake checkpoint changed since the staging plan was built");
+      }
+      if (!INTAKE_GENERATE_READY_STATES.has(base.transactionState)) {
+        fail("INTAKE-GENERATE-PRECONDITION", "intake staging generation requires transactionState ready-to-generate or generated");
+      }
+      // Compare content hashes only, never generatedAt: a genuine replay call
+      // stamps a DIFFERENT wall-clock time than the original (fresh nowIso
+      // per call), so comparing the full object would make every true replay
+      // look like a change and defeat the "same revision -> true no-op"
+      // requirement (design SSc.2).
+      const sameGenerated = base.generated !== null
+        && base.generated.designInputSha256 === nextGenerated.designInputSha256
+        && base.generated.prdSha256 === nextGenerated.prdSha256
+        && base.generated.specSha256 === nextGenerated.specSha256;
+      if (base.transactionState === "generated" && sameGenerated) return null;
+      const { contentSha256: dropSha, ...baseUnsigned } = base;
+      void dropSha;
+      return {
+        ...baseUnsigned,
+        revision: base.revision + 1,
+        updatedAt: nowIso,
+        generated: nextGenerated,
+        transactionState: "generated",
+      };
+    },
+  });
+  return {
+    schema: INTAKE_GENERATE_APPLY_SCHEMA,
+    root: result.paths.root,
+    mutated: result.mutated,
+    featureId: plan.featureId,
+    targets,
+    checkpoint: result.value,
+  };
+}
+
 function resultFromPersisted(plan, status, mutated, spawn = defaultGitSpawn) {
   const readback = projectReadContinuityStatus(readSanctionedState(plan.root));
   if (readback.code !== "CS-STATUS-ACTIVE" || readback.continuity.status !== "valid") {

@@ -33,10 +33,15 @@ import {
   INTAKE_CONSENT_APPLY_SCHEMA,
   INTAKE_CAPTURE_APPLY_SCHEMA,
   INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
+  INTAKE_GENERATE_PLAN_SCHEMA,
+  INTAKE_GENERATE_APPLY_SCHEMA,
+  INTAKE_STAGING_DIRNAME,
   applyOnboardingContinuityRepair,
   applyOnboardingIntakeCapture,
   applyOnboardingIntakeConsent,
   applyOnboardingIntakeDesignQuestions,
+  applyOnboardingIntakeGenerate,
+  planOnboardingIntakeGenerate,
   applyOnboardingKickoff,
   applyOnboardingKickoffPromotion,
   applyOnboardingKickoffPromotionCleanupRecovery,
@@ -2871,5 +2876,166 @@ check("intake checkpoint: a preimage that changes between the two observations i
   assert.equal(after.values.language, "de");
   assert.equal(after.values.profile, null, "the refused call's own profile candidate must never have been written");
 });
+
+// ---------------------------------------------------------------------------
+// Intake staging generation (Wave 4 onboarding coordinator, step 4 --
+// NVA-W4-COORD-2, design.md SSa.5 point 4 / SSc.2). Happy path, precondition/
+// error paths, and idempotent no-op/regeneration coverage for the
+// plan/apply pair, plus the SSc.2-mandated crash-injection matrix.
+
+function readyToGenerateRoot(name, text = "requirement material one") {
+  const root = fixture(name, { neutral: true });
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", profile: "feature", activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text, activate: true });
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root,
+    answers: [{ question: "What is the goal?", answer: "Ship the coordinator." }],
+    activate: true,
+  });
+  return root;
+}
+
+check("planOnboardingIntakeGenerate / applyOnboardingIntakeGenerate: happy path derives and writes all three staging targets", () => {
+  const root = readyToGenerateRoot("intake-generate-happy");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(plan.schema, INTAKE_GENERATE_PLAN_SCHEMA);
+  assert.match(plan.featureId, /^onboarding-[a-f0-9]{12}$/);
+  assert.equal(plan.targets.designInput.path, `${INTAKE_STAGING_DIRNAME}/design-input.md`);
+  assert.equal(plan.targets.prd.path, `${INTAKE_STAGING_DIRNAME}/prd_${plan.featureId}.md`);
+  assert.equal(plan.targets.spec.path, `${INTAKE_STAGING_DIRNAME}/spec.md`);
+
+  const applied = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.schema, INTAKE_GENERATE_APPLY_SCHEMA);
+  assert.equal(applied.mutated, true);
+  assert.equal(applied.featureId, plan.featureId);
+  assert.equal(applied.checkpoint.transactionState, "generated");
+  assert.equal(applied.checkpoint.generated.designInputSha256, plan.targets.designInput.afterSha256);
+
+  for (const key of ["designInput", "prd", "spec"]) {
+    const absolute = join(root, plan.targets[key].path);
+    assert.equal(existsSync(absolute), true);
+    assert.equal(digest(readFileSync(absolute, "utf8")), plan.targets[key].afterSha256);
+    assert.equal(applied.targets[key].wrote, true);
+  }
+});
+
+check("applyOnboardingIntakeGenerate: activation is required", () => {
+  const root = readyToGenerateRoot("intake-generate-activation");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  expectIntakeError("INTAKE-GENERATE-ACTIVATION-REQUIRED", () => applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: plan.planSha256,
+  }));
+});
+
+check("planOnboardingIntakeGenerate: requires an existing checkpoint", () => {
+  const root = fixture("intake-generate-no-checkpoint", { neutral: true });
+  expectIntakeError("INTAKE-GENERATE-PRECONDITION", () => planOnboardingIntakeGenerate({ rootDir: root }));
+});
+
+check("planOnboardingIntakeGenerate: refuses a checkpoint still short of ready-to-generate", () => {
+  const root = fixture("intake-generate-not-ready", { neutral: true });
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, activate: true });
+  expectIntakeError("INTAKE-GENERATE-PRECONDITION", () => planOnboardingIntakeGenerate({ rootDir: root }));
+});
+
+check("applyOnboardingIntakeGenerate: refuses a plan digest mismatch", () => {
+  const root = readyToGenerateRoot("intake-generate-digest-mismatch");
+  expectIntakeError("INTAKE-GENERATE-PLAN-DIGEST", () => applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: "0".repeat(64), activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeGenerate: requires the project/ directory to already exist", () => {
+  const root = fixture("intake-generate-no-project-dir");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, activate: true });
+  applyOnboardingIntakeCapture({ rootDir: root, text: "material", activate: true });
+  applyOnboardingIntakeDesignQuestions({ rootDir: root, answers: [{ question: "Q?", answer: "A." }], activate: true });
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  expectIntakeError("INTAKE-GENERATE-PROJECT-DIRECTORY-MISSING", () => applyOnboardingIntakeGenerate({
+    rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeGenerate: a re-run against the same checkpoint revision is a true no-op", () => {
+  const root = readyToGenerateRoot("intake-generate-noop-replay");
+  const plan = planOnboardingIntakeGenerate({ rootDir: root });
+  const first = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(first.mutated, true);
+  const replanned = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.equal(replanned.planSha256, plan.planSha256, "an unchanged checkpoint must reconstruct the identical plan digest");
+  const second = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: replanned.planSha256, activate: true });
+  assert.equal(second.mutated, false);
+  assert.equal(second.checkpoint.revision, first.checkpoint.revision);
+  for (const key of ["designInput", "prd", "spec"]) {
+    assert.equal(second.targets[key].wrote, false, `${key} must not be rewritten on an unchanged replay`);
+  }
+});
+
+check("applyOnboardingIntakeGenerate: a changed checkpoint safely regenerates with a STABLE featureId", () => {
+  const root = readyToGenerateRoot("intake-generate-regenerate");
+  const firstPlan = planOnboardingIntakeGenerate({ rootDir: root });
+  const first = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: firstPlan.planSha256, activate: true });
+  // Capturing more material after "generated" is structurally permitted
+  // (applyOnboardingIntakeCapture does not gate on transactionState beyond
+  // the very first capture) -- exactly the case SSc.2 describes as safely
+  // regenerable.
+  applyOnboardingIntakeCapture({ rootDir: root, text: "a second, later requirement", activate: true });
+  const secondPlan = planOnboardingIntakeGenerate({ rootDir: root });
+  assert.notEqual(secondPlan.planSha256, firstPlan.planSha256);
+  assert.equal(secondPlan.featureId, firstPlan.featureId,
+    "featureId must stay stable across regeneration -- otherwise the prior prd_<id>.md is orphaned");
+  const second = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: secondPlan.planSha256, activate: true });
+  assert.equal(second.mutated, true);
+  assert.notEqual(second.checkpoint.generated.designInputSha256, first.checkpoint.generated.designInputSha256);
+  assert.equal(existsSync(join(root, secondPlan.targets.prd.path)), true);
+});
+
+// ---------------------------------------------------------------------------
+// Intake staging generation crash-injection (NVA-W4-COORD-2, design SSc.2):
+// per-target write-if-different is a pure function of the already-durable
+// checkpoint, so a crash at any fault point must leave the crashed target
+// either absent or fully committed (never torn), and a plain retry (against
+// the same still-unmutated checkpoint -- the crashed call never reached the
+// checkpoint commit, since staging is written entirely before it) must
+// converge to the correct fully-generated state.
+
+const INTAKE_GENERATE_STAGING_KEYS = ["designInput", "prd", "spec"];
+const INTAKE_GENERATE_WRITE_FAULT_STAGES = ["temp-fsync", "rename", "directory-fsync"];
+
+for (const key of INTAKE_GENERATE_STAGING_KEYS) {
+  for (const stage of INTAKE_GENERATE_WRITE_FAULT_STAGES) {
+    check(`intake staging generation: crash at ${key}-${stage} leaves that target either absent or fully committed, never torn, and a retry converges`, () => {
+      const root = readyToGenerateRoot(`intake-generate-crash-${key}-${stage}`);
+      const plan = planOnboardingIntakeGenerate({ rootDir: root });
+      expectIntakeError("INTAKE-GENERATE-SIMULATED-CRASH", () => applyOnboardingIntakeGenerate({
+        rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+        deps: { crashAt: `${key}-${stage}` },
+      }));
+      const absolute = join(root, plan.targets[key].path);
+      if (stage === "rename" || stage === "directory-fsync") {
+        // renameSync() is atomic: by the time these two fault points fire,
+        // the real target already carries the fully valid new content.
+        assert.equal(existsSync(absolute), true);
+        assert.equal(digest(readFileSync(absolute, "utf8")), plan.targets[key].afterSha256);
+      } else {
+        // temp-fsync fires strictly before the rename -- this is the
+        // first-ever write for this target, so it must be untouched
+        // (absent), never a torn partial file.
+        assert.equal(existsSync(absolute), false);
+      }
+      const afterCrash = readOnboardingIntakeCheckpoint({ rootDir: root });
+      assert.equal(afterCrash.value.transactionState, "ready-to-generate",
+        "the checkpoint commit is the LAST step -- a crash during staging writes must never reach it");
+      const recovered = applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+      assert.equal(recovered.mutated, true);
+      assert.equal(recovered.checkpoint.transactionState, "generated");
+      for (const eachKey of INTAKE_GENERATE_STAGING_KEYS) {
+        const eachAbsolute = join(root, plan.targets[eachKey].path);
+        assert.equal(digest(readFileSync(eachAbsolute, "utf8")), plan.targets[eachKey].afterSha256,
+          `${eachKey} must converge to the correct fully-written content`);
+      }
+    });
+  }
+}
 
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);

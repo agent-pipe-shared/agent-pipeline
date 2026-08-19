@@ -6,9 +6,13 @@ import {
   applyOnboardingIntakeConsent,
   applyOnboardingIntakeCapture,
   applyOnboardingIntakeDesignQuestions,
+  applyOnboardingIntakeGenerate,
+  planOnboardingIntakeGenerate,
   INTAKE_CONSENT_APPLY_SCHEMA,
   INTAKE_CAPTURE_APPLY_SCHEMA,
   INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
+  INTAKE_GENERATE_PLAN_SCHEMA,
+  INTAKE_GENERATE_APPLY_SCHEMA,
 } from "../lib/onboarding-continuity.mjs";
 import {
   applyProjectOnboardingManifestRepairV4,
@@ -101,6 +105,17 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   { name: "intake-consent-apply", flat: true, mutates: true, automatedArgvShape: null },
   { name: "intake-capture-apply", flat: true, mutates: true, automatedArgvShape: null },
   { name: "intake-design-questions-apply", flat: true, mutates: true, automatedArgvShape: null },
+  // Wave 4 onboarding coordinator, step 4 (NVA-W4-COORD-2, design.md SSa.5 point 4). Unlike the
+  // three apply-only commands above, this IS a plan/apply pair (mirroring every other command in
+  // the table, per design): intake-generate-plan needs no operand beyond the bare lifecycle argv
+  // (staging content is a pure function of the already-durable checkpoint), so it is
+  // `automatedArgvShape: "lifecycle"` and is covered automatically by GUARDDERIVE-1's derived
+  // admission -- no guard-lifecycle-ready.mjs change needed for the plan half. intake-generate-apply
+  // mutates, so it needs the SAME sanctionedOnboardingArgs() hand-list admission branch the three
+  // commands above are still missing (KNOWN GAP, not fixed here -- see the comment above and
+  // backlog/items/2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md).
+  { name: "intake-generate-plan", flat: true, mutates: false, automatedArgvShape: "lifecycle" },
+  { name: "intake-generate-apply", flat: true, mutates: true, automatedArgvShape: null },
 ].map((entry) => Object.freeze(entry)));
 
 export { ONBOARDING_SUBCOMMANDS };
@@ -336,6 +351,12 @@ export function main(args = process.argv.slice(2), {
         rootDir: options.root, answers, activate: options.activate, deps,
       });
     }
+    else if (options.command === "intake-generate-plan") output = planOnboardingIntakeGenerate({
+      rootDir: options.root, deps,
+    });
+    else if (options.command === "intake-generate-apply") output = applyOnboardingIntakeGenerate({
+      rootDir: options.root, expectedPlanSha256: options.planSha256, activate: options.activate, deps,
+    });
     else {
       const operation = options.command === "initialize-runtime"
         ? "runtime"
@@ -362,14 +383,23 @@ export function main(args = process.argv.slice(2), {
     return 2;
   }
   write(`${JSON.stringify(output, null, 2)}\n`);
-  if (["pipeline.codex-onboarding-kickoff-plan.v1", "pipeline.codex-onboarding-kickoff-promotion-plan.v1"].includes(output.schema)) return 0;
-  // Wave 4 intake-checkpoint apply commands (NVA-W4-COORD-1) are apply-only,
+  // Wave 4 step 4 (NVA-W4-COORD-2): intake-generate-plan is `{ schema, root,
+  // ..., planSha256, targets }` shaped, no `status` field -- same
+  // reaching-this-line-means-success convention as the two kickoff plan
+  // schemas it is grouped with below.
+  if ([
+    "pipeline.codex-onboarding-kickoff-plan.v1", "pipeline.codex-onboarding-kickoff-promotion-plan.v1",
+    INTAKE_GENERATE_PLAN_SCHEMA,
+  ].includes(output.schema)) return 0;
+  // Wave 4 intake-checkpoint apply commands (NVA-W4-COORD-1/2) are apply-only,
   // `{ schema, root, mutated, checkpoint }` shaped -- no `status` field, so
   // the resting-status set below never applies to them. Reaching this line at
   // all means the apply function returned rather than throwing, i.e. it
   // succeeded (possibly as a no-op replay, `mutated: false`).
-  if ([INTAKE_CONSENT_APPLY_SCHEMA, INTAKE_CAPTURE_APPLY_SCHEMA, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA]
-    .includes(output.schema)) return 0;
+  if ([
+    INTAKE_CONSENT_APPLY_SCHEMA, INTAKE_CAPTURE_APPLY_SCHEMA, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
+    INTAKE_GENERATE_APPLY_SCHEMA,
+  ].includes(output.schema)) return 0;
   if (output.schema === "pipeline.project-onboarding-remote-adoption-plan.v1") return output.status === "ready" || output.status === "activation-required" ? 0 : 1;
   // `runtime-attestation-required` is a legitimate resting point for an
   // inspect/plan command: it names what the caller still needs before it can
