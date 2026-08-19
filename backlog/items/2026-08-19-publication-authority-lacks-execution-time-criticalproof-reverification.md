@@ -148,3 +148,15 @@ current state before this filing) is not an acceptable third option.
   to the PO for a decision; only then dispatch-ready for implementation
   (direction 1) or for an ADR write-up (direction 2).
 - **Date:** 2026-08-19
+
+### PO Decision — 2026-08-19
+
+- **Decision:** Direction 2 — document the asymmetry as an accepted, bounded
+  tradeoff via a new ADR, rather than migrating publication onto push/deploy's
+  execution-time re-verification shape.
+- **Rationale:** PO's direct choice between the item's two named directions.
+- **Assignment:** Dispatch-ready — a Goldfish writes the ADR (the CAS/lock
+  chain's guarantees, why they're judged sufficient for a release-only,
+  single-destination, fixed-executor path, and what would revisit the
+  decision) and closes this item on landing.
+- **Date:** 2026-08-19

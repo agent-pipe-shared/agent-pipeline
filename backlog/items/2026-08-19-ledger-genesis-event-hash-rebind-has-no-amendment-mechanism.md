@@ -71,3 +71,15 @@ Not designed here — two directions, neither built:
 - **Assignment (if accepted):** design-tier dispatch once a direction is
   chosen.
 - **Date:** 2026-08-19
+
+### PO Decision — 2026-08-19
+
+- **Decision:** Direction 1 — a new, explicitly-scoped amendment kind that
+  lets a later event supersede a genesis event's stale `itemSha256` binding,
+  mirroring the existing reachability-amendment pattern; the hash chain
+  itself is never rewritten.
+- **Rationale:** PO's direct choice between the item's two named directions.
+- **Assignment:** Dispatch-ready — design-tier Goldfish designs the amendment
+  schema/vocabulary, wires `check-backlog-state.mjs`'s `itemSha256` check to
+  consult it, applies it to repair event 41, and closes this item on landing.
+- **Date:** 2026-08-19
