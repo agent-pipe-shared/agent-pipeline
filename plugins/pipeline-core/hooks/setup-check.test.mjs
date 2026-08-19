@@ -221,6 +221,47 @@ function runCli(rootDir) {
 }
 
 // ======================================================================================
+// Reachability (backlog item 2026-08-08-an-installing-consumer-is-never-asked-any-setup-decision.md,
+// Direction 3): the `default-markers` branch's `resolvingSteps()` names `node setup.mjs`, which
+// SETUP.md forbids a marketplace-installed CONSUMER to run. This proves that branch never
+// actually fires for that audience, because no shipped consumer code path ever writes a
+// `setup:` key into pipeline.user.yaml -- an onboarding-generated file has the shape below
+// (mirrors this repo's own tracked pipeline.user.yaml minus the `setup` key, which no library
+// under plugins/pipeline-core/lib/ ever writes).
+// ======================================================================================
+{
+  const rootDir = fixtureDir("onboarding-generated-shape");
+  writeRaw(
+    join(rootDir, "pipeline.user.yaml"),
+    [
+      "advisor_export:",
+      "  consent: \"approved\"",
+      "agent_runtime: \"claude-code\"",
+      "autonomy:",
+      "  branch_model: \"feature-branch\"",
+      "  push_policy: \"gated\"",
+      "  wip_limit: 3",
+      "gates:",
+      "  claude_md_max_lines: 200",
+      "  dev_plan: \"blocking\"",
+      "  push: \"blocking\"",
+      "  push_approval: \"signature\"",
+      "  security: \"blocking\"",
+      "language:",
+      "  agent_facing: \"en\"",
+      "  human_facing: \"en\"",
+      "",
+    ].join("\n"),
+  );
+  const { stdout, observation } = decideFromProjectDir(rootDir);
+  ok(
+    "onboarding-generated shape (no setup: key at all) -> the hook is silent (default-markers never fires)",
+    stdout === "" && observation === null,
+    stdout,
+  );
+}
+
+// ======================================================================================
 // Lifecycle reconciliation (SETUPSTATUS-1): one lifecycle, one answer for one human
 //
 // This hook and `pipeline-start-preflight` observe DIFFERENT things and neither is derived

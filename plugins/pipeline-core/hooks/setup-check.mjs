@@ -104,6 +104,24 @@ export const OBSERVATION_SCOPE = "project-personalization";
  * The steps that are expected to change this hook's answer -- named, never implied. Both the
  * machine-readable observation and the human-facing message are built from this one list, so
  * the declaration and the prose cannot drift apart.
+ *
+ * REACHABILITY (backlog item 2026-08-08-an-installing-consumer-is-never-asked-any-setup-decision.md,
+ * Direction 3): `node setup.mjs` is correct advice ONLY for the source-repo-collegue audience
+ * this hook's file header names -- someone who cloned the Pipeline SOURCE checkout (where
+ * `setup.mjs` lives at the repo root and SETUP.md tells them to run it). It is never reachable
+ * for a marketplace-installed CONSUMER project: only `./plugins/pipeline-core` ships via the
+ * marketplace (`.claude-plugin/marketplace.json`), `setup.mjs` is not part of that shipped tree,
+ * and no shipped consumer code path (`project-onboarding-v3.mjs`, `machine-plane.mjs`, or any
+ * other library under `plugins/pipeline-core/lib/`) ever writes a `setup:` key into
+ * `pipeline.user.yaml` at all -- confirmed by direct grep, zero hits outside this file, its own
+ * test, and unrelated migration-test fixtures. So a consumer's onboarding-generated
+ * `pipeline.user.yaml` can never carry the literal `unconfigured` marker `isStillDefault` keys
+ * on, and this `default-markers` branch never fires for that audience in practice. The message
+ * naming `node setup.mjs` is therefore accurate for every audience it is actually reachable by;
+ * it just never reaches the "installing consumer" audience the backlog item worried about, since
+ * that audience cannot produce the literal marker this branch keys on. See
+ * `setup-check.test.mjs`'s "onboarding-generated pipeline.user.yaml never carries default
+ * markers" case for the regression proof.
  * @param {"missing"|"default-markers"} reason
  * @returns {string[]}
  */
