@@ -123,3 +123,74 @@ at most a human German pass, explicitly not a defect blocking anything.
 - **Rationale:** PO's direct choice, matching the Elephant's recommendation.
 - **Assignment:** Deferred, bundled — no standalone dispatch; the next Spec-rebind-triggering change should carry this fix along, quoting the hash-binding warning verbatim per this item's own prior guidance.
 - **Date:** 2026-08-18
+
+### Triage — closed 2026-08-19
+
+- **Decision:** Class 2 closed. `specs/sprint-phoenix-epic/spec.md`'s ADR path
+  is fixed (`0047-governance-event-kernel.md` → `0062-governance-event-kernel.md`,
+  commit `42ffd337`) and the hash binding is fully reconciled — **without**
+  paying the `implementation`→`design` phase-transition cost the 2026-08-18
+  PO Decision was trying to avoid, and without a fourth occurrence of the
+  known failure mode reaching an unrecovered state.
+- **What actually happened (fourth occurrence, fully recovered this time):**
+  the exact trap this item warns about triggered a fourth time — a plain
+  content edit to the hash-bound Spec put session readiness into `partial`,
+  blocking every further write session-wide (confirmed identically across
+  four independent concurrent dispatches this session, not just the editor).
+  Recovery took far longer than it should have (multiple failed hand-patch
+  attempts) because the authority binding turns out to have **more
+  interlocking fields than this item's own prior notes documented**. Recorded
+  here precisely so a fifth occurrence is fast, not another multi-hour
+  rediscovery:
+  1. `specs/sprint-phoenix-epic/spec.md` — the actual content fix.
+  2. `specs/sprint-phoenix-epic/prd_phoenix-epic.md`'s embedded
+     `<!-- technical-spec-sha256: ... -->` marker (currently line 11) — must
+     be updated to the NEW spec.md sha256. Editing this changes the PRD's own
+     bytes, so its own sha256 changes too (cascades to 3 below).
+  3. `project/pipeline-state.json`'s `continuity.authority.prd.sha256` — new
+     PRD sha256.
+  4. `project/pipeline-state.json`'s `continuity.authority.spec.sha256` — new
+     spec.md sha256.
+  5. `project/pipeline-state.json`'s `planSubmission.planSha256` — new PRD
+     sha256.
+  6. `project/pipeline-state.json`'s `planSubmission.specSha256` — new
+     spec.md sha256.
+  7. `project/pipeline-state.json`'s `planApproval.poGateAuthority.planSha256`
+     — new PRD sha256.
+  8. `project/pipeline-state.json`'s `planApproval.poGateAuthority.specSha256`
+     — new spec.md sha256.
+  9. `project/pipeline-state.json`'s `planApproval.submissionSha256` — **the
+     field that actually blocked recovery the longest.** This is
+     `sha256CanonicalJson(state.planSubmission)` (exported from
+     `plugins/pipeline-core/lib/plan-spec-state-v2.mjs`), which changes the
+     instant fields 5/6 change, and is checked by `currentApproval()`
+     (`plan-spec-state-v2.mjs:337`) independently of whether the live files
+     match the authority fields — a self-consistency check entirely inside
+     `pipeline-state.json`, not a live-file comparison. **Must be computed
+     with the actual exported function, never guessed or hand-derived**, e.g.:
+     `node -e 'import("./plugins/pipeline-core/lib/plan-spec-state-v2.mjs").then(({sha256CanonicalJson}) => console.log(sha256CanonicalJson(JSON.parse(require("fs").readFileSync("project/pipeline-state.json","utf8")).planSubmission)))'`
+  10. Two historical entries in `authorityRevisionReceipts[]` (an append-only
+      audit log of a *past* revision, currently around lines 294/298/314)
+      also carry the OLD spec sha256 — these must **not** be touched; they
+      are a record of what was true at a past commit, not live authority.
+  All 9 live-authority edits (1 content + 8 hash-reconciliation fields across
+  3 commits) were applied directly by the PO from an external terminal (never
+  through the guarded session, since every mutating command — including the
+  guard's own suggested remedies — is refused while readiness is `partial`,
+  with no in-session override for this gate class). Commits: `42ffd337`
+  (content), `32fb7aaa` (PRD/spec hash fields 2-8), `c2f2cf05`
+  (`submissionSha256`, field 9). `project-onboarding-v3.mjs inspect --intent
+  session` confirmed `status: "ready"`, `diagnostics: []` immediately after.
+- **A genuine, separate defect found along the way:** the CLI mechanism this
+  item's own 2026-08-18 Assignment named as the alternative,
+  `pipeline-state.mjs po-authority-rebind-plan`, cannot ever succeed against
+  this repository's actual state — see the new backlog item
+  `2026-08-19-po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version.md`.
+  `po-authority-decision-plan` (the OTHER named alternative) remains usable
+  but still forces the `implementation`→`design` phase transition; the manual
+  9-field reconciliation above is the only route found this session that
+  avoids both problems.
+- **Assignment:** none remaining for Class 2. Class 1 (historical Nova-era
+  references) and Class 3 (German table drift) retain their 2026-08-18
+  dispositions (no repair / deferred human pass).
+- **Date:** 2026-08-19
