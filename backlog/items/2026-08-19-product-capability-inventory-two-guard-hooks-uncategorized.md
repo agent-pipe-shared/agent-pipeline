@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.product-capability-inventory-two-guard-hooks-uncategorized
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "897a4466"
+closure_evidence: "docs/product-capability-inventory.json"
 source: "Found by PHX-WP-BACKLOG-OBSGOV-MISC-TRIAGE while diagnosing product-capability-inventory-tests failure from a full clean-candidate Verify run, 2026-08-18/19."
 ---
 
@@ -55,4 +59,24 @@ already waiting on; classify them once that wiring lands, not before.
   outside this session), not a design ambiguity to resolve in-session.
 - **Assignment (if accepted):** Piece (1): Goldfish, immediately. Piece (2):
   after the TP-4/HGO ceremony for the two guard hooks completes.
+- **Date:** 2026-08-19
+
+### Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** Piece (2)'s prerequisite already landed (commit `8fcd369c`
+  wired both `guard-el01-tripwire.mjs` and `guard-onboarding-consent-lock.mjs`
+  into `hooks.json`'s `PreToolUse` `Edit|Write|NotebookEdit` matcher, plain
+  Claude-Code-native wiring identical in shape to `guard-testpath.mjs`, no
+  Codex bridging), so the classification the item deferred is now
+  determinable: both hooks join the `claude-hook-safety` capability
+  alongside `guard-testpath.mjs`. Verifying this surfaced a further,
+  unrelated 3-surface gap (`handover-rotate-tests`,
+  `human-decision-attribution-tests`, `pipeline-state-rebind-mutable-tests`,
+  from commit `66228c24`) of the exact same mechanical shape as piece (1);
+  added to `deterministic-verification` alongside the existing 377+
+  verify-phase surfaces, no new capability, no reclassification of anything
+  else. `docs/product-capability-inventory.json` updated (commit
+  `897a4466`); `node harness/scripts/check-product-capability-inventory.mjs`
+  now exits 0.
 - **Date:** 2026-08-19
