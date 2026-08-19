@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4c6d6940af97d219b930a39242a283e1e9134500ab7e5626e0ed5a8e11f5c90a"
+    "transitionHead": "47ea41d46a51116f1f31ada7518518b12132f3481f61e60e3c704098fa31cc41"
   },
   "counts": {
-    "open": 59,
+    "open": 58,
     "in_progress": 7,
-    "closed": 229
+    "closed": 230
   },
   "items": [
     {
@@ -2701,11 +2701,15 @@
     },
     {
       "id": "pipeline.sentinel-epic-acceptance-matrix-archive-drift",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Surfaced by the Nova Wave 4 candidate verify run (2026-08-19): check-spec-retention.mjs FAILs 'sprint-sentinel-epic archive bytes differ from active acceptance authority' / 'archive digest is stale for acceptance'. Confirmed pre-existing and unrelated to Wave 4/5 work by commit c1434d49 ('revert(spec-retention): restore sprint-sentinel-epic's frozen PRD content', 2026-08-18), which already verified the drift predates that session entirely -- specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md's last edit before that was commit 86deb0cb ('chore(release): prepare 0.4.0 candidate', 2026-07-24)."
+      "source": "Surfaced by the Nova Wave 4 candidate verify run (2026-08-19): check-spec-retention.mjs FAILs 'sprint-sentinel-epic archive bytes differ from active acceptance authority' / 'archive digest is stale for acceptance'. Confirmed pre-existing and unrelated to Wave 4/5 work by commit c1434d49 ('revert(spec-retention): restore sprint-sentinel-epic's frozen PRD content', 2026-08-18), which already verified the drift predates that session entirely -- specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md's last edit before that was commit 86deb0cb ('chore(release): prepare 0.4.0 candidate', 2026-07-24).",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "1ca28ded4fab926f46a8eb4c00637a805c4f9f07",
+      "closureEvidence": "backlog/items/2026-08-19-sentinel-epic-acceptance-matrix-archive-drift.md"
     },
     {
       "id": "pipeline.sentinel-go-live-completion",

@@ -245,7 +245,7 @@
 | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.sentinel-epic-acceptance-matrix-archive-drift | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.sentinel-epic-acceptance-matrix-archive-drift | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | closed | defect | pipeline | 2026-08-07 | — |
@@ -303,6 +303,6 @@
 
 ## Counts
 
-- open: 59
+- open: 58
 - in_progress: 7
-- closed: 229
+- closed: 230
