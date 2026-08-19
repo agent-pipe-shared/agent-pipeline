@@ -69,13 +69,14 @@
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | open | requirement | pipeline | 2026-08-07 | — |
+| pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | closed | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-testpath-not-kernel-protected | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.guard-testpath-override-ot09-stale-literal-pattern | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2 | open | requirement | pipeline | 2026-08-18 | — |
+| pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2 | closed | requirement | pipeline | 2026-08-18 | — |
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | closed | defect | pipeline | 2026-08-07 | — |
@@ -176,6 +177,6 @@
 
 - open: 10
 - in_progress: 25
-- closed: 119
+- closed: 120
 - rejected: 1
 - deferred: 11

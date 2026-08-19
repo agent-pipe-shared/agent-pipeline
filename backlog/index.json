@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d70fc9c9c8ad4cfc2b6ebfc046bf6202a1c82e0c17c7b4ce2c50b2fc5bbf0569"
+    "transitionHead": "ef7ad1ec3f21020f51e97b13065eeecf4090b7d26a26598fdac3fc6cac690053"
   },
   "counts": {
     "open": 10,
     "in_progress": 25,
-    "closed": 119,
+    "closed": 120,
     "rejected": 1,
     "deferred": 11
   },
@@ -702,6 +702,14 @@
       "source": "PO requirement (APS, 2026-08-07) — the finalized GMW and HGO modules in the next plugin version must write their evidence cleanly into the audit ledger Phoenix delivers; the information to log is \"what was approved, when, why, by whom\". Recorded with the concrete gaps the Elephant found on verification against the bound Phoenix acceptance criteria."
     },
     {
+      "id": "pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Discovered incidentally by PHX-WP-GMW-LEDGER-EMISSION while writing regression tests for the install/close ledger-emission wiring; disclosed in that dispatch's report and in backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md's progress note, 2026-08-19."
+    },
+    {
       "id": "pipeline.governance-product-verify-suites-deregistered",
       "status": "closed",
       "type": "defect",
@@ -775,11 +783,15 @@
     },
     {
       "id": "pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Formalizing EPIC-AC-05's disposed bar for H-AC-11's O-4 scoping decision (PO, 2026-08-17, specs/sprint-phoenix-epic/acceptance.md), which named the fix but was never filed as a backlog item with an owner and trigger. See acceptance.md H-AC-11's 2026-08-18 disposition note."
+      "source": "Formalizing EPIC-AC-05's disposed bar for H-AC-11's O-4 scoping decision (PO, 2026-08-17, specs/sprint-phoenix-epic/acceptance.md), which named the fix but was never filed as a backlog item with an owner and trigger. See acceptance.md H-AC-11's 2026-08-18 disposition note.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "a910ed069f0df9d4d49bd4dfdd8d1be17b7f4366",
+      "closureEvidence": "backlog/items/2026-08-18-h-ac-11-restricted-profile-intake-record-is-design-increment-2.md"
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
