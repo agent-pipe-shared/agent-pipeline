@@ -5,6 +5,10 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 8d3fd44f6f30e3c022f4ffecf67974c68482c022
+closure_evidence: backlog/items/2026-08-18-atomic-prd-approval-without-mutation.md
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-2 (priority P0)"
 ---
 

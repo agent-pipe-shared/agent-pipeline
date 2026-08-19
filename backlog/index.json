@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "84b01a44a04759445258b5274a78fc263e78d96148283d970ad0e16636009e4c"
+    "transitionHead": "7560818e3aa5f5374ab39d6c9a3415e6c3fa8b82e9487d6f2173f380498d082a"
   },
   "counts": {
-    "open": 96,
+    "open": 91,
     "in_progress": 7,
-    "closed": 185
+    "closed": 192
   },
   "items": [
     {
@@ -198,11 +198,15 @@
     },
     {
       "id": "pipeline.atomic-prd-approval-without-mutation",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-2 (priority P0)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-2 (priority P0)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "8d3fd44f6f30e3c022f4ffecf67974c68482c022",
+      "closureEvidence": "backlog/items/2026-08-18-atomic-prd-approval-without-mutation.md"
     },
     {
       "id": "pipeline.authority-decision-apply-defaults-to-codex",
@@ -367,11 +371,15 @@
     },
     {
       "id": "pipeline.canonical-verify-evidence-path",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-5 (priority P0)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-5 (priority P0)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
+      "closureEvidence": "backlog/items/2026-08-18-canonical-verify-evidence-path.md"
     },
     {
       "id": "pipeline.canonical-worktree-lifecycle",
@@ -428,11 +436,15 @@
     },
     {
       "id": "pipeline.cli-docs-generated-from-parser",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-3 (priority P2)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-3 (priority P2)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
+      "closureEvidence": "backlog/items/2026-08-18-cli-docs-generated-from-parser.md"
     },
     {
       "id": "pipeline.close-spec-retention-and-consent",
@@ -957,11 +969,15 @@
     },
     {
       "id": "pipeline.full-push-preflight-before-signature",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-4 (priority P0)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-4 (priority P0)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
+      "closureEvidence": "backlog/items/2026-08-18-full-push-preflight-before-signature.md"
     },
     {
       "id": "pipeline.git-appears-despite-initializes-git-false",
@@ -1156,6 +1172,14 @@
       "source": "self-observation during Wave-3 dispatch NVA-W3-R3, 2026-08-18 (Nova A backlog finalization sprint)"
     },
     {
+      "id": "pipeline.guard-dispatch-has-no-workflow-tool-awareness",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "self-observation during dispatch NVA-WFDISP-1, 2026-08-18 (briefed disclosure of a confirmed gap: guard-dispatch.mjs has zero Workflow-tool awareness)"
+    },
+    {
       "id": "pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally",
       "status": "closed",
       "type": "defect",
@@ -1293,11 +1317,15 @@
     },
     {
       "id": "pipeline.happy-path-local-telemetry",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-2 (priority P2)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-2 (priority P2)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
+      "closureEvidence": "backlog/items/2026-08-18-happy-path-local-telemetry.md"
     },
     {
       "id": "pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible",
@@ -1938,11 +1966,15 @@
     },
     {
       "id": "pipeline.phase-aware-bootstrap-readiness",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-1 (priority P1)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-1 (priority P1)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
+      "closureEvidence": "backlog/items/2026-08-18-phase-aware-bootstrap-readiness.md"
     },
     {
       "id": "pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit",
@@ -2532,6 +2564,14 @@
       "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-5 (priority P1)"
     },
     {
+      "id": "pipeline.sentinel-epic-acceptance-matrix-archive-drift",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Surfaced by the Nova Wave 4 candidate verify run (2026-08-19): check-spec-retention.mjs FAILs 'sprint-sentinel-epic archive bytes differ from active acceptance authority' / 'archive digest is stale for acceptance'. Confirmed pre-existing and unrelated to Wave 4/5 work by commit c1434d49 ('revert(spec-retention): restore sprint-sentinel-epic's frozen PRD content', 2026-08-18), which already verified the drift predates that session entirely -- specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md's last edit before that was commit 86deb0cb ('chore(release): prepare 0.4.0 candidate', 2026-07-24)."
+    },
+    {
       "id": "pipeline.sentinel-go-live-completion",
       "status": "closed",
       "type": "workflow-improvement",
@@ -2865,11 +2905,15 @@
     },
     {
       "id": "pipeline.universal-human-command-renderer",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-3 (priority P0)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-3 (priority P0)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0f8bdafcd7b7b4ea42fbdbfb9085aafa8aa75a15",
+      "closureEvidence": "backlog/items/2026-08-18-universal-human-command-renderer.md"
     },
     {
       "id": "pipeline.unregistered-suite-is-red-and-invisible-to-verify",
