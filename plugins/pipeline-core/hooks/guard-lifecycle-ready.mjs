@@ -1884,9 +1884,19 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // loosely (non-empty, not flag-shaped) here, the same idiom the adopt-remote --remote and
   // plan-partial-authority --source branches above already apply to a free-form caller value --
   // deep JSON-shape validation stays the library's job, not this shell-argv allowlist's.
-  return args[0] === "intake-design-questions-apply"
+  if (args[0] === "intake-design-questions-apply"
     && exactRoot(args, root, 1)
     && args[3] === "--answers-json" && typeof args[4] === "string" && args[4].trim() !== "" && !args[4].startsWith("--")
+    && args[5] === "--activate" && args.length === 6) return true;
+  // intake-generate-apply (Wave 4 onboarding coordinator step 4, landed after this item was
+  // originally filed with only 3 subcommands -- confirmed a 4th, `mutates: true,
+  // automatedArgvShape: null` entry in ONBOARDING_SUBCOMMANDS with no admission branch either).
+  // applyOnboardingIntakeGenerate() requires expectedPlanSha256, mirroring the same
+  // --plan-sha256/HEX/--activate shape the kickoff-apply and adopt-remote-apply branches above
+  // already use for a digest-bound apply step.
+  return args[0] === "intake-generate-apply"
+    && exactRoot(args, root, 1)
+    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
     && args[5] === "--activate" && args.length === 6;
 }
 

@@ -2057,6 +2057,33 @@ test("NVA-W5-GUARDADMIT-1: intake-design-questions-apply admits exactly the --an
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("NVA-W5-GUARDADMIT-1: intake-generate-apply admits exactly the --plan-sha256/--activate shape and no wider one", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    const command = `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const bad of [
+      // missing --plan-sha256 entirely
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${sha}`,
+      // malformed / short / non-hex --plan-sha256
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${"a".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${"g".repeat(64)} --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${sha} --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root /tmp/other --plan-sha256 ${sha} --activate`,
+      // intake-generate-plan (read-only, GUARDDERIVE-1-covered) does not smuggle in the apply shape
+      `node '${ONBOARDING_SCRIPT}' intake-generate-plan --root '${path}' --plan-sha256 ${sha} --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 /**
  * NVA-LCGUARD-3 (backlog: 2026-08-17-lifecycle-guard-omits-the-operator-authority-repair-
  * shape.md). collectOperatorContinuityAuthorityAction() (lib/project-onboarding-v3.mjs)
