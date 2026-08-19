@@ -224,13 +224,17 @@ check("F1: codex adapter recognizes every push shape guard-push.mjs itself recog
 
 // Negative case for the same fix: a command that merely CONTAINS the substring
 // "push" -- or is a `git` command at all -- must not be misclassified as a push by
-// the new normalized detector. `git status` and `git commit -m "push later"` are
+// the new normalized detector. `git status` and `git commit -m "chore: push later"` are
 // both fully allowed today (no push gate applies); the fixed detector must keep
 // allowing them, proving the shared-normalization fix narrows to real pushes and
 // does not silently widen scope to any command whose text merely mentions "push".
+// The commit subject carries a `chore:` prefix so this fixture stays GIT-01-clean
+// (an unrelated, later-landed conventional-commit-type check) rather than being
+// independently blocked for a reason that has nothing to do with what this case
+// is actually proving.
 check("F1: the shared-normalization fix does not widen push detection to non-push commands", () => {
   const root = fixture();
-  for (const command of ["git status", 'git commit -m "push later"']) {
+  for (const command of ["git status", 'git commit -m "chore: push later"']) {
     const result = run({ tool_name: "Bash", tool_input: { command } }, root);
     assert.equal(result.status, 0, `${command}\n${result.stderr}`);
     assert.equal(result.stdout, "", command);
