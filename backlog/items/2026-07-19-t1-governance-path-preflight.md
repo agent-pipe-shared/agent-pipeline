@@ -112,3 +112,47 @@ clause-2 sentence, only in secondary summaries) and is untouched by
 this decision — it remains genuinely open and unassigned. Clause 1
 (governance paths) is proven; clause 2 (gate ETA) is now retired by
 spec/AC wording; the remaining sanctioned gate is the tool-setup AC.
+
+### Scoping, 2026-08-19 — no "tool-setup" AC clause exists to prove; item can close
+
+Searched the entire `specs/2026-07-19-sprint-sentinel-epic/` directory
+(`rg -rn "tool-setup|tool setup"`) for the actual clause this AC's
+"tool-setup disposition" wording is supposed to trace to. It appears in
+exactly three places, and all three are summary/table characterizations,
+never an actual acceptance-criterion sentence:
+
+- `backlog-acceptance-matrix.md`, the `pipeline.t1-governance-path-preflight`
+  row's "Current AC assessment" cell: "...without complete path/ETA/
+  tool-setup disposition."
+- `prd_sentinel-epic.md`'s "Complete backlog scope" table, this item's
+  "Required completion" cell: "audit and complete path, ETA, and setup
+  ACs, then close."
+- `spec.md`'s "Starting reconciliation classification" table (line 203,
+  itself already flagged by the prior dispatch as "a design hypothesis
+  to be proven in SNT-7, not closure evidence"): "full ETA/tool-setup
+  contract may be partial."
+
+The one and only place `prd_sentinel-epic.md` states this AC's actual
+Required-outcomes text is §3, line 161 — a SINGLE bullet: "T1 packets
+include governance paths and an honest gate ETA or `unknown`." That
+bullet contains exactly the two clauses already resolved above (clause 1
+governance paths, proven; clause 2 gate ETA, retired by PO decision
+#18). No third bullet, clause, or sentence about tool setup, tool
+installation, or a tool-availability check exists anywhere in §3, in
+the packet schema (`PACKET_SCHEMA`, already confirmed by the prior
+dispatch to carry no such field), or in any other AC-bearing section of
+this epic's spec files.
+
+**Conclusion: "tool-setup disposition" is not a distinct, checkable AC
+clause — it is imprecise paraphrasing in three summary/table cells that
+bundled "path" + "ETA" + a vague third word together without a
+corresponding Required-outcomes sentence ever being written.** There is
+nothing to specify, register, or prove for it, by the same reasoning PO
+decision #18 already applied to the (real, but stale) gate-ETA clause.
+Both of this AC's actual clauses are now resolved (clause 1 proven,
+clause 2 retired); no further design or dispatch is needed. **This item
+can close** — a future session should run the standard close
+ritual (status flip, closure metadata, ledger reconciliation) citing
+this scoping note plus the two prior dispatch results as closure
+evidence. Not closed here: closing was out of this scoping pass's
+directive.
