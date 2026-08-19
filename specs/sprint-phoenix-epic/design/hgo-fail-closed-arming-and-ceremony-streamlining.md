@@ -145,13 +145,25 @@ first.
 1. **`planHumanGuardOverride` becomes get-or-create, not pure.** On the *first* successful call
    for a given `(requestSha256, authorSourceRoot)` pair, take `repositoryObservation()` once,
    check it against `request.repository` (frozen at denial) **narrowly** — `fingerprintSha256`
-   and `policyIdentity` only, not `statusSha256`/`head`/`tree`/`state` — and persist the full
-   plan payload, including `plugin: pluginIdentity(pluginRoot)` (`:377-415`) in the same shape the
-   payload already carries it today, to a new store (`storage()` gains a `plans` directory
-   alongside `requests`/`capabilities`, written with the same `writeExclusive` discipline). Every
-   later call for the same pair reads the persisted plan back unchanged (no new observation, no
-   new comparison) — the same idempotency callers already rely on today, just backed by a file
-   instead of recomputation.
+   and `policyIdentity` only, not `statusSha256`/`head`/`tree`/`state`. **NEW (Revision 3) —
+   `pluginIdentity(pluginRoot)` (`:377-415`) is ALSO checked at this first call, in full, against
+   `request.plugin` (frozen at denial, unnarrowed) — fail closed with the existing `HGO-DRIFT`
+   code on any mismatch.** This is not a new check: today's (pre-this-design) `planHumanGuardOverride`
+   already does exactly this full-equality comparison, unconditionally, on *every* call
+   (`canonical(plugin) !== canonical(request.plugin)`, current `:1526`); silently dropping it at
+   the first call — as an earlier draft of this section did — would reopen a window this design
+   must not open: a plugin-code tamper landing between denial and the first `plan()` call would be
+   captured, unverified, as the new persisted-plan baseline, and then never be flagged, since step
+   3c below only ever compares fresh state against *that same, already-tampered* baseline. Unlike
+   the repository check, `pluginIdentity()` is not narrowed here — it is small and cheap by
+   construction (six file hashes, `:377-415`), so there is no "safe to narrow" case to make for it,
+   matching step 3c's own later verdict that plugin-code identity is never safe to stop checking.
+   On success, persist the full plan payload, including `plugin: pluginIdentity(pluginRoot)` (the
+   same value just verified) in the same shape the payload already carries it today, to a new
+   store (`storage()` gains a `plans` directory alongside `requests`/`capabilities`, written with
+   the same `writeExclusive` discipline). Every later call for the same pair reads the persisted
+   plan back unchanged (no new observation, no new comparison) — the same idempotency callers
+   already rely on today, just backed by a file instead of recomputation.
 2. **`prepareHumanGuardOverrideAuthorization`, `authorizeHumanGuardOverride`, and
    `authorizeHumanGuardOverrideBySignature` stop calling `planHumanGuardOverride` for a fresh
    *repository* observation.** They read the persisted plan (validating the supplied `planSha256`
@@ -537,6 +549,35 @@ plan-persistence layer gained a second, deliberately narrow write path. Step 5's
 recovery instruction is corrected. Part B (§2), Part C's core recipe (§3.1-3.3, 3.5) and Part D
 (§4) are untouched; §3.4 gets a corrected recovery sentence (not a rewrite) and a new §3.6
 documents the new subcommand.
+
+### 1.10 Revision 3 — a first-plan-time plugin-identity check restored, found during implementation verification
+
+Found while verifying the Revision 2 implementation against the repo's own pre-existing test suite
+(not a Critic round; the round-cap policy governs Critic dispatches, not the Elephant's own
+verification, and this is a narrow, mechanical completion of an already-established pattern, not a
+new design direction). **Finding:** step 1 as Revision 2 left it persisted `plugin:
+pluginIdentity(pluginRoot)` at the first `plan()` call with no verification at all — no comparison
+against anything. Today's (pre-this-design) `planHumanGuardOverride` does the opposite: it
+compares fresh `pluginIdentity()` against `request.plugin` (frozen at denial) in full, on *every*
+call, unconditionally, failing `HGO-DRIFT` on mismatch (current `:1526`,
+`canonical(plugin) !== canonical(request.plugin)`). Dropping that comparison at the first call —
+as Revision 2 did — reopens a window this design must not open: a plugin-code tamper landing
+between denial and the first `plan()` call would be captured, unverified, as the new
+persisted-plan baseline, and then never flagged, since step 3c only ever compares fresh state
+against *that same, already-tampered* baseline. The pre-existing test
+`"policy-library and override-CLI drift invalidate the loaded plugin identity"`
+(`human-guard-override.test.mjs`) encodes exactly this property and caught the gap by failing
+against the Revision 2 implementation.
+
+**Fix:** step 1 (§1.4) now additionally checks fresh `pluginIdentity(pluginRoot)` against
+`request.plugin`, in full (unnarrowed — `pluginIdentity()` is six file hashes, cheap by
+construction, so there is no "safe to narrow" case for it, matching step 3c's own verdict that
+plugin-code identity is never safe to stop checking), failing the existing `HGO-DRIFT` code (not a
+new code — this restores an existing check at an existing failure code, not a new failure mode) on
+mismatch. This exactly restores the property the pre-existing test encodes; the fix requires no
+change to that test. Step 3c (arm-time `HGO-PLUGIN-DRIFT`) is untouched — the two checks now
+cover two different windows (denial→first-plan; first-plan→arm) the same way steps 1 and 3a/3b
+already do for repository/policy.
 
 ## 2. Part B — the digest-withholding comment
 
