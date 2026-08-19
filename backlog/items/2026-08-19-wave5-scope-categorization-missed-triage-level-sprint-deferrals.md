@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
 source: "Self-observation, 2026-08-19, this session: a manual sweep of the Wave-5-scope work list found 12 of 54 items already explicitly deferred to another sprint by their own Triage text, none of which the automated categorization pass had excluded."
 ---
@@ -85,3 +85,17 @@ deferrals).
   over the source-of-truth file) is worth a durable note in case a similar
   categorization pass is built again.
 - **Date:** 2026-08-19
+
+## Closure, 2026-08-19
+
+PO decision: close, no new canon note (Option 1 of the two offered). The
+corrected exclusion list already proved itself twice more since filing —
+once continuing the Wave 5 dispatch rounds, once again during this
+session's fresh 51-item backlog-scope audit, both times by reading each
+item's own `## Triage` section directly rather than trusting a generated
+evidence summary. CLAUDE.md's existing hard rule ("Re-verify an inherited
+'still open'/'still needed' claim before dispatching work on it") already
+covers the general case this incident is a specific instance of; a
+separate durable canon sentence would be redundant. `scratch/categorize-verify-results.mjs`
+remains a scratch script, not durable canon, and needs no further
+treatment.
