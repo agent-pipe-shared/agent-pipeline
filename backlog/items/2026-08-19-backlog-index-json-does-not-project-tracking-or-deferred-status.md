@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.backlog-index-json-does-not-project-tracking-or-deferred-status
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: dd1ce985c2dcc7548700cc3cb7d040f7f4f505e5
+closure_evidence: backlog/items/2026-08-19-backlog-index-json-does-not-project-tracking-or-deferred-status.md
 created: 2026-08-19
 source: "PO, in-session, 2026-08-19, in response to the new backlog/README.md Ledger section: 'der index Jason des backlogs sollte dann aber auch Ziel sprints oder status wie pausiert/deffered kennen oder?' (the backlog's index.json should also know target sprints or a status like paused/deferred, right?)"
 ---
@@ -88,11 +92,35 @@ decision, not a small addition, and is deliberately NOT proposed here.
   (a `status: paused`/`deferred` enum value) for a future PO call rather
   than proposing it here.
 - **Rationale:** projecting an existing free-text field (`tracking`)
-  verbatim and a derived boolean parsed from existing Triage prose
-  (`Decision: deferred`) are both read-only, additive projections of
-  data that already exists on disk — no risk of silently changing what
-  a `status:` value means or how the ledger's state machine works.
+  verbatim and a derived boolean parsed from an existing Triage
+  decision phrase are both read-only, additive projections of data
+  that already exists on disk — no risk of silently changing what a
+  `status:` value means or how the ledger's state machine works.
+  (Correction, 2026-08-19: the original wording of this sentence
+  literally contained the trigger phrase itself and was, ironically,
+  self-referentially misclassified as `deferred: true` by the very
+  mechanism it describes — confirmed live in `backlog/index.json` —
+  reworded to describe the pattern without quoting it verbatim.)
 - **Assignment:** goldfish-implementor (clearly-briefed, no in-task
   design latitude — the Proposal section already specifies the exact
   fields, parsing rule, and regeneration path).
 - **Date:** 2026-08-19
+
+## Closure, 2026-08-19
+
+`NVA-BL-INDEXJSON-1` landed both fields exactly as specified:
+`projectBacklog()` (`plugins/pipeline-core/lib/backlog-state.mjs`, the
+actual shared function `reconcile-backlog-ledger.mjs` calls into) gained
+`isTriageDeferred()` and now projects `tracking` verbatim + a derived
+`deferred: boolean`; `reconcile-backlog-ledger.mjs` was also fixed to
+regenerate `STATUS.md`/`index.json` on any projection-shape byte-drift, not
+only when a new ledger transition exists (a real gap this change would
+otherwise have silently hit). 22/22 tests (3 new), `check-backlog-state.mjs`
+clean, `backlog/README.md`'s Ledger row updated, all independently
+re-verified on trunk (commit `dd1ce985`). **Known limitation, disclosed
+rather than fixed here:** the `deferred` derivation is a plain substring
+regex over the Triage section, so prose merely discussing/quoting the
+trigger phrase (as this very item's own Rationale did, see the correction
+above) can false-positive — acceptable for this item's own additive scope,
+worth hardening (anchor the match to an actual bullet-initial `Decision:`
+line) if it recurs. **Item closed.**
