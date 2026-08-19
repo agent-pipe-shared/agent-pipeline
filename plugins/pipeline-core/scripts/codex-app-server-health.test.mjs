@@ -69,4 +69,42 @@ check("Critic readiness requires a successful bounded model-start probe", () => 
   assert.equal(unavailable.code, "CAS-MODEL-UNAVAILABLE");
 });
 
-process.stdout.write(`${passed}/6 checks passed.\n`);
+check("win32 detects platform before spawning restart and returns a distinct typed result", () => {
+  const calls = [];
+  const result = checkCodexAppServer({
+    recover: true,
+    platform: "win32",
+    spawn: (_bin, args) => { calls.push(args); return response(1, "", "socket stale"); },
+  });
+  assert.equal(result.status, "unsupported");
+  assert.equal(result.code, "CAS-PLATFORM-UNSUPPORTED");
+  assert.equal(result.recovery, "not-applicable");
+  assert.match(result.operatorAction, /WSL/);
+  assert.match(result.detail, /win32/);
+  assert.deepEqual(calls, [["app-server", "daemon", "version"]]);
+});
+
+check("non-Windows platforms still attempt the real restart call unchanged", () => {
+  const calls = [];
+  const results = [response(1, "", "socket stale"), response(0), health()];
+  const result = checkCodexAppServer({
+    recover: true,
+    platform: "linux",
+    spawn: (_bin, args) => { calls.push(args); return results.shift(); },
+  });
+  assert.equal(result.code, "CAS-READY");
+  assert.equal(result.recovery, "restarted");
+  assert.deepEqual(calls, [["app-server", "daemon", "version"], ["app-server", "daemon", "restart"], ["app-server", "daemon", "version"]]);
+
+  const darwinCalls = [];
+  const darwinResult = checkCodexAppServer({
+    recover: true,
+    platform: "darwin",
+    spawn: (_bin, args) => { darwinCalls.push(args); return darwinCalls.length === 1 ? response(1, "", "socket stale") : response(1, "", "restart failed"); },
+  });
+  assert.equal(darwinResult.code, "CAS-DAEMON-RECOVERY-FAILED");
+  assert.equal(darwinResult.recovery, "failed");
+  assert.deepEqual(darwinCalls, [["app-server", "daemon", "version"], ["app-server", "daemon", "restart"]]);
+});
+
+process.stdout.write(`${passed}/8 checks passed.\n`);

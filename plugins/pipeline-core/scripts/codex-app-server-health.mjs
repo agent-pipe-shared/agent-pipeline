@@ -16,6 +16,7 @@ export const CODEX_APP_SERVER_HEALTH_SCHEMA = "pipeline.codex-app-server-health.
 export const CODEX_APP_SERVER_DOCTOR_SCHEMA = "pipeline.codex-app-server-doctor.v1";
 const VERSION_KEYS = ["status", "backend", "managedCodexPath", "managedCodexVersion", "socketPath", "cliVersion", "appServerVersion"];
 const OPERATOR_ACTION = "codex app-server daemon restart && codex doctor";
+const WSL_OPERATOR_ACTION = "Codex app-server daemon lifecycle is Unix-only; run Codex with this pipeline inside WSL (Windows Subsystem for Linux) instead of on native Windows.";
 const MODEL_PROBE = fileURLToPath(new URL("./codex-app-server-model-probe.mjs", import.meta.url));
 
 function isObject(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
@@ -118,9 +119,20 @@ export function observeCodexAppServer({ executable = "codex", spawn = spawnSync,
  * observation. It never invokes a model, starts a pipeline worker, or claims
  * that the current host exposes background wakeups.
  */
-export function checkCodexAppServer({ recover = false, executable = "codex", spawn = spawnSync, requireModelReady = false } = {}) {
+export function checkCodexAppServer({ recover = false, executable = "codex", spawn = spawnSync, requireModelReady = false, platform = process.platform } = {}) {
   const first = observeCodexAppServer({ executable, spawn, requireModelReady });
   if (first.status === "ready" || recover !== true || first.code === "CAS-CODEX-UNAVAILABLE" || first.code === "CAS-EXECUTION-UNAVAILABLE") return first;
+  if (platform === "win32") {
+    return {
+      ...first,
+      status: "unsupported",
+      code: "CAS-PLATFORM-UNSUPPORTED",
+      phase: "recover",
+      recovery: "not-applicable",
+      operatorAction: WSL_OPERATOR_ACTION,
+      detail: "codex app-server daemon restart is Unix-only and cannot run on native Windows (win32); use WSL to run Codex with this pipeline.",
+    };
+  }
   const restart = invoke(executable, ["app-server", "daemon", "restart"], spawn);
   const failure = executionFailure(restart);
   if (failure !== null || restart.status !== 0) {
