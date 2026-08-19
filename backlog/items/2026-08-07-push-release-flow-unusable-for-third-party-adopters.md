@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-07
 closed_at: "2026-08-19"
 closure_repository: "self"
-closure_commit: "0000000000000000000000000000000000000000"
+closure_commit: "e2fcf75cde2e698f0fcd1565718d3fc6b5369c45"
 closure_evidence: "backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md"
 source: "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'"
 due: 2026-09-06
