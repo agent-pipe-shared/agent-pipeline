@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "48c47bd2ea09369bbe2e7504e150c3372aa5711f0217640943149be329537c96"
+    "transitionHead": "f5313bfe4913f4c47b99f75dff05e728c15e28fb5f47aec9e0fe33385e0bff46"
   },
   "counts": {
-    "open": 54,
+    "open": 52,
     "in_progress": 7,
-    "closed": 234
+    "closed": 236
   },
   "items": [
     {
@@ -1545,11 +1545,15 @@
     },
     {
       "id": "pipeline.installing-consumer-is-never-asked-any-setup-decision",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, preparing the tester mail: 'wenn ich den Leuten sage, soundso installiert ihr das Plugin, dann führen Sie aber ja nie das Setup aus. Das heißt, an den Entscheidungen bezüglich Scratchpad beziehungsweise Keyordner, welche Runner, auch PO Gate, welches ist Blocking, Chatfreigabe versus Signature -- da kommen Sie nirgendwo dran vorbei. Wann und wie entscheidet man das, wenn man installiert?'"
+      "source": "PO, 2026-08-08, preparing the tester mail: 'wenn ich den Leuten sage, soundso installiert ihr das Plugin, dann führen Sie aber ja nie das Setup aus. Das heißt, an den Entscheidungen bezüglich Scratchpad beziehungsweise Keyordner, welche Runner, auch PO Gate, welches ist Blocking, Chatfreigabe versus Signature -- da kommen Sie nirgendwo dran vorbei. Wann und wie entscheidet man das, wenn man installiert?'",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "2640075144cdd0a2ddac36a2a41f2181c01c19f7",
+      "closureEvidence": "backlog/items/2026-08-08-an-installing-consumer-is-never-asked-any-setup-decision.md"
     },
     {
       "id": "pipeline.intake-values-restart-resilient-immediately",
@@ -2918,11 +2922,15 @@
     },
     {
       "id": "pipeline.staleness-check-unsettled-top-level-await-warning",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "PO, live, 2026-08-19: same session transcript as the greenfield ask-before-install-duty item, terminal output: 'SessionStart:startup hook error / Failed with non-blocking status code: Warning: Detected unsettled top-level await at file:///.../plugins/pipeline-core/hooks/staleness-check.mjs:208'."
+      "source": "PO, live, 2026-08-19: same session transcript as the greenfield ask-before-install-duty item, terminal output: 'SessionStart:startup hook error / Failed with non-blocking status code: Warning: Detected unsettled top-level await at file:///.../plugins/pipeline-core/hooks/staleness-check.mjs:208'.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "8e8072ee475b261c38f847392e867060cc081666",
+      "closureEvidence": "backlog/items/2026-08-19-staleness-check-unsettled-top-level-await-warning.md"
     },
     {
       "id": "pipeline.stateful-design-contract-template",
