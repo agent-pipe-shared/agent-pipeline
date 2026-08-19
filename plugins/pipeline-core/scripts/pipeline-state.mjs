@@ -5741,6 +5741,76 @@ function runFeaturePackageReadCommand(sub, argv) {
   return plan.status === "bootstrap-preview" ? 0 : 2;
 }
 
+// ---- PHX-WP-MUTABLE-REBIND-EXPLICIT-CLI: the deliberate, out-of-band rebind trigger --------
+/**
+ * `feature-package-rebind-mutable` (PHX-WP-MUTABLE-ARTIFACT-AUTOREBIND's own remaining design
+ * question, per backlog/items/2026-08-17-acceptance-md-edits-repeatedly-drift-lifecycle-json-
+ * bound-digest.md: "a dedicated CLI verb an operator or Elephant invokes explicitly").
+ *
+ * This is the ONLY place in this script that ever passes `autoRebindMutable: true` to
+ * `validateFeaturePackage`. It is a deliberate, standalone, operator/Elephant-INITIATED
+ * command -- never a silent side effect of `feature-package-apply` / `-reconcile` / `-plan` /
+ * `-inspect` / `-status`, which stay exactly as unwired as PHX-WP-AUTOREBIND-WRITEPATH-
+ * INVESTIGATE-FINISH left them (see the comment on `runFeaturePackageApplyCommand` above for
+ * why: an internal recompute inside a write path that also consumes an approval-bound preview
+ * digest cannot distinguish a routine edit from deliberate tampering). Called here, with no
+ * preview digest to defeat and no approval gate to bypass, that risk does not apply: the
+ * caller sees exactly what was rebound (or that nothing was) in the printed result, same as
+ * running the command IS the audit signal.
+ *
+ * Routed ahead of `readState()`, like the read-only three: this verb's authority is the
+ * `--root` repository's own topology, never the operator's local state file. It takes no
+ * writer lock and keeps no recovery journal -- `validateFeaturePackage`'s own rebind write is
+ * a single atomic `writeFileSync`, not a multi-step transaction, and `immutable`/`append-only`
+ * artifacts are never touched by it (the mutability class test lives once, in
+ * `autoRebindMutableArtifact`, and is never made configurable from here or anywhere else).
+ */
+const FEATURE_PACKAGE_REBIND_MUTABLE_SUBCOMMAND = "feature-package-rebind-mutable";
+const FEATURE_PACKAGE_REBIND_MUTABLE_SCHEMA = "pipeline.feature-package-rebind-mutable.v1";
+const FEATURE_PACKAGE_REBIND_MUTABLE_FLAGS = new Set(["root", "manifest"]);
+
+function runFeaturePackageRebindMutableCommand(argv) {
+  const sub = FEATURE_PACKAGE_REBIND_MUTABLE_SUBCOMMAND;
+  const parsed = parseFeaturePackageReadFlags(argv, FEATURE_PACKAGE_REBIND_MUTABLE_FLAGS);
+  if (!parsed.ok) return refuseFeaturePackageRead(sub, parsed.error);
+  const flags = parsed.value;
+  if (flags.root === undefined) return refuseFeaturePackageRead(sub, 'argument "--root <dir>" is required');
+  const root = resolve(flags.root);
+  let rootStat = null;
+  try { rootStat = statSync(root); } catch { rootStat = null; }
+  if (rootStat === null || !rootStat.isDirectory()) {
+    return refuseFeaturePackageRead(sub, `argument "--root" does not name a readable directory: ${flags.root}`);
+  }
+  if (flags.manifest === undefined) {
+    return refuseFeaturePackageRead(sub, 'argument "--manifest <repo-relative-path>" is required');
+  }
+  const manifest = featurePackageReadRelative(root, flags.manifest);
+  if (manifest === null) {
+    return refuseFeaturePackageRead(sub, `argument "--manifest" must be a canonical path inside --root: ${flags.manifest}`);
+  }
+
+  const checked = validateFeaturePackage(root, manifest, null, { autoRebindMutable: true });
+  if (checked.receipt === null) {
+    return refuseFeaturePackageRead(sub, `argument "--manifest" names an unreadable or malformed manifest: ${manifest} (${checked.findings.join("; ")})`);
+  }
+  const rebinds = Array.isArray(checked.rebinds) ? checked.rebinds : [];
+  for (const rebind of rebinds) {
+    console.log(`Rebound ${rebind.path} (${rebind.class}): ${rebind.from} -> ${rebind.to}`);
+  }
+  if (rebinds.length === 0) console.log(`No mutable-class artifact needed rebinding in ${manifest}.`);
+  console.log(JSON.stringify({
+    schema: FEATURE_PACKAGE_REBIND_MUTABLE_SCHEMA,
+    ok: checked.ok,
+    manifest: checked.receipt.manifest,
+    featureId: checked.receipt.featureId,
+    manifestSha256: checked.receipt.manifestSha256,
+    rebindCount: rebinds.length,
+    rebinds,
+    findings: checked.findings,
+  }, null, 2));
+  return checked.ok ? 0 : 2;
+}
+
 // ---- PHX-0A-WRITE: the transactional half of the #22 lifecycle writer family (P-AC-08) ----
 /**
  * `feature-package-apply` / `feature-package-recover`.
@@ -6601,6 +6671,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   // Routed ahead of readState(): these three are read-only reports over a repository
   // topology and must not be gated by the operator's local state file.
   if (FEATURE_PACKAGE_READ_SUBCOMMANDS.has(sub)) return runFeaturePackageReadCommand(sub, rest);
+  // Routed ahead of readState() too: a deliberate, standalone, non-PO-gated rebind trigger
+  // (PHX-WP-MUTABLE-REBIND-EXPLICIT-CLI) -- never a silent side effect of any other verb.
+  if (sub === FEATURE_PACKAGE_REBIND_MUTABLE_SUBCOMMAND) return runFeaturePackageRebindMutableCommand(rest);
   // Routed ahead of readState() too: this transaction's authority is the --root
   // repository's own topology and its own private journal, never the operator's
   // local state file (PHX-0A-WRITE, P-AC-08).
@@ -7558,7 +7631,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, continuity-authority-revision-plan, continuity-authority-revision-apply, continuity-authority-revision-recover, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block, feature-package-inspect, feature-package-status, feature-package-plan, feature-package-apply, feature-package-reconcile, feature-package-recover.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-apply-native, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, continuity-authority-revision-plan, continuity-authority-revision-apply, continuity-authority-revision-recover, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block, feature-package-inspect, feature-package-status, feature-package-plan, feature-package-apply, feature-package-reconcile, feature-package-recover, feature-package-rebind-mutable.`,
       );
       return 2;
     }
