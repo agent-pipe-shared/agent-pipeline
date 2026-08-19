@@ -4,6 +4,10 @@ id: pipeline.dispatch-record-does-not-bind-to-its-commit
 type: defect
 owner: pipeline
 status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 859a508df9aae0276d9483dc9bda39322f38e061
+closure_evidence: backlog/items/2026-08-09-the-dispatch-record-does-not-bind-to-the-commit-it-vouches-for.md
 created: 2026-08-09
 due: 2026-08-23
 source: "Found independently by all three Critic rounds against the 0.5.4 candidate (A-F2/A-F5, B-F3, C-F3/C-F4), then reproduced by the Elephant one hour later in 1c3cd86."
