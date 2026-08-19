@@ -60,20 +60,27 @@ test("the standard adapter derives selection evidence locally and never embeds a
 // wiring genuinely connects, not merely that both modules mention each
 // other's names.
 //
-// Both new cases below are FAILING-preflight-outcome cases, reached via two
-// different real integration seams (compiledIntermediateReadback's
-// compilePermissionProfile()/validateCodexSandboxState() call, and
-// runPreflight()'s runCodexSandboxPreflight() call) and two different
-// consumption channels (thrown error vs. return value). A PASSING-outcome
-// case is intentionally NOT included -- see setupRuntime()'s and the first
-// test's comments for why one is not obtainable from this module's current,
+// The two cases below are reached via two different real integration seams
+// (compiledIntermediateReadback's compilePermissionProfile()/
+// validateCodexSandboxState() call, and runPreflight()'s
+// runCodexSandboxPreflight() call) and two different consumption channels
+// (return value vs. return value/thrown error). The first case
+// (createCoordinatorScratch()) reaches a genuine PASSING outcome since the
+// deniedRoots fix landed (dispatch NVA-BL-CSDENIED-1, backlog item
+// codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set):
+// compiledIntermediateReadback() no longer collides with its own runtime read
+// set, so this call path now reaches a real, structurally valid compiled
+// profile end-to-end instead of failing closed. The second case
+// (runPreflight()/observeHost()) remains a FAILING-preflight-outcome case --
+// see setupRuntime()'s and the first test's comments for why a PASSING
+// preflight *receipt* is not obtainable from this module's current,
 // unmodified code without either a live, fully sandbox-capable Codex CLI
 // (explicitly out of scope, matching this suite's sibling's own established
 // live-subprocess limitation) or reproducing genuine OS-level sandbox
 // enforcement inside a test double (which would itself be exactly the kind of
 // "runtime-side stub standing in for the whole module" this dispatch's DoD
-// forbids). This is reported as an explicit open item in the dispatch report,
-// not silently worked around.
+// forbids). This remains an explicit open item in the dispatch report, not
+// silently worked around.
 // ---------------------------------------------------------------------------
 
 function writeFakeCodex(root) {
@@ -116,7 +123,17 @@ function setupRuntime(t) {
   const init = spawnSync("git", ["init", "-q", repoRoot], { encoding: "utf8" });
   assert.equal(init.status, 0, `git init failed: ${init.stderr}`);
   const session = startSessionDescriptor(repoRoot, { sessionId: "wiring-probe-session" });
-  const codexPath = writeFakeCodex(repoRoot);
+  // The fake codex binary is deliberately placed OUTSIDE repoRoot (a sibling
+  // temp dir), not nested inside it: compiledIntermediateReadback() folds
+  // codexPath into runtimeReadSet, and compilePermissionProfile()'s overlap
+  // check (real, unmocked) rejects any runtimeReadSet entry nested under
+  // inputRoot exactly as it rejects any other alias/overlap -- a fixture
+  // codexPath inside the fixture repoRoot would fail closed for a reason
+  // unrelated to the deniedRoots/sensitiveRoots collision this suite is
+  // about, masking whether that specific fix actually works.
+  const codexHostRoot = realpathSync(mkdtempSync(join(tmpdir(), "codex-runtime-wiring-codex-")));
+  t.after(() => rmSync(codexHostRoot, { recursive: true, force: true }));
+  const codexPath = writeFakeCodex(codexHostRoot);
   return createCodexSandboxRuntimeTransport({
     sandboxContext: CONTEXT,
     sandboxRuntime: {
@@ -130,33 +147,40 @@ function scratchRequest() {
   return { repoFingerprint: CONTEXT.repoFingerprint, duty: "advisory", queueRevision: 1, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: CONTEXT.referenceSetSha256, runner: "codex", model: "wiring-probe-model" };
 }
 
-test("selection.createCoordinatorScratch() makes a real, unmocked call into codex-sandbox-preflight.mjs's compilePermissionProfile()/validateCodexSandboxState(), and a real TERMINAL_CODES failure propagates rather than being swallowed", (t) => {
+test("selection.createCoordinatorScratch() makes a real, unmocked call into codex-sandbox-preflight.mjs's compilePermissionProfile()/validateCodexSandboxState(), and now reaches a genuine PASSING compiled profile end-to-end", (t) => {
   const transport = setupRuntime(t);
-  // compiledIntermediateReadback() (this module's own, only call site for
-  // these two preflight exports) hardcodes deniedRoots: ["/proc"], while
-  // codex-sandbox-preflight.mjs's own resolveNodeRuntimeReadSet() -- which
-  // this module also calls, unconditionally, to build its runtimeReadSet --
-  // always includes the literal path "/proc/self". compilePermissionProfile()'s
-  // real, unmocked overlap check (preflight's own closed-permission-compiler
-  // contract, not anything engineered by this test) correctly and safely
-  // rejects that self-contradictory combination -- confirmed empirically
-  // against this exact runtime call path (not merely against
-  // compilePermissionProfile() in isolation) to reproduce on every physically
-  // valid repoRoot/codexPath, not just this test's fixture. In other words:
-  // every real "intermediate" readback/scratch call through this module's
-  // current, unmodified code fails closed today. That is a genuine,
-  // naturally-occurring (not artificially engineered) TERMINAL_CODES failure,
-  // and exactly the kind of pre-existing defect this dispatch's wiring test
-  // was positioned to surface; see this dispatch's completion report for the
-  // full analysis and a recommendation to fix it separately (out of this
-  // test-authorship dispatch's scope: it would change codex-sandbox-runtime.mjs's
-  // actual behavior/logic, which this dispatch is forbidden from doing).
-  assert.throws(() => transport.selection.createCoordinatorScratch(scratchRequest()), (error) => {
-    assert.equal(error.name, "SandboxPreflightError");
-    assert.equal(error.code, "profile-error");
-    assert.match(error.message, /overlap or alias/);
-    return true;
-  });
+  // Before dispatch NVA-BL-CSDENIED-1's fix, compiledIntermediateReadback()
+  // (this module's own, only call site for these two preflight exports)
+  // hardcoded deniedRoots: ["/proc"], while codex-sandbox-preflight.mjs's own
+  // resolveNodeRuntimeReadSet() -- which this module also calls,
+  // unconditionally, to build its runtimeReadSet -- always includes the
+  // literal path "/proc/self", nested under "/proc". Every real
+  // "intermediate" readback/scratch call through this exact wiring failed
+  // closed with "overlap or alias" (compilePermissionProfile()'s real,
+  // unmocked overlap check). deniedRoots is now ["/proc/sys"]: a sibling of
+  // "/proc/self" under the same parent, never a sub/superpath of it, so this
+  // call now reaches compilePermissionProfile()/validateCodexSandboxState()
+  // and returns a real, structurally valid "intermediate" compiled profile --
+  // not a caught fail() exception -- confirmed empirically against this exact
+  // runtime call path (not merely against compilePermissionProfile() in
+  // isolation), on a physically valid repoRoot/codexPath, not an engineered
+  // fixture.
+  const scratch = transport.selection.createCoordinatorScratch(scratchRequest());
+  assert.match(scratch.sandboxStateSha256, /^[a-f0-9]{64}$/);
+  assert.match(scratch.profileRawSha256, /^[a-f0-9]{64}$/);
+  const state = JSON.parse(scratch.sandboxStateJson);
+  assert.equal(state.permissionProfile.network, "enabled");
+  assert.deepEqual(state.permissionProfile.file_system.entries.map((entry) => entry.access), ["read", "write"]);
+  assert.equal(state.permissionProfile.file_system.entries[0].path.type, "special");
+  assert.equal(state.permissionProfile.file_system.entries[0].path.value.kind, "root");
+  assert.equal(state.permissionProfile.file_system.entries[1].path.path, scratch.path);
+  // selection.readbackProfile() (compiledIntermediateReadback's second,
+  // distinct call site in this module) resolves the same in-memory pending
+  // scratch by its scratchRootSha256 and also now reaches the same real
+  // compiled profile, rather than failing closed.
+  const readback = transport.selection.readbackProfile({ profile: { sha256: scratch.profileRawSha256, scratchRootSha256: scratch.sha256 } });
+  assert.equal(readback.sha256, scratch.profileRawSha256);
+  assert.equal(readback.scratchRootSha256, scratch.sha256);
 });
 
 test("selection.runPreflight() and selection.observeHost() make a real, unmocked call into codex-sandbox-preflight.mjs's runCodexSandboxPreflight(), and a real TERMINAL_CODES failure receipt is consumed via the runtime module's own return value, not silently swallowed", async (t) => {

@@ -86,8 +86,20 @@ function compiledIntermediateReadback(runtime, scratch, selectedProfile = null) 
     outputRoot: scratch.path,
     runtimeReadSet: [...new Set([...resolveNodeRuntimeReadSet(process.execPath), runtime.codexPath, CODEX_ADVISORY_CHILD_PATH])].sort(),
     // The intermediate compiled form does not include deny entries, but its
-    // shared compiler requires two real, non-overlapping control roots.
-    deniedRoots: ["/proc"],
+    // shared compiler requires two real, non-overlapping control roots. Both
+    // must be real, existing directories (compilePermissionProfile's
+    // uniquePhysicalPaths()/physicalDirectory() precondition) that never
+    // overlap inputRoot/outputRoot/runtimeReadSet/each other. `/proc` itself
+    // is unusable here: resolveNodeRuntimeReadSet() unconditionally includes
+    // the literal path "/proc/self" in runtimeReadSet, and "/proc/self" is
+    // nested under "/proc", so a deniedRoots of "/proc" always collides with
+    // it (confirmed 2026-08-19, backlog item
+    // codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set).
+    // "/proc/sys" is a sibling of "/proc/self" under the same parent (never a
+    // sub/superpath of it), always present on a real Linux host as part of
+    // procfs, and keeps the same "deny sensitive kernel surface" semantic the
+    // original "/proc" choice was reaching for.
+    deniedRoots: ["/proc/sys"],
     sensitiveRoots: ["/sys"],
     sandboxCwd: runtime.repoRoot,
   });
