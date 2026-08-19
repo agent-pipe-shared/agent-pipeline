@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 130948c15fee0afe389cf787772f11b75b6dad72
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs
 created: 2026-08-18
 source: "self-observation during Wave-3 dispatch NVA-W3-R3, 2026-08-18 (Nova A backlog finalization sprint)"
 ---
@@ -229,3 +233,26 @@ Steps 2-3 (apply the same `extractShellWriteTargets()` pattern to
 the dispatch ran out of tool budget after step 1's commit. Next dispatch can
 start directly from step 2 of the Design section above; step 1's extraction
 is done and does not need to be redesigned.
+
+### Progress, 2026-08-19 (NVA-W5-DEVPLANSHELL-2) — step 2 landed
+
+`devPlanGateVerdict({filePath, projectDir})` extracted from `guard-devplan.mjs`
+into new `plugins/pipeline-core/lib/guard-devplan-policy.mjs`; `guard-devplan.mjs`
+is now a thin wrapper around it. Commit `5e08f3ae` (cherry-picked to trunk).
+Verified: `guard-devplan.test.mjs` 47/47, `check-consumer-safe-paths.test.mjs`
+9/9, both unmodified. Step 3 (wiring the shell lane into
+`guard-lifecycle-ready.mjs`) remains open.
+
+### Closure, 2026-08-19 (NVA-W5-DEVPLANSHELL-3) — step 3 landed, item complete
+
+`devPlanShellRefusalHit()`/`devPlanShellBlocked()`/`devPlanShellFaultBlocked()`
+added to `guard-lifecycle-ready.mjs`, mirroring `protectedTestPathShellRefusalHit()`
+et al. exactly, wired into the same `Bash|PowerShell` dispatch point immediately
+after the `GUARD-TESTPATH-SHELL` lane. New `DEVPLANSHELL-1..4` test cases
+(shell write refused/read admitted, exempt-prefix bypass, PowerShell coverage,
+classifier-fault fail-closed per GL-09) mirror the `TPSHELL-*` pattern. Commit
+`130948c1` (cherry-picked to trunk). Verified: `guard-lifecycle-ready.test.mjs`
+123/123, `guard-devplan.test.mjs` 47/47, `check-consumer-safe-paths.test.mjs`
+9/9 — all green, no regressions.
+
+All 3 steps of the design are now landed and tested. **Closing this item.**
