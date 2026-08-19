@@ -212,3 +212,13 @@ a range-checking script is guardrail-tier work … and needs a regression
 suite to be trusted"). A follow-up item/dispatch is needed for that
 enforcement wiring, scoped to include the `guard-git.test.mjs` coverage the
 `guard-git.mjs` route would need.
+
+### Note, 2026-08-19 — NOT resolved by the 2026-08-19 TP-3 consolidation ceremony
+
+Stays **open**. The 2026-08-19 signed TP-3 ceremony (commit `92bb2a08`)
+registered 107 *existing, already-written* test files into `verify.mjs`'s
+`TEST_SUITES` array; it did not write new enforcement logic. This item's
+remaining gap is different in kind — an active range-walk step (or a
+`guard-git.mjs` wiring) that does not exist as code yet — so it was
+correctly out of scope for that ceremony and is unaffected by it. Do not
+infer closure from the ceremony's suite count.

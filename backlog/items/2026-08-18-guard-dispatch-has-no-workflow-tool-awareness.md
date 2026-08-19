@@ -103,3 +103,14 @@ dispatch with real design latitude rather than a rushed same-session patch.
   inferred from `workflow-dispatch.md`'s description, not observed live
   — worth confirming before or during that follow-up.
 - **Date:** 2026-08-19
+
+### Note, 2026-08-19 — NOT resolved by the 2026-08-19 TP-3 consolidation ceremony
+
+Stays **open**. The 2026-08-19 signed TP-3 ceremony (commit `92bb2a08`)
+registered 107 test files into `harness/scripts/verify.mjs` — a different
+protected file and a different guard class from this item's actual
+blocker, which is `plugins/pipeline-core/hooks/hooks.json`'s PreToolUse
+matcher (TP-4). An attempted edit to `hooks.json` this same session
+resolved to `status=author-repair-required`, not the signable HGO class —
+no in-session route exists for it at all. Do not infer closure from the
+TP-3 ceremony's suite count.

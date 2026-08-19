@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.unregistered-suite-is-red-and-invisible-to-verify
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 due: 2026-08-21
 source: "Found incidentally during the 0.5.3 candidate work, 2026-08-07, while looking for something else. Re-confirmed by running the suite directly on candidate d4887b7."
@@ -215,3 +215,22 @@ follow-up item/dispatch scoped to that full sweep rather than folding it into
 this item's remaining registration work.
 
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19
+
+Candidate 3 for this item's own named suite
+(`codex-isolated-critic-protected-preimage-tests`) landed via the signed
+TP-3 ceremony, commit `92bb2a08` — confirmed present in
+`harness/scripts/verify.mjs`'s `TEST_SUITES` array and green in the full
+378-suite Verify run against commit `f047f639`. The deferred follow-up
+sweep (candidate 4) is also done: the same ceremony registered 107 of the
+116 suites `check-suite-registration.mjs` flagged as unaccounted for; the
+other 9 are explained, not silently dropped — 6 are already covered by
+the detector-blind `WINDOWS_ASSURANCE_VERIFY_SUITES`/`SCOPED_VERIFY_SUITES`
+arrays (a real, separate gap in the detector itself, not filed as its own
+item yet), and 3 are genuinely broken suites deliberately left
+unregistered rather than turning Verify red for an unrelated defect
+(`windows-assurance-verify-registration.test.mjs`'s WAVR19 sub-test,
+`afk-activation.test.mjs`, and `security-readiness/security-readiness.test.mjs`'s
+broken import path). All four proposal candidates are therefore resolved
+or explicitly accounted for. Closing.

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-governed-directory-contract
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-22
 source: "PO, 2026-08-08: 'uns fehlt da noch eine art adr die die verzeichnisstrukturen besser hart vorgibt und definiert was wo hin gehört - agenten neigen bei jeder neuen session dazu neue strukturen zu erfinden. das muss die pipeline steuern.' Five corroborating instances from that same night are recorded below."
@@ -227,3 +227,14 @@ the same reason across this whole item and its siblings this session
 the one remaining piece — registering `check-directory-contract.test.mjs`
 into `harness/scripts/verify.mjs`'s `TEST_SUITES` — is TP-3-protected and
 needs a signed/maintenance-window ceremony, not a routine dispatch.
+
+## Closure, 2026-08-19
+
+The remaining piece landed via the signed TP-3 ceremony, commit
+`92bb2a08`: `check-directory-contract-tests`,
+`check-gitignore-anchoring-tests`, and
+`check-session-bootstrap-directory-contract-tests` are all now present in
+`harness/scripts/verify.mjs`'s `TEST_SUITES` array and ran green (29/29
+combined) in the full 378-suite Verify run against commit `f047f639`. All
+three of ADR-0063's named follow-ups are now built, tested, and actually
+wired into the gate. Closing.

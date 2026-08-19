@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "PO, 2026-08-17, mid-candidate-stamp: 'wundere mich warum die pipeline immer noch so viel tmp nutzt obwohl wir dafür eigentlich scratch erfunden haben' — asked after this session's local /tmp filled to 100% inode usage (1,038,060 of 1,048,576) and started making `git` itself fail with ENOSPC, blocking work until the PO manually remounted tmpfs with a higher inode count and cleared stale entries."
 ---
@@ -145,3 +145,14 @@ array (TP-3), which needs a maintenance-window or signature ceremony, not
 a routine dispatch. The exact registration snippet is already documented
 in `test-tmpdir-budget.mjs`'s own header comment, mirroring the existing
 `state-budget-tests`/`state-budget-check` pair.
+
+## Closure, 2026-08-19
+
+The remaining piece landed via the signed TP-3 ceremony, commit
+`92bb2a08`: both `test-tmpdir-tests` and `test-tmpdir-budget-tests` are
+now present in `harness/scripts/verify.mjs`'s `TEST_SUITES` array and ran
+green in the full 378-suite Verify run against commit `f047f639`. The
+budget check is therefore now genuinely "surfaced through `verify.mjs`",
+matching the original decision's wording exactly, and the same run
+re-confirmed `scratch/test-tmp/` clean after this session's own cleanup.
+Bounded scope fully delivered. Closing.
