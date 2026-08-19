@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "a910ed069f0df9d4d49bd4dfdd8d1be17b7f4366"
+closure_evidence: "backlog/items/2026-08-18-h-ac-11-restricted-profile-intake-record-is-design-increment-2.md"
 source: "Formalizing EPIC-AC-05's disposed bar for H-AC-11's O-4 scoping decision (PO, 2026-08-17, specs/sprint-phoenix-epic/acceptance.md), which named the fix but was never filed as a backlog item with an owner and trigger. See acceptance.md H-AC-11's 2026-08-18 disposition note."
 ---
 
@@ -90,3 +94,29 @@ usage string comparison); neither carries the increment-1 attribution
 wiring this item's remaining piece depends on. There is nothing to port —
 this is a genuine gap in both checkouts, not a Phoenix-specific one Nova
 already solved. Stays open, blocked exactly as before; no action taken.
+
+### Triage — closed 2026-08-19
+
+- **Decision:** Closed. Increment 1's own prerequisite (portable-side CLI
+  wiring) landed this session (`PHX-WP-GMW-LEDGER-EMISSION`, commit
+  `3504b707`), unblocking the one remaining piece this item was tracking.
+  `PHX-WP-HAC11-D1-GMW-WIRING` (commit `a910ed06`) then built it: `install`
+  accepts an optional `--attribution-key-file`; when supplied, after the
+  portable append-and-arm sequence succeeds, it appends one restricted
+  `pipeline.human-decision-attribution.v1` event carrying `subject.reason`
+  and the verified signer's `{keyReference, publicKeySha256}` — fail-open,
+  additive, never blocking `install` or the window's arming. Independently
+  re-verified by the Elephant directly (not just trusted from the dispatch
+  report): `node --test scripts/guard-maintenance-window.test.mjs` → 9/9
+  pass, including a structural no-correlator assertion on the stored record.
+- **HGO needs no corresponding wiring** — design §5.4 already establishes
+  HGO exposes no attribution/rationale to move in the first place (digest-only
+  `reasonSha256`); this item's own scope names only GMW's D-1 piece.
+- **Open, disclosed, not blocking closure:** `harness/scripts/verify.mjs`
+  registration for the extended suite remains TP-3 protected, no in-session
+  edit path — the suite passes standalone. `--attribution-store-root` was not
+  a named CLI flag; the store root is derived deterministically
+  (`~/.pipeline/governance-restricted/guard-maintenance-window/<fingerprint>`),
+  documented in the design doc's own 2026-08-19 addendum (§5.4) as a disclosed
+  implementation choice.
+- **Date:** 2026-08-19
