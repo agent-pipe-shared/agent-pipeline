@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 65)
+**Last updated:** 2026-08-19 (checkpoint 66)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
@@ -11,7 +11,17 @@
 
 ---
 
-## CHECKPOINT — 2026-08-19 (65): hook registration DONE, both backlog items closed, GMW window closed cleanly; 3 of 4 pre-existing reds now green (READ THIS FIRST)
+## CHECKPOINT — 2026-08-19 (66): shell-grammar Critic rework (F1/F2/F3) landed and independently re-verified; commit misattributed to `329ac49c` (documented, not history-rewritten); round-2 delta Critic next (READ THIS FIRST)
+
+**Rework `PHX-WP-READONLY-GRAMMAR-WIDEN-CRITIC-FIX1` complete, all 3 findings addressed.** F1 (blocker): `mkdir -p` admission narrowed from generic `isProjectWritePath` to exactly `scratch/`/`.claude/worktrees/` via new `CHAIN_ELIGIBLE_MKDIR_PREFIXES`/`isChainEligibleMkdirTarget` — independently grepped present in `guard-lifecycle-ready.mjs`. F2: new test proves both directions (admit narrowed target, refuse `guardrails/`) on a genuinely GOVERNED root, with a verified-stronger deviation from the literal spec — the guard refuses at the closed-grammar tokenizer layer for ANY `&&`, before `requireProjectOnboardingReadyFn` is ever reached in either direction, so "mock invocation observed" isn't achievable; the test asserts the stronger unconditional-refusal guarantee instead, with an explanatory in-test comment. F3: comment corrected from "unbriefed" to "accepted but deferred." Independently re-ran `node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` myself: 48/48 pass.
+
+**Commit-attribution defect found and NOT silently fixed.** The dispatch's own `git add`+`git commit` on its 2 files (`guard-lifecycle-ready.mjs`, `.test.mjs`) raced against this session's own commit and landed inside `329ac49c` ("docs(phoenix): close the two guard-hook registration backlog items") instead of its own commit — confirmed via `git show --stat 329ac49c`. Content is correct and at HEAD; only the commit boundary/message/trailers are wrong (missing `Dispatch: PHX-WP-READONLY-GRAMMAR-WIDEN-CRITIC-FIX1 (goldfish)`, subject doesn't mention the shell-grammar fix). Attempted a clean local split (`git reset --soft ac1afc86` then three separate re-commits) since both `329ac49c` and `6114e6f8` are still unpushed (`origin/sprint_phoenix` HEAD is `8a92d377`, well behind) — the auto-mode classifier blocked the `reset --soft` itself. Decision: do not fight the classifier for a cosmetic attribution fix with zero functional impact; document it here instead and move on. Ledger/backlog-closure evidence integrity is unaffected (those commits' own SHAs are unchanged).
+
+**Next:** dispatch the round-2 delta Critic re-review (round 2 of the ~2-round budget, F1/F2/F3 as bare labels only). If PASS or only minor findings (dispose directly, no 3rd dispatch): proceed straight to the PO's "clean cut and push" instruction — fresh full Verify, `security-scan.mjs`, push-approval ceremony, `git push origin sprint_phoenix`.
+
+---
+
+## CHECKPOINT — 2026-08-19 (65): hook registration DONE, both backlog items closed, GMW window closed cleanly; 3 of 4 pre-existing reds now green
 
 **Hook registration complete.** The V2 dispatch's own edit was correct for `verify.mjs` but hit a NEW, unrelated pre-existing gap in `docs/product-capability-inventory.json` (`guard-maintenance-window-cli-tests` — registered in `verify.mjs` from earlier GMW work, never added to the inventory) that made its own DoD check unsatisfiable regardless of how correct its briefed diff was — a scoping miss in how the item was briefed, not a dispatch failure. Diagnosed directly (a small Node script diffing `discoverSurfaces()` against the declared inventory) and split into two honest commits: `14bebfe6` (the goldfish's actual briefed diff, `Commit-Act: orchestrator` since the dispatch itself truncated before its own commit step) and `81cbba4f` (the Elephant's own isolated one-entry fix for the unrelated gap). Both `verify-suite-registration-check` and `check-product-capability-inventory.test.mjs` (16/16) now genuinely pass. Both backlog items closed with real evidence (`329ac49c`).
 
