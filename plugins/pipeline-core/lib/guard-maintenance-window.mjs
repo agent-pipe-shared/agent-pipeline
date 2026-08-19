@@ -711,6 +711,13 @@ export function currentGuardMaintenanceWindow({ rootDir, nowMs = Date.now(), spa
     // stated authorship declaration without reading window.json directly.
     authorshipMode: record.authorshipMode,
     stage0Selfcheck: record.stage0Selfcheck,
+    // PHX-WP-GMW-LEDGER-EMISSION: surfaced so a `close`-time caller can identify which
+    // ledger request/grant this window's own portable decision trail belongs to
+    // (`guard-authority-ledger-intake.mjs`'s `requestDecisionId`/`grantDecisionId` are
+    // both derived from this digest) WITHOUT re-reading window.json directly or
+    // duplicating this function's own validation. Read-only, additive: no change to
+    // what is stored, verified, or how install/close narrow or arm capability.
+    intentSha256: record.intent.sha256,
   };
   if (!active) {
     return { status: "expired", ...shared, expiresAtMs: Number.isFinite(effectiveExpiresAtMs) ? effectiveExpiresAtMs : null };
