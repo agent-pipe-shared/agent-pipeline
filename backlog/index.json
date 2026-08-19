@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0f12a90c9f2c4d3e9b64245f768485cdaf06d9bb71e0c1c5cdb2584607157bf2"
+    "transitionHead": "4c6d6940af97d219b930a39242a283e1e9134500ab7e5626e0ed5a8e11f5c90a"
   },
   "counts": {
-    "open": 61,
+    "open": 59,
     "in_progress": 7,
-    "closed": 227
+    "closed": 229
   },
   "items": [
     {
@@ -686,11 +686,15 @@
     },
     {
       "id": "pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (2026-08-17 continued entries). Finding surfaced by a read-only research fork."
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (2026-08-17 continued entries). Finding surfaced by a read-only research fork.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9d6a79fed034d256d5550b322a51929b54f60b89",
+      "closureEvidence": "backlog/items/2026-08-18-critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate.md"
     },
     {
       "id": "pipeline.critic-route-pre-check-not-in-force-in-installed-plugin",
@@ -1429,11 +1433,15 @@
     },
     {
       "id": "pipeline.harness-classifier-blocks-authorized-onboarding-action",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Third measured instance of this class; the first two were on the push path."
+      "source": "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Third measured instance of this class; the first two were on the push path.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9d6a79fed034d256d5550b322a51929b54f60b89",
+      "closureEvidence": "backlog/items/2026-08-08-the-harness-classifier-blocks-the-onboarding-action-the-pipeline-just-authorized.md"
     },
     {
       "id": "pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs",

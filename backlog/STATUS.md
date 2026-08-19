@@ -65,7 +65,7 @@
 | pipeline.control-path-invalid-misfires-on-a-transient-repository-discovery-race | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.critic-context-isolation | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critic-review-has-no-defined-path-for-a-root-commit | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.critic-route-pre-check-not-in-force-in-installed-plugin | open | defect | pipeline | 2026-08-11 | — |
 | pipeline.critical-human-proof-not-materialized-for-signature-mode | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | closed | defect | pipeline | 2026-08-05 | — |
@@ -133,7 +133,7 @@
 | pipeline.happy-path-local-telemetry | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | open | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.harness-classifier-blocks-authorized-onboarding-action | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | 2026-08-17 | — |
@@ -303,6 +303,6 @@
 
 ## Counts
 
-- open: 61
+- open: 59
 - in_progress: 7
-- closed: 227
+- closed: 229
