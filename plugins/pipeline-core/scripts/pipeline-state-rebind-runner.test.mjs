@@ -17,6 +17,7 @@ import { dirname, join } from "node:path";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { run, SCHEMA_ID, statePath } from "./pipeline-state.mjs";
+import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 
 const roots = [];
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
@@ -80,6 +81,78 @@ function planRebind(f) {
   assert.equal(result.status, 0, result.err);
   return JSON.parse(result.out);
 }
+
+/**
+ * PHX-WP-REBIND-V4-SCHEMA: same physical shape as fixture(), but planApproval.schema
+ * is "pipeline.plan-approval.v4" (this repository's live schema) -- bound via a
+ * planSubmission rather than v2's own specBoundBy/specBoundAt, mirroring
+ * validPriorAuthority's v4 fallback (pipeline-state.mjs, ~line 4786).
+ */
+function fixtureV4(name) {
+  const dir = mkdtempSync(join(tmpdir(), `pipeline-rebind-runner-v4-${name}-`)); roots.push(dir);
+  const featureDir = join(dir, "specs", "runner-v4-shaped");
+  mkdirSync(featureDir, { recursive: true });
+  mkdirSync(dirname(statePath(dir)), { recursive: true });
+  const planPath = "specs/runner-v4-shaped/prd_runner_v4.md";
+  const specPath = "specs/runner-v4-shaped/spec.md";
+  const oldSpecSha = hash("# older V4 Spec\n");
+  writeFileSync(join(dir, specPath), "# later V4 Spec\n");
+  const newSpecSha = hash(readFileSync(join(dir, specPath)));
+  writeFileSync(join(dir, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${oldSpecSha} -->\n# Runner-V4-shaped PRD\n`);
+  const planSha = hash(readFileSync(join(dir, planPath)));
+  const profile = { schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en", sourceSha256: h("1"), runtimeSha256: h("2"), receiptSha256: h("3"), repositoryFingerprint: h("4") };
+  const continuity = {
+    schema: "pipeline.continuity.v0", featureId: "runner-v4-shaped", revision: 3,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+    authority: { prd: { path: planPath, sha256: planSha }, spec: { path: specPath, sha256: oldSpecSha }, result: null },
+    queueHead: { packageId: "runner-v4", actionId: "rebind", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  };
+  const poGateAuthority = { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha };
+  const submission = {
+    schema: "pipeline.plan-submission.v1", featureId: "runner-v4-shaped", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha,
+    profile: "feature", profileSha256: h("5"), submittedBy: "PO (runner-04 v4 fixture submission)", submittedAt: "2026-07-26T14:00:00.000Z",
+  };
+  const planApproval = {
+    schema: "pipeline.plan-approval.v4", approvedBy: "PO (runner-04 v4 fixture)", approvedAt: "2026-07-26T14:08:37.500Z",
+    submissionSha256: sha256CanonicalJson(submission), profileSha256: submission.profileSha256,
+    poGateAuthority, priorInvalidationSha256: null,
+  };
+  const state = {
+    schema: SCHEMA_ID, activeFeature: { id: "runner-v4-shaped", planPath, phase: "implementation" }, planApproved: true,
+    planApproval, planSubmission: submission, continuity, updatedAt: "2026-07-26T14:08:37.500Z",
+  };
+  writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
+  const deps = {
+    dir, now: () => "2026-07-28T10:00:00.000Z", ownerNonce: () => `rebind-runner-v4-${String(++nonce).padStart(8, "0")}`,
+    poGateProfile: () => ({ ok: true, value: profile }),
+    poGateAuthority: ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === newSpecSha && typeof expectedPlanSha256 === "string"
+      ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
+      : { ok: false, code: "PO-GATE-AUTHORITY-STALE" },
+    v4Inspection: () => ({ status: "ready" }),
+  };
+  return { dir, deps, planPath, specPath, newSpecSha };
+}
+
+test("rebind-plan (V4-SCHEMA): a v4-schema planApproval with a genuinely stale, otherwise-valid authority now succeeds", () => {
+  const f = fixtureV4("stale");
+  const plan = planRebind(f);
+  assert.equal(plan.schema, "pipeline.po-authority-rebind-plan.v1");
+  const applied = invoke(plan.applyAction.argv.slice(1), f.deps);
+  assert.equal(applied.status, 0, applied.err);
+  const result = JSON.parse(applied.out);
+  assert.equal(result.phase, "design");
+});
+
+test("rebind-plan (V4-SCHEMA): a v4-schema planApproval that is NOT stale still fails PO-REBIND-NOT-STALE, not PO-REBIND-APPROVAL", () => {
+  const f = fixtureV4("not-stale");
+  writeFileSync(join(f.dir, f.planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${f.newSpecSha} -->\n# Runner-V4-shaped PRD\n`);
+  const rejected = invoke(["po-authority-rebind-plan"], f.deps);
+  assert.equal(rejected.status, 2);
+  assert.match(rejected.err, /PO-REBIND-NOT-STALE/);
+  assert.ok(!/PO-REBIND-APPROVAL/.test(rejected.err), rejected.err);
+});
 
 test("rebind-apply: explicit --runner claude reaches all three V4 intents", () => {
   const f = fixture("explicit-claude");

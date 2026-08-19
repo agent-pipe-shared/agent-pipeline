@@ -4720,10 +4720,7 @@ function validRebindApproval(state, prd, spec, profile) {
   const authority = approval?.poGateAuthority;
   const approvalKeys = ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"];
   const authorityKeys = ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"];
-  if (!exactObjectKeys(approval, approvalKeys) || !exactObjectKeys(authority, authorityKeys)
-    || approval.schema !== "pipeline.plan-approval.v2"
-    || isBlank(approval.approvedBy) || isBlank(approval.specBoundBy)
-    || !canonicalIso(approval.approvedAt) || !canonicalIso(approval.specBoundAt)
+  if (!exactObjectKeys(authority, authorityKeys)
     || authority.schema !== "pipeline.po-gate-authority.v2" || authority.planPath !== state.activeFeature?.planPath
     || authority.planSha256 !== prd.sha256 || authority.specPath !== spec.path
     || !SHA256_RE.test(authority.specSha256) || !profile?.ok) return null;
@@ -4731,6 +4728,19 @@ function validRebindApproval(state, prd, spec, profile) {
   if (!profileValue || authority.humanFacing !== profileValue.humanFacing
     || authority.sourceSha256 !== profileValue.sourceSha256 || authority.runtimeSha256 !== profileValue.runtimeSha256
     || authority.receiptSha256 !== profileValue.receiptSha256 || authority.repositoryFingerprint !== profileValue.repositoryFingerprint) return null;
+  if (exactObjectKeys(approval, approvalKeys) && approval.schema === "pipeline.plan-approval.v2"
+    && !isBlank(approval.approvedBy) && !isBlank(approval.specBoundBy)
+    && canonicalIso(approval.approvedAt) && canonicalIso(approval.specBoundAt)) return authority;
+  // v4-schema fallback (mirrors validPriorAuthority's dual-handling, ~line 4786):
+  // the v4 planApproval carries no specBoundBy/specBoundAt of its own -- its
+  // authority binding is validated via the submission it was approved against.
+  const submission = state?.planSubmission;
+  if (!validCurrentPlanApproval(approval) || !validPlanSubmission(submission)
+    || approval.submissionSha256 !== sha256CanonicalJson(submission)
+    || approval.profileSha256 !== submission.profileSha256
+    || submission.featureId !== state.activeFeature?.id
+    || submission.planPath !== authority.planPath || submission.planSha256 !== authority.planSha256
+    || submission.specPath !== authority.specPath || submission.specSha256 !== authority.specSha256) return null;
   return authority;
 }
 
