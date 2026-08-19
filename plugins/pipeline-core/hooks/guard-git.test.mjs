@@ -1241,6 +1241,112 @@ check(
   { projectDir: OLD_DIR, stderrIncludes: ["GG-07", "already consumed"] },
 );
 
+// ---- GG-22: a commit must not leave an earlier backlog status-flip unreconciled since -----
+// the last backlog/transitions.ndjson touch -------------------------------------------------
+//
+// Builds on the already-established real-git-repo primitives above (gitRepoFixture/gitIn/
+// commitFile, used unmodified for the SIG-* cases) rather than a second git-repo mechanism.
+// New, additive helpers used only by the GG22-* cases below -- the plain-temp-dir fixtures
+// elsewhere in this file (EMPTY_DIR and friends) are untouched.
+function gg22ItemBody(status, triage = "Demo triage text.") {
+  return `---\nid: demo-item\nstatus: ${status}\ntitle: demo backlog item\n---\n\nTriage: ${triage}\n`;
+}
+function gg22CommitItem(root, name, status, message, triage) {
+  mkdirSync(join(root, "backlog", "items"), { recursive: true });
+  writeFileSync(join(root, "backlog", "items", name), gg22ItemBody(status, triage));
+  gitIn(root)("add", "--", `backlog/items/${name}`);
+  gitIn(root)("commit", "--quiet", "-m", message);
+}
+function gg22CommitLedgerTouch(root, message = "chore: reconcile backlog ledger", seq = 1) {
+  mkdirSync(join(root, "backlog"), { recursive: true });
+  writeFileSync(join(root, "backlog", "transitions.ndjson"), `{"seq":${seq}}\n`);
+  gitIn(root)("add", "--", "backlog/transitions.ndjson");
+  gitIn(root)("commit", "--quiet", "-m", message);
+}
+function gg22StageFile(root, relPath, body) {
+  const segments = relPath.split("/").slice(0, -1);
+  if (segments.length > 0) mkdirSync(join(root, ...segments), { recursive: true });
+  writeFileSync(join(root, relPath), body);
+  gitIn(root)("add", "--", relPath);
+}
+
+// GG22-1: bootstrap/no-op -- backlog/transitions.ndjson never existed in this repo's history.
+const GG22_BOOT_DIR = gitRepoFixture("guard-test-gg22-bootstrap-");
+commitFile(GG22_BOOT_DIR, "seed.txt", "seed\n");
+gg22StageFile(GG22_BOOT_DIR, "notes.txt", "hello\n");
+check(
+  "GG22-1 allow  bootstrap: backlog/transitions.ndjson never existed in history",
+  'git commit -m "chore: add notes"',
+  ALLOW,
+  { projectDir: GG22_BOOT_DIR },
+);
+
+// GG22-2: clean -- the status flip is reconciled by a LATER ledger touch, nothing outstanding.
+const GG22_CLEAN_DIR = gitRepoFixture("guard-test-gg22-clean-");
+commitFile(GG22_CLEAN_DIR, "seed.txt", "seed\n");
+gg22CommitItem(GG22_CLEAN_DIR, "demo.md", "open", "chore: add demo item (open)");
+gg22CommitItem(GG22_CLEAN_DIR, "demo.md", "in_progress", "chore: flip demo item to in_progress");
+gg22CommitLedgerTouch(GG22_CLEAN_DIR);
+gg22StageFile(GG22_CLEAN_DIR, "src/app.mjs", "export const x = 1;\n");
+check(
+  "GG22-2 allow  clean: status flip reconciled by a later ledger touch, nothing outstanding",
+  'git commit -m "feat: add app"',
+  ALLOW,
+  { projectDir: GG22_CLEAN_DIR },
+);
+
+// GG22-3: debt -- the status flip happened AFTER the last ledger touch, disallowed path staged.
+const GG22_DEBT_DIR = gitRepoFixture("guard-test-gg22-debt-");
+commitFile(GG22_DEBT_DIR, "seed.txt", "seed\n");
+gg22CommitItem(GG22_DEBT_DIR, "demo.md", "open", "chore: add demo item (open)");
+gg22CommitLedgerTouch(GG22_DEBT_DIR);
+gg22CommitItem(GG22_DEBT_DIR, "demo.md", "in_progress", "chore: flip demo item to in_progress");
+gg22StageFile(GG22_DEBT_DIR, "src/app.mjs", "export const x = 1;\n");
+check(
+  "GG22-3 block  debt: status flip after the last ledger touch, disallowed path staged",
+  'git commit -m "feat: add app"',
+  BLOCK,
+  { projectDir: GG22_DEBT_DIR, stderrIncludes: ["GG-22", "backlog/items/demo.md", "reconcile-backlog-ledger.mjs --activate"] },
+);
+
+// GG22-4: the reconciliation commit itself -- only backlog/items/**+ledger paths staged, debt
+// exists but this IS the fixing commit and must not be blocked from happening.
+const GG22_FIX_DIR = gitRepoFixture("guard-test-gg22-fixcommit-");
+commitFile(GG22_FIX_DIR, "seed.txt", "seed\n");
+gg22CommitItem(GG22_FIX_DIR, "demo.md", "open", "chore: add demo item (open)");
+gg22CommitLedgerTouch(GG22_FIX_DIR);
+gg22CommitItem(GG22_FIX_DIR, "demo.md", "in_progress", "chore: flip demo item to in_progress");
+gg22StageFile(GG22_FIX_DIR, "backlog/transitions.ndjson", `{"seq":2}\n`);
+check(
+  "GG22-4 allow  reconciliation commit: staged commit touches only backlog/items+ledger paths",
+  'git commit -m "chore: reconcile backlog ledger"',
+  ALLOW,
+  { projectDir: GG22_FIX_DIR },
+);
+
+// GG22-5: item touched since reconcile, but its status: line did not change (Triage-only edit).
+const GG22_TRIAGE_DIR = gitRepoFixture("guard-test-gg22-triage-only-");
+commitFile(GG22_TRIAGE_DIR, "seed.txt", "seed\n");
+gg22CommitItem(GG22_TRIAGE_DIR, "demo.md", "open", "chore: add demo item (open)");
+gg22CommitLedgerTouch(GG22_TRIAGE_DIR);
+gg22CommitItem(GG22_TRIAGE_DIR, "demo.md", "open", "chore: update demo item triage prose", "Updated triage prose, no status change.");
+gg22StageFile(GG22_TRIAGE_DIR, "src/app.mjs", "export const x = 1;\n");
+check(
+  "GG22-5 allow  non-status edit: item touched since reconcile but its status: line did not change",
+  'git commit -m "feat: add app"',
+  ALLOW,
+  { projectDir: GG22_TRIAGE_DIR },
+);
+
+// GG22-6: fail-open -- a spawnSync git failure (PATH broken for the guard's own child process)
+// must never block, even against the exact same debt state that GG22-3 proves DOES block.
+check(
+  "GG22-6 allow  fail-open: a spawnSync git failure never blocks (same debt state as GG22-3)",
+  'git commit -m "feat: add app"',
+  ALLOW,
+  { projectDir: GG22_DEBT_DIR, env: { PATH: "/nonexistent-guard-test-bin" } },
+);
+
 // ---- Summary -------------------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR, ...SIGNED_ROOTS]) {
   try {
