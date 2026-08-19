@@ -1763,6 +1763,16 @@ export function planHumanGuardOverride({
  * whole point of freezing (design doc §1.1) comes back. This is the only place,
  * other than first-creation above, allowed to WRITE to the `plans` store; it
  * never touches `capabilities` and never arms anything.
+ *
+ * Revision 4 (design doc §1.4 step 6 / §1.11): re-deriving `plugin` here means
+ * the FULL step-1 treatment -- verify-then-persist, not just recompute-then-
+ * persist. The freshly-observed `pluginIdentity(pluginRoot)` is checked in
+ * full against `request.plugin` (frozen at denial, unnarrowed), failing
+ * `HGO-DRIFT` on any mismatch, BEFORE it is accepted into the refreshed
+ * baseline -- the identical check Revision 3 added to planHumanGuardOverride's
+ * first call, applied here so a plugin-code tamper occurring while an
+ * HGO-CANDIDATE-DRIFT recovery is pending cannot be laundered, unverified,
+ * into the new trusted baseline.
  */
 export function refreezeHumanGuardOverridePlan({
   rootDir,
@@ -1784,6 +1794,9 @@ export function refreezeHumanGuardOverridePlan({
   const policy = policyIdentity(repo.root, pluginRoot, request.denials);
   assertNoRequestDrift(repository, policy, request);
   const plugin = pluginIdentity(pluginRoot);
+  if (canonical(plugin) !== canonical(request.plugin)) {
+    fail("HGO-DRIFT", "override plugin identity drifted before refreeze");
+  }
   const refreshedPayload = { ...priorPlan, plugin, repository };
   delete refreshedPayload.planSha256;
   const planSha256 = sha(refreshedPayload);
