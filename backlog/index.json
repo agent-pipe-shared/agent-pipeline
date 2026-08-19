@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b7a6464c039a78f505da8daa4bf6b8f8f64cc38627b41cdf5e1378238b13c37a"
+    "transitionHead": "4ee3b8e3efaa619e53cb2e1cc832cd21bb5cb10126f001fe639882869192ffd9"
   },
   "counts": {
     "open": 51,
     "in_progress": 7,
-    "closed": 237
+    "closed": 239
   },
   "items": [
     {
@@ -272,6 +272,14 @@
       "closureRepository": "self",
       "closureCommit": "c2f8cd13dcb8a570dd44156e108629200096bc78",
       "closureEvidence": "specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md"
+    },
+    {
+      "id": "pipeline.backlog-index-json-does-not-project-tracking-or-deferred-status",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "PO, in-session, 2026-08-19, in response to the new backlog/README.md Ledger section: 'der index Jason des backlogs sollte dann aber auch Ziel sprints oder status wie pausiert/deffered kennen oder?' (the backlog's index.json should also know target sprints or a status like paused/deferred, right?)"
     },
     {
       "id": "pipeline.backlog-ledger-baseline-migration-commit-unreachable",
@@ -1257,11 +1265,15 @@
     },
     {
       "id": "pipeline.guard-dispatch-has-no-workflow-tool-awareness",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "self-observation during dispatch NVA-WFDISP-1, 2026-08-18 (briefed disclosure of a confirmed gap: guard-dispatch.mjs has zero Workflow-tool awareness)"
+      "source": "self-observation during dispatch NVA-WFDISP-1, 2026-08-18 (briefed disclosure of a confirmed gap: guard-dispatch.mjs has zero Workflow-tool awareness)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "5283618ea8f2b81cc7756c1b0d22679c15476733",
+      "closureEvidence": "plugins/pipeline-core/hooks/hooks.json"
     },
     {
       "id": "pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally",
@@ -1646,6 +1658,14 @@
       "closureRepository": "self",
       "closureCommit": "04e28774d8416904cccee5dd1fc561db4d2a86af",
       "closureEvidence": "plugins/pipeline-core/scripts/security-scan.test.mjs"
+    },
+    {
+      "id": "pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-17",
+      "source": "L-AC-01 investigation (PHX-WP-LAC01-REMAINING, 2026-08-17) plus this session's own re-check of validateLifecycleGovernanceEvent and the approve-push call site, specs/sprint-phoenix-epic/evidence/acceptance-evidence-map.mjs POINTERS['L-AC-01']. Migrated verbatim from the Phoenix checkout (agent-pipeline-share_phoenix, branch sprint_phoenix) into this Nova repository's backlog on 2026-08-19 per explicit PO instruction — see Migration note below."
     },
     {
       "id": "pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote",
@@ -3040,11 +3060,15 @@
     },
     {
       "id": "pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing."
+      "source": "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "70069a74ddcf56bdd65c91b8ee940a5a815079bf",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-git.test.mjs"
     },
     {
       "id": "pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions",
