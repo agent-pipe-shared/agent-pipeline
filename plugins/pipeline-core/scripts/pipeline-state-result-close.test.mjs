@@ -116,6 +116,7 @@ function approvedImplementation() {
   const implementation = enterPlanImplementation({
     state: approved.state,
     expectedStateSha256: sha256CanonicalJson(approved.state),
+    at: "2026-07-31T11:12:00.000Z",
   });
   assert.equal(implementation.ok, true);
   return { ...implementation.state, updatedAt: "2026-07-31T11:15:00.000Z" };
