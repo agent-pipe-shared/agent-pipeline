@@ -4,6 +4,10 @@ id: pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 70069a74ddcf56bdd65c91b8ee940a5a815079bf
+closure_evidence: plugins/pipeline-core/hooks/guard-git.test.mjs
 created: 2026-08-17
 source: "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing."
 ---

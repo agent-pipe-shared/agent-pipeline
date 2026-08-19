@@ -4,6 +4,10 @@ id: pipeline.guard-dispatch-has-no-workflow-tool-awareness
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 5283618ea8f2b81cc7756c1b0d22679c15476733
+closure_evidence: plugins/pipeline-core/hooks/hooks.json
 created: 2026-08-18
 source: "self-observation during dispatch NVA-WFDISP-1, 2026-08-18 (briefed disclosure of a confirmed gap: guard-dispatch.mjs has zero Workflow-tool awareness)"
 ---
