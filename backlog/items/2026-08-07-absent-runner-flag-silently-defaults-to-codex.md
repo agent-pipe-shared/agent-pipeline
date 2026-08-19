@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-07
 closed_at: "2026-08-19"
 closure_repository: "self"
-closure_commit: "0000000000000000000000000000000000000000"
+closure_commit: "370e014b78fe3bc54de18bb6ccd8cac861cc0fc1"
 closure_evidence: "backlog/items/2026-08-07-absent-runner-flag-silently-defaults-to-codex.md"
 source: "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md."
 due: 2026-09-06
