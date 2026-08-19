@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: "2026-08-19"
 closure_repository: self
-closure_commit: 59253fb0
+closure_commit: 59253fb0d19f336ebc59029a231dfaa4cd7a3d6e
 closure_evidence: backlog/items/2026-08-18-fresh-repo-onboarding-intake-first-transaction.md
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-0 (priority P0)"

@@ -1144,7 +1144,7 @@
       "deferred": false,
       "closedAt": "2026-08-19",
       "closureRepository": "self",
-      "closureCommit": "59253fb0",
+      "closureCommit": "59253fb0d19f336ebc59029a231dfaa4cd7a3d6e",
       "closureEvidence": "backlog/items/2026-08-18-fresh-repo-onboarding-intake-first-transaction.md"
     },
     {
@@ -1753,7 +1753,7 @@
       "deferred": false,
       "closedAt": "2026-08-19",
       "closureRepository": "self",
-      "closureCommit": "59253fb0",
+      "closureCommit": "59253fb0d19f336ebc59029a231dfaa4cd7a3d6e",
       "closureEvidence": "backlog/items/2026-08-18-intake-values-restart-resilient-immediately.md"
     },
     {
@@ -1932,7 +1932,7 @@
       "deferred": false,
       "closedAt": "2026-08-19",
       "closureRepository": "self",
-      "closureCommit": "59253fb0",
+      "closureCommit": "59253fb0d19f336ebc59029a231dfaa4cd7a3d6e",
       "closureEvidence": "backlog/items/2026-08-18-lossless-pre-restart-checkpoint.md"
     },
     {
