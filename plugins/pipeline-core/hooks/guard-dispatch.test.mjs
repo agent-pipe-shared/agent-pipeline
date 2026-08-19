@@ -105,6 +105,39 @@ check("GD9 the real goldfish-task.md template, filled, is dispatchable", {
   tool_input: { subagent_type: "pipeline-core:goldfish-implementor", prompt: filledTemplateBody("templates/prompts/goldfish-task.md") },
 }, ALLOW);
 
+// GD10/GD11 -- Workflow-tool awareness (backlog 2026-08-18-guard-dispatch-has-no-workflow-tool-awareness):
+// an `agent()` call embedded in a Workflow `script` string is checked the same way a direct
+// Task/Agent dispatch is, without needing a discrete subagent_type/prompt tool_input field.
+const WORKFLOW_SCRIPT_CONTAMINATED = `
+async function main() {
+  const result = await agent({
+    agentType: 'pipeline-core:critic',
+    prompt: \`${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x\`,
+    isolation: 'worktree',
+  });
+  return result;
+}
+`;
+check("GD10 block  a Workflow-embedded agent() call carrying a claims list", {
+  tool_name: "Workflow",
+  tool_input: { script: WORKFLOW_SCRIPT_CONTAMINATED },
+}, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-CLAIMS-LIST", "templates/prompts/critic-review.md"] });
+
+const WORKFLOW_SCRIPT_CLEAN = `
+async function main() {
+  const result = await agent({
+    agentType: 'pipeline-core:critic',
+    prompt: \`${CLEAN_CRITIC}\`,
+    isolation: 'worktree',
+  });
+  return result;
+}
+`;
+check("GD11 allow  a Workflow-embedded agent() call with a clean references-only prompt", {
+  tool_name: "Workflow",
+  tool_input: { script: WORKFLOW_SCRIPT_CLEAN },
+}, ALLOW);
+
 console.log(`\n${pass}/${pass + failures.length} cases passed.`);
 if (failures.length > 0) {
   console.log("Failures:");

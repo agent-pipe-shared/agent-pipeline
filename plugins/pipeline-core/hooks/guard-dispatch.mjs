@@ -26,10 +26,49 @@
  * structural check. It matches phrases and required fields, so it catches the accident —
  * which is the failure that actually happened — and not a dispatcher who rewords the same
  * steer. It is not a substitute for reading the template.
+ *
+ * WORKFLOW-TOOL AWARENESS. A direct Agent-tool dispatch arrives as a discrete `tool_input`
+ * with `subagent_type`/`prompt`. A Workflow-tool `agent()`/`parallel()`/`pipeline()` call
+ * carries the same 6-field briefing shape, but embedded inside a `script` string parameter
+ * rather than a discrete field — this is the gap backlog item
+ * 2026-08-18-guard-dispatch-has-no-workflow-tool-awareness.md disclosed after NVA-WFDISP-1.
+ * `extractWorkflowDispatches` recovers the common case: a static `agentType`/`prompt` pair
+ * written as adjacent object-literal fields, prompt as a template/single/double-quoted string
+ * literal with no `${...}` interpolation. Anything built programmatically (concatenation, a
+ * helper function, interpolation) is NOT statically resolvable here and is deliberately left
+ * alone (fail-open, same posture as the rest of this file) rather than guessed at — a false
+ * positive on a script that never dispatches a Goldfish/Critic role is worse than a miss.
  */
 import { readFileSync } from "node:fs";
 
 import { dispatchFindings } from "../lib/dispatch-policy.mjs";
+
+// Recover `{ agentType: '...', prompt: `...` }`-shaped dispatches embedded in a Workflow
+// script body. Regex-based, not a JS parser: it only claims the statically-obvious case.
+function extractWorkflowDispatches(script) {
+  const found = [];
+  const agentTypeRe = /agentType\s*:\s*(['"])((?:(?!\1)[\s\S])*?)\1/g;
+  let m;
+  while ((m = agentTypeRe.exec(script)) !== null) {
+    const agentType = m[2];
+    const windowEnd = Math.min(script.length, agentTypeRe.lastIndex + 4000);
+    const window = script.slice(agentTypeRe.lastIndex, windowEnd);
+    const promptOpen = /prompt\s*:\s*([`'"])/.exec(window);
+    if (!promptOpen) continue; // no prompt field nearby -> not a dispatch call, skip
+    const quote = promptOpen[1];
+    let i = promptOpen.index + promptOpen[0].length;
+    let body = null;
+    while (i < window.length) {
+      if (window[i] === "\\") { i += 2; continue; }
+      if (window[i] === quote) { body = window.slice(promptOpen.index + promptOpen[0].length, i); break; }
+      i += 1;
+    }
+    if (body === null) continue; // unterminated within window -> cannot resolve, fail open
+    if (body.includes("${")) continue; // built dynamically -> not statically verifiable, fail open
+    found.push({ subagentType: agentType, prompt: body });
+  }
+  return found;
+}
 
 let input;
 try {
@@ -46,11 +85,25 @@ if (!toolInput || typeof toolInput !== "object") process.exit(0);
 // the failure class this repository already paid for with NotebookEdit.
 const subagentType = toolInput.subagent_type ?? toolInput.subagentType ?? "";
 const prompt = toolInput.prompt ?? "";
-if (typeof subagentType !== "string" || subagentType === "" || typeof prompt !== "string") process.exit(0);
 
-const { role, findings } = dispatchFindings({ subagentType, prompt });
-if (findings.length === 0) process.exit(0);
+let dispatches;
+if (typeof subagentType === "string" && subagentType !== "" && typeof prompt === "string") {
+  dispatches = [{ subagentType, prompt }];
+} else if (typeof toolInput.script === "string" && toolInput.script !== "") {
+  // Workflow-tool call: no discrete subagent_type/prompt field, but the script may carry
+  // one or more embedded agent()/parallel()/pipeline() dispatches worth checking the same way.
+  dispatches = extractWorkflowDispatches(toolInput.script);
+  if (dispatches.length === 0) process.exit(0);
+} else {
+  process.exit(0);
+}
 
+const blocked = dispatches
+  .map((d) => dispatchFindings(d))
+  .filter((r) => r.findings.length > 0);
+if (blocked.length === 0) process.exit(0);
+
+const { role, findings } = blocked[0];
 const template = role === "critic" ? "templates/prompts/critic-review.md" : "templates/prompts/goldfish-task.md";
 process.stderr.write([
   `BLOCKED (guard-dispatch, plugin pipeline-core): this ${role} dispatch was not built from ${template}.`,
