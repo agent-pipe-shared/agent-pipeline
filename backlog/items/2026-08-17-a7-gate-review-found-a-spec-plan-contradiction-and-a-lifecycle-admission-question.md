@@ -84,3 +84,14 @@ suggests) — not done this block.
 - **Assignment (if accepted):** F3 — next PO touchpoint. F4 — a dedicated, focused read of the
   plan-sha256 provenance chain, owner `pipeline`, due `2026-08-30`.
 - **Date:** 2026-08-17
+
+### F3 resolved, PO-confirmed 2026-08-19
+
+F3's reconciliation was already implemented earlier this session (commit
+`4a227a79`, dispatch `NVA-W3-1`, PO decision 2026-08-18 #1 direction D):
+`specs/sprint-nova-epic/acceptance.md`'s NVA-G15 row now states the
+any-well-formed-key/attribution-not-restriction posture; `lifecycle.json`'s
+digest was re-hashed to match. PO explicitly confirmed 2026-08-19 that this
+reconciliation is correct and complete — F3 is resolved. **F4 remains
+genuinely open** (own due date 2026-08-30, does not block the Nova A 0.6.0
+candidate) — item stays `open` for F4 only.
