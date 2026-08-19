@@ -47,6 +47,16 @@ something to do here without review.
 
 ## Entries
 
+## Candidate 4e9db9a7ff8b16026c435ebe125cb96374ee9e21 — 2026-08-19, range 85b718cf..4e9db9a7, checkpoint 69 (push confirmation) + gitleaks-item closure bookkeeping
+
+- ADR-0012: checked, no change needed.
+
+  Two docs-only commits on top of the already-pushed `85b718cf`: checkpoint
+  69 appended to `docs/state.md` (confirms the push landed, enumerates the
+  9 remaining open backlog items for the next session) and a backlog-item
+  status correction (unrelated to ADR-0012's own governed artifact except
+  that `docs/state.md` narrates it). Purely additive narrative.
+
 ## Candidate ebd614cec847abd10da166c46d47748466650cdf — 2026-08-19, range 8a92d377..ebd614ce, checkpoints 36-68: the whole unpushed marathon session since the last push (513 commits) — first Layer 1b reconciliation run since checkpoint 35
 
 Also fixed on the way: ADR-0066's `Governs:` line was wrapped across 3 markdown
