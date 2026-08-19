@@ -109,7 +109,7 @@
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-ask-before-install-duty-ignored-live | open | defect | pipeline | 2026-08-19 | — |
-| pipeline.greenfield-onboarding-writes-mixed-authority-tiers | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.greenfield-onboarding-writes-mixed-authority-tiers | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.greenfield-seeded-with-private-overlay-calibration | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit | closed | idea | pipeline | 2026-08-17 | — |
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | closed | defect | pipeline | 2026-08-07 | — |
@@ -134,7 +134,7 @@
 | pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | open | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | open | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.hgofix-1-separatornormalized-has-no-injection-seam-and-line-792-has-no-test | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.host-managed-codex-apply-may-fail-its-own-target-boundary-invariant | closed | defect | pipeline | 2026-08-12 | — |
@@ -193,7 +193,7 @@
 | pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.pipeline-state-scripts-test-file-never-runs-in-full-verify | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.plan-partial-authority-guard-allowlist-does-not-admit-its-own-profile-source-flags | closed | defect | pipeline | 2026-08-17 | — |
@@ -244,7 +244,7 @@
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.self-healing-local-cleanup-recovery | open | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.sentinel-epic-acceptance-matrix-archive-drift | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -276,7 +276,7 @@
 | pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions | closed | workflow-improvement | pipeline | 2026-08-17 | — |
-| pipeline.two-manifest-literals-bypass-the-single-seed-owner | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.two-manifest-literals-bypass-the-single-seed-owner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.two-minor-happy-path-retries-in-the-final-codex-run | open | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
@@ -303,6 +303,6 @@
 
 ## Counts
 
-- open: 66
+- open: 61
 - in_progress: 7
-- closed: 222
+- closed: 227

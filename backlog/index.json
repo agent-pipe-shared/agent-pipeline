@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a48805b6d2dd18877b7b09a337fa35144998302c80a89be1f9feb6fc4dd58eb1"
+    "transitionHead": "0f12a90c9f2c4d3e9b64245f768485cdaf06d9bb71e0c1c5cdb2584607157bf2"
   },
   "counts": {
-    "open": 66,
+    "open": 61,
     "in_progress": 7,
-    "closed": 222
+    "closed": 227
   },
   "items": [
     {
@@ -1169,11 +1169,15 @@
     },
     {
       "id": "pipeline.greenfield-onboarding-writes-mixed-authority-tiers",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO, live greenfield onboarding of an empty repository with the Claude runner, 2026-08-07: 'da liegen trotz frischem repo wieder dateien auf die sich die pipeline bezieht im .claude ordner und nicht in .arbetheon'."
+      "source": "PO, live greenfield onboarding of an empty repository with the Claude runner, 2026-08-07: 'da liegen trotz frischem repo wieder dateien auf die sich die pipeline bezieht im .claude ordner und nicht in .arbetheon'.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "77aef463aa4a80d1ad153f901873630747ee21f0",
+      "closureEvidence": "backlog/items/2026-08-07-greenfield-onboarding-writes-mixed-authority-tiers.md"
     },
     {
       "id": "pipeline.greenfield-seeded-with-private-overlay-calibration",
@@ -1433,11 +1437,15 @@
     },
     {
       "id": "pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "PO, 2026-08-18, live during two TP-3 human-guard-override ceremonies run this session (registering worktree-create-tests / session-cleanup-owner-nonce-tests in verify.mjs). The PO ran all four CLI steps (plan handed to the agent; prepare-authorization, emit-signature-digest, sign-intent, authorize-by-signature run by the PO) and objected explicitly: 'wiederspricht klar meinen design vorgaben nur so wenig PO gates wie wirklich nötig und nur der teil mit dem externen key ist der echte schutz'."
+      "source": "PO, 2026-08-18, live during two TP-3 human-guard-override ceremonies run this session (registering worktree-create-tests / session-cleanup-owner-nonce-tests in verify.mjs). The PO ran all four CLI steps (plan handed to the agent; prepare-authorization, emit-signature-digest, sign-intent, authorize-by-signature run by the PO) and objected explicitly: 'wiederspricht klar meinen design vorgaben nur so wenig PO gates wie wirklich nötig und nur der teil mit dem externen key ist der echte schutz'.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "77aef463aa4a80d1ad153f901873630747ee21f0",
+      "closureEvidence": "backlog/items/2026-08-18-hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs.md"
     },
     {
       "id": "pipeline.hgo-signed-admission-had-the-same-v3-trustanchor-gap-as-gmw",
@@ -2082,11 +2090,15 @@
     },
     {
       "id": "pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Elephant, 2026-08-18, live during the OT09 (guard-testpath-override.test.mjs line 213) repair ceremony for the Phoenix reconcile-approval port regression (see backlog/items/2026-08-18-critical-human-proof-policy-lacks-the-reconcile-approval-generalization.md and docs/state.md's 2026-08-18 entry). A full `pipeline-author-repair` signature ceremony was walked end to end with the PO: plan, prepare-authorization, emit-signature-digest, PO sign-intent (succeeded), authorize-by-signature (succeeded, capability armed, status: armed, consumedAt: null, correct authorSourceRoot recorded). Retrying the byte-identical original Edit twice against a confirmed-clean working tree still returned the exact same TP-7/author-repair-required denial as if the capability had never been armed. The capability expired unused (DEFAULT_TTL_MS 30 min) before a root cause was found; OT09 is still red as of this entry."
+      "source": "Elephant, 2026-08-18, live during the OT09 (guard-testpath-override.test.mjs line 213) repair ceremony for the Phoenix reconcile-approval port regression (see backlog/items/2026-08-18-critical-human-proof-policy-lacks-the-reconcile-approval-generalization.md and docs/state.md's 2026-08-18 entry). A full `pipeline-author-repair` signature ceremony was walked end to end with the PO: plan, prepare-authorization, emit-signature-digest, PO sign-intent (succeeded), authorize-by-signature (succeeded, capability armed, status: armed, consumedAt: null, correct authorSourceRoot recorded). Retrying the byte-identical original Edit twice against a confirmed-clean working tree still returned the exact same TP-7/author-repair-required denial as if the capability had never been armed. The capability expired unused (DEFAULT_TTL_MS 30 min) before a root cause was found; OT09 is still red as of this entry.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "77aef463aa4a80d1ad153f901873630747ee21f0",
+      "closureEvidence": "backlog/items/2026-08-18-pipeline-author-repair-signature-mode-never-actually-admits-the-edit.md"
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
@@ -2669,11 +2681,15 @@
     },
     {
       "id": "pipeline.self-healing-local-cleanup-recovery",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-5 (priority P1)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-5 (priority P1)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "77aef463aa4a80d1ad153f901873630747ee21f0",
+      "closureEvidence": "backlog/items/2026-08-18-self-healing-local-cleanup-recovery.md"
     },
     {
       "id": "pipeline.sentinel-epic-acceptance-matrix-archive-drift",
@@ -3008,11 +3024,15 @@
     },
     {
       "id": "pipeline.two-manifest-literals-bypass-the-single-seed-owner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Self-reported by the implementing dispatch of commit 7a99a18 and independently confirmed as finding F7 of the second Critic round on the 2026-08-08 hardening block."
+      "source": "Self-reported by the implementing dispatch of commit 7a99a18 and independently confirmed as finding F7 of the second Critic round on the 2026-08-08 hardening block.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "77aef463aa4a80d1ad153f901873630747ee21f0",
+      "closureEvidence": "backlog/items/2026-08-08-two-manifest-literals-still-bypass-the-single-seed-owner.md"
     },
     {
       "id": "pipeline.two-minor-happy-path-retries-in-the-final-codex-run",
