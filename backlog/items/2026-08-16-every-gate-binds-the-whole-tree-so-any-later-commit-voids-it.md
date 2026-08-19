@@ -89,3 +89,22 @@ one small non-spawning suite) is dispatched and in flight as
 not started. This item still stays open until (b) and (c) both land and this
 gate's own binding is demonstrably cheap in the general case, not just for
 one pilot suite.
+
+### Progress, 2026-08-19
+
+Candidate (b) confirmed landed (trailer `NVA-ADR65B-1`, several commits).
+`NVA-BL-ADR65C-1` (goldfish-implementor, worktree-isolated) started
+candidate (c): `recovery-preview-attestation-tests` promoted to a Tier-B
+declared-input entry (the suite's module has zero imports of its own, so
+its declared two files are provably its entire real input; no
+`--allow-fs-write` needed). Commit `79a0aaba` (cherry-picked from the
+dispatch's worktree, commit `7e067746`). 18/18 `verify-journal.test.mjs`,
+13/13 `recovery-preview-attestation.test.mjs`.
+
+**Still not "the general case"** — one more suite narrowed, ~264 remain
+Tier A. The dispatch scanned and rejected 3 further candidates as not a
+clean fit for the current pattern: `route-receipt-tests` (multi-file/JSON-config
+dependency chain, needs its own declaration shape design) and
+`afk-ledger-tests`/`state-budget-tests` (both write outside the repo tree
+via `os.tmpdir()`, not a fit for the current scratch-clean Tier-B model
+without a `--allow-fs-write` design extension). Item stays `open`.
