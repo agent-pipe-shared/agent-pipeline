@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.backlog-closure-metadata-missing-across-historical-items
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
 source: "Found by PHX-WP-BACKLOG-OBSGOV-MISC-TRIAGE while diagnosing backlog-state-check and backlog-ledger-reconciliation-tests failures from a full clean-candidate Verify run, 2026-08-18/19."
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "a2a2bcc715f21ed79541064e9152f865b253fb6f"
+closure_evidence: "backlog/items/2026-08-19-backlog-closure-metadata-missing-across-historical-items.md"
 ---
 
 # Dozens of closed backlog items lack required closure metadata, dating back to 2026-07-27
@@ -100,3 +104,23 @@ now — for each of the 10 contradiction items, should `status` revert to what
 their own Triage text says, or should the Triage text be reconciled to
 confirm `closed` (with real closure metadata then added)? This is a much
 smaller, well-bounded decision than the original "unknown historical scope."
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved. The "sharper remaining scope" question above
+  was itself answered by `PHX-WP-BACKLOG-CONTRADICTION-REINVESTIGATE` (commit
+  `a2a2bcc7`): all 10 "contradiction" items were re-investigated end-to-end
+  and every one turned out to have a genuine, later, superseding closure the
+  prior pass had missed (not a real contradiction needing a PO call) — all 10
+  now carry real, verified closure metadata. The 1 malformed-evidence-path item
+  was separately fixed (`f86b9cbd`). `reconcile-backlog-ledger.mjs --activate`
+  then ran clean, recording 177 transitions across 94 items with zero blocking
+  findings. The one genuinely unresolved piece this investigation surfaced —
+  ledger event 41's stale `itemSha256` on a genesis event, which has no
+  supported amendment mechanism — is out of THIS item's original scope (a
+  missing-metadata problem, not a hash-chain-integrity one) and is tracked in
+  its own item, `2026-08-19-ledger-genesis-event-hash-rebind-has-no-amendment-mechanism.md`.
+- **Rationale:** Every symptom this item was filed against (`backlog-state-check`
+  exit 2, `backlog-ledger-reconciliation-tests` failures from missing closure
+  metadata) is resolved and verified, not merely narrowed.
+- **Date:** 2026-08-19
