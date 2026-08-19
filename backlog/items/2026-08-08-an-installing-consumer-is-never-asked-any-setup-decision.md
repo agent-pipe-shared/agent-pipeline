@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.installing-consumer-is-never-asked-any-setup-decision
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-15
 source: "PO, 2026-08-08, preparing the tester mail: 'wenn ich den Leuten sage, soundso installiert ihr das Plugin, dann führen Sie aber ja nie das Setup aus. Das heißt, an den Entscheidungen bezüglich Scratchpad beziehungsweise Keyordner, welche Runner, auch PO Gate, welches ist Blocking, Chatfreigabe versus Signature -- da kommen Sie nirgendwo dran vorbei. Wann und wie entscheidet man das, wenn man installiert?'"
@@ -260,3 +260,22 @@ path. Not dispatched; flagging rather than guessing.
 **Status:** stays `open` for the Direction 3 question above and the
 Nightwing-deferred full config-UI treatment; the item's one same-release,
 non-deferred obligation is done.
+
+## Closure, 2026-08-19
+
+`NVA-BL-SETUPCHK-1` (goldfish-implementor, worktree-isolated) resolved
+Direction 3's open question: reachability confirmed NOT possible for a
+marketplace-installed consumer (only `plugins/pipeline-core` ships via
+the marketplace, `setup.mjs` is not part of that tree, and no shipped
+consumer library ever writes the unconfigured marker `default-markers`
+keys on into a consumer's onboarding-generated config). The message
+stays correct for the audience it IS reachable by (a source-repo
+colleague with `setup.mjs` available). Documented in `resolvingSteps()`
+and proven with a new regression test asserting an onboarding-shaped
+config keeps the hook silent. Commit `10d0f677` (cherry-picked from the
+dispatch's worktree, commit `98b9d7c8`).
+
+Direction 3 closed. Remaining scope (the full config-UI treatment) is
+explicitly Nightwing-deferred, not this item's blocker — **item closed**,
+consistent with the item's own "same-release obligation is done" framing
+above.
