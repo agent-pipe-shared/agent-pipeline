@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 1b6e6a606ffcd6f32c3993b73be1110d3eb299af
+closure_evidence: backlog/items/2026-08-07-technical-lock-for-pipeline-consent-before-onboarding-complete.md
 created: 2026-08-07
 source: "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
 due: 2026-09-06
@@ -143,3 +147,13 @@ Deferred to Sprint Alfred ("Agent-first architecture, mechanical governance,
 measurable rigor, and control integrity" — ADR-0043's 2026-08-17
 amendment), matching this item's own 2026-08-12 Assignment note ("not
 urgent — one historical incident, no repeat observed").
+
+### Closure, 2026-08-19
+
+PO decision: close, final. Matches this item's own investigation finding
+(NVA-BL-83, 2026-08-12): a real, confirmed, PARTIAL gap (the window between
+PO consent and the first onboarding governance-marker write has zero
+technical barrier today) — deferred to Sprint Alfred on 2026-08-17 as "not
+urgent, one historical incident, no repeat observed." PO, 2026-08-19: close
+as not acute; if it recurs, file a fresh item with the new incident's
+evidence rather than reopening this one.

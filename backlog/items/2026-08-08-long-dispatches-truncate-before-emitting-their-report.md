@@ -471,3 +471,21 @@ thought (not a mechanical follow-on to the closing-allowance fix).
   precisely, and sits alongside the other dispatch-reliability items already
   assigned there.
 - **Date:** 2026-08-18
+
+### Pull-forward decision, 2026-08-19
+
+PO decision: pull the two still-open gaps forward into the Nova A final
+wave, explicitly overriding the 2026-08-18 Alfred assignment above for
+this item specifically (PO: "dann aufbereiten und in die finale welle
+planen was sinnvoll ist rest schließen"). This session directly
+experienced and worked around the exact ~50-tool-call termination cliff
+this item documents (the step-6 onboarding-coordinator dispatch,
+`NVA-W5-COORD-STEP6-1`, hit it 5 separate times) — the shipped
+closing-allowance mechanism is real and helped, but did not eliminate
+truncation, matching this item's own "durability changed the cost, not
+the rate" finding. Scoped for the final wave, exactly the two gaps named
+above, nothing broader: (1) a detectable signal (or a ruled-out absence of
+one) for the announced-then-abandoned-pause failure mode; (2) whether the
+nested `run_in_background` non-resumption pattern recurs, and if so a
+scoped fix. Not a re-litigation of the shipped closing-allowance mechanism,
+which stays as-is.

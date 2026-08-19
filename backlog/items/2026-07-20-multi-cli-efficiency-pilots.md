@@ -3,7 +3,11 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.multi-cli-efficiency-pilots"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "1b6e6a606ffcd6f32c3993b73be1110d3eb299af"
+closure_evidence: "backlog/items/2026-07-20-multi-cli-efficiency-pilots.md"
 created: "2026-07-20"
 source: "Public transfer completeness review of post-v0.3 Multi-CLI design and measurement work"
 due: "2026-09-08"
@@ -52,6 +56,21 @@ condition, and rollback before execution. Efficiency claims require observed
 route and cost evidence from the bounded pilot; estimates or receipt reuse
 alone are insufficient. The pilots must not weaken independent Critic review,
 candidate binding, PO gates, security gates, or publication admission.
+
+## Closure, 2026-08-19 — supersedes the 2026-08-18 "go" decision
+
+PO decision: close, topic discarded. This reverses the "PO decision,
+2026-08-18 (20-item decision batch) — go" section below, which authorized
+both pilots to run for real. PO, 2026-08-19: "Das haben wir doch bewusst um
+entschieden und den elephant auf das workflow-tool eingestellt! das item
+daher komplett schließen - thema ist verworfen." The Workflow tool (adopted
+and in active use this session for exactly the kind of multi-package/
+multi-dispatch batching these pilots would have measured) now serves the
+efficiency goal directly; the bespoke wave-review/remote-mini-train pilot
+mechanism this item designed is no longer needed. The evidence-
+normalization-layer follow-up this item's own Triage split out (due
+2026-09-22, unassigned) is discarded along with it — not carried forward as
+a separate item.
 
 ## Ownership and expiry
 

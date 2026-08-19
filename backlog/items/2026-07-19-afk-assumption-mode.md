@@ -56,3 +56,20 @@ checker, `evidence-bound-review-retry-economics`) for one combined
 signed HGO ceremony rather than three separate ones. Item stays
 `in_progress` for that registration plus the release-administration
 half above.
+
+### Progress, 2026-08-19 (later) — suite-registration half now landed
+
+The combined TP-3 ceremony this note anticipated landed (commit
+`1083229b`, "register the live state-numeric-claims check, afk-activation
+and plugin-scoped codex-sandbox-preflight suites") — `afk-activation-tests`
+is now live in `harness/scripts/verify.mjs`, confirmed present. PO,
+2026-08-19: "register suites + close" — the registration half is done, but
+this item's own 2026-08-18 Triage explicitly split the remaining gate into
+two independent halves and bound the second (final PO disposition and
+candidate evidence) to the actual Nova A candidate freeze, "same as
+`2026-07-19-session-keep-awake.md`" — which the PO separately confirmed
+this same session stays open, grouped into the final wave. Keeping this
+item `in_progress` rather than closing now, to honor that already-recorded
+two-half design rather than overriding it based on an instruction that
+predates knowing the registration half had separately landed; it closes
+alongside `session-keep-awake` at the final candidate freeze.

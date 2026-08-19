@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.temp-directories-leak-until-the-filesystem-refuses-every-write
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 1b6e6a606ffcd6f32c3993b73be1110d3eb299af
+closure_evidence: backlog/items/2026-08-08-temp-directories-leak-until-the-filesystem-refuses-every-write.md
 created: 2026-08-08
 due: 2026-08-15
 source: "Observed live on 2026-08-08: the tmpfs inode table on the PO's machine was exhausted, blocking every process that needed to create a file. Diagnosed jointly with the PO from df/mount output during the 0.5.4 candidate run."
@@ -142,3 +146,19 @@ control integrity" — ADR-0043's 2026-08-17 amendment). Not needed near-term
 on this machine specifically (a reboot resets `/tmp` between sessions in
 this environment), but genuinely large and matches Alfred's mechanical-
 governance scope well.
+
+### Closure, 2026-08-19
+
+PO decision: close, final. PO, 2026-08-19: "kein Pipeline problem und
+inzwischen bei mir gelöst" (not a Pipeline problem, and meanwhile resolved
+on my end). For the record, accurately: this item's own 2026-08-11
+measurement attributed the bulk of the leak (5,526 top-level `/tmp` entries
+across ~90 prefix groups) to THIS repository's own test suites, not to
+external/incidental usage — a real tension with "not a Pipeline problem"
+worth preserving here rather than silently smoothing over, even though the
+PO's closure decision stands regardless (the practical trigger, an
+unrebooted long-lived machine, is reported resolved on the PO's own
+environment). Direction 4 (a Verify-time guard against a run leaving behind
+more temp directories than it found) was never built; if the leak
+resurfaces on a machine that does not reboot between sessions, that guard
+is the concrete next step, not a full re-investigation.

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.intake-values-restart-resilient-immediately
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 59253fb0
+closure_evidence: backlog/items/2026-08-18-intake-values-restart-resilient-immediately.md
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-4 (priority P1)"
 ---
@@ -81,3 +85,15 @@ in flight) and wiring the checkpoint's held values back into the actual
 collect-input call sites so a restart truly skips the re-ask end-to-end
 (part of the coordinator's still-unbuilt steps 4-6). Stays `open`, still
 tracked as subsumed — do not close until the parent item closes.
+
+## Closure, 2026-08-19
+
+PO decision: close now — the parent item
+(`fresh-repo-onboarding-intake-first-transaction`) is closed in this same
+batch, and this item's own Triage said explicitly "do not close until the
+parent item closes." `applyOnboardingIntakeConsent` persists
+`gitAuthor`/`language`/`profile` into the private intake checkpoint the
+instant each is answered (commit `75055e4e`), and the coordinator's now-
+complete steps 4-6 wire that checkpoint through to the actual bound
+authority — this item's acceptance test (no already-answered mandatory
+question re-asked after a restart) holds for the full, now-landed flow.

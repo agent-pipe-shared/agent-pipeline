@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 1b6e6a606ffcd6f32c3993b73be1110d3eb299af
+closure_evidence: backlog/items/2026-08-16-nothing-connects-an-acceptance-criterion-to-a-check-that-runs.md
 created: 2026-08-16
 source: "PO, 2026-08-16: 'Wichtiger ist aber, dass die pipeline auch im user projekt dafür sorgt das die richtigen tests entstehen und sie anwendet.' Raised while discussing why a hosted project's verify gate can be satisfied without checking anything."
 ---
@@ -75,3 +79,14 @@ patch) stands unchanged.
 - **Assignment (if accepted):** next available Alfred slot — Spec/ADR
   authorship on the check-identifier chain, as already scoped above.
 - **Date:** 2026-08-18
+
+### Closure, 2026-08-19
+
+PO decision: close, final. PO's message: "das passiert automatisch vor dem
+schließen von issues als finale prüfung und kann zu" (message was cut off
+mid-sentence in the source turn — recorded verbatim rather than guessed at;
+worth asking the PO if there was more to say here). For the record,
+accurately: this item's own Triage describes accepted-but-deferred
+Spec/ADR-weight design work (Sprint Alfred scope, 2026-08-18), not an
+existing automatic pre-close check — closing per the PO's clear decision
+regardless.

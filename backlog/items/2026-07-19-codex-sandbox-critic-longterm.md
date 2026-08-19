@@ -3,7 +3,11 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.codex-sandbox-critic-longterm"
 type: "defect"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "1b6e6a606ffcd6f32c3993b73be1110d3eb299af"
+closure_evidence: "backlog/items/2026-07-19-codex-sandbox-critic-longterm.md"
 created: "2026-07-19"
 source: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md"
 tracking: "Sentinel recovery baseline; no completion claim."
@@ -170,3 +174,22 @@ them under "isolation" and "shadow", which the PRD's "intermediate
 lane" framing does not name as one of the four required dimensions —
 included here only so a future session doesn't need to re-discover
 that they exist.
+
+## Closure, 2026-08-19
+
+PO decision: close entirely. `NVA-BL-CSANDBOX-2` (landed earlier this
+session, commit `5c61f96c`) closed the Runtime dimension's integration-path
+gap this item's own 2026-08-19 "Progress" section had left open — the
+intermediate lane's own remaining local ACs (host/select/runtime/preflight,
+all four dimensions) are now fully covered. While proving a real
+passing-outcome case for the Runtime dimension, that same dispatch found a
+genuine, 100%-reproducible production defect unrelated to this item's own
+scope (`deniedRoots`/`/proc/self` collision in the intermediate readback
+lane) — filed separately as
+`codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set`,
+not folded into this closure. The strong lane's own closure route stays
+externally gated (an upstream selected-sandbox capability, GitHub Issue #29)
+per this item's existing 2026-08-18 Triage — not dispatchable by any
+goldfish task, not our task to pursue further. PO, 2026-08-19: "Item
+komplett schließen - das kommt dann irgendwann von alleine und keine
+Aufgabe für uns!"

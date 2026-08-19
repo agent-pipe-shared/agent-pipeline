@@ -324,3 +324,17 @@ remain assigned wherever NVA-B61-7 lands, unchanged.
   `codex-pretool-guard.mjs`/`onboarding-continuity.mjs` outside a dedicated
   authorized pass).
 - **Date:** 2026-08-17
+
+### Scheduling decision, 2026-08-19
+
+PO decision: schedule directly into the Nova A final wave. `NVA-B61-7`
+itself has still not landed — checked live via `git log --grep="B61-7"`,
+which shows only two docs-only commits (filing this item, the 2026-08-17
+re-verification note), no implementation — so Directions 1-3 need to be
+built directly by whichever dispatch picks this up, not merely unblocked
+by a dependency landing elsewhere. This item is current-scope, not
+sprint-deferred (confirmed above, 2026-08-17), so pulling it into the
+final wave does not cross a sprint boundary. Per the item's own governance
+(GF-059 F1/F3), the implementing dispatch must stay inside a dedicated,
+explicitly authorized pass for `codex-pretool-guard.mjs`/
+`onboarding-continuity.mjs` internals — not a freehand scope expansion.

@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 1b6e6a606ffcd6f32c3993b73be1110d3eb299af
+closure_evidence: backlog/items/2026-08-17-no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing.md
 created: 2026-08-17
 source: "Live, same-session incident: the Elephant dispatched NVA-VENDORSYNC-1 to goldfish-deep with an explicit `model: opus`/`max` override and a stated MP-05/MP-07 rationale (architecture/guardrail-adjacent). goldfish-deep's actual configured default is sonnet at effort xhigh (plugins/pipeline-core/agents/goldfish-deep.md frontmatter, matching pipeline.user.yaml's models.implement.claude routing). The PO caught the deviation live in chat and asked how to stop this recurring silently across sessions; not investigated or fixed here, filed for future hardening per the PO's own framing (\"das braucht auch später eine Härtung\")."
 ---
@@ -111,3 +115,15 @@ not a quick patch). Directions worth weighing by whoever picks this up:
   precisely; the three numbered directions in this item's own Proposal
   section are the design's starting point.
 - **Date:** 2026-08-18
+
+### Closure, 2026-08-19
+
+PO decision: close, not pursued further in this backlog. For the record,
+accurately: this item's own Triage never claimed the gap was "proven not
+implementable" — it is a real, confirmed guard gap (`guard-dispatch.mjs`
+checks that a model is NAMED, never that it matches configured routing),
+deferred to Sprint Alfred on 2026-08-18 as guardrail-tier design work,
+never attempted. The PO's decision is simply to close it out of this
+backlog now rather than carry it to Alfred formally; if the underlying
+routing-deviation risk resurfaces in practice, it can be re-opened fresh
+with whatever new evidence prompted it.

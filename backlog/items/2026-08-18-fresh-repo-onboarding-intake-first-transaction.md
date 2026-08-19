@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.fresh-repo-onboarding-intake-first-transaction
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 59253fb0
+closure_evidence: backlog/items/2026-08-18-fresh-repo-onboarding-intake-first-transaction.md
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-0 (priority P0)"
 ---
@@ -214,3 +218,24 @@ named verify path (`project-onboarding-v3.test.mjs`) does not exist —
 nearest file is `project-onboarding-v3-argv-closure.test.mjs`; and the
 briefing's baseline test counts (193/193, 128/128) were stale — actual
 current baselines are 210/210 and 119/119.
+
+## Closure, 2026-08-19
+
+PO decision: close now. The full atomic bootstrap-from-intake coordinator
+this item's Triage chose (Option 1, the item's own 6-step Proposal) is now
+completely landed: steps 1-3 (commit `75055e4e`), step 4 (commit
+`0080116b`), step 5 (5 commits, `e83b895b`/`32bfe508`/`ac1cf0d6`/
+`d08ab73e`/`20a70ea4`), and step 6 (commits `10e1b6a0`/`59253fb0`) — a
+genuinely fresh repository now routes `intake-required` →
+`intake-design-questions-required` → `bootstrap-binding-required` instead
+of the old `kickoff-required` path, with a `recognisedKickoff()`-mid-kickoff
+repo and an already-`ready` repo both proven unaffected by regression
+tests. Each step has its own happy-path/precondition/idempotency/
+crash-injection/CAS-drift test coverage. One honest gap, noted rather than
+silently closed over: no single coded test exercises the full 6-step chain
+end-to-end in one run (empty repo → material paste → restart → bound
+authority, exactly as this item's own acceptance test describes) —
+coverage is complete but piecewise, per-step, not one round-trip test. If a
+future greenfield happy-path run surfaces a seam between steps that
+per-step tests could not catch, that is the concrete follow-up, not a
+re-litigation of this closure.

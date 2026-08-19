@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.runner-neutrality-before-third-runner
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 1b6e6a606ffcd6f32c3993b73be1110d3eb299af
+closure_evidence: backlog/items/2026-08-08-runner-neutrality-must-hold-before-a-third-runner-lands.md
 created: 2026-08-08
 due: 2026-12-31
 source: "PO question of 2026-08-08 during the greenfield hardening block: whether Antigravity/AGY support is tracked anywhere, given that it will require runner neutrality to hold far better than it does today."
@@ -135,3 +139,15 @@ this item: directions 1-3 should not be assumed safely deferred until
 Alfred merely because AGY is "later" — AGY could start at any point ahead
 of Alfred. Not escalated to an active dispatch this session (no AGY start
 date given); flag again if AGY work is scheduled before Alfred lands.
+
+### Closure, 2026-08-19
+
+PO decision: close/discard here. AGY tracking and scheduling stays on
+GitHub Issue #69 (linked above), handled by the PO through a separate
+channel outside this backlog — not this item's job to carry forward. PO,
+2026-08-19: "Das item hier komplett schließen und verwerfen das mache ich
+separat über ein schon vorhandenes issue." The runner-neutrality
+precondition Directions 1-3 (measuring the class, loud defaults, a
+third-runner readiness criterion) are not implemented and are not being
+picked up elsewhere by this closure — if AGY work starts before they
+exist, this gap will need re-raising as a fresh item at that time.

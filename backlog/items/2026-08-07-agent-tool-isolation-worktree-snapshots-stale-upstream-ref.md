@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 1b6e6a606ffcd6f32c3993b73be1110d3eb299af
+closure_evidence: backlog/items/2026-08-07-agent-tool-isolation-worktree-snapshots-stale-upstream-ref.md
 created: 2026-08-07
 source: "NOVA-GMW-1 first dispatch attempt, 2026-08-07 -- Agent tool isolation:worktree."
 due: 2026-09-06
@@ -92,3 +96,16 @@ pre-existing item). Two additions from this occurrence:
 
 Still not a repository-code defect to fix here (harness-level). Decision
 unchanged: accept-open.
+
+## Closure, 2026-08-19
+
+PO decision: close, final. Confirmed harness/tool-level limitation
+(`Agent`/`Workflow` tool's `isolation: "worktree"` snapshot source), not
+fixable from this repository's own code — matches this item's own existing
+Triage conclusion, reconfirmed independently on 2026-08-11. The documented
+workaround (self-heal via `git checkout --detach <sha>`, proactive
+`git rev-parse HEAD` verification before trusting a fresh worktree) is now
+itself a standing CLAUDE.md Hard Rule
+(`plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`),
+so the operational knowledge this item exists to preserve already has a
+durable home outside the backlog.

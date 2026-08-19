@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.lossless-pre-restart-checkpoint
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 59253fb0
+closure_evidence: backlog/items/2026-08-18-lossless-pre-restart-checkpoint.md
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-1 (priority P0)"
 ---
@@ -89,3 +93,17 @@ write path landed too (commit `22d22ef3`) — a crash at any of the evidence
 write's 3 fault points leaves the on-disk state either cleanly absent or
 cleanly committed, never a torn/partial evidence file, with a clean retry.
 The mechanism's crash-safety is now proven, not just implemented.
+
+## Closure, 2026-08-19
+
+PO decision: close now — the parent item
+(`fresh-repo-onboarding-intake-first-transaction`) is closed in this same
+batch, and this item's own Triage said explicitly "close this item as
+merged once that work lands." The private
+`pipeline.onboarding-intake-checkpoint.v1` schema losslessly persists
+material-input chunks as content-addressed evidence files before any
+restart barrier (commit `75055e4e`), proven crash-safe at all 3 fault
+points of the evidence write (commit `22d22ef3`), and the coordinator's
+now-complete steps 4-6 carry that checkpoint through to a bound authority
+state — this item's acceptance test (a PO's 10KB+ paste surviving a forced
+restart without re-pasting) holds for the full, now-landed flow.
