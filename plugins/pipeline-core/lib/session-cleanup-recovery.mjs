@@ -329,10 +329,25 @@ function recoveryBackupDirectory(root, deps) {
  * Fails closed (never silently skips) if the source exists but is not a
  * plain regular file, since that is exactly the shape a symlink attack or a
  * damaged private store would take.
+ *
+ * CORRECTED 2026-08-19 (Critic finding F3, dispatch W4-CRITIC-2C): the
+ * absence check used to be `!existsSync(sourcePath)`, which FOLLOWS
+ * symlinks -- a DANGLING symlink at sourcePath made existsSync() return
+ * false, so the function returned null (silently "nothing to back up")
+ * instead of reaching the isSymbolicLink() check below and failing closed.
+ * lstatSync() never follows the link, so it succeeds on a dangling symlink
+ * (reporting the link itself) and only throws ENOENT when sourcePath is
+ * truly absent -- that is the one case this function still treats as
+ * legitimately absent.
  */
 function backupBeforeMutation(root, deps, label, sourcePath) {
-  if (!existsSync(sourcePath)) return null;
-  const info = lstatSync(sourcePath);
+  let info;
+  try {
+    info = lstatSync(sourcePath);
+  } catch (err) {
+    if (err?.code === "ENOENT") return null;
+    throw err;
+  }
   if (!info.isFile() || info.isSymbolicLink()) {
     fail("WT-SESSION-RECOVERY-BACKUP", "cleanup recovery backup source is unsafe");
   }
@@ -1748,4 +1763,5 @@ export const sessionCleanupRecoveryInternals = {
   securePrivateDirectory,
   safePrivateFile,
   recoveryJournalPaths,
+  backupBeforeMutation,
 };

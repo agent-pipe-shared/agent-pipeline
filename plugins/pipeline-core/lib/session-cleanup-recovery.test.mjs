@@ -27,6 +27,7 @@ import {
   readdirSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -38,6 +39,7 @@ import test from "node:test";
 import {
   applySessionCleanupRecovery,
   planSessionCleanupRecovery,
+  sessionCleanupRecoveryInternals,
 } from "./session-cleanup-recovery.mjs";
 import {
   applyOnboardingKickoff,
@@ -46,6 +48,7 @@ import {
 } from "./onboarding-continuity.mjs";
 import {
   cleanupSession,
+  createDetachedWorktree,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
   retireSessionDescriptor,
@@ -311,6 +314,120 @@ test("release-lost-binding auto-executes without confirmation, backs up onboardi
     assert.equal(applied.status, "recovered");
     assertOnboardingBackups(root, preOnboarding);
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// Critic finding F2, 2026-08-19 (dispatch W4-CRITIC-2C): retire-externally-
+// archived-orphans/retire-mixed-orphans -- the ONLY one of the six kinds
+// that deletes a pre-existing file it did not create (the external-archive
+// cleanup manifest, via retireExternallyArchivedSession ->
+// worktree-lifecycle.mjs's unlinkSync) -- had zero direct test coverage,
+// and backupExternalRetirementManifest() had never been exercised at all.
+// Fixture mirrors session-cleanup-binding.test.mjs's own
+// "an explicitly confirmed recovery retires only externally archived
+// disposable worktrees" test (a closed feature, a detached-worktree
+// archive, a legacy-shaped orphan descriptor), built directly here (not
+// imported) to avoid a cross-file fixture-shape mismatch with this file's
+// own `fixture()` (which always seeds a live active feature via a real
+// kickoff; the binding-test file's fixture does not).
+function closedFeatureRoot(name) {
+  const root = mkdtempSync(join(tmpdir(), `session-cleanup-recovery-${name}-`));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  const git = spawnSync("git", ["init", "-q"], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(git.status, 0, git.stderr);
+  writeFileSync(join(root, ".claude", "pipeline.json"), `${JSON.stringify({
+    project: "fixture", verify: "node verify.mjs", autonomy: "bounded",
+    branchModel: "local", worktree: "supported", stakes: "high", constraints: [],
+  }, null, 2)}\n`);
+  gitRun(root, ["add", ".claude"]);
+  gitRun(root, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "fixture: external archive recovery"]);
+  const closedAt = "2026-07-30T08:00:00.000Z";
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0", planApproved: false, updatedAt: closedAt,
+    closedFeatures: [{
+      id: "closed-transition", planPath: "specs/closed/prd.md", phaseAtClose: "implementation",
+      closedAt, closedBy: "PO", forCommit: null,
+    }],
+  }, null, 2)}\n`);
+  return root;
+}
+
+test("retire-externally-archived-orphans auto-executes without confirmation, backs up the external-retirement manifest first, and converges to closed-unbound", () => {
+  const root = closedFeatureRoot("external-archive");
+  try {
+    const descriptor = startSessionDescriptor(root, { sessionId: "session-recovery-external-archive" });
+    const record = createDetachedWorktree(root, "archive", gitRun(root, ["rev-parse", "HEAD"]), descriptor);
+    gitRun(root, ["worktree", "remove", record.physicalPath]);
+    rewriteAsLegacyDescriptor(root, descriptor.sessionId);
+    const plan = planSessionCleanupRecovery({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "retire-externally-archived-orphans");
+    assert.equal(plan.applyAction.requiresConfirmation, false);
+    const manifestPath = join(gitCommonDir(root), "agent-pipeline", "session-cleanup", "active", `${descriptor.sessionId}.json`);
+    assert.equal(existsSync(manifestPath), true, "the fixture must actually produce the external-retirement manifest this test backs up");
+    const preManifest = readFileSync(manifestPath);
+    const applied = applySessionCleanupRecovery({
+      rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+    });
+    assert.equal(applied.status, "retired");
+    assert.equal(applied.externallyArchivedDescriptorCount, 1);
+    // The manifest backupBeforeMutation() writes must exist and carry the
+    // EXACT pre-deletion bytes -- proving the backup ran before
+    // retireExternallyArchivedSession's unlinkSync, not after or never.
+    const backedUp = readFileSync(backupPath(root, `external-manifest.${descriptor.sessionId}`));
+    assert.deepEqual(backedUp, preManifest);
+    assert.equal(existsSync(manifestPath), false, "the recovery must still actually delete the live manifest");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+    assert.deepEqual(listActiveSessionDescriptors(root), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// Critic F2/F3 (fail-closed branch coverage): backupBeforeMutation() must
+// refuse rather than silently skip when a source it is asked to back up is
+// present but not a plain regular file -- proven directly against the
+// exported primitive rather than by driving a full recovery, since
+// fabricating a symlinked descriptor/manifest through the public
+// planSessionCleanupRecovery surface is not reachable (every producer of
+// those paths already writes a plain file). Two shapes, both wrongly
+// treated as "absent, nothing to back up" before the 2026-08-19 fix:
+test("backupBeforeMutation fails closed on a live symlinked source instead of silently skipping it", () => {
+  const root = fixture("backup-symlink-fail-closed");
+  try {
+    const realFile = join(root, "real-target.txt");
+    writeFileSync(realFile, "not a private cleanup file, just a symlink target\n");
+    const symlinkSource = join(root, "symlinked-source");
+    symlinkSync(realFile, symlinkSource);
+    assert.throws(
+      () => sessionCleanupRecoveryInternals.backupBeforeMutation(root, {}, "symlink-test", symlinkSource),
+      (error) => error?.code === "WT-SESSION-RECOVERY-BACKUP",
+      "a symlinked backup source must fail closed with WT-SESSION-RECOVERY-BACKUP, never silently skip",
+    );
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// The actual defect Critic F3 named: existsSync() FOLLOWS symlinks, so a
+// DANGLING symlink (target does not exist) used to make the old
+// `!existsSync(sourcePath)` guard return true and the function return null
+// -- silently, before ever reaching the isSymbolicLink() check above. This
+// is the regression test for that fix (lstatSync-based absence check).
+test("backupBeforeMutation fails closed on a DANGLING symlinked source, not a silent null", () => {
+  const root = fixture("backup-dangling-symlink-fail-closed");
+  try {
+    const missingTarget = join(root, "target-that-does-not-exist.txt");
+    const danglingSymlink = join(root, "dangling-source");
+    symlinkSync(missingTarget, danglingSymlink);
+    assert.throws(
+      () => sessionCleanupRecoveryInternals.backupBeforeMutation(root, {}, "dangling-symlink-test", danglingSymlink),
+      (error) => error?.code === "WT-SESSION-RECOVERY-BACKUP",
+      "a dangling symlink must fail closed with WT-SESSION-RECOVERY-BACKUP, never be treated as a legitimately absent source",
+    );
+    // A genuinely absent path (no file, no symlink, nothing) is still the
+    // one case that legitimately returns null -- unchanged by this fix.
+    const trulyAbsent = join(root, "nothing-here-at-all.txt");
+    assert.equal(
+      sessionCleanupRecoveryInternals.backupBeforeMutation(root, {}, "absent-test", trulyAbsent),
+      null,
+    );
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
