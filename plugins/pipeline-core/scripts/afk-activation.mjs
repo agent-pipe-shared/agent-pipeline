@@ -130,7 +130,7 @@ export async function activateFromBytes(rawInstruction, dependencies = {}) {
   let activatedAt;
   try {
     root = dependencies.root ? resolve(dependencies.root) : trustedRoot(dependencies.cwd ?? process.cwd());
-    const projectAuthority = resolveProjectAuthorityPaths({ rootDir: root });
+    const projectAuthority = (dependencies.resolveProjectAuthorityPaths ?? resolveProjectAuthorityPaths)({ rootDir: root });
     const statePath = projectAuthority.status === "ready"
       ? projectAuthority.state
       : (projectAuthority.source === "legacy" ? LEGACY_STATE : NEUTRAL_STATE);

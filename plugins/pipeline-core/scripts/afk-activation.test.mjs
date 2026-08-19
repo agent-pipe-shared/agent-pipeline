@@ -89,6 +89,7 @@ function dependencies(base, overrides = {}) {
       if (!base.byPath.has(path)) throw new Error(`unexpected read ${path}`);
       return base.byPath.get(path);
     },
+    resolveProjectAuthorityPaths: () => ({ status: "ready", source: "legacy", state: ".claude/pipeline-state.json" }),
     observeSurface: async () => structuredClone(base.surface),
     observeGit: async () => structuredClone(base.git),
     readExistingActivation: async () => ({ receipt: null, state: "off" }),
