@@ -69,3 +69,115 @@ Two independent angles, likely both warranted:
 ## Triage
 
 Not yet triaged.
+
+### Direction 2 design, 2026-08-19
+
+**Direction 1 ships independently and first.** The short `systemMessage`
+reword (line 117 of `codex-session-start-hint.mjs`, "before running any
+Pipeline command" → "before any project work") needs no design and no
+technical dependency on Direction 2 — dispatch it as a one-line mechanical
+edit whenever convenient, ahead of or alongside Direction 2.
+
+**Ungoverned-folder definition (reuse, don't reinvent).** Both
+`codex-session-start-hint.mjs:13-20` and `guard-lifecycle-ready.mjs:98`
+already carry an identical `GOVERNANCE_MARKERS` array (`.agent-pipeline/
+core.lock.json`, `pipeline.user.yaml`, `project/pipeline.json`,
+`project/pipeline.yaml`, `.claude/pipeline.json`, `.claude/pipeline.yaml`)
+and `guard-lifecycle-ready.mjs:2509-2513` already computes `governed` the
+same way and returns `verdict(0)` unconditionally when `!governed`. That is
+the exact integration point: this is a duplicated-but-consistent check
+already, and the fix replaces one `if (!governed) return verdict(0);` line
+with the narrower logic below — no new "governed" definition, no new file
+existence check.
+
+**Trigger scope (MVP): Edit/Write/NotebookEdit only, not Bash.**
+`guard-lifecycle-ready.mjs` already runs on both `Bash|PowerShell` and
+`Edit|Write|NotebookEdit` matchers (`hooks.json`). The confirmed live
+incident was two `Write` calls — gate exactly the tool that violated the
+duty. A Bash-command mutation classifier (e.g. detecting `git init`) is
+real future scope but adds real false-positive surface (distinguishing a
+mutating command from a read-only one in free-form Bash is not reliable);
+leaving Bash ungated in this MVP is a deliberate, stated scope cut, not an
+oversight.
+
+**Session-scoped consent marker: a file, keyed by `session_id`, mirroring
+the ALREADY-ESTABLISHED pattern in this same plugin
+(`stop-suggest.mjs`'s `.claude/.stop-suggest-<session_id>.json` +
+`resolveSessionIdFromInput()`, `stop-suggest.mjs:456-460`).** Each guard
+invocation is a fresh process with no in-memory state across tool calls, so
+only a file survives between the blocked call and the retried one.
+`guard-lifecycle-ready.mjs:main()` already parses the full PreToolUse
+`input` object (`main()`, ~line 2672-2675) and threads it into
+`evaluateLifecycleReadyGuard(input, ...)` — the implementor needs to
+confirm/thread `input.session_id` down to the ungoverned-branch scope
+(~line 2506) the same way `stop-suggest.mjs` reads it from Stop-hook stdin;
+Claude Code's PreToolUse payload carries `session_id` at the top level, so
+this is wiring, not a design question.
+
+Marker path: `.claude/.pipeline-install-consent-<session_id>.json`. **The
+marker clears the gate on EITHER answer (yes or no), not consent alone** —
+the underlying duty is "ask and wait for an answer before touching files,"
+not "block all work until Pipeline is installed." A user who says no must
+still be able to get their unrelated Write through, once, without being
+asked again every subsequent turn of the same session. This directly
+bounds the blast-radius risk named below.
+
+**New sanctioned recorder script, admitted the same way this session
+already added 4 admission branches to `sanctionedOnboardingArgs()`
+today** (`intake-consent-apply`/`intake-capture-apply`/
+`intake-design-questions-apply`/`intake-generate-apply`, commits
+`70bd1fb3`/`0b2386fd`): `plugins/pipeline-core/scripts/
+onboarding-consent-mark.mjs record --root <root> --session-id <id>
+--answer yes|no` — writes
+`{schema: "pipeline.onboarding-consent-mark.v1", sessionId, answer,
+recordedAt}` atomically (same `writeExclusiveSynced`/`renameSync`/
+`fsyncDirectory` pattern already used elsewhere in this codebase, e.g.
+`scratch/apply-guard-handover-size-wiring.mjs`'s documented approach) to
+the marker path. **No new guard-admission branch is actually required for
+this script's own Bash invocation**: Bash/PowerShell calls stay outside
+this gate's scope in the ungoverned branch (see trigger scope above), so
+they already pass through unconditionally today and continue to.
+
+**PreToolUse pseudocode (replaces the current unconditional
+`if (!governed) return verdict(0);`):**
+
+```js
+if (!governed) {
+  const toolName = input?.tool_name;
+  if (toolName !== "Edit" && toolName !== "Write" && toolName !== "NotebookEdit") {
+    return verdict(0); // Bash/PowerShell and everything else: unchanged
+  }
+  const sessionId = resolveSessionIdFromInput(input); // mirror stop-suggest.mjs
+  if (!sessionId) return verdict(0); // fail-open: no session context, never block on this alone
+  const markerPath = join(root, ".claude", `.pipeline-install-consent-${sessionId}.json`);
+  if (existsSync(markerPath)) return verdict(0); // already asked+answered this session, either way
+  return verdict(2, ONBOARDING_CONSENT_GATE_MESSAGE);
+}
+```
+
+`ONBOARDING_CONSENT_GATE_MESSAGE` (new constant): instructs the agent to
+ask the user in their own language whether Agent Pipeline should be
+installed for this repository, then run the exact `onboarding-consent-mark.mjs
+record` command with the observed answer, then retry the identical write —
+mirroring the existing `--granted`/HGO-style "typed read-only recovery
+action" pattern this guard already uses elsewhere.
+
+**Named, real trade-off for the PO to weigh before dispatch (not resolved
+here):** this gate fires plugin-wide, for EVERY Claude/Codex session that
+has this plugin installed and opens ANY ungoverned folder — including a
+user doing completely unrelated, non-Pipeline work who has no interest in
+onboarding. The design above bounds the cost to a single one-time pause per
+session, cleared by either a yes or a no answer, which matches the
+already-existing prose duty's own intent ("ask... then... after consent" —
+never "force install"). But it is still a real, visible behavior change for
+every consumer of this plugin, not just this repo, and is worth an explicit
+go-ahead before implementation, not an implicit one.
+
+**Implementation checklist for the dispatch:** (1) new
+`onboarding-consent-mark.mjs` script + its own tests; (2) the
+`guard-lifecycle-ready.mjs` pseudocode above + `session_id` threading +
+tests (positive: marker present → allow; negative: marker absent, tool
+Edit/Write/NotebookEdit → block; Bash unaffected; no `session_id` →
+fail-open); (3) add the marker glob (`.claude/.pipeline-install-consent-*.json`)
+to `.gitignore` if not already covered by an existing `.claude/.*` pattern;
+(4) Direction 1's reword, landed separately or in the same dispatch.
