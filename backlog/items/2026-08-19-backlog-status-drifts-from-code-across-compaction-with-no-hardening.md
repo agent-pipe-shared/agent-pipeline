@@ -242,3 +242,13 @@ Not itself designed here: whether `guardrails/git.md` needs a new
 individual bullet for `GG-22` — the file documents the GG union mostly by
 range/mechanism rather than one bullet per rule id, so this is an
 implementer judgment call, not a requirement.
+
+### Piece 2b landed, 2026-08-19
+
+`check-state-numeric-claims.mjs` (the live checker itself, not just its
+`.test.mjs` fixture) is now registered as its own `verify.mjs` suite entry
+(`state-numeric-claims-check`), mirroring the `backlog-state-check`
+pattern this correction asked for. Landed via a signed TP-3 HGO ceremony,
+commit `1083229b`. Piece 2 (both 2 and 2b) is now fully closed. Piece 1
+(`GG-22`, fully designed above) is dispatched separately this same
+session (Wave 5). Item stays `open` until piece 1 lands.
