@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4fdb26fa542477d50c463009575ce447415c4aef65b500143aae14714ec0bf57"
+    "transitionHead": "c51ec4ea988c99454e1498e1f3639672120355079bb644254f8cc23ffc983084"
   },
   "counts": {
-    "open": 57,
+    "open": 56,
     "in_progress": 7,
-    "closed": 231
+    "closed": 232
   },
   "items": [
     {
@@ -3186,11 +3186,15 @@
     },
     {
       "id": "pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Self-observation, 2026-08-19, this session: a manual sweep of the Wave-5-scope work list found 12 of 54 items already explicitly deferred to another sprint by their own Triage text, none of which the automated categorization pass had excluded."
+      "source": "Self-observation, 2026-08-19, this session: a manual sweep of the Wave-5-scope work list found 12 of 54 items already explicitly deferred to another sprint by their own Triage text, none of which the automated categorization pass had excluded.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "5f77a34a188e7fd8e2f1993b2dc2671431d02499",
+      "closureEvidence": "backlog/items/2026-08-19-wave5-scope-categorization-missed-triage-level-sprint-deferrals.md"
     },
     {
       "id": "pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory",

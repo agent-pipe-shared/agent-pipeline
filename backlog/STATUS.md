@@ -289,7 +289,7 @@
 | pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.warn-security-gate-hard-blocks-every-push | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.windows-directory-durability | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs | closed | defect | pipeline | 2026-08-18 | — |
@@ -303,6 +303,6 @@
 
 ## Counts
 
-- open: 57
+- open: 56
 - in_progress: 7
-- closed: 231
+- closed: 232
