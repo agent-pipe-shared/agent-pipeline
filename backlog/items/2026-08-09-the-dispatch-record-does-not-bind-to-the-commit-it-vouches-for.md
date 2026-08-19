@@ -347,3 +347,17 @@ core mechanism, cited above).
 `status:` and no `Closure` section added, as briefed) and
 `plugins/pipeline-core/scripts/dispatch-authorship-verify.test.mjs` (two
 new tests, `(n)`/`(n2)`, no production code changed).
+
+### Direction 2 adopted into the protocol, 2026-08-19 (Wave 5, dispatch NVA-W5-07)
+
+The commit-then-checkpoint design above is now the ACTUAL protocol text,
+not only a recommendation sitting in this backlog item: `roles/goldfish.md`
+GF-09-D and `templates/prompts/goldfish-task.md` field 6 both describe the
+two-step ordering (checkpoint after every commit; final act overwrites
+`outcome`+`report`) verbatim as designed here. No production code changed
+— `dispatch-authorship-verify.test.mjs` (33/33) confirms the interim
+`"committed-pending-report"` outcome was already terminal to the checker
+before this change, exactly as the design predicted. Direction 2 is
+**closed**; Direction 3 (a distinct Elephant trailer, still a genuine
+open design question per Options A/B above) is the only remaining piece —
+item stays `open` for that.
