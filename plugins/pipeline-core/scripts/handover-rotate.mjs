@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 // handover-rotate.mjs
 //
 // Rotation/archive mechanism for a project's handover file (default
