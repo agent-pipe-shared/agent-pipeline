@@ -124,3 +124,121 @@ and did not respond in-session, so the Elephant proceeded with the lowest-
 risk default (stamp a local test candidate now, documenting this gap
 rather than silently treating piece 2 as complete) per the session's
 standing auto-mode guidance rather than blocking indefinitely.
+
+### Piece 1 design, 2026-08-19
+
+**Mechanism:** a new stateless union rule in
+`plugins/pipeline-core/hooks/guard-git.mjs`, id **`GG-22`** (next available;
+`GG-01`..`GG-21` are all taken), triggered on `git commit` invocations. This
+rule inspects repository STATE (staged diff + recent history) rather than
+matching the command string, so it shells out to `git` via `spawnSync`
+exactly like the existing GG-03 push-verification code (`guard-git.mjs`
+line ~742, `spawnSync("git", [...], {cwd: root, encoding: "utf8", shell:
+false, timeout: 5000})`) — do not try to express this as a regex against
+the raw command text.
+
+**Debt detection (cheap, bounded, stateless — recomputed fresh every
+invocation, never scans all ~295 item files):**
+
+1. `lastReconcile = git log -1 --format=%H -- backlog/transitions.ndjson`
+   — the most recent commit that touched the ledger file (empty string if
+   the file has never been touched; see bootstrap case below).
+2. `itemsTouchedSinceReconcile = git diff --name-only <lastReconcile>..HEAD
+   -- backlog/items/` — bounded to commits since the last reconciliation,
+   not the whole item corpus.
+3. For each such path, `git diff <lastReconcile>..HEAD -- <path>` and check
+   whether the hunk contains a changed `status:` frontmatter line (a
+   `-status: ...` line paired with a differently-valued `+status: ...`
+   line). Reuse or mirror the frontmatter `status:` parsing
+   `check-backlog-state.mjs`/`reconcile-backlog-ledger.mjs` already use —
+   do not write a second, independently-drifting parser.
+4. `debtPaths` = the subset of `itemsTouchedSinceReconcile` whose status
+   actually changed (a Triage-only edit does NOT count as debt).
+5. `debt = debtPaths.length > 0`.
+
+**Allow-rule for the currently proposed commit, when `debt` is true:**
+
+- `stagedPaths = git diff --cached --name-only`.
+- Allowed set = every `backlog/items/*.md` path (any item, not just the
+  ones in `debtPaths` — batched multi-item closures across several commits
+  before one shared reconciliation commit are an established, legitimate
+  pattern already used repeatedly this session, e.g. commits
+  `77aef463`→`f1635598`→`dab33d9f`) UNION `{backlog/transitions.ndjson,
+  backlog/STATUS.md, backlog/index.json}`.
+- **Block (`GG-22`)** unless every path in `stagedPaths` is inside that
+  allowed set. This admits the existing 3-commit closure pattern (status
+  flip → closure metadata → ledger reconciliation) and batched closures
+  unchanged, while blocking exactly the observed failure: the session
+  moves on to an unrelated file (guard code, docs, anything outside
+  `backlog/`) while a status change from an earlier commit sits
+  unreconciled.
+- When `debt` is false (HEAD is already ledger-consistent, or no item has
+  been touched since the last reconciliation), no restriction — ordinary
+  commits proceed exactly as today.
+
+**Block message shape:**
+```
+BLOCKED (git-guard GG-22, plugin pipeline-core): an earlier commit changed
+backlog/items/<path>'s status without a matching ledger reconciliation
+since <lastReconcile-sha-or-"repository start">.
+Run: node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate
+Then commit the resulting backlog/STATUS.md / backlog/index.json /
+backlog/transitions.ndjson changes before any other commit.
+```
+Mirror the file's existing `emit(code, lines)`/`blockNormal(rule)` helpers.
+**This is a plain deny, not an override-eligible rule** — unlike
+GG-01..GG-10/GG-21, there is no legitimate reason an agent would need to
+bypass it with `OVERRIDE GG-22`, since the fix is always cheap and
+mechanical (one command, then a commit). Do not wire it into the
+override-arming machinery.
+
+**Explicitly out of scope for v1 (deliberate narrowing, not an oversight):**
+- New item CREATION (a file appearing in `backlog/items/` that didn't
+  exist at `lastReconcile`) is not treated as debt — only STATUS CHANGES
+  to existing items, matching this item's own Mode-1 description (closures
+  going unreconciled), not creation-count drift.
+- The rule only looks at `HEAD`'s own history on the current branch — a
+  worktree-isolated dispatch on a different branch has its own independent
+  debt trail; this matches how every other GG rule in this file already
+  scopes to the current checkout.
+- The bootstrap case (`backlog/transitions.ndjson` never touched in this
+  repository's history, so `lastReconcile` is empty) must be handled by an
+  explicit, TESTED decision — either treat the whole history as the
+  lookback window, or no-op the rule entirely until the ledger file exists
+  once — not left as an unhandled `git diff ''..HEAD` edge case.
+
+**Test cases** (`plugins/pipeline-core/hooks/guard-git.test.mjs`, new
+fixtures alongside the existing `GG-01`..`GG-21` coverage):
+1. HEAD ledger-consistent (no debt) → an unrelated commit (only
+   `docs/state.md` staged) is admitted, unchanged from today.
+2. HEAD has an un-reconciled status flip (debt) → a commit staging only an
+   unrelated file (no `backlog/` paths at all) is BLOCKED with `GG-22`.
+3. Same debt state → a commit staging only `backlog/items/<same-item>.md`
+   (closure-metadata-style edit, no further status change) is ADMITTED
+   (commit #2 of the 3-commit pattern).
+4. Same debt state → a commit staging `backlog/transitions.ndjson` +
+   `backlog/STATUS.md` + `backlog/index.json` together is ADMITTED and
+   clears the debt (commit #3).
+5. Same debt state → a commit staging a SECOND, DIFFERENT item's status
+   flip is ADMITTED (batched multi-item closure pattern).
+6. Same debt state → a commit staging `backlog/items/<same-item>.md` AND
+   an unrelated file (e.g. `plugins/pipeline-core/hooks/guard-git.mjs`)
+   together is BLOCKED (the unrelated file is outside the allowed set).
+7. A Triage-only edit to an item (no `status:` line change) followed
+   immediately by an unrelated commit is ADMITTED — Triage-only edits
+   never create debt.
+8. The empty-`lastReconcile` bootstrap case behaves sanely per whichever
+   explicit decision is made above — this must be its own asserted test,
+   not left implicit.
+
+**Fail-open discipline:** like every other check in this file (line ~300,
+`process.exit(0); // fail-open: guard is a safety net, not a prison`), any
+`spawnSync` error, timeout, or unexpected git output while computing
+`debt` must fail OPEN (allow the commit), not block — this is a hardening
+rule, not a hard security boundary, and must never itself become a source
+of an unrecoverable stuck repository.
+
+Not itself designed here: whether `guardrails/git.md` needs a new
+individual bullet for `GG-22` — the file documents the GG union mostly by
+range/mechanism rather than one bullet per rule id, so this is an
+implementer judgment call, not a requirement.
