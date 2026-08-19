@@ -3853,6 +3853,7 @@ function claudePromotedRoot(path, deps = fakeDeps) {
   writeFileSync(join(path, prdPath), [
     "<!-- po-language: en -->",
     `<!-- technical-spec-sha256: ${specSha256} -->`,
+    PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
     "",
     "# Claude-promoted product requirements",
     "",
@@ -3915,6 +3916,7 @@ test("omitting the runner on a direct kickoff promotion call is a caller error, 
     writeFileSync(join(path, prdPath), [
       "<!-- po-language: en -->",
       `<!-- technical-spec-sha256: ${specSha256} -->`,
+      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
       "",
       "# Codex-promoted product requirements",
       "",
@@ -3978,6 +3980,7 @@ test("a promotion plan produced for one runner does not validate an apply for an
     writeFileSync(join(path, prdPath), [
       "<!-- po-language: en -->",
       `<!-- technical-spec-sha256: ${specSha256} -->`,
+      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
       "",
       "# Cross-runner product requirements",
       "",
@@ -4050,6 +4053,7 @@ test("kickoff promotion replaces only the exact unapproved seed and is replay-sa
       writeFileSync(join(path, prdPath), [
         "<!-- po-language: en -->",
         `<!-- technical-spec-sha256: ${specSha256} -->`,
+        PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
         "",
         `# ${profile} PRD`,
         "",
@@ -4154,6 +4158,7 @@ test("public cleanup privatization preserves the historical kickoff seed for CLI
     writeFileSync(join(path, prdPath), [
       "<!-- po-language: en -->",
       `<!-- technical-spec-sha256: ${postPrivateSpecSha256} -->`,
+      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
       "",
       "# Post-private PRD",
       "",
@@ -4206,6 +4211,7 @@ test("kickoff promotion fails closed for authority drift, a real active feature,
     writeFileSync(join(path, "specs", "prd_real.md"), [
       "<!-- po-language: en -->",
       `<!-- technical-spec-sha256: ${realSpecSha256} -->`,
+      PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
       "",
       "# PRD",
       "",

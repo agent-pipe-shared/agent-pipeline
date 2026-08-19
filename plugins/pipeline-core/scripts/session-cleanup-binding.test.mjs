@@ -149,6 +149,7 @@ function legacyPromotionCleanupMismatch(name) {
   writeFileSync(join(authorityDir, "prd_rune.md"), [
     "<!-- po-language: en -->",
     `<!-- technical-spec-sha256: ${runeSpecSha256} -->`,
+    "<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->",
     "",
     "# Rune PRD",
     "",
