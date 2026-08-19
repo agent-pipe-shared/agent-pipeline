@@ -18,6 +18,12 @@ import { checkObservationGovernance } from "./check-observation-governance.mjs";
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const EXCLUDED_PATH = "AGENTS.md";
+// Archived-history directories (ADR-0064): a verbatim, never-re-edited copy of
+// a prior handover section whose internal relative links resolved correctly
+// only at its original location. Excluded the same way AGENTS.md is: never
+// scanned as a link source, and any link INTO it resolves without checking
+// against trackedPaths. Directory-prefix match, not a second exact constant.
+const EXCLUDED_PREFIXES = ["docs/state-archive"];
 const STATEFUL_DESIGN_SURFACES = ["templates/spec.md", "roles/elephant.md"];
 const STATEFUL_DESIGN_OPERATIVE_HEADINGS = [
   "### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)",
@@ -66,7 +72,9 @@ function posixPath(value) {
 }
 
 export function isExcludedRepoPath(value) {
-  return posixPath(value).replace(/^\.\//, "") === EXCLUDED_PATH;
+  const normalized = posixPath(value).replace(/^\.\//, "");
+  if (normalized === EXCLUDED_PATH) return true;
+  return EXCLUDED_PREFIXES.some((prefix) => normalized === prefix || normalized.startsWith(`${prefix}/`));
 }
 
 function inside(root, target) {

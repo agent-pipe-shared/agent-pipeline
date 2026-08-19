@@ -288,6 +288,49 @@ test("internal symlink aliases cannot bypass the excluded instruction path", () 
   assert(!reads.includes("alias/AGENTS.md"));
 });
 
+test("isExcludedRepoPath: docs/state-archive is a directory-prefix exclusion, AGENTS.md stays exact-match only", () => {
+  assert.equal(isExcludedRepoPath("docs/state-archive"), true);
+  assert.equal(isExcludedRepoPath("docs/state-archive/anything.md"), true);
+  assert.equal(isExcludedRepoPath("docs/state-archive/nested/deep.md"), true);
+  assert.equal(isExcludedRepoPath("docs/state-archive-not-really/foo.md"), false);
+  assert.equal(isExcludedRepoPath("AGENTS.md"), true);
+  assert.equal(isExcludedRepoPath("AGENTS.mdx"), false);
+});
+
+test("a Markdown source under docs/state-archive/ is never scanned, even when its internal links would otherwise fail", () => {
+  const { root } = fixture({
+    "docs/state-archive/2026-08-19--rotation.md": "# Archived\n\n[Stale](../../old/path/that/no/longer/exists.md)\n",
+  });
+  const reads = [];
+  const readText = (file) => {
+    const rel = relative(root, file).split("\\").join("/");
+    reads.push(rel);
+    return execFileSync(process.execPath, ["-e", "process.stdout.write(require('fs').readFileSync(process.argv[1]))", file], { encoding: "utf8" });
+  };
+  const result = runFixture(root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", "docs/state-archive/2026-08-19--rotation.md"],
+    markdownPaths: ["CLAUDE.md", "docs/state.md", "README.md", "docs/state-archive/2026-08-19--rotation.md"],
+    readText,
+  });
+  assert.deepEqual(result.findings, []);
+  assert(!reads.includes("docs/state-archive/2026-08-19--rotation.md"));
+});
+
+test("a link into a specific docs/state-archive/ file resolves via the exclusion, not the pre-existing trackedDescendant fallback", () => {
+  const { root } = fixture({
+    "README.md": "# Home\n\n[Archived](docs/state-archive/2026-08-19--rotation.md)\n",
+  });
+  // Deliberately absent from trackedPaths (and no descendant entry with this
+  // exact prefix + "/" exists either), so the pre-existing trackedDescendant
+  // fallback at the target check cannot be what makes this pass — only the
+  // isExcludedRepoPath directory-prefix exclusion can.
+  const result = runFixture(root, {
+    trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"],
+  });
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.stats.excludedLinks, 1);
+});
+
 test("untracked targets fail even when present in the worktree", () => {
   const { root } = fixture({ "README.md": "# Home\n\n[Ghost](ghost.md)\n", "ghost.md": "# Ghost\n" });
   assert.match(runFixture(root).findings.join("\n"), /target is not tracked/);
