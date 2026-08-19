@@ -246,6 +246,14 @@ export function stripFencedCode(markdown) {
     .join("\n");
 }
 
+// A reference-style link scan (`[text][ref]`) run over a raw line false-
+// positives on inline code containing bracket-adjacent regex syntax, e.g.
+// `` `[a-z][a-z0-9-]{0,63}` `` -- strip backtick-delimited spans first so
+// character-class notation inside code never looks like a markdown link.
+function stripInlineCode(line) {
+  return line.replace(/(`+)(?:(?!\1)[\s\S])*?\1/g, "");
+}
+
 function cleanHeading(value) {
   return value
     .replace(/[<>]/g, "")
@@ -400,7 +408,7 @@ export function extractMarkdownLinks(markdown) {
     for (const destination of inlineDestinations(line)) {
       links.push({ destination: unwrapDestination(destination), line: index + 1, kind: "inline" });
     }
-    for (const match of line.matchAll(/!?\[([^\]]+)\]\[([^\]]*)\]/g)) {
+    for (const match of stripInlineCode(line).matchAll(/!?\[([^\]]+)\]\[([^\]]*)\]/g)) {
       const id = normalizeReferenceId(match[2] || match[1]);
       const target = definitions.get(id);
       if (target) links.push({ ...target, line: index + 1, kind: "reference-use" });
