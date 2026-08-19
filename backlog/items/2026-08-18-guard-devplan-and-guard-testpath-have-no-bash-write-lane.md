@@ -200,3 +200,32 @@ design from scratch — it is the identical, already-live, already-tested set
 whether `guard-devplan.mjs`'s Edit/Write lane itself has any unrelated
 defects — this design only closes the Bash-write coverage gap, it does not
 re-review the existing lane's own logic.
+
+### Progress, 2026-08-19 (NVA-W5-DEVPLANSHELL-1)
+
+Step 1 of the 3-step plan landed and verified: `extractShellWriteTargets()`
+extracted from `plugins/pipeline-core/lib/protected-test-paths.mjs`,
+rule-independent, covering redirects/write-executable operands/git-write-verb
+operands/opaque-interpreter-code PATH_TOKEN scan/unparsed-command fallback/
+PowerShell write-cmdlet operands. `protectedTestPathShellHit()` now composes
+it. Commit `e07cb067` (cherry-picked to trunk).
+
+Verified: `guard-lifecycle-ready.test.mjs` 119/119 unmodified (incl. all 7
+`TPSHELL-*` cases), new `protected-test-paths.test.mjs` 12/12 (new file —
+the briefing's named pre-existing suite at that path did not actually exist;
+the behavior it would have pinned is covered by the `TPSHELL-*` cases
+instead, documented as a deviation).
+
+**Noted deviation, minor, untested by the existing suite either way:** the
+two-phase refactor (candidates through `ruleForCandidate()`, then a residual
+rule-derived opaque-interpreter-code basename-needle fallback) changes
+result ORDER in the rare case a single command contains both an opaque
+needle-only match for one rule and an independent full-path match for a
+different rule in a later segment — original code returned the opaque hit
+first, the refactor now returns the full-path hit first.
+
+Steps 2-3 (apply the same `extractShellWriteTargets()` pattern to
+`guard-devplan.mjs`, add the `GUARD-DEVPLAN-SHELL` test cases) remain open —
+the dispatch ran out of tool budget after step 1's commit. Next dispatch can
+start directly from step 2 of the Design section above; step 1's extraction
+is done and does not need to be redesigned.

@@ -180,3 +180,37 @@ item's own acceptance test needs) has not started, and the known
 `guard-lifecycle-ready.mjs` admission gap
 (`guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands`)
 remains open.
+
+### Progress, 2026-08-19 (NVA-W5-COORD2-1)
+
+Recon dispatch (goldfish-deep, worktree-isolated) confirmed **step 4 is
+already fully implemented**, contrary to this item's own framing: commit
+`0080116b feat(onboarding): coordinator step 4` (`intake-generate-plan`/
+`intake-generate-apply`, staging generation) is CLI-wired, guard-wired
+(`NVA-W5-GUARDADMIT-1` covers its admission branch), and tested (~15 tests
+including 9 crash-injection cases, part of the 210/210
+`onboarding-continuity.test.mjs` baseline). The genuinely open remainder is
+only steps 5-6.
+
+The dispatch stopped rather than attempt step 5 (`bootstrap-bind-plan`/
+`bootstrap-bind-apply`, reusing `applyOnboardingKickoffPromotion` with a new
+"coordinator-sourced, no kickoff predecessor" branch per
+`specs/wave4-onboarding-coordinator/design.md` §a.5.5/§c.3) within its tool
+budget — it read `buildKickoffPromotionPlan`, `validatePromotionPlan`
+(~130 lines, almost entirely keyed on a non-null `plan.kickoff.*`),
+`applyOnboardingKickoffPromotion`'s CAS logic, and `currentTarget()` in
+full, and assessed the surface as covered by ~45 existing invariant-dense
+tests (15 `KICKOFF_FAULT_STAGES` fault-injection cases + ~30 crash/CAS-drift/
+replay/content tests) any additive branch must not regress. **Sizing
+guidance for the next dispatch: size step 5 alone as comparable in
+difficulty to the whole steps-1-4 effort combined** — this is the recon
+dispatch's own explicit recommendation, not a guess. Step 6 (three new
+`v4Inspection` statuses per §a.4, plus §e's migration routing) is separate
+additional work, entirely untouched by this recon.
+
+No code was changed by this dispatch — recon only, evidence in its own
+(uncommitted, worktree-local) dispatch record. Also found: DoD check 3's
+named verify path (`project-onboarding-v3.test.mjs`) does not exist —
+nearest file is `project-onboarding-v3-argv-closure.test.mjs`; and the
+briefing's baseline test counts (193/193, 128/128) were stale — actual
+current baselines are 210/210 and 119/119.

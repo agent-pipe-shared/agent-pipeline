@@ -327,3 +327,22 @@ remaining gap is different in kind — an active range-walk step (or a
 `guard-git.mjs` wiring) that does not exist as code yet — so it was
 correctly out of scope for that ceremony and is unaffected by it. Do not
 infer closure from the ceremony's suite count.
+
+### Progress, 2026-08-19 (NVA-W5-GITGUARD-1) — untested checkpoint, NOT on trunk yet
+
+A dispatch (goldfish-deep, worktree-isolated) wrote a full implementation of
+both this item's Part A (GIT-01 wiring: `guard-git.mjs` now calls the
+already-existing `commitTypeFindings()` against the commit subject and
+blocks with code GIT-01 on an inadmissible type) AND the separate GG-22
+backlog-ledger-debt guard (blocks a commit that would leave an earlier
+backlog status-flip unreconciled, fail-open on any git/parse error) — but
+exhausted its full 50-tool budget writing the implementation and never
+reached tests, verify, or its own commit/report. The Elephant found the
+diff uncommitted in the worktree, confirmed it was the only change, and
+committed it as-is (`1a25b866`, worktree `wf_3e6df4de-8d6-1`, message
+explicitly labelled "untested checkpoint") so the work is not lost — **this
+commit is NOT on trunk and NOT verified; no test file exists yet for either
+GIT-01 wiring or GG-22.** A follow-up dispatch must self-heal onto
+`1a25b866` (not trunk), add tests for both blocks, run
+`guard-git.test.mjs`/whatever suite covers this hook, and only then land it
+on trunk.

@@ -181,3 +181,41 @@ Edit/Write/NotebookEdit → block; Bash unaffected; no `session_id` →
 fail-open); (3) add the marker glob (`.claude/.pipeline-install-consent-*.json`)
 to `.gitignore` if not already covered by an existing `.claude/.*` pattern;
 (4) Direction 1's reword, landed separately or in the same dispatch.
+
+### Progress, 2026-08-19 — Direction 1 landed; Direction 2 twice failed with zero output, deferred
+
+**Direction 1 is done and on trunk**, landed by an unrelated dispatch
+(NVA-W5-DOCFIX-1, commit `b7982cdb`): item (4) above is satisfied.
+
+**Direction 2 (the PreToolUse consent guard) failed twice, both times with
+zero output**, despite explicit PO go-ahead for the design (this session,
+`AskUserQuestion` → "Ja, dispatchen"):
+
+- Attempt 1 (`NVA-W5-CONSENTGUARD-1`, goldfish-deep, worktree-isolated,
+  briefed by citing this item's own Triage-section design and telling the
+  dispatch which sections to read): used its full 50-tool budget on
+  discovery (grepping for atomic-write helpers, hunting for the session-id
+  marker precedent) and returned empty text with zero commits, zero
+  uncommitted diff.
+- Attempt 2 (`NVA-W5-CONSENTGUARD-2`, same agent type, full design
+  pre-inlined verbatim into the briefing itself — exact anchor lines,
+  exact pseudocode, exact new-file contract, specifically to remove the
+  need for any discovery): STILL used its full 50-tool budget and returned
+  empty text with zero commits, zero uncommitted diff, and its dispatch
+  record shows not even a bootstrap log entry — the opening act the
+  briefing itself mandates as step 1.
+
+Both attempts are budget-exhaustion failures with literally nothing
+produced, not partial progress — unlike this same session's other Wave 5
+dispatches (which returned either real diffs or an honest clean stop). This
+is worth flagging as possibly systemic rather than task-specific: the
+Elephant session itself hit the closed shell-grammar guard
+(`GUARD-PARSE-UNSUPPORTED`/`GUARD-REDIRECT-UNAPPROVED`) repeatedly on
+routine commands in the same session window, and it is plausible a
+fresh-context dispatch loses more of its budget to the same friction with
+no session-level memory of the pattern to route around it. Not confirmed —
+no dispatch transcript showed the actual failure mode for attempt 2 (no log
+entries to read). **Deferred rather than a third automated retry** — two
+full-budget zero-output attempts is the point to stop and hand this to a
+dedicated future session with room to diagnose the dispatch-side failure
+itself, not just re-attempt the same task.
