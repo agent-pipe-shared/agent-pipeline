@@ -3,9 +3,21 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 55)
+**Last updated:** 2026-08-19 (checkpoint 56)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
+
+---
+
+## CHECKPOINT — 2026-08-19 (56): a stale `lifecycle.json` PRD/Spec-digest reconcile PO-signed and landed; a 3-round HGO fail-closed-arming design (2 Critic rounds + 1 self-verified rework) is now stable and ready for implementation dispatch (READ THIS FIRST)
+
+**Reconcile ceremony completed and independently confirmed.** `feature-package-reconcile` run by the PO against candidate `7a659e3f`, plan digest `4356ccd7…`, signature-mode approval (`~/agent-pipeline-po-nova/proof-manual.json`) — resynced `lifecycle.json`'s declared prd/spec artifact digests to the current bytes of `prd_phoenix-epic.md`/`spec.md`. Committed as `f42cf0c1`. Two real operational bugs found and fixed live (not design bugs): (1) the PO's first attempt ran from a different, stale sibling checkout lacking the subcommand — the fix is always invoking this repo's own `pipeline-state.mjs` by absolute path from a cwd actually inside it; (2) `--proof-request`/`--proof-authority`/`--proof` must be absolute paths resolving OUTSIDE the project directory (`externalPublicJson()`), so all three files were relocated to `~/agent-pipeline-po-nova/` — the same directory `sign-intent` already writes to. No further stale-reconcile blocker known.
+
+**`specs/sprint-phoenix-epic/design/hgo-fail-closed-arming-and-ceremony-streamlining.md` is now stable.** History: `56cf4c43` (Part A fail-closed-at-arming fix / Part B digest-withholding comment fix / Part C `prepare-for-signature` streamlining, 548 lines) → Critic round 1: FAIL, 2 blockers → `70f54fee` (Revision 1, fixes both) → Critic round 2 (delta): FAIL, 1 new blocker — the documented `HGO-CANDIDATE-DRIFT` recovery ("re-run `prepare-for-signature` against new HEAD") is structurally unreachable, because `planHumanGuardOverride`'s persisted-plan store is a frozen-forever get-or-create keyed by `(requestSha256, authorSourceRoot)`: re-running the same call just re-reads the same stale plan and re-fails immediately → `aa5433ea` (Revision 2, new §1.4 step 6 + §3.6: a distinct, explicitly-invoked `refreeze-plan` subcommand that re-checks the identical unconditional drift gate against the frozen `request` and, only on success, overwrites the persisted plan with a fresh observation + audit trail entry). **Per the standing 2-Critic-round budget, Revision 2 was personally verified by the Elephant (not re-dispatched to Critic a 3rd time)** — read in full against the round-2 finding; the mechanism neither relaxes the drift gate nor reopens the original §1.1 problem. Design work for all three parts (A/B/C) is now considered closed; implementation has not started.
+
+**New backlog item filed, explicitly deferred:** `2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md` (commit `7a659e3f`) — the closed Bash grammar still rejects common read-only compositions (`&&`-chained mkdir/probe sequences, `2>/dev/null`, multi-command diagnostics) beyond the narrower grep-pipeline fix already closed in `2026-07-26-readonly-command-guard-classification.md`. Status `open`, deliberately sequenced after the current HGO guard-editing work to avoid two concurrent guard-editing dispatches.
+
+**Next step:** dispatch implementation of Parts A+B together (`lib/human-guard-override.mjs`: the fail-closed-arming mechanism + digest-withholding comment correction) via `goldfish-deep`, then Part C (`prepare-for-signature`/`refreeze-plan` CLI subcommands) once Part A's new persisted-plan mechanism is in place — each followed by its own Critic review before being considered done. Only after both land does the promised final-gates sequence run: fresh full Verify → `security-scan.mjs` → new push-approval ceremony (the prior one is stale) → push. The Stop-hook's own `security-scan` suggestion is premature until implementation lands; do not run it early.
 
 ---
 
