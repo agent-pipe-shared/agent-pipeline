@@ -83,3 +83,9 @@ test coverage for the new capture path (follow-up dispatch in flight), and steps
 which this item's own acceptance test (a full restart round-trip producing a
 content-equivalent design-input.md) actually needs end-to-end. Stays `open`,
 still tracked as subsumed — do not close until the parent item closes.
+
+**Update, 2026-08-19:** crash-injection coverage for the material-capture
+write path landed too (commit `22d22ef3`) — a crash at any of the evidence
+write's 3 fault points leaves the on-disk state either cleanly absent or
+cleanly committed, never a torn/partial evidence file, with a clean retry.
+The mechanism's crash-safety is now proven, not just implemented.

@@ -148,3 +148,35 @@ round-trip coverage, all green (`onboarding-continuity.test.mjs` 185/185,
 `deps.crashAt` fault point already stubbed in the write primitives) and the
 CAS-drift test are dispatched as a follow-up Batch B, not yet landed as of
 this update. Item stays `open`.
+
+### Update, 2026-08-19 — Batch B landed; Phase 1 is now fully implemented and test-covered
+
+Crash-injection tests at all 7 fault points (4 in `applyIntakeCheckpointMutation`:
+`cas-recheck`/`temp-fsync`/`rename`/`directory-fsync`; 3 in
+`writeIntakeCheckpointEvidence`: `evidence-temp-fsync`/`evidence-rename`/
+`evidence-directory-fsync`) plus the CAS-drift test landed on trunk (commit
+`22d22ef3`): 8 new tests, all green (`onboarding-continuity.test.mjs`
+193/193, `project-onboarding-v3.test.mjs` 128/128,
+`check-consumer-safe-paths.test.mjs` 9/9, no regressions). **This completes
+NVA-W4-COORD-1 Phase 1's test-coverage DoD** — the intake-checkpoint schema,
+CAS-protected primitives, and all three step-1/2/3 apply functions are now
+implemented, CLI-wired, and fully test-covered (happy path, precondition/
+error paths, idempotency, crash-injection, CAS-drift).
+
+One narrow, non-blocking finding surfaced while writing the crash tests and
+is documented rather than fixed: after a crash at the `rename` or
+`directory-fsync` fault point, an identical-values retry takes
+`applyIntakeCheckpointMutation`'s unlocked no-op fast path and therefore
+never releases the stale writer lock the crash left behind. Not a
+data-correctness bug — the checkpoint content is exactly right, and
+`acquireLock()`'s existing same-token/staleness recovery cleans the lock up
+on the next call that actually has real work to do (proven by the test
+itself). Not scheduled for a fix; noted here for visibility only.
+
+Item stays `open` — Phase 1's core module is now complete and fully tested,
+but the coordinator as a whole (steps 4-6: staging generation, authority
+binding, CLI retirement/migration story — the actual transaction this
+item's own acceptance test needs) has not started, and the known
+`guard-lifecycle-ready.mjs` admission gap
+(`guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands`)
+remains open.
