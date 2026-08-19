@@ -1613,6 +1613,12 @@
       "member": "guard-lifecycle-ready-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-maintenance-window-cli-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -3299,6 +3305,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-handover-size-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-onboarding-consent-lock-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-decision-reference-tests",
