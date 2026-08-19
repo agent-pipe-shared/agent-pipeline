@@ -2425,6 +2425,22 @@ check("syncStateMdNextAction: resyncs a calibration-configured handover path, no
     "the sync must not fall back to writing docs/state.md when a custom handover is configured");
 });
 
+check("syncStateMdNextAction: resyncs an object-shaped ({ path, maxBytes }) calibration-configured handover", () => {
+  const root = fixture("sync-object-handover", { handover: { path: "notes/project state.md", maxBytes: 30000 } });
+  mkdirSync(join(root, "notes"), { recursive: true });
+  writeFileSync(join(root, "notes", "project state.md"), [
+    "# Project state", "", "## Goal", "", "Ship it.", "",
+    "## Next action", "", "Review the goal and establish the initial PRD and technical specification.", "",
+  ].join("\n"));
+  const result = syncStateMdNextAction(root, nextActionStateFixture());
+  assert.equal(result.ok, true);
+  assert.equal(result.changed, true);
+  const rewritten = readFileSync(join(root, "notes", "project state.md"), "utf8");
+  assert.match(rewritten, /pipeline-state submit-plan --by/);
+  assert.ok(!existsSync(join(root, "docs", "state.md")),
+    "the sync must not fall back to writing docs/state.md when an object-shaped handover is configured");
+});
+
 check("syncStateMdNextAction: is a no-op write when the rendered text already matches", () => {
   const state = nextActionStateFixture();
   const section = nextActionSection(state);

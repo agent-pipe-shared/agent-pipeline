@@ -3441,9 +3441,24 @@ export function syncStateMdNextAction(dir, state) {
     const calibrationObservation = observeOptionalProjectFile(root, selectedPaths.calibration, "Pipeline calibration");
     if (calibrationObservation.status === "present") {
       const calibration = parseJsonObject(calibrationObservation, "Pipeline calibration");
-      handoverPath = calibration.handover === undefined
+      // Dual-shape `calibration.handover`, matching `observeDetailed()` above
+      // and `handover-rotation.mjs`'s `resolveHandoverConfig()`: a plain
+      // string names the path directly (predating ADR-0066); an ADR-0066
+      // Decision 5 `{ path, maxBytes }` object names it via `.path`
+      // (`maxBytes` is not read here -- this call site only ever needed the
+      // path). Anything else (including an object without a usable `.path`)
+      // still reaches `safeRelativePath()`, whose failure is caught below
+      // and falls back to the `docs/state.md` default, same as before this
+      // fix.
+      const handoverValue = calibration.handover;
+      const handoverPathCandidate = handoverValue
+        && typeof handoverValue === "object"
+        && !Array.isArray(handoverValue)
+        ? handoverValue.path
+        : handoverValue;
+      handoverPath = handoverValue === undefined
         ? "docs/state.md"
-        : safeRelativePath(calibration.handover, "configured handover");
+        : safeRelativePath(handoverPathCandidate, "configured handover");
     }
   } catch {
     handoverPath = "docs/state.md";
