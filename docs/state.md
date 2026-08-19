@@ -5,6 +5,8 @@
 
 **Last updated:** 2026-08-19 (checkpoint 51)
 
+**Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
+
 ---
 
 ## CHECKPOINT — 2026-08-19 (51): one more genuine closure found (a safe, explicit CLI verb the item's own text asked for); 13 open items, 12 in this sprint's scope, every one now precisely classified with its exact blocker (READ THIS FIRST)
