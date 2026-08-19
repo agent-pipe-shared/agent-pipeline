@@ -161,6 +161,12 @@
       "member": "guard-git"
     },
     {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-handover-size.mjs",
+      "member": "guard-handover-size"
+    },
+    {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
@@ -237,6 +243,12 @@
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
       "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\""
     },
     {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
@@ -1547,6 +1559,12 @@
       "member": "guard-gate-strength-gmw-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-ledger-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-gate-strength-ledger-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-origin-attestation-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1575,6 +1593,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "guard-handoff-offer-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-handover-size-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-handover-size-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
@@ -2965,6 +2989,7 @@
         "guard:plugins/pipeline-core/hooks/guard-el01-tripwire.mjs:guard-el01-tripwire",
         "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
         "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
+        "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size",
         "guard:plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs:guard-onboarding-consent-lock",
         "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
@@ -2974,6 +2999,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-el01-tripwire.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
@@ -3014,6 +3040,7 @@
         "plugins/pipeline-core/hooks/guard-dispatch.mjs",
         "plugins/pipeline-core/hooks/guard-el01-tripwire.mjs",
         "plugins/pipeline-core/hooks/guard-git.mjs",
+        "plugins/pipeline-core/hooks/guard-handover-size.mjs",
         "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
         "plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs",
         "plugins/pipeline-core/hooks/guard-push.mjs",
@@ -3263,11 +3290,13 @@
         "verify-phase:harness/scripts/verify.mjs:guard-dispatch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-el01-tripwire-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-gmw-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-gate-strength-origin-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-authority-grant-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-phoenix-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-handoff-offer-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-handover-size-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-human-override-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-maintenance-window-tests",
