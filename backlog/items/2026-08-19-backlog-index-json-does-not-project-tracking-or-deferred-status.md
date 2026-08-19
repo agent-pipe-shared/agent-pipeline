@@ -77,4 +77,22 @@ decision, not a small addition, and is deliberately NOT proposed here.
 
 ## Triage
 
-Not yet triaged.
+- **Decision:** accepted, current scope, as written — the item's own
+  Proposal is already narrowly scoped, purely additive (no status-enum
+  change, no new command surface), and reuses the existing
+  `reconcile-backlog-ledger.mjs --activate` regeneration path. No PO
+  input is needed beyond what the PO already gave when they raised this
+  ("der index Jason des backlogs sollte dann aber auch Ziel sprints oder
+  status wie pausiert/deffered kennen") — the item's own "Out of scope"
+  paragraph already correctly reserves the one real design decision
+  (a `status: paused`/`deferred` enum value) for a future PO call rather
+  than proposing it here.
+- **Rationale:** projecting an existing free-text field (`tracking`)
+  verbatim and a derived boolean parsed from existing Triage prose
+  (`Decision: deferred`) are both read-only, additive projections of
+  data that already exists on disk — no risk of silently changing what
+  a `status:` value means or how the ledger's state machine works.
+- **Assignment:** goldfish-implementor (clearly-briefed, no in-task
+  design latitude — the Proposal section already specifies the exact
+  fields, parsing rule, and regeneration path).
+- **Date:** 2026-08-19
