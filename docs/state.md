@@ -3,11 +3,23 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 63)
+**Last updated:** 2026-08-19 (checkpoint 64)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
 **Recovered Sentinel-epic normative documents** (retained per `backlog/items/2026-07-20-spec-retention-on-close.md`, enforced by `governance/spec-retention.json` + `check-spec-retention.mjs`; this section must keep linking all seven — do not prune it when trimming older checkpoints): [PRD](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md), [Spec](../specs/2026-07-19-sprint-sentinel-epic/spec.md), [acceptance matrix](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md), [reconciliation design](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md), [recovery record](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md), [platform-support contract](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md), [Windows blockers scope](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
+
+---
+
+## CHECKPOINT — 2026-08-19 (64): PO signed and installed the TP-3 maintenance window; Critic round 1 on the shell-grammar fix FAIL (1 blocker, 2 major) — rework dispatched; hook-registration retry in flight (READ THIS FIRST)
+
+**Maintenance window ceremony completed.** The PO ran `guard-maintenance-window.mjs prepare` themselves (first attempt defaulted to the wrong plan/spec — Nova's, not Phoenix's, caught before signing and redone correctly), signed the intent digest externally via `po-human-approval.mjs sign-intent` (the generic signer this script already provides, `~/agent-pipeline-po-nova`), and `install`ed it. Window active: scope `TP-3`, bound to `2786fe64`, ~1.9h TTL from install. `PHX-WP-VERIFY-REGISTER-GUARD-HOOKS-V2` re-dispatched immediately to use it — in flight at this checkpoint.
+
+**Critic round 1 on `b3153385` (shell-grammar widening): FAIL.** Finding 1 (**blocker**): `isChainEligibleSegment`'s `mkdir -p` branch admitted ANY in-repo path via the generic `isProjectWritePath`, not the backlog item's required narrower scratch/worktree set — proven live: a not-onboarding-ready governed session could `mkdir` anywhere in the repo (including `guardrails/`) via a two-clause `&&`-chain, bypassing the onboarding-readiness gate entirely. Finding 2 (major): the new regression test used an UNGOVERNED temp root, so it never actually exercised the bypass path Finding 1 lives in — vacuous, explaining how the bug shipped under 47/47 green. Finding 3 (major): the backlog's explicitly-accepted "grep-pipe as a trailing chain stage" requirement was not implemented, and the code's own comment mischaracterized it as "unbriefed" when it was PO-accepted scope.
+
+**Rework dispatched** (`PHX-WP-READONLY-GRAMMAR-WIDEN-CRITIC-FIX1`, goldfish-deep): narrows the `mkdir -p` admission to exactly `scratch/`/`.claude/worktrees/`, adds a governed-root regression test proving both the narrowed admit and the still-refused case, corrects the F3 comment from "unbriefed" to "accepted but deferred." F3's actual implementation (the grep-pipe trailing stage itself) is deliberately NOT bundled into this rework — split into its own tracked item (`2026-08-19-readonly-and-chain-grep-pipe-trailing-stage-not-implemented.md`, `74ba2c75`) so the blocker fix isn't held up by a separate, riskier parser extension. In flight at this checkpoint.
+
+**Next step:** await both in-flight dispatches. Hook-registration: verify + commit, watch the window's remaining TTL. Shell-grammar rework: this is round 1 of the ~2-round Critic budget — a round-2 delta re-review is appropriate once the fix lands (not a 3rd from-scratch review); dispose any further minor findings directly per round-cap policy rather than a 3rd dispatch.
 
 ---
 
