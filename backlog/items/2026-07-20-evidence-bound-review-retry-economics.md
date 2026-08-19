@@ -3,7 +3,11 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.evidence-bound-review-retry-economics"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "cd95c3334105adfdcd90eddcea524240e0cd5c16"
+closure_evidence: "backlog/items/2026-07-20-evidence-bound-review-retry-economics.md"
 created: "2026-07-20"
 source: "Public V3 Foundation stabilization review of formal review and dispatch retries"
 due: "2026-09-08"
@@ -294,3 +298,22 @@ ceremony against this exact repo, run by whoever has the external Ed25519
 key — not this dispatch). Once applied and Verify itself confirms green,
 this item's remaining scope is fully closed. Status stays `in_progress`.
 - **Date:** 2026-08-18
+
+### Closure, 2026-08-19
+
+The three hunks landed under a signed Guard Maintenance Window (PO André,
+scope TP-3): the `PIPELINE_REVIEW_RETRY_INPUT` env-var constant, and the
+`review-retry-plan-check` suite entry pointing at the actual checker script
+(mirroring `phase26-invariants-check`'s pattern) — commit `cd95c333`.
+(`review-retry-planner-tests`/`check-review-retry-plan-tests`, this item's
+hunk B and the test half of hunk C, turned out already registered by an
+earlier, unrelated ceremony this session — found live via `rg`, not assumed
+from this item's own prior text.) A full Verify run confirmed
+`review-retry-plan-check` and `check-review-retry-plan-tests` both green
+(`evidence/verify-latest.json`, run `verify-1787152263731-4c4b543a38320f6d`);
+the run's overall exit 1 came solely from self-inflicted mid-run tree drift
+(this Elephant made further commits while the run was in flight) and the
+standing `human-guard-override-tests` marketplace-mirror exception, both
+unrelated to this item. **Item closed** — live wiring into the actual retry
+decision path was always out of this item's own scope (a separate, later,
+higher-risk follow-up per `NVA-RETRYECON-1`'s own closing note).

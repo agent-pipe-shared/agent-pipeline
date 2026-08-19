@@ -120,3 +120,19 @@ suites move to the selective set). Not designed further here — this
 entry only removes the "needs a PO decision" blocker; the concrete
 selective-set design still needs its own pass once the duration data
 exists.
+
+### Update, 2026-08-19 — part 1 fully landed
+
+`durationMs`/`reused` now propagate from `runVerifyJournal()` into
+`harness/scripts/verify.mjs`'s own public evidence artifact (one-line fix,
+landed under a signed Guard Maintenance Window, PO André, scope TP-3 —
+commit `cd95c333`; the earlier-cited marketplace-mirror-refresh blocker
+turned out not to still apply, the GMW mechanism worked directly against
+this checkout). A full Verify run confirms every suite's evidence entry now
+carries both fields (`evidence/verify-latest.json`, run
+`verify-1787152263731-4c4b543a38320f6d`). **Part 1 is now the precondition
+part 3's selective-set design needs — done.** Parts 2 (declare per-suite
+inputs — mostly covered by ADR-0065, candidates a/b landed, candidate c
+not started), 3 (the concrete selective-set design itself, now
+data-unblocked), and 4 (the consolidation rule) remain open. Item stays
+`open`.

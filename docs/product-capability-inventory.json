@@ -2249,6 +2249,12 @@
       "member": "review-economy-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:review-retry-plan-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "review-retry-plan-check"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:review-retry-planner-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -3243,6 +3249,7 @@
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
         "verify-phase:harness/scripts/verify.mjs:resume-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
+        "verify-phase:harness/scripts/verify.mjs:review-retry-plan-check",
         "verify-phase:harness/scripts/verify.mjs:review-retry-planner-tests",
         "verify-phase:harness/scripts/verify.mjs:rotate-handover-sections-tests",
         "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
