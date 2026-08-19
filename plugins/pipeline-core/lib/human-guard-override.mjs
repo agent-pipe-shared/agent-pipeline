@@ -317,6 +317,10 @@ function storage(common) {
   return {
     base,
     requests: secureDirectory(join(base, "requests")),
+    // Part A (design doc §1.4 step 1): the persisted plan snapshot, one file per
+    // (requestSha256, authorSourceRoot) pair, written with the identical
+    // writeExclusive/writeAtomic discipline `requests`/`capabilities` already use.
+    plans: secureDirectory(join(base, "plans")),
     capabilities: secureDirectory(join(base, "capabilities")),
     locks: secureDirectory(join(base, "locks")),
     key: join(base, "audit.key"),
@@ -479,6 +483,39 @@ function repositoryObservation(root, spawn = spawnSync) {
     statusSha256: sha(git(root, ["status", "--porcelain=v1", "--untracked-files=all"], spawn)),
     state: stateObservation(root),
   };
+}
+
+/**
+ * Part A step 3 (design doc §1.4): the ONLY repository-adjacent re-check left at
+ * arm time, deliberately narrowed to what genuinely cannot wait for the persisted
+ * plan to be trusted as-is -- the calling repository's physical fingerprint (3a),
+ * the project's guard/policy configuration (3b), and, restored per Critic round 1
+ * Finding 2 / ADR-0058's "recursive-verifier hole" concern, the override
+ * machinery's OWN code identity (3c, HGO-PLUGIN-DRIFT -- deliberately not the
+ * reused HGO-DRIFT, so an audit reader can tell a machinery-tamper refusal apart
+ * from a repository-freshness refusal). Returns the one fresh repository
+ * observation taken for 3a so the caller can bind `capabilityCore.repository` to
+ * what was actually live at arm time, not the plan-frozen snapshot -- exactly
+ * GMW's own precedent for `openingTreeSha256` (guard-maintenance-window.mjs
+ * :530-532).
+ */
+function armTimeFreshnessCheck({ repo, pluginRoot, planned, spawn }) {
+  const isLocalPluginInstall = planned.mode === "global-plugin-install";
+  const repository = isLocalPluginInstall
+    ? localPluginInstallSourceObservation(repo)
+    : repositoryObservation(repo.root, spawn);
+  if (repository.fingerprintSha256 !== planned.repository.fingerprintSha256) {
+    fail("HGO-DRIFT", "override repository fingerprint drifted before arming");
+  }
+  const policy = policyIdentity(repo.root, pluginRoot, planned.denials);
+  if (canonical(policy) !== canonical(planned.policy)) {
+    fail("HGO-DRIFT", "override policy identity drifted before arming");
+  }
+  const plugin = pluginIdentity(pluginRoot);
+  if (canonical(plugin) !== canonical(planned.plugin)) {
+    fail("HGO-PLUGIN-DRIFT", "override machinery plugin identity drifted before arming");
+  }
+  return repository;
 }
 
 function safePath(root, candidate) {
@@ -1009,6 +1046,83 @@ function capabilityPath(paths, digest) {
   return join(paths.capabilities, `${digest}.json`);
 }
 
+// ---------------------------------------------------------------------------------
+// Part A (design doc §1.4): the persisted plan store. Keyed by (requestSha256,
+// authorSourceRoot) -- design doc §1.7's own flagged keying requirement, since
+// authorSourceRoot changes mode/sourceRoot in the payload. The file name is a
+// digest of the KEY, not of the plan's content (unlike requests, whose file name
+// IS the content digest) -- self-consistency is instead checked via the embedded
+// `planSha256` field, exactly the same trust tier `requestSha256` already gives
+// requests: owner-private-directory protection, not an audit-key HMAC (a tampered
+// plan cannot widen authority beyond what the arm-time freshness re-check in
+// armTimeFreshnessCheck() below still allows against LIVE state).
+// ---------------------------------------------------------------------------------
+const PLAN_KEYS = [
+  "schema",
+  "status",
+  "root",
+  "requestSha256",
+  "plugin",
+  "repository",
+  "toolName",
+  "toolInputSha256",
+  "commandClass",
+  "denials",
+  "policy",
+  "preview",
+  "eligiblePaths",
+  "mode",
+  "authorSourceRoot",
+  "expiresAt",
+  "planSha256",
+];
+
+function planPath(paths, requestSha256, authorSourceRoot) {
+  if (!SHA256.test(requestSha256)) fail("HGO-DIGEST", "request digest is invalid");
+  return join(paths.plans, `${sha({ requestSha256, authorSourceRoot })}.json`);
+}
+
+function validatedPlan(path) {
+  const value = readJson(path);
+  const core = Object.fromEntries(Object.entries(value).filter(([name]) => name !== "planSha256"));
+  if (!exactKeys(value, PLAN_KEYS) || value.schema !== PLAN_SCHEMA || value.status !== "planned"
+    || !SHA256.test(value.requestSha256 ?? "") || !SHA256.test(value.planSha256 ?? "")
+    || sha(core) !== value.planSha256) {
+    fail("HGO-PLAN", "persisted override plan is invalid");
+  }
+  return value;
+}
+
+/** Returns the persisted plan for (requestSha256, authorSourceRoot), or null if none exists yet. */
+function readPersistedPlan(paths, requestSha256, authorSourceRoot) {
+  const path = planPath(paths, requestSha256, authorSourceRoot);
+  if (!existsSync(path)) return null;
+  const persisted = validatedPlan(path);
+  if (persisted.requestSha256 !== requestSha256) fail("HGO-PLAN", "persisted override plan does not match its request");
+  return persisted;
+}
+
+/** The identical check `request` expiry gets at plan first-creation (design doc §1.4 step 1, :1520) and at refreeze (step 6). */
+function assertRequestNotExpired(request, repo, nowMs) {
+  if (request.root !== repo.root || new Date(request.expiresAt).getTime() <= nowMs) {
+    fail("HGO-EXPIRED", "override request expired");
+  }
+}
+
+/**
+ * The identical, unconditional narrow drift gate design doc §1.4 steps 1 and 6 both
+ * enforce against the frozen `request`: `fingerprintSha256` and `policyIdentity`
+ * only -- never `statusSha256`/`head`/`tree`/`state`, and never `pluginIdentity`
+ * (which is not compared here at all; see armTimeFreshnessCheck() for why the
+ * override machinery's own code identity is instead re-verified only at arm time).
+ */
+function assertNoRequestDrift(repository, policy, request) {
+  if (repository.fingerprintSha256 !== request.repository.fingerprintSha256
+    || canonical(policy) !== canonical(request.policy)) {
+    fail("HGO-DRIFT", "override request preimage drifted");
+  }
+}
+
 function key(paths, { create = false } = {}) {
   if (!existsSync(paths.key)) {
     if (!create) fail("HGO-AUDIT-KEY", "audit key is missing");
@@ -1227,6 +1341,13 @@ const CAPABILITY_KEYS = [
   "reasonSha256",
   "plugin",
   "repository",
+  // Part A step 5 (design doc §1.4): the exact candidate the PO's signature
+  // covers ({commit, tree} | null) -- signature path only, null on the chat
+  // path (Finding 1's scope). Additive on v2 (design doc §1.7 leaves the v2-vs-v3
+  // choice to this dispatch; this is the only in-tree exact-key-set reader of
+  // this schema outside this file's own tests, per grep, so keeping v2 does not
+  // silently break another reader).
+  "signedCandidate",
   "toolName",
   "toolInputSha256",
   "commandClass",
@@ -1260,6 +1381,10 @@ function validatedCapability(paths, path) {
     || !SHA256.test(value.reasonSha256 ?? "")
     || !SHA256.test(value.toolInputSha256 ?? "")
     || typeof value.commandClass !== "string" || value.commandClass.trim() === ""
+    || !(value.signedCandidate === null
+      || (object(value.signedCandidate) && exactKeys(value.signedCandidate, ["commit", "tree"])
+        && typeof value.signedCandidate.commit === "string" && value.signedCandidate.commit !== ""
+        && typeof value.signedCandidate.tree === "string" && value.signedCandidate.tree !== ""))
     || !object(value.policy) || !object(value.preview)
     || !new Set(["standard", "pipeline-author-repair", "global-plugin-install"]).has(value.mode)
     || !(value.authorSourceRoot === null || typeof value.authorSourceRoot === "string")
@@ -1313,9 +1438,19 @@ function validatedRequest(paths, requestSha256) {
 // swallowed reason, not the missing route, so this deliberately offers no command: it says
 // that a route was attempted, and what the attempt observed.
 //
-// What it can disclose is bounded by construction rather than by care. Only two tokens ever
-// reach the output, each rendered only if it matches a typed-token shape and is short --
-// so no `/`, `\`, `:`, whitespace or newline can pass -- plus a fixed clause selected by
+// The digest omission below is a UX/attention nudge, not a security boundary: it is meant to
+// make a human notice and personally drive a non-planned (e.g. author-repair) ceremony, not to
+// keep an agent from learning requestSha256. It does not, because it cannot -- the underlying
+// request record is written unconditionally to
+// `<paths.requests>/<requestSha256>.json` before this function ever runs (`:1471`), and any
+// session with ordinary filesystem read access can recover the digest from there. The real
+// security boundary is downstream and unrelated to this rendering: authorizeHumanGuardOverride()
+// and authorizeHumanGuardOverrideBySignature() cannot arm a capability without, respectively, an
+// in-session activation gated to `chat` mode, or a genuine Ed25519 signature verified against the
+// committed trust anchor (ADR-0059) -- neither of which knowing this digest grants. What this
+// function still bounds, for its own sake (defense in depth, not the actual access control): only
+// two tokens ever reach the output, each rendered only if it matches a typed-token shape and is
+// short -- so no `/`, `\`, `:`, whitespace or newline can pass -- plus a fixed clause selected by
 // the observed status. No error message, no stack, no digest, no path. `candidateSourceRoot`
 // (the one field of a non-planned outcome carrying an absolute host path) is never read.
 // ---------------------------------------------------------------------------------
@@ -1489,6 +1624,58 @@ export function recordHumanGuardDenial({
     : { status: "planned", requestSha256 };
 }
 
+function buildPlanResult(record, scriptPath) {
+  return {
+    ...record,
+    prepareAuthorizationAction: {
+      executable: process.execPath,
+      argv: [
+        scriptPath,
+        "prepare-authorization",
+        "--repo",
+        record.root,
+        "--request-sha256",
+        record.requestSha256,
+        "--plan-sha256",
+        record.planSha256,
+        "--reason",
+        "<human-reason>",
+        ...(record.authorSourceRoot === null ? [] : ["--author-source-root", record.authorSourceRoot]),
+      ],
+      mutation: false,
+      requiresConfirmation: false,
+      executionBoundary: "local-process",
+      expected: {
+        schema: "pipeline.human-guard-override-authorization-selection.v1",
+        status: "prepared",
+      },
+    },
+  };
+}
+
+/**
+ * Part A step 1 (design doc §1.4, Revision 3): get-or-create, not pure. The FIRST
+ * successful call for a given (requestSha256, authorSourceRoot) pair takes one
+ * repositoryObservation(), checks it narrowly against the frozen `request`
+ * (assertNoRequestDrift -- fingerprintSha256 + policyIdentity only), and ALSO
+ * checks a freshly-computed `pluginIdentity(pluginRoot)` in FULL against
+ * `request.plugin` (frozen at denial, unnarrowed) -- fail closed with the
+ * existing `HGO-DRIFT` code on any mismatch. This is not a new check: it
+ * restores, at the first call, the exact full-equality comparison the
+ * pre-redesign `planHumanGuardOverride` already made unconditionally on every
+ * call; dropping it here would let a plugin-code tamper landing between denial
+ * and this first call be captured, unverified, as the new persisted-plan
+ * baseline (armTimeFreshnessCheck()'s later HGO-PLUGIN-DRIFT check at step 3c
+ * only ever compares fresh state against *that same* baseline, so it cannot
+ * catch a baseline that was already tampered when captured). On success,
+ * persists the full plan payload (including that same freshly-verified
+ * `plugin: pluginIdentity()` value) as the new trusted baseline, re-verified
+ * only at arm time from here on, exactly mirroring GMW's own architecture
+ * where `prepare` is the sole freeze point with nothing earlier to re-check
+ * against. Every LATER call for the same pair reads the persisted plan back
+ * unchanged -- no new observation, no new comparison -- which is what
+ * actually closes design doc §1.1's problem.
+ */
 export function planHumanGuardOverride({
   rootDir,
   pluginRoot,
@@ -1509,6 +1696,11 @@ export function planHumanGuardOverride({
     repo = controlPathTopology(rootDir);
     paths = storage(repo.common);
   }
+  const persisted = readPersistedPlan(paths, requestSha256, selectedAuthorSourceRoot);
+  if (persisted !== null) {
+    if (topologyError !== null && persisted.mode !== "global-plugin-install") throw topologyError;
+    return buildPlanResult(persisted, scriptPath);
+  }
   let request;
   try { request = validatedRequest(paths, requestSha256); }
   catch (error) {
@@ -1517,16 +1709,15 @@ export function planHumanGuardOverride({
   }
   const isLocalPluginInstall = request.mode === "global-plugin-install";
   if (topologyError !== null && !isLocalPluginInstall) throw topologyError;
-  if (request.root !== repo.root || new Date(request.expiresAt).getTime() <= nowMs) fail("HGO-EXPIRED", "override request expired");
+  assertRequestNotExpired(request, repo, nowMs);
   const plugin = pluginIdentity(pluginRoot);
   const repository = isLocalPluginInstall
     ? localPluginInstallSourceObservation(repo)
     : repositoryObservation(repo.root, spawn);
   const policy = policyIdentity(repo.root, pluginRoot, request.denials);
-  if (canonical(plugin) !== canonical(request.plugin)
-    || canonical(policy) !== canonical(request.policy)
-    || canonical(repository) !== canonical(request.repository)) {
-    fail("HGO-DRIFT", "override request preimage drifted");
+  assertNoRequestDrift(repository, policy, request);
+  if (canonical(plugin) !== canonical(request.plugin)) {
+    fail("HGO-DRIFT", "override plugin identity drifted before first plan");
   }
   let mode = isLocalPluginInstall ? "global-plugin-install" : "standard";
   let authorSourceRootValue = null;
@@ -1558,32 +1749,63 @@ export function planHumanGuardOverride({
     expiresAt: request.expiresAt,
   };
   const planSha256 = sha(payload);
-  return {
-    ...payload,
+  const record = { ...payload, planSha256 };
+  const path = planPath(paths, requestSha256, selectedAuthorSourceRoot);
+  writeExclusive(path, Buffer.from(`${JSON.stringify(record)}\n`, "utf8"));
+  return buildPlanResult(record, scriptPath);
+}
+
+/**
+ * Part A step 6, Revision 2 (design doc §1.4): the sole non-restart recovery path
+ * from an HGO-CANDIDATE-DRIFT refusal. Deliberately a SECOND, explicitly-invoked
+ * entry point, never folded into planHumanGuardOverride()'s own get-or-create
+ * path above -- `plan` must stay a pure cache read once a plan exists, or the
+ * whole point of freezing (design doc §1.1) comes back. This is the only place,
+ * other than first-creation above, allowed to WRITE to the `plans` store; it
+ * never touches `capabilities` and never arms anything.
+ */
+export function refreezeHumanGuardOverridePlan({
+  rootDir,
+  pluginRoot,
+  requestSha256,
+  authorSourceRoot = null,
+  nowMs = Date.now(),
+  spawn = spawnSync,
+} = {}) {
+  const repo = topology(rootDir, spawn);
+  const paths = storage(repo.common);
+  const priorPlan = readPersistedPlan(paths, requestSha256, authorSourceRoot);
+  if (priorPlan === null) {
+    fail("HGO-PLAN-ABSENT", "no persisted override plan exists for this request; run plan or prepare-for-signature first");
+  }
+  const request = validatedRequest(paths, requestSha256);
+  assertRequestNotExpired(request, repo, nowMs);
+  const repository = repositoryObservation(repo.root, spawn);
+  const policy = policyIdentity(repo.root, pluginRoot, request.denials);
+  assertNoRequestDrift(repository, policy, request);
+  const plugin = pluginIdentity(pluginRoot);
+  const refreshedPayload = { ...priorPlan, plugin, repository };
+  delete refreshedPayload.planSha256;
+  const planSha256 = sha(refreshedPayload);
+  const record = { ...refreshedPayload, planSha256 };
+  const path = planPath(paths, requestSha256, authorSourceRoot);
+  writeAtomic(path, Buffer.from(`${JSON.stringify(record)}\n`, "utf8"));
+  appendAudit(paths, {
+    type: "replanned",
+    at: new Date(nowMs).toISOString(),
+    requestSha256,
+    priorPlanSha256: priorPlan.planSha256,
     planSha256,
-    prepareAuthorizationAction: {
-      executable: process.execPath,
-      argv: [
-        scriptPath,
-        "prepare-authorization",
-        "--repo",
-        repo.root,
-        "--request-sha256",
-        requestSha256,
-        "--plan-sha256",
-        planSha256,
-        "--reason",
-        "<human-reason>",
-        ...(authorSourceRootValue === null ? [] : ["--author-source-root", authorSourceRootValue]),
-      ],
-      mutation: false,
-      requiresConfirmation: false,
-      executionBoundary: "local-process",
-      expected: {
-        schema: "pipeline.human-guard-override-authorization-selection.v1",
-        status: "prepared",
-      },
-    },
+    authorSourceRoot,
+  });
+  return {
+    schema: "pipeline.human-guard-override-refreeze-plan.v1",
+    status: "refrozen",
+    root: repo.root,
+    requestSha256,
+    priorPlanSha256: priorPlan.planSha256,
+    planSha256,
+    expiresAt: priorPlan.expiresAt,
   };
 }
 
@@ -1722,6 +1944,10 @@ export function authorizeHumanGuardOverride({
     ? controlPathTopology(rootDir)
     : topology(rootDir, spawn);
   const paths = storage(repo.common);
+  // Part A step 3 (design doc §1.4): the one remaining arm-time freshness
+  // re-check. `freshRepository` -- not `planned.repository` -- becomes
+  // capabilityCore.repository below (design doc §1.4 step 3's own instruction).
+  const freshRepository = armTimeFreshnessCheck({ repo, pluginRoot, planned, spawn });
   const capabilityCore = {
     schema: CAPABILITY_SCHEMA,
     status: "armed",
@@ -1731,7 +1957,10 @@ export function authorizeHumanGuardOverride({
     selectionSha256,
     reasonSha256,
     plugin: planned.plugin,
-    repository: planned.repository,
+    repository: freshRepository,
+    // Finding 1 (design doc §1.4 step 5) is scoped to the signature path only --
+    // the chat path has no signed-intent concept to bind a candidate to.
+    signedCandidate: null,
     toolName: planned.toolName,
     toolInputSha256: planned.toolInputSha256,
     commandClass: planned.commandClass,
@@ -1899,6 +2128,24 @@ export function authorizeHumanGuardOverrideBySignature({
   // uses for every mode other than global-plugin-install.
   const repo = topology(rootDir, spawn);
   const paths = storage(repo.common);
+  // Part A step 3 (design doc §1.4): the same arm-time freshness re-check the chat
+  // path runs, placed here AFTER signature verification succeeds, exactly as
+  // design doc §1.4 step 3 requires ("after signature verification succeeds for
+  // the signed path").
+  const freshRepository = armTimeFreshnessCheck({ repo, pluginRoot, planned, spawn });
+  // Part A step 5 (design doc §1.4, Finding 1): the exact candidate the PO's
+  // signature covers -- plan-persisted, byte-identical to what was signed, never
+  // re-derived. Step 5's check: the fresh 3a observation's head/tree must still
+  // match it, or a commit landed on HEAD after signing but before this arm call.
+  const signedCandidate = { commit: planned.repository.head, tree: planned.repository.tree };
+  if (freshRepository.head !== signedCandidate.commit || freshRepository.tree !== signedCandidate.tree) {
+    fail(
+      "HGO-CANDIDATE-DRIFT",
+      "a commit landed on HEAD after the PO's signature was computed but before this arm call; "
+        + "run refreeze-plan to obtain a new signable candidate bound to the current HEAD, then "
+        + "re-run prepare-for-signature, get a fresh PO signature, and retry authorize-by-signature",
+    );
+  }
   const capabilityCore = {
     schema: CAPABILITY_SCHEMA,
     status: "armed",
@@ -1908,7 +2155,8 @@ export function authorizeHumanGuardOverrideBySignature({
     selectionSha256: prepared.selectionSha256,
     reasonSha256: prepared.reasonSha256,
     plugin: planned.plugin,
-    repository: planned.repository,
+    repository: freshRepository,
+    signedCandidate,
     toolName: planned.toolName,
     toolInputSha256: planned.toolInputSha256,
     commandClass: planned.commandClass,
