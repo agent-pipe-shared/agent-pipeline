@@ -1,0 +1,16 @@
+{
+  "taskId": "PHX-WP-HGO-LEDGER-EMISSION-V3",
+  "model": "claude-sonnet-5",
+  "effort": "xhigh",
+  "rulesetSha": "5fa52282cd58e6be5c04dceada78dda8c9dd072b7f2d4b4d833b5d2ab8a54af2",
+  "dispatcher": "goldfish-deep",
+  "outcome": "in-progress",
+  "log": [
+    {
+      "phase": "bootstrap",
+      "toolUseCount": 5,
+      "note": "Worktree self-heal complete: HEAD moved from dd1eb9eedeb7ac48860c8ec9745750c9a8367b32 to expected d7759d0199562be0a551a1b780c9508fb2b4d3fd via git checkout --detach. Working tree was clean before heal, no stash needed. Dispatch record created as opening act."
+    }
+  ],
+  "report": null
+}
