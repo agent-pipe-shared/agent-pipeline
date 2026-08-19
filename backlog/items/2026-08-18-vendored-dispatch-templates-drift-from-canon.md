@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 0080b64019955ad2edfabfe50f5678aa1b556e2f
+closure_evidence: backlog/items/2026-08-18-vendored-dispatch-templates-drift-from-canon.md
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch, preamble narrative (2026-08-11 'NOVA-CLOSING-ALLOWANCE-01' entry). Finding surfaced by a read-only research fork, verified against current source before filing."
 ---
 
