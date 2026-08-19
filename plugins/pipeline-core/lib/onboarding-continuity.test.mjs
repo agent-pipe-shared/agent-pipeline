@@ -1897,7 +1897,10 @@ check("the promoted state's language is the promoted PRD's marker, not the kicko
   promote(seed);
   const promoted = JSON.parse(readFileSync(seed.statePath, "utf8"));
   const prdText = readFileSync(promotedArtifact(seed, "prd_promoted.md"), "utf8");
-  assert.match(prdText, /<!-- po-language: de -->/u);
+  // A literal-string check, not a regex literal: semgrep's parser has a known
+  // PartialParsing false positive on regex literals containing `<!--`/`-->`
+  // (2026-08-19, found by a Verify run, unrelated to any product defect).
+  assert.ok(prdText.includes("<!-- po-language: de -->"));
   assert.equal(promoted.continuity.runtime.humanFacingLanguage, "de",
     "one transaction must not emit a PRD saying de and a state saying en");
   assert.equal(classifyOnboardingContinuity({ rootDir: seed.root }).status, "valid");
@@ -2035,8 +2038,12 @@ check("promotion refuses a PRD carrying more than one technical Spec marker, wit
 check("promotion refuses a PRD whose technical Spec marker disagrees with the neighboring spec.md, with a distinct code", () => {
   const seed = promotionSeed("spec-marker-mismatch");
   const path = promotedArtifact(seed, "prd_promoted.md");
+  // A RegExp() string constructor, not a regex literal: semgrep's parser has a
+  // known PartialParsing false positive on regex literals containing
+  // `<!--`/`-->` (2026-08-19, found by a Verify run, unrelated to any product
+  // defect).
   writeFileSync(path, readFileSync(path, "utf8").replace(
-    /<!-- technical-spec-sha256: [0-9a-f]{64} -->/u,
+    new RegExp("<!-- technical-spec-sha256: [0-9a-f]{64} -->", "u"),
     `<!-- technical-spec-sha256: ${"a".repeat(64)} -->`,
   ));
   assert.throws(() => planOnboardingKickoffPromotion(seed.request),
