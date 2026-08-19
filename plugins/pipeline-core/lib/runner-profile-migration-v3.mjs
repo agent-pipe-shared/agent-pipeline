@@ -188,6 +188,39 @@ function slimRuntimeSeed(relative, { overlayCalibration = true } = {}) {
   if (relative === ".claude/pipeline.json" && !overlayCalibration) return freshCalibrationBytes();
   return SLIM_V3_RUNTIME_SEEDS[relative];
 }
+// Direction 2 of backlog/items/2026-08-08-two-manifest-literals-still-bypass-
+// the-single-seed-owner.md asked whether "what does a fresh project get"
+// (SLIM_V3_RUNTIME_SEEDS / slimRuntimeSeed() above) and "what does an
+// existing project's absent target get repaired to" (LEGACY_V3_RUNTIME_SEEDS
+// / resolveLegacyRuntimeSeed() above) should collapse into one seed table,
+// now that both already resolve `.claude/pipeline.yaml` from the same single
+// owner, freshManifestBytes(). Investigated for this fix and NOT unified,
+// because the divergence that is left is meaningful, not accidental
+// duplication: slimRuntimeSeed() answers a fresh-initialization question
+// that has no legacy-repair analogue -- "is THIS caller the private overlay
+// activating itself" (the `overlayCalibration` parameter, see the comment
+// above this function) -- and returns the overlay's own committed
+// calibration literal for that one caller (private-overlay-activation.mjs)
+// or freshCalibrationBytes() for every other slim caller. A legacy v0/v1/v2
+// source or a host-managed-Codex v3 project is, by definition, never a
+// private overlay activating itself: it is an EXISTING consumer project
+// whose absent target is being repaired, not a project choosing its own
+// calibration identity at first materialization. resolveLegacyRuntimeSeed()
+// therefore has nothing to branch on for `.claude/pipeline.json` and
+// correctly falls back to the flat `"{}\n"` placeholder LEGACY_V3_RUNTIME_
+// SEEDS carries for every legacy/repair caller alike. The two seed tables
+// also fire under different trigger conditions (sourceKind alone selects
+// the legacy/host-managed-Codex branch in runtimeBaselines(); the slim
+// branch additionally requires the caller's explicit
+// `initializeMissingRuntimeForSlimV3` opt-in). Folding both tables into one
+// function would mean plumbing the overlay-activation distinction into code
+// paths where it is meaningless (legacy/repair) or silently dropping it --
+// exactly the "one function answering both questions" shape the item warned
+// would make a future literal feel unsafe to remove. So the two concepts
+// stay separate tables on purpose; only the sub-question they actually share
+// -- which `gates` chapter `.claude/pipeline.yaml` gets -- is unified, and it
+// already is, through freshManifestBytes() in both resolveLegacyRuntimeSeed()
+// and slimRuntimeSeed().
 
 class IntentionalMigrationInterruption extends Error {
   constructor(target) { super(`intentional interruption after ${target}`); this.name = "IntentionalMigrationInterruption"; }

@@ -146,3 +146,25 @@ new). No guard/protected-file boundary reached; no TP-3/TP-4 stop.
 Status left `open` (Direction 2 still unresolved; no Closure section
 added per DoD).
 - **Date:** 2026-08-18
+
+### Documentation, 2026-08-19 (wave 5, dispatch NVA-W5-08)
+
+Direction 2 answered as a documentation-only follow-up: a code comment was
+added in `plugins/pipeline-core/lib/runner-profile-migration-v3.mjs`,
+directly after `slimRuntimeSeed()`, explaining — with evidence, not a
+guess — why `SLIM_V3_RUNTIME_SEEDS`/`slimRuntimeSeed()` (fresh project) and
+`LEGACY_V3_RUNTIME_SEEDS`/`resolveLegacyRuntimeSeed()` (existing project's
+absent-target repair) remain two separate seed tables rather than one. The
+`.claude/pipeline.yaml` sub-question both tables shared is already unified
+(both resolve it from `freshManifestBytes()`, per the wave-2 fix above); the
+remaining divergence, on `.claude/pipeline.json`, is real and load-bearing:
+`slimRuntimeSeed()`'s `overlayCalibration` parameter answers a
+fresh-initialization-only question ("is this caller the private overlay
+activating itself") that a legacy/repair caller cannot ever be true for, so
+unifying the tables would mean plumbing overlay-activation intent into
+code paths where it has no meaning. Not attempted: any runtime-behavior
+change (comment-only per DoD). Verified unaffected:
+`runner-profile-migration-v3.test.mjs` — 44/44 pass, same count as before
+this dispatch; `check-consumer-safe-paths.test.mjs` — 9/9 pass. Status left
+`open` (this item's own Triage/status is reserved for the Elephant).
+- **Date:** 2026-08-19
