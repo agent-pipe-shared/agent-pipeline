@@ -72,6 +72,11 @@ Per-dimension finding:
   `test()`/`t.test()` wrapping many sub-assertions, or it may genuinely
   be thin. **Needs one direct read of that file before it can be called
   covered or not.**
+  **Resolved, 2026-08-19:** the file uses this repository's own custom
+  `check()` assertion-helper convention (`let passed = 0`), not
+  `node:test`'s `test()` — `grep -c "^check("` finds **69** individual
+  assertions. Well covered, not thin; the earlier grep simply matched
+  the wrong declaration shape.
 - **Select** — code: `plugins/pipeline-core/scripts/codex-sandbox-select.mjs`;
   test: `codex-sandbox-select.test.mjs`, 14 named test cases covering
   request-digest domain separation, storage derivation, symlink
@@ -135,6 +140,25 @@ per the existing Triage above. The host-dimension open question above
 should be resolved (one direct read of `codex-critic-host.test.mjs`)
 before or alongside that dispatch, since it may turn out to need the
 same treatment.
+
+### Progress, 2026-08-19
+
+`NVA-BL-CSANDBOX-1` (goldfish-deep, worktree-isolated) closed the
+bounded preflight gap above: `plugins/pipeline-core/scripts/codex-sandbox-preflight.test.mjs`
+(new, 455 lines) covers all 4 named requirements — 22/23 tests pass, 1
+skipped and documented inline (the fixture-driven subprocess happy path
+does not complete cleanly in this environment, `child-stdio-error`).
+Commit `2e72de5f` (cherry-picked from the dispatch's worktree, commit
+`219727a8`). The host-dimension open question above is now also
+resolved (69 `check()` assertions, well covered).
+
+**Item stays `in_progress`.** Two things this pass and the prior
+scoping pass both left genuinely open: the Runtime dimension's
+integration-path gap (neither existing test case exercises the actual
+call into preflight, both stop before or route around it), and the
+three files named just below that were never read in either pass.
+Preflight's own unit coverage is no longer the gap; whether preflight
+is correctly WIRED from Runtime is still unverified.
 
 Not read this pass (named in the matrix's evidence list but out of
 this briefing's context-file scope): `codex-critic-isolation.mjs`/

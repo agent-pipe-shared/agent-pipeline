@@ -39,3 +39,20 @@ bound to the actual Nova A candidate freeze, same as
 dispatched separately. **Assignment:** pipeline; suite-registration half queued
 as the next dispatch after the three currently in flight land.
 **Date:** 2026-08-18
+
+### Progress, 2026-08-19
+
+`NVA-BL-AFK-1` (goldfish-implementor, worktree-isolated) root-caused and
+fixed the 8/13 failing tests in `afk-activation.test.mjs` (now 13/13
+pass) — a stale test fixture no longer matching a real-filesystem call
+`afk-activation.mjs` gained in commit `73cb41c7`; made the call
+dependency-injectable, matching the existing pattern. Commit `9f9a1cdc`
+(cherry-picked from the dispatch's worktree, commit `6928f5ca`).
+
+Suite registration into `harness/scripts/verify.mjs` was attempted and
+correctly denied (TP-3) — not yet landed, queued alongside the other
+pending verify.mjs registrations (F1's `state-numeric-claims-tests` live
+checker, `evidence-bound-review-retry-economics`) for one combined
+signed HGO ceremony rather than three separate ones. Item stays
+`in_progress` for that registration plus the release-administration
+half above.
