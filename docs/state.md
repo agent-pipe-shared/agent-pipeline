@@ -3,13 +3,29 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 58)
+**Last updated:** 2026-08-19 (checkpoint 59)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
 ---
 
-## CHECKPOINT — 2026-08-19 (58): HGO Part C (CLI wiring) implemented and landed; Critic round 1 FAIL (2 major), both fixed; Critic round 2 (delta) dispatched; backlog audit closed 5 stale items, opened 3 new pre-existing-red findings (READ THIS FIRST)
+## CHECKPOINT — 2026-08-19 (59): Critic round 2 (delta) FAIL, 2 findings — both disposed directly per round-cap policy, no 3rd dispatch; HGO Part C's Critic gate is now closed (READ THIS FIRST)
+
+**Round 2 verdict: FAIL** (1 major, 1 minor). Round-cap reached (~2-round budget) — both findings disposed by direct verification/fix rather than a 3rd dispatch.
+
+**Finding 1 (major, disposed):** the evidence handed to the Critic (`scratch/critic-evidence-hgo-implc/full-verify-evidence-round2.txt`) was hand-composed prose, not the QG-03-mandated machine-generated JSON. Disposition: the genuine QG-03 artifact already existed on disk the whole time — `evidence/verify-latest.json`, `schema: pipeline.verify-evidence.v0`, `candidate.binding: "exact"` to `bdbbacd4cfb9884fd61933e70f88162fcf77910d`. Read it directly and cross-checked its `steps[]`/`exitCode` against the prose's claims: exactly 4 red steps (`spec-retention-check` exit 2, `product-capability-inventory-tests` exit 1, `verify-suite-registration-check` exit 2, `security-scan` exit 2), overall `exitCode: 2` — numerically matches what round 1's fix narrated, no discrepancy. `evidence/verify-latest.json` is the evidence of record for this delta going forward, not the scratch prose.
+
+**Finding 2 (minor, fixed):** the prose evidence misattributed the `product-capability-inventory-tests` failure to check `HAW-A01`; direct read of `harness/scripts/check-product-capability-inventory.test.mjs:115-129` confirms line 124 sits inside `HAW-A02` ("accepts an attested receipt and an honest inventory-phase pending gate"), not `HAW-A01`. Corrected the same misattribution where it had propagated into `backlog/items/2026-08-19-product-capability-inventory-missing-two-new-guard-hooks.md`.
+
+**Everything else in round 2 was clean:** the discriminating-test question (category 1) resolved in favor of the fix after adversarial sub-candidate analysis; the 3 other red-step root-cause claims (gitleaks FP, 2 unregistered hooks, spec-retention) all independently confirmed accurate; scope discipline and trailer/dispatch trajectory both clean.
+
+**HGO Part C's Critic gate is now closed** — no outstanding findings block it.
+
+**Next step:** the final-gates sequence promised since checkpoint 58 — fresh full `harness/scripts/verify.mjs` in the detached verify worktree (current `evidence/verify-latest.json` is already commit-exact to HEAD and usable if no further commits land first), `security-scan.mjs`, a new push-approval ceremony (the prior one is stale), then push. Note `security-scan` is itself one of the 4 pre-existing reds (`evidence/verify-latest.json` step `security-scan: exitCode 2`) — root-caused in checkpoint 58 as the gitleaks false positive on `guard-maintenance-window.mjs:172`, not a real credential; this needs an actual fix (not just root-causing) before the security gate can go green for push, per checkpoint 58's own note that these are "not optional cleanup." Remaining Phoenix-scope backlog after the gates: `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger`'s CLI-side "granted" wiring (checkpoint 55's gap), then `closed-shell-grammar-still-rejects-common-readonly-composition`.
+
+---
+
+## CHECKPOINT — 2026-08-19 (58): HGO Part C (CLI wiring) implemented and landed; Critic round 1 FAIL (2 major), both fixed; Critic round 2 (delta) dispatched; backlog audit closed 5 stale items, opened 3 new pre-existing-red findings
 
 **Part C landed, `eabc96b6`.** `prepareHumanGuardOverrideForSignature()` added to `lib/human-guard-override.mjs` (collapses plan → prepare-authorization → digest-emission into one call, mirroring `authorizeHumanGuardOverrideBySignature()`'s own recipe); `prepare-for-signature`/`refreeze-plan` CLI subcommands wired into `scripts/guard-human-override.mjs` (the latter a thin wrapper over the already-implemented, already-tested `refreezeHumanGuardOverridePlan`). Dispatch hit the same stale-worktree-base bug the very first Part A+B attempt hit, but this time the mandatory self-heal check caught it correctly (only a benign shell-grammar detour on the way).
 

@@ -12,9 +12,10 @@ source: "Found while gathering full harness/scripts/verify.mjs evidence for the 
 
 ## Description
 
-`harness/scripts/check-product-capability-inventory.test.mjs`'s `HAW-A01`
-check ("discovers the complete current direct product surface") fails with
-`AssertionError: false !== true` at line 124. `docs/product-capability-inventory.json`
+`harness/scripts/check-product-capability-inventory.test.mjs`'s `HAW-A02`
+check ("accepts an attested receipt and an honest inventory-phase pending
+gate") fails with `AssertionError: false !== true` at line 124.
+`docs/product-capability-inventory.json`
 does not mention either `guard-gate-strength-ledger` or `guard-handover-size`
 (confirmed via direct grep — zero hits for both names in the inventory
 document), the same two guard hooks the companion item
