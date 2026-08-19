@@ -50,7 +50,9 @@ import {
   removeRestartBarrierCas, requiresNativeRuntimeReadback, sha256,
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
-import { readOnboardingSessionCleanupBinding } from "./onboarding-continuity.mjs";
+import {
+  applyOnboardingIntakeGenerate, planOnboardingIntakeGenerate, readOnboardingSessionCleanupBinding,
+} from "./onboarding-continuity.mjs";
 import {
   cleanupSession, listActiveSessionDescriptors, retireSessionDescriptor, startSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
@@ -6097,6 +6099,136 @@ test("a fresh greenfield onboarding populates both manifest tiers without ever r
     assert.equal(authority.source, "neutral");
     assert.equal(authority.manifest, "project/pipeline.yaml");
     assert.equal(authority.calibration, "project/pipeline.json");
+  } finally { dispose(path); }
+});
+
+// Wave 4 onboarding coordinator, step 6 (design SSa.4/SSa.5/SSe;
+// NVA-W5-COORD-STEP6-1). The four cases below are this dispatch's own DoD:
+// the three new v4Inspection statuses a genuinely fresh repository now
+// settles into, plus the two regressions design SSe requires (a mid-kickoff
+// repository and an already-ready repository both completely unaffected).
+
+test("v4Inspection routes a genuinely fresh repository through the full intake coordinator lifecycle (intake-required -> intake-design-questions-required -> bootstrap-binding-required)", () => {
+  const path = root();
+  let stderr = "";
+  // onboarding-continuity.mjs's intake-checkpoint functions read `deps.spawn`
+  // (singular), not `deps.spawnSync` -- the convention every OTHER call in
+  // this file's own fakeDeps object satisfies. Without it, `deps.spawn` is
+  // undefined and falls back to the real spawnSync, which fails against this
+  // fixture's fake (mkdirSync-only) `.git` directory. Both names point at the
+  // same fakeGit, so every other simulated git behaviour stays identical.
+  const intakeDeps = { ...fakeDeps, spawn: fakeGit };
+  const invoke = (args) => {
+    let output = "";
+    stderr = "";
+    const code = onboardingCli(args, {
+      deps: intakeDeps,
+      write: (chunk) => { output += chunk; },
+      writeError: (chunk) => { stderr += chunk; },
+    });
+    return { code, result: output ? JSON.parse(output) : null };
+  };
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+
+    // No checkpoint at all: intake-required, nextAction asks for consent.
+    const fresh = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(fresh.status, "intake-required");
+    assert.equal(fresh.continuity.status, "absent-pristine");
+    assert.equal(fresh.nextAction.kind, "collect-input");
+    assert.deepEqual(fresh.nextAction.expected, { schema: "pipeline.project-onboarding.v4", statuses: ["intake-required"] });
+    assert.ok(fresh.nextAction.inputs.some((input) => input.name === "gitAuthorName"));
+
+    // Consent recorded, no material captured yet: still intake-required, but
+    // nextAction switches to intake-capture-apply.
+    const consented = invoke(["intake-consent-apply", "--root", path, "--granted", "--activate", "--runner", "codex"]);
+    assert.equal(consented.code, 0, stderr);
+    const afterConsent = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(afterConsent.status, "intake-required");
+    assert.equal(afterConsent.nextAction.kind, "collect-input");
+    assert.equal(afterConsent.nextAction.input.name, "text");
+
+    // First material chunk captured: intake-design-questions-required,
+    // nextAction asks for the one bundled design-question round.
+    const captured = invoke(["intake-capture-apply", "--root", path, "--text", "Ship a safe project.", "--activate", "--runner", "codex"]);
+    assert.equal(captured.code, 0, stderr);
+    const afterCapture = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(afterCapture.status, "intake-design-questions-required");
+    assert.equal(afterCapture.nextAction.kind, "collect-input");
+    assert.equal(afterCapture.nextAction.input.name, "answersJson");
+
+    // Design questions answered: still intake-design-questions-required (SSa.4:
+    // "until step 4 runs"), but nextAction is now a real, ready-to-run
+    // intake-generate-plan command -- no PO input left to collect.
+    const answers = JSON.stringify([{ question: "What is the primary goal?", answer: "Ship safely." }]);
+    const answered = invoke(["intake-design-questions-apply", "--root", path, "--answers-json", answers, "--activate", "--runner", "codex"]);
+    assert.equal(answered.code, 0, stderr);
+    const afterAnswers = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(afterAnswers.status, "intake-design-questions-required");
+    assert.equal(afterAnswers.nextAction.kind, "command");
+    assert.equal(afterAnswers.nextAction.argv[1], "intake-generate-plan");
+
+    // Staging generated: bootstrap-binding-required, nextAction is the real
+    // bootstrap-bind-plan command. Called directly (not through onboardingCli):
+    // planOnboardingIntakeGenerate/applyOnboardingIntakeGenerate take `spawn`
+    // as their own top-level parameter, never nested under `deps` -- the CLI
+    // wrapper's `{ rootDir, deps }` call shape never actually threads a test's
+    // injected spawn through to these two specific functions (harmless in real
+    // usage, where the untouched default falls back to real git against a real
+    // repository; this fixture's git is fakeGit-simulated, so the default's
+    // real spawnSync fails against it). A CLI-level regression in this exact
+    // wiring is separately covered by project-onboarding-v3-argv-closure.test.mjs.
+    const genPlan = planOnboardingIntakeGenerate({ rootDir: path, repositoryCapability: "local", spawn: fakeGit });
+    const genApplied = applyOnboardingIntakeGenerate({
+      rootDir: path, repositoryCapability: "local", expectedPlanSha256: genPlan.planSha256, activate: true,
+      deps: { spawn: fakeGit },
+    });
+    assert.equal(genApplied.checkpoint.transactionState, "generated");
+    const afterGenerate = inspectProjectOnboardingV3({ runner: "codex", rootDir: path, deps: fakeDeps });
+    assert.equal(afterGenerate.status, "bootstrap-binding-required");
+    assert.equal(afterGenerate.continuity.status, "absent-pristine");
+    assert.equal(afterGenerate.nextAction.kind, "command");
+    assert.equal(afterGenerate.nextAction.argv[1], "bootstrap-bind-plan");
+  } finally { dispose(path); }
+});
+
+test("regression: a repository recognisedKickoff() already recognizes as mid-kickoff is completely unaffected by the intake-coordinator routing", () => {
+  const path = root();
+  try {
+    const args = claudePromotedRoot(path);
+    // Immediately after kickoff-apply (before promotion), this is exactly the
+    // mid-kickoff shape recognisedKickoff() (onboarding-continuity.mjs,
+    // untouched by this dispatch) recognizes. v4Inspection reports it exactly
+    // as it always has: continuity becomes "valid" the instant kickoff-apply
+    // writes its provisional state, so it never reaches the absent-pristine
+    // branch this dispatch changed at all -- "ready" here is pre-existing,
+    // unchanged behaviour, not a new claim this dispatch introduces.
+    const midKickoff = inspectProjectOnboardingV3({ rootDir: path, deps: args.deps, runner: "claude" });
+    assert.equal(midKickoff.status, "ready");
+    assert.equal(midKickoff.continuity.status, "valid");
+    // recognisedKickoff() itself still recognizes this exact seed: proven by
+    // driving the real (non-replay) kickoff-sourced promotion plan/apply
+    // through to completion, which internally requires
+    // recognisedKickoff() to succeed (buildKickoffPromotionPlan's
+    // kickoff-sourced branch, onboarding-continuity.mjs).
+    const plan = planProjectOnboardingKickoffPromotionV4({ ...args, runner: "claude" });
+    assert.equal(plan.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
+    const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, runner: "claude", planSha256: plan.planSha256, activate: true });
+    assert.equal(applied.status, "ready");
+    assert.equal(applied.continuity.status, "valid");
+  } finally { dispose(path); }
+});
+
+test("regression: a repository already at ready (kickoff-apply's provisional authority) is completely unaffected by the intake-coordinator routing", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, runner: "codex" });
+    assert.equal(observed.status, "ready");
+    assert.equal(observed.continuity.status, "valid");
   } finally { dispose(path); }
 });
 
