@@ -27,6 +27,8 @@ import {
 } from "./po-gate-authority.mjs";
 import { sha256CanonicalJson } from "./plan-spec-state-v2.mjs";
 import { mkdtempTestScratch } from "./test-tmpdir.mjs";
+import { ProjectOnboardingReadyError } from "./project-onboarding-ready-gate.mjs";
+import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 
 import {
   KICKOFF_FAULT_STAGES,
@@ -3078,25 +3080,53 @@ for (const key of INTAKE_GENERATE_STAGING_KEYS) {
 // NVA-W5-COORD-STEP5-1). bootstrap-bind-plan/bootstrap-bind-apply: the thin
 // adapter over planOnboardingKickoffPromotion/applyOnboardingKickoffPromotion
 // via the new coordinator-sourced ("no kickoff predecessor") branch.
-function bootstrapBindReadyRoot(name, { poLanguage = "en" } = {}) {
+// NVA-BL-INTAKEBIND-1 (AC-4): the freshly generated staging PRD already
+// carries valid po-language/technical-spec-sha256 markers (AC-1) -- the only
+// remaining marker, po-plan-acknowledged, is a genuine judgment call with no
+// automatic write. It is added here through the REAL sanctioned edit path
+// (guard-lifecycle-ready.mjs's bootstrap-binding-required staging-authoring
+// admission), proven by actually invoking the guard's own real
+// admission-decision function first and asserting it admits this exact Edit,
+// then performing the equivalent file mutation -- never a raw bypass.
+function bootstrapBindReadyRoot(name) {
   const root = readyToGenerateRoot(`bootstrap-bind-${name}`);
   const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
   applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
   const prdAbsolute = join(root, generatePlan.targets.prd.path);
-  const specAbsolute = join(root, generatePlan.targets.spec.path);
-  const specBytes = readFileSync(specAbsolute);
-  // The staging PRD is an explicitly unreviewed draft (design SSa.4/SSc.3): it
-  // must be edited to carry the three PO-gate markers before binding, exactly
-  // as promotionSeed()'s own hand-authored PRD fixture does for the
-  // kickoff-sourced path above.
-  writeFileSync(prdAbsolute, [
-    `<!-- po-language: ${poLanguage} -->`,
-    `<!-- technical-spec-sha256: ${digest(specBytes)} -->`,
-    PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
-    readFileSync(prdAbsolute, "utf8"),
-  ].join("\n"));
+  const admission = evaluateLifecycleReadyGuard(
+    { tool_name: "Edit", tool_input: { file_path: generatePlan.targets.prd.path } },
+    {
+      projectDir: root,
+      requireProjectOnboardingReadyFn() {
+        throw new ProjectOnboardingReadyError("PORG-NOT-READY", "raw",
+          { intent: "session", lifecycleStatus: "bootstrap-binding-required" });
+      },
+    },
+  );
+  assert.equal(admission.exitCode, 0, "the guard must actually admit this exact staging-PRD edit before we perform it");
+  writeFileSync(prdAbsolute, `${readFileSync(prdAbsolute, "utf8")}${PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER}\n`);
   return { root, featureId: generatePlan.featureId };
 }
+
+// NVA-BL-INTAKEBIND-1 (AC-1, reproduce-first): before this fix, a genuinely
+// fresh, unmodified intake-generated staging PRD (no hand-injected markers)
+// failed planOnboardingBootstrapBind() with KICKOFF-PROMOTION-PRD-LANGUAGE-
+// MARKER-INVALID -- a dead end for the entire material-intake happy path
+// (confirmed live via scratch/repro-nva-bl-intakebind-1.mjs before any fix
+// landed). Proves the fix: the freshly generated PRD now already carries
+// BOTH mechanical markers with the correct values, and only the genuine
+// judgment-call marker (po-plan-acknowledged) is still missing.
+check("planOnboardingBootstrapBind: a fresh, unmodified intake-generated staging PRD already carries valid po-language/technical-spec-sha256 markers -- only the acknowledgement marker is still missing", () => {
+  const root = readyToGenerateRoot("bootstrap-bind-ac1-markers");
+  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  const prdText = readFileSync(join(root, generatePlan.targets.prd.path), "utf8");
+  assert.equal(prdText.startsWith(
+    `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${generatePlan.targets.spec.afterSha256} -->\n`,
+  ), true, prdText);
+  expectKickoffError("KICKOFF-PROMOTION-PRD-ACKNOWLEDGEMENT-MARKER-MISSING",
+    () => planOnboardingBootstrapBind({ rootDir: root }));
+});
 
 check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor", () => {
   const { root, featureId } = bootstrapBindReadyRoot("happy");
