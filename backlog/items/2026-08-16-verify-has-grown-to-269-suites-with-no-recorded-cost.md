@@ -104,3 +104,19 @@ cannot be audited for whether any receipt was reused. Same TP-3/no-active-GMW
 blocker as `NVA-VERIFYDUR-1`; when the marketplace refresh eventually
 unblocks that file, propagate `reused` in the same edit as `durationMs`,
 not a separate PO-gated round.
+
+### PO decision, 2026-08-19 — Part 3 tiering: selective
+
+PO decision: **selective tiering** — the split originally proposed in
+"Four parts" item 3 above (selective execution during work, full before a
+candidate stamp and before a push) is the adopted shape, not a bespoke
+alternative. This resolves the one open scope-widening question part 3
+needed a PO call for. Still blocked on the same standing prerequisites as
+the rest of this item: part 1's `durationMs`/`reused` propagation into
+`harness/scripts/verify.mjs` needs the marketplace-mirror refresh + a
+fresh TP-3 ceremony before landing, and a selective tier needs `durationMs`
+data to order suites by cost before it can be designed concretely (which
+suites move to the selective set). Not designed further here — this
+entry only removes the "needs a PO decision" blocker; the concrete
+selective-set design still needs its own pass once the duration data
+exists.
