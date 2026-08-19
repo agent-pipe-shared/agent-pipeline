@@ -3,11 +3,23 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 62)
+**Last updated:** 2026-08-19 (checkpoint 63)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
 **Recovered Sentinel-epic normative documents** (retained per `backlog/items/2026-07-20-spec-retention-on-close.md`, enforced by `governance/spec-retention.json` + `check-spec-retention.mjs`; this section must keep linking all seven — do not prune it when trimming older checkpoints): [PRD](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md), [Spec](../specs/2026-07-19-sprint-sentinel-epic/spec.md), [acceptance matrix](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md), [reconciliation design](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md), [recovery record](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md), [platform-support contract](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md), [Windows blockers scope](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
+
+---
+
+## CHECKPOINT — 2026-08-19 (63): `closed-shell-grammar-still-rejects-common-readonly-composition` implemented (`b3153385`), independently re-verified, Critic review in flight; PO maintenance-window gate still the binding blocker (READ THIS FIRST)
+
+**Shell grammar widened**, dispatched (`PHX-WP-READONLY-GRAMMAR-WIDEN`, goldfish-deep) and landed as `b3153385`: `guard-lifecycle-ready.mjs` now admits (a) a small explicit `&&`-chain allowlist (`git rev-parse`/`log` restricted-flags/`status`, `echo`, `ls`, `mkdir -p` restricted to already-writable paths) and (b) a trailing `2>/dev/null`/`2>nul` redirect on an already-admitted command. Disclosed boundaries drawn, not silently assumed: `2>&1` NOT admitted (shared tokenizer limitation, out of this dispatch's file scope), a chain ending in a pipe NOT admitted, `git log --all`/format/author/path flags excluded. Independently re-verified by the Elephant: commit trailer correct, file scope matches exactly (2 files), `node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` re-run directly — 47/47 pass. Loose evidence/dispatch-record files the goldfish left at repo root were tidied into `scratch/` (ADR-0063 directory contract) before Critic dispatch.
+
+**Critic review dispatched** (guardrail-tier, mandatory per this session's own established practice for every `guard-*.mjs` change) — in flight at this checkpoint, verdict not yet known.
+
+**PO conversation, same window:** the PO asked live where the maintenance-window signature request was — clarified that only the `prepare` step (which builds the unsigned request) had been attempted, and it was blocked by the auto-mode classifier as a sensitive action; handed the PO the exact `prepare` command to run themselves via `!` (bypasses the classifier since it becomes the PO's own action), pending their external Ed25519 key.
+
+**Next step:** await the Critic verdict on `b3153385` (fix any findings, or accept a clean pass). The PO maintenance-window ceremony (checkpoint 60/61's exact commands) remains the sole blocker for `PHX-WP-VERIFY-REGISTER-GUARD-HOOKS` and, downstream, the promised final-gates sequence (fresh full Verify → `security-scan.mjs` → new push-approval ceremony → push).
 
 ---
 
