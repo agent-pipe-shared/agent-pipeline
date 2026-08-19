@@ -36,6 +36,26 @@ the agent is cryptographically incapable of producing this proof by design
 
 ### Layers 2 + 3 — the human's one command (current shape)
 
+**Run this FIRST, before anything below in this section**
+(`plugins/pipeline-core/scripts/push-prepare.mjs`, backlog item
+`pipeline.full-push-preflight-before-signature`): a single READ-ONLY report
+that atomically checks a clean/unchanged working tree, canonical
+candidate-bound verify evidence, the push threat-model artifact, and the
+critical-human-proof trust-anchor posture (including the exact
+`external-key-directory-vs-committed-trustAnchors` membership check the next
+section describes by hand) — all BEFORE the passphrase prompt, not
+discovered one layer at a time by trial and error. Only once every check is
+green does it print the fully-formed `authorize-critical` command below,
+with a correct `--subject-sha256` already computed.
+
+```
+node plugins/pipeline-core/scripts/push-prepare.mjs \
+  --by <name> --remote <remote> --destination refs/heads/<branch>
+```
+
+A red check names its own remedy; nothing below this line needs running
+until the report is fully green.
+
 ```
 node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical \
   --repo-root <repo> --directory <external-po-dir> \
@@ -84,11 +104,10 @@ command, type `approve`, enter the passphrase), never a fourth ritual. The
 only difference from the `push` example: this kind adds an additive,
 kind-agnostic `--subject <repo-relative path>` flag, so the confirmation
 decodes the release version, base commit, lifecycle feature/manifest and
-retention-policy digest instead of showing a bare hash (ADR-0064 Decision 4 —
-not vendored into this tree's `adr/` set as of this writing; see
-`docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md`
-in the source repository). When `--subject` is supplied, `--subject-sha256`
-becomes optional and derived from it.
+retention-policy digest instead of showing a bare hash
+([ADR-0064](adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md)
+Decision 4). When `--subject` is supplied, `--subject-sha256` becomes
+optional and derived from it.
 
 ```
 node plugins/pipeline-core/scripts/po-human-approval.mjs authorize-critical \
@@ -141,8 +160,11 @@ path in every project, including a consumer's, never a sprint-specific one.
 If that file does not exist yet in the target project, create it first with:
 
 ```
-node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model --dir <repo>
+node plugins/pipeline-core/scripts/pipeline-state.mjs materialize-push-threat-model
 ```
+
+Takes no flags — run it from the project directory (or with
+`CLAUDE_PROJECT_DIR` set); there is no `--dir` flag on this script.
 
 which copies the plugin's shipped template into place (refuses if the file
 already exists, since overwriting it would invalidate any push proof already
@@ -171,6 +193,25 @@ committed `project/critical-human-proof.json` → `trustAnchor.publicKeySha256`
 — **never** by filesystem timestamps or guessing from directory naming. A
 mismatch fails closed with `CRITICAL-PROOF-TRUST-ANCHOR-MISMATCH`; treat that
 error as the check, not a surprise.
+
+### Ordering rule — the handover commit comes BEFORE the signature (interim workflow measure)
+
+A signature binds one exact commit and tree (`--subject-sha256` is computed
+over `{sourceCommit, remote, destination, threatModel}`, and `approve-push`
+fails closed the instant the observed candidate's commit differs from what
+the signature covers, `gitCandidate(dir).commit !== head.commit`). The
+practical consequence: the handover/documentation commit for a release
+**MUST** land before Layers 2-3 run, and **nothing MUST be committed between
+signing and pushing** — including a documentation-only commit. Every commit
+after signing, however small, voids the approval and costs another signing
+ceremony (private key, passphrase, human ceremony, all over again).
+
+This is a workflow rule, not a mechanism, and it is explicitly labelled as an
+**interim measure**: the durable fix — an approval that survives a bounded,
+declared change (e.g. a documented-in-advance handover-only commit) — is a
+separate, unstarted design. Until that exists, sequence is the only
+protection: finalize everything that will be committed, commit it, THEN
+start Layer 2/3.
 
 ### Layer 4 — consume the proof into pipeline state (agent work)
 
@@ -216,10 +257,41 @@ release.
 "auto mode classifier" may refuse the actual `git push`/`git restore`
 invocation regardless of Pipeline-side clearance — this is outside the
 Pipeline's control or visibility, undiscoverable except by attempting the
-exact command. When it fires, the only resolution today is the PO running
-the identical, already-Pipeline-authorized command in their own terminal.
-This compounding is tracked as its own finding:
+exact command. This compounding is tracked as its own finding:
 `backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md`.
+
+**Resolved for `git push` on 2026-08-16 (PO decision):** `.claude/settings.json`
+now carries a single narrow `permissions.allow` entry, `Bash(git push *)`, so
+the Pipeline's own hook chain is the authority for a push rather than being
+overruled by a second gate that adds nothing to it. This is safe for a checked
+reason, not an optimistic one, and the layer actually doing the checking for an
+ordinary branch push is **not** `GG-03`: `GG-01`/`GG-02` (`guard-git.mjs`)
+still block every `--force` and `+refspec` push unconditionally, approval or
+not, but `GG-03` matches only a `--delete`/`-d`/`:refspec` deletion or
+overwrite of `main`/`master` — it is never even evaluated for an ordinary
+push to a feature branch, so its signed-push admission route (reachable only
+when `GG-03` is the sole matching rule) is correspondingly unreachable there
+too, and `guard-git.mjs` simply lets such a push through. What actually
+enforces the recorded push approval for an ordinary push is a separate hook,
+`guard-push.mjs`, which runs after `guard-git.mjs`: its approval check
+requires, under `gates.push.approval: "required"`, that
+`state.pushApproval.lastApproved.forCommit` equal the pushed source commit
+and that `authorizeRecordedPush` independently verify the recorded approval
+for this exact candidate, remote and destination ref; a failure there is
+reported under `gates.push.mode`. The entry deliberately covers `git push`
+alone — never `git *` — so no other command gains anything.
+
+Two things about that change are worth keeping. First, `git restore` is **not**
+covered and can still be refused this way; the fallback below still applies to
+it. Second, and more instructive: **an agent cannot make this change itself.**
+The dispatch that was briefed to add the entry had its edit to
+`.claude/settings.json` refused by the classifier it was about to relax
+("Permission for this action was denied by the Claude Code auto mode
+classifier"), and correctly stopped rather than seeking an override. The layer
+is self-sealing — a human must edit the file. When any classifier refusal fires
+for something not covered by an allow entry, the resolution remains the PO
+running the identical, already-Pipeline-authorized command in their own
+terminal.
 
 ### Layer 6 — the GitHub repository ruleset (outside this repo, discovered by rejection)
 
