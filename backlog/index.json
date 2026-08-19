@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a824248d77a158c08b2c2920e59a303b0af99dc1d728a4707cfee17bfcec275a"
+    "transitionHead": "388c90bdef75e3602b0d4d0f4303c9635181ee5ac11da57518bfd89d9d5d367d"
   },
   "counts": {
-    "open": 68,
+    "open": 69,
     "in_progress": 7,
     "closed": 219
   },
@@ -1282,6 +1282,14 @@
       "closureRepository": "self",
       "closureCommit": "a32e1b99ba3abc71165014227064bba261064f14",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Nova Wave 4, dispatch NVA-W4-COORD-1 (intake-checkpoint coordinator Phase 1) — found and named while implementing, not fixed in that dispatch's scope"
     },
     {
       "id": "pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv",
