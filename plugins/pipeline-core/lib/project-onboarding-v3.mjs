@@ -61,7 +61,7 @@ import {
   runtimeRestartBindingCurrent,
 } from "./codex-onboarding-runtime.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
-import { applySessionCleanupRecovery, planSessionCleanupRecovery } from "./session-cleanup-recovery.mjs";
+import { applySessionCleanupRecovery, planSessionCleanupRecovery, SessionCleanupRecoveryError } from "./session-cleanup-recovery.mjs";
 import {
   LEGACY_CALIBRATION,
   LEGACY_STATE,
@@ -1293,7 +1293,8 @@ function partialCleanupRecoveryResult({
           scriptPath: SESSION_CLEANUP_SCRIPT,
         });
         return null;
-      } catch {
+      } catch (error) {
+        const typed = error instanceof SessionCleanupRecoveryError;
         return lifecycleResult({
           status: "partial",
           root,
@@ -1304,8 +1305,10 @@ function partialCleanupRecoveryResult({
           nextAction: cleanupHumanRecoveryAction(root),
           diagnostics: [lifecycleDiagnostic(
             "$.authority.sessionCleanup",
-            "cleanup_recovery_apply_failed",
-            "an automatic, digest-bound cleanup recovery attempt did not converge",
+            typed ? error.code : "cleanup_recovery_apply_failed",
+            typed
+              ? error.message
+              : "an automatic, digest-bound cleanup recovery attempt did not converge",
             "retain the state and request an explicit authority decision; do not guess, replace, or delete a descriptor",
           )],
         });

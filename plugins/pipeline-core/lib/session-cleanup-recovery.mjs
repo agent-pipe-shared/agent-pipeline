@@ -399,11 +399,25 @@ function backupOnboardingPrivateState(root, deps) {
  * this change's file scope. Only reached by retire-externally-archived-orphans
  * / retire-mixed-orphans, and only for descriptors requiring external
  * retirement -- disclosed, deliberate coupling, not an oversight.
+ *
+ * Path construction is split into `externalRetirementManifestPath()` (below)
+ * so a regression test can pin this duplicated convention against
+ * worktree-lifecycle.mjs's real `cleanupManifestPath()` by comparing the two
+ * routes' output for the same inputs, without exporting either module's
+ * internals to the other (Critic finding F5, 2026-08-19).
  */
-function backupExternalRetirementManifest(root, deps, sessionId) {
+function externalRetirementManifestPath(root, deps, sessionId) {
   const common = resolveGitCommonDirectoryForBackup(root, deps);
-  const manifestPath = join(common, "agent-pipeline", "session-cleanup", "active", `${sessionId}.json`);
-  return backupBeforeMutation(root, deps, `external-manifest.${sessionId}`, manifestPath);
+  return join(common, "agent-pipeline", "session-cleanup", "active", `${sessionId}.json`);
+}
+
+function backupExternalRetirementManifest(root, deps, sessionId) {
+  return backupBeforeMutation(
+    root,
+    deps,
+    `external-manifest.${sessionId}`,
+    externalRetirementManifestPath(root, deps, sessionId),
+  );
 }
 
 function validateCompositeJournal(value, expectedPlanSha256) {
@@ -1764,4 +1778,5 @@ export const sessionCleanupRecoveryInternals = {
   safePrivateFile,
   recoveryJournalPaths,
   backupBeforeMutation,
+  externalRetirementManifestPath,
 };

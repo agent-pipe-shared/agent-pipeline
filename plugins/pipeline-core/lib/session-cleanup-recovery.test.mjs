@@ -104,6 +104,28 @@ function backupPath(root, label) {
   return join(gitCommonDir(root), "agent-pipeline", "session-cleanup-recovery", "backups", `${label}.bak`);
 }
 
+// Recursively search for a file by exact basename, returning its full path
+// (or null). Used only to DISCOVER where worktree-lifecycle.mjs's real,
+// un-exported cleanupManifestPath() convention actually wrote a manifest --
+// never to duplicate that convention as a literal (Critic finding F5,
+// 2026-08-19: the existing external-retirement test above already hardcodes
+// the convention as a literal `manifestPath`, which does not PIN it against
+// the real function; this search is independent of any assumed convention).
+function findFileNamed(dir, name) {
+  if (!existsSync(dir)) return null;
+  for (const entry of readdirSync(dir)) {
+    const entryPath = join(dir, entry);
+    const info = lstatSync(entryPath);
+    if (info.isDirectory()) {
+      const found = findFileNamed(entryPath, name);
+      if (found) return found;
+    } else if (info.isFile() && entry === name) {
+      return entryPath;
+    }
+  }
+  return null;
+}
+
 function onboardingPrivateDir(root) {
   return join(gitCommonDir(root), "agent-pipeline", "onboarding");
 }
@@ -379,6 +401,41 @@ test("retire-externally-archived-orphans auto-executes without confirmation, bac
     assert.equal(existsSync(manifestPath), false, "the recovery must still actually delete the live manifest");
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
     assert.deepEqual(listActiveSessionDescriptors(root), []);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// Critic finding F5 (QG-06), 2026-08-19: the external-manifest path
+// convention (`session-cleanup/active/<sessionId>.json` under the Git
+// common dir) is deliberately duplicated in session-cleanup-recovery.mjs's
+// `externalRetirementManifestPath()` rather than exported from
+// worktree-lifecycle.mjs, and was disclosed as un-pinned by any test -- a
+// future change to worktree-lifecycle.mjs's real, still-un-exported
+// `cleanupManifestPath()` would silently disable this kind's `.bak` safety
+// net (the reconstruction would simply stop finding the manifest, and
+// `backupBeforeMutation` would return null instead of failing loudly).
+// This test proves both routes agree for the SAME inputs: it discovers
+// where the manifest actually landed by searching the filesystem (produced
+// entirely through worktree-lifecycle.mjs's real public API, never through
+// a hardcoded literal), then asserts session-cleanup-recovery.mjs's
+// reconstruction resolves to that exact discovered path.
+test("the external-manifest backup path convention is pinned against worktree-lifecycle.mjs's real cleanupManifestPath output", () => {
+  const root = closedFeatureRoot("external-manifest-path-pin");
+  try {
+    const descriptor = startSessionDescriptor(root, { sessionId: "session-recovery-manifest-path-pin" });
+    const record = createDetachedWorktree(root, "archive", gitRun(root, ["rev-parse", "HEAD"]), descriptor);
+    gitRun(root, ["worktree", "remove", record.physicalPath]);
+    rewriteAsLegacyDescriptor(root, descriptor.sessionId);
+    const commonAgentPipelineDir = join(gitCommonDir(root), "agent-pipeline");
+    const discovered = findFileNamed(commonAgentPipelineDir, `${descriptor.sessionId}.json`);
+    assert.ok(discovered, "fixture must produce a real external-retirement manifest via worktree-lifecycle.mjs to discover");
+    const reconstructed = sessionCleanupRecoveryInternals.externalRetirementManifestPath(
+      root, {}, descriptor.sessionId,
+    );
+    assert.equal(
+      reconstructed,
+      discovered,
+      "session-cleanup-recovery.mjs's duplicated manifest-path convention must match worktree-lifecycle.mjs's real cleanupManifestPath() output for the same inputs",
+    );
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
