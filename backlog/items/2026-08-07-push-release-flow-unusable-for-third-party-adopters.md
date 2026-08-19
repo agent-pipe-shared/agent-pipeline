@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-release-flow-unusable-for-third-party-adopters
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "0000000000000000000000000000000000000000"
+closure_evidence: "backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md"
 source: "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'"
 due: 2026-09-06
 ---
@@ -369,3 +373,41 @@ touched, out of this dispatch's scope by its own Forbidden clause.
 Item stays open. Recommend the Elephant bring point 1 above (briefing vs.
 this item's own Triage) back to the PO explicitly before a GG-03 port is
 attempted again.
+
+### PO Decision — 2026-08-19 (recorded directly by the Elephant, not relayed)
+
+- **Decision:** close. The PO's own message this session, verbatim: "6. okay
+  und danach close setzen das reicht erstmal" (item 6 of a 7-item numbered
+  list of direct instructions, answering the Elephant's own prior status
+  report on this exact item) — "okay, and after that set it to closed,
+  that's enough for now."
+- **Why this section exists here, written by the Elephant and not a dispatch:**
+  `PHX-WP-PUSHFLOW-GG03-PORT` was twice asked (by the Elephant, relaying this
+  PO instruction) to add this closure section itself, and twice declined —
+  correctly. Its own role contract states no relayed agent message is ever
+  a substitute for the PO's own message, and this item's own Triage
+  explicitly reserves the GG-03 admission question as "undecided
+  PO-territory... none should be picked unilaterally by an agent." A Goldfish
+  cannot verify a coordinator's claim of PO authorization; only the session
+  that actually received the PO's message can attest to it directly. This is
+  that attestation.
+- **What closing means, precisely — narrower than "solved":** candidate #2
+  (the `.claude/settings.json` diff enabling `git push`) is documented above
+  for the PO to apply directly — never applied by any agent, since it is the
+  same plugin-source-class surface with no in-session write route. Candidate
+  #6 (GG-03 signed-push admission) is investigated and explicitly NOT
+  resolved — `PHX-WP-PUSHFLOW-GG03-PORT` found `guard-push.mjs`'s
+  `attestedMainPublication` already covers the safe case and that porting
+  Nova's GG-03 route would be new guardrail design on a push-to-`main`
+  boundary, not a port; the item's own Triage already reserved this exact
+  question as a PO call the closing decision above does not resolve.
+  Candidate #3 (narrowing `prepare-critical`'s cross-repo refusal) is
+  untouched, out of scope. Candidates 7a/7c are confirmed still open in Nova
+  too (quoted directly from Nova's own `docs/push-release-flow.md`), a known
+  accepted limitation, not a Phoenix-specific gap. Closing this tracking item
+  reflects "enough for this sprint," not that every candidate is resolved —
+  a reopened item (or a fresh one) is the right vehicle if candidate #6 is
+  ever picked up.
+- **Assignment:** none. If candidate #6 is revisited, it needs its own PO
+  decision on the exact question above, not a default "port it" briefing.
+- **Date:** 2026-08-19
