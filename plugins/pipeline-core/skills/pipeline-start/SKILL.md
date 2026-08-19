@@ -284,7 +284,10 @@ the diff itself.** Implementation work under an `epic`- or `feature`-profile
 plan is dispatched to a Goldfish subagent (via the Agent/Task tool,
 optionally fanned out with the Workflow tool) rather than written directly
 by this session; a `mini`-profile plan is the sole exception and may be
-implemented directly. This is a followed instruction, not a technically
+implemented directly. Build the dispatch briefing from
+`templates/prompts/goldfish-task.md` (never freehand); for the Workflow-tool
+variant, see `references/workflow-dispatch.md` for its additive
+requirements. This is a followed instruction, not a technically
 guard-enforced rule — no guard blocks or detects a non-dispatched write, so
 skipping the dispatch right here produces no refusal to catch it: get this
 right by reading this paragraph now, not by expecting a later guard to stop
