@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.self-healing-local-cleanup-recovery
 type: workflow-improvement
 owner: pipeline
-status: closed
+status: open
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-5 (priority P1)"
 ---
@@ -75,8 +75,72 @@ I also found two related, currently-open defects in the same file/mechanism fami
 
 **Estimated complexity:** small
 
-## Closure, 2026-08-19
+## Implementation status, 2026-08-19 (NOT closed — reopened after Critic FAIL)
 
-Implemented and merged: all six typed cleanup-recovery kinds now auto-execute (requiresConfirmation: false) with a .bak pre-mutation backup safety net; an independent Critic review was dispatched for this security-relevant change (task W4-CRITIC-2C).
+Implemented, not accepted: all six typed cleanup-recovery kinds now
+auto-execute (requiresConfirmation: false) with a .bak pre-mutation
+backup safety net. Commit: 3d5fda6d. A companion fix
+(9d8cd787, unrelated commit's fixture regression) is unrelated to this
+item's own correctness.
 
-Commit(s): 3d5fda6d.
+An independent Critic review (task W4-CRITIC-2C, opus/max route,
+security-class-mandated) returned FAIL after a full 10-category hunt
+(a prior attempt truncated with zero output and had to be retried):
+
+- **F1 (major, unresolved):** `partialCleanupRecoveryResult()` now
+  performs the recovery in-line and, on success, falls through to
+  return a `ready` lifecycle result built from the PRE-recovery
+  `continuity` object — nothing re-observes continuity after the
+  mutation. Three of the six kinds (`release-lost-binding`,
+  `release-closed-feature`, and the release half of the composite)
+  mutate portable State and return a fresh `stateSha256`/`mutated`
+  flag from the underlying call that the caller never re-reads. A
+  caller trusting the returned `ready` result gets digests the same
+  call just invalidated.
+- **F2 (major, unresolved, QG-11):** two of the six kinds
+  (`quarantine-private-receipt`, and both
+  `retire-externally-archived-orphans`/`retire-mixed-orphans` via
+  `backupExternalRetirementManifest`) have ZERO test coverage, and
+  every fail-closed branch of the new `.bak` helpers is untested.
+  The external-retirement path is the only one of the six that
+  deletes a pre-existing file it did not create — the single kind
+  where the `.bak` net most directly replaces the removed human gate
+  — and its backup helper silently returns `null` on a missing
+  source with no caller checking the result. (The Critic separately
+  verified the actual path-reconstruction logic IS correct today by
+  direct trace — the finding is the absence of a test pinning it, not
+  a present bug.)
+- **F3 (minor):** the commit's claim "all fail closed on a symlink or
+  non-regular-file source" is false for two of the three backup
+  helpers (`backupBeforeMutation` uses `existsSync`, which follows
+  symlinks and returns false — silently skipping, not failing closed,
+  on a dangling symlink; `backupOnboardingPrivateState` silently
+  `continue`s past non-regular entries instead of refusing). Residual
+  risk is bounded by an independent downstream fail-closed check, but
+  the security claim in the commit message does not hold as written.
+- **F4 (minor):** a bare `catch {}` in the new apply path discards the
+  typed failure code and replaces it with one generic message — the
+  human escalation path (the safety valve replacing the removed gate)
+  now gets strictly less diagnostic information than before.
+- **F5 (minor, QG-06):** the external-manifest path convention is
+  disclosed as deliberately duplicated/un-exported rather than pinned
+  by any test — a future change to the source convention would
+  silently disable that kind's safety net.
+
+The Critic also found, independently of this item, that a SIBLING
+commit (`ee72a712`, a different Wave-4 item) had broken 7 previously-
+green tests elsewhere in the tree via a promotion admission check;
+that regression was real, live, and has since been fixed directly
+(commit 9d8cd787) — noted here only because the same review surfaced
+it, not because this item caused it.
+
+**Not further reworked this session** (context budget exhausted after
+1 full review round on this item; per this repo's "cap Critic rounds
+at two" practice a second round remains available before this item
+should be closed again). Needs, in order: (1) re-observe continuity
+after a mutating recovery before returning `ready` (F1); (2) add
+direct test coverage for `quarantine-private-receipt` and the
+external-retirement backup path, plus at least one test per
+fail-closed branch (F2); (3) fix the two silent-skip helpers to
+actually fail closed, or correct the commit's claim (F3); (4) a
+Critic re-review once (1)-(3) land.

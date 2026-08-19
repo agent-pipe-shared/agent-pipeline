@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.atomic-prd-approval-without-mutation
 type: workflow-improvement
 owner: pipeline
-status: closed
+status: open
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-2 (priority P0)"
 ---
@@ -69,8 +69,48 @@ rebind, or signature step, and continuity is immediately valid.
 
 **Estimated complexity:** medium
 
-## Closure, 2026-08-19
+## Implementation status, 2026-08-19 (NOT closed — reopened after 2 Critic FAILs)
 
-Implemented and merged: a new po-authority-acknowledge-plan/apply pair gives a bound-but-unacknowledged PRD a sanctioned route to the acknowledgement marker, and promotionArtifacts() now admission-checks it; an independent Critic review was dispatched (task W4-CRITIC-2B).
+Implemented, not accepted: a new po-authority-acknowledge-plan/apply pair
+gives a bound-but-unacknowledged PRD a sanctioned route to the
+acknowledgement marker, and promotionArtifacts() now admission-checks
+it. Commits: 00b768cb, ee72a712, cd725129 (round-1 fix: required --by
+attribution, bound to the plan's own digest).
 
-Commit(s): 00b768cb, ee72a712.
+Two independent Critic reviews (task W4-CRITIC-2B, opus/max route)
+both returned FAIL. Round 1 (00b768cb/ee72a712): F1 blocker — the
+route was fully agent-executable with no attribution at all. Round 2,
+after the round-1 fix (00b768cb/ee72a712/cd725129):
+- **F-A (major, unresolved):** `--by` is now required and bound to the
+  plan's digest, but the value is never persisted anywhere durable —
+  it is accepted at the CLI and discarded once the transaction
+  commits. The code's own added comment claims the opposite
+  ("the attribution field exists so that instruction is recorded, not
+  merely trusted"). Every other `--by` route in this file persists
+  the name (`state.planApproval.approvedBy`/`specBoundBy`); this one
+  does not.
+- **F-B (major, unresolved):** the reviewed range fails this repo's
+  own `dispatch-authorship-verify.mjs` — `00b768cb`'s dispatch record
+  (`evidence/dispatch-record-NVA-W4-2B.json`) was never finalized to a
+  terminal outcome, and `ee72a712` carries no `Dispatch:` trailer at
+  all (orchestrator-direct guard/continuity work, not declared as
+  stage-0).
+- **F-C (minor):** guard-lifecycle-ready.mjs admits
+  `po-authority-acknowledge-apply` but not `-plan` (its own only input
+  source) in the not-ready lane — inert there, though the route works
+  in a ready session.
+- **F-D (minor, disclosed):** the shipped mechanism still mutates the
+  bound PRD's bytes, which is literally the inverse of the item's own
+  title. This reflects the item's accepted Triage decision (Option 2:
+  extend the rebind family, keep the PRD-file marker) — invisible to
+  the Critic by the anti-contamination stripping convention — not an
+  oversight, but worth a PO sanity-check against the item's own
+  wording.
+
+**Not further reworked this session** (context budget exhausted after
+2 review rounds, per this repo's own "cap Critic rounds at two, then
+self-verify" practice — self-verification was not reached either).
+Needs, in order: (1) persist `by` into `continuity` or a new
+`state.planApproval`-adjacent field (F-A); (2) finalize the
+`NVA-W4-2B` dispatch record to a terminal outcome (F-B, no code
+change needed); (3) a third Critic round once (1)/(2) land.
