@@ -3,11 +3,33 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 59)
+**Last updated:** 2026-08-19 (checkpoint 61)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
 **Recovered Sentinel-epic normative documents** (retained per `backlog/items/2026-07-20-spec-retention-on-close.md`, enforced by `governance/spec-retention.json` + `check-spec-retention.mjs`; this section must keep linking all seven — do not prune it when trimming older checkpoints): [PRD](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md), [Spec](../specs/2026-07-19-sprint-sentinel-epic/spec.md), [acceptance matrix](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md), [reconciliation design](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md), [recovery record](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md), [platform-support contract](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md), [Windows blockers scope](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
+
+---
+
+## CHECKPOINT — 2026-08-19 (61): gitleaks false positive fixed directly (`c3bf83b7`); 2 of 4 pre-existing reds now green, 2 still blocked on the PO's maintenance-window signature (READ THIS FIRST)
+
+**`security-scan`'s gitleaks finding fixed** (`c3bf83b7`) — dispatched Goldfish `PHX-WP-GITLEAKS-ATTRIBUTION-KEY-FP` correctly stopped (per its stop conditions) rather than guess: the backlog item's own markdown had quoted the flagged line verbatim, creating a second live gitleaks finding at its own path, which the briefing hadn't scoped for. Disposed directly (small, mechanical, well under the EL-16 threshold): added the `content-v1` suppression entry for the real source finding, computed via the adapter's own `gitleaksContentAuthorityLine()` export (not hand-typed); reworded the backlog item's quote to avoid the `KEY...="..."` shape gitleaks matches on, rather than adding a second suppression entry the repo would keep needing to regenerate on every future rewording. Verified via the adapter's own `run()` against an isolated copy of just the three affected files: PASS, 0 findings.
+
+**Status of the 4 pre-existing reds now: 2 fixed, 2 blocked.** `spec-retention-check` ✅ (checkpoint 60), `security-scan`'s gitleaks finding ✅ (this checkpoint). `verify-suite-registration-check` and `product-capability-inventory-tests` ❌ — both need the same `verify.mjs` edit, which is gated by `guard-testpath` TP-3 behind an expired maintenance window (checkpoint 60's finding still stands: needs a fresh PO signature ceremony).
+
+**Next step:** get the PO's maintenance-window signature for the hook-registration fix (checkpoint 60 has the exact `prepare`/`install` commands); re-dispatch `PHX-WP-VERIFY-REGISTER-GUARD-HOOKS` once unblocked (the target edit is already fully scoped — `verify.mjs:352-353`, plus the `docs/product-capability-inventory.json` sibling-shape entries). Once all 4 are green, run the final-gates sequence — fresh full Verify → `security-scan.mjs` → new push-approval ceremony → push.
+
+---
+
+## CHECKPOINT — 2026-08-19 (60): spec-retention-check fixed directly; 2 dispatches for the remaining pre-existing reds; hook-registration dispatch blocked on an expired maintenance window — needs a PO signature ceremony (READ THIS FIRST)
+
+**`spec-retention-check` fixed** (`d15941fc`) — the check itself was passing logic-wise the whole time; `docs/state.md` had simply stopped linking the 7 recovered Sentinel-epic spec files at some prior handover rewrite. Added a standing links section above the checkpoint history (see top of this file) so a future trim can't drop it again. Verified green directly.
+
+**Two Goldfish dispatches sent for the other 3 pre-existing reds:**
+- `PHX-WP-VERIFY-REGISTER-GUARD-HOOKS` (register `guard-gate-strength-ledger`/`guard-handover-size` in `verify.mjs` + `docs/product-capability-inventory.json`) — **BLOCKED, no commit landed.** Both hooks confirmed green standalone, but the `verify.mjs` edit itself is gated by `guard-testpath` TP-3, and the prior maintenance window that covered TP-3 (`.git/agent-pipeline/guard-maintenance-window/window.json`, reason "Phoenix backlog batch 2...") **expired 2026-08-18T22:40:24Z** (checked live: now well past that) and is bound to a stale candidate tree besides. Opening a fresh window's `prepare` step was attempted directly and was itself blocked by the auto-mode classifier as a sensitive action — correctly so; this needs the actual PO ceremony. **Open item for the PO:** run `guard-maintenance-window.mjs prepare --repo-root . --scope TP-3 --ttl-seconds 7200 --reason "..." --authorship-mode goldfish-dispatch --feature-id sprint-phoenix-epic` (or have the Elephant run `prepare` when auto-mode allows it in-session), then `install --request <path> --proof <external-signature-json>` with the external Ed25519 key (`~/agent-pipeline-po-nova` per the standing PO signing-directory convention) — then re-dispatch this exact task; the intended `verify.mjs:352-353` edit and the `docs/product-capability-inventory.json` sibling-shape entries were fully scoped by the first attempt's report and don't need re-investigation.
+- `PHX-WP-GITLEAKS-ATTRIBUTION-KEY-FP` (suppress the confirmed gitleaks false positive on `guard-maintenance-window.mjs:172`) — in flight at this checkpoint, does not touch `verify.mjs` so should not hit the same gate.
+
+**Next step:** await the gitleaks dispatch's result and fold it in; get the PO's maintenance-window signature for the hook-registration fix; once all 4 pre-existing reds are actually green (not just root-caused), run the final-gates sequence — fresh full Verify → `security-scan.mjs` → new push-approval ceremony → push.
 
 ---
 
