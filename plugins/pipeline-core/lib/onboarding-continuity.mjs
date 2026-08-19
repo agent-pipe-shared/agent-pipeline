@@ -4733,6 +4733,471 @@ function currentTarget(path, expectedSha256) {
   return { status: actual === expectedSha256 ? "exact" : "conflict", sha256: actual };
 }
 
+// ---------------------------------------------------------------------------
+// Intake checkpoint (Wave 4 onboarding coordinator, steps 1-3 --
+// specs/wave4-onboarding-coordinator/design.md SSa.1/SSa.2/SSa.5/SSc.1).
+//
+// A private, restart-resilient checkpoint that records consent, restart-
+// resilient values (git author/language/profile), lossless material-input
+// evidence, and the one bundled design-question round -- BEFORE any
+// provisional kickoff artifact is ever written. Lives beside
+// continuity-history.json/session-cleanup-binding.json under the same
+// resolvePrivate() directory, reuses the SAME writeExclusiveSynced() +
+// acquireLock()/releaseLock() primitives this file already uses for those
+// two files -- never a new atomicity mechanism (SSc.1).
+//
+// Scope: steps 1-3 only (intake-consent-apply, intake-capture-apply,
+// intake-design-questions-apply -- NVA-W4-COORD-1). Steps 4-6 (staging
+// generation, binding, v4Inspection wiring, CLI retirement) are a
+// deliberate, separate follow-up: this module never reaches
+// "generated"/"bound" and never touches applyOnboardingKickoffPromotion.
+// NVA-W4-COORD-1 also found design SSb's claim that no
+// guard-lifecycle-ready.mjs change is needed FALSE for these mutating
+// commands (sanctionedOnboardingArgs() hand-lists every mutating onboarding
+// subcommand's exact argv shape; GUARDDERIVE-1's derived admission only ever
+// covers `mutates: false` commands) -- the guard admission gap is a named,
+// separate open item for a follow-up dispatch, not fixed here.
+
+export const INTAKE_CHECKPOINT_SCHEMA = "pipeline.onboarding-intake-checkpoint.v1";
+export const INTAKE_CHECKPOINT_BASENAME = "intake-checkpoint.json";
+export const INTAKE_CHECKPOINT_EVIDENCE_DIRNAME = "intake-checkpoint-evidence";
+export const INTAKE_CONSENT_APPLY_SCHEMA = "pipeline.onboarding-intake-consent-apply.v1";
+export const INTAKE_CAPTURE_APPLY_SCHEMA = "pipeline.onboarding-intake-capture-apply.v1";
+export const INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA = "pipeline.onboarding-intake-design-questions-apply.v1";
+const INTAKE_CHECKPOINT_LOCK_BASENAME = ".intake-checkpoint.lock";
+const INTAKE_CHECKPOINT_LOCK_SCHEMA = "pipeline.onboarding-intake-checkpoint-lock.v1";
+const INTAKE_TRANSACTION_STATES = new Set([
+  "collecting", "design-questions-pending", "ready-to-generate", "generated", "bound",
+]);
+const INTAKE_LANGUAGES = new Set(["de", "en"]);
+const INTAKE_PROFILES = new Set(["epic", "feature", "mini"]);
+// Generous, not resume-hint's 4 KB cap: the checkpoint is private and never
+// git-tracked (SSa.1), but a per-chunk ceiling still exists so a single
+// malformed/runaway capture cannot grow the private directory unbounded.
+const INTAKE_MAX_MATERIAL_BYTES = 1_000_000;
+
+class SimulatedIntakeCrash extends Error {}
+
+function validIntakeGitAuthor(value) {
+  return value === null || (exactKeys(value, new Set(["name", "email"]))
+    && typeof value.name === "string" && value.name.trim().length > 0
+    && typeof value.email === "string" && value.email.trim().length > 0);
+}
+
+function validIntakeValues(value) {
+  return exactKeys(value, new Set(["gitAuthor", "language", "profile"]))
+    && validIntakeGitAuthor(value.gitAuthor)
+    && (value.language === null || INTAKE_LANGUAGES.has(value.language))
+    && (value.profile === null || INTAKE_PROFILES.has(value.profile));
+}
+
+function validIntakeConsent(value) {
+  return value === null || (exactKeys(value, new Set(["granted", "at"]))
+    && value.granted === true && canonicalIsoTimestamp(value.at));
+}
+
+function validIntakeMaterialInputEntry(entry) {
+  return exactKeys(entry, new Set(["sha256", "evidencePath", "byteLength", "receivedAt"]))
+    && SHA256_RE.test(entry.sha256)
+    && entry.evidencePath === `${INTAKE_CHECKPOINT_EVIDENCE_DIRNAME}/${entry.sha256}.txt`
+    && Number.isSafeInteger(entry.byteLength) && entry.byteLength >= 0
+    && canonicalIsoTimestamp(entry.receivedAt);
+}
+
+function validIntakeDesignQuestionEntry(entry) {
+  return exactKeys(entry, new Set(["question", "answer", "answeredAt"]))
+    && typeof entry.question === "string" && entry.question.trim().length > 0
+    && typeof entry.answer === "string" && entry.answer.trim().length > 0
+    && canonicalIsoTimestamp(entry.answeredAt);
+}
+
+function validIntakeGenerated(value) {
+  return value === null || (exactKeys(value, new Set(["designInputSha256", "prdSha256", "specSha256", "generatedAt"]))
+    && SHA256_RE.test(value.designInputSha256) && SHA256_RE.test(value.prdSha256)
+    && SHA256_RE.test(value.specSha256) && canonicalIsoTimestamp(value.generatedAt));
+}
+
+function validateIntakeCheckpoint(root, value) {
+  if (!exactKeys(value, new Set([
+    "schema", "root", "revision", "createdAt", "updatedAt", "consent", "values",
+    "materialInput", "designQuestions", "transactionState", "generated", "contentSha256",
+  ]))) return false;
+  if (value.schema !== INTAKE_CHECKPOINT_SCHEMA || value.root !== root) return false;
+  if (!Number.isSafeInteger(value.revision) || value.revision < 0) return false;
+  if (!canonicalIsoTimestamp(value.createdAt) || !canonicalIsoTimestamp(value.updatedAt)) return false;
+  if (!validIntakeConsent(value.consent) || !validIntakeValues(value.values)) return false;
+  if (!Array.isArray(value.materialInput) || !value.materialInput.every(validIntakeMaterialInputEntry)) return false;
+  if (value.designQuestions !== null && (!Array.isArray(value.designQuestions)
+    || value.designQuestions.length === 0
+    || !value.designQuestions.every(validIntakeDesignQuestionEntry))) return false;
+  if (!INTAKE_TRANSACTION_STATES.has(value.transactionState)) return false;
+  if (!validIntakeGenerated(value.generated)) return false;
+  if (!SHA256_RE.test(value.contentSha256)) return false;
+  const { contentSha256, ...unsigned } = value;
+  return canonicalSha256(unsigned) === contentSha256;
+}
+
+function defaultIntakeCheckpoint(root, nowIso) {
+  const unsigned = {
+    schema: INTAKE_CHECKPOINT_SCHEMA,
+    root,
+    revision: 0,
+    createdAt: nowIso,
+    updatedAt: nowIso,
+    consent: null,
+    values: { gitAuthor: null, language: null, profile: null },
+    materialInput: [],
+    designQuestions: null,
+    transactionState: "collecting",
+    generated: null,
+  };
+  return { ...unsigned, contentSha256: canonicalSha256(unsigned) };
+}
+
+export function resolveIntakeCheckpointPaths({
+  rootDir, repositoryCapability = "local", spawn = defaultGitSpawn, create = false,
+} = {}) {
+  const root = physicalRoot(rootDir);
+  const privatePaths = resolvePrivate(root, repositoryCapability, { create, spawn });
+  return {
+    root,
+    directory: privatePaths.directory,
+    checkpoint: join(privatePaths.directory, INTAKE_CHECKPOINT_BASENAME),
+    evidenceDirectory: join(privatePaths.directory, INTAKE_CHECKPOINT_EVIDENCE_DIRNAME),
+    lock: join(privatePaths.directory, INTAKE_CHECKPOINT_LOCK_BASENAME),
+  };
+}
+
+function readIntakeCheckpointRaw(path) {
+  if (!existsSync(path)) return { status: "absent", value: null, sha256: null };
+  const raw = readPhysicalFile(path, "intake checkpoint");
+  let value;
+  try {
+    value = JSON.parse(raw.toString("utf8"));
+  } catch {
+    fail("INTAKE-CHECKPOINT-MALFORMED", "intake checkpoint is malformed");
+  }
+  return { status: "present", value, sha256: sha256(raw) };
+}
+
+export function readOnboardingIntakeCheckpoint({
+  rootDir, repositoryCapability = "local", spawn = defaultGitSpawn,
+} = {}) {
+  const paths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: false });
+  const observed = readIntakeCheckpointRaw(paths.checkpoint);
+  if (observed.status === "present" && !validateIntakeCheckpoint(paths.root, observed.value)) {
+    fail("INTAKE-CHECKPOINT-MALFORMED", "intake checkpoint is malformed");
+  }
+  return { paths, ...observed };
+}
+
+function ensureIntakeEvidenceDirectory(paths) {
+  if (existsSync(paths.evidenceDirectory)) return;
+  mkdirSync(paths.evidenceDirectory, { mode: 0o700 });
+  fsyncDirectory(paths.directory);
+}
+
+/**
+ * Content-addressed, single-target atomic write for one material-input
+ * evidence blob. Idempotent by construction: identical bytes always resolve
+ * to the identical path, so a retry after a crash (or a benign race with
+ * another writer) converges on the same file rather than writing twice.
+ */
+function writeIntakeCheckpointEvidence(paths, bytes, deps = {}) {
+  ensureIntakeEvidenceDirectory(paths);
+  const digest = sha256(bytes);
+  const target = join(paths.evidenceDirectory, `${digest}.txt`);
+  const fault = (point) => {
+    if (deps.crashAt === point) throw new SimulatedIntakeCrash(point);
+    (deps.fault ?? (() => {}))(point);
+  };
+  if (existsSync(target)) {
+    if (sha256(readPhysicalFile(target, "intake checkpoint evidence")) !== digest) {
+      fail("INTAKE-EVIDENCE-CONFLICT", "intake checkpoint evidence content changed");
+    }
+    return { sha256: digest, byteLength: bytes.length, path: target, wrote: false };
+  }
+  const suffixSource = (deps.randomUUID ?? randomUUID)();
+  if (typeof suffixSource !== "string" || !/^[a-f0-9-]{32,64}$/iu.test(suffixSource)) {
+    fail("INTAKE-CHECKPOINT-RANDOM-UNAVAILABLE", "intake checkpoint temporary-name source is invalid");
+  }
+  const temporary = join(paths.evidenceDirectory, `.${digest}.intake-${suffixSource.replaceAll("-", "")}.tmp`);
+  let temporaryRecord;
+  let renamed = false;
+  try {
+    temporaryRecord = writeExclusiveSynced(temporary, bytes, 0o600);
+    fault("evidence-temp-fsync");
+    if (existsSync(target)) {
+      try { unlinkOwned(temporaryRecord); } catch {}
+      temporaryRecord = null;
+      return { sha256: digest, byteLength: bytes.length, path: target, wrote: false };
+    }
+    renameSync(temporary, target);
+    temporaryRecord = null;
+    renamed = true;
+    fault("evidence-rename");
+    fsyncDirectory(paths.evidenceDirectory);
+    fault("evidence-directory-fsync");
+    return { sha256: digest, byteLength: bytes.length, path: target, wrote: true };
+  } catch (error) {
+    if (error instanceof SimulatedIntakeCrash) {
+      throw new KickoffError("INTAKE-CHECKPOINT-SIMULATED-CRASH", `simulated crash at ${error.message}`, {
+        committed: renamed ? true : (temporaryRecord ? null : false),
+      });
+    }
+    if (temporaryRecord) { try { unlinkOwned(temporaryRecord); } catch {} }
+    if (error instanceof KickoffError) throw error;
+    fail("INTAKE-EVIDENCE-WRITE-FAILED", "intake checkpoint evidence write failed");
+  }
+}
+
+/**
+ * Single-target CAS write shared by every intake-checkpoint mutation. Reuses
+ * writeExclusiveSynced()/fsyncDirectory()/acquireLock()/releaseLock()
+ * unchanged (SSc.1); the only new thing is the fault-hook granularity
+ * (temp-fsync/rename/directory-fsync per write call site) the crash-injection
+ * tests assert against.
+ *
+ * `mutate(observed)` receives the freshest on-disk observation and returns
+ * either `null` (nothing to change -- idempotent no-op, never writes) or the
+ * next UNSIGNED record (no contentSha256). It is called TWICE: once unlocked
+ * (to decide whether a lock is even worth acquiring) and once again under the
+ * lock against a fresh re-observation, so a writer that mutates the checkpoint
+ * between the two observations is caught as CAS drift rather than silently
+ * overwritten.
+ */
+function applyIntakeCheckpointMutation({
+  rootDir, repositoryCapability = "local", deps = {}, mutate,
+} = {}) {
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const initialPaths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: false });
+  const initial = readIntakeCheckpointRaw(initialPaths.checkpoint);
+  if (mutate(initial) === null) return { mutated: false, paths: initialPaths, value: initial.value };
+
+  const paths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: true });
+  const lockOptions = { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 };
+  const token = `intake-checkpoint-${sha256(Buffer.from(paths.checkpoint, "utf8")).slice(0, 32)}`;
+  const lock = acquireLock(paths.lock, INTAKE_CHECKPOINT_LOCK_SCHEMA, token, lockOptions);
+  const fault = (point) => {
+    if (deps.crashAt === point) throw new SimulatedIntakeCrash(point);
+    (deps.fault ?? (() => {}))(point);
+  };
+  let temporaryRecord;
+  let committed = false;
+  let simulatedCrash = false;
+  try {
+    fault("cas-recheck");
+    const current = readIntakeCheckpointRaw(paths.checkpoint);
+    if (current.status !== initial.status
+      || (current.status === "present" && current.sha256 !== initial.sha256)) {
+      fail("INTAKE-CHECKPOINT-CAS-DRIFT", "intake checkpoint preimage changed");
+    }
+    const next = mutate(current);
+    if (next === null) return { mutated: false, paths, value: current.value };
+    const record = { ...next, contentSha256: canonicalSha256(next) };
+    if (!validateIntakeCheckpoint(paths.root, record)) {
+      fail("INTAKE-CHECKPOINT-INVALID", "intake checkpoint write would be malformed");
+    }
+    const bytes = Buffer.from(`${JSON.stringify(record, null, 2)}\n`, "utf8");
+    const suffixSource = (deps.randomUUID ?? randomUUID)();
+    if (typeof suffixSource !== "string" || !/^[a-f0-9-]{32,64}$/iu.test(suffixSource)) {
+      fail("INTAKE-CHECKPOINT-RANDOM-UNAVAILABLE", "intake checkpoint temporary-name source is invalid");
+    }
+    const temporary = join(
+      paths.directory,
+      `.${INTAKE_CHECKPOINT_BASENAME}.intake-${suffixSource.replaceAll("-", "")}.tmp`,
+    );
+    temporaryRecord = writeExclusiveSynced(temporary, bytes, 0o600);
+    fault("temp-fsync");
+    if (current.status === "present"
+      ? sha256(readPhysicalFile(paths.checkpoint, "intake checkpoint")) !== current.sha256
+      : existsSync(paths.checkpoint)) {
+      fail("INTAKE-CHECKPOINT-CAS-DRIFT", "intake checkpoint preimage changed before publish");
+    }
+    renameSync(temporary, paths.checkpoint);
+    temporaryRecord = null;
+    committed = true;
+    fault("rename");
+    fsyncDirectory(paths.directory);
+    fault("directory-fsync");
+    const readback = readIntakeCheckpointRaw(paths.checkpoint);
+    if (readback.status !== "present" || readback.sha256 !== sha256(bytes)
+      || canonicalJson(readback.value) !== canonicalJson(record)) {
+      fail("INTAKE-CHECKPOINT-READBACK-INVALID", "intake checkpoint readback is invalid", { committed: true });
+    }
+    return { mutated: true, paths, value: readback.value };
+  } catch (error) {
+    if (error instanceof SimulatedIntakeCrash) {
+      simulatedCrash = true;
+      throw new KickoffError(
+        "INTAKE-CHECKPOINT-SIMULATED-CRASH",
+        `simulated crash at ${error.message}`,
+        { committed: committed ? true : (temporaryRecord ? null : false) },
+      );
+    }
+    if (!committed && temporaryRecord) {
+      try { unlinkOwned(temporaryRecord); } catch {}
+    }
+    if (error instanceof KickoffError) throw error;
+    fail("INTAKE-CHECKPOINT-WRITE-FAILED", "intake checkpoint write failed before commit", { committed });
+  } finally {
+    if (!simulatedCrash && !releaseLock(lock)) {
+      // A retained lock fails the next writer closed, same disposition as
+      // every other lock in this file.
+    }
+  }
+}
+
+/**
+ * Step 1: captures consent + any still-missing required values (git
+ * author/language/profile) in one bundled ask. Idempotent: safe to re-run,
+ * only fills fields still null (design SSa.5 point 1).
+ */
+export function applyOnboardingIntakeConsent({
+  rootDir, repositoryCapability = "local", granted, gitAuthor = null, language = null,
+  profile = null, activate = false, deps = {},
+} = {}) {
+  if (activate !== true) fail("INTAKE-CONSENT-ACTIVATION-REQUIRED", "intake consent apply requires explicit activation");
+  if (granted !== true) fail("INTAKE-CONSENT-REQUIRED", "intake consent apply requires explicit affirmative consent");
+  if (gitAuthor !== null && !validIntakeGitAuthor(gitAuthor)) fail("INTAKE-CONSENT-INVALID-GIT-AUTHOR", "candidate git author is invalid");
+  if (language !== null && !INTAKE_LANGUAGES.has(language)) fail("INTAKE-CONSENT-INVALID-LANGUAGE", "candidate language is invalid");
+  if (profile !== null && !INTAKE_PROFILES.has(profile)) fail("INTAKE-CONSENT-INVALID-PROFILE", "candidate profile is invalid");
+  const nowIso = deps.now ? deps.now() : new Date().toISOString();
+  const result = applyIntakeCheckpointMutation({
+    rootDir, repositoryCapability, deps,
+    mutate: (observed) => {
+      const base = observed.status === "present" ? observed.value : defaultIntakeCheckpoint(physicalRoot(rootDir), nowIso);
+      const nextConsent = base.consent ?? { granted: true, at: nowIso };
+      const nextValues = {
+        gitAuthor: base.values.gitAuthor ?? gitAuthor,
+        language: base.values.language ?? language,
+        profile: base.values.profile ?? profile,
+      };
+      if (observed.status === "present"
+        && canonicalJson(nextConsent) === canonicalJson(base.consent)
+        && canonicalJson(nextValues) === canonicalJson(base.values)) return null;
+      const { contentSha256: dropSha, ...baseUnsigned } = base;
+      void dropSha;
+      return {
+        ...baseUnsigned,
+        revision: observed.status === "present" ? base.revision + 1 : base.revision,
+        updatedAt: nowIso,
+        consent: nextConsent,
+        values: nextValues,
+      };
+    },
+  });
+  return { schema: INTAKE_CONSENT_APPLY_SCHEMA, root: result.paths.root, mutated: result.mutated, checkpoint: result.value };
+}
+
+/**
+ * Step 2: appends one material-input chunk as a new evidence file +
+ * materialInput entry. Called once per PO message containing requirements;
+ * restart-resilient by construction (design SSa.2/SSc.1). The FIRST accepted
+ * capture also advances transactionState from "collecting" to
+ * "design-questions-pending" (monotonic; never regresses a state that has
+ * already moved past that point).
+ */
+export function applyOnboardingIntakeCapture({
+  rootDir, repositoryCapability = "local", text, activate = false, deps = {},
+} = {}) {
+  if (activate !== true) fail("INTAKE-CAPTURE-ACTIVATION-REQUIRED", "intake capture apply requires explicit activation");
+  if (typeof text !== "string" || text.length === 0) fail("INTAKE-CAPTURE-EMPTY", "intake capture requires non-empty material text");
+  const bytes = Buffer.from(text, "utf8");
+  if (bytes.length > INTAKE_MAX_MATERIAL_BYTES) fail("INTAKE-CAPTURE-TOO-LARGE", "intake capture chunk exceeds the per-chunk byte limit");
+  const nowIso = deps.now ? deps.now() : new Date().toISOString();
+
+  // Evidence is written BEFORE the checkpoint entry that references it: a
+  // crash between the two leaves an orphaned-but-harmless evidence file,
+  // never a checkpoint entry pointing at a missing one. Content-addressed, so
+  // a retry converges rather than duplicating.
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const paths = resolveIntakeCheckpointPaths({ rootDir, repositoryCapability, spawn, create: true });
+  const evidence = writeIntakeCheckpointEvidence(paths, bytes, deps);
+
+  const result = applyIntakeCheckpointMutation({
+    rootDir, repositoryCapability, deps,
+    mutate: (observed) => {
+      const base = observed.status === "present" ? observed.value : defaultIntakeCheckpoint(physicalRoot(rootDir), nowIso);
+      if (base.consent === null) fail("INTAKE-CAPTURE-CONSENT-REQUIRED", "material input capture requires consent to already be recorded");
+      if (base.materialInput.some((entry) => entry.sha256 === evidence.sha256)) return null;
+      const entry = {
+        sha256: evidence.sha256,
+        evidencePath: `${INTAKE_CHECKPOINT_EVIDENCE_DIRNAME}/${evidence.sha256}.txt`,
+        byteLength: evidence.byteLength,
+        receivedAt: nowIso,
+      };
+      const { contentSha256: dropSha, ...baseUnsigned } = base;
+      void dropSha;
+      return {
+        ...baseUnsigned,
+        revision: observed.status === "present" ? base.revision + 1 : base.revision,
+        updatedAt: nowIso,
+        materialInput: [...base.materialInput, entry],
+        transactionState: base.transactionState === "collecting" ? "design-questions-pending" : base.transactionState,
+      };
+    },
+  });
+  return {
+    schema: INTAKE_CAPTURE_APPLY_SCHEMA,
+    root: result.paths.root,
+    mutated: result.mutated,
+    evidence: { sha256: evidence.sha256, byteLength: evidence.byteLength, wrote: evidence.wrote },
+    checkpoint: result.value,
+  };
+}
+
+/**
+ * Step 3: writes the ONE bundled design-question round's answers into
+ * designQuestions, flips transactionState to "ready-to-generate" (design
+ * SSa.5 point 3). Requires at least one captured material-input chunk
+ * (transactionState already "design-questions-pending") and existing
+ * consent. Idempotent only for an exact replay of the same already-answered
+ * round; a different answer set after the round is already answered is
+ * refused rather than silently overwritten -- the round is asked exactly
+ * once.
+ */
+export function applyOnboardingIntakeDesignQuestions({
+  rootDir, repositoryCapability = "local", answers, activate = false, deps = {},
+} = {}) {
+  if (activate !== true) fail("INTAKE-DESIGN-QUESTIONS-ACTIVATION-REQUIRED", "intake design-questions apply requires explicit activation");
+  if (!Array.isArray(answers) || answers.length === 0) fail("INTAKE-DESIGN-QUESTIONS-EMPTY", "intake design-questions apply requires at least one question/answer pair");
+  const nowIso = deps.now ? deps.now() : new Date().toISOString();
+  const candidateEntries = answers.map((entry) => ({
+    question: entry?.question,
+    answer: entry?.answer,
+    answeredAt: nowIso,
+  }));
+  if (!candidateEntries.every(validIntakeDesignQuestionEntry)) {
+    fail("INTAKE-DESIGN-QUESTIONS-INVALID", "intake design-question entries are invalid");
+  }
+  const result = applyIntakeCheckpointMutation({
+    rootDir, repositoryCapability, deps,
+    mutate: (observed) => {
+      if (observed.status !== "present") fail("INTAKE-DESIGN-QUESTIONS-PRECONDITION", "intake design questions require an existing checkpoint");
+      const base = observed.value;
+      if (base.consent === null) fail("INTAKE-DESIGN-QUESTIONS-CONSENT-REQUIRED", "intake design questions require consent to already be recorded");
+      if (["ready-to-generate", "generated", "bound"].includes(base.transactionState)) {
+        if (base.designQuestions !== null && canonicalJson(base.designQuestions) === canonicalJson(candidateEntries)) return null;
+        fail("INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED", "the one bundled design-question round was already answered with different content");
+      }
+      if (base.transactionState !== "design-questions-pending") {
+        fail("INTAKE-DESIGN-QUESTIONS-PRECONDITION", "intake design questions require at least one captured material-input chunk first");
+      }
+      const { contentSha256: dropSha, ...baseUnsigned } = base;
+      void dropSha;
+      return {
+        ...baseUnsigned,
+        revision: base.revision + 1,
+        updatedAt: nowIso,
+        designQuestions: candidateEntries,
+        transactionState: "ready-to-generate",
+      };
+    },
+  });
+  return { schema: INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA, root: result.paths.root, mutated: result.mutated, checkpoint: result.value };
+}
+
 function resultFromPersisted(plan, status, mutated, spawn = defaultGitSpawn) {
   const readback = projectReadContinuityStatus(readSanctionedState(plan.root));
   if (readback.code !== "CS-STATUS-ACTIVE" || readback.continuity.status !== "valid") {

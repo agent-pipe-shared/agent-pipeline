@@ -3,6 +3,14 @@
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import {
+  applyOnboardingIntakeConsent,
+  applyOnboardingIntakeCapture,
+  applyOnboardingIntakeDesignQuestions,
+  INTAKE_CONSENT_APPLY_SCHEMA,
+  INTAKE_CAPTURE_APPLY_SCHEMA,
+  INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
+} from "../lib/onboarding-continuity.mjs";
+import {
   applyProjectOnboardingManifestRepairV4,
   applyProjectOnboardingKickoffV4,
   applyProjectOnboardingKickoffPromotionV4,
@@ -83,6 +91,16 @@ const ONBOARDING_SUBCOMMANDS = Object.freeze([
   { name: "kickoff-promote-apply", flat: false, mutates: true, automatedArgvShape: null },
   { name: "adopt-remote-plan", flat: false, mutates: false, automatedArgvShape: null },
   { name: "adopt-remote-apply", flat: false, mutates: true, automatedArgvShape: null },
+  // Wave 4 onboarding coordinator, Phase 1 (NVA-W4-COORD-1, specs/wave4-onboarding-coordinator/design.md
+  // SSa.5 steps 1-3). Apply-only: no separate plan step exists for these three (design SSa.5 lists them
+  // as single "-apply" commands, unlike steps 4-5's plan/apply pairs). KNOWN GAP, not fixed here: unlike
+  // every other `mutates: true` entry above, guard-lifecycle-ready.mjs's sanctionedOnboardingArgs() has no
+  // admission branch for these three names yet -- GUARDDERIVE-1's derived admission only ever covers
+  // `mutates: false` commands, so a Bash-invoked automated call to any of these three is still refused by
+  // GUARD-LIFECYCLE-NOT-READY until a follow-up dispatch adds the exact-argv-shape branch deliberately.
+  { name: "intake-consent-apply", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "intake-capture-apply", flat: true, mutates: true, automatedArgvShape: null },
+  { name: "intake-design-questions-apply", flat: true, mutates: true, automatedArgvShape: null },
 ].map((entry) => Object.freeze(entry)));
 
 export { ONBOARDING_SUBCOMMANDS };
@@ -184,6 +202,11 @@ function parse(args) {
     else if (arg === "--spec-path") { const specPath = args[index + 1]; if (!specPath || specPath.startsWith("--")) return { error: "--spec-path requires a repository path" }; output.specPath = specPath; index += 1; }
     else if (arg === "--design-input-path") { const designInputPath = args[index + 1]; if (!designInputPath || designInputPath.startsWith("--")) return { error: "--design-input-path requires a repository path" }; output.designInputPath = designInputPath; index += 1; }
     else if (arg === "--plan-sha256") { const digest = args[index + 1]; if (!/^[a-f0-9]{64}$/u.test(digest ?? "")) return { error: "--plan-sha256 requires a lowercase SHA-256 digest" }; output.planSha256 = digest; index += 1; }
+    else if (arg === "--granted") output.granted = true;
+    else if (arg === "--git-author-name") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--git-author-name requires a name" }; output.gitAuthorName = value; index += 1; }
+    else if (arg === "--git-author-email") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--git-author-email requires an email" }; output.gitAuthorEmail = value; index += 1; }
+    else if (arg === "--text") { const value = args[index + 1]; if (value === undefined) return { error: "--text requires one argv text element" }; output.text = value; index += 1; }
+    else if (arg === "--answers-json") { const value = args[index + 1]; if (!value || value.startsWith("--")) return { error: "--answers-json requires a JSON array" }; output.answersJson = value; index += 1; }
     else if (arg === "--activate") output.activate = true;
     else if (arg === "--help" || arg === "-h") output.help = true;
     else return { error: `unknown argument: ${arg}` };
@@ -202,6 +225,11 @@ function parse(args) {
   // partial claim that would silently resolve to `operatorAuthority: null` and
   // hand back the flat "operator-authority-required" ask again.
   const isRepairCommand = output.command === "plan-repair" || output.command === "apply-repair";
+  // intake-consent-apply's --language/--profile candidate values are its own
+  // still-missing-values ask (design SSa.5 point 1), a genuinely third
+  // non-kickoff, non-repair command allowed to carry --language -- additive to
+  // the isRepairCommand carve-out above, never a widening of it.
+  const isIntakeConsentCommand = output.command === "intake-consent-apply";
   if (output.command?.startsWith("kickoff-promote-")) {
     if (output.goal !== undefined) return { error: "--goal is not valid for kickoff promotion" };
     if (output.language !== undefined) return { error: "--language is not valid for kickoff promotion" };
@@ -209,7 +237,7 @@ function parse(args) {
   } else if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
   else if (output.command?.startsWith("kickoff-") && output.language === undefined) return { error: "kickoff plan/apply requires --language <de|en>" };
   else if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
-  else if (!output.command?.startsWith("kickoff-") && !isRepairCommand && output.language !== undefined) return { error: "--language is only valid for kickoff plan/apply" };
+  else if (!output.command?.startsWith("kickoff-") && !isRepairCommand && !isIntakeConsentCommand && output.language !== undefined) return { error: "--language is only valid for kickoff plan/apply" };
   if (isRepairCommand) {
     const operatorFields = [output.featureId, output.planPath, output.prdPath, output.specPath, output.language];
     const suppliedCount = operatorFields.filter((value) => value !== undefined).length;
@@ -288,6 +316,26 @@ export function main(args = process.argv.slice(2), {
       planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath, designInputPath: options.designInputPath,
       runner: options.runner, planSha256: options.planSha256, activate: options.activate, deps,
     });
+    else if (options.command === "intake-consent-apply") output = applyOnboardingIntakeConsent({
+      rootDir: options.root,
+      granted: options.granted === true,
+      gitAuthor: options.gitAuthorName && options.gitAuthorEmail
+        ? { name: options.gitAuthorName, email: options.gitAuthorEmail } : null,
+      language: options.language ?? null,
+      profile: options.profile ?? null,
+      activate: options.activate,
+      deps,
+    });
+    else if (options.command === "intake-capture-apply") output = applyOnboardingIntakeCapture({
+      rootDir: options.root, text: options.text, activate: options.activate, deps,
+    });
+    else if (options.command === "intake-design-questions-apply") {
+      let answers;
+      try { answers = JSON.parse(options.answersJson ?? "null"); } catch { answers = null; }
+      output = applyOnboardingIntakeDesignQuestions({
+        rootDir: options.root, answers, activate: options.activate, deps,
+      });
+    }
     else {
       const operation = options.command === "initialize-runtime"
         ? "runtime"
@@ -315,6 +363,13 @@ export function main(args = process.argv.slice(2), {
   }
   write(`${JSON.stringify(output, null, 2)}\n`);
   if (["pipeline.codex-onboarding-kickoff-plan.v1", "pipeline.codex-onboarding-kickoff-promotion-plan.v1"].includes(output.schema)) return 0;
+  // Wave 4 intake-checkpoint apply commands (NVA-W4-COORD-1) are apply-only,
+  // `{ schema, root, mutated, checkpoint }` shaped -- no `status` field, so
+  // the resting-status set below never applies to them. Reaching this line at
+  // all means the apply function returned rather than throwing, i.e. it
+  // succeeded (possibly as a no-op replay, `mutated: false`).
+  if ([INTAKE_CONSENT_APPLY_SCHEMA, INTAKE_CAPTURE_APPLY_SCHEMA, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA]
+    .includes(output.schema)) return 0;
   if (output.schema === "pipeline.project-onboarding-remote-adoption-plan.v1") return output.status === "ready" || output.status === "activation-required" ? 0 : 1;
   // `runtime-attestation-required` is a legitimate resting point for an
   // inspect/plan command: it names what the caller still needs before it can
