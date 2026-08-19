@@ -311,3 +311,157 @@ test("authorize-by-signature validates its flag set like the sibling subcommands
   assert.equal(status, 2);
   assert.match(captured.stderr, /HGO-USAGE/u);
 });
+
+/**
+ * PHX-WP-HGO-FAILCLOSED-IMPL-C, design doc §3.2/§3.3. `prepare-for-signature`
+ * collapses `plan` -> `prepare-authorization` (fixed `HGO_SIGNATURE_REASON`) ->
+ * digest-emission into one CLI call. This asserts the full output shape
+ * verbatim from §3.3, that the two ready-to-copy command blocks resolve real
+ * absolute sibling-script paths (only the two PO-local placeholders stay
+ * literal), and that `intentSha256` is deterministic/reproducible for the same
+ * inputs (a second call against the same persisted plan must reproduce it
+ * exactly, since design doc §3.4 makes `prepare-for-signature` the normal path
+ * by which the persisted plan is created and every later call just re-reads it).
+ */
+test("prepare-for-signature emits the exact §3.3 output shape, with real resolved script paths and a reproducible intentSha256", () => {
+  const root = fixture();
+  try {
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "prepare-for-signature\n" }, denials,
+    });
+    assert.equal(recorded.status, "planned");
+
+    const first = io();
+    const status = main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], first);
+    assert.equal(status, 0, first.stderr);
+    const value = JSON.parse(first.stdout);
+
+    assert.equal(value.schema, "pipeline.human-guard-override-prepare-for-signature.v1");
+    assert.equal(value.status, "prepared");
+    assert.equal(value.root, root);
+    assert.equal(value.requestSha256, recorded.requestSha256);
+    assert.match(value.planSha256, /^[a-f0-9]{64}$/u);
+    assert.match(value.selectionSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(value.reasonSha256, createHash("sha256").update(Buffer.from(HGO_SIGNATURE_REASON, "utf8")).digest("hex"));
+    assert.match(value.intentSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(typeof value.expiresAt, "string");
+    assert.ok(!Number.isNaN(new Date(value.expiresAt).getTime()), value.expiresAt);
+
+    assert.deepEqual(value.signIntentCommand, {
+      executable: process.execPath,
+      argv: [
+        join(PLUGIN_ROOT, "scripts", "po-human-approval.mjs"),
+        "sign-intent",
+        "--repo-root", root,
+        "--directory", "<external-po-material-directory>",
+        "--intent-sha256", value.intentSha256,
+      ],
+      mutation: false,
+      requiresConfirmation: true,
+      executionBoundary: "attended-external-terminal",
+    });
+    assert.deepEqual(value.authorizeBySignatureCommand, {
+      executable: process.execPath,
+      argv: [
+        SCRIPT,
+        "authorize-by-signature",
+        "--repo", root,
+        "--request-sha256", recorded.requestSha256,
+        "--plan-sha256", value.planSha256,
+        "--proof", "<external-proof.json>",
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      executionBoundary: "local-process",
+    });
+
+    // Reproducibility: a second call against the same (requestSha256, null
+    // authorSourceRoot) pair reads the same persisted plan back unchanged
+    // (design doc §1.4 step 1/§3.4) and must reproduce the identical digests.
+    const second = io();
+    assert.equal(main(["prepare-for-signature", "--repo", root, "--request-sha256", recorded.requestSha256], second), 0, second.stderr);
+    const repeat = JSON.parse(second.stdout);
+    assert.equal(repeat.planSha256, value.planSha256);
+    assert.equal(repeat.selectionSha256, value.selectionSha256);
+    assert.equal(repeat.intentSha256, value.intentSha256);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("prepare-for-signature validates its flag set like the sibling plan/prepare-authorization subcommands", () => {
+  const captured = io();
+  const status = main(["prepare-for-signature", "--repo", "/tmp/does-not-matter"], captured);
+  assert.equal(status, 2);
+  assert.match(captured.stderr, /HGO-USAGE/u);
+});
+
+/**
+ * PHX-WP-HGO-FAILCLOSED-IMPL-C, design doc §3.6. `refreeze-plan` is a thin CLI
+ * wrapper over the already-implemented, already-lib-tested
+ * `refreezeHumanGuardOverridePlan()` -- this proves only the CLI wiring: a
+ * successful refreeze reaching the library function and printing its exact
+ * result, plus a failure code (`HGO-PLAN-ABSENT`) surfacing through the CLI's
+ * ordinary exit-code-2 + stderr-code convention.
+ */
+test("refreeze-plan CLI wiring: a benign drift refreezes successfully and prints the exact §3.6 output shape", () => {
+  const root = fixture();
+  try {
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "refreeze cli\n" }, denials,
+    });
+    assert.equal(recorded.status, "planned");
+    const planned = planHumanGuardOverride({ rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, scriptPath: SCRIPT });
+
+    // A benign commit -- changes head/tree only, not fingerprintSha256/policyIdentity.
+    writeFileSync(join(root, "refreeze-cli-benign.md"), "benign\n");
+    git(root, "add", "refreeze-cli-benign.md");
+    git(root, "commit", "-q", "-m", "benign commit before CLI refreeze");
+
+    const captured = io();
+    const status = main(["refreeze-plan", "--repo", root, "--request-sha256", recorded.requestSha256], captured);
+    assert.equal(status, 0, captured.stderr);
+    const value = JSON.parse(captured.stdout);
+    assert.equal(value.schema, "pipeline.human-guard-override-refreeze-plan.v1");
+    assert.equal(value.status, "refrozen");
+    assert.equal(value.root, root);
+    assert.equal(value.requestSha256, recorded.requestSha256);
+    assert.equal(value.priorPlanSha256, planned.planSha256);
+    assert.notEqual(value.planSha256, planned.planSha256);
+    assert.equal(value.expiresAt, planned.expiresAt);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("refreeze-plan CLI wiring: HGO-PLAN-ABSENT surfaces through the ordinary exit-code-2 + stderr-code convention", () => {
+  const root = fixture();
+  try {
+    const denials = [{ guard: "guard-testpath.mjs", reason: "TP-3: fixture" }];
+    const recorded = recordHumanGuardDenial({
+      rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "refreeze cli absent\n" }, denials,
+    });
+    assert.equal(recorded.status, "planned");
+    // No plan created for this request -- refreeze-plan must only ever
+    // overwrite an existing plan, never create the first one.
+    const captured = io();
+    const status = main(["refreeze-plan", "--repo", root, "--request-sha256", recorded.requestSha256], captured);
+    assert.equal(status, 2);
+    assert.match(captured.stderr, /HGO-PLAN-ABSENT/u);
+    assert.equal(captured.stdout, "");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("refreeze-plan validates its flag set like the sibling plan subcommand", () => {
+  const captured = io();
+  const status = main(["refreeze-plan", "--repo", "/tmp/does-not-matter"], captured);
+  assert.equal(status, 2);
+  assert.match(captured.stderr, /HGO-USAGE/u);
+});

@@ -1893,6 +1893,116 @@ export function prepareHumanGuardOverrideAuthorization({
   };
 }
 
+/**
+ * Part C (design doc §3.2/§3.3): collapses `plan` (or reads the already-persisted
+ * plan -- design doc §1.4 step 1's own get-or-create semantics; no new
+ * persistence implementation, design doc §3.4) -> `prepareHumanGuardOverrideAuthorization()`
+ * with the fixed `HGO_SIGNATURE_REASON` -> digest-emission into one call,
+ * replicating exactly the recipe `authorizeHumanGuardOverrideBySignature()` itself
+ * already proves (its own `createPoApprovalIntent(...)` call below, unchanged).
+ * Performs no signature verification and touches no private key -- "pure digest
+ * computation against data already in the repository" (ADR-0059 Decision 1),
+ * exactly as true of `plan` and `prepare-authorization` today.
+ *
+ * The `global-plugin-install` mode is not special-cased here the way
+ * `authorizeHumanGuardOverrideBySignature()` special-cases it (its own
+ * `HGO-SIGNATURE-UNSUPPORTED-MODE` refusal): that mode's `repository` observation
+ * carries no `head`/`tree` at all, so `createPoApprovalIntent()`'s own candidate
+ * validation already throws for it, caught below as `HGO-SIGNATURE-INTENT-INVALID`
+ * -- an extra early check would only rename an already-fail-closed outcome.
+ */
+export function prepareHumanGuardOverrideForSignature({
+  rootDir,
+  pluginRoot,
+  requestSha256,
+  nowMs = Date.now(),
+  spawn = spawnSync,
+  scriptPath,
+  humanApprovalScriptPath,
+  authorSourceRoot = null,
+} = {}) {
+  const planned = planHumanGuardOverride({
+    rootDir,
+    pluginRoot,
+    requestSha256,
+    nowMs,
+    spawn,
+    scriptPath,
+    authorSourceRoot,
+  });
+  const prepared = prepareHumanGuardOverrideAuthorization({
+    rootDir,
+    pluginRoot,
+    requestSha256,
+    planSha256: planned.planSha256,
+    reason: HGO_SIGNATURE_REASON,
+    nowMs,
+    spawn,
+    scriptPath,
+    authorSourceRoot,
+  });
+  let intent;
+  try {
+    intent = createPoApprovalIntent({
+      kind: HGO_SIGNATURE_INTENT_KIND,
+      featureId: HGO_SIGNATURE_INTENT_FEATURE_ID,
+      planSha256: HGO_SIGNATURE_INTENT_PLAN_SHA256,
+      specSha256: HGO_SIGNATURE_INTENT_SPEC_SHA256,
+      candidate: { commit: planned.repository.head, tree: planned.repository.tree },
+      policyRevision: HGO_SIGNATURE_INTENT_POLICY_REVISION,
+      subjectSha256: prepared.selectionSha256,
+      decision: HGO_SIGNATURE_INTENT_DECISION,
+    });
+  } catch {
+    fail("HGO-SIGNATURE-INTENT-INVALID", "signed authorization intent could not be built from the current repository observation");
+  }
+  return {
+    schema: "pipeline.human-guard-override-prepare-for-signature.v1",
+    status: "prepared",
+    root: planned.root,
+    requestSha256,
+    planSha256: planned.planSha256,
+    selectionSha256: prepared.selectionSha256,
+    reasonSha256: prepared.reasonSha256,
+    intentSha256: intent.sha256,
+    expiresAt: planned.expiresAt,
+    signIntentCommand: {
+      executable: process.execPath,
+      argv: [
+        humanApprovalScriptPath,
+        "sign-intent",
+        "--repo-root",
+        planned.root,
+        "--directory",
+        "<external-po-material-directory>",
+        "--intent-sha256",
+        intent.sha256,
+      ],
+      mutation: false,
+      requiresConfirmation: true,
+      executionBoundary: "attended-external-terminal",
+    },
+    authorizeBySignatureCommand: {
+      executable: process.execPath,
+      argv: [
+        scriptPath,
+        "authorize-by-signature",
+        "--repo",
+        planned.root,
+        "--request-sha256",
+        requestSha256,
+        "--plan-sha256",
+        planned.planSha256,
+        "--proof",
+        "<external-proof.json>",
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      executionBoundary: "local-process",
+    },
+  };
+}
+
 export function authorizeHumanGuardOverride({
   rootDir,
   pluginRoot,
