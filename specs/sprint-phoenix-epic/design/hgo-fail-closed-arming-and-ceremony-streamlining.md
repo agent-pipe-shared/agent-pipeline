@@ -265,8 +265,18 @@ first.
    with the *same* `HGO-DRIFT` code on any mismatch, unconditionally: a `policyIdentity` change
    (the project's guard configuration edited between the original plan and now) still blocks a
    re-freeze exactly as it blocks first creation; a re-freeze is not a relaxed gate, it is the
-   same gate run again. On success, it overwrites the persisted plan's `repository` (and
-   `plugin`, re-derived the same way step 1's first call already does) fields with the fresh
+   same gate run again. **NEW (Revision 4) — "re-derived the same way step 1's first call already
+   does" means the FULL step-1 treatment, verification included, not only recomputation:**
+   re-freeze also takes a fresh `pluginIdentity(pluginRoot)` and checks it against `request.plugin`
+   in full (unnarrowed, exactly Revision 3's step-1 check), failing the same `HGO-DRIFT` code on
+   mismatch, BEFORE accepting the fresh reading as the new persisted-plan baseline. This is not
+   optional or a lesser echo of step 1's check — omitting it would let refreeze itself become the
+   exact laundering path Revision 3 closed for first-plan-creation: a plugin-code tamper occurring
+   while a `HGO-CANDIDATE-DRIFT` recovery is pending would otherwise be captured, unverified, as
+   the new trusted baseline, and step 3c could never catch it afterward (3c only ever compares
+   fresh state against whatever baseline is currently persisted). On success (all three of
+   `fingerprintSha256`/`policyIdentity`/`pluginIdentity` matching their frozen `request` values),
+   it overwrites the persisted plan's `repository` and `plugin` fields with the fresh, now-verified
    observation, deriving a new `planSha256` since the payload content changed, and appends a
    `replanned` audit entry (`{requestSha256, priorPlanSha256, planSha256, authorSourceRoot}`) to
    the same HMAC-chained ledger `appendAudit` already writes every other transition to — giving
@@ -578,6 +588,25 @@ mismatch. This exactly restores the property the pre-existing test encodes; the 
 change to that test. Step 3c (arm-time `HGO-PLUGIN-DRIFT`) is untouched — the two checks now
 cover two different windows (denial→first-plan; first-plan→arm) the same way steps 1 and 3a/3b
 already do for repository/policy.
+
+### 1.11 Revision 4 — response to the implementation's own Critic round-1 finding
+
+Found by the first Critic review of the Part A/B implementation diff (commit `7473f6c9`), not a
+re-review of this document. **Finding (major):** `refreezeHumanGuardOverridePlan` (step 6) adopted
+a freshly-observed `pluginIdentity()` straight into the new persisted-plan baseline with no
+comparison at all — inheriting exactly the class of gap Revision 3 closed for
+`planHumanGuardOverride`'s first-call path, via a second write path this design itself introduces.
+The design's own prose already said re-freeze re-derives `plugin` "the same way step 1's first
+call already does" (§1.4 step 6, unchanged text) — after Revision 3, step 1's first call means
+verify-then-persist, not just recompute-then-persist; the implementation read the phrase as the
+latter. **Closed by Revision 4** (§1.4 step 6, above): re-freeze now verifies fresh
+`pluginIdentity(pluginRoot)` against `request.plugin` in full, failing `HGO-DRIFT`, before
+accepting it into the refreshed baseline — the identical check Revision 3 added to step 1, applied
+to step 6's own re-derivation for the same reason. Two further minor findings from the same
+review (missing tamper coverage for 2 of `pluginIdentity()`'s six hashed files in existing
+tests; missing `authorSourceRoot`-collision regression coverage per §1.7's own already-flagged
+open item) are implementation-detail test-coverage gaps, not design gaps — closed directly in the
+implementing dispatch's test additions, not documented further here.
 
 ## 2. Part B — the digest-withholding comment
 
