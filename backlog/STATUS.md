@@ -97,7 +97,7 @@
 | pipeline.fresh-repo-onboarding-intake-first-transaction | open | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.full-push-preflight-before-signature | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.git-appears-despite-initializes-git-false | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.git-appears-despite-initializes-git-false | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.git-identity-ask-step-unreachable-through-live-cli-path | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation | closed | defect | pipeline | 2026-08-10 | — |
@@ -247,7 +247,7 @@
 | pipeline.sentinel-epic-acceptance-matrix-archive-drift | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.session-told-ready-but-not-how-to-repair | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.setup-promises-a-human-name-repair-it-cannot-perform | closed | defect | pipeline | 2026-08-09 | — |
@@ -290,7 +290,7 @@
 | pipeline.warn-security-gate-hard-blocks-every-push | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.windows-directory-durability | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
-| pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.windows-private-state-assurance | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-runtime-baseline-containment | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.windows-trusted-tool-resolution | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
@@ -301,6 +301,6 @@
 
 ## Counts
 
-- open: 74
+- open: 71
 - in_progress: 7
-- closed: 212
+- closed: 215

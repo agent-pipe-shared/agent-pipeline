@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "15c06e26452b7992c25a7e61050e5fc4fc1911810d523839455096187558f163"
+    "transitionHead": "4d1140e8d86e1545a0f877e95da49dabdba44a83e14a8bfaf63a8a323d5becb4"
   },
   "counts": {
-    "open": 74,
+    "open": 71,
     "in_progress": 7,
-    "closed": 212
+    "closed": 215
   },
   "items": [
     {
@@ -1029,11 +1029,15 @@
     },
     {
       "id": "pipeline.git-appears-despite-initializes-git-false",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-4)."
+      "source": "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-4).",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "f12c335034c524c325e960d3c508df1d0530fed5",
+      "closureEvidence": "backlog/items/2026-08-08-a-git-repository-appears-although-the-plan-said-it-would-not.md"
     },
     {
       "id": "pipeline.git-identity-ask-step-unreachable-through-live-cli-path",
@@ -2678,11 +2682,15 @@
     },
     {
       "id": "pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
+      "source": "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "f12c335034c524c325e960d3c508df1d0530fed5",
+      "closureEvidence": "backlog/items/2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md"
     },
     {
       "id": "pipeline.session-told-ready-but-not-how-to-repair",
@@ -3131,11 +3139,15 @@
     },
     {
       "id": "pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "PO, 2026-08-18, relaying a diagnosis from a separate Windows Claude Code session working on an unrelated consumer project ('Toolbox'), which vendors the same `plugins/pipeline-core` source via the marketplace. `project-onboarding-v3.mjs inspect --intent session` was returning `continuity-observation-unavailable` on that Windows machine even though pipeline-state.json/PRD/spec content was independently verified byte-correct (checked via `certutil -hashfile`). Two of the reported hit locations (`lib/onboarding-continuity.mjs:617,625`, `lib/local-supervisor-state.mjs:61,65,69`) were independently spot-checked against this repo's own current source and confirmed to match exactly, including that this exact same file already has correct win32-aware branching elsewhere (onboarding-continuity.mjs:1211,4482) but not at the two reported lines -- corroborating the report rather than taking it on faith."
+      "source": "PO, 2026-08-18, relaying a diagnosis from a separate Windows Claude Code session working on an unrelated consumer project ('Toolbox'), which vendors the same `plugins/pipeline-core` source via the marketplace. `project-onboarding-v3.mjs inspect --intent session` was returning `continuity-observation-unavailable` on that Windows machine even though pipeline-state.json/PRD/spec content was independently verified byte-correct (checked via `certutil -hashfile`). Two of the reported hit locations (`lib/onboarding-continuity.mjs:617,625`, `lib/local-supervisor-state.mjs:61,65,69`) were independently spot-checked against this repo's own current source and confirmed to match exactly, including that this exact same file already has correct win32-aware branching elsewhere (onboarding-continuity.mjs:1211,4482) but not at the two reported lines -- corroborating the report rather than taking it on faith.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "f12c335034c524c325e960d3c508df1d0530fed5",
+      "closureEvidence": "backlog/items/2026-08-18-windows-posix-mode-bit-checks-are-meaningless-on-ntfs.md"
     },
     {
       "id": "pipeline.windows-private-state-assurance",
