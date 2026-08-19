@@ -301,3 +301,61 @@ dispatch is needed for: (1) the CLI-side `granted` wiring itself, (2)
 dedicated regression tests for both the new hook-side helpers and the CLI
 wiring once built.
 - **Date:** 2026-08-19
+
+### Progress note — CLI-side `granted` wiring hits a real architectural conflict, correctly reverted; hook-side test coverage landed (2026-08-19, `PHX-WP-HGO-LEDGER-EMISSION-V3`)
+
+A follow-up dispatch built the CLI-side wiring, found a genuine architectural
+blocker by empirical proof (a live round-trip test), and **correctly
+reverted it rather than ship a regression** — this is the dispatch's own
+briefed stop condition firing exactly as intended, not a failure.
+
+**The blocker:** design §8.1 requires arming (HGO `granted`) to be
+fail-closed — the ledger append must happen, and succeed, before the
+capability is armed. But `appendHumanGovernanceDecision` writes into the
+tracked worktree without committing, and `authorizeHumanGuardOverride()`/
+`authorizeHumanGuardOverrideBySignature()` (`lib/human-guard-override.mjs`,
+out of this dispatch's edit scope) independently re-derive
+`repositoryObservation` (including `statusSha256`) at arm time and refuse
+`HGO-DRIFT` the instant that status differs from what was captured at
+denial time. Appending-before-arming therefore breaks arming for every
+representable decision — confirmed live, not assumed, via a full
+deny→authorize→consume round-trip test that failed exactly this way before
+being discarded along with the reverted wiring. `scripts/guard-human-override.mjs`
+and its test file are confirmed byte-identical to their pre-dispatch state
+(`git diff`, empty) — zero collateral change landed.
+
+**What DID land, independently re-verified by the Elephant:** new direct
+test coverage for the two previously-untested hook-side helpers
+(`appendOverrideDeniedLedgerEvent`, `appendOverrideConsumedLedgerEvent`) in
+`plugins/pipeline-core/hooks/guard-gate-strength-ledger.test.mjs`, 2/2 pass.
+Commit `5c459eaa`, cherry-picked to `sprint_phoenix` as `bce05e53`. All
+pre-existing suites re-confirmed unchanged: `guard-gate-strength.test.mjs`
+31/31, `guard-gate-strength-gmw.test.mjs` 1/1,
+`guard-authority-ledger-intake.test.mjs` 19/19.
+
+**Decision: this item's HGO half is done to the point a disclosed gap is
+the right stopping point, not a further goldfish dispatch.** Three
+dispatches have now worked this exact topic (a correctly-stopped
+wrong-premise attempt, the hook-side landing, this CLI-side attempt). The
+dispatch's own assessment — "needs a real design review, not a
+goldfish-scale patch" — is accepted rather than second-guessed: the
+remaining question (how `authorizeHumanGuardOverride`'s drift check should
+interact with a ledger append that necessarily touches the worktree) is a
+security-critical-file design decision, not a scoping or implementation
+gap a tighter briefing would fix. Candidate directions the dispatch
+surfaced, unevaluated: exclude `governance/events/**` from the
+drift-relevant `statusSha256` preimage; make the ledger append commit
+atomically; or thread the pre-append repository observation through to the
+arm call instead of re-deriving a fresh one at arm time.
+
+**Item's final status for this round:** GMW's ledger emission — fully done
+(round "GMW half complete" above). HGO's hook-side (denial+consumption) —
+fully done and now tested. HGO's CLI-side (`granted`) — a disclosed,
+understood, empirically-proven architectural gap, mirroring how §14 of the
+design doc already carries other disclosed gaps for this same feature.
+Closing this item as **partially delivered, remaining CLI-side gap
+tracked** rather than reopening a fourth dispatch without a design review
+first — matches the earlier PO-approved precedent (option (b) in this
+item's own history) of accepting a documented increment-1 gap when the
+alternative is unbounded further dispatching on the same file.
+- **Date:** 2026-08-19
