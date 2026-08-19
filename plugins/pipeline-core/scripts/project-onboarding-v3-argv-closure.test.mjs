@@ -13,7 +13,6 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -108,10 +107,6 @@ function neutralGitFixture(prefix) {
   return root;
 }
 
-function sha256Hex(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
-}
-
 test("project-onboarding-v3 CLI: the intake -> generate -> bootstrap-bind chain works end to end through main()", () => {
   const dir = neutralGitFixture("bootstrap-bind-e2e");
   try {
@@ -136,16 +131,14 @@ test("project-onboarding-v3 CLI: the intake -> generate -> bootstrap-bind chain 
     assert.equal(result.status, 0, result.output);
     const generated = JSON.parse(result.output);
 
-    // The staged PRD is an explicitly unreviewed draft (design SSa.4/SSc.3): it must carry the
-    // three PO-gate markers before binding, mirroring onboarding-continuity.test.mjs's own
-    // bootstrapBindReadyRoot() fixture -- this is fixture setup via direct file edit, not part of
-    // the CLI surface under test.
+    // The staged PRD is an explicitly unreviewed draft (design SSa.4/SSc.3): the generator
+    // (buildIntakePrdContent(), NVA-BL-INTAKEBIND-1) now emits the po-language and
+    // technical-spec-sha256 markers mechanically, so only the one marker representing a
+    // genuine review decision -- po-plan-acknowledged -- still needs adding here, mirroring
+    // onboarding-continuity.test.mjs's own bootstrapBindReadyRoot() fixture. This is fixture
+    // setup via direct file edit, not part of the CLI surface under test.
     const prdAbsolute = join(dir, generated.targets.prd.path);
-    const specAbsolute = join(dir, generated.targets.spec.path);
-    const specSha256 = sha256Hex(readFileSync(specAbsolute));
     writeFileSync(prdAbsolute, [
-      "<!-- po-language: en -->",
-      `<!-- technical-spec-sha256: ${specSha256} -->`,
       PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
       readFileSync(prdAbsolute, "utf8"),
     ].join("\n"));
