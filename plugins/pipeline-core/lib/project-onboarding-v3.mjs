@@ -2244,6 +2244,23 @@ function readyLifecycleResult({ root, runner, intent, repository, runtime, conti
       strict: true,
     });
     if (cleanupRecovery !== null) return cleanupRecovery;
+    // Critic finding F1, 2026-08-19 (dispatch W4-CRITIC-2C): a null return
+    // here can mean a recovery kind that MUTATED portable State (three of
+    // the six typed kinds release a binding) just committed successfully --
+    // the `continuity` this function was called with is the preimage, not
+    // the postimage. Re-observe it fresh before anything below reads it,
+    // exactly like afterRuntimeLifecycleResult's own first observation
+    // (line ~2464) already does; a stale digest silently returned as
+    // "ready" is worse than the extra read.
+    try {
+      continuity = (fs.classifyOnboardingContinuity ?? classifyOnboardingContinuity)({
+        rootDir: root,
+        repositoryCapability: repository.mode,
+        spawn: fs.spawnSync,
+      });
+    } catch {
+      continuity = emptyContinuity();
+    }
   }
   // Runtime projection and App-Server health are distinct authorities. A
   // plugin-managed projection still requires the same single, read-only
