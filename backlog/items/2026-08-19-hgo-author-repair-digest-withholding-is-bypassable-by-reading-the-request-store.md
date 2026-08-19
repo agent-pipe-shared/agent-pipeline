@@ -108,5 +108,37 @@ explicitly out of scope and covered by role-contract prohibition instead).
 
 ## Triage
 
-Not yet triaged — logged same-session per direct PO instruction, pending its
-own dedicated design/dispatch round.
+- **Decision (PO, 2026-08-19, same session):** Re-scoped. The PO's own
+  assessment: withholding the digest from stderr while the underlying
+  request record stays fully readable on disk is security-by-obscurity,
+  not a real control — chasing candidate directions 1-3 above (encrypting
+  or otherwise hiding the digest) would be hardening the wrong boundary.
+  The actual security property was never digest secrecy: `authorize`/
+  `authorize-by-signature` cannot arm a capability without a valid Ed25519
+  signature bound to the intent, produced only with the PO's private key,
+  which an agent never has access to and cannot forge regardless of
+  whether it also knows the plaintext digest. Knowing the digest lets an
+  agent construct the NEXT ceremony command; it does not let it skip the
+  human-signing step.
+- **Correction (this fix):** withdraw candidates 1-3 (obscuring the
+  digest). The remaining work is documentation-only: `humanGuardRouteUnavailableReason`'s
+  own comment ("bounded by construction rather than by care") should be
+  corrected to state plainly that the withholding is a UX/attention
+  nudge — encouraging a human, not an agent, to notice and drive an
+  author-repair ceremony — not a security boundary; the real boundary is
+  named explicitly (the Ed25519 signing key requirement in
+  `authorizeHumanGuardOverrideBySignature`, ADR-0059). Candidate 4
+  (behavioral role-contract prohibition against reading the requests
+  store) still stands as a cheap, real belt-and-braces addition, since an
+  agent that reads the store to skip asking the PO at all — as opposed to
+  reading it after the PO has already explicitly authorized proceeding, as
+  happened live this session — would still be undesirable process
+  behavior even though it isn't a cryptographic bypass.
+- **Assignment:** documentation fix to `lib/human-guard-override.mjs`'s
+  own comments (`humanGuardRouteUnavailableReason`, and the module-level
+  docstring if it makes the same claim elsewhere) — bundle with the
+  related ceremony-streamlining work in
+  `backlog/items/2026-08-19-hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step.md`,
+  since both touch the same file in the same review pass. Guardrail/hook
+  code — goes to `goldfish-deep`, never a same-session Elephant edit.
+- **Date:** 2026-08-19
