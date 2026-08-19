@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 3fedc770a8a8196d49376f3c033558eaf51bf057
+closure_evidence: plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs
 source: "PO live external test transcript (2026-08-19), project D:\\Dev\\Rune_Test1_Claude_060_56 on Windows/WSL, Claude runner, plugin 0.6.0+claude.20260819163512.ca18e0c. Full material-design-input onboarding (consent -> capture x6 -> design-questions -> generate-plan/-apply) completed cleanly, then bootstrap-bind-plan refused with KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID -- a dead end for the entire material-intake happy path."
 ---
 
@@ -154,5 +158,9 @@ depth) -- but the shape is reasonably clear from the code already read:
 
 - **Decision:** Accepted, all 3 parts of the Proposal. PO characterized this as a critical blocker on the material-intake happy path (2026-08-19) and asked for it fixed before the next candidate stamp.
 - **Rationale:** Confirmed root cause in code, not just from the PO's report; the fix restores documented design intent (SSa.4/SSc.3, the test fixture's own comment) rather than working around it. The 3 lower-severity friction points in the Triggering situation are explicitly out of scope for this fix.
-- **Assignment (if accepted):** Dispatching to goldfish-deep, worktree-isolated.
+- **Assignment (if accepted):** Dispatched to goldfish-deep, worktree-isolated (`NVA-BL-INTAKEBIND-1`, truncated twice mid-run, resumed procedurally both times per this session's established recovery discipline). Landed on trunk as `3fedc770` (cherry-picked from worktree commits `9153aa1c`/`68a39bd9`/`30ee2bb8`), independently re-verified on trunk (`onboarding-continuity.test.mjs` 230/230, `guard-lifecycle-ready.test.mjs` 126/126, `project-onboarding-ready-gate.test.mjs` 8/8, `check-consumer-safe-paths.test.mjs` 9/9).
 - **Date:** 2026-08-19
+
+## Closure, 2026-08-19
+
+All 3 defects fixed as designed: (1) `buildIntakePrdContent()` now emits the `po-language`/`technical-spec-sha256` markers mechanically, mirroring `initialPrdContent()`; (2) a new narrow `guard-lifecycle-ready.mjs` admission (`isBootstrapBindingStagingAuthoringWrite()`) lets a real session author/acknowledge the staging PRD/spec exactly while `lifecycleStatus === "bootstrap-binding-required"`, restoring the design's own intended review step (SSa.4/SSc.3) with no widening beyond the two exact staging paths; (3) `PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES` now includes the 3 step-6 statuses, so the guard's own status allowlist can recognize the window at all. The real (non-coordinator-sourced) kickoff-promotion path's marker requirements are proven unchanged (existing acknowledgement-refusal test still passes). Landed `3fedc770`. Independent Critic review is still pending as part of the final T1 gate for this candidate (self-application, CLAUDE.md) — not yet PO-accepted.
