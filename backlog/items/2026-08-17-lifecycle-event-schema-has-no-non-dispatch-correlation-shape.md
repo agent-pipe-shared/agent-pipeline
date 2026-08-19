@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape
-type: requirement
+type: defect
 owner: pipeline
 status: open
 created: 2026-08-17
