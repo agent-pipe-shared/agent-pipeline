@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d88b56098f28c13f8355d893168860d7ee0dde13a9ac6ebf351e3c7dafa783a2"
+    "transitionHead": "193a1f545698178cfb80994b00e169967b0017361acf0acab4d71013e955a621"
   },
   "counts": {
     "open": 51,
-    "in_progress": 7,
-    "closed": 240
+    "in_progress": 6,
+    "closed": 241
   },
   "items": [
     {
@@ -2979,12 +2979,16 @@
     },
     {
       "id": "pipeline.t1-governance-path-preflight",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; no completion claim.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0b5544f1150ed9788e2e391c42cc328e9ee87c3c",
+      "closureEvidence": "backlog/items/2026-07-19-t1-governance-path-preflight.md"
     },
     {
       "id": "pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete",
