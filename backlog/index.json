@@ -3,31 +3,39 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6d902b0183e7033ed96f71723e81bd1048da9b4965f49e0f59e7990d5d26db03"
+    "transitionHead": "398490419593ec92e077be9ae35acf16fd567d70d181721c0613b0b035f1e725"
   },
   "counts": {
-    "open": 98,
-    "in_progress": 26,
-    "closed": 28,
+    "open": 18,
+    "in_progress": 25,
+    "closed": 110,
     "rejected": 1,
-    "deferred": 1
+    "deferred": 11
   },
   "items": [
     {
       "id": "pipeline.a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Push gate of 2026-08-08 — two of the four failed attempts trace to this cause; the worktree workaround is currently carried as an instruction in docs/state.md rather than as a fixed mechanism"
+      "source": "Push gate of 2026-08-08 — two of the four failed attempts trace to this cause; the worktree workaround is currently carried as an instruction in docs/state.md rather than as a fixed mechanism",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "615bcd247ccc0f339102d669e5d78cd6e684d874",
+      "closureEvidence": "backlog/items/2026-08-08-a-checkout-that-cannot-be-clean-defeats-every-cleanliness-gate.md"
     },
     {
       "id": "pipeline.a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Elephant pre-Critic-dispatch check on PHX-WP-AAC04 (commit 78006b4), 2026-08-09."
+      "source": "Elephant pre-Critic-dispatch check on PHX-WP-AAC04 (commit 78006b4), 2026-08-09.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "de7cf0d41cd1dff1c0f878de20834535447c0a37",
+      "closureEvidence": "backlog/items/2026-08-09-a-second-dispatch-claimed-an-evidence-artifact-it-never-wrote.md"
     },
     {
       "id": "pipeline.absent-runner-flag-silently-defaults-to-codex",
@@ -39,27 +47,39 @@
     },
     {
       "id": "pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "this session's own feature-package-topology digest-binding, hit twice"
+      "source": "this session's own feature-package-topology digest-binding, hit twice",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "82be6796c918882cfbe74c48b82598b010b745f4",
+      "closureEvidence": "backlog/items/2026-08-17-acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest.md"
     },
     {
       "id": "pipeline.accepted-adrs-drift-from-implementation-undetected",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Found on 2026-08-09 by two determination-first dispatches (PHX-ADR40, PHX-ADR38) sent to restore text the 0.5.2 merge audit reported as lost. Neither restored anything: both found the text had been deliberately superseded, and both surfaced this drift instead. Verified independently at source by the Elephant before filing."
+      "source": "Found on 2026-08-09 by two determination-first dispatches (PHX-ADR40, PHX-ADR38) sent to restore text the 0.5.2 merge audit reported as lost. Neither restored anything: both found the text had been deliberately superseded, and both surfaced this drift instead. Verified independently at source by the Elephant before filing.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "b85613905f13ed153eeb45f90e07a798354c960d",
+      "closureEvidence": "backlog/items/2026-08-09-accepted-adrs-contradict-the-implementation-and-nothing-detects-it.md"
     },
     {
       "id": "pipeline.adr-0045-topology-divergence-from-package-and-skill",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "First real run of harness/scripts/check-doc-reconciliation.mjs over the commit range 8dcb1cc..dec2ed4 implicated docs/adr/0045-canonical-artifact-topology.md (Governs: specs/**) because paths under specs/ changed in that range. Reading the ADR against the actual specs/sprint-phoenix-epic/ package it governs then showed two distinct divergences between the decision record and the shipped implementation."
+      "source": "First real run of harness/scripts/check-doc-reconciliation.mjs over the commit range 8dcb1cc..dec2ed4 implicated docs/adr/0045-canonical-artifact-topology.md (Governs: specs/**) because paths under specs/ changed in that range. Reading the ADR against the actual specs/sprint-phoenix-epic/ package it governs then showed two distinct divergences between the decision record and the shipped implementation.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "0252cb01f354d29b1262467d649788505f1e7245",
+      "closureEvidence": "backlog/items/2026-08-09-adr-0045-topology-divergence-from-package-and-skill.md"
     },
     {
       "id": "pipeline.adr-0047-numbering-collision",
@@ -104,39 +124,55 @@
     },
     {
       "id": "pipeline.agent-can-self-arm-the-git-override",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Found on 2026-08-08 by the PHX-RED1 dispatch while diagnosing why plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs is red. The suite is not a broken test: it specifies a human-authority binding that was never built, and diagnosing that surfaced the live hole below. Verified independently at source by the Elephant before filing, not taken from the dispatch report."
+      "source": "Found on 2026-08-08 by the PHX-RED1 dispatch while diagnosing why plugins/pipeline-core/hooks/guard-git-phoenix.test.mjs is red. The suite is not a broken test: it specifies a human-authority binding that was never built, and diagnosing that surfaced the live hole below. Verified independently at source by the Elephant before filing, not taken from the dispatch report.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "172933448968c7c76b4132bb089fa7391cb997e3",
+      "closureEvidence": "backlog/items/2026-08-08-an-agent-can-arm-the-git-override-itself-and-only-prose-forbids-it.md"
     },
     {
       "id": "pipeline.agent-decision-journal-code-pattern-array-coercion",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-16",
-      "source": "Found 2026-08-16 by PHX-WP-AAC01-REVALIDATION-TRIGGER while adding revalidationTrigger: RegExp.test() stringifies its argument, so CODE.test(value.reasonCode) alone admits an array like [\"SOME_CODE\"] where a string is required. Fixed for the new field with an added typeof guard; the pre-existing reasonCode instance was left untouched as out of scope."
+      "source": "Found 2026-08-16 by PHX-WP-AAC01-REVALIDATION-TRIGGER while adding revalidationTrigger: RegExp.test() stringifies its argument, so CODE.test(value.reasonCode) alone admits an array like [\"SOME_CODE\"] where a string is required. Fixed for the new field with an added typeof guard; the pre-existing reasonCode instance was left untouched as out of scope.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "169e95654f457df0efc60f33db5a8e5cf8c27dfa",
+      "closureEvidence": "backlog/items/2026-08-16-agent-decision-journal-code-pattern-array-coercion.md"
     },
     {
       "id": "pipeline.agent-decision-journal-no-production-producer",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-11",
-      "source": "Converged on during Sprint Phoenix Class B scoping (docs/state.md, 2026-08-11 checkpoint, 'PO said keep going' and following sections; specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md, 'The unifying finding'). PO decision confirmed 2026-08-11 (direct mobile question, 'Journal-Gap'): plan this as its own initiative."
+      "source": "Converged on during Sprint Phoenix Class B scoping (docs/state.md, 2026-08-11 checkpoint, 'PO said keep going' and following sections; specs/sprint-phoenix-epic/design/class-b-multi-dispatch-plan.md, 'The unifying finding'). PO decision confirmed 2026-08-11 (direct mobile question, 'Journal-Gap'): plan this as its own initiative.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "2e1fc22c3486399987a6e19a87eb8e3e0825d908",
+      "closureEvidence": "backlog/items/2026-08-11-agent-decision-journal-has-no-production-producer.md"
     },
     {
       "id": "pipeline.agent-definitions-pin-the-review-tier-model",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Critic round 1 of the 0.5.3 candidate, 2026-08-07 — the Critic reported its own route violation from direct same-dispatch evidence; the cause was found in the shipped agent definitions afterwards."
+      "source": "Critic round 1 of the 0.5.3 candidate, 2026-08-07 — the Critic reported its own route violation from direct same-dispatch evidence; the cause was found in the shipped agent definitions afterwards.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "08684e7874b79c04a44601c487f343be0dfaefa5",
+      "closureEvidence": "backlog/items/2026-08-07-agent-definitions-pin-the-review-tier-model.md"
     },
     {
       "id": "pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref",
-      "status": "open",
+      "status": "deferred",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
@@ -144,15 +180,19 @@
     },
     {
       "id": "pipeline.anchor-check-passes-on-wrong-language-content",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Measured by the PHX-R3-RESCOPE dispatch and re-verified independently by the Elephant. PO decision (APS, 2026-08-07): accepted for implementation."
+      "source": "Measured by the PHX-R3-RESCOPE dispatch and re-verified independently by the Elephant. PO decision (APS, 2026-08-07): accepted for implementation.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "41b7c4705de1bde037a9efac4d99a4d5de5426bd",
+      "closureEvidence": "backlog/items/2026-08-07-anchor-check-passes-on-wrong-language-content.md"
     },
     {
       "id": "pipeline.approval-mechanisms-require-out-of-session-po-acts",
-      "status": "open",
+      "status": "deferred",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
@@ -167,28 +207,64 @@
       "source": "Critic finding F-B, delta re-review of the F2 implementation fix (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md); recorded via the WP2-WP3-partA-rework-2 dispatch (which also fixed F-A/F-C/F-D from the same review)."
     },
     {
+      "id": "pipeline.authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "dispatch PHX-WP-ARPROOF-HUMANNAME; mirrors backlog/items/2026-08-17-trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof.md",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "a3d3f3459e60589a99eaed595ef50c4161883a2e",
+      "closureEvidence": "backlog/items/2026-08-18-authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had.md"
+    },
+    {
       "id": "pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-11",
-      "source": "Recorded in docs/state.md as F5/F6 (minor) findings from the PX0-AC-05 authority-revision receipt review chain: real, tracked, not yet fixed at the time of that checkpoint, but left without an owner or due date in the handover prose itself. Filed as a proper owned, dated backlog item per QG-06 (a known gap with no due date is a finding, not a mitigation), without altering the docs/state.md checkpoint narrative."
+      "source": "Recorded in docs/state.md as F5/F6 (minor) findings from the PX0-AC-05 authority-revision receipt review chain: real, tracked, not yet fixed at the time of that checkpoint, but left without an owner or due date in the handover prose itself. Filed as a proper owned, dated backlog item per QG-06 (a known gap with no due date is a finding, not a mitigation), without altering the docs/state.md checkpoint narrative.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "17d0437d5f70c6449cf924d7f872d4a2fda64515",
+      "closureEvidence": "backlog/items/2026-08-11-authority-revision-receipt-dedup-and-recovery-integrity-gaps.md"
     },
     {
       "id": "pipeline.authority-signing-terminal-contract",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Phoenix §7 authority revision; approve step failed twice inside an agent session"
+      "source": "Phoenix §7 authority revision; approve step failed twice inside an agent session",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "946f715f97f8dbdadca6fab701fcca19a6ebd48a",
+      "closureEvidence": "backlog/items/2026-08-06-authority-signing-terminal-contract.md"
     },
     {
       "id": "pipeline.b3-inventory-missed-agent-facing-documents-under-docs-deploy",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Critic out-of-scope observation, Phoenix gate-integrity full review round 1, 2026-08-08: docs/deploy/README.md carries live operating-model section citations and appears in neither B3 inventory."
+      "source": "Critic out-of-scope observation, Phoenix gate-integrity full review round 1, 2026-08-08: docs/deploy/README.md carries live operating-model section citations and appears in neither B3 inventory.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-08-b3-inventory-missed-agent-facing-documents-under-docs-deploy.md"
+    },
+    {
+      "id": "pipeline.backlog-closure-metadata-missing-across-historical-items",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Found by PHX-WP-BACKLOG-OBSGOV-MISC-TRIAGE while diagnosing backlog-state-check and backlog-ledger-reconciliation-tests failures from a full clean-candidate Verify run, 2026-08-18/19.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "a2a2bcc715f21ed79541064e9152f865b253fb6f",
+      "closureEvidence": "backlog/items/2026-08-19-backlog-closure-metadata-missing-across-historical-items.md"
     },
     {
       "id": "pipeline.backlog-delivery-status-reconciliation",
@@ -213,11 +289,15 @@
     },
     {
       "id": "pipeline.bare-branch-name-in-git-push-fails-approval-with-a-misleading-code",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in plugins/pipeline-core/lib/critical-action-authorization.mjs and plugins/pipeline-core/hooks/guard-push.mjs under dispatch PHX-BL4 (2026-08-09)."
+      "source": "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in plugins/pipeline-core/lib/critical-action-authorization.mjs and plugins/pipeline-core/hooks/guard-push.mjs under dispatch PHX-BL4 (2026-08-09).",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "4e1b9186a5063330931f93455c3185f9d122d68a",
+      "closureEvidence": "backlog/items/2026-08-09-bare-branch-name-in-git-push-fails-approval-with-a-misleading-code.md"
     },
     {
       "id": "pipeline.canonical-worktree-lifecycle",
@@ -230,27 +310,39 @@
     },
     {
       "id": "pipeline.citation-coordinate-checker-bare-basename",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Filed under phase-plan item R3.3 (gate integrity and residual closure). Disclosed inside the R3 design's own verification log (specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md §II.8, round-2 rework, F-B) but never filed as its own item, so the finding was reachable only by whoever read that section."
+      "source": "Filed under phase-plan item R3.3 (gate integrity and residual closure). Disclosed inside the R3 design's own verification log (specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md §II.8, round-2 rework, F-B) but never filed as its own item, so the finding was reachable only by whoever read that section.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "b54d8d0f9d1f18df2f5e82b5d908f33931036d2b",
+      "closureEvidence": "backlog/items/2026-08-08-citation-coordinate-checker-resolved-bare-basenames-to-the-wrong-file.md"
     },
     {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-05",
-      "source": "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift"
+      "source": "PO observation, Sprint Nova session 2026-08-05, plus a concrete misdiagnosis it caused in that same session (Elephant read .claude/pipeline.yaml as authority and drew the wrong conclusion about the push gate); independently confirmed and extended by the T1 Critic of candidate 8d9b3df as finding F-E (major), which withdrew its own earlier, too-generous disposition of the same drift",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "c12cbdf7058204863fd9f96df84699e20e51347b",
+      "closureEvidence": "backlog/items/2026-08-05-claude-dir-leftovers-defeat-runner-neutral-project-migration.md"
     },
     {
       "id": "pipeline.claude-has-no-start-time-opt-in-adoption-path",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-05",
-      "source": "PO observation, Sprint Nova session 2026-08-05, in the same session that reproduced the setup.mjs marketplace collision by hand"
+      "source": "PO observation, Sprint Nova session 2026-08-05, in the same session that reproduced the setup.mjs marketplace collision by hand",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "88dc3ba6952f226ed4f9caa57bad982cb660a425",
+      "closureEvidence": "backlog/items/2026-08-05-claude-has-no-start-time-opt-in-adoption-path.md"
     },
     {
       "id": "pipeline.close-spec-retention-and-consent",
@@ -274,7 +366,7 @@
     },
     {
       "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",
-      "status": "open",
+      "status": "deferred",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
@@ -308,19 +400,39 @@
     },
     {
       "id": "pipeline.commit-trailer-block-wrapped-continuation-line-parses-as-empty",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Independent Critic FAIL (2026-08-09, F6) on a full-range review of the Phoenix measurement/closure wave."
+      "source": "Independent Critic FAIL (2026-08-09, F6) on a full-range review of the Phoenix measurement/closure wave.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "a9c0f025e90e74f8748ce7d8459b0d03f12b29d8",
+      "closureEvidence": "backlog/items/2026-08-09-a-commit-trailer-block-with-a-wrapped-continuation-line-parses-as-empty.md"
     },
     {
       "id": "pipeline.commit-trailer-cannot-distinguish-authorship-from-commit-act",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Raised as finding F3 by an independent Critic review on 2026-08-08. A dispatch authored a diff but stopped before committing it; the orchestrator performed the commit act. The resulting trailer is textually identical to one whose dispatch committed its own work, and the deviation was discoverable only from a separate document that git does not bind."
+      "source": "Raised as finding F3 by an independent Critic review on 2026-08-08. A dispatch authored a diff but stopped before committing it; the orchestrator performed the commit act. The resulting trailer is textually identical to one whose dispatch committed its own work, and the deviation was discoverable only from a separate document that git does not bind.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "f5db8aebe00711b57ed3846f2c17689a5d116c64",
+      "closureEvidence": "backlog/items/2026-08-08-the-commit-trailer-cannot-say-who-performed-the-commit-act.md"
+    },
+    {
+      "id": "pipeline.concurrent-session-prevention-supersedes-a-ac-01",
+      "status": "closed",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "PO ruling, Sprint Phoenix closure sweep, 2026-08-18: A-AC-01's remaining ordering-seam gap (main-session-route.mjs needing a Claude host adapter for pipelineMainSessionRoute) is struck rather than built, because the clean fix for the underlying risk is preventing two sessions from ever operating concurrently against the same repository root (same or different runner) in the first place — see specs/sprint-phoenix-epic/acceptance.md A-AC-01's 2026-08-18 amendment.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "18e5516cf14a9a02fca8cd9bdb6c6ddb1fcf4d78",
+      "closureEvidence": "backlog/items/2026-08-18-concurrent-session-prevention-supersedes-a-ac-01s-remaining-gap.md"
     },
     {
       "id": "pipeline.critic-context-isolation",
@@ -332,19 +444,27 @@
     },
     {
       "id": "pipeline.critical-command-kinds-excludes-feature-package-reconcile",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-16",
-      "source": "Found 2026-08-16 while building the PO's feature-package-reconcile signing request for the Phoenix P-AC-11/FTP-ARTIFACT-2 ceremony -- the PO had to manually cp a request file the Elephant built out to the external signing directory, and asked why."
+      "source": "Found 2026-08-16 while building the PO's feature-package-reconcile signing request for the Phoenix P-AC-11/FTP-ARTIFACT-2 ceremony -- the PO had to manually cp a request file the Elephant built out to the external signing directory, and asked why.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "141550c32f29a5d771f9638a7aaa0823904fb699",
+      "closureEvidence": "backlog/items/2026-08-16-critical-command-kinds-excludes-feature-package-reconcile.md"
     },
     {
       "id": "pipeline.critical-human-proof-not-wired-to-push-and-prd-gates",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-05",
-      "source": "PO question during Sprint Nova session, 2026-08-05: asked whether the ed25519 human-proof mechanism (built for Sprint Cyborg) needed one-time setup before this session's branch push. Investigation found it exists but is not enforced for either of the two human gates it was meant to secure."
+      "source": "PO question during Sprint Nova session, 2026-08-05: asked whether the ed25519 human-proof mechanism (built for Sprint Cyborg) needed one-time setup before this session's branch push. Investigation found it exists but is not enforced for either of the two human gates it was meant to secure.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "18e5516cf14a9a02fca8cd9bdb6c6ddb1fcf4d78",
+      "closureEvidence": "backlog/items/2026-08-05-critical-human-proof-not-wired-to-push-and-prd-gates.md"
     },
     {
       "id": "pipeline.cross-repository-override-ledger-binding",
@@ -364,7 +484,7 @@
     },
     {
       "id": "pipeline.dispatch-record-contaminates-every-critic-review",
-      "status": "open",
+      "status": "deferred",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
@@ -372,35 +492,51 @@
     },
     {
       "id": "pipeline.dispatch-templates-cite-restructured-operating-model-sections",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Critic round-4 briefing-violations note, delta re-review of WP2-WP3-partA-rework-3 (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-3-delta-critic-review-138e2e3.md); widened by the Elephant on verification. Recorded, not fixed, because the correct target is a real decision rather than a renumbering."
+      "source": "Critic round-4 briefing-violations note, delta re-review of WP2-WP3-partA-rework-3 (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-3-delta-critic-review-138e2e3.md); widened by the Elephant on verification. Recorded, not fixed, because the correct target is a real decision rather than a renumbering.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "c1167320ffec5813b71043adaa4780b5503048a3",
+      "closureEvidence": "backlog/items/2026-08-07-dispatch-templates-cite-restructured-operating-model-sections.md"
     },
     {
       "id": "pipeline.dispatched-agents-return-truncated-mid-step",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day."
+      "source": "PO, 2026-08-07: 'die goldfische generell und criticer liefern seit einiger zeit immer abgeschnittenes das könnte an der WSL umgebung liegen'. Four instances measured in one session the same day.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-07-dispatched-agents-return-truncated-mid-step.md"
     },
     {
       "id": "pipeline.dispatches-report-completed-on-a-truncated-fragment",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Observed six times in one Elephant session (2026-08-07) across both Goldfish and Critic dispatches. Recorded with the detection and recovery that worked, because the failure is silent by construction."
+      "source": "Observed six times in one Elephant session (2026-08-07) across both Goldfish and Critic dispatches. Recorded with the detection and recovery that worked, because the failure is silent by construction.",
+      "closedAt": "2026-08-08",
+      "closureRepository": "self",
+      "closureCommit": "88dc3ba6952f226ed4f9caa57bad982cb660a425",
+      "closureEvidence": "backlog/items/2026-08-07-dispatches-report-completed-on-a-truncated-fragment.md"
     },
     {
       "id": "pipeline.doc-reconciliation-blind-to-adr-corpus-changes",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Raised as an unverified observation by an independent review of a commit range; the review explicitly did not build a repro. Confirmed at source under dispatch PHX-BL2 (2026-08-09): read all five `**Governs:**` lines in docs/adr/ and the paths touched by the 2026-08-09 ADR-0047 renumber commit (88a7133)."
+      "source": "Raised as an unverified observation by an independent review of a commit range; the review explicitly did not build a repro. Confirmed at source under dispatch PHX-BL2 (2026-08-09): read all five `**Governs:**` lines in docs/adr/ and the paths touched by the 2026-08-09 ADR-0047 renumber commit (88a7133).",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "339f08bd848bec332ba78f602109b83f1ea70360",
+      "closureEvidence": "backlog/items/2026-08-09-doc-reconciliation-blind-to-adr-corpus-changes.md"
     },
     {
       "id": "pipeline.documentation-information-architecture",
@@ -430,11 +566,15 @@
     },
     {
       "id": "pipeline.elephant-authored-production-diff-closed-its-own-gating-criterion",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Independent Critic FAIL (2026-08-09, F2) on a full-range review of the Phoenix measurement/closure wave (57 commits, 8e7a2f7..f7d9c0d)."
+      "source": "Independent Critic FAIL (2026-08-09, F2) on a full-range review of the Phoenix measurement/closure wave (57 commits, 8e7a2f7..f7d9c0d).",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "6bf621c50a1b8d68da94267f574cca2a3156445d",
+      "closureEvidence": "backlog/items/2026-08-09-elephant-authored-production-diff-closed-its-own-gating-criterion.md"
     },
     {
       "id": "pipeline.elephant-direct-implementation-under-afk-authorization",
@@ -446,11 +586,15 @@
     },
     {
       "id": "pipeline.epic-file-contract-has-no-drift-check",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Found while preparing the Spec-amendment branch of a Critic finding, by checking first whether comparable files were already listed in specs/sprint-phoenix-epic/spec.md §7. They were not. The finding that raised it had reviewed a sixteen-commit range and could not see the sprint-long pattern."
+      "source": "Found while preparing the Spec-amendment branch of a Critic finding, by checking first whether comparable files were already listed in specs/sprint-phoenix-epic/spec.md §7. They were not. The finding that raised it had reviewed a sixteen-commit range and could not see the sprint-long pattern.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "78137b1a4f955e41e47b411246bf34385d09f7e4",
+      "closureEvidence": "backlog/items/2026-08-09-epic-file-contract-has-no-drift-check.md"
     },
     {
       "id": "pipeline.evidence-bound-review-retry-economics",
@@ -462,11 +606,15 @@
     },
     {
       "id": "pipeline.evidence-gitignore-left-dozens-of-durable-artifacts-untracked",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Found 2026-08-17 while trying to commit a fresh acceptance-evidence-map snapshot: git silently refused to see the new file. Traced to .gitignore's unanchored `evidence/` rule matching specs/sprint-phoenix-epic/evidence/ too, fixed in commit 13811594."
+      "source": "Found 2026-08-17 while trying to commit a fresh acceptance-evidence-map snapshot: git silently refused to see the new file. Traced to .gitignore's unanchored `evidence/` rule matching specs/sprint-phoenix-epic/evidence/ too, fixed in commit 13811594.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "00350b2d4f46f86804f188cb84ceff6c947bfa3d",
+      "closureEvidence": "backlog/items/2026-08-17-evidence-gitignore-left-dozens-of-durable-artifacts-untracked.md"
     },
     {
       "id": "pipeline.execution-model-switchback",
@@ -491,15 +639,19 @@
     },
     {
       "id": "pipeline.first-verify-run-is-red-with-four-failures",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "The first end-to-end verify run this repository has completed in some time, obtained after repairing a duplicate suite registration the 0.5.3 merge introduced. 256 of 260 steps pass; four fail. All four are pre-existing and were invisible while the gate could not start."
+      "source": "The first end-to-end verify run this repository has completed in some time, obtained after repairing a duplicate suite registration the 0.5.3 merge introduced. 256 of 260 steps pass; four fail. All four are pre-existing and were invisible while the gate could not start.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-08-first-verify-run-is-red-with-four-failures.md"
     },
     {
       "id": "pipeline.gate-strength-override-route-advertised-not-offered",
-      "status": "open",
+      "status": "deferred",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
@@ -507,19 +659,27 @@
     },
     {
       "id": "pipeline.gate-strength-shell-comment-understates-its-own-scope",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Adjacent finding by the Elephant while verifying the GMW lift question for the WP2-WP3 Part A residuals (2026-08-07). Verified against the code, not assumed. Recorded rather than fixed because the affected file is a NEVER_LIFTABLE_KERNEL_PATH and cannot be edited in-session."
+      "source": "Adjacent finding by the Elephant while verifying the GMW lift question for the WP2-WP3 Part A residuals (2026-08-07). Verified against the code, not assumed. Recorded rather than fixed because the affected file is a NEVER_LIFTABLE_KERNEL_PATH and cannot be edited in-session.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "e0a87ecee3a643d1e498c390ca8b9ee2730f879d",
+      "closureEvidence": "backlog/items/2026-08-07-gate-strength-shell-comment-understates-its-own-scope.md"
     },
     {
       "id": "pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-16",
-      "source": "Found 2026-08-16 when two dispatches in one session correctly refused to force-add their dispatch records, and the Critic separately flagged that the evidence artifact it was given sat under scratch/ rather than the calibration's canonical evidence/ location. Verified with git check-ignore before filing."
+      "source": "Found 2026-08-16 when two dispatches in one session correctly refused to force-add their dispatch records, and the Critic separately flagged that the evidence artifact it was given sat under scratch/ rather than the calibration's canonical evidence/ location. Verified with git check-ignore before filing.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "00350b2d4f46f86804f188cb84ceff6c947bfa3d",
+      "closureEvidence": "backlog/items/2026-08-16-gitignore-evidence-rule-swallows-durable-spec-artifacts.md"
     },
     {
       "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",
@@ -531,35 +691,51 @@
     },
     {
       "id": "pipeline.governance-product-verify-suites-deregistered",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "merge report section 4 finding 3 and section 7.3 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+      "source": "merge report section 4 finding 3 and section 7.3 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "0b540510214e4868d683c86cd1af01b044ff9417",
+      "closureEvidence": "backlog/items/2026-08-07-governance-product-verify-suites-deregistered.md"
     },
     {
       "id": "pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically."
+      "source": "0.5.2 release session, 2026-08-07: PO asked why a release cannot run end-to-end through the Pipeline with only the final signature as the human step, for the version-surface strip specifically.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "88dc3ba6952f226ed4f9caa57bad982cb660a425",
+      "closureEvidence": "backlog/items/2026-08-07-gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions.md"
     },
     {
       "id": "pipeline.guard-lifecycle-ready-blocks-claude-memory-writes",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-29",
-      "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)"
+      "source": "Sprint Cyborg epic, self-application finding #2 (Elephant self-observation while implementing CYB-2E; PO decision Option B recorded in docs/state.md, session 2026-07-29)",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "591a2b8b5e48e314910b654bafd5f7c6c48a80cf",
+      "closureEvidence": "backlog/items/2026-07-29-guard-lifecycle-ready-blocks-claude-memory-writes.md"
     },
     {
       "id": "pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone."
+      "source": "Live onboarding test (rune_test1_claude line of work) hitting a self-inflicted guard rejection at the plan-runtime step, 2026-08-07 (Nova GMW session); root cause independently re-verified by reading the cited source directly, not taken from the report alone.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-07-guard-lifecycle-ready-rejects-plan-runtime-intent-argv.md"
     },
     {
       "id": "pipeline.guard-testpath-not-kernel-protected",
@@ -574,6 +750,22 @@
       "closureEvidence": "backlog/evidence/2026-08-16-verify-red-suite-backlog-closures.md"
     },
     {
+      "id": "pipeline.guard-testpath-override-ot09-stale-literal-pattern",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Found by PHX-WP-TESTPATH-GATESTRENGTH-TRIAGE while diagnosing 5 failing guard-testpath/gate-strength suites from a full clean-candidate Verify run, 2026-08-18/19."
+    },
+    {
+      "id": "pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Formalizing EPIC-AC-05's disposed bar for H-AC-11's O-4 scoping decision (PO, 2026-08-17, specs/sprint-phoenix-epic/acceptance.md), which named the fix but was never filed as a backlog item with an owner and trigger. See acceptance.md H-AC-11's 2026-08-18 disposition note."
+    },
+    {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
       "status": "open",
       "type": "workflow-improvement",
@@ -583,59 +775,95 @@
     },
     {
       "id": "pipeline.hash-chained-ledger-collides-with-the-secret-scanner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Observed 2026-08-08 while repairing the 38 pre-public-core reachability findings: the repair commit turned the live security scan red, one finding per appended ledger line."
+      "source": "Observed 2026-08-08 while repairing the 38 pre-public-core reachability findings: the repair commit turned the live security scan red, one finding per appended ledger line.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "c8dee9d47692fd5f87a6a3f4cc15a666cc7fb247",
+      "closureEvidence": "backlog/items/2026-08-08-the-hash-chained-ledger-collides-permanently-with-the-secret-scanner.md"
     },
     {
       "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO decision and observation during the first live guard-maintenance-window signing on 2026-08-07: the wrong key directory was used twice before the trust mismatch surfaced, and the PO was handed two commands where only the first is theirs."
+      "source": "PO decision and observation during the first live guard-maintenance-window signing on 2026-08-07: the wrong key directory was used twice before the trust mismatch surfaced, and the PO was handed two commands where only the first is theirs.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "71f330db73a9d4554dbe72f63d5de2c337437d35",
+      "closureEvidence": "backlog/items/2026-08-07-human-approval-ux-directory-clarity-and-single-command.md"
     },
     {
       "id": "pipeline.human-authorization-prompts-ignore-the-configured-language-profile",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
+      "source": "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md"
     },
     {
       "id": "pipeline.human-legible-approval-record",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Product Owner requirement raised at the Phoenix plan-approval gate"
+      "source": "Product Owner requirement raised at the Phoenix plan-approval gate",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "8acfd9361028b400418a8b6035a04eeb827b9e49",
+      "closureEvidence": "backlog/items/2026-08-06-human-legible-approval-record.md"
     },
     {
       "id": "pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Critic finding F5, Phoenix gate-integrity full review round 1, 2026-08-08: lifecycle.json rebound the sha256 of an entry declared mutability immutable, and the schema has no field that could have carried the reason."
+      "source": "Critic finding F5, Phoenix gate-integrity full review round 1, 2026-08-08: lifecycle.json rebound the sha256 of an entry declared mutability immutable, and the schema has no field that could have carried the reason.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "01d2c3c06780bd4e9553767e0cd56a076c16c377",
+      "closureEvidence": "backlog/items/2026-08-08-immutable-manifest-entries-can-be-rebound-with-no-amendment-record.md"
     },
     {
       "id": "pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-16",
-      "source": "Found 2026-08-16 overnight: a real, correctly-signed, correctly-scoped GMW window (TP-1..TP-12, ~3.7h TTL) was installed, but every single edit it should have covered was refused by the live guard hooks. Traced to source, not guessed."
+      "source": "Found 2026-08-16 overnight: a real, correctly-signed, correctly-scoped GMW window (TP-1..TP-12, ~3.7h TTL) was installed, but every single edit it should have covered was refused by the live guard hooks. Traced to source, not guessed.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "8e8dd393fd7eba110f85ecf5ce69be5f41f6bd6b",
+      "closureEvidence": "backlog/items/2026-08-16-installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits.md"
     },
     {
       "id": "pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "merge report section 4 findings 1/2/4/5/6/11 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+      "source": "merge report section 4 findings 1/2/4/5/6/11 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361",
+      "closedAt": "2026-08-07",
+      "closureRepository": "self",
+      "closureCommit": "8b34e1fb3fff85996c8cd550b5e12f327acbff2b",
+      "closureEvidence": "backlog/items/2026-08-07-ledger-backed-plan-and-push-authority-absent-on-merged-base.md"
+    },
+    {
+      "id": "pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Found by PHX-WP-LEDGER-EVENT41-HASH-FIX while resolving the last remaining backlog-state-check failure, 2026-08-19."
     },
     {
       "id": "pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape",
@@ -647,19 +875,27 @@
     },
     {
       "id": "pipeline.live-plugin-root-undefended-in-the-shell-lane",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Finding SL-1 of the PHX-R2-THREATMODEL-rework dispatch (2026-08-07), re-verified independently by the Elephant at source. Security class. NOT executed by either party — confirming it empirically would mean disarming the guard that is enforcing at the time."
+      "source": "Finding SL-1 of the PHX-R2-THREATMODEL-rework dispatch (2026-08-07), re-verified independently by the Elephant at source. Security class. NOT executed by either party — confirming it empirically would mean disarming the guard that is enforcing at the time.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "85efcceb95375d062940cb31df2e384caa913c02",
+      "closureEvidence": "backlog/items/2026-08-07-live-plugin-root-undefended-in-the-shell-lane.md"
     },
     {
       "id": "pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06"
+      "source": "GATE-HONESTY-11 dispatch briefing, finding N1 (major), Sprint Nova session 2026-08-06",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "88dc3ba6952f226ed4f9caa57bad982cb660a425",
+      "closureEvidence": "backlog/items/2026-08-06-local-plugin-install-attestation-does-not-bind-external-marketplace-root.md"
     },
     {
       "id": "pipeline.local-worker-supervisor-cli-suite-flakes-under-full-verify",
@@ -675,15 +911,19 @@
     },
     {
       "id": "pipeline.maintenance-window-selectivity-is-untested-at-both-levels",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Observation from a parallel Phoenix session on the marketplace snapshot that each guard hook carries only one maintenance-window test, sharpened and empirically checked against the live TP-2/TP-6/TP-7 window during the 2026-08-07 Nova session."
+      "source": "Observation from a parallel Phoenix session on the marketplace snapshot that each guard hook carries only one maintenance-window test, sharpened and empirically checked against the live TP-2/TP-6/TP-7 window during the 2026-08-07 Nova session.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "2c227a3d6f90855c7a8eed09bd4e932142925589",
+      "closureEvidence": "backlog/items/2026-08-07-maintenance-window-selectivity-is-untested-at-both-levels.md"
     },
     {
       "id": "pipeline.managed-onboarding-success-contract",
-      "status": "open",
+      "status": "deferred",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-25",
@@ -699,19 +939,27 @@
     },
     {
       "id": "pipeline.module-scope-manifest-read-rearms-the-disarm-by-config-fault",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Observed out-of-diff by the PHX-R1-REWORK-3 Critic (round 4) while deriving the shell lane's governance-marker list from source, offered without severity because it is not a defect of that review object. Independently re-verified from source by the Elephant before filing."
+      "source": "Observed out-of-diff by the PHX-R1-REWORK-3 Critic (round 4) while deriving the shell lane's governance-marker list from source, offered without severity because it is not a defect of that review object. Independently re-verified from source by the Elephant before filing.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "34a7590746fc0da5979e8272cb0320400fc8c05b",
+      "closureEvidence": "backlog/items/2026-08-07-module-scope-manifest-read-rearms-the-disarm-by-config-fault.md"
     },
     {
       "id": "pipeline.mp22-orchestrator-self-implementation-has-no-enforcement",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Critic rounds 1 and 2 of the 0.5.3 candidate, 2026-08-07 — both independently found the same class of violation, round 2 with the sharper spec-ref."
+      "source": "Critic rounds 1 and 2 of the 0.5.3 candidate, 2026-08-07 — both independently found the same class of violation, round 2 with the sharper spec-ref.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "339f08bd848bec332ba78f602109b83f1ea70360",
+      "closureEvidence": "backlog/items/2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md"
     },
     {
       "id": "pipeline.multi-cli-efficiency-pilots",
@@ -723,7 +971,7 @@
     },
     {
       "id": "pipeline.native-windows-verify-red-suite-class",
-      "status": "open",
+      "status": "deferred",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
@@ -731,35 +979,51 @@
     },
     {
       "id": "pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains."
+      "source": "Sprint Nova session, 2026-08-06, ADR-0054 step 1 (routing hardcoded readers through resolveProjectAuthorityPaths). Comparing the two authority tiers before routing more readers to the resolver revealed that the tier the resolver PREFERS is the one nothing maintains.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "88dc3ba6952f226ed4f9caa57bad982cb660a425",
+      "closureEvidence": "backlog/items/2026-08-06-neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates.md"
     },
     {
       "id": "pipeline.no-check-validates-prose-section-citations",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Measured by the PHX-R3-RESCOPE dispatch (344 stale citations across 57 files). PO decision (APS, 2026-08-07): accepted for implementation, as the follow-up that makes the defect class non-recurring."
+      "source": "Measured by the PHX-R3-RESCOPE dispatch (344 stale citations across 57 files). PO decision (APS, 2026-08-07): accepted for implementation, as the follow-up that makes the defect class non-recurring.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "f028fd531f2d73244a8986327b1ad440ba0a76c5",
+      "closureEvidence": "backlog/items/2026-08-07-no-check-validates-prose-section-citations.md"
     },
     {
       "id": "pipeline.no-gate-is-tested-end-to-end-for-satisfiability",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite."
+      "source": "PO question, 2026-08-06: why does an agent keep stopping and asking instead of working under the operating model. Investigating produced a structural answer rather than a behavioural one — four gate defects in a single session, none found by the suite.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "18e5516cf14a9a02fca8cd9bdb6c6ddb1fcf4d78",
+      "closureEvidence": "backlog/items/2026-08-06-no-gate-is-tested-end-to-end-for-satisfiability.md"
     },
     {
       "id": "pipeline.no-test-pins-the-ungoverned-path-rule-stand-down",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Coverage observation made by the PHX-R1-REWORK-2 dispatch while verifying the governance-marker precondition. Outside that briefing's scope, so recorded rather than acted on."
+      "source": "Coverage observation made by the PHX-R1-REWORK-2 dispatch while verifying the governance-marker precondition. Outside that briefing's scope, so recorded rather than acted on.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "a2f16a65f816da8609a771df690d051a104e3930",
+      "closureEvidence": "backlog/items/2026-08-07-no-test-pins-the-ungoverned-path-rule-stand-down.md"
     },
     {
       "id": "pipeline.nonblocking-interaction-continuity",
@@ -796,27 +1060,39 @@
     },
     {
       "id": "pipeline.onboarding-ready-path-unconditional-restart-barrier-read",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation."
+      "source": "ADR-0051 Follow-up section names this as one of two gaps to track as a dated backlog item; created per backlog/items/2026-08-05-adr-0051-follow-up-gaps-untracked.md's proposal, executed 2026-08-06 night autonomous backlog reconciliation.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "88dc3ba6952f226ed4f9caa57bad982cb660a425",
+      "closureEvidence": "backlog/items/2026-08-07-onboarding-ready-path-unconditional-restart-barrier-read.md"
     },
     {
       "id": "pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07."
+      "source": "PO handover from a separate session (rune_test1_claude), submitted through the PO's own channel, 2026-08-07.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md"
     },
     {
       "id": "pipeline.p-ac-11-four-dimensions-declared-but-inert",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-16",
-      "source": "Independent Critic review of 0d3d9bcc..8be6c308, finding F3 (blocker), 2026-08-16. Full report: specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md."
+      "source": "Independent Critic review of 0d3d9bcc..8be6c308, finding F3 (blocker), 2026-08-16. Full report: specs/sprint-phoenix-epic/evidence/pac11-critic-review-8be6c308.md.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "fc034721cb82e42e8617020cef986648cffd3db8",
+      "closureEvidence": "backlog/items/2026-08-16-p-ac-11-four-dimensions-declared-but-inert.md"
     },
     {
       "id": "pipeline.p-ac-11-lifecycleevents-still-has-no-owner-or-expiry",
@@ -832,19 +1108,27 @@
     },
     {
       "id": "pipeline.parallel-goldfish-dispatches-race-on-shared-checkout",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint."
+      "source": "Observed live during a 2026-08-07 wave of five parallel Nova A evidence-sealing Goldfish dispatches, each briefed 'Worktree: no' on the reasoning that their file scopes were disjoint.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "55912293385c595109abffad3442661bb1166956",
+      "closureEvidence": "backlog/items/2026-08-07-parallel-goldfish-dispatches-race-on-shared-checkout.md"
     },
     {
       "id": "pipeline.part-a-limitation-2-orphaned-by-the-r2-rework",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Critic finding F2 on PHX-R2-THREATMODEL-rework (specs/sprint-phoenix-epic/evidence/phx-r2-threatmodel-rework-critic-review-ad5d185.md). Recorded by the Elephant as the disposition of that finding — the item the finding says was missing."
+      "source": "Critic finding F2 on PHX-R2-THREATMODEL-rework (specs/sprint-phoenix-epic/evidence/phx-r2-threatmodel-rework-critic-review-ad5d185.md). Recorded by the Elephant as the disposition of that finding — the item the finding says was missing.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "5c3c50d4bebf17a847b673560c5638cc7f385f17",
+      "closureEvidence": "backlog/items/2026-08-07-part-a-limitation-2-orphaned-by-the-r2-rework.md"
     },
     {
       "id": "pipeline.pipeline-state-rebind-codex-default-runner",
@@ -860,15 +1144,19 @@
     },
     {
       "id": "pipeline.po-approval-confirmation-missing-intent-digest",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-10",
-      "source": "Found on 2026-08-10 by the K-AC-05 round-4 (final) Critic review of the fork-disposition approval mechanism (commit 4673ff8a under review), while checking whether a tampered approvalIntent could still reach signing after that round's F2 fix. The Critic scoped it explicitly as a pre-existing defect in the shared signing ceremony, outside the reviewed delta's three changed files, and recommended routing it as its own work package rather than folding it into K-AC-05's exhausted Critic cap. Verified independently by the Elephant against source before filing."
+      "source": "Found on 2026-08-10 by the K-AC-05 round-4 (final) Critic review of the fork-disposition approval mechanism (commit 4673ff8a under review), while checking whether a tampered approvalIntent could still reach signing after that round's F2 fix. The Critic scoped it explicitly as a pre-existing defect in the shared signing ceremony, outside the reviewed delta's three changed files, and recommended routing it as its own work package rather than folding it into K-AC-05's exhausted Critic cap. Verified independently by the Elephant against source before filing.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "141550c32f29a5d771f9638a7aaa0823904fb699",
+      "closureEvidence": "backlog/items/2026-08-10-po-approval-confirmation-does-not-name-the-signed-digest.md"
     },
     {
       "id": "pipeline.po-authority-decision-prd-candidate-static",
-      "status": "open",
+      "status": "deferred",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
@@ -888,7 +1176,7 @@
     },
     {
       "id": "pipeline.po-gate-authority-receipt-readback",
-      "status": "open",
+      "status": "deferred",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-25",
@@ -905,11 +1193,15 @@
     },
     {
       "id": "pipeline.prepared-maintenance-window-dies-at-the-next-commit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Found on 2026-08-08 while planning a TP-3/TP-5 window for Phoenix. The Elephant was about to hand the PO a prepare command with two implementation dispatches still in flight; reading install() first showed that every commit those dispatches made would have voided the signature before it could be used. Caught by reading, not by a refusal -- the ceremony gives no warning at prepare time."
+      "source": "Found on 2026-08-08 while planning a TP-3/TP-5 window for Phoenix. The Elephant was about to hand the PO a prepare command with two implementation dispatches still in flight; reading install() first showed that every commit those dispatches made would have voided the signature before it could be used. Caught by reading, not by a refusal -- the ceremony gives no warning at prepare time.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "2e22cc023491bba454db7ddecb219aa87a9261b4",
+      "closureEvidence": "backlog/items/2026-08-08-a-prepared-maintenance-window-dies-at-the-next-commit.md"
     },
     {
       "id": "pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive",
@@ -932,6 +1224,14 @@
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
     },
     {
+      "id": "pipeline.product-capability-inventory-two-guard-hooks-uncategorized",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Found by PHX-WP-BACKLOG-OBSGOV-MISC-TRIAGE while diagnosing product-capability-inventory-tests failure from a full clean-candidate Verify run, 2026-08-18/19."
+    },
+    {
       "id": "pipeline.project-authority-dual-state-repair-and-failclosed-gate",
       "status": "closed",
       "type": "defect",
@@ -952,20 +1252,36 @@
       "source": "user-requested feature expansion after the first public observation publication"
     },
     {
-      "id": "pipeline.published-lifecycle-event-schema-still-enumerates-cancellation",
+      "id": "pipeline.publication-authority-lacks-execution-time-criticalproof-reverification",
       "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Noted as a remaining gap during PHX-WP-PUBLICATION-UNIFICATION (commit 41c7711d, 2026-08-19), which proved the publication-authority approve/authorize migration onto the shared pipeline.po-approval-proof.v1 contract was already functionally complete; recorded as a to-be-filed follow-up in backlog/items/2026-08-02-unified-human-authorization-ux.md's 2026-08-19 progress note. This item is that filing, backed by a fresh full read of both code paths."
+    },
+    {
+      "id": "pipeline.published-lifecycle-event-schema-still-enumerates-cancellation",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "PHX-WP-LAC08 dispatch report (commit 20014aab), Elephant checkpoint docs/state.md 2026-08-17"
+      "source": "PHX-WP-LAC08 dispatch report (commit 20014aab), Elephant checkpoint docs/state.md 2026-08-17",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "da72aacfd3230e4d8e6da37808efccc68ff20071",
+      "closureEvidence": "backlog/items/2026-08-17-published-lifecycle-event-schema-still-enumerates-cancellation.md"
     },
     {
       "id": "pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in harness/scripts/verify.mjs and plugins/pipeline-core/hooks/guard-push.mjs under dispatch PHX-BL4 (2026-08-09)."
+      "source": "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in harness/scripts/verify.mjs and plugins/pipeline-core/hooks/guard-push.mjs under dispatch PHX-BL4 (2026-08-09).",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0136b29f13c7b70c4c20adf882c1788eab978abe",
+      "closureEvidence": "backlog/items/2026-08-09-push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to.md"
     },
     {
       "id": "pipeline.push-guard-worktree-target",
@@ -990,11 +1306,15 @@
     },
     {
       "id": "pipeline.readonly-command-guard-classification",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-26",
-      "source": "Phoenix close self-retro; specs/sprint-phoenix-epic/RECOVERY.md R-02"
+      "source": "Phoenix close self-retro; specs/sprint-phoenix-epic/RECOVERY.md R-02",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "6a58725b485a0721cd3d7aa55a821f761ae49d43",
+      "closureEvidence": "backlog/items/2026-07-26-readonly-command-guard-classification.md"
     },
     {
       "id": "pipeline.ready-gate-env-var-runner-authority",
@@ -1010,19 +1330,39 @@
     },
     {
       "id": "pipeline.reconcile-lock-reuse-lexical-path-comparison",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-11",
-      "source": "Independent Critic review, 2026-08-11, commit 3e1a727e (single-commit delta review), Finding 1. specs/sprint-phoenix-epic/evidence/pac08-f1-critic-review-3e1a727e.md"
+      "source": "Independent Critic review, 2026-08-11, commit 3e1a727e (single-commit delta review), Finding 1. specs/sprint-phoenix-epic/evidence/pac08-f1-critic-review-3e1a727e.md",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "170bffbe4c3568f43a68b35d14fec96c968a0d22",
+      "closureEvidence": "backlog/items/2026-08-11-reconcile-lock-reuse-uses-lexical-not-real-path-comparison.md"
+    },
+    {
+      "id": "pipeline.reconcile-lock-reuse-regression-test-needs-a-tp5-window",
+      "status": "closed",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "PHX-WP-RECONCILE-LOCK-REALPATH dispatch (2026-08-18), stop condition: harness/scripts/pipeline-state.test.mjs is a TP-5 protected test path",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "2eaf90fe326e13fc552e1966d6c1ca7845dc89a4",
+      "closureEvidence": "backlog/items/2026-08-18-reconcile-lock-reuse-regression-test-needs-a-tp5-window.md"
     },
     {
       "id": "pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-27",
-      "source": "CYB-A0 round-2 Critic re-review (new-issue N1), found while verifying the fix for round-1 F1-F5 in plugins/pipeline-core/lib/recovery-preview-attestation.mjs"
+      "source": "CYB-A0 round-2 Critic re-review (new-issue N1), found while verifying the fix for round-1 F1-F5 in plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "97ba659890493597f90b8939fb602d613c67a636",
+      "closureEvidence": "backlog/items/2026-07-27-recovery-preview-ack-unstable-getter-poisons-replay-ledger.md"
     },
     {
       "id": "pipeline.recovery-preview-callback-attestation",
@@ -1063,27 +1403,51 @@
     },
     {
       "id": "pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Elephant self-observation across the Phoenix gate-integrity phase, 2026-08-07/08: six dispatches ended at or past budget, four with no report at all; recorded in docs/state.md before being filed here."
+      "source": "Elephant self-observation across the Phoenix gate-integrity phase, 2026-08-07/08: six dispatches ended at or past budget, four with no report at all; recorded in docs/state.md before being filed here.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-08-report-early-duty-is-conditional-in-writing-and-unconditional-in-practice.md"
     },
     {
       "id": "pipeline.restart-launch-is-codex-only-for-every-runner",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06."
+      "source": "Manual re-run of the empty-directory onboarding smoke test in scratch/onboarding-smoke-test while re-verifying backlog/items/2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md (see backlog/evidence/2026-08-06-onboarding-runner-identity-reverification.md), 2026-08-06.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "88dc3ba6952f226ed4f9caa57bad982cb660a425",
+      "closureEvidence": "backlog/items/2026-08-06-restart-launch-is-codex-only-for-every-runner.md"
     },
     {
       "id": "pipeline.resume-hint-opaque-token-rejects-hyphenated-english",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Found via a purpose-written probe script isolating which of twelve candidate strings caused `resume-hint.mjs capture` to fail; confirmed at source (plugins/pipeline-core/lib/resume-hint.mjs) under dispatch PHX-BL2 (2026-08-09)."
+      "source": "Found via a purpose-written probe script isolating which of twelve candidate strings caused `resume-hint.mjs capture` to fail; confirmed at source (plugins/pipeline-core/lib/resume-hint.mjs) under dispatch PHX-BL2 (2026-08-09).",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "f685a2b560af4a77f486c04cb4aa2bf54f999985",
+      "closureEvidence": "backlog/items/2026-08-09-resume-hint-opaque-token-rejects-hyphenated-english.md"
+    },
+    {
+      "id": "pipeline.resume-hint-test-unregistered-in-verify-gate",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-18",
+      "source": "Discovered as a byproduct of the PHX-WP-GOVPROD-REGISTER dispatch (2026-08-18), which registered a different suite and found this one also unregistered while re-running the registration checker.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "67db3432fe06ccee3a89e5362317c8997a3ed3a0",
+      "closureEvidence": "backlog/items/2026-08-18-resume-hint-test-unregistered-in-verify-gate.md"
     },
     {
       "id": "pipeline.ruleset-freshness-wsl-subsystem-absent",
@@ -1095,19 +1459,27 @@
     },
     {
       "id": "pipeline.ruleset-source-test-unregistered-in-the-verify-gate",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Measured by the PHX-R1-REWORK-1 dispatch while correcting R1's protection boundary, and re-verified independently by the Elephant. Third occurrence of the same defect class in this feature area."
+      "source": "Measured by the PHX-R1-REWORK-1 dispatch while correcting R1's protection boundary, and re-verified independently by the Elephant. Third occurrence of the same defect class in this feature area.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-07-ruleset-source-test-unregistered-in-the-verify-gate.md"
     },
     {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-27",
-      "source": "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)"
+      "source": "discovered as a sibling of Critic finding F4 (CLAUDE-RUNNER-01 delta review round 2) during briefing-i's fix of `plugins/pipeline-core/lib/runtime-projection-v3.mjs` (commit `894261d`)",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-07-27-runtime-projection-v2-eager-manifest-load.md"
     },
     {
       "id": "pipeline.security-scan-cross-branch-gitleaks-findings",
@@ -1164,11 +1536,15 @@
     },
     {
       "id": "pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
+      "source": "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md"
     },
     {
       "id": "pipeline.setup-mjs-marketplace-name-collision-defeats-local-dev-installs",
@@ -1184,19 +1560,27 @@
     },
     {
       "id": "pipeline.seven-unregistered-suites-are-red",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Filed under phase-plan item R1.2 (gate integrity and residual closure) after the unregistered-suite measurement ran all 109 files. 102 are green and are being registered in batches; these 7 are red and are deliberately excluded from that registration. Machine artifact: specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md"
+      "source": "Filed under phase-plan item R1.2 (gate integrity and residual closure) after the unregistered-suite measurement ran all 109 files. 102 are green and are being registered in batches; these 7 are red and are deliberately excluded from that registration. Machine artifact: specs/sprint-phoenix-epic/evidence/unregistered-suite-classification.md",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "17b797fdc172ec1d0a4ff587e16804a3ef9a4bf2",
+      "closureEvidence": "backlog/items/2026-08-08-seven-unregistered-suites-are-red-and-must-not-be-registered.md"
     },
     {
       "id": "pipeline.signed-authority-binding-durability",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "Phoenix §7 authority revision; observed directly during the revision sequence"
+      "source": "Phoenix §7 authority revision; observed directly during the revision sequence",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "4cd3e93d729a0cff6b4ab708a4c1faf047a947e1",
+      "closureEvidence": "backlog/items/2026-08-06-signed-authority-binding-durability.md"
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
@@ -1246,7 +1630,7 @@
     },
     {
       "id": "pipeline.the-ledger-reconciler-writes-before-the-items-are-validated",
-      "status": "open",
+      "status": "deferred",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
@@ -1254,36 +1638,52 @@
     },
     {
       "id": "pipeline.trust-mismatch-names-neither-key-nor-directory",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Hit live on 2026-08-08 when the PO signed a maintenance-window intent from the wrong one of two same-named key directories. The signature was cryptographically sound; the install refused with a five-word code that named nothing. Diagnosing it took the agent four read-only steps that the tool could have done itself."
+      "source": "Hit live on 2026-08-08 when the PO signed a maintenance-window intent from the wrong one of two same-named key directories. The signature was cryptographically sound; the install refused with a five-word code that named nothing. Diagnosing it took the agent four read-only steps that the tool could have done itself.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "badde56d93ef9f792e31820d111238d4ff64d594",
+      "closureEvidence": "backlog/items/2026-08-08-trust-mismatch-names-neither-the-expected-key-nor-the-directory-that-holds-it.md"
     },
     {
       "id": "pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in plugins/pipeline-core/scripts/po-human-approval.mjs under dispatch PHX-BL4 (2026-08-09)."
+      "source": "First end-to-end signed push of this repository (8dcb1cc..3387065, sprint_phoenix), confirmed at source in plugins/pipeline-core/scripts/po-human-approval.mjs under dispatch PHX-BL4 (2026-08-09).",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "141550c32f29a5d771f9638a7aaa0823904fb699",
+      "closureEvidence": "backlog/items/2026-08-09-trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key.md"
     },
     {
       "id": "pipeline.trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "this session's own feature-package-reconcile ceremony for R-AC-06's acceptance.md digest drift"
+      "source": "this session's own feature-package-reconcile ceremony for R-AC-06's acceptance.md digest drift",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "4c2f04cbe1e926f9aaeb0e8a598a28465ab528c4",
+      "closureEvidence": "backlog/items/2026-08-17-trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof.md"
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-02",
       "source": "PO product-direction decision during Sprint Cyborg CYB-4 PO-proof UX review, 2026-08-02",
-      "tracking": "Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed."
+      "tracking": "Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "6b34ed12d7ac9fe61723157e72c527518a0af6ff",
+      "closureEvidence": "backlog/items/2026-08-02-unified-human-authorization-ux.md"
     },
     {
       "id": "pipeline.verify-gate-scoped-registration",
@@ -1296,11 +1696,27 @@
     },
     {
       "id": "pipeline.verify-gate-unreachable-without-a-session-cleanup-binding",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Elephant diagnosis while dispositioning Critic finding F1 on PHX-R2-THREATMODEL-rework (2026-08-07). The symptom was already recorded in docs/state.md as an unexplained infra gap; this item records the measured cause."
+      "source": "Elephant diagnosis while dispositioning Critic finding F1 on PHX-R2-THREATMODEL-rework (2026-08-07). The symptom was already recorded in docs/state.md as an unexplained infra gap; this item records the measured cause.",
+      "closedAt": "2026-08-18",
+      "closureRepository": "self",
+      "closureCommit": "d202633c1b545197ed4f6f16dab7254b2bcef811",
+      "closureEvidence": "backlog/items/2026-08-07-verify-gate-unreachable-without-a-session-cleanup-binding.md"
+    },
+    {
+      "id": "pipeline.verify-registration-check-fixtures-lack-real-git-topology",
+      "status": "closed",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Found by PHX-WP-VERIFYREG-TRIAGE while diagnosing verify-suite-registration-tests, windows-assurance-verify-registration-tests, scoped-verify-registration-tests, and verify-evidence-root-tests failures from a full clean-candidate Verify run, 2026-08-18/19.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "e61b05924c38b246abee65ef2cb4d91dcee11c77",
+      "closureEvidence": "backlog/items/2026-08-19-verify-registration-check-fixtures-lack-real-git-topology.md"
     },
     {
       "id": "pipeline.windows-directory-durability",
