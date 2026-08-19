@@ -1773,8 +1773,8 @@ test("GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivatio
     // legitimately extend it, but never by accident -- this assertion has to be edited
     // deliberately alongside the table.
     assert.deepEqual([...derived].sort(), [
-      "plan", "plan-manifest-repair", "plan-partial-authority", "plan-readback",
-      "plan-reinstall", "plan-repair", "plan-runtime", "plan-source-recovery",
+      "intake-generate-plan", "plan", "plan-manifest-repair", "plan-partial-authority",
+      "plan-readback", "plan-reinstall", "plan-repair", "plan-runtime", "plan-source-recovery",
     ]);
     // Every derived name really is admitted by the real guard in the bare lifecycleArgv
     // shape -- the derivation is load-bearing, not decoration.
