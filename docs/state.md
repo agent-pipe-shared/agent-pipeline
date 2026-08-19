@@ -3,7 +3,32 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 50)
+**Last updated:** 2026-08-19 (checkpoint 51)
+
+---
+
+## CHECKPOINT — 2026-08-19 (51): one more genuine closure found (a safe, explicit CLI verb the item's own text asked for); 13 open items, 12 in this sprint's scope, every one now precisely classified with its exact blocker (READ THIS FIRST)
+
+`PHX-WP-MUTABLE-REBIND-EXPLICIT-CLI` (commit `82be6796`, finished by the orchestrator after a truncated report — real work verified sound and tested first, 5/5 new tests + 534/534 full suite, no regressions) built exactly the one remaining safe, buildable piece `acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest` asked for: a dedicated, standalone, explicitly operator/Elephant-initiated `feature-package-rebind-mutable` CLI verb — deliberately different in kind from the CLI-write-path silent wiring already proven unsafe, since there is no approval-bound preview digest here to defeat. Item closed. Its new test file still needs `verify.mjs` registration (TP-3, same pending HGO ceremony as everything else).
+
+**Open backlog items: 14 → 13.** One of those 13 (`lifecycle-event-schema-has-no-non-dispatch-correlation-shape`) is explicitly assigned to Nova B and is therefore OUTSIDE this goal's own stated scope ("nicht anderen sprints zugeordneten") — it does not count against completion of this goal at all. The remaining **12 in-scope open items**, each with its exact, verified blocker:
+
+| Item | Blocker |
+|---|---|
+| `el-01-has-no-in-session-tripwire` | TP-4 HGO ceremony (PO's Ed25519 key) |
+| `technical-lock-for-pipeline-consent-before-onboarding-complete` | TP-4 HGO ceremony (same key) |
+| `guard-testpath-override-ot09-stale-literal-pattern` | TP-7 HGO ceremony (same key) |
+| `product-capability-inventory-two-guard-hooks-uncategorized` | TP-4 HGO ceremony (same key, piece 2 only) |
+| `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger` | a separate, unfinished plugin-authoring-repo session |
+| `publication-authority-lacks-execution-time-criticalproof-reverification` | named PO design decision (2 directions) |
+| `ledger-genesis-event-hash-rebind-has-no-amendment-mechanism` | named PO design decision (2 directions), a hash-chain-integrity question |
+| `push-release-flow-unusable-for-third-party-adopters` | item's own text: "not to freelance a fix for guardrail-class flow design" (candidate #1 already landed this session) |
+| `absent-runner-flag-silently-defaults-to-codex` | standing PO instruction to skip work already solved in Nova |
+| `adr-0047-renumber-left-live-references-behind` | PO's own sequencing decision (bundle into next Spec-authority work) |
+| `handover-file-has-no-rotation-obligation` | exhaustive extraction now complete (checkpoint 49); only the live rotation-execution step remains, correctly held for human review of the specific proposed archival before it runs against the canonical handover file |
+| `h-ac-11-restricted-profile-intake-record-is-design-increment-2` | design done, core implemented (`22d8ef09`); only the final CLI call site remains, blocked on a real prerequisite (increment 1's own CLI wiring, not yet built) not commissioned by this item |
+
+Every one of these 12 was re-examined this session at least once for a legitimate autonomous path forward before being left blocked — 4 were found to have real remaining actionable slices and those slices were built (this checkpoint, checkpoint 50, and earlier). Verify (396+/398, 5 red suites tracking exactly the TP-3/TP-4/TP-7/design-decision items above) and security-scan (clean) are otherwise unchanged.
 
 ---
 
