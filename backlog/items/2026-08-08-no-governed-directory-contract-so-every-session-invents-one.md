@@ -212,3 +212,18 @@ across all three follow-ups; it needs a dedicated TP-3-ceremony dispatch.
 Frontmatter `status:` and any Closure section are intentionally left
 untouched here, per this dispatch's own briefing — closure is a central,
 post-Critic-review decision.
+
+### Verification, 2026-08-19 (Wave 5)
+
+Directly re-ran all three test suites named above:
+`harness/scripts/check-directory-contract.test.mjs` (20/20 pass),
+`harness/scripts/check-gitignore-anchoring.test.mjs` (4/4 pass),
+`harness/scripts/check-session-bootstrap-directory-contract.test.mjs`
+(5/5 pass) — 29/29 total, confirming all three follow-ups' actual code
+is live and correct, not merely reported so. **Status stays `open`** for
+the same reason across this whole item and its siblings this session
+(`guard-dispatch-has-no-workflow-tool-awareness`,
+`test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention`):
+the one remaining piece — registering `check-directory-contract.test.mjs`
+into `harness/scripts/verify.mjs`'s `TEST_SUITES` — is TP-3-protected and
+needs a signed/maintenance-window ceremony, not a routine dispatch.
