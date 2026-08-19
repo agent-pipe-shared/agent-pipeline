@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "995270f6294948ce54f15b402ac9e3c0f0ff0d094bc2ba42badfb802547ee059"
+    "transitionHead": "25b7a30121713cc08729e27c21456b7e4996f700df21d78565878b3e9d52860f"
   },
   "counts": {
-    "open": 50,
-    "in_progress": 5,
-    "closed": 244
+    "open": 41,
+    "in_progress": 3,
+    "closed": 255
   },
   "items": [
     {
@@ -158,12 +158,16 @@
     },
     {
       "id": "pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "NOVA-GMW-1 first dispatch attempt, 2026-08-07 -- Agent tool isolation:worktree.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
+      "closureEvidence": "backlog/items/2026-08-07-agent-tool-isolation-worktree-snapshots-stale-upstream-ref.md"
     },
     {
       "id": "pipeline.agents-are-judged-by-rules-no-artifact-ever-tells-them",
@@ -623,13 +627,17 @@
     },
     {
       "id": "pipeline.codex-sandbox-critic-longterm",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": false,
-      "tracking": "Sentinel recovery baseline; no completion claim."
+      "tracking": "Sentinel recovery baseline; no completion claim.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
+      "closureEvidence": "backlog/items/2026-07-19-codex-sandbox-critic-longterm.md"
     },
     {
       "id": "pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set",
@@ -1128,12 +1136,16 @@
     },
     {
       "id": "pipeline.fresh-repo-onboarding-intake-first-transaction",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
       "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-0 (priority P0)",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "59253fb0",
+      "closureEvidence": "backlog/items/2026-08-18-fresh-repo-onboarding-intake-first-transaction.md"
     },
     {
       "id": "pipeline.fresh-repo-onboarding-never-asks-for-git-identity",
@@ -1733,12 +1745,16 @@
     },
     {
       "id": "pipeline.intake-values-restart-resilient-immediately",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
       "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-4 (priority P1)",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "59253fb0",
+      "closureEvidence": "backlog/items/2026-08-18-intake-values-restart-resilient-immediately.md"
     },
     {
       "id": "pipeline.kickoff-apply-action-drops-runner",
@@ -1908,12 +1924,16 @@
     },
     {
       "id": "pipeline.lossless-pre-restart-checkpoint",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
       "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-1 (priority P0)",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "59253fb0",
+      "closureEvidence": "backlog/items/2026-08-18-lossless-pre-restart-checkpoint.md"
     },
     {
       "id": "pipeline.maintenance-window-selectivity-is-untested-at-both-levels",
@@ -2009,12 +2029,16 @@
     },
     {
       "id": "pipeline.multi-cli-efficiency-pilots",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public transfer completeness review of post-v0.3 Multi-CLI design and measurement work",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
+      "closureEvidence": "backlog/items/2026-07-20-multi-cli-efficiency-pilots.md"
     },
     {
       "id": "pipeline.native-windows-verify-red-suite-class",
@@ -2109,12 +2133,16 @@
     },
     {
       "id": "pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-17",
       "source": "Live, same-session incident: the Elephant dispatched NVA-VENDORSYNC-1 to goldfish-deep with an explicit `model: opus`/`max` override and a stated MP-05/MP-07 rationale (architecture/guardrail-adjacent). goldfish-deep's actual configured default is sonnet at effort xhigh (plugins/pipeline-core/agents/goldfish-deep.md frontmatter, matching pipeline.user.yaml's models.implement.claude routing). The PO caught the deviation live in chat and asked how to stop this recurring silently across sessions; not investigated or fixed here, filed for future hardening per the PO's own framing (\"das braucht auch später eine Härtung\").",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
+      "closureEvidence": "backlog/items/2026-08-17-no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing.md"
     },
     {
       "id": "pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed",
@@ -2158,12 +2186,16 @@
     },
     {
       "id": "pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-16",
       "source": "PO, 2026-08-16: 'Wichtiger ist aber, dass die pipeline auch im user projekt dafür sorgt das die richtigen tests entstehen und sie anwendet.' Raised while discussing why a hosted project's verify gate can be satisfied without checking anything.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
+      "closureEvidence": "backlog/items/2026-08-16-nothing-connects-an-acceptance-criterion-to-a-check-that-runs.md"
     },
     {
       "id": "pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects",
@@ -2921,12 +2953,16 @@
     },
     {
       "id": "pipeline.runner-neutrality-before-third-runner",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "PO question of 2026-08-08 during the greenfield hardening block: whether Antigravity/AGY support is tracked anywhere, given that it will require runner neutrality to hold far better than it does today.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
+      "closureEvidence": "backlog/items/2026-08-08-runner-neutrality-must-hold-before-a-third-runner-lands.md"
     },
     {
       "id": "pipeline.runtime-projection-v2-eager-manifest-load",
@@ -3277,21 +3313,29 @@
     },
     {
       "id": "pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
+      "closureEvidence": "backlog/items/2026-08-07-technical-lock-for-pipeline-consent-before-onboarding-complete.md"
     },
     {
       "id": "pipeline.temp-directories-leak-until-the-filesystem-refuses-every-write",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed live on 2026-08-08: the tmpfs inode table on the PO's machine was exhausted, blocking every process that needed to create a file. Diagnosed jointly with the PO from df/mount output during the 0.5.4 candidate run.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "1b6e6a606ffcd6f32c3993b73be1110d3eb299af",
+      "closureEvidence": "backlog/items/2026-08-08-temp-directories-leak-until-the-filesystem-refuses-every-write.md"
     },
     {
       "id": "pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route",
