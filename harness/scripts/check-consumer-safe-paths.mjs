@@ -150,6 +150,13 @@ export const VENDORED_CANON_ALLOWLIST = Object.freeze([
   // docs/adr/0029-file-handoffs-status.md (lines 11, 50)
   { file: "plugins/pipeline-core/docs/adr/0029-file-handoffs-status.md", match: "he CLI `harness/scripts/", reason: vendoredCanonAllowlistReason("docs/adr/0029-file-handoffs-status.md") }, // L11
   { file: "plugins/pipeline-core/docs/adr/0029-file-handoffs-status.md", match: "ie CLI `harness/scripts/", reason: vendoredCanonAllowlistReason("docs/adr/0029-file-handoffs-status.md") }, // L50
+  // docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md (lines 11, 12, 31, 36):
+  // this repository's own Nova-sprint historical evidence trail (the one real
+  // release-preflight run this ADR is grounded in), not a consumer-facing path.
+  { file: "plugins/pipeline-core/docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md", match: "`specs/sprint-nova-epic/implementation/issue-acceptance-matrix.md`", reason: vendoredCanonAllowlistReason("docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md") }, // L11
+  { file: "plugins/pipeline-core/docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md", match: "`specs/sprint-nova-epic/plans/nova-a.md`", reason: vendoredCanonAllowlistReason("docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md") }, // L12
+  { file: "plugins/pipeline-core/docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md", match: "`specs/sprint-nova-epic/evidence/nova-a/a6/release-preflight-report-57ee7e9.json`", reason: vendoredCanonAllowlistReason("docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md") }, // L31
+  { file: "plugins/pipeline-core/docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md", match: "`specs/sprint-nova-epic/evidence/nova-a/a6/consent-input-57ee7e9.json`", reason: vendoredCanonAllowlistReason("docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md") }, // L36
 ]);
 
 export const ALLOWLIST = Object.freeze([
