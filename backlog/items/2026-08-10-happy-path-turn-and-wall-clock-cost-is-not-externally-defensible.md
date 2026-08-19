@@ -302,3 +302,78 @@ and D from this item's own Proposal are the closest existing framing for
 these two findings respectively; a new, not-yet-filed defect class for the
 push-approval feature-id/override gap may also be warranted, but designing
 either fix is explicitly out of scope for this investigation dispatch.
+
+### Fix designs, 2026-08-19
+
+**(a) is already fixed — confirmed, not redesigned.** Before designing a
+new fix, checked whether the root cause still exists: `git log -S` on
+`PROMOTION_FEATURE_ID_DOWNSTREAM` (`plugins/pipeline-core/lib/
+onboarding-continuity.mjs:156`) shows the fix landed same-day as the
+incident, commit `8ae0de01` (2026-08-10T09:07:43+02:00, ~3 minutes after
+the transcript's push-abandonment moment at 07:04:57Z), dispatch `GF-099`.
+`promotionInput()` (`onboarding-continuity.mjs:4043-4050`) now rejects a
+feature id at `kickoff promote` time — the one point it is still
+choosable — if it would later fail `po-human-approval.mjs`'s stricter
+`^[a-z][a-z0-9-]{0,63}$` shape (uppercase, `_`, `.`, `:`, or >64 chars),
+with a message naming the constraint and the exact reason
+("...it will later be rejected at push-approval otherwise"). Separately,
+kickoff's own current default feature-id generator already produces a
+compliant id unprompted (`n${goalSha256.slice(0,16)}` — lowercase, starts
+with a letter, hex digits only), so the specific `2026-08-10_amon-sul`
+failure mode (date-prefixed, underscore-containing) cannot recur from the
+default path either. Regression coverage: `onboarding-continuity.test.mjs`
+"promotion refuses a feature id that would later fail push-approval's
+stricter shape" (6 rejection shapes + the kickoff- prefix distinction +
+a no-regression positive case), confirmed passing live just now
+(`node plugins/pipeline-core/lib/onboarding-continuity.test.mjs`,
+210/210). **No further design or implementation needed for (a);** the
+"no lightweight override" framing in this item's own Recommendation
+line no longer applies — there is nothing left to override once the bad
+id can never be chosen. Whoever picks up implementation should verify
+this is still true (re-run the same test file) rather than re-designing.
+
+**(b) needs a real fix — two-part design, ready for direct
+implementation, no further PO input needed:**
+
+1. **Add a "don't rediscover — here's where the answer already is"
+   pointer table to the happy-path guidance an agent actually has loaded
+   at the moment it first needs each mechanism.** Confirmed the gap is
+   real: `rg -n "goldfish-task.md" harness/session-bootstrap.md
+   plugins/pipeline-core/skills/pipeline-start/SKILL.md` returns zero
+   hits — the canonical Goldfish-dispatch template
+   (`templates/prompts/goldfish-task.md`) is referenced only from
+   `docs/operating-model.md` §2 (the normative core, not the bootstrap
+   happy path an agent is actually following turn-to-turn). This is the
+   same shape of gap GF-092/GF-094 already fixed for `kickoff plan`/
+   `kickoff promote` flags in `kickoff-design.md` — apply the identical
+   pattern to the third confirmed instance: add one short line to
+   `plugins/pipeline-core/skills/pipeline-start/SKILL.md`'s "Kickoff
+   intake and the durable design package" section (or the "Gate
+   authority and autonomous continuation" section, wherever the first
+   Goldfish-dispatch instruction already lives), naming
+   `templates/prompts/goldfish-task.md` directly as the dispatch-briefing
+   source, and `workflow-dispatch.md` for the Workflow-tool variant
+   (already loaded lazily per the skill's own "Typed lazy loading"
+   section — just needs the SKILL.md prose to say "use these paths",
+   not leave the agent to find them). No new mechanism, no design
+   latitude — a doc pointer, mirroring an already-proven fix pattern.
+   Estimated cost: well under the 5m36s it cost the observed session to
+   discover this from source.
+2. **(Secondary, larger, NOT designed in full here — flag as a
+   possible follow-up, not a requirement of this fix.)** Proposal
+   candidate B's second half ("a standing check that every CLI surface
+   an agent is expected to invoke during the happy path is fully and
+   correctly documented") would need its own scoped design pass — e.g.
+   a lint comparing each script's declared argv flags against whether a
+   loaded reference doc names them — genuinely larger scope (new
+   verify-adjacent tooling, false-positive risk across every CLI in the
+   repo) and not needed to close the 3 confirmed instances found so far.
+   Recommend NOT bundling this into the same dispatch as fix 1 above;
+   treat as a separate, lower-priority item if a fourth rediscovery
+   instance recurs after fix 1 lands.
+
+**Recommendation:** dispatch fix (b)-1 alone (mechanical, bounded, one
+doc edit) to a `goldfish-mechanic`/`goldfish-implementor` tier; do not
+redesign or re-dispatch (a) — it is closed in substance already, only
+this item's own status needs to catch up once someone confirms the
+above.
