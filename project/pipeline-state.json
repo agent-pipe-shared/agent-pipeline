@@ -167,7 +167,7 @@
       },
       "spec": {
         "path": "specs/sprint-phoenix-epic/spec.md",
-        "sha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f"
+        "sha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
       },
       "result": null
     },
@@ -237,7 +237,7 @@
     "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
     "planSha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723",
     "specPath": "specs/sprint-phoenix-epic/spec.md",
-    "specSha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f",
+    "specSha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287",
     "profile": "epic",
     "profileSha256": "26494e6fbe5634bf4b7bbd698f5348b74f766bb3bcb715d926f5def107d50ba0",
     "submittedBy": "Elephant",
@@ -268,7 +268,7 @@
       "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
       "planSha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723",
       "specPath": "specs/sprint-phoenix-epic/spec.md",
-      "specSha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f"
+      "specSha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
     },
     "priorInvalidationSha256": "7ea3bf1823f41e25df7f7a4da8499eb6b5d58eb25d3adfcbf3392ce4fe3ac1f2"
   },
