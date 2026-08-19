@@ -222,3 +222,41 @@ assignment already recorded (goldfish-deep, onboarding/lifecycle code) and
 stays a same-release dispatch target rather than a close, since it needs real
 design latitude in `project-onboarding-v3.mjs` plus test coverage to trust.
 Not attempted here.
+
+### Correction, 2026-08-19 (Wave 5 round 4) — the "not attempted" note above is stale
+
+Re-verified against current source before dispatching further work on this
+item, per CLAUDE.md's re-verify-before-dispatch rule — and the 2026-08-18
+"Not attempted here" note is wrong as of today. `collectPushApprovalPreferenceAction()`
+and `unresolvedMachinePushApprovalSetup()` (`plugins/pipeline-core/lib/project-onboarding-v3.mjs`,
+landed commit `22b9755e`, same day, no `Dispatch:` trailer — direct
+Elephant-authored work, not a dispatch, which is why the earlier note in
+this same file missed it) implement exactly the assigned piece: a
+`collect-input` ask, gated on `machine-plane.mjs` never having been written,
+explaining chat vs. signature and guiding the PO through creating their
+signing key via `po-human-approval.mjs setup`, wired into the real
+`apply-portable-seed --activate` CLI path. Confirmed live on trunk today —
+`project-onboarding-v3.test.mjs` 128/128 passing, including "apply-portable-seed
+--activate surfaces the push-approval-setup ask-step once per machine" and
+the sibling author-identity test. **This closes the item's bounded,
+undeferred piece.** Do not re-dispatch it.
+
+**One separate, still-live gap surfaced while re-verifying** (Direction 3 of
+this item's own body, not yet checked in any prior triage pass): the
+SessionStart hook `plugins/pipeline-core/hooks/setup-check.mjs` — shipped to
+every consumer via `hooks/hooks.json` (hook 8, `startup|resume|clear`
+matcher) — still names `` `node setup.mjs` `` as the resolving step for its
+`default-markers` branch (`resolvingSteps()`, line 114), the exact script
+`SETUP.md:202` forbids a consumer to run. Whether this is actually reachable
+by a marketplace-installed consumer (its own doc comment frames it as
+"Shareable Edition" personalization for a "collegue" who clones the Pipeline
+SOURCE repo, which may mean a consumer's freshly-onboarded `pipeline.user.yaml`
+never carries the literal default markers this hook keys on in the first
+place) is a real open question, not resolved by this correction — needs a
+dedicated read of the onboarding-generated `pipeline.user.yaml` shape before
+either fixing the message or confirming it is dead code for the consumer
+path. Not dispatched; flagging rather than guessing.
+
+**Status:** stays `open` for the Direction 3 question above and the
+Nightwing-deferred full config-UI treatment; the item's one same-release,
+non-deferred obligation is done.
