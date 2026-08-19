@@ -22,7 +22,7 @@
 | pipeline.agent-tool-isolation-worktree-snapshots-stale-upstream-ref | deferred | defect | pipeline | 2026-08-07 | — |
 | pipeline.anchor-check-passes-on-wrong-language-content | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.approval-mechanisms-require-out-of-session-po-acts | deferred | defect | pipeline | 2026-08-07 | — |
-| pipeline.attestation-git-presence-gate-not-gs8-protected | in_progress | defect | pipeline | 2026-08-07 | — |
+| pipeline.attestation-git-presence-gate-not-gs8-protected | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.authority-revision-receipt-dedup-and-recovery-integrity-gaps | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.authority-signing-terminal-contract | closed | workflow-improvement | pipeline | 2026-08-06 | — |
@@ -125,7 +125,7 @@
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.product-capability-inventory-two-guard-hooks-uncategorized | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.project-authority-dual-state-repair-and-failclosed-gate | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.project-scoped-github-issue-operations | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.project-scoped-github-issue-operations | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.publication-authority-lacks-execution-time-criticalproof-reverification | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.published-lifecycle-event-schema-still-enumerates-cancellation | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | closed | defect | pipeline | 2026-08-09 | — |
@@ -136,10 +136,10 @@
 | pipeline.reconcile-lock-reuse-lexical-path-comparison | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.reconcile-lock-reuse-regression-test-needs-a-tp5-window | closed | requirement | pipeline | 2026-08-18 | — |
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | closed | defect | pipeline | 2026-07-27 | — |
-| pipeline.recovery-preview-callback-attestation | in_progress | defect | pipeline | 2026-07-20 | — |
+| pipeline.recovery-preview-callback-attestation | closed | defect | pipeline | 2026-07-20 | — |
 | pipeline.regulated-document-hooks | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.release-preflight-cli-base-commit-not-peeled | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.release-preflight-has-a-builder-but-no-cli | in_progress | defect | pipeline | 2026-08-06 | — |
+| pipeline.release-preflight-has-a-builder-but-no-cli | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.restart-launch-is-codex-only-for-every-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.resume-hint-opaque-token-rejects-hyphenated-english | closed | defect | pipeline | 2026-08-09 | — |
@@ -148,7 +148,7 @@
 | pipeline.ruleset-source-test-unregistered-in-the-verify-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.runtime-projection-v2-eager-manifest-load | closed | defect | pipeline | 2026-07-27 | — |
 | pipeline.security-scan-cross-branch-gitleaks-findings | closed | defect | pipeline | 2026-07-25 | — |
-| pipeline.self-application-integrity-check-absent | in_progress | defect | pipeline | 2026-08-07 | — |
+| pipeline.self-application-integrity-check-absent | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.semgrep-timeout-oversized-pipeline-state-test | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -179,7 +179,7 @@
 ## Counts
 
 - open: 9
-- in_progress: 25
-- closed: 123
+- in_progress: 20
+- closed: 128
 - rejected: 2
 - deferred: 11

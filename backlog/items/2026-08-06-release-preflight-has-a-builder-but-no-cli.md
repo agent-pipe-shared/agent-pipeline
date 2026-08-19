@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.release-preflight-has-a-builder-but-no-cli
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
 created: 2026-08-06
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "5e20b854afc1f499d1376c43558565389e375c59"
+closure_evidence: "plugins/pipeline-core/scripts/release-preflight-cli.mjs"
 source: "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
 due: 2026-09-06
 ---
@@ -86,3 +90,9 @@ All five publication gates now have producers.
 
 - `plugins/pipeline-core/scripts/publication-gate-evidence.mjs` — the same problem for the other four gates, solved.
 - `docs/release-0.5.2-readiness.md` — carries the version-surface step this preflight would check.
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — stale `in_progress` record, resolution already documented in this item's own "Resolved 2026-08-06" section but never transitioned.
+- **Rationale:** Found during a PO-requested audit of in_progress backlog items for completed-but-untracked entries. `release-preflight-cli.mjs` exists and is wired into the publication executor exactly as this item's own resolution note describes; no further work needed.
+- **Date:** 2026-08-19

@@ -3,8 +3,12 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.recovery-preview-callback-attestation"
 type: "defect"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-20"
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "97ba659890493597f90b8939fb602d613c67a636"
+closure_evidence: "plugins/pipeline-core/lib/recovery-preview-attestation.mjs"
 source: "Public V3 Foundation stabilization review of the migration recovery boundary"
 due: "2026-07-27"
 expires: "2026-08-03"
@@ -63,7 +67,6 @@ before further implementation or prioritization.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed — implemented, stale `in_progress` record.
+- **Rationale:** Found during a PO-requested audit of in_progress backlog items. `recovery-preview-attestation.mjs` implements exactly the acceptance boundary this item specifies: `attestRecoveryPreviewDelivery()` binds one acknowledgement to one invocation (digest + invocation-id match required), and every missing/malformed/replayed/mismatched/timed-out/throwing callback returns a typed non-success code (`RP-CALLBACK-ABSENT`, `RP-ACK-MALFORMED`, `RP-ACK-REPLAY`, `RP-DIGEST-MISMATCH`, `RP-INVOCATION-MISMATCH`, `RP-CALLBACK-TIMEOUT`, `RP-CALLBACK-THREW`) without advancing recovery state. Suite `recovery-preview-attestation-tests` is registered in `verify.mjs`.
+- **Date:** 2026-08-19

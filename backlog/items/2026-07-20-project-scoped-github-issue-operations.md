@@ -3,8 +3,12 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.project-scoped-github-issue-operations"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-20"
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "8ae6567ec893957d7a5824660dbab8a7252a8b79"
+closure_evidence: "plugins/pipeline-core/skills/github-issue-operations/SKILL.md"
 source: "user-requested feature expansion after the first public observation publication"
 due: "2026-08-10"
 expires: "2026-08-17"
@@ -73,7 +77,6 @@ evidence before implementation or prioritization.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** closed — implemented, stale `in_progress` record.
+- **Rationale:** Found during a PO-requested audit of in_progress backlog items. `skills/github-issue-operations/SKILL.md` plus `scripts/github-issue-operations.mjs` cover every acceptance criterion: target resolution with `owner/repo` display before any write, local `gh` auth with no token exposure, typed setup/permission failures, narrow create/edit (title/body/labels only, delete/transfer/close/reopen/etc. explicitly forbidden), preview + confirmation, and mandatory readback (`publish-unverified` on mismatch). `docs/github-issue-operations.md` documents setup. Suite `github-issue-operations-tests` is registered in `verify.mjs`.
+- **Date:** 2026-08-19

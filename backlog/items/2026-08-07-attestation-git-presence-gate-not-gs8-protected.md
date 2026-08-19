@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.attestation-git-presence-gate-not-gs8-protected
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
 created: 2026-08-07
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "025f9e1a2a547b7abc438d998801acddcabdf166"
+closure_evidence: "plugins/pipeline-core/hooks/guard-gate-strength.mjs"
 source: "Critic finding F-B, delta re-review of the F2 implementation fix (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md); recorded via the WP2-WP3-partA-rework-2 dispatch (which also fixed F-A/F-C/F-D from the same review)."
 due: 2026-09-06
 ---
@@ -103,3 +107,9 @@ already received for its own gate-strength question (§A.3 item 3).
 - **Design (2026-08-07):** designed as residual R1 in
   `specs/sprint-phoenix-epic/design/part-a-residuals-and-dispatch-template-drift.md` §I.1.
 - **Date:** 2026-08-07
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — implemented, stale `in_progress` record.
+- **Rationale:** Found during a PO-requested audit of in_progress backlog items. `guard-gate-strength.mjs`'s `GATE_STRENGTH_PATHS` now carries a `GS-9` entry protecting exactly `plugins/pipeline-core/lib/self-application-attestation-gate.mjs` — the module that decides whether the GS-8 origin/content attestation runs at all, closing the gap this item described.
+- **Date:** 2026-08-19

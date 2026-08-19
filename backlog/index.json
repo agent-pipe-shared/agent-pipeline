@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ac6e8221518263e915126bc4436414572512842ac7bff16e0ee657ed329313c3"
+    "transitionHead": "60072bcf9ec748d9adcf48431dbab1b7543a98a7641f5c6746d2474ee95f2975"
   },
   "counts": {
     "open": 9,
-    "in_progress": 25,
-    "closed": 123,
+    "in_progress": 20,
+    "closed": 128,
     "rejected": 2,
     "deferred": 11
   },
@@ -208,11 +208,15 @@
     },
     {
       "id": "pipeline.attestation-git-presence-gate-not-gs8-protected",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Critic finding F-B, delta re-review of the F2 implementation fix (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md); recorded via the WP2-WP3-partA-rework-2 dispatch (which also fixed F-A/F-C/F-D from the same review)."
+      "source": "Critic finding F-B, delta re-review of the F2 implementation fix (specs/sprint-phoenix-epic/evidence/wp2wp3-parta-rework-1-delta-critic-review-7aa84f0.md); recorded via the WP2-WP3-partA-rework-2 dispatch (which also fixed F-A/F-C/F-D from the same review).",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "025f9e1a2a547b7abc438d998801acddcabdf166",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-gate-strength.mjs"
     },
     {
       "id": "pipeline.authority-revision-proof-has-the-same-trustpolicy-shape-gap-po-approval-proof-had",
@@ -1325,11 +1329,15 @@
     },
     {
       "id": "pipeline.project-scoped-github-issue-operations",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "user-requested feature expansion after the first public observation publication"
+      "source": "user-requested feature expansion after the first public observation publication",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "8ae6567ec893957d7a5824660dbab8a7252a8b79",
+      "closureEvidence": "plugins/pipeline-core/skills/github-issue-operations/SKILL.md"
     },
     {
       "id": "pipeline.publication-authority-lacks-execution-time-criticalproof-reverification",
@@ -1454,11 +1462,15 @@
     },
     {
       "id": "pipeline.recovery-preview-callback-attestation",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Public V3 Foundation stabilization review of the migration recovery boundary"
+      "source": "Public V3 Foundation stabilization review of the migration recovery boundary",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "97ba659890493597f90b8939fb602d613c67a636",
+      "closureEvidence": "plugins/pipeline-core/lib/recovery-preview-attestation.mjs"
     },
     {
       "id": "pipeline.regulated-document-hooks",
@@ -1483,11 +1495,15 @@
     },
     {
       "id": "pipeline.release-preflight-has-a-builder-but-no-cli",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-06",
-      "source": "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding."
+      "source": "sprint_phoenix handover finding 1, 2026-08-06. The gate-evidence half was closed by publication-gate-evidence.mjs; the release-preflight half was not, and is recorded separately so the remainder is not lost inside a partly-fixed finding.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "5e20b854afc1f499d1376c43558565389e375c59",
+      "closureEvidence": "plugins/pipeline-core/scripts/release-preflight-cli.mjs"
     },
     {
       "id": "pipeline.report-early-duty-is-conditional-in-writing-and-unconditional-in-practice",
@@ -1583,11 +1599,15 @@
     },
     {
       "id": "pipeline.self-application-integrity-check-absent",
-      "status": "in_progress",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "merge report section 4 findings 7 and 9 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361"
+      "source": "merge report section 4 findings 7 and 9 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "57065c328b10b32c29e1025283dfaa47742eabc4",
+      "closureEvidence": "plugins/pipeline-core/lib/self-application-attestation-gate.mjs"
     },
     {
       "id": "pipeline.semgrep-timeout-oversized-pipeline-state-test",

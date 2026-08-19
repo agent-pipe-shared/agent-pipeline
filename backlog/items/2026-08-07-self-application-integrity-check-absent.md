@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.self-application-integrity-check-absent
 type: defect
 owner: pipeline
-status: in_progress
+status: closed
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "57065c328b10b32c29e1025283dfaa47742eabc4"
+closure_evidence: "plugins/pipeline-core/lib/self-application-attestation-gate.mjs"
 source: merge report section 4 findings 7 and 9 (specs/sprint-phoenix-epic/evidence/merge-0.5.2-what-fell-away.md gitignored evidence artifact); merge commit 75b8361
 created: 2026-08-07
 due: 2026-09-06
@@ -192,3 +196,9 @@ PO course gate.
 All three round-3 findings independently re-derived and confirmed resolved
 from source; no new blocker/major/minor. **Design phase DONE — ready for
 implementation dispatch.**
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — implemented, stale `in_progress` record.
+- **Rationale:** Found during a PO-requested audit of in_progress backlog items. `plugins/pipeline-core/lib/self-application-attestation-gate.mjs` implements exactly the accepted design: reuses `observeCodexPublicCoreIdentity`/`observePublicCoreIdentity` (`public-core-observation.mjs`) and `normalizeRulesetSource` (`ruleset-source.mjs`) against the `PUBLIC_SELF_APPLICATION_ORIGINS` allowlist, folded into bootstrap readiness. Full test coverage exists (`bootstrap-source-attestation-acceptance.test.mjs`, `guard-gate-strength-origin-attestation.test.mjs`), both registered in `verify.mjs`.
+- **Date:** 2026-08-19
