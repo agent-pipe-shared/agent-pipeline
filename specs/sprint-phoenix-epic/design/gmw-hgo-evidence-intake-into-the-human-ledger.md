@@ -491,18 +491,198 @@ rather than quietly softened.
   decision, and only the GMW pair exposes attribution or rationale at all (§5.2,
   R-3, and O-4). The record H-AC-11 describes is created by increment 2, in the
   restricted store, under R-2.
-- **Increment 2 (D-1, bundled with the rebind of §9).** Move attribution into the
-  restricted governance store (§3.4) to gain encryption at rest, expiry, erase
-  receipts and key destruction — i.e. the machinery H-AC-06's restricted branch
-  actually names. This requires (a) a new payload schema, e.g.
-  `pipeline.human-decision-attribution.v1`, admitted for `origin: "human"` **only**
-  when `storageProfile === "restricted-machine-local"`, a ~2-line addition to
-  `governance-event.mjs:169-174` plus a closed-shape validator module, and (b) a
-  spec §6.1 amendment, since that list is declared closed
-  (`specs/sprint-phoenix-epic/spec.md:278-301`). Precedent exists:
-  `pipeline.human-role-exception-decision.v1` is already implemented and already
-  absent from that list, so the family has been extended once before — which is an
-  argument for doing it through the rebind, not around it.
+- **Increment 2 (D-1) — the restricted machine-local attribution record, specified.**
+
+  D-1 moves the two values §5.1 excludes from the portable record — the free-text
+  rationale and the trust anchor's `{keyReference, publicKeySha256}` pair — into
+  the restricted governance store (§3.4), under a new payload schema admitted
+  **only** when `storageProfile === "restricted-machine-local"`. This gains the
+  machinery H-AC-06's restricted branch actually names: encryption at rest,
+  expiry, erase receipts and key destruction. It does **not** attempt to satisfy
+  H-AC-11's no-join-handle clause (§5.2 keeps O-4 open); R-2 already states the
+  zone rule this record must hold to, and every field below is chosen to hold to
+  it.
+
+  **No spec.md amendment, corrected from the earlier revision of this
+  paragraph.** That revision required a spec.md §6.1 amendment as a
+  precondition, citing `pipeline.human-role-exception-decision.v1` as evidence
+  that the family "has been extended once before" while still treating that
+  extension as something that goes *through* the rebind. Re-reading the
+  precedent itself: `human-role-exception-decision.mjs` is implemented, shipped,
+  and tested (`plugins/pipeline-core/lib/human-role-exception-decision.mjs`,
+  `governance-event.mjs:170`), and `spec.md:278-299`'s closed list does **not**
+  name it — verified again for this revision, not merely carried forward. The
+  precedent is therefore "extended without a §6.1 amendment ever landing," not
+  "extended through one." D-1 follows the identical, already-proven path: a
+  validator module plus a matching JSON Schema file under `governance/schemas/`,
+  no edit to `spec.md`. §9's closing bullet, which asserted the amendment as a
+  precondition, is corrected to match in the same pass as this section.
+
+  **New payload schema: `pipeline.human-decision-attribution.v1`.** Closed
+  shape, nine keys, `exact()`-enforced the same way
+  `human-role-exception-decision.mjs:56` enforces its own:
+
+  ```text
+  schema              "pipeline.human-decision-attribution.v1"
+  packageId           ID; "guard-maintenance-window" | "human-guard-override" --
+                       reuses guard-authority-ledger-intake.mjs's own
+                       WINDOW_PACKAGE_ID / OVERRIDE_PACKAGE_ID constants (:38,
+                       :40). An already-public category value, not a per-record
+                       correlator -- R-2 forbids record-level correlators, not
+                       shared category values, the same distinction
+                       repositoryFingerprint already relies on in the same rule.
+  authorityClass       AUTHORITIES set, unchanged from human-governance-decision.mjs:10
+  identityAssurance    ASSURANCE set, unchanged from human-governance-decision.mjs:11;
+                       this producer emits "locally-attributed" only -- never
+                       "externally-attested". Moving the pointer to a
+                       better-protected store does not upgrade what it attests
+                       to (§5.2's own argument, unweakened).
+  reasonCode           CODE pattern, unchanged; a restatement of the already-
+                       public §5.3 code, not new information.
+  rationale            string, 1-4096 Unicode scalar chars; the free text §5.1
+                       exclusion 3 keeps out of the portable record.
+  keyReference         string, the `KEY_REFERENCE` pattern
+                       (`critical-human-proof-policy.mjs:213`,
+                       `^[A-Za-z0-9._:@/-]{1,200}$`).
+  publicKeySha256      sha-256 hex. Both this and keyReference are read verbatim
+                       from the trust anchor pair
+                       (`critical-human-proof-policy.mjs:247-249`) -- §5.1
+                       exclusion 2's forbidden pair, admissible **here** because
+                       this store is encrypted, machine-local and erasable,
+                       which is the entire reason D-1 exists.
+  timeBucketEpochMs    integer; must satisfy
+                       `value % ATTRIBUTION_TIME_BUCKET_MS === 0` with
+                       `ATTRIBUTION_TIME_BUCKET_MS = 86_400_000` (one day) --
+                       R-2's "no exact timestamp" enforced structurally, not by
+                       convention. The builder (below) only ever emits
+                       `Math.floor(occurredAtEpochMs / ATTRIBUTION_TIME_BUCKET_MS)
+                       * ATTRIBUTION_TIME_BUCKET_MS`; the modulus check is what a
+                       hand-built payload cannot evade.
+  ```
+
+  Deliberately **absent**: `decisionId`, any link, `scope.candidate`,
+  `scope.artifacts`, `ruleDigest`, `policyDigest`, `validity`. None of R-2's
+  forbidden correlators has a field to occupy in this payload; there is
+  structurally nothing left to carry one.
+
+  **Validator module.**
+  `plugins/pipeline-core/lib/human-decision-attribution.mjs` — new file,
+  mirroring `human-role-exception-decision.mjs`'s own shape exactly (the same
+  `fail`/`record`/`exact` helpers, the same `HumanGovernanceLedgerError` import
+  from `human-governance-decision.mjs`, the same freeze-on-return discipline).
+  Exports:
+
+  - `HUMAN_DECISION_ATTRIBUTION_SCHEMA = "pipeline.human-decision-attribution.v1"`
+  - `ATTRIBUTION_TIME_BUCKET_MS = 86_400_000` — exported so the producer and the
+    validator share one literal rather than two copies that can drift apart.
+  - `validateHumanDecisionAttribution(payload)` — input: a plain object; output:
+    the frozen validated payload; throws `HumanGovernanceLedgerError` with one
+    of `HDA-SHAPE` (wrong/missing/extra key, bad enum), `HDA-RATIONALE` (empty,
+    over 4096 chars, or not Unicode-scalar), `HDA-KEY-REFERENCE` (fails
+    `KEY_REFERENCE`), `HDA-DIGEST` (bad `publicKeySha256`), `HDA-TIME-BUCKET`
+    (not a safe non-negative integer, or not a multiple of
+    `ATTRIBUTION_TIME_BUCKET_MS`).
+  - `isHumanDecisionAttribution(value)` — schema-tag check before validation,
+    same contract as `isHumanRoleExceptionDecision`.
+
+  Matching JSON Schema:
+  `governance/schemas/human-decision-attribution.schema.json`, the same closed
+  Draft-2020-12 shape as
+  `governance/schemas/human-role-exception-decision.schema.json`.
+
+  **Consumer wiring — one edit, checked rather than assumed.** The obvious
+  candidate for a second edit turns out, on tracing the actual call path, not
+  to be needed:
+
+  1. `plugins/pipeline-core/lib/governance-event.mjs:169-174`
+     (`validateEnvelopeShape`'s `payloadByOrigin`): add
+     `"pipeline.human-decision-attribution.v1"` as a third entry of the `human`
+     array, **and** one condition next to the existing portable/restricted
+     coherence block (`:191-195`): a `human-decision-attribution.v1` envelope
+     must fail validation if `storageProfile !== "restricted-machine-local"`.
+     This is the only edit this document proposes.
+  2. **Not needed:** `plugins/pipeline-core/lib/governance-event-store.mjs`'s
+     `assertPortablePayload` (`:348-360`, the human-role-exception-decision
+     call site) looks like a second candidate — a guard clause rejecting the
+     attribution schema before the existing `roleException` branch
+     (`:354-356`). Tracing `assertPortablePayload`'s one and only caller
+     (`appendPortableGovernanceEvent`, `:711`) finds it is reached exclusively
+     through `assertIntent` (`:395-413`), and `assertIntent` already requires
+     `candidate.storageProfile !== "repository-public-safe"` to fail closed
+     (`:408`) for **every** portable intent, independent of payload schema.
+     That requirement and step 1's new coherence condition are mutually
+     exclusive for the attribution schema — one demands
+     `repository-public-safe`, the other forbids it — so an
+     attribution-schema intent always fails `GES-INTENT` inside `assertIntent`
+     and `assertPortablePayload` never runs at all. A guard clause placed
+     there could never execute; adding one would be exactly the
+     "looks-prudent, adds nothing" move §5.5 already declines elsewhere in
+     this document. **An earlier revision of this section proposed that guard
+     as a required second edit; this revision traces the call path instead of
+     assuming it and finds the one edit in step 1 already closes the path
+     completely** — matching the original "~2-line addition" estimate, for the
+     reason actually verified rather than merely restated.
+
+  Neither restricted store function needs a payload-specific check
+  (`putRestrictedGovernanceEvent`, `queryRestrictedGovernanceEvent`,
+  `governance-event-store.mjs:1442,1505` — both validate only the generic
+  envelope, verified in §3.4) — so D-1 adds none there either; the
+  schema-admission edit in step 1 is what makes an attribution envelope pass
+  that generic check at all.
+
+  **Producer wiring.** One new pure builder in
+  `plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs`, beside the
+  existing §7.4/§7.5 builders and following their exact no-I/O discipline
+  (§7.1):
+
+  ```text
+  export function buildWindowAttributionEvent({
+    repositoryFingerprint, packageId, authorityClass, reasonCode,
+    rationale, keyReference, publicKeySha256, occurredAtEpochMs,
+  } = {}) { … }
+  ```
+
+  It (a) builds and validates the nine-key payload via
+  `validateHumanDecisionAttribution`, floor-bucketing `occurredAtEpochMs` itself
+  so the caller can never supply an already-finer-grained value by construction
+  error; (b) wraps it into a **draft** restricted envelope with `correlation`,
+  `candidate` and every `artifacts` entry set to the typed state
+  `{state:"omitted-by-policy"}` (R-2), `repositoryFingerprint` present
+  (zone-scoped, R-2's stated exception), a **fresh random**
+  `eventId`/`idempotencyKey` — never derived from the portable decision's
+  `decisionId` or `intent.sha256`; deriving either would smuggle a correlator
+  back in through the identifier, exactly what §5.2's "no identifier scheme"
+  finding already rules out one layer up — `storageProfile:
+  "restricted-machine-local"`, `classification: "restricted"`,
+  `retentionCompatibility: "machine-local-expiring"`; and (c) does **not** call
+  `sealGovernanceEvent` itself — sequencing and digesting for the restricted
+  zone happens where `putRestrictedGovernanceEvent`'s caller already owns the
+  key and authorization (`governance-event-store.mjs:1442`), so this builder
+  returns the unsealed draft plus the validated payload, matching the
+  "pure builder, caller does I/O" split §7.1 already established for the
+  portable half.
+
+  **Where the two producers call it, and why HGO does not.** GMW: at `install`
+  (`scripts/guard-maintenance-window.mjs`), alongside the portable append
+  §7.4/§11 already schedule for that CLI — reading `subject.reason` and the
+  verified `proof.keyReference`/computed `publicKeySha256`, the same pair
+  `installGuardMaintenanceWindow` already verifies against the trust anchor,
+  never a value this builder re-derives independently. HGO needs no call: §5.2
+  R-3 already establishes HGO exposes no attribution or rationale to move in
+  the first place (digest-only `reasonSha256`, §3.3) — there is nothing for D-1
+  to protect on the HGO side.
+
+  **This CLI wiring is a named dependency, not a step of this document's own
+  inventory.** Both producer CLIs' own portable-side wiring (§7.4/§7.5) is
+  itself not yet landed in this checkout — verified: neither
+  `scripts/guard-maintenance-window.mjs` nor `scripts/guard-human-override.mjs`
+  calls into `guard-authority-ledger-intake.mjs` today, only the pure builder
+  module and its unit tests exist (§11's `lib/guard-authority-ledger-intake.mjs`
+  and `lib/guard-authority-ledger-intake.test.mjs` rows are shipped; its two
+  **script** rows are not). D-1's GMW call site is therefore correctly
+  sequenced *after* that portable-side landing, not before it or in place of
+  it, and is recorded here as a dependency rather than specified as a
+  standalone implementation step this document schedules.
 
 ### 5.5 `policyDigest`: the closed preimage, and why it is not the trust anchor
 
@@ -1328,8 +1508,13 @@ derived row-by-row from §11 rather than summarized:
   to GMW's machine-local storage so that the rationale and the proof no longer sit in
   a record keyed by the intent digest; that touches a module another session owns, it
   is not proposed here, and it would still not remove the structural join.
-- Only if increment 2 (D-1) is accepted: `spec.md` §6.1's closed schema family
-  gains the restricted attribution schema.
+- **Corrected — no longer applies.** This bullet previously read "Only if
+  increment 2 (D-1) is accepted: `spec.md` §6.1's closed schema family gains the
+  restricted attribution schema." §5.4's own re-verification of its cited
+  precedent (`pipeline.human-role-exception-decision.v1`, shipped and absent
+  from `spec.md:278-299`) found the schema family is extended by shipping a
+  validator module and a matching JSON Schema file, not by a §6.1 amendment —
+  so D-1 needs none, and this rebind gains no row for it.
 
 ## 10. Assumptions and pinned dependencies
 

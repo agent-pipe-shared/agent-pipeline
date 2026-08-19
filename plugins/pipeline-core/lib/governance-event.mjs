@@ -164,14 +164,20 @@ function validateEnvelopeShape(value, errors) {
   if (value.digestAlgorithm !== GOVERNANCE_EVENT_DIGEST_ALGORITHM) add(errors, "digest-algorithm");
   if (typeof value.eventId !== "string" || !ID.test(value.eventId)) add(errors, "event-id");
   if (typeof value.idempotencyKey !== "string" || !ID.test(value.idempotencyKey)) add(errors, "idempotency-key");
-  // The human stream carries two decision classes: the plan-era decision and
-  // the bounded role exception. Every other origin stays single-class.
+  // The human stream carries three decision classes: the plan-era decision,
+  // the bounded role exception, and the restricted machine-local attribution
+  // record (GMW/HGO design D-1). Every other origin stays single-class.
   const payloadByOrigin = {
-    human: ["pipeline.human-governance-decision.v1", "pipeline.human-role-exception-decision.v1"],
+    human: ["pipeline.human-governance-decision.v1", "pipeline.human-role-exception-decision.v1", "pipeline.human-decision-attribution.v1"],
     agent: ["pipeline.agent-decision-event.v1"],
     lifecycle: ["pipeline.lifecycle-governance-event.v1"],
   };
   if (!Object.hasOwn(payloadByOrigin, value.origin) || !payloadByOrigin[value.origin].includes(value.payloadSchema)) add(errors, "origin-payload-schema");
+  // D-1's payload carries the two values the portable record structurally
+  // excludes (rationale, trust-anchor pointer), so it is admitted only into
+  // the restricted zone -- never portably, regardless of what the caller
+  // otherwise declares.
+  if (value.payloadSchema === "pipeline.human-decision-attribution.v1" && value.storageProfile !== "restricted-machine-local") add(errors, "attribution-storage-profile");
   if ((value.origin === "human" && value.authorityClass !== "human-authority") || (value.origin !== "human" && value.authorityClass !== "non-authoritative")) add(errors, "origin-authority-class");
   if (typeof value.eventType !== "string" || !EVENT_TYPE.test(value.eventType)) add(errors, "event-type");
   if (![value.occurredAtEpochMs, value.observedAtEpochMs, value.sequence].every((number) => Number.isSafeInteger(number) && number >= 0)) add(errors, "integer-range");

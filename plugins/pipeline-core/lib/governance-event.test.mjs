@@ -140,6 +140,25 @@ test("envelope binds each origin to its payload and cannot collapse authority", 
   assert.equal(validateFocusedEnvelope(eventFixture({ payloadSchema: "pipeline.agent-decision-event.v1" })), false);
 });
 
+test("D-1: pipeline.human-decision-attribution.v1 is admitted only under storageProfile restricted-machine-local", () => {
+  const attributionBase = eventFixture({
+    origin: "human", authorityClass: "human-authority", streamId: "human",
+    payloadSchema: "pipeline.human-decision-attribution.v1",
+  });
+  const portableAttempt = validateGovernanceEventEnvelope(attributionBase, { verifyDigests: false });
+  assert.equal(portableAttempt.valid, false);
+  assert.ok(portableAttempt.errors.includes("attribution-storage-profile"));
+
+  const restricted = validateGovernanceEventEnvelope({
+    ...attributionBase,
+    classification: "restricted",
+    storageProfile: "restricted-machine-local",
+    retentionCompatibility: "machine-local-expiring",
+    disclosureClass: "machine-local-only",
+  }, { verifyDigests: false });
+  assert.ok(!restricted.errors.includes("attribution-storage-profile"), restricted.errors?.join(","));
+});
+
 test("envelope rejects unknown fields and preserves the six exact typed absence states", () => {
   assert.equal(validateFocusedEnvelope({ ...eventFixture(), privatePath: "/home/private" }), false);
   const states = envelope.$defs.typedState.properties.state.enum;

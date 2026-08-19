@@ -24,6 +24,7 @@ import {
   WINDOW_REASON_CODE_UNATTESTED,
   buildAppendIntent,
   buildOverrideDecisions,
+  buildWindowAttributionEvent,
   buildWindowExpiryDecision,
   buildWindowGrantDecision,
   buildWindowRequestDecision,
@@ -34,8 +35,9 @@ import {
   requestDecisionId,
   revokeDecisionId,
 } from "./guard-authority-ledger-intake.mjs";
-import { canonicalSha256, canonicalizeJson } from "./governance-event.mjs";
+import { canonicalSha256, canonicalizeJson, sealGovernanceEvent, validateGovernanceEventEnvelope } from "./governance-event.mjs";
 import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
+import { ATTRIBUTION_TIME_BUCKET_MS, validateHumanDecisionAttribution } from "./human-decision-attribution.mjs";
 import { LIFTABLE_RULE_IDS, MAX_WINDOW_TTL_MS, isLiftableRuleId } from "./guard-maintenance-window.mjs";
 
 // ---------------------------------------------------------------------------------
@@ -666,4 +668,73 @@ test("§7.3 support: a disposition must belong to the request digest and generat
   assert.equal(revoked.policyDigest, grant.policyDigest);
   assert.equal(revoked.ruleDigest, grant.ruleDigest);
   assert.deepEqual(revoked.validity, grant.validity);
+});
+
+// ---------------------------------------------------------------------------------
+// D-1: the restricted machine-local attribution record (design §5.4).
+// ---------------------------------------------------------------------------------
+
+function attributionRequest(overrides = {}) {
+  return {
+    repositoryFingerprint: LEDGER_FINGERPRINT,
+    packageId: "guard-maintenance-window",
+    authorityClass: "product-owner",
+    reasonCode: WINDOW_REASON_CODE_UNATTESTED,
+    rationale: "Lifting GS-6 for the release window.",
+    keyReference: "po-signing-key-1",
+    publicKeySha256: "9".repeat(64),
+    occurredAtEpochMs: INSTALLED_AT_MS,
+    ...overrides,
+  };
+}
+
+test("D-1: buildWindowAttributionEvent produces a shape-valid restricted draft", () => {
+  const draft = buildWindowAttributionEvent(attributionRequest());
+  assert.equal(draft.payloadSchema, "pipeline.human-decision-attribution.v1");
+  assert.equal(draft.storageProfile, "restricted-machine-local");
+  assert.equal(draft.classification, "restricted");
+  assert.equal(draft.retentionCompatibility, "machine-local-expiring");
+  const shape = validateGovernanceEventEnvelope(draft, { verifyDigests: false });
+  assert.equal(shape.valid, true, shape.errors?.join(","));
+  // The payload itself independently satisfies its own closed validator.
+  const payload = validateHumanDecisionAttribution(draft.payload);
+  assert.equal(payload.rationale, "Lifting GS-6 for the release window.");
+});
+
+test("D-1: sealGovernanceEvent turns the draft into a fully valid envelope", () => {
+  const draft = buildWindowAttributionEvent(attributionRequest());
+  const sealed = sealGovernanceEvent(draft);
+  const validated = validateGovernanceEventEnvelope(sealed);
+  assert.equal(validated.valid, true, validated.errors?.join(","));
+});
+
+test("D-1 R-2: no record-level correlator crosses -- correlation/candidate/artifacts are all typed states", () => {
+  const draft = buildWindowAttributionEvent(attributionRequest());
+  for (const key of ["featureId", "packageId", "requestId", "sessionId", "dispatchId", "traceId"]) {
+    assert.deepEqual(draft.correlation[key], { state: "omitted-by-policy" });
+  }
+  assert.deepEqual(draft.candidate, { state: "omitted-by-policy" });
+  assert.deepEqual(draft.artifacts, [{ state: "omitted-by-policy" }]);
+});
+
+test("D-1: eventId/idempotencyKey are fresh random values, never derived from a portable decisionId", () => {
+  const requestDecision = buildWindowRequestDecision(windowRequest());
+  const draft = buildWindowAttributionEvent(attributionRequest());
+  assert.notEqual(draft.idempotencyKey, requestDecision.decisionId);
+  assert.ok(!draft.idempotencyKey.includes(INTENT_SHA256.slice(0, 32)));
+  const second = buildWindowAttributionEvent(attributionRequest());
+  assert.notEqual(draft.idempotencyKey, second.idempotencyKey, "two calls must not collide on identifier");
+});
+
+test("D-1: occurredAtEpochMs is bucketed to day granularity, never left exact", () => {
+  const exactMs = INSTALLED_AT_MS + 12_345; // deliberately not bucket-aligned
+  const draft = buildWindowAttributionEvent(attributionRequest({ occurredAtEpochMs: exactMs }));
+  assert.equal(draft.payload.timeBucketEpochMs % ATTRIBUTION_TIME_BUCKET_MS, 0);
+  assert.notEqual(draft.payload.timeBucketEpochMs, exactMs);
+  assert.equal(draft.payload.timeBucketEpochMs, Math.floor(exactMs / ATTRIBUTION_TIME_BUCKET_MS) * ATTRIBUTION_TIME_BUCKET_MS);
+});
+
+test("D-1: an invalid rationale/packageId fails closed through the payload validator", () => {
+  assert.throws(() => buildWindowAttributionEvent(attributionRequest({ rationale: "" })), (error) => error.code === "HDA-RATIONALE");
+  assert.throws(() => buildWindowAttributionEvent(attributionRequest({ packageId: "not-a-real-package" })), (error) => error.code === "HDA-SHAPE");
 });

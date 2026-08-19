@@ -208,6 +208,22 @@ test("exact idempotency is a zero-write replay while a conflicting key fails clo
   assert.equal(result.eventCount, 1);
 });
 
+test("D-1: an attribution-schema intent cannot reach the portable stream even mislabeled repository-public-safe", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const attempt = intent({
+    payloadSchema: "pipeline.human-decision-attribution.v1",
+    origin: "human", authorityClass: "human-authority", streamId: "human",
+    eventType: "human.attributed",
+    payload: { schema: "pipeline.human-decision-attribution.v1" },
+  });
+  // assertIntent's own storageProfile === "repository-public-safe" requirement
+  // for every portable intent, and governance-event.mjs's new attribution-only-
+  // restricted coherence rule, are mutually exclusive for this schema -- so the
+  // envelope-shape check inside assertIntent fails first, before the human
+  // payload validator ever runs.
+  await assert.rejects(() => append(root, attempt), (error) => error instanceof GovernanceEventStoreError && error.code === "GES-INTENT");
+});
+
 test("agent journal payloads persist only as candidate-bound, closed observational events", async (t) => {
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const payload = { eventId: "agent-decision-1", kind: "assumption", state: "declared", reasonCode: "ASSUMPTION.DECLARED", candidateDigest: canonicalSha256(candidate), relatedHumanDecisionId: null, supersedesEventId: null };

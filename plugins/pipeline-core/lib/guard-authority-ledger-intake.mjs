@@ -20,8 +20,10 @@
  * output. `policyDigest`'s preimage is closed and enumerated below precisely so
  * that property can be verified constructively instead of by blocklist.
  */
+import { randomBytes } from "node:crypto";
 import { canonicalSha256, validateGovernanceEventEnvelope } from "./governance-event.mjs";
 import { validateHumanGovernanceDecision } from "./human-governance-decision.mjs";
+import { ATTRIBUTION_TIME_BUCKET_MS, validateHumanDecisionAttribution } from "./human-decision-attribution.mjs";
 import { LIFTABLE_RULE_IDS, MAX_WINDOW_TTL_MS } from "./guard-maintenance-window.mjs";
 
 /**
@@ -736,4 +738,110 @@ export function buildAppendIntent({
   if (!shape.valid) fail("GAL-INTENT", `the derived append intent is not a valid envelope: ${shape.errors.join(",")}`);
 
   return Object.freeze(intent);
+}
+
+// ---------------------------------------------------------------------------------
+// D-1: the restricted machine-local attribution record (increment 2)
+// Design: §5.4 of the same document.
+// ---------------------------------------------------------------------------------
+
+/**
+ * Pure builder for the restricted attribution record's draft envelope. Design
+ * §5.4: this is the only place a rationale or a trust-anchor pointer is ever
+ * placed into a governance-event envelope, and it is placed only under
+ * `storageProfile: "restricted-machine-local"` -- both governance-event.mjs's
+ * envelope-shape check and governance-event-store.mjs's `assertPortablePayload`
+ * refuse this payload schema on the portable path.
+ *
+ * No I/O, no clock read: `occurredAtEpochMs` is a caller-supplied parameter,
+ * bucketed here (never by the caller) so a finer-grained value cannot reach
+ * the payload by construction error. `eventId`/`idempotencyKey` are fresh
+ * random identifiers -- never derived from the portable decision's
+ * `decisionId` or `intent.sha256` -- because deriving either would smuggle a
+ * record-level correlator back in through the identifier itself, which is
+ * exactly what §5.2's "no identifier scheme" finding rules out one layer up.
+ *
+ * The return value is an **unsealed draft**: `sequence`, `previousEventDigest`,
+ * `payloadDigest` and `eventDigest` are present only as shape-valid
+ * placeholders (mirroring `buildAppendIntent`'s own probe convention above).
+ * The caller must run it through `sealGovernanceEvent` (governance-event.mjs)
+ * before `putRestrictedGovernanceEvent` will accept it -- this module performs
+ * no digesting of its own, matching the "pure builder, caller does the I/O and
+ * the sealing" split §7.1 already established for the portable half.
+ */
+export function buildWindowAttributionEvent({
+  repositoryFingerprint,
+  packageId,
+  authorityClass,
+  reasonCode,
+  rationale,
+  keyReference,
+  publicKeySha256,
+  occurredAtEpochMs,
+} = {}) {
+  requireDigest(repositoryFingerprint, "repositoryFingerprint");
+  requireSafeInteger(occurredAtEpochMs, "occurredAtEpochMs");
+  const timeBucketEpochMs = Math.floor(occurredAtEpochMs / ATTRIBUTION_TIME_BUCKET_MS) * ATTRIBUTION_TIME_BUCKET_MS;
+  const payload = validateHumanDecisionAttribution({
+    schema: "pipeline.human-decision-attribution.v1",
+    packageId,
+    authorityClass: requireAuthorityClass(authorityClass),
+    identityAssurance: "locally-attributed",
+    reasonCode,
+    rationale,
+    keyReference,
+    publicKeySha256,
+    timeBucketEpochMs,
+  });
+
+  const eventId = `evt-attribution-${randomBytes(16).toString("hex")}`;
+  const idempotencyKey = `attribution-${randomBytes(16).toString("hex")}`;
+
+  const draft = {
+    schema: "pipeline.governance-event-envelope.v1",
+    payloadSchema: "pipeline.human-decision-attribution.v1",
+    canonicalization: "RFC8785",
+    digestAlgorithm: "sha-256",
+    eventId,
+    idempotencyKey,
+    origin: "human",
+    authorityClass: "human-authority",
+    eventType: "human.attributed",
+    occurredAtEpochMs,
+    observedAtEpochMs: occurredAtEpochMs,
+    timeAssurance: "locally-observed",
+    repositoryFingerprint,
+    sourceUri: `urn:pipeline:repository:${repositoryFingerprint}`,
+    streamId: "human",
+    sequence: 1,
+    previousEventDigest: null,
+    correlation: {
+      featureId: OMITTED_BY_POLICY,
+      packageId: OMITTED_BY_POLICY,
+      requestId: OMITTED_BY_POLICY,
+      sessionId: OMITTED_BY_POLICY,
+      dispatchId: OMITTED_BY_POLICY,
+      traceId: OMITTED_BY_POLICY,
+    },
+    candidate: OMITTED_BY_POLICY,
+    artifacts: [OMITTED_BY_POLICY],
+    policy: {
+      policyDigest: UNAVAILABLE,
+      configurationDigest: UNAVAILABLE,
+      capturePolicyDigest: UNAVAILABLE,
+      redactionPolicyDigest: UNAVAILABLE,
+    },
+    classification: "restricted",
+    storageProfile: "restricted-machine-local",
+    retentionCompatibility: "machine-local-expiring",
+    disclosureClass: "machine-local-only",
+    payloadDigest: "0".repeat(64),
+    eventDigest: "0".repeat(64),
+    payload,
+  };
+
+  const shape = validateGovernanceEventEnvelope(draft, { verifyDigests: false });
+  if (!shape.valid) fail("GAL-INTENT", `the derived attribution draft is not a valid envelope: ${shape.errors.join(",")}`);
+
+  return Object.freeze(draft);
 }

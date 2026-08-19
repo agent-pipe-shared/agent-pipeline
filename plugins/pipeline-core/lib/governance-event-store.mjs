@@ -349,6 +349,15 @@ function assertPortablePayload(event, policy) {
   const stream = policy.streams.find((entry) => entry?.origin === event.origin);
   if (!stream || stream.storageProfile !== "repository-public-safe" || stream.personalIdentifiability !== "prohibited" || stream.contextualIdentifiability !== "prohibited") fail("GES-CAPTURE-DENIED", "Capture policy denies this portable event.");
   if (event.origin === "human") {
+    // D-1's restricted attribution record can never reach this function at all:
+    // assertIntent (the sole caller's precondition, governance-event-store.mjs:408)
+    // already requires storageProfile === "repository-public-safe" for every
+    // portable intent, and governance-event.mjs's envelope-shape check requires
+    // the attribution schema to declare storageProfile === "restricted-machine-local".
+    // The two are mutually exclusive, so an attribution-schema intent fails
+    // GES-INTENT before assertPortablePayload ever runs; no guard is added here
+    // (design §5.4 traces this and corrects an earlier draft that assumed a
+    // second edit was needed).
     // The envelope's declared payload schema selects the validator, so a role
     // exception cannot be admitted through the plan-decision contract.
     const roleException = event.payloadSchema === "pipeline.human-role-exception-decision.v1";
