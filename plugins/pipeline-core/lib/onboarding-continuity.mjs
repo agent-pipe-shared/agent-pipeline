@@ -5178,7 +5178,14 @@ export function applyOnboardingIntakeDesignQuestions({
       const base = observed.value;
       if (base.consent === null) fail("INTAKE-DESIGN-QUESTIONS-CONSENT-REQUIRED", "intake design questions require consent to already be recorded");
       if (["ready-to-generate", "generated", "bound"].includes(base.transactionState)) {
-        if (base.designQuestions !== null && canonicalJson(base.designQuestions) === canonicalJson(candidateEntries)) return null;
+        // Compare question/answer content only, never `answeredAt`: a genuine
+        // replay call is issued at a DIFFERENT wall-clock time than the
+        // original (a fresh `nowIso` per call, by construction), so comparing
+        // the full entry -- timestamp included -- would make every real
+        // replay look like a content change and wrongly refuse it.
+        const sameContent = (a, b) => a.length === b.length
+          && a.every((entry, index) => entry.question === b[index].question && entry.answer === b[index].answer);
+        if (base.designQuestions !== null && sameContent(base.designQuestions, candidateEntries)) return null;
         fail("INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED", "the one bundled design-question round was already answered with different content");
       }
       if (base.transactionState !== "design-questions-pending") {

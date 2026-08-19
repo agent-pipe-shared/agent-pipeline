@@ -29,7 +29,14 @@ import { mkdtempTestScratch } from "./test-tmpdir.mjs";
 
 import {
   KICKOFF_FAULT_STAGES,
+  INTAKE_CHECKPOINT_SCHEMA,
+  INTAKE_CONSENT_APPLY_SCHEMA,
+  INTAKE_CAPTURE_APPLY_SCHEMA,
+  INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA,
   applyOnboardingContinuityRepair,
+  applyOnboardingIntakeCapture,
+  applyOnboardingIntakeConsent,
+  applyOnboardingIntakeDesignQuestions,
   applyOnboardingKickoff,
   applyOnboardingKickoffPromotion,
   applyOnboardingKickoffPromotionCleanupRecovery,
@@ -40,11 +47,13 @@ import {
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
   planOnboardingKickoffPromotionCleanupRecovery,
+  readOnboardingIntakeCheckpoint,
   readOnboardingSessionCleanupBinding,
   reconstructOnboardingKickoffPlan,
   reconstructOnboardingKickoffPromotionPlan,
   releaseOnboardingSessionCleanup,
   replaceNextActionSection,
+  resolveIntakeCheckpointPaths,
   syncStateMdNextAction,
   validateKickoffGoal,
 } from "./onboarding-continuity.mjs";
@@ -2450,6 +2459,290 @@ check("syncStateMdNextAction: is a no-op write when the rendered text already ma
   const result = syncStateMdNextAction(root, state);
   assert.equal(result.ok, true);
   assert.equal(result.changed, false);
+});
+
+// ---------------------------------------------------------------------------
+// Intake checkpoint (Wave 4 onboarding coordinator, steps 1-3 -- NVA-W4-COORD-1
+// Batch A: happy-path / precondition-and-error-path / idempotency coverage
+// for the three step-1/2/3 apply functions, plus one validateIntakeCheckpoint
+// round-trip test (validateIntakeCheckpoint itself is not exported; exercised
+// indirectly through readOnboardingIntakeCheckpoint, which calls it on every
+// read). Batch B (crash-injection at each fault point + the CAS-drift test)
+// is a separate follow-up dispatch, deliberately not attempted here.
+
+function expectIntakeError(code, fn) {
+  assert.throws(fn, (error) => error?.code === code);
+}
+
+function grantIntakeConsent(root) {
+  return applyOnboardingIntakeConsent({ rootDir: root, granted: true, activate: true });
+}
+
+function captureIntakeMaterial(root) {
+  grantIntakeConsent(root);
+  return applyOnboardingIntakeCapture({ rootDir: root, text: "requirement material", activate: true });
+}
+
+check("intake checkpoint: validateIntakeCheckpoint round-trips through readOnboardingIntakeCheckpoint", () => {
+  const root = fixture("intake-validate-roundtrip");
+  const applied = applyOnboardingIntakeConsent({
+    rootDir: root,
+    granted: true,
+    gitAuthor: { name: "Jane PO", email: "jane@example.com" },
+    language: "en",
+    profile: "feature",
+    activate: true,
+  });
+  assert.equal(applied.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(applied.mutated, true);
+  const observed = readOnboardingIntakeCheckpoint({ rootDir: root });
+  assert.equal(observed.status, "present");
+  assert.equal(observed.value.schema, INTAKE_CHECKPOINT_SCHEMA);
+  assert.equal(observed.value.revision, 0);
+  assert.equal(observed.value.transactionState, "collecting");
+  assert.deepEqual(observed.value.consent, { granted: true, at: observed.value.createdAt });
+  assert.deepEqual(observed.value.values, {
+    gitAuthor: { name: "Jane PO", email: "jane@example.com" },
+    language: "en",
+    profile: "feature",
+  });
+
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  const tampered = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
+  tampered.revision = 7; // contentSha256 now stale -- self-digest must catch this
+  writeFileSync(paths.checkpoint, `${JSON.stringify(tampered, null, 2)}\n`);
+  expectIntakeError("INTAKE-CHECKPOINT-MALFORMED", () => readOnboardingIntakeCheckpoint({ rootDir: root }));
+});
+
+check("applyOnboardingIntakeConsent: happy path grants consent and fills all three values in one bundled ask", () => {
+  const root = fixture("intake-consent-happy");
+  const result = applyOnboardingIntakeConsent({
+    rootDir: root,
+    granted: true,
+    gitAuthor: { name: "A B", email: "a@b.example" },
+    language: "de",
+    profile: "mini",
+    activate: true,
+  });
+  assert.equal(result.schema, INTAKE_CONSENT_APPLY_SCHEMA);
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.consent.granted, true);
+  assert.deepEqual(result.checkpoint.values, {
+    gitAuthor: { name: "A B", email: "a@b.example" },
+    language: "de",
+    profile: "mini",
+  });
+});
+
+check("applyOnboardingIntakeConsent: activation is required", () => {
+  const root = fixture("intake-consent-activation");
+  expectIntakeError("INTAKE-CONSENT-ACTIVATION-REQUIRED", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, activate: false,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: requires explicit affirmative consent", () => {
+  const root = fixture("intake-consent-required");
+  expectIntakeError("INTAKE-CONSENT-REQUIRED", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: false, activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: rejects an invalid candidate git author", () => {
+  const root = fixture("intake-consent-bad-author");
+  expectIntakeError("INTAKE-CONSENT-INVALID-GIT-AUTHOR", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, gitAuthor: { name: "", email: "a@b.example" }, activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: rejects an invalid candidate language", () => {
+  const root = fixture("intake-consent-bad-language");
+  expectIntakeError("INTAKE-CONSENT-INVALID-LANGUAGE", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, language: "fr", activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: rejects an invalid candidate profile", () => {
+  const root = fixture("intake-consent-bad-profile");
+  expectIntakeError("INTAKE-CONSENT-INVALID-PROFILE", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, profile: "huge", activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeConsent: idempotent re-run only fills fields still null, never overwrites an answered one", () => {
+  const root = fixture("intake-consent-idempotent");
+  const first = applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, gitAuthor: { name: "First", email: "first@example.com" }, activate: true,
+  });
+  assert.equal(first.mutated, true);
+  assert.equal(first.checkpoint.values.language, null);
+  assert.equal(first.checkpoint.values.profile, null);
+
+  const second = applyOnboardingIntakeConsent({
+    rootDir: root,
+    granted: true,
+    gitAuthor: { name: "Second", email: "second@example.com" }, // already answered -- must be ignored
+    language: "en",
+    profile: "epic",
+    activate: true,
+  });
+  assert.equal(second.mutated, true);
+  assert.deepEqual(second.checkpoint.values, {
+    gitAuthor: { name: "First", email: "first@example.com" },
+    language: "en",
+    profile: "epic",
+  });
+  assert.equal(second.checkpoint.consent.at, first.checkpoint.consent.at);
+  assert.equal(second.checkpoint.revision, first.checkpoint.revision + 1);
+
+  const third = applyOnboardingIntakeConsent({
+    rootDir: root,
+    granted: true,
+    gitAuthor: { name: "Third", email: "third@example.com" },
+    language: "de",
+    profile: "mini",
+    activate: true,
+  });
+  assert.equal(third.mutated, false, "every field is already answered -- a third call is a true no-op");
+  assert.deepEqual(third.checkpoint.values, second.checkpoint.values);
+  assert.equal(third.checkpoint.revision, second.checkpoint.revision);
+});
+
+check("applyOnboardingIntakeCapture: happy path appends one evidence file and one materialInput entry", () => {
+  const root = fixture("intake-capture-happy");
+  grantIntakeConsent(root);
+  const result = applyOnboardingIntakeCapture({
+    rootDir: root, text: "The PO's real requirement text.", activate: true,
+  });
+  assert.equal(result.schema, INTAKE_CAPTURE_APPLY_SCHEMA);
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.materialInput.length, 1);
+  const entry = result.checkpoint.materialInput[0];
+  assert.equal(entry.evidencePath, `intake-checkpoint-evidence/${entry.sha256}.txt`);
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  const evidenceBytes = readFileSync(join(paths.evidenceDirectory, `${entry.sha256}.txt`));
+  assert.equal(evidenceBytes.toString("utf8"), "The PO's real requirement text.");
+  assert.equal(result.checkpoint.transactionState, "design-questions-pending");
+});
+
+check("applyOnboardingIntakeCapture: activation is required", () => {
+  const root = fixture("intake-capture-activation");
+  grantIntakeConsent(root);
+  expectIntakeError("INTAKE-CAPTURE-ACTIVATION-REQUIRED", () => applyOnboardingIntakeCapture({
+    rootDir: root, text: "text", activate: false,
+  }));
+});
+
+check("applyOnboardingIntakeCapture: rejects empty text", () => {
+  const root = fixture("intake-capture-empty");
+  grantIntakeConsent(root);
+  expectIntakeError("INTAKE-CAPTURE-EMPTY", () => applyOnboardingIntakeCapture({
+    rootDir: root, text: "", activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeCapture: rejects a chunk over the per-chunk byte limit", () => {
+  const root = fixture("intake-capture-too-large");
+  grantIntakeConsent(root);
+  expectIntakeError("INTAKE-CAPTURE-TOO-LARGE", () => applyOnboardingIntakeCapture({
+    rootDir: root, text: "a".repeat(1_000_001), activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeCapture: requires consent to already be recorded", () => {
+  const root = fixture("intake-capture-consent-required");
+  expectIntakeError("INTAKE-CAPTURE-CONSENT-REQUIRED", () => applyOnboardingIntakeCapture({
+    rootDir: root, text: "text before consent", activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeCapture: advances transactionState from collecting to design-questions-pending only on the first capture", () => {
+  const root = fixture("intake-capture-transition");
+  grantIntakeConsent(root);
+  const first = applyOnboardingIntakeCapture({ rootDir: root, text: "chunk one", activate: true });
+  assert.equal(first.checkpoint.transactionState, "design-questions-pending");
+  const second = applyOnboardingIntakeCapture({ rootDir: root, text: "chunk two", activate: true });
+  assert.equal(second.checkpoint.transactionState, "design-questions-pending");
+  assert.equal(second.checkpoint.materialInput.length, 2);
+});
+
+check("applyOnboardingIntakeCapture: an idempotent duplicate-content capture converges without a second entry", () => {
+  const root = fixture("intake-capture-duplicate");
+  grantIntakeConsent(root);
+  const first = applyOnboardingIntakeCapture({ rootDir: root, text: "same content", activate: true });
+  assert.equal(first.mutated, true);
+  const second = applyOnboardingIntakeCapture({ rootDir: root, text: "same content", activate: true });
+  assert.equal(second.mutated, false);
+  assert.equal(second.checkpoint.materialInput.length, 1);
+});
+
+check("applyOnboardingIntakeDesignQuestions: happy path records the bundled round and flips to ready-to-generate", () => {
+  const root = fixture("intake-design-questions-happy");
+  captureIntakeMaterial(root);
+  const result = applyOnboardingIntakeDesignQuestions({
+    rootDir: root,
+    answers: [{ question: "What is the primary user?", answer: "Internal operators." }],
+    activate: true,
+  });
+  assert.equal(result.schema, INTAKE_DESIGN_QUESTIONS_APPLY_SCHEMA);
+  assert.equal(result.mutated, true);
+  assert.equal(result.checkpoint.transactionState, "ready-to-generate");
+  assert.equal(result.checkpoint.designQuestions.length, 1);
+  assert.equal(result.checkpoint.designQuestions[0].question, "What is the primary user?");
+});
+
+check("applyOnboardingIntakeDesignQuestions: activation is required", () => {
+  const root = fixture("intake-design-questions-activation");
+  captureIntakeMaterial(root);
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-ACTIVATION-REQUIRED", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q", answer: "A" }], activate: false,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: rejects an empty answer set", () => {
+  const root = fixture("intake-design-questions-empty");
+  captureIntakeMaterial(root);
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-EMPTY", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [], activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: requires at least one captured material-input chunk first", () => {
+  const root = fixture("intake-design-questions-precondition");
+  grantIntakeConsent(root);
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-PRECONDITION", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q", answer: "A" }], activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: requires an existing checkpoint at all", () => {
+  const root = fixture("intake-design-questions-no-checkpoint");
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-PRECONDITION", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q", answer: "A" }], activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: refuses a different answer set once the round is already answered", () => {
+  const root = fixture("intake-design-questions-already-answered");
+  captureIntakeMaterial(root);
+  applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q1", answer: "A1" }], activate: true,
+  });
+  expectIntakeError("INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED", () => applyOnboardingIntakeDesignQuestions({
+    rootDir: root, answers: [{ question: "Q2", answer: "A2" }], activate: true,
+  }));
+});
+
+check("applyOnboardingIntakeDesignQuestions: an exact replay of the same already-answered round is a no-op", () => {
+  const root = fixture("intake-design-questions-replay");
+  captureIntakeMaterial(root);
+  const answers = [{ question: "Q1", answer: "A1" }];
+  const first = applyOnboardingIntakeDesignQuestions({ rootDir: root, answers, activate: true });
+  assert.equal(first.mutated, true);
+  const replay = applyOnboardingIntakeDesignQuestions({ rootDir: root, answers, activate: true });
+  assert.equal(replay.mutated, false);
+  assert.equal(replay.checkpoint.transactionState, "ready-to-generate");
+  assert.equal(replay.checkpoint.revision, first.checkpoint.revision);
 });
 
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);
