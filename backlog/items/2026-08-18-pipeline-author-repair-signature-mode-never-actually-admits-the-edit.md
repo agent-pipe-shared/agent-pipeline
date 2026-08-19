@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 77aef463aa4a80d1ad153f901873630747ee21f0
+closure_evidence: backlog/items/2026-08-18-pipeline-author-repair-signature-mode-never-actually-admits-the-edit.md
 source: "Elephant, 2026-08-18, live during the OT09 (guard-testpath-override.test.mjs line 213) repair ceremony for the Phoenix reconcile-approval port regression (see backlog/items/2026-08-18-critical-human-proof-policy-lacks-the-reconcile-approval-generalization.md and docs/state.md's 2026-08-18 entry). A full `pipeline-author-repair` signature ceremony was walked end to end with the PO: plan, prepare-authorization, emit-signature-digest, PO sign-intent (succeeded), authorize-by-signature (succeeded, capability armed, status: armed, consumedAt: null, correct authorSourceRoot recorded). Retrying the byte-identical original Edit twice against a confirmed-clean working tree still returned the exact same TP-7/author-repair-required denial as if the capability had never been armed. The capability expired unused (DEFAULT_TTL_MS 30 min) before a root cause was found; OT09 is still red as of this entry."
 ---
 

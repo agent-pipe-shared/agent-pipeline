@@ -5,6 +5,10 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 77aef463aa4a80d1ad153f901873630747ee21f0
+closure_evidence: backlog/items/2026-08-18-hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs.md
 source: "PO, 2026-08-18, live during two TP-3 human-guard-override ceremonies run this session (registering worktree-create-tests / session-cleanup-owner-nonce-tests in verify.mjs). The PO ran all four CLI steps (plan handed to the agent; prepare-authorization, emit-signature-digest, sign-intent, authorize-by-signature run by the PO) and objected explicitly: 'wiederspricht klar meinen design vorgaben nur so wenig PO gates wie wirklich nötig und nur der teil mit dem externen key ist der echte schutz'."
 ---
 

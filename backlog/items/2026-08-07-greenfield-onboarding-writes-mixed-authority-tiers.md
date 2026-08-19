@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-07
 due: 2026-08-21
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 77aef463aa4a80d1ad153f901873630747ee21f0
+closure_evidence: backlog/items/2026-08-07-greenfield-onboarding-writes-mixed-authority-tiers.md
 source: "PO, live greenfield onboarding of an empty repository with the Claude runner, 2026-08-07: 'da liegen trotz frischem repo wieder dateien auf die sich die pipeline bezieht im .claude ordner und nicht in .arbetheon'."
 ---
 

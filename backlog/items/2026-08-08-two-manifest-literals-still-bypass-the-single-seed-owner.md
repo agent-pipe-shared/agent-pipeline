@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 77aef463aa4a80d1ad153f901873630747ee21f0
+closure_evidence: backlog/items/2026-08-08-two-manifest-literals-still-bypass-the-single-seed-owner.md
 source: "Self-reported by the implementing dispatch of commit 7a99a18 and independently confirmed as finding F7 of the second Critic round on the 2026-08-08 hardening block."
 ---
 
