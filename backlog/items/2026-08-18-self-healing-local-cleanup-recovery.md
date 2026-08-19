@@ -178,3 +178,33 @@ Verification: `session-cleanup-recovery.test.mjs` (8/8, was 5/5),
 
 Commits (full sequence): 3d5fda6d, 9d8cd787 (unrelated sibling-commit
 regression fix, not this item's own defect), 94a020d4, 1ebf1004.
+
+## Implementation status, 2026-08-19 round 3 (F4/F5 fixed, dispatch NVA-W4-F4F5)
+
+**F4 (fixed):** `partialCleanupRecoveryResult()`'s catch block now checks
+`error instanceof SessionCleanupRecoveryError` and surfaces the typed
+error's own `code`/`message` when true, falling back to the previous
+generic message only for a genuinely untyped failure — the human
+escalation path no longer loses diagnostic information that was
+already available.
+
+**F5 (fixed, QG-06):** `backupExternalRetirementManifest`'s path
+construction was extracted into its own `externalRetirementManifestPath()`
+function (exported via `sessionCleanupRecoveryInternals` for test access)
+and pinned by a new regression test: the test triggers a real external
+retirement through `worktree-lifecycle.mjs`'s own public API, discovers
+where the manifest actually landed on disk (no hardcoded literal), and
+asserts `externalRetirementManifestPath()`'s reconstruction matches
+exactly — a future drift in `worktree-lifecycle.mjs`'s real
+`cleanupManifestPath()` convention would now be caught, not silently
+disable the safety net.
+
+Verification: `session-cleanup-recovery.test.mjs` (9/9, was 8/8, +1 new
+F5 test), `project-onboarding-v3.test.mjs` (128/128, unaffected),
+`check-consumer-safe-paths.test.mjs` (9/9) all pass. Commit `dfb46b50`.
+
+**Remaining, still open:** the `quarantine-private-receipt` test-coverage
+gap (F2's still-uncovered piece, needs a coordinator-close-shaped fixture)
+and `backupOnboardingPrivateState`'s silent-skip of non-regular directory
+entries (a separate, smaller, already-disclosed F3 sibling gap, not
+touched by any round so far). Status stays `open` for these two.
