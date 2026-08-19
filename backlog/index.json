@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ef7ad1ec3f21020f51e97b13065eeecf4090b7d26a26598fdac3fc6cac690053"
+    "transitionHead": "908a5a2137f324340a948c732ea56a28d2df9270060b9e350f1f8527cb1bcdc1"
   },
   "counts": {
-    "open": 10,
+    "open": 9,
     "in_progress": 25,
-    "closed": 120,
+    "closed": 121,
     "rejected": 1,
     "deferred": 11
   },
@@ -703,11 +703,15 @@
     },
     {
       "id": "pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Discovered incidentally by PHX-WP-GMW-LEDGER-EMISSION while writing regression tests for the install/close ledger-emission wiring; disclosed in that dispatch's report and in backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md's progress note, 2026-08-19."
+      "source": "Discovered incidentally by PHX-WP-GMW-LEDGER-EMISSION while writing regression tests for the install/close ledger-emission wiring; disclosed in that dispatch's report and in backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md's progress note, 2026-08-19.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "66240d8b302537803e7ba1c401b435d1765e757b",
+      "closureEvidence": "backlog/items/2026-08-19-gmw-prepare-cli-authorship-mode-invalid-on-every-call.md"
     },
     {
       "id": "pipeline.governance-product-verify-suites-deregistered",

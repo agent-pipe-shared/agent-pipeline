@@ -69,7 +69,7 @@
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | open | requirement | pipeline | 2026-08-07 | — |
-| pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gs6-blocks-inert-plugin-metadata-in-self-hosted-sessions | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | closed | defect | pipeline | 2026-07-29 | — |
@@ -175,8 +175,8 @@
 
 ## Counts
 
-- open: 10
+- open: 9
 - in_progress: 25
-- closed: 120
+- closed: 121
 - rejected: 1
 - deferred: 11
