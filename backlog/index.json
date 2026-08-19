@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "388c90bdef75e3602b0d4d0f4303c9635181ee5ac11da57518bfd89d9d5d367d"
+    "transitionHead": "a48805b6d2dd18877b7b09a337fa35144998302c80a89be1f9feb6fc4dd58eb1"
   },
   "counts": {
-    "open": 69,
+    "open": 66,
     "in_progress": 7,
-    "closed": 219
+    "closed": 222
   },
   "items": [
     {
@@ -1853,11 +1853,15 @@
     },
     {
       "id": "pipeline.no-governed-directory-contract",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08: 'uns fehlt da noch eine art adr die die verzeichnisstrukturen besser hart vorgibt und definiert was wo hin gehört - agenten neigen bei jeder neuen session dazu neue strukturen zu erfinden. das muss die pipeline steuern.' Five corroborating instances from that same night are recorded below."
+      "source": "PO, 2026-08-08: 'uns fehlt da noch eine art adr die die verzeichnisstrukturen besser hart vorgibt und definiert was wo hin gehört - agenten neigen bei jeder neuen session dazu neue strukturen zu erfinden. das muss die pipeline steuern.' Five corroborating instances from that same night are recorded below.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "ebc6ea4c238f12aa8e4b0050b0c0ec4829a9d18a",
+      "closureEvidence": "backlog/items/2026-08-08-no-governed-directory-contract-so-every-session-invents-one.md"
     },
     {
       "id": "pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing",
@@ -2924,11 +2928,15 @@
     },
     {
       "id": "pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "PO, 2026-08-17, mid-candidate-stamp: 'wundere mich warum die pipeline immer noch so viel tmp nutzt obwohl wir dafür eigentlich scratch erfunden haben' — asked after this session's local /tmp filled to 100% inode usage (1,038,060 of 1,048,576) and started making `git` itself fail with ENOSPC, blocking work until the PO manually remounted tmpfs with a higher inode count and cleared stale entries."
+      "source": "PO, 2026-08-17, mid-candidate-stamp: 'wundere mich warum die pipeline immer noch so viel tmp nutzt obwohl wir dafür eigentlich scratch erfunden haben' — asked after this session's local /tmp filled to 100% inode usage (1,038,060 of 1,048,576) and started making `git` itself fail with ENOSPC, blocking work until the PO manually remounted tmpfs with a higher inode count and cleared stale entries.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "ebc6ea4c238f12aa8e4b0050b0c0ec4829a9d18a",
+      "closureEvidence": "backlog/items/2026-08-17-test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention.md"
     },
     {
       "id": "pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source",
@@ -3049,11 +3057,15 @@
     },
     {
       "id": "pipeline.unregistered-suite-is-red-and-invisible-to-verify",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "Found incidentally during the 0.5.3 candidate work, 2026-08-07, while looking for something else. Re-confirmed by running the suite directly on candidate d4887b7."
+      "source": "Found incidentally during the 0.5.3 candidate work, 2026-08-07, while looking for something else. Re-confirmed by running the suite directly on candidate d4887b7.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "ebc6ea4c238f12aa8e4b0050b0c0ec4829a9d18a",
+      "closureEvidence": "backlog/items/2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md"
     },
     {
       "id": "pipeline.vendored-dispatch-templates-drift-from-canon",

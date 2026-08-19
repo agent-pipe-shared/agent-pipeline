@@ -173,7 +173,7 @@
 | pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | closed | workflow-improvement | pipeline | 2026-08-06 | — |
-| pipeline.no-governed-directory-contract | open | workflow-improvement | pipeline | 2026-08-08 | — |
+| pipeline.no-governed-directory-contract | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.no-pre-dispatch-check-catches-a-model-deviating-from-configured-routing | open | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.no-rename-path-for-a-feature-id-continuity-already-fixed | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.no-sanctioned-way-to-start-over | closed | defect | pipeline | 2026-08-08 | — |
@@ -269,7 +269,7 @@
 | pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.temp-directories-leak-until-the-filesystem-refuses-every-write | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.test-path-guard-blocks-the-briefed-edit-and-offers-no-route | open | defect | pipeline | 2026-08-08 | — |
-| pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | open | workflow-improvement | pipeline | 2026-08-17 | — |
+| pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | closed | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -281,7 +281,7 @@
 | pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.unified-human-authorization-ux | open | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.universal-human-command-renderer | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.unregistered-suite-is-red-and-invisible-to-verify | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.unregistered-suite-is-red-and-invisible-to-verify | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.vendored-dispatch-templates-drift-from-canon | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.verify-authorship-defaults-to-source-markers-not-behavior | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.verify-evidence-has-no-producer | closed | defect | pipeline | 2026-08-08 | — |
@@ -303,6 +303,6 @@
 
 ## Counts
 
-- open: 69
+- open: 66
 - in_progress: 7
-- closed: 219
+- closed: 222
