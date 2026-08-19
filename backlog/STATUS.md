@@ -31,7 +31,7 @@
 | pipeline.backlog-delivery-status-reconciliation | closed | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
 | pipeline.backlog-ledger-baseline-migration-commit-unreachable | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.backlog-plan-writers-skip-drift-classification | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.backlog-plan-writers-skip-drift-classification | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.backlog-status-drifts-from-code-across-compaction-with-no-hardening | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | closed | workflow-improvement | pipeline | 2026-08-11 | — |
@@ -180,7 +180,7 @@
 | pipeline.nothing-connects-an-acceptance-criterion-to-a-check-that-runs | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.observation-governance-bootstrap-false-positives-on-vendor-synced-consumer-projects | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.observation-intake-document-governance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | closed | defect | pipeline | 2026-08-07 | — |
@@ -226,7 +226,7 @@
 | pipeline.push-release-flow-unusable-for-third-party-adopters | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
-| pipeline.reconcile-backlog-ledger-evidence-commit-predates-referenced-file | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.reconcile-backlog-ledger-evidence-commit-predates-referenced-file | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger | open | defect | pipeline | 2026-07-27 | — |
 | pipeline.recovery-preview-callback-attestation | closed | defect | pipeline | 2026-07-20 | — |
 | pipeline.regulated-document-hooks | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -301,6 +301,6 @@
 
 ## Counts
 
-- open: 71
+- open: 68
 - in_progress: 7
-- closed: 215
+- closed: 218

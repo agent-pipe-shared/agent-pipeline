@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4d1140e8d86e1545a0f877e95da49dabdba44a83e14a8bfaf63a8a323d5becb4"
+    "transitionHead": "0196d44b077b5098eea818571228df9205cbfb14037b862b70144c3958d5fe59"
   },
   "counts": {
-    "open": 71,
+    "open": 68,
     "in_progress": 7,
-    "closed": 215
+    "closed": 218
   },
   "items": [
     {
@@ -295,11 +295,15 @@
     },
     {
       "id": "pipeline.backlog-plan-writers-skip-drift-classification",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "self-observation during Wave-3 dispatches NVA-W3-R4E/R4F, 2026-08-18 (Nova A backlog finalization sprint)"
+      "source": "self-observation during Wave-3 dispatches NVA-W3-R4E/R4F, 2026-08-18 (Nova A backlog finalization sprint)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "5e34c0b55321d2332eec641c1e881e6bd73fe5d3",
+      "closureEvidence": "backlog/items/2026-08-18-backlog-plan-writers-skip-drift-classification.md"
     },
     {
       "id": "pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values",
@@ -1926,11 +1930,15 @@
     },
     {
       "id": "pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Live incident, 2026-08-18, this session: setting project/pipeline.json's `handover` key to the ADR-0066-Decision-5-sanctioned `{ path, maxBytes }` object shape (already fully supported by handover-rotate.mjs/lib/handover-rotation.mjs) dropped the session into an unrecoverable continuity-observation-unavailable readiness class, blocking every Edit/Write/mutating-Bash tool call. Recovered only via an out-of-session `! git checkout -- project/pipeline.json` run by the PO directly (bypassing the tool-call hook chain), since even the guard's own suggested recovery command was itself blocked by the same gate."
+      "source": "Live incident, 2026-08-18, this session: setting project/pipeline.json's `handover` key to the ADR-0066-Decision-5-sanctioned `{ path, maxBytes }` object shape (already fully supported by handover-rotate.mjs/lib/handover-rotation.mjs) dropped the session into an unrecoverable continuity-observation-unavailable readiness class, blocking every Edit/Write/mutating-Bash tool call. Recovered only via an out-of-session `! git checkout -- project/pipeline.json` run by the PO directly (bypassing the tool-call hook chain), since even the guard's own suggested recovery command was itself blocked by the same gate.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "5e34c0b55321d2332eec641c1e881e6bd73fe5d3",
+      "closureEvidence": "backlog/items/2026-08-18-onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string.md"
     },
     {
       "id": "pipeline.onboarding-does-not-ignore-the-scratch-directory-it-mandates",
@@ -2460,11 +2468,15 @@
     },
     {
       "id": "pipeline.reconcile-backlog-ledger-evidence-commit-predates-referenced-file",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Critic review of Wave-3 diff (dispatch: T1 guardrail-tier, functional-equivalent-read-only, opus), 2026-08-18, finding F4"
+      "source": "Critic review of Wave-3 diff (dispatch: T1 guardrail-tier, functional-equivalent-read-only, opus), 2026-08-18, finding F4",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "5e34c0b55321d2332eec641c1e881e6bd73fe5d3",
+      "closureEvidence": "backlog/items/2026-08-18-reconcile-backlog-ledger-evidence-commit-predates-referenced-file.md"
     },
     {
       "id": "pipeline.recovery-preview-ack-unstable-getter-poisons-replay-ledger",
