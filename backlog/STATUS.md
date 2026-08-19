@@ -7,7 +7,7 @@
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0047-numbering-collision | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
@@ -303,6 +303,6 @@
 
 ## Counts
 
-- open: 52
+- open: 51
 - in_progress: 7
-- closed: 236
+- closed: 237

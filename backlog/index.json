@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f5313bfe4913f4c47b99f75dff05e728c15e28fb5f47aec9e0fe33385e0bff46"
+    "transitionHead": "b7a6464c039a78f505da8daa4bf6b8f8f64cc38627b41cdf5e1378238b13c37a"
   },
   "counts": {
-    "open": 52,
+    "open": 51,
     "in_progress": 7,
-    "closed": 236
+    "closed": 237
   },
   "items": [
     {
@@ -37,11 +37,15 @@
     },
     {
       "id": "pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Nova A Slice A7 comprehensive gate Critic review (continuation dispatch), 2026-08-17, findings F3 (major) and F4 (minor). Both are documentation/spec-conformance questions deliberately NOT resolved unilaterally by the Elephant, per spec.md's own rule that a contradiction fails closed to the applicable human gate rather than being silently narrowed."
+      "source": "Nova A Slice A7 comprehensive gate Critic review (continuation dispatch), 2026-08-17, findings F3 (major) and F4 (minor). Both are documentation/spec-conformance questions deliberately NOT resolved unilaterally by the Elephant, per spec.md's own rule that a contradiction fails closed to the applicable human gate rather than being silently narrowed.",
+      "closedAt": "2026-08-19T11:39:04Z",
+      "closureRepository": "self",
+      "closureCommit": "fe645b8290de651f48f0a638db1841eb15915481",
+      "closureEvidence": "backlog/items/2026-08-17-a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question.md"
     },
     {
       "id": "pipeline.absent-runner-flag-silently-defaults-to-codex",
