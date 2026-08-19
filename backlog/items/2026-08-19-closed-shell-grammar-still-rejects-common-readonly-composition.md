@@ -97,10 +97,16 @@ closed.
 
 ## Triage
 
-Not yet triaged — logged same-session per the PO's live question. Sequencing
-note: this session currently has an in-flight Critic delta review and pending
-implementation dispatches for the HGO fail-closed-arming fix; this item
-should not be picked up mid-flight alongside that guardrail work (avoid
-running two independent guard-editing dispatches against overlapping
-`guard-*.mjs` machinery concurrently) — natural next item once the current
-HGO batch lands.
+- **Decision:** Accepted — proposal direction 1-3 adopted as scoped (a small
+  explicit allowlist of read-only `&&`-chainable commands plus trailing
+  `2>/dev/null`/`2>&1` on an already-admitted command, every existing
+  fail-closed guarantee preserved, closed fixtures proving both admit and
+  still-refuse directions).
+- **Rationale:** The HGO fail-closed-arming batch this item's own sequencing
+  note was waiting on has landed and closed (checkpoint 62). The friction is
+  real and recurring — this same session hit it repeatedly after the item was
+  filed, not just in the two triggering incidents already recorded.
+- **Assignment:** Goldfish-deep dispatch, per the item's own proposal (a
+  guardrail-tier `guard-lifecycle-ready.mjs` change needs the design-tier
+  effort and a Critic review before landing, never a freehand guard edit).
+- **Date:** 2026-08-19
