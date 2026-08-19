@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "908a5a2137f324340a948c732ea56a28d2df9270060b9e350f1f8527cb1bcdc1"
+    "transitionHead": "19a6830d25b966ca0c8d6e5aed6be88f9dfee3c670f8b91a0c58a1d34459501e"
   },
   "counts": {
-    "open": 9,
+    "open": 8,
     "in_progress": 25,
-    "closed": 121,
+    "closed": 122,
     "rejected": 1,
     "deferred": 11
   },
@@ -1200,11 +1200,15 @@
     },
     {
       "id": "pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Found live while recovering from a real GUARD-LIFECYCLE-NOT-READY session-wide incident on 2026-08-19 (spec.md/PRD authority drift caused by an ADR-0047 reference fix); see backlog/items/2026-08-09-adr-0047-renumber-left-live-references-behind.md's 2026-08-19 closing triage for the full recovery record."
+      "source": "Found live while recovering from a real GUARD-LIFECYCLE-NOT-READY session-wide incident on 2026-08-19 (spec.md/PRD authority drift caused by an ADR-0047 reference fix); see backlog/items/2026-08-09-adr-0047-renumber-left-live-references-behind.md's 2026-08-19 closing triage for the full recovery record.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "2dd82be31765992217e6a3eecab4aab38d2cc49b",
+      "closureEvidence": "backlog/items/2026-08-19-po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version.md"
     },
     {
       "id": "pipeline.po-gate-authority-path-canonicalization",

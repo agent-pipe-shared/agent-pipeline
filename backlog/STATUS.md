@@ -113,7 +113,7 @@
 | pipeline.pipeline-state-rebind-codex-default-runner | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.po-approval-confirmation-missing-intent-digest | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-authority-decision-prd-candidate-static | deferred | defect | pipeline | 2026-08-08 | — |
-| pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.po-authority-rebind-plan-checks-for-the-wrong-plan-approval-schema-version | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.po-gate-authority-path-canonicalization | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-authority-receipt-readback | deferred | defect | pipeline | 2026-07-25 | — |
 | pipeline.po-gate-worktree-authority | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -175,8 +175,8 @@
 
 ## Counts
 
-- open: 9
+- open: 8
 - in_progress: 25
-- closed: 121
+- closed: 122
 - rejected: 1
 - deferred: 11
