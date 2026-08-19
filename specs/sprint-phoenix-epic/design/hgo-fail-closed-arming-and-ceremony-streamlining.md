@@ -215,9 +215,9 @@ first.
    fresh `repositoryObservation()` is taken, **for the signature path only**, compare that fresh
    observation's `head`/`tree` against `signedCandidate.commit`/`.tree`. If they diverge — meaning
    at least one commit landed on HEAD after the PO's signature was computed but before this arm
-   call — fail closed with a new code, `HGO-CANDIDATE-DRIFT`, instructing the operator to re-run
-   `prepare-for-signature` (§3) against the new HEAD and obtain a fresh signature; the capability
-   is not written. If they match — the common case, since the tolerated ledger append (failure
+   call — fail closed with a new code, `HGO-CANDIDATE-DRIFT`, instructing the operator to run the
+   explicit re-freeze recovery (`refreeze-plan`, step 6 below, §3.6) rather than merely re-running
+   `prepare-for-signature` against the same stale plan; the capability is not written. If they match — the common case, since the tolerated ledger append (failure
    mode 1) never touches `head`/`tree` at all — arming proceeds exactly as before, and
    `capability.repository.head`/`.tree` is now **guaranteed by construction, not by hope,** to be
    bit-identical to `capability.signedCandidate`. This closes the gap at
@@ -229,6 +229,75 @@ first.
    sign. `capability.signedCandidate` also stays in the persisted record after arming (not
    discarded), giving an independent auditor a self-evident, checkable invariant
    (`repository.head === signedCandidate.commit`) rather than only a runtime refusal to trust.
+6. **NEW (Revision 2) — the actual `HGO-CANDIDATE-DRIFT` recovery: an explicit, distinct
+   re-freeze operation, never step 1's ordinary get-or-create path.** Step 1's own semantics make
+   the recovery instruction Revision 1 wrote for step 5 above ("re-run `prepare-for-signature`
+   against the new HEAD") structurally false: `requestSha256` is a content hash of the denial
+   record and never changes for a given denial (§1.1, `:1469`), so a second `plan`/
+   `prepare-for-signature` call for the *same* `(requestSha256, authorSourceRoot)` pair reads the
+   *same* persisted plan back unchanged, by step 1's own construction — the exact stale
+   `head`/`tree` that already tripped `HGO-CANDIDATE-DRIFT`. Nothing about "running it again"
+   takes a new observation. A working recovery needs a *second*, deliberately distinct entry
+   point that is explicitly allowed to overwrite an existing persisted plan record — something
+   step 1's own get-or-create contract must never do on the ordinary path, or the whole point of
+   freezing (§1.1's original problem) comes back.
+
+   `refreezeHumanGuardOverridePlan({ rootDir, pluginRoot, requestSha256, authorSourceRoot = null,
+   ... })` (CLI: `refreeze-plan`, §3.6) requires a persisted plan to already exist for
+   `(requestSha256, authorSourceRoot)` (fails `HGO-PLAN-ABSENT` otherwise — use ordinary
+   `plan`/`prepare-for-signature` first) and the underlying `request` to still be unexpired
+   (`HGO-EXPIRED`, the identical check step 1 already makes at first creation, `:1520`). It then
+   takes one fresh `repositoryObservation()` and re-checks the *identical* narrow gate step 1
+   already enforces — `fingerprintSha256` and `policyIdentity`, both against
+   `request.repository`/`request.policy` (frozen at denial, never re-derived) — failing closed
+   with the *same* `HGO-DRIFT` code on any mismatch, unconditionally: a `policyIdentity` change
+   (the project's guard configuration edited between the original plan and now) still blocks a
+   re-freeze exactly as it blocks first creation; a re-freeze is not a relaxed gate, it is the
+   same gate run again. On success, it overwrites the persisted plan's `repository` (and
+   `plugin`, re-derived the same way step 1's first call already does) fields with the fresh
+   observation, deriving a new `planSha256` since the payload content changed, and appends a
+   `replanned` audit entry (`{requestSha256, priorPlanSha256, planSha256, authorSourceRoot}`) to
+   the same HMAC-chained ledger `appendAudit` already writes every other transition to — giving
+   an independent auditor an explicit, checkable trail distinguishing a deliberate re-freeze from
+   tampering, the same evidentiary standard step 5's `signedCandidate` invariant already
+   established.
+
+   Deliberately not automatic, and deliberately a *second* function rather than a staleness
+   branch inside `prepare-for-signature`: detecting "is the persisted plan stale" at all requires
+   taking a fresh `repositoryObservation()` to compare against, so folding that detection into
+   `prepare-for-signature` would mean `prepare-for-signature` re-observes the calling repository
+   on *every* call whether or not anything actually drifted — silently reopening exactly the
+   §1.1 problem this whole design exists to close, just moved one function over. Re-freezing
+   stays an operator-facing, rare, explicitly-invoked action, reached only after an
+   `HGO-CANDIDATE-DRIFT` refusal is actually observed, never a background/automatic step on the
+   happy path.
+
+   This is *not* borrowed from GMW's own precedent, because GMW has no equivalent recovery to
+   borrow: `prepareGuardMaintenanceWindowRequest` (`guard-maintenance-window.mjs:427-499`) has no
+   get-or-create gate at all — it `writeAtomic`s a fresh `commit`/`tree` (`:473-474`, `:498`) on
+   *every* call, unconditionally, so GMW's own "re-run prepare" already IS a re-freeze, trivially,
+   because GMW's request store was never freeze-once in the first place. And
+   `installGuardMaintenanceWindow` (`:503-533`) has no candidate-freshness check symmetrical to
+   HGO's step 5 at all — it reuses `request.intent.value.candidate` unconditionally (`:537-546`)
+   with no live-HEAD comparison, so GMW never *detects* the scenario step 5 detects, and
+   therefore never needed to design a recovery from detecting it. HGO's step 5 protection
+   (Finding 1, §1.8) is strictly stronger than GMW's own install-time check on this one
+   dimension; the recovery mechanism above is the necessary, undesigned-in-GMW cost of that extra
+   strength, not a gap in mirroring the precedent.
+
+   Recovery flow after `HGO-CANDIDATE-DRIFT`, correctly (supersedes the sentence step 5 above and
+   §3.4 below previously carried): run `refreeze-plan` (obtains a new `planSha256` bound to the
+   new HEAD) → run `prepare-for-signature` again (now reads the just-refrozen plan, emitting a
+   new `selectionSha256`/`intentSha256` bound to the new candidate) → the PO signs the new intent
+   → run `authorize-by-signature` with the new `planSha256` and the new proof. This is not a full
+   ceremony restart: the original `request` (denial-time facts — `toolName`, `toolInputSha256`,
+   `denials`, `commandClass`, `eligiblePaths`, `decisionPreview`) is untouched and reused,
+   `requestSha256` never changes, and no new denial is produced. It *is* a fresh PO signature,
+   unavoidably: `signedCandidate` (step 5) is bound to a specific `(commit, tree)` by
+   construction, and a signature over the old pair cannot cover the new one — the operator-facing
+   cost this design set out to bound is the restart-from-denial, not the re-signing, which step
+   4's own frozen-candidate reasoning already established is non-negotiable for any commit-bound
+   signature.
 
 ### 1.5 Checked against both failure modes (Revision 1)
 
@@ -260,7 +329,10 @@ first.
   signature *means* — the PO's signature cannot retroactively cover a commit it never saw, no matter
   how the ceremony is otherwise relaxed, and step 4 (unchanged) already relies on this same
   principle for verification. The operator-facing cost is a re-sign against the new HEAD, not a full
-  restart of the ceremony from denial.
+  restart of the ceremony from denial — **but only because of step 6's explicit re-freeze
+  operation (Revision 2)**: step 1's own get-or-create semantics, on their own, make "re-sign
+  against the new HEAD" unreachable for the same `requestSha256` (see §1.9 for why the version
+  Critic round 2 reviewed was wrong on exactly this point).
 
 A fix that only handled one of these (candidates 1 or 2 above) would still fail the DoD's explicit
 dual-failure-mode check; this revision is still verified against the actual mechanism behind both,
@@ -298,6 +370,14 @@ version of this section left open (see §1.8).
   `gmw-hgo-evidence-intake-into-the-human-ledger.md:1121` sources the ledger's `scope.candidate`
   from) can no longer diverge from what the PO's signature actually covers and still arm —
   enforced structurally by step 5's refusal, not left as a documented residual risk.
+- **NEW, added by Revision 2:** the `HGO-CANDIDATE-DRIFT` recovery path (step 6) reuses the
+  identical, unconditional narrow gate (`fingerprintSha256`+`policyIdentity` against the frozen
+  `request`) that ordinary plan-creation (step 1) already enforces — recovery is not a relaxed or
+  parallel check, it is the same check run again through a second, explicitly-invoked entry
+  point. No step on the ordinary ceremony path (`plan`, `prepare-authorization`,
+  `prepare-for-signature`, `authorize`, `authorize-by-signature`) gains a new repository
+  re-observation; only the new, distinct `refreeze-plan` verb does, and only when an operator
+  deliberately invokes it after seeing `HGO-CANDIDATE-DRIFT`.
 
 ### 1.7 Residual risk / open questions for the PO (Part A) (Revision 1)
 
@@ -335,6 +415,21 @@ version of this section left open (see §1.8).
   a `v3` schema bump or ships as a backward-compatible additive field on `v2` is a decision for the
   implementing dispatch, not resolved here; either way, existing `v2` readers that do not know the
   field must not fail on records that carry it.
+- **NEW (Revision 2):** `refreeze-plan`'s own regression tests are not designed in full here —
+  flagged for the implementing dispatch: (a) a benign re-freeze (`fingerprintSha256`/
+  `policyIdentity` unchanged, only `head`/`tree`/`statusSha256` differing) must succeed and
+  produce a new `planSha256`; (b) a `policyIdentity` change (project guard-config edited since the
+  original plan) must still block a re-freeze with `HGO-DRIFT`, proving the gate is not relaxed
+  for the recovery path; (c) re-freezing an expired request must fail `HGO-EXPIRED`; (d)
+  re-freezing a `(requestSha256, authorSourceRoot)` pair with no persisted plan yet must fail
+  `HGO-PLAN-ABSENT`; (e) a re-freeze must never itself arm anything or write to the `capabilities`
+  store.
+- **NEW (Revision 2):** the interaction between a deliberate re-freeze and an independently-armed
+  chat-mode capability for the *same* `requestSha256` (the chat path has no `signedCandidate`
+  concept and could in principle arm against the OLD `planSha256` while a stalled signature-path
+  ceremony is being re-frozen under a new `planSha256`) is not designed here — flagged as a
+  residual concurrency question for the implementing dispatch, not blocking; nothing about the
+  re-freeze mechanism itself changes chat-mode's own untouched arming path (§1.6).
 
 ### 1.8 Revision 1 — response to Critic round 1 findings
 
@@ -386,6 +481,62 @@ design (still get-or-create plan persistence, still no fresh repository re-obser
 plan and arm, still the frozen candidate for signature verification). Part B (§2), Part C
 (§3.1-3.3, 3.5) and Part D (§4) are untouched; §3.4 gets one clarifying addendum (below) for
 consistency with the revised §1.4, not a rewrite.
+
+### 1.9 Revision 2 — response to Critic round 2 finding
+
+This subsection documents exactly what changed versus the Revision 1 version reviewed in Critic
+round 2 (delta review), mapped to the one blocker finding by the property a re-reviewer would
+recognize, so a re-reviewer can map this revision to what it fixes without re-deriving it.
+
+**Finding (blocker, signature path, round 2 delta)** — Revision 1's §1.5/§3.4 claimed an operator
+recovers from `HGO-CANDIDATE-DRIFT` by "re-running `prepare-for-signature` against the new HEAD"
+to obtain a fresh signature. This is structurally false under §1.4 step 1's own get-or-create
+contract: `requestSha256` is a content hash of the original denial and never changes for a given
+denial; every call to `plan`/`prepare-for-signature` for the *same* `(requestSha256,
+authorSourceRoot)` pair reads the *same* persisted plan back unchanged, by construction —
+"re-running" it obtains the identical stale `head`/`tree` that already tripped the refusal, not a
+fresh one. There was, as Revision 1 left it, no way to actually get a signature bound to the new
+HEAD without a brand-new `requestSha256` (a full ceremony restart from denial) — exactly the
+restart both §1.5 and §3.4 twice explicitly claimed did not happen. The finding contrasted this
+against GMW's own real precedent: `prepareGuardMaintenanceWindowRequest` writes `commit`/`tree`
+fresh on every call (`guard-maintenance-window.mjs:473-474`, `writeAtomic` at `:498`) with no
+get-or-create gate at all, so GMW's "prepare again" trivially IS a re-freeze; HGO's design departs
+from GMW exactly on the dimension that decides whether "re-run against new HEAD" is possible, and
+the superseded revision did not acknowledge or reconcile the departure.
+
+Closed by new §1.4 step 6: a distinct `refreezeHumanGuardOverridePlan` operation (CLI:
+`refreeze-plan`, §3.6), reachable only as an explicit, operator-invoked recovery action — never
+automatically, never from the ordinary `plan`/`prepare-for-signature` happy path — that takes one
+fresh `repositoryObservation()`, re-checks the identical narrow gate step 1 already enforces
+(`fingerprintSha256`+`policyIdentity` against the frozen `request`, unconditionally, no
+relaxation), additionally checks the underlying `request` has not expired, and — only on success —
+overwrites the persisted plan's `repository`/`plugin` fields with the fresh observation, producing
+a new `planSha256`. The corrected recovery flow (§1.4 step 6, §3.4, §3.6) is: `refreeze-plan` →
+`prepare-for-signature` (now reads the just-refrozen plan) → a fresh PO signature over the new
+candidate → `authorize-by-signature` with the new `planSha256`. This is genuinely not a full
+restart (the original `request` — `toolName`, `toolInputSha256`, `denials`, `commandClass`,
+`eligiblePaths`, `decisionPreview` — is untouched, `requestSha256` never changes, no new denial is
+produced), while still requiring a fresh PO signature, which is unavoidable and was already true
+in principle (step 4's frozen-candidate reasoning): a signature bound to `(commit, tree)` cannot
+retroactively cover a different pair.
+
+**Why this required a new mechanism rather than a wording fix (the DoD's own two-way test):** a
+mechanism exists — refreezing does not require touching the ledger/GMW/evidence-intake design,
+does not relax the narrow gate for recovery, and does not reintroduce fresh-repository-observation
+on any ordinary happy-path call — so the DoD's "false claim removed honestly" fallback was not
+needed; the operator-facing goal of avoiding a full restart-from-denial is preserved for real, not
+merely by deleting the claim.
+
+**What did not change:** §1.1-1.3 and §1.4 steps 1-4 are untouched — this revision does not reopen
+the original HGO-DRIFT problem (§1.1) or relax the ordinary get-or-create semantics step 1
+established; it adds one new, narrowly-scoped, explicitly-invoked recovery path alongside them.
+§1.4 step 3 (3a/3b/3c) and the `HGO-PLUGIN-DRIFT` code (Revision 1, Finding 2) are untouched — the
+arm-time checks are exactly as strict as Revision 1 left them; only the *pre*-arming
+plan-persistence layer gained a second, deliberately narrow write path. Step 5's
+`signedCandidate`/`HGO-CANDIDATE-DRIFT` detection itself is untouched; only its documented
+recovery instruction is corrected. Part B (§2), Part C's core recipe (§3.1-3.3, 3.5) and Part D
+(§4) are untouched; §3.4 gets a corrected recovery sentence (not a rewrite) and a new §3.6
+documents the new subcommand.
 
 ## 2. Part B — the digest-withholding comment
 
@@ -589,11 +740,17 @@ implementation invariant for whoever builds this.
 **Revision 1 addendum:** the persisted plan `prepare-for-signature` creates is also the exact
 source of `signedCandidate` (§1.4 step 5, §1.8) — no new call or artifact is needed;
 `authorizeHumanGuardOverrideBySignature` populates `capabilityCore.signedCandidate` from the same
-persisted-plan `repository.head`/`.tree` it already reads for intent verification (§1.4 step 4). If
-`authorize-by-signature` fails with the new `HGO-CANDIDATE-DRIFT` code (a commit landed on HEAD
-between signing and arming), the correct recovery is to re-run `prepare-for-signature` against the
-new HEAD and obtain a fresh signature — retrying `authorize-by-signature` against the stale proof
-cannot succeed.
+persisted-plan `repository.head`/`.tree` it already reads for intent verification (§1.4 step 4).
+
+**Revision 2 addendum (corrects the sentence above):** if `authorize-by-signature` fails with the
+new `HGO-CANDIDATE-DRIFT` code (a commit landed on HEAD between signing and arming), merely
+retrying `prepare-for-signature` cannot succeed — it reads the same persisted plan back unchanged
+(§1.4 step 1), so it would re-emit the identical stale `head`/`tree` and the identical
+`planSha256`/`intentSha256` that already led to the refusal. The correct recovery is §1.4 step 6:
+run `refreeze-plan` (§3.6) first, against the same `requestSha256`, to obtain a new `planSha256`
+bound to the new HEAD; only then does re-running `prepare-for-signature` produce a genuinely new
+`selectionSha256`/`intentSha256` worth signing. Retrying `authorize-by-signature` against the
+stale proof, either way, still cannot succeed.
 
 ### 3.5 What does not change
 
@@ -605,6 +762,46 @@ cannot succeed.
 - The trust anchor resolution (`project/critical-human-proof.json`, `:1882-1893`) and the
   deliberate absence of a caller-suppliable `--authority` override
   (`scripts/guard-human-override.mjs:150-168`) are untouched.
+
+### 3.6 Revision 2 — the `refreeze-plan` recovery subcommand
+
+New subcommand implementing §1.4 step 6 — the sole way, other than a full ceremony restart, to
+recover from an `HGO-CANDIDATE-DRIFT` refusal:
+
+```
+guard-human-override.mjs refreeze-plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]
+```
+
+Flag validation mirrors `plan` exactly (`exactFlagSet`, `SHA256.test`, `:92-106`): `repo` and
+`request-sha256` required, `author-source-root` optional and, if present, forwarded unchanged —
+the same key `(requestSha256, authorSourceRoot)` the persisted plan store uses.
+
+**Output** (new schema `pipeline.human-guard-override-refreeze-plan.v1`):
+
+```json
+{
+  "schema": "pipeline.human-guard-override-refreeze-plan.v1",
+  "status": "refrozen",
+  "root": "<repo.root>",
+  "requestSha256": "<64hex>",
+  "priorPlanSha256": "<64hex>",
+  "planSha256": "<64hex>",
+  "expiresAt": "<ISO-8601>"
+}
+```
+
+**Failure modes:** `HGO-PLAN-ABSENT` (no persisted plan exists yet for this pair — use ordinary
+`plan`/`prepare-for-signature` first, this subcommand only ever overwrites an existing plan, never
+creates the first one); `HGO-EXPIRED` (the underlying `request` has expired — the same check §1.4
+step 1 already makes at first creation); `HGO-DRIFT` (`fingerprintSha256`/`policyIdentity`
+mismatch against the frozen `request` — the identical, unconditional narrow gate ordinary
+plan-creation enforces, not a relaxed one; see §1.4 step 6 and §1.6).
+
+After a successful `refreeze-plan`, the operator's next command is `prepare-for-signature` again
+(§3.2) — unchanged, since it already reads whatever plan is currently persisted for the pair, and
+`refreeze-plan` is the only thing that changed what that is. §3.2's own three-step recipe (plan-or-
+read → prepare-authorization → digest-emission) does not itself learn about re-freezing; it simply
+reads whatever is on disk, exactly as it already does for an ordinary, never-drifted ceremony.
 
 ## 4. Part D — why the Auto Mode classifier blocks HGO commands (hypothesis, not a finding)
 
@@ -661,11 +858,16 @@ commands are blocked, ordinary commands are not, and the discriminator is unknow
   (mirroring `guard-maintenance-window.mjs`'s `install` case) is not designed here in
   implementation detail — this document closes the architectural blocker; the orchestration is
   the natural next dispatch.
-- **(A, Revision 1)** `HGO-PLUGIN-DRIFT`/`HGO-CANDIDATE-DRIFT` both-directions regression tests,
-  and the operator-facing re-sign UX after an `HGO-CANDIDATE-DRIFT` refusal, are flagged for the
-  implementing dispatch, not designed in full here (§1.7, §1.8).
+- **(A, Revision 1)** `HGO-PLUGIN-DRIFT`/`HGO-CANDIDATE-DRIFT` both-directions regression tests
+  are flagged for the implementing dispatch, not designed in full here (§1.7, §1.8). The
+  operator-facing re-sign UX itself is now designed at the architecture level (§1.4 step 6, §3.6,
+  Revision 2) — only exact CLI error-string wording and the `refreeze-plan` regression tests
+  (§1.7, Revision 2 bullets) remain for the implementing dispatch.
 - **(A, Revision 1)** Whether `signedCandidate` ships as a `v3` schema bump or an additive `v2`
   field on `CAPABILITY_SCHEMA` is left to the implementing dispatch (§1.7).
+- **(A, Revision 2)** `refreeze-plan`'s regression tests (§1.7) and the chat-mode/signature-path
+  concurrency question (§1.7) are flagged for the implementing dispatch, not designed in full
+  here.
 - **(B)** No behavior change; only the risk of an implementing dispatch treating this as "nothing
   to verify" — a `node --check` pass on the touched file plus a fresh read-through confirming the
   corrected wording matches this document is the right bar, since there is no test to gate a
@@ -683,9 +885,15 @@ checkout at commit `56cf4c43a46025a4b0ec814143e0e13dca837962` (the base this rew
 pinned to) before this revision was finalized; all other citations below were carried forward
 unchanged from the original dispatch's own `ec7c11d0` verification.
 
+**Revision 2 addendum:** the citations below marked "(Revision 2)" were newly introduced by
+`PHX-WP-HGO-FAILCLOSED-DESIGN-REWORK2` and were opened and confirmed directly against this
+checkout at commit `70f54fee05b2a652bc6d834427471cb8511c8cac` (the base this rework dispatch was
+pinned to) before this revision was finalized; every other citation below is unchanged.
+
 `lib/human-guard-override.mjs`: `repositoryObservation` `:472-482`; `recordHumanGuardDenial`
 `:1376`, request persistence `:1449-1471`; comment block `:1300-1321`; `humanGuardRouteUnavailableReason`
-`:1357-1374`; `planHumanGuardOverride` `:1492`, drift fail `:1526-1529`; `prepareHumanGuardOverrideAuthorization`
+`:1357-1374`; `planHumanGuardOverride` `:1492`, expiry check `:1520` (Revision 2), drift fail
+`:1526-1529`; `prepareHumanGuardOverrideAuthorization`
 `:1590`, reason check `:1601-1604`, nested plan call `:1605-1613` (Revision 1); `pluginIdentity`
 `:377-415` (Revision 1); `policyIdentity` `:417-444` (Revision 1); `authorizeHumanGuardOverride`
 `:1661`, chat-mode gate `:1675-1692`, nested prepare call `:1697-1707` (Revision 1), nested plan
