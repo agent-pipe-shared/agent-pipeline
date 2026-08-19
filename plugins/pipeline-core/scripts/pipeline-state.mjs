@@ -4326,6 +4326,27 @@ function parsePoRebindApply(argv) {
   return { planSha256: argv[1], plannedAt: argv[3], runner: argv[6] };
 }
 
+// Dedicated to po-authority-acknowledge-apply (Critic finding F1, 2026-08-19):
+// parsePoRebindApply() above is shared with rebind-apply/decision-apply,
+// neither of which take --by; adding it there would loosen those two
+// unrelated commands. --by must match exactly what po-authority-acknowledge-
+// plan recorded -- enforced structurally, not by a separate comparison: `by`
+// is part of the hashed plan payload (see buildPoAuthorityAcknowledgePlan),
+// so a mismatched --by here makes the recomputed planSha256 disagree with
+// the caller-supplied one, and the existing stale-plan refusal in
+// runPoAuthorityRebindApply() catches it -- the same mechanism every other
+// preimage/postimage field already relies on.
+function parsePoAcknowledgeApply(argv) {
+  if (argv.length !== 7 && argv.length !== 9) return null;
+  if (argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
+    || argv[2] !== "--updated-at" || !canonicalIso(argv[3])
+    || argv[4] !== "--by" || isBlank(argv[5])
+    || argv[6] !== "--activate") return null;
+  if (argv.length === 7) return { planSha256: argv[1], plannedAt: argv[3], by: argv[5] };
+  if (argv[7] !== "--runner" || !PO_REBIND_RUNNERS.has(argv[8])) return null;
+  return { planSha256: argv[1], plannedAt: argv[3], by: argv[5], runner: argv[8] };
+}
+
 function parsePoDecisionSelection(argv) {
   if (argv.length !== 6 || argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
     || argv[2] !== "--planned-at" || !canonicalIso(argv[3])
@@ -4485,13 +4506,21 @@ function resolvePoRebindRunner(explicitRunner, env) {
 // only ever INSERTS the one sanctioned literal line, once. Deliberately does
 // NOT merge with approve-plan or touch activeFeature.phase/planApproval: this
 // stays a narrow, additive fix for exactly the acknowledgement marker, mirroring
-// the rebind/decision family's own "one concern per route" shape. Deliberately
-// carries no --by flag either, matching rebind-apply/decision-apply's own
-// precedent exactly (neither has one): the actual PO-authorship signal is the
-// marker TEXT itself, which per ADR-0061/ACKNOWLEDGEMENT_REPAIR can only ever
-// have been added by the PO out of band, never by an agent on their behalf --
-// unchanged by this route, which only makes an already-PO-authored marker
-// bindable into continuity despite the file being frozen.
+// the rebind/decision family's own "one concern per route" shape.
+//
+// CORRECTED 2026-08-19 (Critic finding F1, dispatch W4-CRITIC-2B): unlike
+// rebind-apply/decision-apply, this route DOES insert the marker itself --
+// it runs exactly when the marker is NOT already present (see the refusal at
+// PO-ACK-ALREADY-ACKNOWLEDGED below) and writes it on the caller's behalf.
+// The marker text is therefore no longer sufficient proof of PO authorship by
+// itself; this route REQUIRES an explicit `--by <name>` at plan time,
+// recorded in the plan payload and covered by planSha256's digest (so the
+// apply step cannot silently apply a plan attributed to someone else). This
+// is not a cryptographic proof -- it is the same attribution discipline
+// close-feature/approve-push already use -- and an agent must still only
+// call this route after the PO has actually reviewed the content and named
+// themself; the attribution field exists so that instruction is recorded,
+// not merely trusted.
 function eligibleAcknowledgeContinuity(state, prd, spec) {
   const continuity = state?.continuity;
   if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
@@ -4521,7 +4550,17 @@ function appendAcknowledgementMarker(prdBytes) {
   return [...confirm.matchAll(PRD_ACKNOWLEDGEMENT_MARKER)].length === 1 ? nextBytes : null;
 }
 
+// `by` travels via `deps.acknowledgeBy`, never as a positional parameter:
+// this function is invoked through the SAME generic `buildPlan(dir, deps,
+// existing, plannedAt)` call shape runPoAuthorityRebindApply() shares across
+// rebind/decision/acknowledge (pipeline-state.mjs ~4845/4853) -- adding a
+// positional `by` here would silently misalign those two other callers'
+// `plannedAt` argument instead of failing loudly. Routing it through `deps`
+// (already threaded uniformly to every buildPlan call) keeps the shared
+// signature intact.
 function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.now?.() ?? new Date().toISOString()) {
+  const by = deps.acknowledgeBy;
+  if (isBlank(by)) return { ok: false, code: "PO-ACK-BY-REQUIRED" };
   if (existing.status !== "ok" || !existing.state) return { ok: false, code: "PO-ACK-STATE" };
   const state = existing.state;
   if (state.schema !== SCHEMA_ID || !state.activeFeature || typeof state.activeFeature.planPath !== "string"
@@ -4570,6 +4609,7 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   const payload = {
     schema: PO_ACK_PLAN_SCHEMA,
     root: realpathSync(resolve(dir)),
+    by,
     plannedAt,
     preimage: {
       state: { sha256: sha256Bytes(existing.raw), identity: stateFile.identity, updatedAt: state.updatedAt ?? null, continuityRevision: continuity.revision },
@@ -4589,24 +4629,31 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
 }
 
 function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
-  if (sub === "po-authority-acknowledge-plan" && rest.length !== 0) { console.error("Error: PO authority acknowledge plan takes no arguments."); return 2; }
-  const apply = sub === "po-authority-acknowledge-apply" ? parsePoRebindApply(rest) : null;
-  if (sub === "po-authority-acknowledge-apply" && apply === null) { console.error("Error: PO authority acknowledge apply requires --plan-sha256 <sha256> --updated-at <ISO-8601> --activate [--runner claude|codex]."); return 2; }
+  const planBy = sub === "po-authority-acknowledge-plan"
+    ? (rest.length === 2 && rest[0] === "--by" && !isBlank(rest[1]) ? rest[1] : null)
+    : null;
+  if (sub === "po-authority-acknowledge-plan" && planBy === null) {
+    console.error("Error: PO authority acknowledge plan requires --by <name> (non-empty) -- an unattributed acknowledgement is refused.");
+    return 2;
+  }
+  const apply = sub === "po-authority-acknowledge-apply" ? parsePoAcknowledgeApply(rest) : null;
+  if (sub === "po-authority-acknowledge-apply" && apply === null) { console.error("Error: PO authority acknowledge apply requires --plan-sha256 <sha256> --updated-at <ISO-8601> --by <name> --activate [--runner claude|codex]."); return 2; }
   if (sub === "po-authority-acknowledge-plan" && existsSync(rebindTransactionPath(deps.dir))) {
     console.error("Error: PO authority acknowledge recovery is pending; replay the exact previously confirmed apply action.");
     return 2;
   }
   if (sub === "po-authority-acknowledge-apply") {
     const runner = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
-    const lock = acquireContinuityLock(deps.dir, PO_REBIND_LOCK_TOKEN, deps);
+    const ackDeps = { ...deps, acknowledgeBy: apply.by };
+    const lock = acquireContinuityLock(ackDeps.dir, PO_REBIND_LOCK_TOKEN, ackDeps);
     if (!lock.ok) { console.error(`Error: PO authority acknowledge refused (${lock.code}); zero mutation.`); return 2; }
     try {
-      const io = { replace: deps.replaceRebindPrdFdContents ?? ((fd, bytes) => { ftruncateSync(fd, 0); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset); fsyncSync(fd); }), rename: deps.renameRebindPrd ?? renameSync, sync: deps.syncRebindDirectory ?? syncDirectory };
-      const stateIo = { replace: deps.replaceRebindStateFdContents ?? io.replace, rename: deps.renameRebindState ?? renameSync, sync: deps.syncRebindDirectory ?? syncDirectory };
-      const recovered = recoverRebindTransaction(deps.dir, apply.planSha256, lock.ownerNonce, io, stateIo);
+      const io = { replace: ackDeps.replaceRebindPrdFdContents ?? ((fd, bytes) => { ftruncateSync(fd, 0); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset); fsyncSync(fd); }), rename: ackDeps.renameRebindPrd ?? renameSync, sync: ackDeps.syncRebindDirectory ?? syncDirectory };
+      const stateIo = { replace: ackDeps.replaceRebindStateFdContents ?? io.replace, rename: ackDeps.renameRebindState ?? renameSync, sync: ackDeps.syncRebindDirectory ?? syncDirectory };
+      const recovered = recoverRebindTransaction(ackDeps.dir, apply.planSha256, lock.ownerNonce, io, stateIo);
       if (!recovered.ok) { console.error(`Error: PO authority acknowledge recovery refused (${recovered.code}); zero new mutation.`); return 2; }
       if (recovered.kind === "rolled-back") { console.error("Error: PO authority acknowledge recovered its interrupted transaction; regenerate and confirm a new plan."); return 2; }
-      return runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
+      return runPoAuthorityRebindApply(apply, ackDeps, lock, io, stateIo, {
         buildPlan: buildPoAuthorityAcknowledgePlan,
         resultSchema: PO_ACK_APPLY_SCHEMA,
         resultCode: "PO-ACK-APPLIED",
@@ -4615,14 +4662,15 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     } finally { releaseContinuityLock(lock); }
   }
   const existing = readStateRaw(deps.dir);
-  const planned = buildPoAuthorityAcknowledgePlan(deps.dir, deps, existing, apply?.plannedAt);
+  const ackDeps = { ...deps, acknowledgeBy: planBy };
+  const planned = buildPoAuthorityAcknowledgePlan(ackDeps.dir, ackDeps, existing);
   if (!planned.ok) {
     console.error(`Error: PO authority acknowledge refused (${planned.code}); zero mutation.`);
     return 2;
   }
   console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: {
     executable: process.execPath,
-    argv: [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--activate"],
+    argv: [fileURLToPath(import.meta.url), "po-authority-acknowledge-apply", "--plan-sha256", planned.planSha256, "--updated-at", planned.payload.plannedAt, "--by", planBy, "--activate"],
     mutation: true, requiresConfirmation: true, requiresHostBoundary: true,
   } }, null, 2));
   return 0;

@@ -1916,6 +1916,26 @@ function sanctionedPoAuthorityRebindArgs(args) {
       && args[7] === "--selection" && args[8] === "spec"
       && args[9] === "--activate" && args.length === 10;
   }
+  // Critic finding F4, 2026-08-19 (dispatch W4-CRITIC-2B): po-authority-
+  // acknowledge-apply's refusal text (po-gate-authority.mjs) and
+  // guard-lifecycle-ready.mjs's own bound-authority-document refusal text
+  // both name this route as sanctioned, but it was missing from this
+  // admission list -- "prescribe a command and then block it", the exact
+  // defect class this same function's own doc comment names above. The
+  // read-only po-authority-acknowledge-plan side is NOT added here: unlike
+  // po-authority-rebind-plan (admitted via isExactPoAuthorityRebindPlannerRecovery,
+  // a diagnostic-gated route above), acknowledge-plan has no equivalent
+  // diagnostic entry yet -- a disclosed, deliberately scoped-down follow-up,
+  // not an oversight; only the CAS-committing apply step is closed here.
+  if (args[0] === "po-authority-acknowledge-apply") {
+    return args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
+      && args[3] === "--updated-at"
+      && typeof args[4] === "string"
+      && Number.isFinite(Date.parse(args[4]))
+      && new Date(args[4]).toISOString() === args[4]
+      && args[5] === "--by" && typeof args[6] === "string" && args[6].trim().length > 0
+      && args[7] === "--activate" && args.length === 8;
+  }
   return args[0] === "po-authority-rebind-apply"
     && args[1] === "--plan-sha256"
     && HEX.test(args[2] ?? "")

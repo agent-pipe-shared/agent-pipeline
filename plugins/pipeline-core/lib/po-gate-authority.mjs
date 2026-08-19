@@ -166,14 +166,17 @@ const ACKNOWLEDGEMENT_REPAIR = "The active PRD does not carry the PO's plan ackn
   + " Spec digest binding above, not a replacement for either, and an agent must never add it on the PO's behalf"
   + " without that review having actually happened."
   + " If this PRD has not been bound by a kickoff promotion, the PO adds that single line to the PRD once satisfied."
-  + " If a kickoff promotion has already bound this PRD, do not add that line in place: the promotion already bound"
-  + " these exact bytes, and an in-place edit only breaks that binding without making this check pass;"
-  + " instead use the sanctioned acknowledge route rather than editing the marker by hand:"
-  + " run the pipeline-core script pipeline-state.mjs po-authority-acknowledge-plan, then pipeline-state.mjs"
-  + " po-authority-acknowledge-apply --plan-sha256 <sha256> --updated-at <ISO-8601> --activate with the digest"
-  + " and timestamp that plan reports; it records the PO's acknowledgement without editing the PRD in place,"
-  + " and an agent must never run it without that PO review having actually happened."
-  + " do not change activeFeature.planPath, which is not what is wrong here.";
+  + " If a kickoff promotion has already bound this PRD, do not add that line by direct Edit/Write: the promotion"
+  + " already bound these exact bytes, and an ungoverned edit only breaks that binding without making this check"
+  + " pass; instead use the sanctioned acknowledge route, which adds the marker through the same atomic,"
+  + " crash-safe transaction primitive already used for other bound-authority updates rather than a raw file write:"
+  + " run the pipeline-core script pipeline-state.mjs po-authority-acknowledge-plan --by <name>, then"
+  + " pipeline-state.mjs po-authority-acknowledge-apply --plan-sha256 <sha256> --updated-at <ISO-8601> --by <name>"
+  + " --activate with the exact digest, timestamp and name that plan reports (2026-08-19: --by is required and"
+  + " covered by the plan's own digest, so a mismatched name is refused as a stale plan, not silently accepted)."
+  + " An agent must never run this route without that PO review having actually happened, and must never invent"
+  + " a --by value -- the name must come from the PO's own instruction, not be guessed or defaulted."
+  + " Do not change activeFeature.planPath, which is not what is wrong here.";
 // A PRD whose bytes are not decodable UTF-8 never reaches any marker check. The
 // defect is the encoding of one file; no path, directory or PRD count is
 // involved, and no script in this repository re-encodes a document for the PO.

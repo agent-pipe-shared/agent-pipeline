@@ -1367,8 +1367,12 @@ check("an absent PO plan acknowledgement marker is signposted to the PO adding t
     assert.match(result.repair, /po-plan-acknowledged: content-sound-and-spec-consistent/u, JSON.stringify(result));
     assert.match(result.repair, /PO's own record/u, JSON.stringify(result));
     assert.equal(result.repair.includes(PLAN_PATH_REPAIR), false, JSON.stringify(result));
-    assert.match(result.repair, /do not change activeFeature\.planPath/u, JSON.stringify(result));
+    assert.match(result.repair, /Do not change activeFeature\.planPath/u, JSON.stringify(result));
     assert.equal(/po-authority-rebind/u.test(result.repair), false, JSON.stringify(result));
+    // 2026-08-19 (Critic F1 fix): the acknowledge route now requires --by,
+    // covered by the plan's own digest.
+    assert.match(result.repair, /po-authority-acknowledge-plan --by/u, JSON.stringify(result));
+    assert.match(result.repair, /--by is required and covered by the plan's own digest/u, JSON.stringify(result));
   });
 });
 

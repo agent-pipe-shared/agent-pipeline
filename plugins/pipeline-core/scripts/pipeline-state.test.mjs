@@ -436,7 +436,7 @@ function invokeCaptured(argv, deps) {
 // the new bytes -- without ever releasing the binding.
 {
   const { root, deps, planPath } = acknowledgeFixture("happy");
-  const planned = invokeCaptured(["po-authority-acknowledge-plan"], deps);
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   assert.equal(plan.schema, "pipeline.po-authority-acknowledge-plan.v1");
@@ -452,7 +452,7 @@ function invokeCaptured(argv, deps) {
 
   // Re-running the plan against the now-acknowledged PRD must refuse: the
   // marker is already present, and the route is one-shot per PRD.
-  const rePlanned = invokeCaptured(["po-authority-acknowledge-plan"], deps);
+  const rePlanned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
   assert.equal(rePlanned.status, 2);
   assert.ok(rePlanned.err.includes("PO-ACK-ALREADY-ACKNOWLEDGED"), rePlanned.err);
 }
@@ -465,7 +465,7 @@ function invokeCaptured(argv, deps) {
   });
   const before = readFileSync(join(root, planPath), "utf8");
   const beforeState = readFileSync(statePath(root), "utf8");
-  const refused = invokeCaptured(["po-authority-acknowledge-plan"], deps);
+  const refused = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
   assert.equal(refused.status, 2);
   assert.ok(refused.err.includes("PO-ACK-ALREADY-ACKNOWLEDGED"), refused.err);
   assert.equal(readFileSync(join(root, planPath), "utf8"), before, "an already-acknowledged PRD must be byte-for-byte untouched");
@@ -477,7 +477,7 @@ function invokeCaptured(argv, deps) {
 // sibling rebind/decision routes it shares runPoAuthorityRebindApply with.
 {
   const { root, deps, planPath } = acknowledgeFixture("digest-mismatch");
-  const planned = invokeCaptured(["po-authority-acknowledge-plan"], deps);
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   const realArgv = plan.applyAction.argv.slice(1);
@@ -492,6 +492,45 @@ function invokeCaptured(argv, deps) {
   assert.ok(rejected.err.toLowerCase().includes("stale"), rejected.err);
   assert.equal(readFileSync(join(root, planPath), "utf8"), before, "a stale-digest apply must leave the PRD untouched");
   assert.equal(readFileSync(statePath(root), "utf8"), beforeState, "a stale-digest apply must leave State untouched");
+}
+
+// Rejection (Critic F1, 2026-08-19): an unattributed acknowledgement must be
+// refused before anything else is even read -- an agent cannot satisfy the
+// PO plan gate without naming who reviewed the content.
+{
+  const { deps } = acknowledgeFixture("by-required-blank");
+  const missing = invokeCaptured(["po-authority-acknowledge-plan"], deps);
+  assert.equal(missing.status, 2);
+  assert.ok(missing.err.includes("--by"), missing.err);
+  const blank = invokeCaptured(["po-authority-acknowledge-plan", "--by", ""], deps);
+  assert.equal(blank.status, 2);
+  assert.ok(blank.err.includes("--by"), blank.err);
+}
+
+// F1 fix, structural proof: --by is part of the hashed plan payload, so an
+// apply whose --by disagrees with what was planned is caught by the SAME
+// stale-plan digest check every other preimage/postimage field already
+// relies on -- not a separate, bolt-on comparison that could be forgotten.
+{
+  const { root, deps, planPath } = acknowledgeFixture("by-bound-to-digest");
+  const planned = invokeCaptured(["po-authority-acknowledge-plan", "--by", "PO"], deps);
+  assert.equal(planned.status, 0, planned.err);
+  const plan = JSON.parse(planned.out);
+  assert.equal(plan.by, "PO", "the plan payload must record who is attributed");
+  const realArgv = plan.applyAction.argv.slice(1);
+  const byIndex = realArgv.indexOf("--by") + 1;
+  const mismatchedArgv = [...realArgv];
+  mismatchedArgv[byIndex] = "Someone Else";
+  const before = readFileSync(join(root, planPath), "utf8");
+  const beforeState = readFileSync(statePath(root), "utf8");
+  const rejected = invokeCaptured(mismatchedArgv, deps);
+  assert.equal(rejected.status, 2);
+  assert.ok(rejected.err.toLowerCase().includes("stale"), rejected.err);
+  assert.equal(readFileSync(join(root, planPath), "utf8"), before, "a mismatched-attribution apply must leave the PRD untouched");
+  assert.equal(readFileSync(statePath(root), "utf8"), beforeState, "a mismatched-attribution apply must leave State untouched");
+  // The exact --by the plan recorded still applies cleanly.
+  const applied = invokeCaptured(realArgv, deps);
+  assert.equal(applied.status, 0, applied.err);
 }
 
 console.log("pipeline-state.test.mjs (CB-1a): all checks passed");
