@@ -70,6 +70,27 @@ ad hoc patch, given both touch commit-time or gate-relevant tooling.
 
 ## Triage
 
-Not yet triaged — filed live during an active verification pass; the PO
-has not yet chosen between implementing #1, #2, both, or a different
-approach.
+- **Decision:** PO chose both pieces (2026-08-19). Dispatched to `goldfish-deep`
+  (`NVA-W5-BLDRIFT-1`, worktree-isolated).
+- **Date:** 2026-08-19
+
+### Piece 2 landed, piece 1 not attempted (dispatch budget)
+
+`NVA-W5-BLDRIFT-1` delivered piece 2 in full: `plugins/pipeline-core/scripts/check-state-numeric-claims.mjs`
+scans `docs/state.md` for current-state "N/M closed"-shaped backlog claims
+and cross-checks them against `backlog/index.json`'s live counts, correctly
+distinguishing a live claim from a historical/archived one (6/6 fixture
+tests). Commit `a2fb5ea3` (cherry-picked to trunk), registered as its own
+verify suite (`state-numeric-claims-tests`) via a signed TP-3 HGO ceremony,
+commit `b3b07fc5`. The dispatch's own live sanity run against the real repo
+immediately caught a genuine stale claim in `docs/state.md`, confirming the
+tool works as intended.
+
+Piece 1 (a commit-time guard extending the already-wired `guard-git.mjs`
+to require a ledger-consistent commit whenever `backlog/items/*.md`'s
+`status:` changes) was explicitly optional in the dispatch briefing — not
+attempted; the dispatch's tool budget was spent on piece 2's investigation
+and the (correctly reported) TP-3 block on registering it. **Item stays
+`open` for piece 1** — needs its own follow-up `goldfish-deep` dispatch,
+scoped to extend `guard-git.mjs` (never `hooks.json`, which is TP-4-protected
+and has no in-session route).
