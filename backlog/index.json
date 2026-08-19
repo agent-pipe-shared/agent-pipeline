@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "570f4217ab8423128a94cf053dd39ab0728be6a8e4964759f7da7fbb74b0faec"
+    "transitionHead": "7245c18f7d770c34fa9f2d48c9fa7b3c15cdba1b8589efda056a2cd0e5003dc3"
   },
   "counts": {
-    "open": 41,
+    "open": 42,
     "in_progress": 3,
     "closed": 256
   },
@@ -2004,6 +2004,15 @@
       "closureRepository": "self",
       "closureCommit": "4af6bb0b289f6afc3ab95c560e3cd142d795bddc",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-17-manifest-repair-runner-gate-closure.md"
+    },
+    {
+      "id": "pipeline.material-intake-bootstrap-bind-has-no-sanctioned-path-to-a-passing-plan-gate",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "PO live external test transcript (2026-08-19), project D:\\Dev\\Rune_Test1_Claude_060_56 on Windows/WSL, Claude runner, plugin 0.6.0+claude.20260819163512.ca18e0c. Full material-design-input onboarding (consent -> capture x6 -> design-questions -> generate-plan/-apply) completed cleanly, then bootstrap-bind-plan refused with KICKOFF-PROMOTION-PRD-LANGUAGE-MARKER-INVALID -- a dead end for the entire material-intake happy path.",
+      "deferred": false
     },
     {
       "id": "pipeline.merged-into-frontmatter-key-documented-but-unsupported",
