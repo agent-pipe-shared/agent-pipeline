@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e7fc07b1312bbe3a2a1b736aa7cc8efaa37e397062e8d1d7ae3a3694fa669c5b"
+    "transitionHead": "48c47bd2ea09369bbe2e7504e150c3372aa5711f0217640943149be329537c96"
   },
   "counts": {
-    "open": 55,
+    "open": 54,
     "in_progress": 7,
-    "closed": 233
+    "closed": 234
   },
   "items": [
     {
@@ -822,11 +822,15 @@
     },
     {
       "id": "pipeline.dispatch-record-does-not-bind-to-its-commit",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Found independently by all three Critic rounds against the 0.5.4 candidate (A-F2/A-F5, B-F3, C-F3/C-F4), then reproduced by the Elephant one hour later in 1c3cd86."
+      "source": "Found independently by all three Critic rounds against the 0.5.4 candidate (A-F2/A-F5, B-F3, C-F3/C-F4), then reproduced by the Elephant one hour later in 1c3cd86.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "859a508df9aae0276d9483dc9bda39322f38e061",
+      "closureEvidence": "backlog/items/2026-08-09-the-dispatch-record-does-not-bind-to-the-commit-it-vouches-for.md"
     },
     {
       "id": "pipeline.dispatch-reported-creating-a-record-it-never-created",

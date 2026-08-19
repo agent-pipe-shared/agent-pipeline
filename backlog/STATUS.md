@@ -77,7 +77,7 @@
 | pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.dispatch-record-does-not-bind-to-its-commit | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.dispatch-record-does-not-bind-to-its-commit | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-reported-creating-a-record-it-never-created | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.dispatched-agents-return-truncated-mid-step | closed | defect | pipeline | 2026-08-07 | — |
@@ -303,6 +303,6 @@
 
 ## Counts
 
-- open: 55
+- open: 54
 - in_progress: 7
-- closed: 233
+- closed: 234
