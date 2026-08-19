@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "25b7a30121713cc08729e27c21456b7e4996f700df21d78565878b3e9d52860f"
+    "transitionHead": "80b200093a2ebf061f45718b54d2265360ce479d6de39d629fe9c873ea0a7ad5"
   },
   "counts": {
-    "open": 41,
+    "open": 42,
     "in_progress": 3,
     "closed": 255
   },
@@ -624,6 +624,15 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript.md"
+    },
+    {
+      "id": "pipeline.codex-runner-has-no-real-support-on-native-windows",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Live external greenfield test, 2026-08-19: project Rune_Test1_Codex_060_55, Windows host, Codex CLI, candidate 0.6.0+codex.20260819163512.ca18e0c. PO pasted the full session transcript; a companion fix (NVA-BL-CASWIN-1, scoped narrowly to the self-contradicting recovery message) was dispatched the same session. This item is the PO's own explicitly deferred second half: \"Für einen späteren sprint bzw. defered ein neues backlog item setzen, dass codex windows support noch gebaut werden muss.\"",
+      "deferred": true
     },
     {
       "id": "pipeline.codex-sandbox-critic-longterm",

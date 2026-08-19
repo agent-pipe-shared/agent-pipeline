@@ -55,6 +55,7 @@
 | pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | closed | idea | pipeline | 2026-08-09 | — |
+| pipeline.codex-runner-has-no-real-support-on-native-windows | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.codex-sandbox-critic-longterm | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | 2026-08-17 | — |
@@ -307,6 +308,6 @@
 
 ## Counts
 
-- open: 41
+- open: 42
 - in_progress: 3
 - closed: 255
