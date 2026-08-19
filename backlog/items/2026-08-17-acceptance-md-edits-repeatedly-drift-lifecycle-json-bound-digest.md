@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "this session's own feature-package-topology digest-binding, hit twice"
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "82be6796c918882cfbe74c48b82598b010b745f4"
+closure_evidence: "backlog/items/2026-08-17-acceptance-md-edits-repeatedly-drift-lifecycle-json-bound-digest.md"
 ---
 
 # every acceptance.md edit drifts lifecycle.json's bound digest, needing a PO-signed reconcile
@@ -115,3 +119,30 @@ informed by it.
   was filed against is only partially closed (a manual/deliberate remedy
   exists; no automatic one does, and the investigation shows an automatic
   one at the CLI write-path level cannot be built safely).
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — the remaining design question is resolved. This
+  item's own text left exactly one still-open question: "whether a routine,
+  non-transparent trigger (e.g. a dedicated CLI verb an operator or Elephant
+  invokes explicitly, rather than a silent side effect of apply/reconcile)
+  should be built." `PHX-WP-MUTABLE-REBIND-EXPLICIT-CLI` (commit `82be6796`)
+  built exactly that: `feature-package-rebind-mutable`, a standalone CLI
+  verb that is the ONLY call site in `pipeline-state.mjs` ever passing
+  `autoRebindMutable: true` — never a silent side effect of any existing
+  verb (a regression test confirms `feature-package-apply` stays unwired).
+  Deliberate, auditable, explicitly operator/Elephant-initiated — none of
+  the tamper-detection risk the CLI-write-path attempt correctly avoided
+  applies here, since there is no approval-bound preview digest to defeat.
+  5/5 new tests pass (mutable-class rebind, immutable-class boundary,
+  clean no-op, missing-argument refusal, apply-stays-unwired regression
+  guard); full `pipeline-state` suite 534/534, no regressions.
+- **Rationale:** Both remedies this item's Proposal ultimately converged on
+  now exist: the library-level capability (`836d0ff2`) and its dedicated,
+  safe, explicit CLI trigger (`82be6796`). Nothing further is undecided.
+- **Note:** the new test file (`plugins/pipeline-core/scripts/pipeline-state-rebind-mutable.test.mjs`)
+  is not yet registered in `harness/scripts/verify.mjs` — that file is
+  TP-3-protected and the session's GMW window (see checkpoint 48) expired
+  before this landed; needs the same HGO ceremony as the other pending
+  TP-3/TP-4/TP-7 items to complete registration.
+- **Date:** 2026-08-19
