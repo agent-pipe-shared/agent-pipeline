@@ -684,7 +684,21 @@ rather than quietly softened.
   it, and is recorded here as a dependency rather than specified as a
   standalone implementation step this document schedules.
 
-### 5.5 `policyDigest`: the closed preimage, and why it is not the trust anchor
+  **UPDATE, 2026-08-19 (`PHX-WP-HAC11-D1-GMW-WIRING`, commit `a910ed06`).**
+  The GMW call site landed, after the §7.4 portable-side wiring it depends on
+  (commit `3504b707`): `install` accepts an optional `--attribution-key-file`
+  and, when supplied, appends one restricted `pipeline.human-decision-attribution.v1`
+  event via `buildWindowAttributionEvent`/`sealGovernanceEvent`/
+  `putRestrictedGovernanceEvent`, fail-open and additive exactly as specified
+  above. Independently re-verified: 9/9 tests pass
+  (`scripts/guard-maintenance-window.test.mjs`), including a structural
+  no-correlator assertion on the stored record. No `--attribution-store-root`
+  flag was named by this section, so the store root is derived deterministically
+  (`~/.pipeline/governance-restricted/guard-maintenance-window/<fingerprint>`,
+  mirroring `external-push-ledger.mjs`'s existing outside-repo convention) rather
+  than left unresolved — a disclosed implementation choice, not a design
+  amendment. Registration in `harness/scripts/verify.mjs` remains open
+  (TP-3 protected, no in-session edit path).
 
 `policyDigest` was the one digest in this design left as prose ("the effective
 proof-policy inputs"). That is not admissible: the only proof policy in the GMW
