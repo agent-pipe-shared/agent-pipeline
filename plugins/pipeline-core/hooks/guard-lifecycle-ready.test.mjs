@@ -550,6 +550,40 @@ test("agents prepare and verify only public PO artifacts while human signing sta
   }
 });
 
+// 2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md: the guard's
+// isHumanPoSigningCommand() list named only three of the six human-terminal signing
+// subcommands (setup, approve, approve-all), missing approve-critical, authorize-critical and
+// sign-intent -- the three added after the list was first written. This regression test proves
+// those three newly-recognized commands are now classified as external-signing-only, matching
+// the already-covered setup/approve/approve-all behaviour.
+test("newly-recognized human-signing commands (approve-critical, authorize-critical, sign-intent) stay external", () => {
+  const path = root();
+  const external = mkdtempSync(join(tmpdir(), "guard-lifecycle-po-signing-"));
+  const readiness = {
+    schema: "pipeline.project-onboarding-ready-gate.v1",
+    status: "ready",
+    intent: "session",
+  };
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of [
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} approve-critical --repo-root ${path} --directory ${external} --kind push`,
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} authorize-critical --repo-root ${path} --directory ${external} --feature-id cyb-4 --plan plan.md --spec spec.md --kind push --subject-sha256 ${"a".repeat(64)} --expires-at 2026-08-21T00:00:00Z`,
+      `node ${PO_HUMAN_APPROVAL_SCRIPT} sign-intent --repo-root ${path} --directory ${external} --intent-sha256 ${"b".repeat(64)}`,
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return readiness; },
+      });
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, /human-terminal actions/u, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(external, { recursive: true, force: true });
+  }
+});
+
 // GF-078 bug 3: isForbiddenCrossRepositoryMutation()'s blanket `poApprovalArgs(...) !== null`
 // branch fired for ANY po-approval-gate.mjs invocation outside the narrow
 // isAgentPoPublicCommand shapes -- including a bare, argument-free --help/--version, which
