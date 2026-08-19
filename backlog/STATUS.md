@@ -210,7 +210,7 @@
 | pipeline.po-key-directory-default-should-be-repo-scoped-not-machine-wide | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.po-key-trust-anchor-onboarding | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.po-language-is-set-without-asking-and-cannot-be-changed | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.post-compact-reground-carries-no-state-md-narrative | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.post-compact-reground-carries-no-state-md-narrative | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.prd-spec-depth-collapses-relative-to-design-input | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.pre-existing-failure-claims-need-evidence | closed | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.preflight-user-and-matching-project-scope-still-collide-as-ambiguous | closed | defect | pipeline | 2026-08-11 | — |
@@ -307,6 +307,6 @@
 
 ## Counts
 
-- open: 52
+- open: 51
 - in_progress: 6
-- closed: 241
+- closed: 242

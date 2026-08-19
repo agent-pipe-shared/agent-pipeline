@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "79ddef50dce876fe6f1848304bf8072eafd041837113e8ccfd9dbb9a722fe538"
+    "transitionHead": "0cfe48b7813b4695cf14306ef5717a2da88459bc0ee67f3b7e559cb03d56a733"
   },
   "counts": {
-    "open": 52,
+    "open": 51,
     "in_progress": 6,
-    "closed": 241
+    "closed": 242
   },
   "items": [
     {
@@ -2520,12 +2520,16 @@
     },
     {
       "id": "pipeline.post-compact-reground-carries-no-state-md-narrative",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
       "source": "PO question this session (2026-08-19 afternoon): why did the Elephant not know its own state after /compact. Diagnosed live by reading plugins/pipeline-core/hooks/post-compact-reground.mjs directly, not inferred.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "a035723503ea62562c95fad80976fc375cad2f19",
+      "closureEvidence": "backlog/items/2026-08-19-post-compact-reground-carries-no-state-md-narrative.md"
     },
     {
       "id": "pipeline.prd-spec-depth-collapses-relative-to-design-input",
