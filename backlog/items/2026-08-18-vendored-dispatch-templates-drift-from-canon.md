@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.vendored-dispatch-templates-drift-from-canon
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch, preamble narrative (2026-08-11 'NOVA-CLOSING-ALLOWANCE-01' entry). Finding surfaced by a read-only research fork, verified against current source before filing."
 ---
@@ -63,3 +63,23 @@ drift is caught mechanically rather than rediscovered by extraction passes.
   bounded task, not something to do inline while mid an unrelated rotation
   pass.
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19 (Wave 5 round 1, dispatch NVA-W5-02, retried)
+
+Both vendored copies re-synced byte-for-byte with their canonical
+counterparts (`diff` produces no output for either pair). A new
+standalone guard, `plugins/pipeline-core/scripts/check-vendored-template-sync.mjs`
+(+ its `.test.mjs`, 4/4 pass), pins byte-equality going forward and
+fails loud on divergence — not wired into `harness/scripts/verify.mjs`
+(TP-protected, needs a separate signed ceremony; noted as a follow-up).
+A first dispatch attempt at this exact task produced no commit and an
+empty result; the retry succeeded (commit `de477b2a`, cherry-picked
+onto trunk as `4c97d9d8`). One post-landing fix was needed and applied
+directly (commit `e8ded04c`): the new guard's own doc comment named
+`harness/scripts/verify.mjs`, a Pipeline-source-only path that doesn't
+exist in a consumer project — caught by `check-consumer-safe-paths.test.mjs`
+only after combining this change with the rest of Wave 5 round 1 on
+trunk (the dispatch's own isolated-worktree run of that same suite had
+reported 9/9 pass, before this line existed in that exact form — a
+timing/ordering artifact, not a suite defect). Reworded to describe the
+file by role rather than by path; suite now 9/9 clean.
