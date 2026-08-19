@@ -38,7 +38,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { criticalProofWaiverFor } from "../lib/critical-human-proof-policy.mjs";
+import { criticalProofWaiverFor, readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   HumanGuardOverrideError,
   authorizeHumanGuardOverride,
@@ -204,13 +204,13 @@ try {
   });
 
   check("OT09 the mode is read from pipeline.user.yaml, which GS-1 protects", () => {
-    // If the setting were readable from somewhere an agent may write, the gate would be a
-    // request again. Pinned against the shared reader's own source path.
-    const source = String(spawnSync(process.execPath, ["-e",
-      `process.stdout.write(require("fs").readFileSync(${JSON.stringify(join(HOOKS, "..", "lib", "critical-human-proof-policy.mjs"))}, "utf8"))`],
-    { encoding: "utf8" }).stdout);
-    assert.match(source, /USER_SOURCE_PATH/u);
-    assert.match(source, /gates\?\.push_approval/u);
+    // Exercises the actual gate-approval-mode resolution path for push_approval, rather
+    // than grepping source for one implementation's literal property access (c6bd3a6b
+    // generalized it to a table-driven lookup).
+    const root = fixture({ mode: "chat" });
+    const resolved = readPushApprovalMode(root);
+    assert.equal(resolved.mode, "chat");
+    assert.equal(resolved.source, "pipeline.user.yaml");
   });
 
   // ---- F3: the allow path, which no test walked until now -------------------------
