@@ -4,6 +4,10 @@ id: pipeline.po-key-trust-anchor-onboarding
 type: workflow-improvement
 owner: pipeline
 status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 7bc32a977e3b96b97edde411ced94964948d1311
+closure_evidence: backlog/items/2026-08-18-po-key-trust-anchor-onboarding.md
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-7 (priority P1)"
 ---
