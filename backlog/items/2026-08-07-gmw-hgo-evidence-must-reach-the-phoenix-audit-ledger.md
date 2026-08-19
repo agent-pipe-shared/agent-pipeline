@@ -145,3 +145,74 @@ mapping above.
 - **Rationale:** (1) is mechanical once agreed and the enumeration is simply wrong without it. (2) is the smaller change per the item's own Proposal and preserves the machine-local/portable split H-AC-05 needs. (3) is what H-AC-05/H-AC-11/H-AC-13 already specify; the residual join-handle gap was already surfaced and reasoned about in the linked design doc rather than invented here.
 - **Assignment:** Dispatch-ready once the finalized GMW lands from the other session (sequencing constraint from the item itself); the H-AC-12 amendment and field mapping can proceed independently now.
 - **Date:** 2026-08-18
+
+### Progress note — GMW half complete, HGO half stays open (2026-08-19, PHX-WP-GMW-LEDGER-EMISSION)
+
+- **What landed.** `install` and `close`
+  (`plugins/pipeline-core/scripts/guard-maintenance-window.mjs`) now emit
+  portable PHX-2 governance-ledger events via the existing
+  `guard-authority-ledger-intake.mjs` builders (`buildWindowRequestDecision`,
+  `buildWindowGrantDecision`, `buildWindowRevocationDecision`,
+  `buildAppendIntent`) plus `human-governance-ledger.mjs`'s
+  `appendHumanGovernanceDecision`/`queryHumanGovernanceDecisions` — the design's
+  §7.4 sequence. `install` appends `requested`+`granted` before arming (skipped
+  when a still-live grant for the same signed request already exists), then
+  `installGuardMaintenanceWindow` verifies/arms exactly as before; a post-append
+  install failure gets a best-effort `revoked(GUARD.MAINTENANCE.NOT_ARMED)`
+  disposition that never masks the original install error. `close` reads the
+  about-to-be-closed window's ledger identity — one new additive
+  `intentSha256` field on `currentGuardMaintenanceWindow`'s return
+  (`plugins/pipeline-core/lib/guard-maintenance-window.mjs`), read-only,
+  no change to install/close's own logic or to GMW's storage contract — and
+  best-effort appends `revoked(GUARD.MAINTENANCE.CLOSED)`; the file-level
+  narrowing itself always runs regardless of the ledger append's outcome
+  (§8.1 fail-open-toward-narrowing). GMW's machine-local
+  `window.json`/`request.json` storage and deletion behaviour is unchanged.
+  New CLI-level regression suite,
+  `plugins/pipeline-core/scripts/guard-maintenance-window.test.mjs` (6/6
+  passing): install round trip (asserts `requested`+`granted`, scope, digests,
+  `authorityClass`/`identityAssurance`, and the `GUARD.MAINTENANCE.WINDOW_UNATTESTED`
+  fallback reason code since GMW's subject carries no `reasonCode` field),
+  idempotent re-install skip (no duplicate grant), a failed-proof install still
+  leaving a `revoked(NOT_ARMED)` trail with no window armed, close round trip
+  (`revoked(CLOSED)` linked to the grant, file-level narrowing unaffected),
+  no-op close on an absent window, and a boundary test asserting the emitted
+  portable decisions structurally cannot and do not carry natural-person
+  attribution, the trust-anchor public key, the free-text reason, or the
+  absolute repository path. H-AC-12's enumeration already named GMW before
+  this dispatch started (commit `b1c57d2c`) — verified against current source,
+  not re-touched.
+- **Why this item stays open.** The item's own scope names BOTH GMW and HGO.
+  HGO's *pure builder* machinery (`buildOverrideDecisions` in
+  `guard-authority-ledger-intake.mjs`) already existed and is unit-tested
+  (`PHX-WP-HAC11-D1-DESIGN-SPEC`, commit `22d8ef09`), but — re-verified
+  directly against source for this dispatch —
+  `plugins/pipeline-core/scripts/guard-human-override.mjs` does not import or
+  call `guard-authority-ledger-intake.mjs` anywhere: the CLI-level producer
+  wiring analogous to what this dispatch just built for GMW does not exist yet
+  for HGO. This dispatch's briefing explicitly scoped that out ("Do not touch
+  HGO's own evidence-intake code..."), so it was not attempted here. The HGO
+  half needs its own dispatch before this item can close.
+- **Also disclosed, not silently dropped.** (1) The full design §7.3
+  concurrent-race byte-identical-adoption logic is not implemented for GMW's
+  `install` wiring — a losing concurrent racer fails closed on the store's own
+  `GES-IDEMPOTENCY-CONFLICT` instead of adopting the winner's record, which
+  still satisfies "no window arms without a matching ledger trail" but is
+  narrower than the design's full §7.3 spec; the DoD's required tests do not
+  exercise concurrent racing. (2) Registering the new suite in
+  `harness/scripts/verify.mjs`'s central `TEST_SUITES` list was attempted and
+  refused in-session by `guard-testpath` (TP-3: an unconditional external
+  human-signed override requirement for any edit to that file, no in-session
+  activation available) — the suite passes standalone
+  (`node --test plugins/pipeline-core/scripts/guard-maintenance-window.test.mjs`)
+  but is not yet wired into the full verify gate. (3) The CLI's own `prepare`
+  command does not forward `authorshipMode`/`stage0Selfcheck` to
+  `prepareGuardMaintenanceWindowRequest`, so `guard-maintenance-window.mjs
+  prepare` always fails `GMW-AUTHORSHIP-MODE-INVALID` today — a pre-existing
+  defect, unrelated to and not touched by this dispatch's install/close-only
+  scope (the new tests build the signed request through the library function
+  directly instead, exactly as `lib/guard-maintenance-window.test.mjs` already
+  does). Worth its own backlog item if not already tracked.
+- **Evidence:** commit(s) landing this progress note (see this file's own git
+  history from this date forward).
+- **Date:** 2026-08-19
