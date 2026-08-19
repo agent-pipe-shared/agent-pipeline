@@ -150,7 +150,7 @@ function compactStdout(input, projectDir) {
     ? authority.state
     : (existsSync(join(rootDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
   const state = loadStateSafe(join(rootDir, statePath));
-  const { stdout } = decideOutput(input, state);
+  const { stdout } = decideOutput(input, state, { rootDir });
   return stdout || null;
 }
 

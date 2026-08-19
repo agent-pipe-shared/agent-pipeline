@@ -11,10 +11,13 @@ import { fileURLToPath } from "node:url";
 import {
   buildRegroundMessage,
   decideOutput,
+  extractLiveStateNarrative,
+  loadStateNarrativeExcerptSafe,
   loadStateSafe,
   resolveRegroundProjection,
   shouldActivate,
 } from "./post-compact-reground.mjs";
+import { STATE_EXCERPT_MAX_BYTES, STATE_EXCERPT_TRUNCATION_MARKER } from "../lib/bootstrap-payload-budget.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./post-compact-reground.mjs", import.meta.url));
 const FEATURE = "phase26-test";
