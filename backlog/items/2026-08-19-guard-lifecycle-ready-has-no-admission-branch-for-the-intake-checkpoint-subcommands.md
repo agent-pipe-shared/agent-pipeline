@@ -5,6 +5,10 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 6cc76ee3602b0f2b59700bea5d6223b25a17adc4
+closure_evidence: backlog/items/2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md
 source: "Nova Wave 4, dispatch NVA-W4-COORD-1 (intake-checkpoint coordinator Phase 1) — found and named while implementing, not fixed in that dispatch's scope"
 ---
 
