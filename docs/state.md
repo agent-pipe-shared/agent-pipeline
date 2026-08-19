@@ -3,11 +3,25 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 64)
+**Last updated:** 2026-08-19 (checkpoint 65)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
 **Recovered Sentinel-epic normative documents** (retained per `backlog/items/2026-07-20-spec-retention-on-close.md`, enforced by `governance/spec-retention.json` + `check-spec-retention.mjs`; this section must keep linking all seven — do not prune it when trimming older checkpoints): [PRD](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md), [Spec](../specs/2026-07-19-sprint-sentinel-epic/spec.md), [acceptance matrix](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md), [reconciliation design](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md), [recovery record](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md), [platform-support contract](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md), [Windows blockers scope](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
+
+---
+
+## CHECKPOINT — 2026-08-19 (65): hook registration DONE, both backlog items closed, GMW window closed cleanly; 3 of 4 pre-existing reds now green (READ THIS FIRST)
+
+**Hook registration complete.** The V2 dispatch's own edit was correct for `verify.mjs` but hit a NEW, unrelated pre-existing gap in `docs/product-capability-inventory.json` (`guard-maintenance-window-cli-tests` — registered in `verify.mjs` from earlier GMW work, never added to the inventory) that made its own DoD check unsatisfiable regardless of how correct its briefed diff was — a scoping miss in how the item was briefed, not a dispatch failure. Diagnosed directly (a small Node script diffing `discoverSurfaces()` against the declared inventory) and split into two honest commits: `14bebfe6` (the goldfish's actual briefed diff, `Commit-Act: orchestrator` since the dispatch itself truncated before its own commit step) and `81cbba4f` (the Elephant's own isolated one-entry fix for the unrelated gap). Both `verify-suite-registration-check` and `check-product-capability-inventory.test.mjs` (16/16) now genuinely pass. Both backlog items closed with real evidence (`329ac49c`).
+
+**GMW ceremony fully landed and cleaned up.** Three portable ledger events now committed (`24acc653` request+grant, `ac1afc86` the close/revoke) — closed the window immediately once its TP-3 scope was no longer needed (the still-in-flight shell-grammar rework only touches `guard-lifecycle-ready.mjs`, not `verify.mjs`).
+
+**Status of the 4 original pre-existing reds: 3 fixed, 1 still open.** `spec-retention-check` ✅, `security-scan`'s gitleaks finding ✅, `verify-suite-registration-check` + `product-capability-inventory-tests` ✅ (this checkpoint) — only `security-scan`'s OTHER scanners (osv-scanner/semgrep/license-check) and a fresh full-gate run remain to confirm.
+
+**Still in flight:** `PHX-WP-READONLY-GRAMMAR-WIDEN-CRITIC-FIX1` (fixing Critic round-1's blocker+2 major findings on the shell-grammar commit).
+
+**PO instruction, this window:** once the shell-grammar topic is fully closed (rework verified, round-2 delta Critic disposed), do a clean cut here and push the current state to `origin/sprint_phoenix` — the promised final-gates sequence (fresh full Verify → `security-scan.mjs` → push-approval ceremony → push) is the literal next step after that, not a separate later ask.
 
 ---
 
