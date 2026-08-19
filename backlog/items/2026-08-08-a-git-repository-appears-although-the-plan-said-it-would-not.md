@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.git-appears-despite-initializes-git-false
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-22
 source: "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-4)."
@@ -70,3 +70,16 @@ seed-through-kickoff sequence. Not reproducible in this repository.
 - **Assignment (if accepted):** next available Nightwing slot — start with a
   fresh-directory onboarding run per the item's own Direction step 1.
 - **Date:** 2026-08-17
+
+## Closure, 2026-08-19
+
+PO decision, 2026-08-19: close now as a false-positive rather than
+leave it deferred to Sprint Nightwing. This item's own 2026-08-17
+Triage could not reproduce the reported state in this repository, and
+the current `plan()` logic
+(`project-onboarding-v3.mjs`, `initializesGit = !hostManaged &&
+(inspected.status === "fresh" || !inspected.entries.includes(".git"))`)
+reads as correctly gated on inspection — no undisclosed initialization
+path was found. Per PO instruction: closing now; if the disclosure
+mismatch is observed again in a future onboarding run, file a new
+backlog item rather than reopening this one.

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.session-scratchpad-is-unwritable-under-the-cross-repo-guard
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
 ---
@@ -267,3 +267,19 @@ Closure section (both explicitly out of scope for this dispatch — closure is
 decided centrally after Critic review).
 
 Commit SHA and branch reported separately by the dispatching Elephant.
+
+## Closure, 2026-08-19
+
+PO decision, 2026-08-19: close now. Candidate 2's implementation
+(dispatch NVA-W1-10, 2026-08-18) is complete: onboarding wiring,
+collision-free per-dispatch naming, and the `roles/critic.md` honest
+rewrite were all already in place; the one genuine gap (ADR-0059 never
+recording that `GUARD-CROSS-REPO-MUTATION` also blocks the host-temp
+scratchpad) was fixed and tested
+(`guard-lifecycle-ready.test.mjs`, 113/113 pass). The
+Critic-contract contradiction this item exists to close is treated as
+informally satisfied: every Critic dispatch this session has used
+`scratch/<codename>-<hex>/` successfully, with zero
+`GUARD-CROSS-REPO-MUTATION` refusals against the in-repo scratch path.
+Per PO instruction, if this friction resurfaces in a future session, it
+gets a new backlog item rather than reopening this one.

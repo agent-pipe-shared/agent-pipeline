@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.windows-posix-mode-bit-checks-are-meaningless-on-ntfs
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "PO, 2026-08-18, relaying a diagnosis from a separate Windows Claude Code session working on an unrelated consumer project ('Toolbox'), which vendors the same `plugins/pipeline-core` source via the marketplace. `project-onboarding-v3.mjs inspect --intent session` was returning `continuity-observation-unavailable` on that Windows machine even though pipeline-state.json/PRD/spec content was independently verified byte-correct (checked via `certutil -hashfile`). Two of the reported hit locations (`lib/onboarding-continuity.mjs:617,625`, `lib/local-supervisor-state.mjs:61,65,69`) were independently spot-checked against this repo's own current source and confirmed to match exactly, including that this exact same file already has correct win32-aware branching elsewhere (onboarding-continuity.mjs:1211,4482) but not at the two reported lines -- corroborating the report rather than taking it on faith."
 ---
@@ -248,3 +248,16 @@ Not yet decided. Suggested approach for whoever picks this up:
   7 suites above (plus the two regression suites) live before this item is
   treated as closed.
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19
+
+PO decision, 2026-08-19: close now. All 7 files were fixed 2026-08-18
+(dispatch NVA-WINMODE-1) with the `platform === "win32"` DACL-delegation
+pattern (`assessWindowsPrivatePath`); POSIX behavior is byte-for-byte
+unchanged in every file, confirmed by the 7 suites' regression passes
+listed above. This item's own withheld-closure condition — "whoever
+next runs a native-Windows session against this branch should re-run
+all 7 suites above ... live before this item is treated as closed" —
+is now satisfied: the PO independently ran a live-Windows verification
+on 2026-08-18 and confirmed success. Closing per that live
+confirmation.
