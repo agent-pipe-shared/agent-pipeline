@@ -56,7 +56,7 @@
 | pipeline.doc-reconciliation-blind-to-adr-corpus-changes | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.documentation-information-architecture | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.el-01-has-no-in-session-tripwire | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.el-01-has-no-in-session-tripwire | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.elephant-authored-production-diff-closed-its-own-gating-criterion | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.elephant-direct-implementation-under-afk-authorization | in_progress | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.epic-file-contract-has-no-drift-check | closed | defect | pipeline | 2026-08-09 | — |
@@ -74,7 +74,7 @@
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | closed | defect | pipeline | 2026-07-29 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-testpath-not-kernel-protected | closed | defect | pipeline | 2026-08-10 | — |
-| pipeline.guard-testpath-override-ot09-stale-literal-pattern | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.guard-testpath-override-ot09-stale-literal-pattern | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2 | open | requirement | pipeline | 2026-08-18 | — |
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | 2026-08-08 | — |
@@ -84,7 +84,7 @@
 | pipeline.immutable-manifest-entries-can-be-rebound-with-no-amendment-record | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.installed-plugin-gmw-hgo-v3-anchor-gap-blocks-all-protected-edits | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-backed-plan-and-push-authority-absent-on-merged-base | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | open | requirement | pipeline | 2026-08-17 | — |
 | pipeline.live-plugin-root-undefended-in-the-shell-lane | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.local-plugin-install-attestation-does-not-bind-external-marketplace-root | closed | defect | pipeline | 2026-08-06 | — |
@@ -155,7 +155,7 @@
 | pipeline.spec-retention-on-close | open | defect | pipeline | 2026-07-20 | — |
 | pipeline.stateful-design-contract-template | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.t1-governance-path-preflight | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | open | workflow-improvement | pipeline | 2026-08-07 | — |
+| pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete | closed | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.the-ledger-reconciler-writes-before-the-items-are-validated | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.trust-mismatch-names-neither-key-nor-directory | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key | closed | defect | pipeline | 2026-08-09 | — |
@@ -173,8 +173,8 @@
 
 ## Counts
 
-- open: 16
+- open: 12
 - in_progress: 25
-- closed: 112
+- closed: 116
 - rejected: 1
 - deferred: 11

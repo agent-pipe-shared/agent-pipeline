@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6cd4eb7053c466aef552f2b3cf8db331a87b2853f12f2112690af00c7a96579e"
+    "transitionHead": "8b3b0e80c7b0c31e11ae192afa0ba22b1a3d6b09d7c5d77cfb73fd826884e46a"
   },
   "counts": {
-    "open": 16,
+    "open": 12,
     "in_progress": 25,
-    "closed": 112,
+    "closed": 116,
     "rejected": 1,
     "deferred": 11
   },
@@ -558,11 +558,15 @@
     },
     {
       "id": "pipeline.el-01-has-no-in-session-tripwire",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "Critic finding F-A, Phoenix gate-integrity delta re-review round 2, 2026-08-08: the orchestrator-authored commit e7f6e96 was caught after the fact, not at write time."
+      "source": "Critic finding F-A, Phoenix gate-integrity delta re-review round 2, 2026-08-08: the orchestrator-authored commit e7f6e96 was caught after the fact, not at write time.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "8fcd369c91ad97f11ccf47d0e18290768e8e24cf",
+      "closureEvidence": "plugins/pipeline-core/hooks/hooks.json"
     },
     {
       "id": "pipeline.elephant-authored-production-diff-closed-its-own-gating-criterion",
@@ -751,11 +755,15 @@
     },
     {
       "id": "pipeline.guard-testpath-override-ot09-stale-literal-pattern",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Found by PHX-WP-TESTPATH-GATESTRENGTH-TRIAGE while diagnosing 5 failing guard-testpath/gate-strength suites from a full clean-candidate Verify run, 2026-08-18/19."
+      "source": "Found by PHX-WP-TESTPATH-GATESTRENGTH-TRIAGE while diagnosing 5 failing guard-testpath/gate-strength suites from a full clean-candidate Verify run, 2026-08-18/19.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "0f50c9bd6a56a62e08f451381b4dcf93cef0f287",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-testpath-override.test.mjs"
     },
     {
       "id": "pipeline.h-ac-11-restricted-profile-intake-record-is-design-increment-2",
@@ -859,11 +867,15 @@
     },
     {
       "id": "pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Found by PHX-WP-LEDGER-EVENT41-HASH-FIX while resolving the last remaining backlog-state-check failure, 2026-08-19."
+      "source": "Found by PHX-WP-LEDGER-EVENT41-HASH-FIX while resolving the last remaining backlog-state-check failure, 2026-08-19.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "05c851b75f7ff4c1fa10c390aa20524fda4a31b8",
+      "closureEvidence": "backlog/items/2026-08-19-ledger-genesis-event-hash-rebind-has-no-amendment-mechanism.md"
     },
     {
       "id": "pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape",
@@ -1630,11 +1642,15 @@
     },
     {
       "id": "pipeline.technical-lock-for-pipeline-consent-before-onboarding-complete",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
+      "source": "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "8fcd369c91ad97f11ccf47d0e18290768e8e24cf",
+      "closureEvidence": "plugins/pipeline-core/hooks/hooks.json"
     },
     {
       "id": "pipeline.the-ledger-reconciler-writes-before-the-items-are-validated",
