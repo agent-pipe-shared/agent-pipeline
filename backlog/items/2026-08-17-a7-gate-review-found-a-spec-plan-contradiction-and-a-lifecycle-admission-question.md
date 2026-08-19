@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-17
 source: "Nova A Slice A7 comprehensive gate Critic review (continuation dispatch), 2026-08-17, findings F3 (major) and F4 (minor). Both are documentation/spec-conformance questions deliberately NOT resolved unilaterally by the Elephant, per spec.md's own rule that a contradiction fails closed to the applicable human gate rather than being silently narrowed."
+closed_at: "2026-08-19T11:39:04Z"
+closure_repository: self
+closure_commit: "fe645b8290de651f48f0a638db1841eb15915481"
+closure_evidence: "backlog/items/2026-08-17-a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question.md"
 ---
 
 # A7 gate review found a spec/plan contradiction (F3) and a lifecycle-admission question (F4)
