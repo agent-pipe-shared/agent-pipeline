@@ -94,3 +94,33 @@ and the (correctly reported) TP-3 block on registering it. **Item stays
 `open` for piece 1** — needs its own follow-up `goldfish-deep` dispatch,
 scoped to extend `guard-git.mjs` (never `hooks.json`, which is TP-4-protected
 and has no in-session route).
+
+### Correction, 2026-08-19: piece 2's "registered as its own verify suite" claim was wrong in substance
+
+The final Slice-A7 T1 Critic gate review (dispatch against candidate
+`84734af0`, base `83f564df`) found, as its top finding (F1, major): the
+`state-numeric-claims-tests` suite registered in `harness/scripts/verify.mjs`
+(commit `b3b07fc5`) points at `check-state-numeric-claims.test.mjs` — the
+linter's own fixture-test file, which only ever exercises a synthetic temp
+root — never at the actual checker (`check-state-numeric-claims.mjs`)
+against the real repository root. The pattern this should have mirrored is
+already present one line above in `verify.mjs`: `backlog-state-check`
+registers the *checker* (`check-backlog-state.mjs`), with its unit tests
+registered separately. So the live gate this piece exists to provide never
+actually runs against `docs/state.md`; only its unit tests run. A stale
+"N/M closed" claim would still pass a full Verify today.
+
+No information was lost — `check-state-numeric-claims.mjs`'s live-mode
+entry point (`process.exit(2)` on findings) is implemented and works when
+invoked directly; it is simply not wired into `verify.mjs`'s registered
+suite list. **Item stays `open`; this correction adds a second, now
+higher-priority piece 2b:** register `check-state-numeric-claims.mjs`
+itself (not just its tests) as a verify suite, mirroring the
+`backlog-state-check` pattern. `verify.mjs` is TP-3-protected, so this
+needs its own fresh signed HGO ceremony (a PO `sign-intent` action outside
+the session) before it can land — not attempted this session block; the PO
+was asked how to sequence this against the pending local candidate stamp
+and did not respond in-session, so the Elephant proceeded with the lowest-
+risk default (stamp a local test candidate now, documenting this gap
+rather than silently treating piece 2 as complete) per the session's
+standing auto-mode guidance rather than blocking indefinitely.
