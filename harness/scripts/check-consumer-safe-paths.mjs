@@ -383,6 +383,18 @@ export const ALLOWLIST = Object.freeze([
       "Class B: header doc comment describing this standalone diagnostic's own relationship to the calibrated Verify gate (deliberately not registered in it), not a consumer-facing path assumption.",
   },
   {
+    file: "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
+    match: "harness/scripts/generate-agent-obligations.mjs (elephant-generated)",
+    reason:
+      "Class B: doc comment example of the elephant-generated trailer form naming this repository's own generator script, self-application-only (the closed ELEPHANT_GENERATOR_ALLOWLIST below only ever names scripts that exist in THIS repo's harness/, never a consumer path assumption).",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs",
+    match: "\"harness/scripts/generate-agent-obligations.mjs\",",
+    reason:
+      "Class B: ELEPHANT_GENERATOR_ALLOWLIST's Map key and scriptPath field both end in this exact substring, this repository's own generator script -- same self-application-only reasoning as the doc comment entry above.",
+  },
+  {
     file: "plugins/pipeline-core/scripts/tmp-leak-guard.mjs",
     match: "wired into `harness/scripts/verify.mjs`",
     reason:
