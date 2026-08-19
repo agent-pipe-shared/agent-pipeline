@@ -45,6 +45,16 @@ function fixture({ items = [], events = [], evidenceFiles = [] } = {}) {
       `---\n${lines.join("\n")}\n---\n\n# ${meta.id}\n\n## Description\n\nFixture body.\n`,
     );
   }
+  // Committed as its own step, separate from the "fixture" commit above: the tool's
+  // primary, documented use case is reconciling item files that were already
+  // committed in the past (edited-Markdown-directly drift), so a realistic fixture
+  // must give the item files a real, containing commit too — the same property
+  // resolveItemFileCommit() now requires before it will cite the baseline as
+  // evidence for a non-closing step.
+  if (items.length > 0) {
+    git(base, "add", "-A");
+    git(base, "commit", "-qm", "items");
+  }
   const chain = [];
   for (const [index, event] of events.entries()) {
     const full = {
@@ -135,11 +145,18 @@ try {
     });
     const path = join(base, "backlog", "items", "2026-07-01-gamma.md");
     writeFileSync(path, readFileSync(path, "utf8").replace("PLACEHOLDER", head));
-    const plan = planBacklogReconciliation(base, { at: "2026-08-06", commit: "0".repeat(40) });
+    // The item's own closure_commit (head) is deliberately the PRE-items commit —
+    // real, but distinct from the reconciliation baseline (the "items" commit
+    // fixture() adds afterward), so a match on `head` can only come from
+    // resolveClosureCommit(), never from a baseline pass-through.
+    const baseline = git(base, "rev-parse", "HEAD");
+    assert.notEqual(baseline, head, "the fixture must give the baseline and the closure_commit different values");
+    const plan = planBacklogReconciliation(base, { at: "2026-08-06" });
+    assert.equal(plan.ok, true, plan.findings.join("; "));
     const closing = plan.planned.at(-1);
     assert.equal(closing.to, "closed");
     assert.equal(closing.evidence.commit, head);
-    assert.equal(plan.planned[0].evidence.commit, "0".repeat(40));
+    assert.equal(plan.planned[0].evidence.commit, baseline, "a non-closing step cites the baseline once it genuinely contains the item file");
   });
 
   check("RBL05 a closure whose evidence file is missing is blocked, and nothing is written", () => {
@@ -354,6 +371,42 @@ try {
     assert.equal(applied.ok, false);
     assert.equal(applied.wrote, false);
     assert.equal(readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8"), before, "nothing is written when the candidate event is refused");
+  });
+
+  check("RBL18 a fresh item's first (open) ledger event's evidence.commit genuinely contains the item file", () => {
+    // Directly the defect closed here: backlog/items/2026-08-18-reconcile-backlog-
+    // ledger-evidence-commit-predates-referenced-file.md. Once the item file has a
+    // real, containing commit (fixture()'s "items" commit), the planned "open"
+    // event's evidence.commit must resolve to a commit whose tree actually holds
+    // the file — not merely a well-formed OID.
+    const { base } = fixture({ items: [ITEM("upsilon", "open")] });
+    const plan = planBacklogReconciliation(base, { at: "2026-08-18" });
+    assert.equal(plan.ok, true, plan.findings.join("; "));
+    const opened = plan.planned[0];
+    assert.equal(opened.to, "open");
+    const lsTree = git(base, "ls-tree", opened.evidence.commit, "--", "backlog/items/2026-07-01-upsilon.md");
+    assert.notEqual(lsTree, "", "evidence.commit must actually contain the referenced item file");
+  });
+
+  check("RBL19 an item file not yet reachable from the baseline is refused, not silently cited as evidence", () => {
+    // The exact pre-fix failure mode: an item file that exists only in the
+    // working tree (added AFTER the reconciliation baseline, not yet committed)
+    // — unconditionally pinning the baseline there produced an "open" event
+    // whose evidence.commit provably does not contain the file it references.
+    const { base } = fixture({});
+    mkdirSync(join(base, "backlog", "items"), { recursive: true });
+    writeFileSync(
+      join(base, "backlog", "items", "2026-08-18-phi.md"),
+      "---\nschema: \"pipeline.backlog-item.v1\"\nid: \"pipeline.phi\"\ntype: \"defect\"\nowner: \"pipeline\"\nstatus: \"open\"\ncreated: \"2026-08-18\"\nsource: \"fixture\"\n---\n\n# pipeline.phi\n\n## Description\n\nFixture body.\n",
+    );
+    const before = readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8");
+    const plan = planBacklogReconciliation(base, { at: "2026-08-18" });
+    assert.equal(plan.ok, false);
+    assert.match(plan.findings.join("\n"), /does not yet contain this item file/u);
+    const applied = applyBacklogReconciliation(base, { at: "2026-08-18" });
+    assert.equal(applied.ok, false);
+    assert.equal(applied.wrote, false);
+    assert.equal(readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8"), before, "nothing is written when the item file's baseline containment cannot be confirmed");
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);

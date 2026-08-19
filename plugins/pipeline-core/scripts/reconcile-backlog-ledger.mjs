@@ -153,6 +153,41 @@ function headCommit(root) {
   }
 }
 
+/**
+ * A non-closing event has no closure_commit field to trust the way
+ * resolveClosureCommit() above does for a closure — there is no pre-existing
+ * record of which commit first gave this item the status it is only now
+ * asserting. Unconditionally pinning the reconciliation baseline produced
+ * exactly the defect closed here (backlog/items/2026-08-18-reconcile-
+ * backlog-ledger-evidence-commit-predates-referenced-file.md): a genuinely
+ * new item file is committed TOGETHER WITH its own first ledger event, so
+ * the baseline (HEAD at planning time, necessarily still the PRIOR commit)
+ * cannot yet contain it — the tool cited a commit that provably does not
+ * hold the file it claims to reconcile.
+ *
+ * The only honest anchor is a commit that ALREADY, verifiably contains this
+ * exact item file — checked directly against the baseline's own tree, the
+ * same way resolveClosureCommit() only ever trusts what the repository can
+ * itself confirm. If the baseline does not yet contain the file, this
+ * refuses rather than fabricate a claim, mirroring the tool's own stated
+ * philosophy: "a closure whose commit is unreachable, or whose evidence
+ * file is missing OR UNTRACKED, STOPS the reconciliation for that item
+ * rather than being recorded."
+ */
+function resolveItemFileCommit(root, baseline, item) {
+  try {
+    execFileSync("git", ["cat-file", "-e", `${baseline}:${item.path}`], { cwd: root, stdio: "ignore" });
+    return { ok: true, commit: baseline };
+  } catch {
+    return {
+      ok: false,
+      finding: `${item.path}: the reconciliation baseline ${baseline} does not yet contain this item file — `
+        + "commit the item file first (it and its first ledger event cannot honestly share one commit's evidence "
+        + "unless the item file is committed before the ledger event is reconciled)",
+    };
+  }
+}
+
 export function planBacklogReconciliation(root = DEFAULT_ROOT, { at = null, commit = null } = {}) {
   const { items, findings } = readItems(root);
   const baseline = commit ?? headCommit(root);
@@ -199,7 +234,21 @@ export function planBacklogReconciliation(root = DEFAULT_ROOT, { at = null, comm
         continue;
       }
     }
+    // Resolved lazily, at most once per item: every non-closing step of the
+    // SAME item cites the same evidence, so this only needs to run once, and
+    // only when at least one planned step for this item is non-closing.
+    let itemFileCommit = null;
+    let itemFileFinding = null;
     for (let step = from + 1; step <= to; step += 1) {
+      if (ORDER[step] !== "closed" && itemFileCommit === null && itemFileFinding === null) {
+        const resolved = resolveItemFileCommit(root, baseline, item);
+        if (resolved.ok) itemFileCommit = resolved.commit;
+        else itemFileFinding = resolved.finding;
+      }
+      if (ORDER[step] !== "closed" && itemFileFinding !== null) {
+        blocked.push(itemFileFinding);
+        break;
+      }
       const event = {
         schema: TRANSITION_SCHEMA,
         sequence: chain.length + 1,
@@ -212,10 +261,12 @@ export function planBacklogReconciliation(root = DEFAULT_ROOT, { at = null, comm
         // A closing entry's evidence commit is the item's OWN recorded closure
         // commit, normalized to a full OID by resolveClosureCommit() above —
         // the checker binds the two, and a reconciliation must not substitute
-        // the reconciling HEAD for the commit that did the work.
+        // the reconciling HEAD for the commit that did the work. A non-closing
+        // entry's evidence commit is resolveItemFileCommit() above: the
+        // baseline, but only once confirmed to actually contain this file.
         evidence: {
           kind: "item-file-reconciliation",
-          commit: ORDER[step] === "closed" ? resolveClosureCommit(root, item).commit : baseline,
+          commit: ORDER[step] === "closed" ? resolveClosureCommit(root, item).commit : itemFileCommit,
           reference: item.path,
         },
         previousHash: chain.length === 0 ? null : chain.at(-1).entryHash,
