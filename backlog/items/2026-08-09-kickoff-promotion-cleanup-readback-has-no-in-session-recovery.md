@@ -248,6 +248,61 @@ actually asks (whether public tracked state leaked private data into itself)
 — a different CAS mechanism than the one that produced the original
 mismatch. This sub-claim does not hold up and is not carried forward.
 
+### Design/correction, 2026-08-19: the revision-check half of Direction 2 is already fixed and tested — not a fresh design target
+
+Dispatched as a design task on the assumption that `kickoffPromotionCleanupRecoveryPlanCore()`
+still hardcodes `state?.continuity?.revision !== 2` (the exact text this item's
+own 2026-08-17 section describes, at its then-current line 5109). Reading the
+function fresh (`plugins/pipeline-core/lib/onboarding-continuity.mjs:6005`,
+current line numbers) found this is no longer true: commit `db742d71`
+(2026-08-18, `fix(onboarding-continuity): admit revision-0->1 promotions into
+cleanup recovery`) already replaced the literal with
+`const promotedRevisions = [0, 1].map((kickoffRevision) => kickoffRevision + 1)`
+(i.e. `[1, 2]`) and `!promotedRevisions.includes(state?.continuity?.revision)`
+— deriving the admitted after-revisions from the same `kickoff.revision`
+domain `buildKickoffPromotionPlan()`/`validatePromotionPlan()` already
+enforce, exactly what this item's Direction 2 asked for. The commit also adds
+a dedicated end-to-end regression test, `"revision-0 kickoff seed promotion
+remains monotonic and replayable"`
+(`onboarding-continuity.test.mjs:1230`, exercising plan → apply → replay for
+the revision-0→1 path via a new `promotionSeed({bumpRevision: false})`
+option), and `onboarding-continuity-tests` is registered in
+`harness/scripts/verify.mjs:253`, so this is a live, enforced regression, not
+a one-off fix. **No further design work is needed for this specific piece.**
+
+This narrows, but does not close, the item. Three pieces remain genuinely
+open, and none of them is a design task this pass should attempt, because
+all three live inside `codex-pretool-guard.mjs`'s HGO branching — exactly the
+code this item's own "Why it is filed rather than fixed here" section and
+2026-08-17 Triage already excluded from ad-hoc modification, reserved for
+"a dedicated authorized pass" tied to Issue #57/NVA-B61-7:
+
+1. **Direction 1** (confirm or rule out the escalated-exec attestation
+   trigger from the original 2026-08-09 incident — `HGO-GIT`/`HGO-ROOT`/
+   `HGO-COMMON-DIR` degrading to `attended-host-terminal` from a legitimately
+   escalated, non-malicious Codex exec context) is still unconfirmed. The
+   2026-08-17 recurrence found a *different*, now-fixed cause (the revision
+   check above); per that section's own words, "the two are not mutually
+   exclusive; either can independently produce the same symptom" — so
+   Direction 1's original question is not answered by the revision-check
+   fix and stays open.
+2. **Direction 2's attestation-path half** ("fix the attestation path so it
+   doesn't degrade... or give `plan-human-recovery` a third, genuinely
+   in-session candidate for this specific cause") is about the
+   escalated-exec attestation failure mode specifically — not the
+   revision-mismatch failure mode the fixed half addressed. Still open.
+3. **Direction 3** (make `cleanup_recovery_observation_unavailable` name
+   which of the two outcomes applies *before* a full PO round-trip) is a
+   diagnostics/UX improvement inside the same guarded surface. Still open.
+
+Per this item's own governance, none of these three should be designed or
+implemented outside that dedicated, explicitly authorized pass — writing an
+implementation-ready design for `codex-pretool-guard.mjs` internals here
+would be the same freehand-scope-creep this item's own GF-059 review record
+(F1/F3) already documents as a past failure mode on this exact item. Item
+stays `open`, scope narrowed by one confirmed-fixed piece; Direction 1-3
+remain assigned wherever NVA-B61-7 lands, unchanged.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:** accepted, stays open, current-scope (not deferred).
