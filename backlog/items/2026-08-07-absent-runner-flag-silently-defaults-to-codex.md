@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.absent-runner-flag-silently-defaults-to-codex
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "0000000000000000000000000000000000000000"
+closure_evidence: "backlog/items/2026-08-07-absent-runner-flag-silently-defaults-to-codex.md"
 source: "NOVA-RESTART-RUNNER-1 stop condition in the 2026-08-07 Nova session; the reverted change is recorded inline at the freshIntent default in plugins/pipeline-core/lib/project-onboarding-v3.mjs in commit 5efb0f1, carrying forward the question deferred by the closed item 2026-08-06-onboarding-lifecycle-plan-hardcodes-the-codex-runner.md."
 due: 2026-09-06
 ---
@@ -100,3 +104,19 @@ the second time the question has been reached and deferred. Do not adopt option
   Phoenix's own call sites and its own copy of the regression test) closes
   this item.
 - **Date:** 2026-08-18
+
+### PO Decision — 2026-08-19
+
+- **Decision:** Close without porting. Nova has already shipped candidate 1
+  (fail closed, `requireRunner()`) against its own copy of
+  `project-onboarding-v3.mjs` and its own regression test; Phoenix does not
+  duplicate that work.
+- **Rationale:** PO's direct instruction — the decision itself (candidate 1,
+  fail closed) is settled and already implemented in the sibling checkout;
+  re-deriving or porting it into Phoenix is deliberately out of scope for
+  this sprint. Phoenix's own 9 bare `runner = "codex"` defaults remain
+  unchanged as a result — closing this item is a scope decision, not a claim
+  that the underlying defect is fixed in this checkout.
+- **Assignment:** None. If Phoenix ever needs `requireRunner()` itself, this
+  is Nova's already-designed pattern to port, not a fresh design question.
+- **Date:** 2026-08-19
