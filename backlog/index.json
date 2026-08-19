@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "80b200093a2ebf061f45718b54d2265360ce479d6de39d629fe9c873ea0a7ad5"
+    "transitionHead": "570f4217ab8423128a94cf053dd39ab0728be6a8e4964759f7da7fbb74b0faec"
   },
   "counts": {
-    "open": 42,
+    "open": 41,
     "in_progress": 3,
-    "closed": 255
+    "closed": 256
   },
   "items": [
     {
@@ -650,12 +650,16 @@
     },
     {
       "id": "pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
       "source": "Dispatch NVA-BL-CSANDBOX-2 (2026-08-19), building integration-path test coverage for codex-sandbox-runtime.mjs's real call into codex-sandbox-preflight.mjs — discovered while trying to construct an honest PASSING preflight-outcome test case.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "ad68796a1ad39a022d17b1000add1ca53aecf7a6",
+      "closureEvidence": "plugins/pipeline-core/scripts/codex-sandbox-runtime.mjs"
     },
     {
       "id": "pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell",

@@ -57,7 +57,7 @@
 | pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-runner-has-no-real-support-on-native-windows | open | defect | pipeline | 2026-08-19 | — |
 | pipeline.codex-sandbox-critic-longterm | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.compaction-stable-bootstrap-lease | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | 2026-08-10 | — |
@@ -308,6 +308,6 @@
 
 ## Counts
 
-- open: 42
+- open: 41
 - in_progress: 3
-- closed: 255
+- closed: 256

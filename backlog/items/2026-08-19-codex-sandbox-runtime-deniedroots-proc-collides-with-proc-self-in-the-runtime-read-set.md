@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-sandbox-runtime-deniedroots-proc-collides-with-proc-self-in-the-runtime-read-set
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: ad68796a1ad39a022d17b1000add1ca53aecf7a6
+closure_evidence: plugins/pipeline-core/scripts/codex-sandbox-runtime.mjs
 source: "Dispatch NVA-BL-CSANDBOX-2 (2026-08-19), building integration-path test coverage for codex-sandbox-runtime.mjs's real call into codex-sandbox-preflight.mjs — discovered while trying to construct an honest PASSING preflight-outcome test case."
 ---
 
@@ -83,7 +87,18 @@ Not designed here — needs a decision on which side owns the fix:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted, Option 1 (narrow `deniedRoots`). PO-confirmed via `AskUserQuestion`, 2026-08-19.
+- **Rationale:** `deniedRoots`/`sensitiveRoots` are structural-precondition-only for the intermediate lane — `compilePermissionProfile()` never emits them into the compiled profile's `entries` for `kind === "intermediate"` (only `"strong"` does), so narrowing the placeholder value is a zero-functional-permission-effect fix, isolated from the security-critical strong lane. `/proc/sys` is a sibling of `/proc/self` under the common `/proc` parent, so `overlaps()`'s relative-path check does not flag it, and it is always present on a real Linux host.
+- **Assignment (if accepted):** Dispatched as `NVA-BL-CSDENIED-1` (goldfish-deep, worktree-isolated). Landed on trunk as `ad68796a1ad39a022d17b1000add1ca53aecf7a6`, independently re-verified (`codex-sandbox-runtime.test.mjs` 4/4, `codex-sandbox-preflight.test.mjs` 22/23 with one pre-existing environment-only skip, `check-consumer-safe-paths.test.mjs` 9/9).
+- **Date:** 2026-08-19
+
+## Closure, 2026-08-19
+
+Fixed by changing `compiledIntermediateReadback()`'s `deniedRoots` from
+`["/proc"]` to `["/proc/sys"]` — a placeholder-value swap only, per Option 1
+above. `sensitiveRoots` (`["/sys"]`) was checked and found not to collide, so
+it is unchanged. The dispatch also added a genuinely PASSING end-to-end
+regression test through `createCoordinatorScratch()`/`readbackProfile()`,
+replacing the prior FAILING-outcome test this defect had forced — closing
+the exact test-coverage gap this item's own source dispatch (`NVA-BL-CSANDBOX-2`)
+had flagged. Landed as `ad68796a1ad39a022d17b1000add1ca53aecf7a6`.
