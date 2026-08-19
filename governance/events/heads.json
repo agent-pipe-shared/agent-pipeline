@@ -1,0 +1,1 @@
+{"repositoryFingerprint":"92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35","schema":"pipeline.governance-event-heads.v1","streams":{"agent":{"eventDigest":null,"sequence":0},"human":{"eventDigest":"b5feda4217659a92706ea511c7e593c1dccb19f1f28da2dadad242ec8a1ab058","sequence":2},"lifecycle":{"eventDigest":null,"sequence":0}}}
