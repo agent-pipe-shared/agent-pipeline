@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatch-record-does-not-bind-to-its-commit
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 due: 2026-08-23
 source: "Found independently by all three Critic rounds against the 0.5.4 candidate (A-F2/A-F5, B-F3, C-F3/C-F4), then reproduced by the Elephant one hour later in 1c3cd86."
@@ -361,6 +361,53 @@ before this change, exactly as the design predicted. Direction 2 is
 **closed**; Direction 3 (a distinct Elephant trailer, still a genuine
 open design question per Options A/B above) is the only remaining piece —
 item stays `open` for that.
+
+## Closure, 2026-08-19 — Direction 3 landed (Option B), PO decision
+
+PO decision (2026-08-19): pull Direction 3 into current scope now via
+Option B (mechanical proof), per this item's own Recommendation, rather
+than waiting for an Alfred slot — Direction 2 had already broken the
+sprint boundary in practice, so treating Direction 3 the same way is
+consistent, not a new precedent.
+
+`NVA-BL-DRECORD3-1` (goldfish-deep, worktree-isolated) landed a new
+`Dispatch: <generator-script-path> (elephant-generated)` trailer form,
+verified by MECHANICAL PROOF rather than a self-reported heuristic:
+`ELEPHANT_GENERATOR_ALLOWLIST` (a closed `Map`, one entry —
+`harness/scripts/generate-agent-obligations.mjs` — never data-driven from
+commit text) is checked BEFORE any execution; the named script is then
+re-run inside an isolated `git worktree` checkout of the commit's PARENT
+tree (`runGeneratorInIsolatedParentTree()`, never the live working tree),
+and its output asserted byte-identical to what the commit actually
+changed. A mismatch is FAIL, never a silent PASS. Explicitly disclosed
+limit (stated in the code's own docstring): this isolates the filesystem
+working directory, not the OS process — a script that shelled out to
+`git` from inside the sandbox would still share this repository's object
+database; the allowlist stays closed to already-reviewed scripts that
+read/write files and never invoke git, precisely because of this.
+
+Commit `94d3ad6f` (cherry-picked from the dispatch's worktree, commit
+`672f6fe6`). 41/41 `dispatch-authorship-verify.test.mjs` tests pass,
+including dedicated sandboxing-isolation proofs (a malicious-shaped
+generator cannot mutate the real tree; a path-traversal or
+prototype-pollution-shaped id resolves to nothing on the `Map`
+allowlist). The dispatch's own briefed DoD (`check-consumer-safe-paths.test.mjs`)
+initially failed — the allowlisted script's own path literal, appearing
+3 times in doc comments/the allowlist entry, tripped the source-only-path
+scan — fixed directly by the Elephant (a data-only allowlist addition,
+mirroring the existing `dispatch-authorship-verify.mjs` Class-B entry
+one line above it, commit `38691033`); 9/9 `check-consumer-safe-paths.test.mjs`
+now pass.
+
+**Deliberately not done:** no independent Critic review has run yet for
+this diff — per CLAUDE.md's self-application policy (guardrail/security-
+adjacent code, code-execution surface), that review is expected before PO
+acceptance, exactly as the item's own Option B text anticipated ("needs a
+dedicated Critic-reviewed dispatch given the code-execution surface").
+Implementation complete; Critic review and PO acceptance pending, not
+silently claimed.
+
+Both directions now closed. Item closed on this basis.
 
 ### Direction 3 Option B implemented, 2026-08-19 (dispatch NVA-BL-DRECORD3-1)
 
