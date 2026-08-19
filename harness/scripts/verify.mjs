@@ -412,6 +412,9 @@ const TEST_SUITES = [
   // node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs --activate
   { name: "backlog-state-check", file: join(pluginScriptsDir, "check-backlog-state.mjs") },
   { name: "state-numeric-claims-tests", file: join(pluginScriptsDir, "check-state-numeric-claims.test.mjs") },
+  { name: "state-numeric-claims-check", file: join(pluginScriptsDir, "check-state-numeric-claims.mjs") },
+  { name: "afk-activation-tests", file: join(pluginScriptsDir, "afk-activation.test.mjs") },
+  { name: "codex-sandbox-preflight-plugin-tests", file: join(pluginScriptsDir, "codex-sandbox-preflight.test.mjs") },
   { name: "parallel-dispatch-planner-tests", file: join(libDir, "parallel-dispatch-planner.test.mjs") },
   { name: "parallel-sprint-integration-tests", file: join(libDir, "parallel-sprint-integration.test.mjs") },
   { name: "continuity-status-tests", file: join(libDir, "continuity-status.test.mjs") },
