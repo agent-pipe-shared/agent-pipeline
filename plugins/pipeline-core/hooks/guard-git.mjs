@@ -400,8 +400,8 @@ const UNION_BLOCKERS = [
     id: "GG-11",
     // Union of all three staging deny-lists. `.env` intentionally without trailing \b
     // so .env.local/.env.production are caught (errs safe: .env.example too).
-    re: /\bgit\s+add\b[^|&;]*(\.env|secrets\.yaml\b|id_ed25519\b|id_rsa\b|\.pem\b|\.key\b)/,
-    why: "Staging secrets/state (.env*, secrets.yaml, SSH keys, .pem/.key) — these never belong in a repo.",
+    re: /\bgit\s+add\b[^|&;]*(\.env|(?<![a-zA-Z0-9_])secrets\.yaml\b|id_ed25519\b|id_rsa\b|\.pem\b|\.key\b)/,
+    why: "Staging secrets/state (.env*, secrets.yaml, SSH keys, .pem/.key) — these never belong in a repo. secrets.yaml uses a negative-lookbehind boundary so fakesecrets.yaml (a real, intentional CI fixture) does not match by substring coincidence (GG-11, backlog item two-guards-block-an-unrelated-file-via-substring-name-matching).",
     origin: ".env: all three · secrets.yaml: <PROJECT_B> · SSH keys/.pem/.key: <PROJECT_C>",
   },
   {
@@ -482,15 +482,15 @@ const RAW_BLOCKERS = [
   {
     id: "GG-15",
     // raw-string rule: git add with a quoted protected target (GG-11 list).
-    re: /\bgit\s+add\b[^|&;]*["'][^"']*(\.env|secrets\.yaml\b|id_ed25519\b|id_rsa\b|\.pem\b|\.key\b)/,
-    why: "Raw-string rule: git add with a quoted protected target (GG-11 list) — quote-stripping alone would hide the staged secret.",
+    re: /\bgit\s+add\b[^|&;]*["'][^"']*(\.env|(?<![a-zA-Z0-9_])secrets\.yaml\b|id_ed25519\b|id_rsa\b|\.pem\b|\.key\b)/,
+    why: "Raw-string rule: git add with a quoted protected target (GG-11 list) — quote-stripping alone would hide the staged secret. secrets.yaml boundary-anchored, same fix as GG-11.",
     origin: "quote-evasion hardening",
   },
   {
     id: "GG-16",
     // raw-string rule: recursive rm/Remove-Item with a quoted protected target.
-    re: /\brm\s+(?:[^|&;]*\s)?-{1,2}[a-z]*r[a-z]*\b[^|&;]*["'][^"']*(\.git\b|\/config\b)|\bremove-item\b(?=[^|&;]*\s-r(?:e(?:c(?:u(?:r(?:s(?:e)?)?)?)?)?)?\b)[^|&;]*["'][^"']*(\.git\b|\.storage\b|secrets\.yaml\b)/,
-    why: "Raw-string rule: recursive rm/Remove-Item with a quoted protected target (.git/.storage/secrets.yaml) — quote-stripping alone would hide the target.",
+    re: /\brm\s+(?:[^|&;]*\s)?-{1,2}[a-z]*r[a-z]*\b[^|&;]*["'][^"']*(\.git\b|\/config\b)|\bremove-item\b(?=[^|&;]*\s-r(?:e(?:c(?:u(?:r(?:s(?:e)?)?)?)?)?)?\b)[^|&;]*["'][^"']*(\.git\b|\.storage\b|(?<![a-zA-Z0-9_])secrets\.yaml\b)/,
+    why: "Raw-string rule: recursive rm/Remove-Item with a quoted protected target (.git/.storage/secrets.yaml) — quote-stripping alone would hide the target. secrets.yaml boundary-anchored, same fix as GG-11.",
     origin: "quote-evasion hardening",
   },
 ];
