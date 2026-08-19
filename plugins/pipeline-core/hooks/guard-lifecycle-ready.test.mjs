@@ -725,6 +725,76 @@ test("the small named &&-chain allowlist and trailing 2>/dev/null admit exactly 
   }
 });
 
+// backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
+// Critic finding F2 (rework round against commit b3153385): the test above uses an
+// UNGOVERNED root (root() writes no BASE_GOVERNANCE_MARKERS file), so
+// evaluateLifecycleReadyGuard's own `if (!governed) return verdict(0);` short-circuits
+// before ever reaching the mkdir-chain admission logic the test above claims to prove --
+// the requireProjectOnboardingReadyFn mock it injects at line ~699 is dead code, and F1's
+// bug (isChainEligibleSegment admitting ANY in-repo mkdir -p target) shipped underneath a
+// passing suite. This test uses a genuinely GOVERNED root (a real marker file on disk) with
+// requireProjectOnboardingReadyFn mocked not-ready, and proves both directions of the
+// narrowed mkdir predicate (F1): the scratch/ target stays admitted; an arbitrary in-repo
+// path outside scratch/ or .claude/worktrees/ (guardrails/, the Critic's own live-proved
+// bypass target) is now refused.
+//
+// Neither direction ever calls requireProjectOnboardingReadyFn, and both assert that
+// explicitly rather than leaving it unobserved: the admitted scratch/ chain is classified
+// read-only-diagnostic and short-circuits to verdict(0) BEFORE evaluateAfterGrammarAdmission
+// (the onboarding-readiness check) is reached -- the same early-exit shape the "non-ready
+// governed roots retain a narrow simple-command read-only diagnostic lane" test above
+// already establishes for other read-only shapes. The refused guardrails/ chain is refused
+// at the closed-grammar layer itself: guard-command-grammar.mjs's tokenizer unconditionally
+// rejects any top-level `&&` as a CONTROL operator (parseStatus "denied"), so a chain that
+// isReadOnlyDiagnosticCommand no longer admits is refused as GUARD-PARSE-UNSUPPORTED before
+// onboarding-readiness is ever consulted either -- refused unconditionally, which is at
+// least as strong a guarantee as "refused only while not yet onboarding-ready" would have
+// been. Documented here rather than assumed: this is a stronger, not weaker, proof than a
+// literal onboarding-readiness-mock-invocation would have given.
+test("the narrowed mkdir chain predicate (F1) still admits scratch/ and refuses an arbitrary in-repo path on a genuinely governed, not-yet-ready root", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+
+    const admitted = "mkdir -p scratch/probe && ls -la scratch/probe";
+    assert.equal(isReadOnlyDiagnosticCommand(admitted, path), true, admitted);
+    let admittedCalls = 0;
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash(admitted), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { admittedCalls += 1; deny("partial"); },
+    }), { exitCode: 0, stderr: "" });
+    assert.equal(admittedCalls, 0,
+      "scratch/ chain must short-circuit before onboarding-readiness is ever consulted");
+
+    const worktree = "mkdir -p .claude/worktrees/probe && ls -la .claude/worktrees/probe";
+    assert.equal(isReadOnlyDiagnosticCommand(worktree, path), true, worktree);
+
+    const refused = "mkdir -p guardrails/critic-probe && ls -la guardrails/critic-probe";
+    assert.equal(isReadOnlyDiagnosticCommand(refused, path), false, refused);
+    let refusedCalls = 0;
+    const result = evaluateLifecycleReadyGuard(bash(refused), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { refusedCalls += 1; deny("partial"); },
+    });
+    assert.equal(result.exitCode, 2, refused);
+    assert.match(result.stderr, /GUARD-PARSE-UNSUPPORTED/u, refused);
+    assert.equal(refusedCalls, 0,
+      "the arbitrary in-repo path must be refused at the closed-grammar layer, "
+        + "never reaching onboarding-readiness");
+
+    // The Critic's own live reproduction shape, DoD check 1: refused end to end.
+    const reproduction = "git rev-parse HEAD && mkdir -p guardrails/critic-probe";
+    assert.equal(isReadOnlyDiagnosticCommand(reproduction, path), false, reproduction);
+    const reproductionResult = evaluateLifecycleReadyGuard(bash(reproduction), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() { deny("partial"); },
+    });
+    assert.equal(reproductionResult.exitCode, 2, reproduction);
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+  }
+});
+
 test("redirect-looking quoted data stays argv while hostile composition is typed and denied", () => {
   const path = root();
   try {

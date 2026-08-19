@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6051f34aa3e2a22ccb048306b07b91879ef92bbee20312c37109e14379f39b1a"
+    "transitionHead": "fedd313cd399e489b70c8af0fc91fd518c19566056a479adbc47d5d558b7bb95"
   },
   "counts": {
-    "open": 13,
+    "open": 11,
     "in_progress": 20,
-    "closed": 129,
+    "closed": 131,
     "rejected": 2,
     "deferred": 11
   },
@@ -1325,11 +1325,15 @@
     },
     {
       "id": "pipeline.product-capability-inventory-missing-two-new-guard-hooks",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19."
+      "source": "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "81cbba4fa82f4607e3296d12fb9f80168ccfe9cf",
+      "closureEvidence": "docs/product-capability-inventory.json"
     },
     {
       "id": "pipeline.product-capability-inventory-two-guard-hooks-uncategorized",
@@ -1822,11 +1826,15 @@
     },
     {
       "id": "pipeline.two-guard-hook-test-files-unregistered-in-verify",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19."
+      "source": "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "14bebfe6e510bcc336dc1da2c0c1d3fd118f3743",
+      "closureEvidence": "harness/scripts/verify.mjs"
     },
     {
       "id": "pipeline.unified-human-authorization-ux",

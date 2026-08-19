@@ -125,7 +125,7 @@
 | pipeline.prepared-maintenance-window-dies-at-the-next-commit | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.privacy-review-critic-dispatch-was-time-boxed-not-exhaustive | deferred | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.private-overlay-activation-bridge | closed | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.product-capability-inventory-missing-two-new-guard-hooks | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.product-capability-inventory-missing-two-new-guard-hooks | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.product-capability-inventory-two-guard-hooks-uncategorized | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.project-authority-dual-state-repair-and-failclosed-gate | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.project-scoped-github-issue-operations | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -169,7 +169,7 @@
 | pipeline.trust-mismatch-names-neither-key-nor-directory | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.trust-policy-exact-key-shape-refuses-a-third-field-and-blames-the-key | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.two-guard-hook-test-files-unregistered-in-verify | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.two-guard-hook-test-files-unregistered-in-verify | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.unified-human-authorization-ux | closed | workflow-improvement | pipeline | 2026-08-02 | Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed. |
 | pipeline.verify-gate-scoped-registration | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.verify-gate-unreachable-without-a-session-cleanup-binding | closed | defect | pipeline | 2026-08-07 | — |
@@ -183,8 +183,8 @@
 
 ## Counts
 
-- open: 13
+- open: 11
 - in_progress: 20
-- closed: 129
+- closed: 131
 - rejected: 2
 - deferred: 11

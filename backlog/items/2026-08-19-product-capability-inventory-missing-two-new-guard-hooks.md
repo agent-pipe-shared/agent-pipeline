@@ -3,10 +3,22 @@ schema: pipeline.backlog-item.v1
 id: pipeline.product-capability-inventory-missing-two-new-guard-hooks
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "81cbba4fa82f4607e3296d12fb9f80168ccfe9cf"
+closure_evidence: "docs/product-capability-inventory.json"
 source: "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19."
 ---
+
+## Closed — 2026-08-19
+
+Both hooks' capability surface registered (`14bebfe6`). A second,
+unrelated pre-existing gap the same check also caught
+(`guard-maintenance-window-cli-tests` missing from the inventory) fixed
+separately (`81cbba4f`) rather than silently folded into this item's
+scope. `check-product-capability-inventory.test.mjs`: 16/16 pass.
 
 # product-capability-inventory-tests fails HAW-A01 — same root cause as the unregistered guard-hook suites
 

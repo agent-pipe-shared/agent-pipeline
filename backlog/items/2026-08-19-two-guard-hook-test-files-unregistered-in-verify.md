@@ -3,10 +3,22 @@ schema: pipeline.backlog-item.v1
 id: pipeline.two-guard-hook-test-files-unregistered-in-verify
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "14bebfe6e510bcc336dc1da2c0c1d3fd118f3743"
+closure_evidence: "harness/scripts/verify.mjs"
 source: "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19."
 ---
+
+## Closed — 2026-08-19
+
+Both suites registered in `verify.mjs`'s `TEST_SUITES`
+(`14bebfe6`), unblocked by a PO-signed TP-3 maintenance window (a prior
+dispatch attempt hit an expired window; re-dispatched after the PO
+completed the signature ceremony). `verify-suite-registration-check`:
+0 unregistered.
 
 # Two guard-hook *.test.mjs suites exist under a registered root with no verify.mjs entry
 
