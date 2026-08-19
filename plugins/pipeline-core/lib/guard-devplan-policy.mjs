@@ -66,6 +66,14 @@ import {
  */
 export const DEFAULT_EXEMPT_PREFIXES = Object.freeze(["docs/", "specs/", ".claude/", "backlog/", "scratch/"]);
 
+// The denial code `guard-lifecycle-ready.mjs`'s `Bash|PowerShell` lane names for this gate
+// (GUARD-DEVPLAN-SHELL, the shell-lane sibling of GUARD-TESTPATH-SHELL) -- co-located with the
+// policy it denies for rather than with `protected-test-paths.mjs`, whose own
+// `TESTPATH_SHELL_DENIAL_CODE` this mirrors, because that module has no ownership stake in
+// this gate's decision (it only supplies the shared candidate-extraction function both shell
+// lanes call, `extractShellWriteTargets()`).
+export const DEVPLAN_SHELL_DENIAL_CODE = "GUARD-DEVPLAN-SHELL";
+
 // The plugin root this policy module is itself running from -- same self-location
 // resolution guard-devplan.mjs's own PLUGIN_ROOT used before this function moved here
 // (`resolve(dirname(fileURLToPath(import.meta.url)), "..")`). Both `hooks/guard-devplan.mjs`

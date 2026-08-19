@@ -77,6 +77,12 @@ import {
   resolveGuardConfigPath,
   TESTPATH_SHELL_DENIAL_CODE,
 } from "../lib/protected-test-paths.mjs";
+// DEVPLANSHELL-*: the shell lane of the Dev-Plan lifecycle gate. Imported from the library
+// the guard defers to, for the same reason AC-10/TPSHELL-* state above -- and because the
+// write lane (guard-devplan.mjs) reads the identical `devPlanGateVerdict()`, so the two
+// lanes can never independently decide a path's dev-plan-gate fate differently from
+// each other.
+import { DEFAULT_EXEMPT_PREFIXES, DEVPLAN_SHELL_DENIAL_CODE } from "../lib/guard-devplan-policy.mjs";
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
@@ -4882,5 +4888,148 @@ test("TPSHELL-7: a classifier fault fails closed (GL-09), never silently admits 
     assert.equal(result.exitCode, 2, "a classifier fault must block, not admit");
     assert.match(result.stderr, new RegExp(`${TESTPATH_SHELL_DENIAL_CODE}-FAULT`, "u"));
     assert.match(result.stderr, /synthetic classifier fault/u, "the fault reason is surfaced, not swallowed silently");
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// ---------------------------------------------------------------------------------
+// DEVPLANSHELL-* : the shell lane of the Dev-Plan lifecycle gate (GUARD-DEVPLAN-SHELL),
+// mirroring TPSHELL-* immediately above -- see that block's own header for the shared
+// rationale (GL-09 authority-bearing coverage must not depend on tool choice). This gate
+// has no separate rules-config file of its own to load -- `devPlanGateVerdict()` reads the
+// manifest/State directly -- so there is no TPSHELL-5/TPSHELL-6-style "shared config
+// source" / "literal-basename derivation" pair to mirror here; both were specific to the
+// protected-test-path gate's own rules loader.
+// ---------------------------------------------------------------------------------
+const DEVPLANSHELL_TARGET = "src/app.js";
+const DEVPLANSHELL_MANIFEST_BLOCKING =
+  "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n";
+const DEVPLANSHELL_UNAPPROVED_STATE = {
+  schema: "pipeline.state.v0",
+  activeFeature: { id: "devplanshell-feature", planPath: ".claude/plans/devplanshell.md", phase: "design" },
+  planApproved: false,
+};
+
+/** A governed, READY fixture with the dev-plan gate blocking and an unapproved feature -- the
+ * same DP07 shape guard-devplan.test.mjs uses for its own "block" case, at the LEGACY_STATE /
+ * LEGACY_MANIFEST paths (`.claude/pipeline.yaml`, `.claude/pipeline-state.json`) devPlanGateVerdict()
+ * actually reads. `.claude/pipeline.yaml` is itself a GOVERNANCE_MARKERS entry, so no separate
+ * `pipeline.user.yaml` marker (as tpShellFixture() writes) is needed to make the fixture governed.
+ */
+function devPlanShellFixture() {
+  const path = mkdtempSync(join(tmpdir(), "guard-lifecycle-devplanshell-"));
+  mkdirSync(join(path, ".claude"), { recursive: true });
+  writeFileSync(join(path, ".claude", "pipeline.yaml"), DEVPLANSHELL_MANIFEST_BLOCKING);
+  writeFileSync(join(path, ".claude", "pipeline-state.json"), JSON.stringify(DEVPLANSHELL_UNAPPROVED_STATE));
+  return path;
+}
+
+function devPlanShellRun(path, command, toolName = "Bash") {
+  return evaluateLifecycleReadyGuard(
+    { tool_name: toolName, tool_input: { command } },
+    { projectDir: path, requireProjectOnboardingReadyFn() { return TPSHELL_READY; } },
+  );
+}
+
+/**
+ * DEVPLANSHELL-1. Both directions in one test, for the same reason TPSHELL-1 states: a
+ * refusal-only test would pass just as happily on a rule that had started refusing reads too.
+ */
+test("DEVPLANSHELL-1: a shell write to a dev-plan-gated path is refused, while reading stays admitted", () => {
+  const path = devPlanShellFixture();
+  try {
+    for (const command of [
+      `printf x > ${DEVPLANSHELL_TARGET}`,
+      `printf x >> ${DEVPLANSHELL_TARGET}`,
+      `cp scratch/fake.js ${DEVPLANSHELL_TARGET}`,
+      `mv scratch/fake.js ${DEVPLANSHELL_TARGET}`,
+      `rm ${DEVPLANSHELL_TARGET}`,
+      `tee ${DEVPLANSHELL_TARGET}`,
+      `sed -i s/a/b/ ${DEVPLANSHELL_TARGET}`,
+      `node -e "require('fs').writeFileSync('${DEVPLANSHELL_TARGET}','x')"`,
+    ]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 2, `admitted a shell write: ${command}`);
+      assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+    }
+    for (const command of [
+      `cat ${DEVPLANSHELL_TARGET}`,
+      `rg -n foo ${DEVPLANSHELL_TARGET}`,
+      `git add ${DEVPLANSHELL_TARGET}`,
+      `git diff ${DEVPLANSHELL_TARGET}`,
+      `git log ${DEVPLANSHELL_TARGET}`,
+    ]) {
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 0, `refused a read/unrelated command: ${command} -- ${result.stderr}`);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * DEVPLANSHELL-2. `DEFAULT_EXEMPT_PREFIXES` iterated straight from the module the gate itself
+ * exports, not retyped here -- the same single-source discipline TPSHELL-5 pins for the
+ * test-path gate's rules loader, applied to this gate's exempt-prefix list instead.
+ */
+test("DEVPLANSHELL-2: a target under an exempt prefix is not blocked by this lane", () => {
+  const path = devPlanShellFixture();
+  try {
+    for (const prefix of DEFAULT_EXEMPT_PREFIXES) {
+      const target = `${prefix}devplanshell-probe.js`;
+      // A non-redirect write shape (as TPSHELL-2 itself uses) -- a `>` redirect is subject
+      // to its own, unrelated grammar-approval check further down the guard, which would
+      // otherwise contaminate this lane's own "not blocked" signal with a different denial.
+      const command = `cp scratch/fake.js ${target}`;
+      const result = devPlanShellRun(path, command);
+      assert.equal(result.exitCode, 0, `blocked an exempt-prefix target: ${command} -- ${result.stderr}`);
+      assert.doesNotMatch(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * DEVPLANSHELL-3. PowerShell is wired into the SAME PreToolUse matcher as Bash, exactly per
+ * TPSHELL-3's own header for its sibling gate: both the test-path AND dev-plan shell lanes
+ * sit inside the same `SHELL_TOOLS.includes(toolName)` block above the POSIX-only early
+ * return, so both cover PowerShell too.
+ */
+test("DEVPLANSHELL-3: a PowerShell write cmdlet naming a dev-plan-gated path is refused, Get-Content is not", () => {
+  const path = devPlanShellFixture();
+  try {
+    for (const command of [
+      `Set-Content ${DEVPLANSHELL_TARGET} "x"`,
+      `Add-Content ${DEVPLANSHELL_TARGET} "x"`,
+      `Remove-Item ${DEVPLANSHELL_TARGET}`,
+      `Copy-Item other.js ${DEVPLANSHELL_TARGET}`,
+    ]) {
+      const result = devPlanShellRun(path, command, "PowerShell");
+      assert.equal(result.exitCode, 2, `admitted a PowerShell write: ${command}`);
+      assert.match(result.stderr, new RegExp(DEVPLAN_SHELL_DENIAL_CODE, "u"), command);
+    }
+    assert.equal(devPlanShellRun(path, `Get-Content ${DEVPLANSHELL_TARGET}`, "PowerShell").exitCode, 0);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
+ * DEVPLANSHELL-4 (mirrors TPSHELL-7). GL-09's own verification clause: a fault-injection test
+ * that raises inside the blocking path and asserts the block exit code, never merely that a
+ * catch is present. The pre-existing shell-lane pattern already fails CLOSED (see
+ * devPlanShellRefusalHit()'s own doc comment); this pins that a command the classifier
+ * genuinely could not evaluate is never silently admitted alongside one it could.
+ */
+test("DEVPLANSHELL-4: a classifier fault fails closed (GL-09), never silently admits the command", () => {
+  const path = devPlanShellFixture();
+  try {
+    const command = `cp scratch/fake.js ${DEVPLANSHELL_TARGET}`;
+    const faulting = () => { throw new Error("synthetic devplan classifier fault"); };
+    const result = evaluateLifecycleReadyGuard(
+      { tool_name: "Bash", tool_input: { command } },
+      {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { return TPSHELL_READY; },
+        devPlanGateVerdictFn: faulting,
+      },
+    );
+    assert.equal(result.exitCode, 2, "a classifier fault must block, not admit");
+    assert.match(result.stderr, new RegExp(`${DEVPLAN_SHELL_DENIAL_CODE}-FAULT`, "u"));
+    assert.match(result.stderr, /synthetic devplan classifier fault/u, "the fault reason is surfaced, not swallowed silently");
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

@@ -39,6 +39,11 @@ import {
 } from "../lib/human-guard-override.mjs";
 import { machinePlaneFilePath } from "../lib/machine-plane.mjs";
 import {
+  DEVPLAN_SHELL_DENIAL_CODE,
+  devPlanGateVerdict,
+} from "../lib/guard-devplan-policy.mjs";
+import {
+  extractShellWriteTargets,
   loadProtectedTestPathRules,
   protectedTestPathShellHit,
   TESTPATH_SHELL_DENIAL_CODE,
@@ -925,6 +930,95 @@ function protectedTestPathShellFaultBlocked(error) {
       + `${TESTPATH_SHELL_DENIAL_CODE}-FAULT: the shell classifier for the protected-test-path `
       + "gate raised while evaluating this command, so whether it writes a protected path "
       + "could not be determined.\n"
+      + `Error: ${error instanceof Error ? error.message : String(error)}\n`
+      + "Why: this gate is authority-bearing (guardrails/global.md GL-09), which MUST resolve "
+      + "to its blocking outcome rather than pass a command through unseen when it cannot "
+      + "complete its evaluation.\n"
+      + "No override route is offered for a classifier fault -- fix the command shape (or the "
+      + "classifier, if the fault is a real defect) and retry.\n",
+  );
+}
+
+/**
+ * GUARD-DEVPLAN-SHELL -- the `Bash|PowerShell` lane of the Dev-Plan-Gate (`guard-devplan.mjs`),
+ * built the identical way `GUARD-TESTPATH-SHELL` closes the same route-choice gap for the
+ * protected-test-path gate, two functions up: extract every write-target CANDIDATE a shell
+ * command's syntax shows it touching (`extractShellWriteTargets()`, the SAME extraction both
+ * shell lanes share -- see that function's own header in `lib/protected-test-paths.mjs`), and
+ * run the IDENTICAL decision function the Edit|Write lane calls (`devPlanGateVerdict()`,
+ * `lib/guard-devplan-policy.mjs`) against each one, in order, stopping at the first "block".
+ * Unlike the test-path lane, no rules-config loading step happens here: `devPlanGateVerdict()`
+ * has no external rule set of its own -- it reads the manifest/State directly -- so there is no
+ * "config unreadable, claim nothing" branch to mirror.
+ *
+ * A "warn" verdict (manifest/State readable-but-malformed, fail-open by policy) or "allow" is
+ * non-blocking here exactly as in the Edit|Write lane -- only "block" produces a hit.
+ *
+ * GL-09 fail-closed contract (mirrors `protectedTestPathShellRefusalHit()`'s own doc comment
+ * just above it): the whole extraction+verdict walk is one try/catch, so a throw anywhere in it
+ * (a malformed command the extractor cannot classify, a corrupt manifest/State byte shape
+ * `devPlanGateVerdict()` itself did not already contain to a "warn") returns a typed fault
+ * sentinel rather than silently falling through as "nothing to check".
+ *
+ * @returns {null|{fault:true,error:Error}|{verdict:"block",reason:string,feature?:string,
+ *   planPath?:string|null,lifecycleStatus?:string,candidate:string,lane:string}} the first
+ *   "block" verdict for any candidate (carrying which candidate/lane produced it), or null when
+ *   nothing blocks.
+ */
+function devPlanShellRefusalHit(command, root, dependencies = {}, toolName = "Bash") {
+  if (typeof command !== "string" || command === "") return null;
+  try {
+    const extractFn = dependencies.extractShellWriteTargetsFn ?? extractShellWriteTargets;
+    const verdictFn = dependencies.devPlanGateVerdictFn ?? devPlanGateVerdict;
+    const targets = extractFn({
+      command,
+      root,
+      toolName,
+      platform: dependencies.platform ?? process.platform,
+    });
+    for (const { candidate, lane } of targets) {
+      const result = verdictFn({ filePath: candidate, projectDir: root });
+      if (result.verdict === "block") return { ...result, candidate, lane };
+    }
+    return null;
+  } catch (error) {
+    return { fault: true, error };
+  }
+}
+
+/**
+ * `hit.reason` is `devPlanGateVerdict()`'s own message text -- the EXACT bytes
+ * `guard-devplan.mjs`'s Edit|Write lane has always emitted for this feature/lifecycle/plan
+ * combination (`Feature "…" lifecycle is "…".` / `Plan: …` / `File: …` / `Why: …`). Embedded
+ * verbatim rather than re-derived, so the shell lane can never drift into inventing its own
+ * wording for a decision the Edit|Write lane already states authoritatively -- the same
+ * one-owner discipline `lib/guard-devplan-policy.mjs`'s own header describes.
+ */
+function devPlanShellBlocked(hit, overrideGuidance) {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${DEVPLAN_SHELL_DENIAL_CODE}: ${hit.reason}\n`
+      + `Detected as a shell write to a dev-plan-gated path (lane: ${hit.lane}).\n`
+      + "Why: an implementing Goldfish MUST NOT write implementation before the plan is approved "
+      + "(roles/goldfish.md GF-04-adjacent discipline, enforced here as a technical gate). This "
+      + "gate is authority-bearing (guardrails/global.md GL-09) -- so which write tool you reach "
+      + "for cannot decide whether it applies.\n"
+      + "A genuine draft-phase write belongs under docs/, specs/, .claude/, backlog/ or scratch/, "
+      + "or the active feature's own plan path while still in draft -- or wait for the sanctioned "
+      + "lifecycle transition named in the Why line above.\n"
+      + (overrideGuidance ?? ""),
+  );
+}
+
+/** Fail-closed outcome for a classifier fault (GL-09) — see devPlanShellRefusalHit(). */
+function devPlanShellFaultBlocked(error) {
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${DEVPLAN_SHELL_DENIAL_CODE}-FAULT: the shell classifier for the dev-plan lifecycle gate `
+      + "raised while evaluating this command, so whether it writes a dev-plan-gated path could "
+      + "not be determined.\n"
       + `Error: ${error instanceof Error ? error.message : String(error)}\n`
       + "Why: this gate is authority-bearing (guardrails/global.md GL-09), which MUST resolve "
       + "to its blocking outcome rather than pass a command through unseen when it cannot "
@@ -2536,6 +2630,22 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
         TESTPATH_SHELL_DENIAL_CODE, reason, "command", root, toolName, input.tool_input, dependencies,
       );
       if (!route.admitted) return protectedTestPathShellBlocked(testPathHit, route.overrideGuidance);
+      shellLifts.push(route.admitted);
+    }
+    // Third, and only when the two stricter siblings above had nothing to say: the dev-plan
+    // lifecycle gate's shell lane (GUARD-DEVPLAN-SHELL). Same ordering discipline -- a command
+    // already refused on a stricter sibling's ground must not also reach a lane that offers its
+    // own lift.
+    const devPlanHit = devPlanShellRefusalHit(input.tool_input.command, root, dependencies, toolName);
+    if (devPlanHit !== null && devPlanHit.fault === true) {
+      return devPlanShellFaultBlocked(devPlanHit.error);
+    }
+    if (devPlanHit !== null) {
+      const reason = `${DEVPLAN_SHELL_DENIAL_CODE}: ${devPlanHit.reason}`;
+      const route = humanOverrideRoute(
+        DEVPLAN_SHELL_DENIAL_CODE, reason, "command", root, toolName, input.tool_input, dependencies,
+      );
+      if (!route.admitted) return devPlanShellBlocked(devPlanHit, route.overrideGuidance);
       shellLifts.push(route.admitted);
     }
   }
