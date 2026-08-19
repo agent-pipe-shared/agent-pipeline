@@ -251,3 +251,53 @@ assumed:
 - No code changed; zero files touched beyond the dispatch's own record.
   Item stays open, now correctly scoped rather than under a wrong premise.
 - **Date:** 2026-08-19
+
+### PO Decision — 2026-08-19
+
+- **Decision:** Option (a) — re-scope the follow-up to cover
+  `hooks/guard-gate-strength.mjs` too, landing denial+authorize+consumption
+  as one coordinated change.
+- **Date:** 2026-08-19
+
+### Progress note — hook half (denial+consumption) landed, CLI half still open (2026-08-19, `PHX-WP-HGO-LEDGER-EMISSION-V2`)
+
+Per the PO's "a)" decision, a re-briefed dispatch covering both files landed
+the harder, riskier half: `hooks/guard-gate-strength.mjs`'s two real call
+sites (`recordHumanGuardDenial`, `consumeHumanGuardOverride`) now append the
+portable `requested`+`denied` / `consumed` events via
+`buildOverrideDecisions`/`appendHumanGovernanceDecision` and the ledger's own
+`appendConsumedHumanGovernanceDecision`, wired through ESM top-level `await`
+inside fail-open `try/catch` at both sites — a ledger-append failure never
+changes this hook's already-decided allow/deny/exit-code behavior (design
+§8.1: both are narrowing/informational on an already-decided enforcement
+action, not arming). `recordHumanGuardDenial`'s `"planned"` return carries
+only `{status, requestSha256}`, not the full capability record
+`buildOverrideDecisions` needs — resolved via the already-exported,
+read-only `planHumanGuardOverride`, disclosed as a deviation rather than
+silently assumed. Commit `1c023d16` (cherry-picked to `sprint_phoenix` as
+`025f9e1a`). Independently re-verified by the Elephant, not just trusted
+from the dispatch report: `guard-gate-strength.test.mjs` 31/31,
+`guard-gate-strength-gmw.test.mjs` 1/1, `guard-authority-ledger-intake.test.mjs`
+19/19 — all byte-identical pre-existing suites, re-run in both the worktree
+and the primary checkout after the cherry-pick, no regressions.
+
+**Disclosed, real gap: no NEW test coverage for the wired functionality
+itself.** The two new exported helpers
+(`appendOverrideDeniedLedgerEvent`, `appendOverrideConsumedLedgerEvent`) are
+verified only by "existing tests still pass unchanged" — nothing exercises
+the denial/consumption ledger-append paths directly. The dispatch disclosed
+this honestly rather than claiming coverage it didn't have; budget was
+consumed almost entirely resolving the `planHumanGuardOverride`
+reconstruction gap and the missing `consumed`-transition id scheme (filled
+locally as `hgo-consume-<i32>-<g>`, disclosed) before code could be written
+correctly.
+
+**Still fully open: HGO's CLI-side `granted` wiring**
+(`scripts/guard-human-override.mjs` → `authorize`/`authorize-by-signature`),
+unstarted, per this dispatch's own explicit disclosure — the larger
+remaining piece was scoped out under the tool budget once the hook-side
+design reconciliation took longer than planned. Item stays open. A follow-up
+dispatch is needed for: (1) the CLI-side `granted` wiring itself, (2)
+dedicated regression tests for both the new hook-side helpers and the CLI
+wiring once built.
+- **Date:** 2026-08-19
