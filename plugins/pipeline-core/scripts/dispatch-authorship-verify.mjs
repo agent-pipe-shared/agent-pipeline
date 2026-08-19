@@ -37,11 +37,23 @@
  *      (stays PASS) and reported as `model-override-declared`, distinguishable from both the
  *      ordinary "agrees" case and an accidental mismatch.
  *
+ * A FIFTH, STRONGER FORM (Direction 3 Option B of the same item): `Dispatch:
+ * <generator-script-path> (elephant-generated)`, e.g. `Dispatch:
+ * harness/scripts/generate-agent-obligations.mjs (elephant-generated)`. Unlike every other
+ * form above, this one is MECHANICAL PROOF rather than a self-reported heuristic: the id
+ * must be on the closed `ELEPHANT_GENERATOR_ALLOWLIST`, the commit's changed paths must all
+ * be covered by that entry's declared output path, and the named script is actually
+ * RE-RUN — in an isolated checkout of the commit's PARENT tree, never the live working
+ * tree (`runGeneratorInIsolatedParentTree`) — with its stdout asserted byte-identical to
+ * what the commit changed the output path to. A mismatch is FAIL, never a silent PASS.
+ *
  * THE FOUR VERDICTS.
  *
  *   PASS          the trailer resolves to a terminal record that does not contradict the
- *                 commit, or the commit DECLARES itself Elephant-direct in the sanctioned
- *                 `stage-0 (elephant)` form AND stays inside the size bound below.
+ *                 commit, the commit DECLARES itself Elephant-direct in the sanctioned
+ *                 `stage-0 (elephant)` form AND stays inside the size bound below, or the
+ *                 commit DECLARES `<allowlisted-script> (elephant-generated)` and re-running
+ *                 that script against the parent tree reproduces the changed output exactly.
  *   FAIL          the trailer names a record that is absent, unfinished, or contradicts
  *                 the commit.
  *   UNVERIFIABLE  the evidence does not decide. Notably: a commit carrying NO `Dispatch:`
@@ -94,7 +106,8 @@
  *   node plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs --strict <sha>
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -122,6 +135,78 @@ export const ELEPHANT_STAGE0_ID = "stage-0";
  * minting a PASS on a diff of any size for the price of one self-written trailer line.
  */
 export const ELEPHANT_STAGE0_MAX_PATHS = 10;
+
+/**
+ * Direction 3 Option B (`2026-08-09-the-dispatch-record-does-not-bind-to-the-commit-it-
+ * vouches-for.md`): `Dispatch: <generator-script-path> (elephant-generated)` is verified by
+ * MECHANICAL PROOF rather than trust — re-running the named script against the commit's
+ * parent tree and asserting byte-identical output to what the commit changed.
+ *
+ * SECURITY. The trailer's id is commit text — attacker-influenced input, exactly like a
+ * goldfish task id (see `SAFE_TASK_ID` above). A verifier that executes a script NAMED IN
+ * THAT INPUT is a code-execution surface into the verification tool itself, so the id is
+ * NEVER used to build a filesystem path or a command argument directly: it is only ever a
+ * lookup key into this literal, closed allowlist. A `Map` (not a plain object) is used
+ * specifically so a key like `"__proto__"` or `"constructor"` cannot resolve to something on
+ * `Object.prototype` — `Map#get` never touches the prototype chain regardless of the key's
+ * text. Growing this list is a code change to this script, reviewed like any other guardrail
+ * change; it must never become data-driven from commit text, environment, or config.
+ */
+export const ELEPHANT_GENERATOR_ALLOWLIST = new Map([
+  [
+    "harness/scripts/generate-agent-obligations.mjs",
+    Object.freeze({
+      scriptPath: "harness/scripts/generate-agent-obligations.mjs",
+      outputPath: "templates/prompts/agent-obligations.md",
+      args: Object.freeze(["--stdout"]),
+    }),
+  ],
+]);
+
+/**
+ * Re-run an allowlisted generator against an ISOLATED checkout of `parentRef` — never the
+ * live working tree. `git worktree add` provisions a fresh directory from the repository's
+ * own object store; the script executes with that directory as its `cwd`, so its own
+ * relative imports resolve inside the sandbox and a relative write lands inside the sandbox,
+ * never in the real checkout. The worktree and its containing temp directory are removed in
+ * `finally` blocks, so a script bug or crash still cannot leave the sandbox mounted against
+ * `repoRoot` for a later call to trip over.
+ *
+ * LIMIT, stated plainly rather than implied away: this isolates the FILESYSTEM working
+ * directory, not the OS process. A script that shells out to `git` from inside the sandbox
+ * worktree still shares this repository's object database and ref namespace (worktrees are
+ * not separate repositories), so a script that deliberately ran e.g. `git branch -D main`
+ * from inside the sandbox could still mutate shared refs. The allowlist is closed precisely
+ * because this isolation is a working-directory boundary, not a full sandbox, and only
+ * already-reviewed generator scripts (which read and write files, and do not invoke git) are
+ * ever named in it.
+ */
+export function runGeneratorInIsolatedParentTree({ repoRoot, parentRef, scriptRelPath, args = [] }) {
+  const base = mkdtempSync(join(tmpdir(), "dispatch-authorship-sandbox-"));
+  const worktreeDir = join(base, "wt");
+  try {
+    execFileSync("git", ["worktree", "add", "--detach", "--quiet", worktreeDir, parentRef], {
+      cwd: repoRoot,
+      encoding: "utf8",
+    });
+    try {
+      return execFileSync(process.execPath, [join(worktreeDir, scriptRelPath), ...args], {
+        cwd: worktreeDir,
+        encoding: "utf8",
+        maxBuffer: 32 * 1024 * 1024,
+      });
+    } finally {
+      try {
+        execFileSync("git", ["worktree", "remove", "--force", worktreeDir], { cwd: repoRoot, encoding: "utf8" });
+      } catch {
+        // Best-effort: the outer rmSync below still purges the directory from disk even if
+        // git's own worktree bookkeeping could not be cleaned (e.g. repoRoot itself is gone).
+      }
+    }
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+}
 
 /**
  * A task id is concatenated into a filename under the evidence directory, and it arrives from
@@ -251,7 +336,7 @@ function result(sha, verdict, classification, reason, extra = {}) {
  * commits without building a git fixture repository.
  */
 export function verifyCommit(sha, deps) {
-  const { readCommitMessage, readChangedPaths, readRecord } = deps;
+  const { readCommitMessage, readChangedPaths, readRecord, readBlobAtCommit, runAllowlistedGenerator } = deps;
   let message;
   try {
     message = readCommitMessage(sha);
@@ -310,6 +395,78 @@ export function verifyCommit(sha, deps) {
       "elephant-direct-declared",
       `declared Elephant-direct (\`${dispatch.raw}\`) in the sanctioned form, ${elephantPaths.length} path(s), within the stage-0 bound of ${ELEPHANT_STAGE0_MAX_PATHS}; no dispatch record expected. "Disclosed" and "judgment-light" stay unchecked`,
       { taskId: dispatch.id, pathCount: elephantPaths.length },
+    );
+  }
+  if (dispatch.role === "elephant-generated") {
+    // ALLOWLIST GATE FIRST, before anything that touches the filesystem or a subprocess.
+    // `dispatch.id` is attacker-influenced commit text; it is used ONLY as a `Map` lookup
+    // key here, never concatenated into a path or a command argument (see the allowlist's
+    // own SECURITY docstring above).
+    const entry = ELEPHANT_GENERATOR_ALLOWLIST.get(dispatch.id);
+    if (!entry) {
+      return result(
+        sha,
+        VERDICT.unverifiable,
+        "elephant-generated-not-allowlisted",
+        `role \`elephant-generated\` names \`${dispatch.id}\`, which is not on the closed generator allowlist; refusing to execute it`,
+        { taskId: dispatch.id },
+      );
+    }
+    let generatedPaths;
+    try {
+      generatedPaths = readChangedPaths(sha);
+    } catch (error) {
+      return result(sha, VERDICT.unverifiable, "commit-paths-unreadable", `changed paths unreadable: ${error.message}`, { taskId: dispatch.id });
+    }
+    const uncoveredByGenerator = generatedPaths.filter((path) => coveringPath(path, [entry.outputPath]) === null);
+    if (uncoveredByGenerator.length > 0) {
+      return result(
+        sha,
+        VERDICT.fail,
+        "elephant-generated-paths-not-covered",
+        `declared \`elephant-generated\` (\`${dispatch.raw}\`) but touches path(s) the allowlisted generator does not produce: ${uncoveredByGenerator.join(", ")}`,
+        { taskId: dispatch.id, uncovered: uncoveredByGenerator },
+      );
+    }
+    let regenerated;
+    try {
+      regenerated = runAllowlistedGenerator(entry, sha);
+    } catch (error) {
+      return result(
+        sha,
+        VERDICT.unverifiable,
+        "elephant-generated-rerun-failed",
+        `re-running \`${entry.scriptPath}\` in an isolated checkout of the parent tree failed: ${error.message}`,
+        { taskId: dispatch.id },
+      );
+    }
+    let committed;
+    try {
+      committed = readBlobAtCommit(sha, entry.outputPath);
+    } catch (error) {
+      return result(
+        sha,
+        VERDICT.unverifiable,
+        "commit-blob-unreadable",
+        `\`${entry.outputPath}\` at ${sha} unreadable: ${error.message}`,
+        { taskId: dispatch.id },
+      );
+    }
+    if (regenerated !== committed) {
+      return result(
+        sha,
+        VERDICT.fail,
+        "elephant-generated-mismatch",
+        `re-running \`${entry.scriptPath}\` against the commit's parent tree does NOT byte-match \`${entry.outputPath}\` as the commit left it`,
+        { taskId: dispatch.id },
+      );
+    }
+    return result(
+      sha,
+      VERDICT.pass,
+      "elephant-generated-verified",
+      `mechanically verified: re-running \`${entry.scriptPath}\` against an isolated checkout of the commit's parent tree reproduces \`${entry.outputPath}\` byte-for-byte`,
+      { taskId: dispatch.id },
     );
   }
   if (dispatch.role !== "goldfish") {
@@ -395,6 +552,9 @@ export function gitDeps({ repoRoot = REPO_ROOT, evidenceDir = DEFAULT_EVIDENCE_D
         .map((line) => line.trim())
         .filter((line) => line !== ""),
     readRecord: (taskId) => readRecordFile(evidenceDir, taskId),
+    readBlobAtCommit: (sha, path) => git(["show", `${sha}:${path}`]),
+    runAllowlistedGenerator: (entry, sha) =>
+      runGeneratorInIsolatedParentTree({ repoRoot, parentRef: `${sha}^`, scriptRelPath: entry.scriptPath, args: entry.args }),
   };
 }
 

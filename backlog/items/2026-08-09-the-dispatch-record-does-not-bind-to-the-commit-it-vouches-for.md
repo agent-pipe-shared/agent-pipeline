@@ -361,3 +361,61 @@ before this change, exactly as the design predicted. Direction 2 is
 **closed**; Direction 3 (a distinct Elephant trailer, still a genuine
 open design question per Options A/B above) is the only remaining piece —
 item stays `open` for that.
+
+### Direction 3 Option B implemented, 2026-08-19 (dispatch NVA-BL-DRECORD3-1)
+
+PO-authorized implementation of Option B exactly as scoped above.
+`dispatch-authorship-verify.mjs` now recognises a fifth trailer form,
+`Dispatch: <generator-script-path> (elephant-generated)`, verified by
+MECHANICAL PROOF rather than trust: `ELEPHANT_GENERATOR_ALLOWLIST` is a
+closed `Map` (one entry: `harness/scripts/generate-agent-obligations.mjs`,
+chosen per this item's own recommendation); the trailer id is used ONLY as
+a `Map` lookup key (never concatenated into a path or command — `Map#get`
+is immune to prototype-pollution-shaped keys like `__proto__`, unlike a
+plain-object lookup) and validated against the allowlist BEFORE any
+execution. On a hit, `runGeneratorInIsolatedParentTree()` provisions a
+disposable `git worktree` checkout of the commit's PARENT tree, runs the
+named script there (never in the live working tree), and the checker
+asserts the captured stdout is byte-identical to what the commit actually
+changed the declared output path to (`git show <sha>:<path>`) — a mismatch
+is `FAIL`/`elephant-generated-mismatch`, never a silent pass; an
+unallowlisted id is `UNVERIFIABLE`/`elephant-generated-not-allowlisted`
+and is never executed; a commit touching paths the generator does not
+produce is `FAIL`/`elephant-generated-paths-not-covered`.
+
+**Tests (`dispatch-authorship-verify.test.mjs`, 41/41 pass, up from 33):**
+(o) happy path via synthetic deps; (o2) mismatch → FAIL; (o3) unallowlisted
+id → UNVERIFIABLE, execution proven never to run; (o4) a path-traversal-
+shaped id is refused by the allowlist the same way; (o5) `__proto__`/
+`constructor`/`hasOwnProperty` ids resolve to nothing on the `Map`; (o6)
+uncovered paths → FAIL; (o7) a REAL end-to-end run — the actual
+`gitDeps()` sandbox re-running the actual `generate-agent-obligations.mjs`
+as it existed at this repository's own real historical commit
+`073014f158f886052dfb8b27ffae84e7ec95e33b`'s parent, reproducing that
+commit's real change byte-for-byte; and a dedicated sandbox-isolation
+test building a throwaway git fixture repo with a script shaped to
+attempt a cwd-relative escape and a relative-traversal escape, proving
+(via `git status --porcelain` before/after, existence checks, and a
+`git worktree list`/temp-directory-count check) that the fixture repo's
+real tree stays untouched and the sandbox is fully cleaned up even though
+the script inside it "succeeds" at writing where it tried to.
+
+**Known adjacent gate NOT fixed here, out of this dispatch's explicit
+scope.** Embedding the literal id `harness/scripts/generate-agent-
+obligations.mjs` — the exact form this item's own Option B text specifies
+— inside `plugins/pipeline-core/scripts/dispatch-authorship-verify.mjs`
+(a file shipped to consumer projects) trips
+`harness/scripts/check-consumer-safe-paths.mjs`'s `SOURCE_ONLY_PREFIXES`
+scan (`harness/` is source-only, per that check's own design). That file
+already carries one Class-B allowlist entry for this same source file's
+header docstring (a different match), so the correct remediation is a
+second, analogous Class-B entry for the three new lines — but this
+dispatch's briefed scope was locked to exactly three files
+(`dispatch-authorship-verify.mjs`, its test file, and this item), which
+excludes `check-consumer-safe-paths.mjs`. `node --test
+harness/scripts/check-consumer-safe-paths.test.mjs` therefore currently
+FAILS its `AC-11` assertion (3 findings, all three new lines). Follow-up
+needed: either a small dedicated dispatch adding the Class-B allowlist
+entry (recommended — the pattern is well-established and low-risk), or an
+Elephant/PO decision to use a non-path-shaped id alias instead (at the
+cost of departing from Option B's literal example text).
