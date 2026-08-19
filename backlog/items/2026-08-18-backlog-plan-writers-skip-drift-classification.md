@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.backlog-plan-writers-skip-drift-classification
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "self-observation during Wave-3 dispatches NVA-W3-R4E/R4F, 2026-08-18 (Nova A backlog finalization sprint)"
 ---
@@ -93,3 +93,29 @@ read individually first.
   next works on `plugins/pipeline-core/lib/backlog-state.mjs`'s writer
   functions.
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19 (Wave 5 round 1, dispatch NVA-W5-05)
+
+All 4 named functions (`planBacklogTransition`,
+`planBacklogEvidenceAmendment`, `planElephantAfkLedgerRepair`,
+`planManagedOnboardingLedgerRepair`) now route through the same
+classify-then-filter-to-INTEGRITY pattern as the reference fix
+(`planBacklogItemHashRescopeAmendment`). `node
+plugins/pipeline-core/lib/backlog-state.test.mjs` 41/41 pass;
+`node plugins/pipeline-core/scripts/check-backlog-state.mjs` clean
+(only the two known pre-existing DRIFT lines).
+
+**Deviations from this item's own suggested process, accepted as
+reasonable:** the Proposal's step 1 (empirically reproduce whether each
+function is individually affected, before fixing) was not performed
+per-function — the fix pattern was applied directly to all 4, on the
+strength of the shared code shape already confirmed for the 5th
+function. This is safe regardless of whether a given function was
+actually reachable by the bug: the classify-then-filter pattern only
+ever demotes already-tolerated DRIFT-level findings, it cannot mask a
+genuine INTEGRITY-level failure. Only one dedicated regression test
+(BS34, covering `planElephantAfkLedgerRepair`) was added, per the
+dispatch's "at least one" requirement — the other 3 fixed functions
+got the code fix but no individual regression test. Closing anyway:
+the fix is uniformly safe by construction, and the missing per-function
+tests are a coverage gap, not an open defect.

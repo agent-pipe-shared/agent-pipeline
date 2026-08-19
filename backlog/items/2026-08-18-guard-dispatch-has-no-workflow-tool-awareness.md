@@ -77,7 +77,29 @@ dispatch with real design latitude rather than a rushed same-session patch.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted, partial implementation landed (Wave 5 round 1,
+  dispatch NVA-W5-01); status stays **open** — the core runtime gap is
+  not yet closed.
+- **Rationale:** the dispatch added `extractWorkflowDispatches()` to
+  `guard-dispatch.mjs`, statically recovering an `agentType`/`prompt`
+  pair from a Workflow script's `agent()` calls and running the same
+  `dispatchFindings` checks (regex-based by design, fail-open on
+  anything not statically resolvable — matching this item's own
+  false-positive-risk caution). `node --test
+  plugins/pipeline-core/hooks/guard-dispatch.test.mjs` 11/11 pass,
+  including 2 new cases (GD10/GD11). **This makes the hook's logic
+  Workflow-aware but does not wire real runtime enforcement**:
+  `plugins/pipeline-core/hooks/hooks.json`'s PreToolUse matcher for this
+  hook is still `Task|Agent` only, so a live Workflow tool call is never
+  routed through this check at all — only the unit tests (which feed
+  stdin directly, bypassing matcher routing) exercise the new logic.
+  Adding `Workflow` to the matcher touches a TP-protected file
+  (`hooks.json`), correctly identified and left untouched by the
+  dispatch per its own scope boundary, rather than attempted freehand.
+- **Assignment:** a follow-up TP-ceremony dispatch to add `Workflow` to
+  `hooks.json`'s PreToolUse matcher for this hook, closing the actual
+  runtime gap. Also unconfirmed: the real Claude Code PreToolUse payload
+  shape for a Workflow tool call (script location, field name) was
+  inferred from `workflow-dispatch.md`'s description, not observed live
+  — worth confirming before or during that follow-up.
+- **Date:** 2026-08-19

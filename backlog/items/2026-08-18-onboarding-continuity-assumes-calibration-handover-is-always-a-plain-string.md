@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.onboarding-continuity-assumes-calibration-handover-is-always-a-plain-string
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Live incident, 2026-08-18, this session: setting project/pipeline.json's `handover` key to the ADR-0066-Decision-5-sanctioned `{ path, maxBytes }` object shape (already fully supported by handover-rotate.mjs/lib/handover-rotation.mjs) dropped the session into an unrecoverable continuity-observation-unavailable readiness class, blocking every Edit/Write/mutating-Bash tool call. Recovered only via an out-of-session `! git checkout -- project/pipeline.json` run by the PO directly (bypassing the tool-call hook chain), since even the guard's own suggested recovery command was itself blocked by the same gate."
 ---
@@ -165,3 +165,18 @@ audited or fixed here) and the decision text's own wording ("the one
 call site") is ambiguous between the two byte-identical occurrences.
 Leaving this open rather than guessing at closure, per the dispatch
 briefing's own instruction to leave status as-is when unsure.
+
+## Closure, 2026-08-19 (Wave 5 round 1, dispatch NVA-W5-03)
+
+The sibling `syncStateMdNextAction()` call site named above as the
+explicitly-unaudited milder-symptom gap is now fixed with the same
+dual-shape resolution pattern, regression-tested
+(`plugins/pipeline-core/lib/onboarding-continuity.test.mjs`, 163/163
+pass, including the new object-shaped-handover case for this call
+site). Both concretely identified call sites sharing this assumption
+(`observeDetailed()`, fixed wave 3; `syncStateMdNextAction()`, fixed
+here) are now resolved. The Description's caveat that "several other
+handover-adjacent call sites ... may have the same or related
+assumptions" was never narrowed to a second confirmed-broken site
+beyond these two — closing on the two concretely identified and now
+fixed sites, not on an unbounded audit claim.

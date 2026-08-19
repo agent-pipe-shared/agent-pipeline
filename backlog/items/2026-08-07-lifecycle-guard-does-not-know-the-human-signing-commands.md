@@ -84,3 +84,20 @@ Not designed here. Two candidates, and the second is the one that matters:
   design-shaped Alfred-track work, not an urgent gap.
 - **Assignment (if accepted):** next available Alfred slot.
 - **Date:** 2026-08-17
+
+### Note, 2026-08-19 (Wave 5 round 1, dispatch NVA-W5-06)
+
+Direction #1 (the trivial 3-name patch) was implemented anyway in this
+dispatch, despite this item's own 2026-08-17 Rationale explicitly
+arguing against doing #1 alone ("would just re-create the drift risk
+Direction #2 exists to close"). This is a process deviation worth
+flagging plainly: this item was categorized as Alfred-scoped and should
+not have been in the Wave-5-round-1 batch. The landed change itself is
+harmless and tested (`guard-lifecycle-ready.test.mjs` 115/115 pass,
+`isHumanPoSigningCommand()` now recognizes 6 of 6:
+`setup`/`approve`/`approve-all`/`approve-critical`/
+`authorize-critical`/`sign-intent`) and does not need to be reverted —
+but it does not substitute for Direction #2 (deriving the list from the
+CLI's actual command set, or a drift-detection check), which remains
+genuinely deferred to Sprint Alfred and is the reason this item's
+`status:` stays **open**.
