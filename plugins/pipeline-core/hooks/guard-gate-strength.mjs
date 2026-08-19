@@ -65,8 +65,19 @@ import { readPushApprovalMode } from "../lib/critical-human-proof-policy.mjs";
 import {
   consumeHumanGuardOverride,
   humanGuardRouteUnavailableReason,
+  planHumanGuardOverride,
   recordHumanGuardDenial,
 } from "../lib/human-guard-override.mjs";
+import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
+import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
+import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
+import {
+  appendConsumedHumanGovernanceDecision,
+  appendHumanGovernanceDecision,
+  queryHumanGovernanceDecisions,
+} from "../lib/human-governance-ledger.mjs";
+import { buildAppendIntent, buildOverrideDecisions, requestDecisionId } from "../lib/guard-authority-ledger-intake.mjs";
 
 const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -177,6 +188,130 @@ export function gateStrengthRuleFor(filePath, projectDir) {
   return GATE_STRENGTH_PATHS.find((rule) => rule.path.toLowerCase() === normalized) ?? null;
 }
 
+// ---------------------------------------------------------------------------------
+// PHX-WP-HGO-LEDGER-EMISSION-V2 (design specs/sprint-phoenix-epic/design/
+// gmw-hgo-evidence-intake-into-the-human-ledger.md §7.1/§7.5): additive portable
+// governance-ledger emission for HGO's `denied` and `consumed` transitions, wired
+// at THIS hook's own two call sites (the CLI's `granted` wiring lives in
+// scripts/guard-human-override.mjs). Mirrors scripts/guard-maintenance-window.mjs's
+// own repositoryFingerprintFor/capturePolicyDigestFor local-helper discipline
+// (small, owned by each caller -- same DUPLICATION NOTE precedent that module
+// documents at its own top).
+//
+// FAIL-OPEN BY DESIGN (§8.1): both helpers below record an outcome (deny, or an
+// already-consumed capability) this hook has already, synchronously and
+// independently, decided by the time either is called. Every call site wraps the
+// `await` in try/catch and never lets a ledger failure change the hook's own
+// exit code or stderr text -- narrowing/informational, not arming (contrast the
+// CLI-side `granted` append, which stays fail-closed per §8.1's other branch).
+// ---------------------------------------------------------------------------------
+
+/** The AUTHORITATIVE repository identity for the ledger -- never the raw rootDir string. */
+export function gateStrengthRepositoryFingerprint(rootDir) {
+  const repo = discoverRepository(rootDir);
+  return { repo, fingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir: repo.commonDir, primaryRoot: repo.primaryRoot }) };
+}
+
+export function gateStrengthCapturePolicyDigest(primaryRoot) {
+  const bytes = readPublicRepositoryFile(primaryRoot, "governance/events/capture-policy.json");
+  return canonicalSha256(parseStrictJson(bytes));
+}
+
+/**
+ * §7.5 `denied`: appends the `requested` then `denied` portable pair for one HGO
+ * denial. `planHumanGuardOverride` (read-only; no file writes; recomputes and
+ * drift-checks the same fields `recordHumanGuardDenial` already wrote) is the only
+ * already-exported function that reconstructs the full request record
+ * (`repository`, `policy`, `eligiblePaths`, `commandClass`) `buildOverrideDecisions`
+ * requires as its `capability` parameter -- `recordHumanGuardDenial`'s own return on
+ * `status: "planned"` carries only `{status, requestSha256}` (verified against
+ * source). DISCLOSED deviation from a literal reading of "act on their existing
+ * return values": `planHumanGuardOverride` is a third already-exported function of
+ * the same module, called read-only, not a modification of the two named ones.
+ *
+ * `notBeforeEpochMs`/`expiresAtEpochMs` are not pinned by §7.5 for `denied` (only
+ * `authorized` names a source, `capability.authorizedAt`/`.expiresAt`). This records
+ * the request's own validity window: `notBeforeEpochMs` is this denial's own clock
+ * read, `expiresAtEpochMs` is the request's own TTL-bound expiry already computed by
+ * `recordHumanGuardDenial`/`planHumanGuardOverride`. DISCLOSED interpretation.
+ */
+export async function appendOverrideDeniedLedgerEvent({ rootDir, pluginRoot, requestSha256, authorizationChannel, nowMs = Date.now() }) {
+  const scriptPath = join(pluginRoot, "scripts", "guard-human-override.mjs");
+  const plan = planHumanGuardOverride({ rootDir, pluginRoot, requestSha256, scriptPath });
+  const { repo, fingerprint } = gateStrengthRepositoryFingerprint(rootDir);
+  const capturePolicyDigest = gateStrengthCapturePolicyDigest(repo.primaryRoot);
+  const { decisions: existing } = await queryHumanGovernanceDecisions({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint });
+  const requestId = requestDecisionId({ intentSha256: requestSha256, producer: "hgo" });
+  const generation = existing.filter((entry) => entry.event === "denied" && entry.links.requestDecisionId === requestId).length;
+  const built = buildOverrideDecisions({
+    transition: "denied",
+    capability: plan,
+    repositoryFingerprint: fingerprint,
+    authorizationChannel,
+    generation,
+    notBeforeEpochMs: nowMs,
+    expiresAtEpochMs: Date.parse(plan.expiresAt),
+  });
+  if (!built.representable) return { appended: false, reason: built.reason };
+  const requestAlreadyAppended = existing.some((entry) => entry.decisionId === requestId);
+  const receipts = [];
+  for (const decision of built.decisions) {
+    if (decision.event === "requested" && requestAlreadyAppended) continue;
+    const intent = buildAppendIntent({
+      decision, repositoryFingerprint: fingerprint, occurredAtEpochMs: nowMs,
+      featureId: null, requestId: requestSha256, capturePolicyDigest,
+    });
+    receipts.push(await appendHumanGovernanceDecision({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint, intent }));
+  }
+  return { appended: true, receipts };
+}
+
+/** Parses the trailing `-<g>` generation out of an `hgo-grant-<i32>-<g>` decisionId. */
+function gateStrengthGenerationOf(decisionId) {
+  const match = /-(\d+)$/u.exec(decisionId);
+  if (!match) throw new Error(`GST-LEDGER-DECISION-ID: cannot parse a generation out of ${decisionId}`);
+  return Number(match[1]);
+}
+
+/**
+ * §7.5 `consumed`: appends via the ledger's own single-use disposition helper
+ * (`appendConsumedHumanGovernanceDecision`), reused rather than re-implemented
+ * (design §7.5's own words: "the strongest anti-replay primitive available"). No
+ * `guard-authority-ledger-intake.mjs` builder exists for `consumed` (it is not in
+ * that module's `OVERRIDE_TRANSITIONS`), so the ledger's own consumption helper is
+ * the correct and only path, matching `scripts/governance-authority.mjs`'s own
+ * existing caller of the same function as the worked precedent for this call
+ * convention. If no live granted decision is found for this request -- including
+ * the case the grant itself was never representable (§7.5 layers 0/3, §8.1's named
+ * exception) -- this appends nothing and returns cleanly; that is not a failure, it
+ * is the not-representable/absent case propagating forward from grant time.
+ *
+ * The `hgo-consume-<i32>-<g>` decisionId is a DISCLOSED filled design gap: §7.3
+ * names no id scheme for `consumed` (only `denyDecisionId` was already filled, with
+ * the identical comment, inside `guard-authority-ledger-intake.mjs`). It follows
+ * that module's own `<producer>-<kind>-<i32>-<g>` convention exactly, computed here
+ * rather than there because that module is out of scope for this dispatch.
+ */
+export async function appendOverrideConsumedLedgerEvent({ rootDir, pluginRoot, requestSha256, nowMs = Date.now() }) {
+  const { repo, fingerprint } = gateStrengthRepositoryFingerprint(rootDir);
+  const requestId = requestDecisionId({ intentSha256: requestSha256, producer: "hgo" });
+  const { decisions, events } = await queryHumanGovernanceDecisions({ repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint });
+  const grant = decisions.find((entry) => entry.event === "granted" && entry.outcome === "granted"
+    && entry.links.requestDecisionId === requestId
+    && !decisions.some((other) => Object.values(other.links).includes(entry.decisionId)
+      && ["consumed", "revoked", "superseded", "corrected"].includes(other.event)));
+  if (!grant) return { appended: false, reason: "no-live-grant" };
+  const grantEvent = events.find((event) => event.payload.decisionId === grant.decisionId);
+  if (!grantEvent) return { appended: false, reason: "no-live-grant" };
+  const generation = gateStrengthGenerationOf(grant.decisionId);
+  const consumeId = `hgo-consume-${requestSha256.slice(0, 32)}-${generation}`;
+  const receipt = await appendConsumedHumanGovernanceDecision({
+    repositoryRoot: repo.primaryRoot, repositoryFingerprint: fingerprint, grantEvent,
+    decisionId: consumeId, eventId: `evt-${consumeId}`, idempotencyKey: consumeId, observedAtEpochMs: nowMs,
+  });
+  return { appended: true, receipt };
+}
+
 if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mjs")) {
   let filePath = "";
   let toolName = "";
@@ -258,6 +393,9 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
       consumed = { status: "absent" }; // an unusable capability is not an authorization
     }
     if (consumed.status === "consumed") {
+      try {
+        await appendOverrideConsumedLedgerEvent({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, requestSha256: consumed.requestSha256 });
+      } catch { /* fail-open (§8.1 narrowing): never changes this already-decided consumption */ }
       process.stderr.write(
         `[pipeline-human-override] guard-gate-strength ${matched.id}: exact one-time capability consumed; plan=${consumed.planSha256}.\n`,
       );
@@ -268,6 +406,11 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
       try {
         const planned = recordHumanGuardDenial({ rootDir: projectDir, pluginRoot: PLUGIN_ROOT, toolName, toolInput, denials });
         if (planned.status === "planned") {
+          try {
+            await appendOverrideDeniedLedgerEvent({
+              rootDir: projectDir, pluginRoot: PLUGIN_ROOT, requestSha256: planned.requestSha256, authorizationChannel: approvalMode,
+            });
+          } catch { /* fail-open (§8.1 narrowing/informational): never changes this already-decided denial */ }
           const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
           const continuation = approvalMode === "chat"
             ? [
