@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "60072bcf9ec748d9adcf48431dbab1b7543a98a7641f5c6746d2474ee95f2975"
+    "transitionHead": "b339d700c47c1526c13f74cb5e220492bb72676d303e557a0c08461d890d6866"
   },
   "counts": {
-    "open": 9,
+    "open": 12,
     "in_progress": 20,
     "closed": 128,
     "rejected": 2,
@@ -706,6 +706,14 @@
       "closureEvidence": "backlog/items/2026-08-16-gitignore-evidence-rule-swallows-durable-spec-artifacts.md"
     },
     {
+      "id": "pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19."
+    },
+    {
       "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",
       "status": "open",
       "type": "requirement",
@@ -1304,6 +1312,14 @@
       "closureEvidence": "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
     },
     {
+      "id": "pipeline.product-capability-inventory-missing-two-new-guard-hooks",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19."
+    },
+    {
       "id": "pipeline.product-capability-inventory-two-guard-hooks-uncategorized",
       "status": "closed",
       "type": "defect",
@@ -1783,6 +1799,14 @@
       "closureRepository": "self",
       "closureCommit": "4c2f04cbe1e926f9aaeb0e8a598a28465ab528c4",
       "closureEvidence": "backlog/items/2026-08-17-trust-policy-shape-disagreement-between-sign-intent-and-verify-po-approval-proof.md"
+    },
+    {
+      "id": "pipeline.two-guard-hook-test-files-unregistered-in-verify",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19."
     },
     {
       "id": "pipeline.unified-human-authorization-ux",
