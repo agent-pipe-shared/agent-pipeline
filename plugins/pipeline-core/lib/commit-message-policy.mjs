@@ -96,14 +96,8 @@ const CORRELATION_RULES = Object.freeze([
   }),
 ]);
 
-/**
- * Is this command line a `git commit` at all? Global options may sit before the verb.
- * Exported so a caller that needs the same "is this a commit invocation" decision without
- * a full message extraction (e.g. guard-git.mjs's GG-22, which must gate on the command
- * being a commit at all, including an editor commit with no `-m`/`-F`) never has to write a
- * second, independently-drifting parser for it.
- */
-export function isGitCommit(tokens) {
+/** Is this command line a `git commit` at all? Global options may sit before the verb. */
+function isGitCommit(tokens) {
   let i = 0;
   // Leading `NAME=value` assignments are part of the command, not the command name. Skipping
   // them is not cosmetic: without this, `PIPELINE_GUARD_OVERRIDE=… git commit -F msg.txt` --
@@ -156,12 +150,12 @@ function heredocBodies(cmd) {
 /**
  * @param {string} cmd raw command line, quoting intact
  * @param {{projectDir: string, readFile: (path: string) => string, requireMarker?: boolean}} options
- * @returns {{inspected: boolean, sources: string[], findings: {code: string, detail: string}[], message: string|null}}
+ * @returns {{inspected: boolean, sources: string[], findings: {code: string, detail: string}[]}}
  */
 export function commitMessageFindings(cmd, { readFile, requireMarker = false } = {}) {
-  if (typeof cmd !== "string" || cmd === "") return { inspected: false, sources: [], findings: [], message: null };
+  if (typeof cmd !== "string" || cmd === "") return { inspected: false, sources: [], findings: [] };
   const tokens = tokenizeArgv(cmd);
-  if (!isGitCommit(tokens)) return { inspected: false, sources: [], findings: [], message: null };
+  if (!isGitCommit(tokens)) return { inspected: false, sources: [], findings: [] };
 
   const parts = [];
   const sources = [];
@@ -193,7 +187,7 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false } =
   // No inspectable message and no named-but-unreadable source: an editor commit. The caller
   // must not treat this as clean -- it is "not looked at", which is a different thing and is
   // reported as such.
-  if (parts.length === 0 && unreadable.length === 0) return { inspected: false, sources: [], findings: [], message: null };
+  if (parts.length === 0 && unreadable.length === 0) return { inspected: false, sources: [], findings: [] };
 
   const message = parts.join("\n");
   const findings = CORRELATION_RULES
@@ -210,12 +204,7 @@ export function commitMessageFindings(cmd, { readFile, requireMarker = false } =
   if (requireMarker && !MARKER.test(message)) {
     findings.push({ code: "GIT-03-MARKER-MISSING", detail: "no `AI-Assisted: true` line" });
   }
-  return {
-    inspected: true,
-    sources: [...sources, ...unreadable.map((entry) => entry.path)],
-    findings,
-    message: parts.length > 0 ? parts.join("\n") : null,
-  };
+  return { inspected: true, sources: [...sources, ...unreadable.map((entry) => entry.path)], findings };
 }
 
 /** GIT-01's admitted Conventional Commit types (`guardrails/git.md:16`), verbatim. */
