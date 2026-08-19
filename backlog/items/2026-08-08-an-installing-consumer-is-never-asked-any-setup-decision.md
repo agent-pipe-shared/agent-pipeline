@@ -4,6 +4,10 @@ id: pipeline.installing-consumer-is-never-asked-any-setup-decision
 type: defect
 owner: pipeline
 status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 2640075144cdd0a2ddac36a2a41f2181c01c19f7
+closure_evidence: backlog/items/2026-08-08-an-installing-consumer-is-never-asked-any-setup-decision.md
 created: 2026-08-08
 due: 2026-08-15
 source: "PO, 2026-08-08, preparing the tester mail: 'wenn ich den Leuten sage, soundso installiert ihr das Plugin, dann führen Sie aber ja nie das Setup aus. Das heißt, an den Entscheidungen bezüglich Scratchpad beziehungsweise Keyordner, welche Runner, auch PO Gate, welches ist Blocking, Chatfreigabe versus Signature -- da kommen Sie nirgendwo dran vorbei. Wann und wie entscheidet man das, wenn man installiert?'"
