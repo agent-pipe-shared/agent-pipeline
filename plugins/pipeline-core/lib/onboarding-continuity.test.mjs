@@ -2745,4 +2745,131 @@ check("applyOnboardingIntakeDesignQuestions: an exact replay of the same already
   assert.equal(replay.checkpoint.revision, first.checkpoint.revision);
 });
 
+// ---------------------------------------------------------------------------
+// Intake checkpoint Batch B (NVA-W4-COORD-1 follow-up): crash-injection at
+// every fault point stubbed via deps.crashAt in applyIntakeCheckpointMutation
+// (the shared single-target CAS writer every step-1/2/3 function goes
+// through) and writeIntakeCheckpointEvidence (capture's evidence blob write),
+// plus the CAS-drift test. Mirrors the file's own pre-existing
+// KICKOFF_FAULT_STAGES "crash at X" pattern above.
+
+// applyIntakeCheckpointMutation's own fault points -- exercised once through
+// applyOnboardingIntakeConsent (the simplest single-call vehicle) since the
+// fault-injected code is the SHARED writer every step-1/2/3 function calls
+// into; the shared logic only needs covering once, not per caller.
+const INTAKE_CHECKPOINT_WRITE_FAULT_STAGES = ["cas-recheck", "temp-fsync", "rename", "directory-fsync"];
+
+for (const stage of INTAKE_CHECKPOINT_WRITE_FAULT_STAGES) {
+  check(`intake checkpoint write: crash at ${stage} leaves either absent or fully committed content, never torn, and a retry converges`, () => {
+    const root = fixture(`intake-checkpoint-crash-${stage.replaceAll(/[^a-z0-9]+/gu, "-")}`);
+    expectIntakeError("INTAKE-CHECKPOINT-SIMULATED-CRASH", () => applyOnboardingIntakeConsent({
+      rootDir: root, granted: true, language: "en", profile: "feature", activate: true,
+      deps: { crashAt: stage },
+    }));
+    const afterCrash = readOnboardingIntakeCheckpoint({ rootDir: root });
+    if (stage === "rename" || stage === "directory-fsync") {
+      // renameSync() is atomic: by the time these two fault points fire, the
+      // real target already carries the fully valid new content.
+      assert.equal(afterCrash.status, "present");
+      assert.equal(afterCrash.value.values.language, "en");
+      assert.equal(afterCrash.value.values.profile, "feature");
+    } else {
+      // cas-recheck/temp-fsync fire strictly before the rename -- this is
+      // the first-ever write for this root, so the real target must be
+      // untouched (absent), never a torn partial file.
+      assert.equal(afterCrash.status, "absent");
+    }
+    // A real crash never releases its writer lock -- prove the retry
+    // recovers it through the same stale-lock path the kickoff crash tests
+    // use (lockStaleMs: 0, nowMs pushed forward), converging either way.
+    const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+    assert.equal(existsSync(paths.lock), true);
+    const recovered = applyOnboardingIntakeConsent({
+      rootDir: root, granted: true, language: "en", profile: "feature", activate: true,
+      deps: { lockStaleMs: 0, nowMs: Date.now() + 60_000 },
+    });
+    assert.equal(recovered.checkpoint.values.language, "en");
+    assert.equal(recovered.checkpoint.values.profile, "feature");
+    if (stage === "rename" || stage === "directory-fsync") {
+      // Narrow, named, non-blocking gap: the crashed write already fully
+      // committed (see above), so this identical-values retry is a true
+      // no-op that returns from applyIntakeCheckpointMutation's UNLOCKED
+      // fast path -- it never touches the lock at all, so the stale lock
+      // the crash left behind is NOT cleaned up here. This is not a data-
+      // correctness bug (the checkpoint content itself is exactly right,
+      // and acquireLock()'s existing same-token/staleness recovery already
+      // handles this lock cleanly the next time a call actually has
+      // something to write) -- proven below with one such real mutation.
+      assert.equal(existsSync(paths.lock), true, "documents the known no-op-retry-never-releases-a-stale-lock gap");
+      const nextRealMutation = applyOnboardingIntakeConsent({
+        rootDir: root, granted: true, profile: "feature", gitAuthor: { name: "A", email: "a@example.com" }, activate: true,
+        deps: { lockStaleMs: 0, nowMs: Date.now() + 120_000 },
+      });
+      assert.equal(nextRealMutation.mutated, true);
+      assert.equal(existsSync(paths.lock), false, "the next call with real work to do does clean up the stale lock");
+    } else {
+      assert.equal(existsSync(paths.lock), false);
+    }
+  });
+}
+
+// writeIntakeCheckpointEvidence's own fault points -- only reachable through
+// applyOnboardingIntakeCapture, and unlocked (content-addressed, no writer
+// lock), so recovery here is a plain retry, not a stale-lock recovery.
+const INTAKE_EVIDENCE_WRITE_FAULT_STAGES = ["evidence-temp-fsync", "evidence-rename", "evidence-directory-fsync"];
+
+for (const stage of INTAKE_EVIDENCE_WRITE_FAULT_STAGES) {
+  check(`intake checkpoint evidence: crash at ${stage} leaves either absent or fully committed evidence bytes, never torn, and a retry converges`, () => {
+    const root = fixture(`intake-evidence-crash-${stage.replaceAll(/[^a-z0-9]+/gu, "-")}`);
+    grantIntakeConsent(root);
+    const text = "material to capture";
+    expectIntakeError("INTAKE-CHECKPOINT-SIMULATED-CRASH", () => applyOnboardingIntakeCapture({
+      rootDir: root, text, activate: true,
+      deps: { crashAt: stage },
+    }));
+    const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+    const evidencePath = join(paths.evidenceDirectory, `${digest(text)}.txt`);
+    if (stage === "evidence-rename" || stage === "evidence-directory-fsync") {
+      assert.equal(existsSync(evidencePath), true);
+      assert.equal(readFileSync(evidencePath, "utf8"), text);
+    } else {
+      assert.equal(existsSync(evidencePath), false);
+    }
+    // The checkpoint entry is written only AFTER writeIntakeCheckpointEvidence
+    // returns -- a crash inside it never reaches applyIntakeCheckpointMutation
+    // at all, so the checkpoint's materialInput must be exactly as before.
+    const afterCrash = readOnboardingIntakeCheckpoint({ rootDir: root });
+    assert.equal(afterCrash.value.materialInput.length, 0);
+    const recovered = applyOnboardingIntakeCapture({ rootDir: root, text, activate: true });
+    assert.equal(recovered.mutated, true);
+    assert.equal(recovered.checkpoint.materialInput.length, 1);
+  });
+}
+
+check("intake checkpoint: a preimage that changes between the two observations is refused as CAS drift, not silently overwritten", () => {
+  const root = fixture("intake-cas-drift");
+  applyOnboardingIntakeConsent({ rootDir: root, granted: true, language: "en", activate: true });
+  const paths = resolveIntakeCheckpointPaths({ rootDir: root });
+  expectIntakeError("INTAKE-CHECKPOINT-CAS-DRIFT", () => applyOnboardingIntakeConsent({
+    rootDir: root, granted: true, profile: "feature", activate: true,
+    deps: {
+      fault(point) {
+        if (point !== "cas-recheck") return;
+        // Simulate a concurrent writer changing the checkpoint's raw bytes
+        // between this call's own unlocked pre-check and its locked
+        // re-observation -- the exact window applyIntakeCheckpointMutation's
+        // two-observation CAS discipline exists to close.
+        const concurrent = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
+        concurrent.values.language = "de";
+        writeFileSync(paths.checkpoint, `${JSON.stringify(concurrent, null, 2)}\n`);
+      },
+    },
+  }));
+  // Refused, so nothing from the refused call's own attempted write landed --
+  // the file must still carry exactly the concurrent writer's content.
+  const after = JSON.parse(readFileSync(paths.checkpoint, "utf8"));
+  assert.equal(after.values.language, "de");
+  assert.equal(after.values.profile, null, "the refused call's own profile candidate must never have been written");
+});
+
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);
