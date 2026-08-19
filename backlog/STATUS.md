@@ -6,12 +6,12 @@
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
 | pipeline.a-promoted-feature-can-never-pass-the-plan-gate | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.absent-runner-flag-silently-defaults-to-codex | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0047-numbering-collision | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.adr-0051-follow-up-gaps-untracked | closed | defect | pipeline | 2026-08-05 | — |
-| pipeline.adr-0056-conflict-scope-text-narrower-than-code | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.adr-0056-conflict-scope-text-narrower-than-code | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.advisor-consent-is-requested-before-the-readiness-preflight | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.agent-definitions-pin-the-review-tier-model | open | defect | pipeline | 2026-08-07 | — |
@@ -42,7 +42,7 @@
 | pipeline.briefing-model-field-contradicts-agent-definition | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.canonical-verify-evidence-path | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.canonical-worktree-lifecycle | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.capability-first-advisor-critic-dispatch | open | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-greenfield-run-happy-path-findings | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | open | idea | pipeline | 2026-08-05 | — |
@@ -53,10 +53,10 @@
 | pipeline.codex-plugin-validator-host-parity | closed | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.codex-pretool-guard-cross-repository-recovery-guidance-points-at-the-wrong-repo | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.codex-read-only-steps-escalate-individually-instead-of-once | closed | idea | pipeline | 2026-08-09 | — |
-| pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | open | idea | pipeline | 2026-08-09 | — |
+| pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.codex-sandbox-critic-longterm | in_progress | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.command-grammar-guesses-shell-dialect-from-host-os-not-the-actual-tool-shell | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.compaction-stable-bootstrap-lease | open | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.compaction-stable-bootstrap-lease | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.compare-three-parallel-happy-path-tests-in-detail | closed | idea | pipeline | 2026-08-10 | — |
 | pipeline.concurrent-dispatches-share-one-index | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.consumer-projects-have-no-goldfish-dispatch-requirement-for-implementation | closed | idea | pipeline | 2026-08-09 | — |
@@ -71,15 +71,15 @@
 | pipeline.critical-human-proof-not-wired-to-push-and-prd-gates | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.critical-human-proof-policy-lacks-the-reconcile-approval-generalization | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.critical-human-proof-policy-seeded-without-trust-anchor | open | idea | pipeline | 2026-08-09 | — |
-| pipeline.critical-push-signing-ceremony-gives-no-path-feedback | open | workflow-improvement | pipeline | 2026-08-09 | — |
+| pipeline.critical-push-signing-ceremony-gives-no-path-feedback | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.cross-repository-override-ledger-binding | closed | workflow-improvement | pipeline | 2026-07-20 | — |
-| pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | open | defect | pipeline | 2026-08-12 | — |
+| pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.decouple-hosted-project-document-language-from-operator-facing-language | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-provenance | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.dispatch-record-does-not-bind-to-its-commit | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.dispatch-reported-creating-a-record-it-never-created | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.dispatched-agents-return-truncated-mid-step | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.docs-state-md-next-action-text-is-a-static-snapshot-with-no-live-sync | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.docs-state-md-sync-ignores-calibration-configured-handover-path | closed | defect | pipeline | 2026-08-10 | — |
@@ -90,9 +90,9 @@
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.explicit-final-acceptance-gate | open | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.explicit-final-acceptance-gate | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.four-critic-preimage-pins-drifted-or-never-valid | open | defect | pipeline | 2026-08-12 | — |
+| pipeline.four-critic-preimage-pins-drifted-or-never-valid | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.fresh-repo-onboarding-intake-first-transaction | open | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.fresh-repo-onboarding-never-asks-for-git-identity | closed | defect | pipeline | 2026-08-09 | — |
@@ -102,7 +102,7 @@
 | pipeline.git-identity-must-be-set-immediately-before-first-commit-not-at-setup-time | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.git-identity-warn-only-diagnostic-does-not-meet-po-expectation | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.gmw-install-never-recognizes-its-own-window-under-v3-multi-anchor-schema | closed | defect | pipeline | 2026-08-16 | — |
-| pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.goldfish-critic-dispatch-bootstrap-token-cost-is-disproportionate | open | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time | closed | workflow-improvement | pipeline | 2026-08-09 | — |
@@ -128,7 +128,7 @@
 | pipeline.guard-refuses-the-prescribed-recovery | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-string-match-makes-a-file-uncommittable | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.handover-file-has-no-rotation-obligation | open | workflow-improvement | pipeline | 2026-08-07 | — |
-| pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.happy-path-local-telemetry | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | open | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
@@ -140,7 +140,7 @@
 | pipeline.human-approval-ux-directory-clarity-and-single-command | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-guard-override-shares-the-po-human-approval-posix-normalization-bug | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | open | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.installing-consumer-is-never-asked-any-setup-decision | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.intake-values-restart-resilient-immediately | open | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.kickoff-apply-action-drops-runner | closed | defect | pipeline | 2026-08-08 | — |
@@ -159,7 +159,7 @@
 | pipeline.lossless-pre-restart-checkpoint | open | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.maintenance-window-selectivity-is-untested-at-both-levels | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.maintenance-window-signature-voided-by-unrelated-write | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | open | defect | pipeline | 2026-08-17 | — |
+| pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.manifest-repair-paths-are-hardcoded-to-runners-default-codex | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.merged-into-frontmatter-key-documented-but-unsupported | closed | defect | pipeline | 2026-08-17 | — |
@@ -168,7 +168,7 @@
 | pipeline.multi-cli-efficiency-pilots | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.native-windows-verify-red-suite-class | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.neutral-authority-tier-is-a-frozen-snapshot-the-compiler-never-updates | closed | defect | pipeline | 2026-08-06 | — |
-| pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home | open | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.no-design-to-implementation-handover-exists | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.no-durable-practice-for-mining-session-transcripts-for-happy-path-defects | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.no-gate-is-tested-end-to-end-for-satisfiability | closed | workflow-improvement | pipeline | 2026-08-06 | — |
@@ -189,7 +189,7 @@
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | closed | defect | pipeline | 2026-08-17 | — |
-| pipeline.per-phase-progress-message-budget | open | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.per-phase-progress-message-budget | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.permitted-edit-drops-session-into-unrecoverable-readiness | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.phase-aware-bootstrap-readiness | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.pipeline-author-repair-signature-mode-never-actually-admits-the-edit | open | defect | pipeline | 2026-08-18 | — |
@@ -217,7 +217,7 @@
 | pipeline.project-settings-enabled-two-pipeline-core-plugin-instances-at-once | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.promotion-freezes-a-prd-the-po-gate-will-reject | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff | closed | defect | pipeline | 2026-08-09 | — |
-| pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination | open | defect | pipeline | 2026-08-18 | — |
+| pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.push-approval-signature-commands-also-line-wrap | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.push-approval-skill-reference-predates-adr-0061 | closed | defect | pipeline | 2026-08-09 | — |
@@ -256,7 +256,7 @@
 | pipeline.shipped-artifacts-assume-the-pipelines-own-repository | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.shipped-guidance-sends-agents-to-a-directory-a-gate-refuses | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.signed-guard-override-has-no-command-that-emits-the-digest-to-sign | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.single-trust-anchor-excludes-key-rotation-and-teams | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.skill-arguments-and-bootstrap-length | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.source-available-commercial-licensing | closed | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -271,7 +271,7 @@
 | pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention | open | workflow-improvement | pipeline | 2026-08-17 | — |
 | pipeline.this-hosts-local-marketplace-copy-is-not-symlinked-to-source | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.three-smaller-greenfield-defects | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.transactional-readbacks-not-status-cascades | open | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.transactional-readbacks-not-status-cascades | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference | open | defect | pipeline | 2026-08-18 | — |
 | pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.two-handover-rotation-mechanisms-use-different-archive-conventions | closed | workflow-improvement | pipeline | 2026-08-17 | — |
@@ -301,6 +301,6 @@
 
 ## Counts
 
-- open: 94
+- open: 75
 - in_progress: 7
-- closed: 192
+- closed: 211

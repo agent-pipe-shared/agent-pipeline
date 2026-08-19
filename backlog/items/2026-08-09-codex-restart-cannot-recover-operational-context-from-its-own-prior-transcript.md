@@ -5,6 +5,10 @@ type: idea
 owner: pipeline
 status: closed
 created: 2026-08-09
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2
+closure_evidence: backlog/items/2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript.md
 source: "PO observation of a live Codex greenfield test session, 2026-08-09 (three rollout files, two restarts), plus independent forensic confirmation that the sanitized resume-hint card cannot carry this class of information by design."
 due: 2026-08-23
 ---

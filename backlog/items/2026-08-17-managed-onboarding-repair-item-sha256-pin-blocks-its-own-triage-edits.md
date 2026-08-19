@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-17
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2
+closure_evidence: backlog/items/2026-08-17-managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits.md
 source: "Surfaced by the 2026-08-17 full-backlog triage pass: filling in this item's own Triage section broke check-backlog-state.mjs."
 ---
 

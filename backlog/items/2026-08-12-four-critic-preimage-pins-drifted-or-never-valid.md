@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-12
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2
+closure_evidence: backlog/items/2026-08-12-four-critic-preimage-pins-drifted-or-never-valid.md
 source: "NVA-BL-42-FIX dispatch, 2026-08-12, while fixing the single stale critic.md pin this item's sibling (NVA-BL-42) named. The fix measured all 9 pins against their baseline-creation commit and found 5 non-matching, not the 1 originally believed."
 ---
 

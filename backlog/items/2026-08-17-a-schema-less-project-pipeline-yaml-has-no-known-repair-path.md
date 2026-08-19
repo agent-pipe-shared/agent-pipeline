@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-17
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2
+closure_evidence: backlog/items/2026-08-17-a-schema-less-project-pipeline-yaml-has-no-known-repair-path.md
 source: "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover, which attributed this to runner-profile-migration-v3.mjs's generator omitting a schema field. That specific root-cause attribution is checked against source and appears WRONG -- filed here with the corrected, narrower, still-unresolved finding."
 ---
 

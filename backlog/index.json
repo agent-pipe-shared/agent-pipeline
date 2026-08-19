@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3cb0a3f5863aa7374f83b6e73b506d7497b621e494297ea92822dd56e2369678"
+    "transitionHead": "c18c953c17859e636ed69973dba07662b98fe0ea55e2592de2b69a8f3ef2288e"
   },
   "counts": {
-    "open": 94,
+    "open": 75,
     "in_progress": 7,
-    "closed": 192
+    "closed": 211
   },
   "items": [
     {
@@ -25,11 +25,15 @@
     },
     {
       "id": "pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover, which attributed this to runner-profile-migration-v3.mjs's generator omitting a schema field. That specific root-cause attribution is checked against source and appears WRONG -- filed here with the corrected, narrower, still-unresolved finding."
+      "source": "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover, which attributed this to runner-profile-migration-v3.mjs's generator omitting a schema field. That specific root-cause attribution is checked against source and appears WRONG -- filed here with the corrected, narrower, still-unresolved finding.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-17-a-schema-less-project-pipeline-yaml-has-no-known-repair-path.md"
     },
     {
       "id": "pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question",
@@ -73,11 +77,15 @@
     },
     {
       "id": "pipeline.adr-0056-conflict-scope-text-narrower-than-code",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, over docs/state.md lines 3489-5929 (the T5 round entry, ~2026-08-06). Finding surfaced by a read-only research fork, verified against current source before filing."
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, over docs/state.md lines 3489-5929 (the T5 round entry, ~2026-08-06). Finding surfaced by a read-only research fork, verified against current source before filing.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-adr-0056-conflict-scope-text-narrower-than-code.md"
     },
     {
       "id": "pipeline.advisor-consent-is-requested-before-the-readiness-preflight",
@@ -404,11 +412,15 @@
     },
     {
       "id": "pipeline.capability-first-advisor-critic-dispatch",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-2 (priority P1)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-2 (priority P1)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-capability-first-advisor-critic-dispatch.md"
     },
     {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
@@ -529,11 +541,15 @@
     },
     {
       "id": "pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript",
-      "status": "open",
+      "status": "closed",
       "type": "idea",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "PO observation of a live Codex greenfield test session, 2026-08-09 (three rollout files, two restarts), plus independent forensic confirmation that the sanitized resume-hint card cannot carry this class of information by design."
+      "source": "PO observation of a live Codex greenfield test session, 2026-08-09 (three rollout files, two restarts), plus independent forensic confirmation that the sanitized resume-hint card cannot carry this class of information by design.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript.md"
     },
     {
       "id": "pipeline.codex-sandbox-critic-longterm",
@@ -558,11 +574,15 @@
     },
     {
       "id": "pipeline.compaction-stable-bootstrap-lease",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-3 (priority P1)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-3 (priority P1)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-compaction-stable-bootstrap-lease.md"
     },
     {
       "id": "pipeline.compare-three-parallel-happy-path-tests-in-detail",
@@ -722,11 +742,15 @@
     },
     {
       "id": "pipeline.critical-push-signing-ceremony-gives-no-path-feedback",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-09",
-      "source": "Independent read-only analysis of the PO's private Codex+Pipeline 0.5.4 happy-path re-test (fifth local candidate, final successful session, 2026-08-09), cross-checked against direct code reading of po-human-approval.mjs. Corrects an earlier self-report from inside that same Codex session, which misidentified the failing subcommand."
+      "source": "Independent read-only analysis of the PO's private Codex+Pipeline 0.5.4 happy-path re-test (fifth local candidate, final successful session, 2026-08-09), cross-checked against direct code reading of po-human-approval.mjs. Corrects an earlier self-report from inside that same Codex session, which misidentified the failing subcommand.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-09-critical-push-signing-ceremony-gives-no-path-feedback.md"
     },
     {
       "id": "pipeline.cross-repository-boundary-guidance-still-omits-the-literal-command",
@@ -754,11 +778,15 @@
     },
     {
       "id": "pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-12",
-      "source": "NVA-BL-75, 2026-08-12, surfaced while measuring override-reachability for backlog/items/2026-08-08-a-guard-reclassification-changed-what-a-signature-can-lift.md. Explicitly disclosed by the dispatch as a measurement, not a claimed exploit."
+      "source": "NVA-BL-75, 2026-08-12, surfaced while measuring override-reachability for backlog/items/2026-08-08-a-guard-reclassification-changed-what-a-signature-can-lift.md. Explicitly disclosed by the dispatch as a measurement, not a claimed exploit.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-12-cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary.md"
     },
     {
       "id": "pipeline.decouple-hosted-project-document-language-from-operator-facing-language",
@@ -806,11 +834,15 @@
     },
     {
       "id": "pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch ('The round's own route violation, and where it came from' entry). Finding surfaced by a read-only research fork."
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch ('The round's own route violation, and where it came from' entry). Finding surfaced by a read-only research fork.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin.md"
     },
     {
       "id": "pipeline.dispatched-agents-return-truncated-mid-step",
@@ -917,11 +949,15 @@
     },
     {
       "id": "pipeline.explicit-final-acceptance-gate",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-6 (priority P1)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-6 (priority P1)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-explicit-final-acceptance-gate.md"
     },
     {
       "id": "pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root",
@@ -937,11 +973,15 @@
     },
     {
       "id": "pipeline.four-critic-preimage-pins-drifted-or-never-valid",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-12",
-      "source": "NVA-BL-42-FIX dispatch, 2026-08-12, while fixing the single stale critic.md pin this item's sibling (NVA-BL-42) named. The fix measured all 9 pins against their baseline-creation commit and found 5 non-matching, not the 1 originally believed."
+      "source": "NVA-BL-42-FIX dispatch, 2026-08-12, while fixing the single stale critic.md pin this item's sibling (NVA-BL-42) named. The fix measured all 9 pins against their baseline-creation commit and found 5 non-matching, not the 1 originally believed.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-12-four-critic-preimage-pins-drifted-or-never-valid.md"
     },
     {
       "id": "pipeline.four-human-guard-override-tests-leak-into-the-real-host-marketplace-registry",
@@ -1045,11 +1085,15 @@
     },
     {
       "id": "pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Critic round-2 review of NVA-A7FIX-2 (4736d913..ad512e80), finding F-B, 2026-08-17."
+      "source": "Critic round-2 review of NVA-A7FIX-2 (4736d913..ad512e80), finding F-B, 2026-08-17.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-17-gmw-kernel-closure-test-does-not-model-spawn-edges.md"
     },
     {
       "id": "pipeline.gmw-reconcile-still-needs-a-manual-copy-after-the-po-signs",
@@ -1325,11 +1369,15 @@
     },
     {
       "id": "pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "PO, 2026-08-18, in-session while planning an incremental extraction pass over docs/state.md's oldest sections (ADR-0066 Decision 6/7): the PO read the mechanism's actual behavior back and said 'das macht auch keinen Sinn und sollte angepasst werden' (that doesn't make sense either and should be adjusted)."
+      "source": "PO, 2026-08-18, in-session while planning an incremental extraction pass over docs/state.md's oldest sections (ADR-0066 Decision 6/7): the PO read the mechanism's actual behavior back and said 'das macht auch keinen Sinn und sollte angepasst werden' (that doesn't make sense either and should be adjusted).",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped.md"
     },
     {
       "id": "pipeline.happy-path-local-telemetry",
@@ -1445,11 +1493,15 @@
     },
     {
       "id": "pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch ('Correction logged for the record (methodological, not just this session's)' entry). Finding surfaced by a read-only research fork."
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch ('Correction logged for the record (methodological, not just this session's)' entry). Finding surfaced by a read-only research fork.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home.md"
     },
     {
       "id": "pipeline.installing-consumer-is-never-asked-any-setup-decision",
@@ -1641,11 +1693,15 @@
     },
     {
       "id": "pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-17",
-      "source": "Surfaced by the 2026-08-17 full-backlog triage pass: filling in this item's own Triage section broke check-backlog-state.mjs."
+      "source": "Surfaced by the 2026-08-17 full-backlog triage pass: filling in this item's own Triage section broke check-backlog-state.mjs.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-17-managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits.md"
     },
     {
       "id": "pipeline.managed-onboarding-success-contract",
@@ -1733,11 +1789,15 @@
     },
     {
       "id": "pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (an ADR-0064-registration incident and a matching self-inflicted OG-DOC-UNCLASSIFIED gap hit again this same session on docs/state-archive/...). Finding surfaced by a read-only research fork, corroborated independently by this session's own experience."
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (an ADR-0064-registration incident and a matching self-inflicted OG-DOC-UNCLASSIFIED gap hit again this same session on docs/state-archive/...). Finding surfaced by a read-only research fork, corroborated independently by this session's own experience.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-new-docs-file-needs-governance-registry-rule-has-no-repo-level-home.md"
     },
     {
       "id": "pipeline.no-design-to-implementation-handover-exists",
@@ -1962,11 +2022,15 @@
     },
     {
       "id": "pipeline.per-phase-progress-message-budget",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-1 (priority P2)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-1 (priority P2)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-per-phase-progress-message-budget.md"
     },
     {
       "id": "pipeline.permitted-edit-drops-session-into-unrecoverable-readiness",
@@ -2287,11 +2351,15 @@
     },
     {
       "id": "pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, over docs/state.md lines 3489-5929 (the T7 Critic round entry, ~2026-08-06). Finding surfaced by a read-only research fork, verified against current source before filing."
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, over docs/state.md lines 3489-5929 (the T7 Critic round entry, ~2026-08-06). Finding surfaced by a read-only research fork, verified against current source before filing.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-push-approval-general-mode-lane-does-not-bind-remote-or-destination.md"
     },
     {
       "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",
@@ -2710,11 +2778,15 @@
     },
     {
       "id": "pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-08",
-      "source": "PO, 2026-08-08, forwarding findings from the Phoenix project as ONE package for Nova/0.5.4 rather than separate tickets. Trimmed 2026-08-09 on the PO's instruction — 'nur was du reproduzieren kannst, rest komplett verwerfen' — after the Elephant walked the whole ceremony live and measured every claim against this code."
+      "source": "PO, 2026-08-08, forwarding findings from the Phoenix project as ONE package for Nova/0.5.4 rather than separate tickets. Trimmed 2026-08-09 on the PO's instruction — 'nur was du reproduzieren kannst, rest komplett verwerfen' — after the Elephant walked the whole ceremony live and measured every claim against this code.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md"
     },
     {
       "id": "pipeline.single-trust-anchor-excludes-key-rotation-and-teams",
@@ -2856,11 +2928,15 @@
     },
     {
       "id": "pipeline.transactional-readbacks-not-status-cascades",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-8 (priority P1)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-8 (priority P1)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
+      "closureEvidence": "backlog/items/2026-08-18-transactional-readbacks-not-status-cascades.md"
     },
     {
       "id": "pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference",

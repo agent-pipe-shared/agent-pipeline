@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-12
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2
+closure_evidence: backlog/items/2026-08-12-cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary.md
 source: "NVA-BL-75, 2026-08-12, surfaced while measuring override-reachability for backlog/items/2026-08-08-a-guard-reclassification-changed-what-a-signature-can-lift.md. Explicitly disclosed by the dispatch as a measurement, not a claimed exploit."
 ---
 

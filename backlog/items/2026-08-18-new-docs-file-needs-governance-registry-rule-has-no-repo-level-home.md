@@ -5,6 +5,10 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2
+closure_evidence: backlog/items/2026-08-18-new-docs-file-needs-governance-registry-rule-has-no-repo-level-home.md
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (an ADR-0064-registration incident and a matching self-inflicted OG-DOC-UNCLASSIFIED gap hit again this same session on docs/state-archive/...). Finding surfaced by a read-only research fork, corroborated independently by this session's own experience."
 ---
 

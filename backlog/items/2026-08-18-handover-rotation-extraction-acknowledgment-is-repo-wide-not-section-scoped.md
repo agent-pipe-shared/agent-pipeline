@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2
+closure_evidence: backlog/items/2026-08-18-handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped.md
 source: "PO, 2026-08-18, in-session while planning an incremental extraction pass over docs/state.md's oldest sections (ADR-0066 Decision 6/7): the PO read the mechanism's actual behavior back and said 'das macht auch keinen Sinn und sollte angepasst werden' (that doesn't make sense either and should be adjusted)."
 ---
 

@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2
+closure_evidence: backlog/items/2026-08-18-dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin.md
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch ('The round's own route violation, and where it came from' entry). Finding surfaced by a read-only research fork."
 ---
 

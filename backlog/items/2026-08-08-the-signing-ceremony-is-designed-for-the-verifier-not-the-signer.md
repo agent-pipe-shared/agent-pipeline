@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-08
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2
+closure_evidence: backlog/items/2026-08-08-the-signing-ceremony-is-designed-for-the-verifier-not-the-signer.md
 due: 2026-09-05
 source: "PO, 2026-08-08, forwarding findings from the Phoenix project as ONE package for Nova/0.5.4 rather than separate tickets. Trimmed 2026-08-09 on the PO's instruction — 'nur was du reproduzieren kannst, rest komplett verwerfen' — after the Elephant walked the whole ceremony live and measured every claim against this code."
 ---
