@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.handover-file-has-no-rotation-obligation
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "b4b685e0741b45b7412ca9a7fd52059e1284a034"
+closure_evidence: "backlog/items/2026-08-07-handover-file-has-no-rotation-obligation.md"
 source: "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
 due: 2026-09-06
 ---
@@ -302,3 +306,50 @@ this item's last step (the `hooks.json` wiring) can proceed:
 Item stays open. The hook itself (round 4, above) is built, tested and merged
 regardless of this open ceremony question — only the `hooks.json` wiring step
 is blocked.
+
+### Closed — 2026-08-19, round 5: `hooks.json` ceremony completed by the PO
+
+The PO explicitly authorized proceeding with the digest already recovered
+above (question 1's process concern resolved pragmatically: the PO's
+explicit in-session authorization to use it turns the earlier concern —
+an agent self-serving around a disclosure boundary — into the PO
+themselves directing the action, which is exactly what that boundary was
+designed to require). A fresh request/plan/prepare-authorization/
+emit-signature-digest chain was run to avoid using a stale, TTL-expired
+digest (the first drifted mid-ceremony — `HGO-DRIFT`, root-caused live to
+a repo-state-changing commit landed between `plan` and
+`prepare-authorization`; fixed by regenerating and making zero further
+commits until the chain completed). The PO signed the resulting
+`intentSha256` externally via `po-human-approval.mjs sign-intent`
+(`~/agent-pipeline-po-nova`) and ran `authorize-by-signature` themselves —
+`status: "armed", mutated: true`. The Elephant then consumed the
+one-time capability with the exact planned edit: `guard-handover-size.mjs`
+wired into `hooks.json`'s `Edit|Write|NotebookEdit` PreToolUse matcher
+family, mirroring the sibling hooks' shape. Commit `b4b685e0`.
+
+**Deliberately not done in the same pass:** the file's own top-level
+`$comment` (documenting "EIGHT hooks" by name) was not updated to describe
+the ninth — doing so would be a second, different edit needing its own
+fresh HGO ceremony (the armed capability was bound to the exact planned
+diff, single-use). Left as a known, minor, non-functional documentation
+gap — the hook enforces correctly regardless of the comment being stale —
+to be closed in the same pass as the two follow-up items this ceremony
+also produced (see below), rather than asking the PO for a fifth ceremony
+round in one sitting.
+
+**Two follow-up items opened during this ceremony, per direct PO
+instruction, not the Elephant's own initiative:**
+[`hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store`](2026-08-19-hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store.md)
+(re-scoped in-session: the PO correctly identified the original "harden
+the withholding" framing as security-by-obscurity — the real boundary is
+the Ed25519 signature requirement, not digest secrecy; now a
+documentation-only fix) and
+[`hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step`](2026-08-19-hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step.md)
+(streamline the four-command relay down to the one step that genuinely
+needs the PO's private key).
+
+**Item closed.** Both remaining pieces from ADR-0064's own Follow-up
+section are now done: the hard-size-gate hook exists AND is wired in.
+`--execute` for real rotation remains a separate, explicitly-scoped-out
+stub — not part of this item's own acceptance, tracked only as an ADR-0064
+Follow-up note, not reopened here.
