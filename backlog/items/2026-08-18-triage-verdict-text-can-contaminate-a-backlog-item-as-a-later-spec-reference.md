@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (2026-08-08 Nova GF-054 block). Finding surfaced by a read-only research fork."
 ---
@@ -132,3 +132,19 @@ next Pipeline session can run the sanctioned ledger writer
 (`plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs` or the
 matching skill) to formally close this item, citing this section and commit
 as closure evidence.
+
+## Closure, 2026-08-19
+
+Formally closed, as this section's own predecessor text invited. An
+independent, code-first verification pass (Workflow task wdyd7rk9g,
+2026-08-19) re-confirmed the implementation live: both
+`backlog-dispatch-reference.mjs` and `backlog-item-strip-for-dispatch.mjs`
+exist and their test files pass 12/12; the dispatch-construction rule is
+wired into `templates/prompts/critic-review.md`, `templates/prompts/goldfish-task.md`,
+and `backlog/README.md` rule 6. The "higher-risk ledger operation" this
+dispatch deliberately deferred has since been performed successfully
+22 times in this same session (closing the 19 Wave-4/general-backlog
+items confirmed resolved-in-code, commits `9ae28dad`/`1eb05885`) using the
+exact sanctioned `reconcile-backlog-ledger.mjs` path this section already
+named — the original risk concern is empirically addressed, so this item
+closes via the same route rather than remaining deferred indefinitely.
