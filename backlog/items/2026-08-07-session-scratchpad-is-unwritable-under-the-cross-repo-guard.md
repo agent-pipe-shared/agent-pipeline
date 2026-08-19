@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-07
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: f12c335034c524c325e960d3c508df1d0530fed5
+closure_evidence: backlog/items/2026-08-07-session-scratchpad-is-unwritable-under-the-cross-repo-guard.md
 source: "PO, 2026-08-07, on watching the guard refuse a scratchpad write: 'eigentlich solltest du auf tmp zugriff haben'. The Critic-contract half of the finding was observed independently the same day."
 ---
 

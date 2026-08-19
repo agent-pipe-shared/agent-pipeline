@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: f12c335034c524c325e960d3c508df1d0530fed5
+closure_evidence: backlog/items/2026-08-18-windows-posix-mode-bit-checks-are-meaningless-on-ntfs.md
 source: "PO, 2026-08-18, relaying a diagnosis from a separate Windows Claude Code session working on an unrelated consumer project ('Toolbox'), which vendors the same `plugins/pipeline-core` source via the marketplace. `project-onboarding-v3.mjs inspect --intent session` was returning `continuity-observation-unavailable` on that Windows machine even though pipeline-state.json/PRD/spec content was independently verified byte-correct (checked via `certutil -hashfile`). Two of the reported hit locations (`lib/onboarding-continuity.mjs:617,625`, `lib/local-supervisor-state.mjs:61,65,69`) were independently spot-checked against this repo's own current source and confirmed to match exactly, including that this exact same file already has correct win32-aware branching elsewhere (onboarding-continuity.mjs:1211,4482) but not at the two reported lines -- corroborating the report rather than taking it on faith."
 ---
 

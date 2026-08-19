@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: f12c335034c524c325e960d3c508df1d0530fed5
+closure_evidence: backlog/items/2026-08-08-a-git-repository-appears-although-the-plan-said-it-would-not.md
 source: "Structured handover from the greenfield happy-path test of the local 0.5.4 build, 2026-08-08 (defect D-4)."
 ---
 
