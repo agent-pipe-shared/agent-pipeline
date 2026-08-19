@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fedd313cd399e489b70c8af0fc91fd518c19566056a479adbc47d5d558b7bb95"
+    "transitionHead": "93220d1f382beb13c8a66752d01eb7d4435aec494e8ad375e60b543ed3358778"
   },
   "counts": {
-    "open": 11,
+    "open": 10,
     "in_progress": 20,
-    "closed": 131,
+    "closed": 132,
     "rejected": 2,
     "deferred": 11
   },
@@ -378,11 +378,15 @@
     },
     {
       "id": "pipeline.closed-shell-grammar-still-rejects-common-readonly-composition",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "PO question, 2026-08-19: 'sollen wir die bash grammatik reibung nicht etwas auflösen und sehr übliche dinge einfach rein nehmen ... die sehr oft genutzt werden?' — asked live after the running Critic delta-review dispatch (and the Elephant itself, same session) repeatedly hit GUARD-PARSE-UNSUPPORTED/GUARD-REDIRECT-UNAPPROVED on ordinary read-only command shapes."
+      "source": "PO question, 2026-08-19: 'sollen wir die bash grammatik reibung nicht etwas auflösen und sehr übliche dinge einfach rein nehmen ... die sehr oft genutzt werden?' — asked live after the running Critic delta-review dispatch (and the Elephant itself, same session) repeatedly hit GUARD-PARSE-UNSUPPORTED/GUARD-REDIRECT-UNAPPROVED on ordinary read-only command shapes.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "329ac49c4f082a71df1e5676e9e35155e8f82276",
+      "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
     },
     {
       "id": "pipeline.codex-critic-isolation-fixture-rejects-merge-commit-head",

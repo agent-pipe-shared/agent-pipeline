@@ -3,10 +3,34 @@ schema: pipeline.backlog-item.v1
 id: pipeline.closed-shell-grammar-still-rejects-common-readonly-composition
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "329ac49c4f082a71df1e5676e9e35155e8f82276"
+closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
 source: "PO question, 2026-08-19: 'sollen wir die bash grammatik reibung nicht etwas auflösen und sehr übliche dinge einfach rein nehmen ... die sehr oft genutzt werden?' — asked live after the running Critic delta-review dispatch (and the Elephant itself, same session) repeatedly hit GUARD-PARSE-UNSUPPORTED/GUARD-REDIRECT-UNAPPROVED on ordinary read-only command shapes."
 ---
+
+## Closed — 2026-08-19
+
+Proposal points 1 (the `&&`-chain allowlist, `mkdir -p` narrowed to
+`scratch/`/`.claude/worktrees/`) and 2 (`2>/dev/null`/`2>&1` trailing
+redirect on an already-admitted command) landed in commit `b3153385`,
+went through a round-1 Critic review (FAIL: 1 blocker + 2 major),
+were reworked, and passed round 2 (PASS, 1 minor finding disposed
+directly — evidence-artifact scope, closed by the full verify-gate
+run in the same session). Point 3 (existing fail-closed guarantees
+preserved) is proven by the unmodified pre-existing test suite still
+passing alongside the new coverage — 48/48.
+
+Proposal point 1's own trailing clause — admitting the existing
+grep-to-grep/grep-to-head pipeline shape as a trailing stage on an
+`&&`-chain — is deliberately NOT included in this closure: split into
+its own tracked item before the round-1 rework began, so the blocker
+fix wasn't held up by a separate, riskier parser extension. See
+`2026-08-19-readonly-and-chain-grep-pipe-trailing-stage-not-implemented.md`
+(still open).
 
 # The closed shell grammar still rejects several very common, genuinely read-only command shapes — narrower than `2026-07-26-readonly-command-guard-classification.md` already fixed
 
