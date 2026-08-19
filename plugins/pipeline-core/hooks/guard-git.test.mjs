@@ -190,6 +190,7 @@ check("R21 allow  ordinary fetch", "git fetch origin refs/heads/main:refs/remote
 check("R11 block  add .env", "git add .env", BLOCK);
 check("R11 block  add .env.production", "git add .env.production", BLOCK);
 check("R11 block  add secrets.yaml", "git add config/secrets.yaml", BLOCK);
+check("R11 allow  add fakesecrets.yaml (unrelated file matched only by substring before the GG-11 fix)", "git add homeassistant/fakesecrets.yaml", ALLOW);
 check("R11 allow  add .storage (project-specific entry removed from the generic denylist)", "git add .storage", ALLOW);
 check("R11 allow  add app-state.db (project-specific entry removed from the generic denylist)", "git add app-state.db", ALLOW);
 check("R11 block  add id_rsa", "git add id_rsa", BLOCK);
