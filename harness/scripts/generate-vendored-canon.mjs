@@ -160,6 +160,7 @@ export const UNIVERSAL_ADRS = Object.freeze([
   { path: "docs/adr/0055-critical-human-proof-waiver.md", reason: "Cited by guardrails/security.md / roles/elephant.md (critical-action human proof)." },
   { path: "docs/adr/0056-push-approval-mode.md", reason: "Cited by guardrails/git.md (GIT-05, gates.push_approval) and docs/push-release-flow.md." },
   { path: "docs/adr/0061-uniform-human-approval-ceremony.md", reason: "Cited by guardrails/git.md (GG-03 second route) and docs/push-release-flow.md." },
+  { path: "docs/adr/0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md", reason: "Cited by docs/push-release-flow.md ('A fourth kind: release-preflight')." },
 ]);
 
 /**
