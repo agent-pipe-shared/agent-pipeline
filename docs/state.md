@@ -3,7 +3,19 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 49)
+**Last updated:** 2026-08-19 (checkpoint 50)
+
+---
+
+## CHECKPOINT — 2026-08-19 (50): re-reviewed the "exhausted" claim once more and found 3 more genuine closures the prior rounds' own bookkeeping had missed — 16 open items down to 14, backlog-state-check down to its one known design-decision item (READ THIS FIRST)
+
+A re-check of every remaining open item's OWN current file content (not just its category) against work already landed found three items whose files simply hadn't been updated to reflect their real, already-achieved state:
+
+- **`backlog-closure-metadata-missing-across-historical-items`** — closed (no new placeholder commit needed: `a2a2bcc7`). Its own file still described the 10 "contradictions" and the 1 malformed-evidence item as unresolved; both were fully fixed several commits ago (`a2a2bcc7`, `f86b9cbd`), and `reconcile-backlog-ledger.mjs --activate` already ran clean. The file just hadn't been told.
+- **`h-ac-11-restricted-profile-intake-record-is-design-increment-2`** — stays open (genuinely, one real prerequisite-blocked piece remains) but its Triage never mentioned that `PHX-WP-HAC11-D1-DESIGN-SPEC` (commit `22d8ef09`) already wrote the missing design spec AND implemented D-1's validator/schema/wiring/builder (11 files, 108 passing test cases). Only the final CLI call site is left, correctly deferred on increment 1's own not-yet-existing CLI wiring.
+- **`unified-human-authorization-ux`** — closed (`707e44e4`). All 5 of its 2026-08-18 scoping-pass work packages had real, landed, or properly-filed dispositions; the umbrella item itself had simply never been told to close once its one remaining thread (publication-authority) got its own tracked item.
+
+**Open backlog items: 16 → 14.** `backlog-state-check` is now down to exactly the one known, already-filed, design-decision-pending item (`ledger event 41: itemSha256 does not bind the current item bytes`) — everything else that check inspects is clean. The remaining 14 open items are unchanged in kind from checkpoint 48's breakdown (PO's Ed25519 key for TP-3/TP-4/TP-7; 2 named design decisions; 1 separate-repo-session blocker; 1 explicit no-freelance item; correct deferrals/wrong-sprint/by-design-open) — this round found no NEW dispatchable work, only bookkeeping the prior rounds owed but hadn't paid. Verify/security-scan state otherwise unchanged from checkpoint 48/49.
 
 ---
 
