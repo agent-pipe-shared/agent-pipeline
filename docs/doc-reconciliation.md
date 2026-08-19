@@ -47,6 +47,72 @@ something to do here without review.
 
 ## Entries
 
+## Candidate ebd614cec847abd10da166c46d47748466650cdf — 2026-08-19, range 8a92d377..ebd614ce, checkpoints 36-68: the whole unpushed marathon session since the last push (513 commits) — first Layer 1b reconciliation run since checkpoint 35
+
+Also fixed on the way: ADR-0066's `Governs:` line was wrapped across 3 markdown
+lines with each path backtick-quoted — this script's single-line regex parser
+only ever read line 1, and the backticks became part of the literal glob
+string, so neither path ever matched a real file (ORPHAN-GOVERNS-GLOB).
+Reformatted to a single-line bare-path list matching every other ADR's
+convention (`ebd614ce`); this is what makes ADR-0066 appear as newly
+implicated below — it was silently never enforced before this fix.
+
+- ADR-0012: checked, no change needed.
+
+  `docs/state.md` (ADR-0012's own governed artifact) grew by 33 checkpoint
+  entries (36 through 68) and was rotated once (checkpoints 1-60 archived to
+  `docs/state-archive/2026-08-19--checkpoints-1-through-60.md` via
+  `handover-rotate.mjs`, per [ADR-0064](adr/0064-handover-rotation-extraction-archive-hard-size-gate.md))
+  once it exceeded its hard size cap. Both are exactly the canonicalized
+  handover's normal operation (one versioned file, rotated not duplicated) —
+  no change to the one-file/memory-mirror-only decision itself.
+
+- ADR-0045: checked, no change needed.
+
+  Every implicated path is either `specs/sprint-phoenix-epic/`'s existing
+  core package artifacts (`acceptance.md`, `lifecycle.json`, `prd_phoenix-
+  epic.md`, `spec.md`, already-enumerated core members) or session/feature
+  evidence and design notes under `specs/sprint-phoenix-epic/evidence/` and
+  `design/` — exactly the "further session- or feature-appropriate artifacts"
+  this ADR's own 2026-08-18 amendment already declared not a topology
+  violation. No new artifact kind, no core-package restructuring.
+
+- ADR-0056: checked, no change needed.
+
+  `guard-push.mjs` changed twice in range: a bare-branch-destination-
+  resolution fix (the exact known finding named in
+  `backlog/items/2026-08-09-bare-branch-name-in-git-push-fails-approval-
+  with-a-misleading-code.md`, already understood, not a new decision) and a
+  decision-reference dual-evaluation addition (an input-validation extension,
+  not a change to which clearance a human must provide or how it binds to
+  the candidate). `project/critical-human-proof.json` and `project/pipeline-
+  state.json` changes are ordinary operational writes from running the
+  already-decided ceremony repeatedly, not schema/policy changes. `gates.
+  push_approval` stayed `signature` throughout.
+
+- ADR-0058: checked, no change needed.
+
+  The substantive design work touching these files this range (HGO
+  fail-closed-arming Parts A/B/C, prepare-for-signature + refreeze-plan CLI,
+  ledger wiring) implements [ADR-0059](adr/0059-signed-human-guard-override.md)
+  (Refines this ADR; carries no `Governs:` line of its own, so it is never
+  independently enforced by this mechanism) — an already-recorded decision,
+  not a fresh one made in this range. `guard-lifecycle-ready.mjs`'s other
+  change in range (the closed-shell-grammar `&&`-chain/mkdir-narrowing
+  widening, `b3153385`/`329ac49c`) is confined to the independent read-only-
+  command-admission logic and never touches the GMW/HGO override or window
+  mechanism this ADR actually governs.
+
+- ADR-0066: checked, no change needed.
+
+  Newly implicated only because its own `Governs:` glob was broken (see
+  above). `guard-push.mjs`'s changes in range (bare-branch-destination fix,
+  decision-reference dual-evaluation) and `pipeline-state.mjs`'s changes
+  (plan-approval schema, rebind CLI verbs, lifecycle-event emission,
+  decision-reference dual-evaluation) do not touch `enforcePublicationAuthorization`,
+  `publication-approve`, or `state.publicationCriticalProofs` — the
+  approval-time-only-signature tradeoff this ADR records is untouched.
+
 ## Candidate 2f401dc513000227bab0453df8fffb0c67222a26 — 2026-08-18, range 5c3c50d4..2f401dc5, checkpoint 40: PO decided all 7 remaining design items
 
 - ADR-0012: checked, no change needed.
