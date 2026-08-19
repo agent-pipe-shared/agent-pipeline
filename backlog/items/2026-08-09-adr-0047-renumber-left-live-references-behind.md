@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.adr-0047-renumber-left-live-references-behind
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "0000000000000000000000000000000000000000"
+closure_evidence: "backlog/items/2026-08-09-adr-0047-renumber-left-live-references-behind.md"
 source: "Filed as the deliberate follow-up named by commit 88a7133 (\"fix(adr): give the three ADRs numbered 0047 real numbers, and move two records to the code\"), which resolved the docs/adr/ corpus and docs/adr/README.md but explicitly left three classes of out-of-corpus reference untouched. Commit message: \"Two things this deliberately does not do... Both are filed rather than smuggled in.\""
 due: 2026-09-08
 ---
