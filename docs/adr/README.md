@@ -77,6 +77,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0063](0063-fork-disposition-approval-proof.md) | Fork disposition requires a PO approval proof, reusing push's signature/chat mode and `po-approval-proof.mjs` rather than a disposition-specific mechanism | accepted | 2026-08-10 |
 | [0064](0064-handover-rotation-extraction-archive-hard-size-gate.md) | Handover rotation: extraction, archive, hard size gate | accepted | 2026-08-18 |
 | [0065](0065-port-authorize-critical-ceremony.md) | Port origin/main's `authorize-critical` single-command ceremony (ADR-0061) into Phoenix | accepted | 2026-08-18 |
+| [0066](0066-publication-approval-time-signature-accepted-tradeoff.md) | Publication's approval-time-only Ed25519 signature check is an accepted, bounded tradeoff (no execution-time re-verification) | accepted | 2026-08-19 |
 
 ### Resubmissions
 
@@ -97,6 +98,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0056](0056-push-approval-mode.md) | `deploy` and `publication` have no source-of-truth mode; add one only if an operator asks |
 | [0057](0057-runner-platform-support-is-an-implementation-obligation.md) | Build the mechanical R1/R2 checks — a literal-runner-default check first, then a both-shell-rendering check |
 | [0058](0058-guard-maintenance-window.md) | A dedicated guard against the same-session worktree-merge bypass path is not yet built (see ADR-0058 Consequences/Follow-up) |
+| [0066](0066-publication-approval-time-signature-accepted-tradeoff.md) | Trigger-based, not calendar-based: destination scope widens beyond a narrow release-channel set, the fixed executor's argument-closed boundary loosens, or a concrete CAS/lock incident surfaces on the publication path (see ADR-0066 Follow-up) |
 
 ### Conventions
 
