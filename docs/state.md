@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 68)
+**Last updated:** 2026-08-19 (checkpoint 69)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
@@ -25,6 +25,24 @@
 **Operational note, not a code defect:** the first full-Verify attempt after the gitleaksignore fix hung for 30+ minutes on `session-cleanup-binding-tests` — diagnosed as CPU contention from an unrelated, concurrent Claude Code session's own heavy test run in the sibling Nova repo (confirmed via `ps aux`; that suite passed standalone in 5.4s once isolated). The orphaned `verify.mjs` process (still alive despite `TaskStop` reporting success) was killed directly; a retry completed cleanly. Two config-file gates required `git stash push -u`/`pop` around each run: both `verify.mjs`'s own candidate preflight and `security-scan.mjs`'s candidate snapshot refuse on ANY working-tree dirt (tracked or untracked), including this repo's own standing-dirty `dispatch-record.json`/`project/pipeline-state.json` files — not previously exercised this explicitly in this session's checkpoints.
 
 **Next:** the push-approval ceremony (`gates.push_approval: signature`, `docs/push-release-flow.md`) at this exact candidate, then `git push origin sprint_phoenix` — the PO's "clean cut and push" instruction, final step.
+
+---
+
+## CHECKPOINT — 2026-08-19 (69): PUSHED — `origin/sprint_phoenix` now at `85b718cf`; session ends here, PC switch, next session fetches fresh (READ THIS FIRST)
+
+**Push completed, all 5 layers.** Push candidate `85b718cf` (checkpoint 67 + a doc-reconciliation record on top): full Verify 406/406 green, `security-scan` clean, Layer 1b `check-doc-reconciliation.mjs` passed (5 ADRs checked: 0012/0045/0056/0058/0066, all "checked, no change needed" — see `docs/doc-reconciliation.md`). PO ran `authorize-critical` (first attempt failed on a real bug — `--expires-at` needs the EXACT `new Date(x).toISOString()` round-trip form including milliseconds, the push-release-flow.md doc's "normalized, not rejected" claim is wrong for this CLI validation path, not yet corrected in the doc — worth a small follow-up fix); corrected timestamp succeeded. Layer 4 (`pipeline-state.mjs approve-push`) and Layer 5 (`git push origin sprint_phoenix:refs/heads/sprint_phoenix`) both ran clean. **Verified: `git rev-parse origin/sprint_phoenix` = `85b718cfc71d5127da6d5214e81ef1f2ce2d3d47`, matching local HEAD exactly** (plus this checkpoint's own commit and the gitleaks-item closure below, both pushed after).
+
+**Backlog bookkeeping gap found and partly fixed:** the pre-push goal check (Stop-hook) correctly caught that 2 already-fixed items were never marked closed in their own files (real fixes had landed same-session, only the backlog metadata lagged) — `2026-08-19-gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag.md` closed this checkpoint (`c3bf83b7` fixed it originally, `8f336c7d` closes the bookkeeping).
+
+**9 open items remain, not yet individually triaged this checkpoint — the next session's first job:**
+- `hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store` (2026-08-19) — **investigated, largely already done**: the PO's own "Correction (this fix)" (the misleading digest-withholding comment) landed in `7473f6c9` ("digest-withholding comment correction"). Only "Candidate 4" (an explicit role-contract prohibition against reading `.git/agent-pipeline/human-guard-overrides/requests/**`) is still unactioned — grepped `roles/`, no such prohibition exists yet. Framed as optional ("cheap... still stands") in the PO's own triage, not mandatory. Likely closeable citing `7473f6c9`, with candidate 4 either done in the same pass or split to its own tiny item.
+- `hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step` (2026-08-19) — **investigated, substantively implemented**: `eabc96b6` ("add HGO prepare-for-signature + refreeze-plan CLI") implements Proposal option 1 exactly (collapses plan→prepare-authorization→emit-signature-digest into one `prepare-for-signature` subcommand emitting ready-to-copy commands). Option 2 (can the Elephant run it directly, bypassing the Auto Mode classifier) was never tried/confirmed either way. Needs a close-or-narrow pass, not a full implementation.
+- `hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check` (2026-08-19) — real, undecided architectural question (3 candidate directions disclosed, none evaluated) — needs a PO decision.
+- `readonly-and-chain-grep-pipe-trailing-stage-not-implemented` (2026-08-19) — deliberately deferred sub-scope of the closed shell-grammar item, real remaining work, not yet dispatched.
+- `spec-retention-on-close` (2026-07-20) — not reinvestigated this checkpoint.
+- `documentation-information-architecture`, `dual-channel-publication`, `regulated-document-hooks`, `stateful-design-contract-template` (all 2026-07-19, "Sentinel recovery baseline; no completion claim") — pattern strongly suggests these are accepted, intentional Sentinel-era carryover explicitly not required for Phoenix's own gates, but this was NOT freshly re-confirmed this checkpoint — verify against the Sentinel recovery record before assuming.
+
+**PO instruction, this exact moment:** stopping work on this machine for a PC switch; next session on the other machine starts with a fresh fetch of this exact pushed state. No further work performed after this checkpoint — commit and push only.
 
 ---
 
