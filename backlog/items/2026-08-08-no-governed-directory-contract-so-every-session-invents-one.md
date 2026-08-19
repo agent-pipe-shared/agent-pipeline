@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: ebc6ea4c238f12aa8e4b0050b0c0ec4829a9d18a
+closure_evidence: backlog/items/2026-08-08-no-governed-directory-contract-so-every-session-invents-one.md
 source: "PO, 2026-08-08: 'uns fehlt da noch eine art adr die die verzeichnisstrukturen besser hart vorgibt und definiert was wo hin gehört - agenten neigen bei jeder neuen session dazu neue strukturen zu erfinden. das muss die pipeline steuern.' Five corroborating instances from that same night are recorded below."
 ---
 

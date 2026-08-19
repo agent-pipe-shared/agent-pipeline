@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-07
 due: 2026-08-21
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: ebc6ea4c238f12aa8e4b0050b0c0ec4829a9d18a
+closure_evidence: backlog/items/2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md
 source: "Found incidentally during the 0.5.3 candidate work, 2026-08-07, while looking for something else. Re-confirmed by running the suite directly on candidate d4887b7."
 ---
 

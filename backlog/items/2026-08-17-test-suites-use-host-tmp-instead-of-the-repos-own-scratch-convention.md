@@ -5,6 +5,10 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 created: 2026-08-17
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: ebc6ea4c238f12aa8e4b0050b0c0ec4829a9d18a
+closure_evidence: backlog/items/2026-08-17-test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention.md
 source: "PO, 2026-08-17, mid-candidate-stamp: 'wundere mich warum die pipeline immer noch so viel tmp nutzt obwohl wir dafür eigentlich scratch erfunden haben' — asked after this session's local /tmp filled to 100% inode usage (1,038,060 of 1,048,576) and started making `git` itself fail with ENOSPC, blocking work until the PO manually remounted tmpfs with a higher inode count and cleared stale entries."
 ---
 
