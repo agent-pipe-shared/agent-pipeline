@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8d32f161632a61d8fcde3583599395af8fd44beaa7121f2d1ff5ac3f5cde6fdb"
+    "transitionHead": "6051f34aa3e2a22ccb048306b07b91879ef92bbee20312c37109e14379f39b1a"
   },
   "counts": {
-    "open": 12,
+    "open": 13,
     "in_progress": 20,
     "closed": 129,
     "rejected": 2,
@@ -1427,6 +1427,14 @@
       "closureRepository": "self",
       "closureCommit": "e2fcf75cde2e698f0fcd1565718d3fc6b5369c45",
       "closureEvidence": "backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md"
+    },
+    {
+      "id": "pipeline.readonly-and-chain-grep-pipe-trailing-stage-not-implemented",
+      "status": "open",
+      "type": "requirement",
+      "owner": "pipeline",
+      "created": "2026-08-19",
+      "source": "Critic round-1 review (Finding 3) of commit b3153385, PHX-WP-READONLY-GRAMMAR-WIDEN. Split out as follow-up work rather than crammed into the same rework that fixed Finding 1 (blocker, security regression) and Finding 2 (vacuous test)."
     },
     {
       "id": "pipeline.readonly-command-guard-classification",
