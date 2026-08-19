@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 5f77a34a188e7fd8e2f1993b2dc2671431d02499
+closure_evidence: backlog/items/2026-08-19-wave5-scope-categorization-missed-triage-level-sprint-deferrals.md
 source: "Self-observation, 2026-08-19, this session: a manual sweep of the Wave-5-scope work list found 12 of 54 items already explicitly deferred to another sprint by their own Triage text, none of which the automated categorization pass had excluded."
 ---
 
