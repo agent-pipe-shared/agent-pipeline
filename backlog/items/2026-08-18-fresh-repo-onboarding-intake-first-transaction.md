@@ -132,3 +132,19 @@ Item stays `open` — Phase 1's core module exists and is committed but is not
 yet test-covered, and the coordinator as a whole (steps 4-6, the actual
 authority-binding transaction this item's acceptance test needs) has not
 started.
+
+### Update, 2026-08-19 — test coverage landing (same dispatch, Batch A)
+
+Happy-path/precondition/idempotency test coverage for the three apply
+functions landed on trunk (commit `34a5fa19`): 22 new tests, `validateIntakeCheckpoint`
+round-trip coverage, all green (`onboarding-continuity.test.mjs` 185/185,
+`project-onboarding-v3.test.mjs` 128/128, `check-consumer-safe-paths.test.mjs`
+9/9, no regressions). Writing the exact-replay test for
+`applyOnboardingIntakeDesignQuestions` exposed and fixed a real bug: the
+"already answered" comparison wrongly included the freshly-generated
+`answeredAt` timestamp, which would have made a genuine idempotent replay
+(issued at a different wall-clock time by construction) falsely refused as
+`INTAKE-DESIGN-QUESTIONS-ALREADY-ANSWERED`. Crash-injection tests (at each
+`deps.crashAt` fault point already stubbed in the write primitives) and the
+CAS-drift test are dispatched as a follow-up Batch B, not yet landed as of
+this update. Item stays `open`.
