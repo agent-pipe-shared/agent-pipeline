@@ -370,6 +370,18 @@ function backupBeforeMutation(root, deps, label, sourcePath) {
  * are internal to onboarding-continuity.mjs (not exported), so backing up by
  * name here would either duplicate them as magic strings or require touching
  * that file -- both worse than backing up whatever is actually present.
+ *
+ * CORRECTED 2026-08-19 (still-open F3 sibling gap, disclosed in the
+ * 2026-08-19 round-2 implementation status): a symlink entry (or any other
+ * non-regular, non-directory entry -- a fifo, a device node) used to hit
+ * `continue`, silently skipping it -- exactly the shape a symlink attack or
+ * a damaged private store would take, and exactly the failure mode
+ * `backupBeforeMutation` itself already fails closed on. This sweep now
+ * fails closed the same way. A genuine SUBDIRECTORY (e.g.
+ * `intake-checkpoint-evidence/`) is not itself unsafe and is still skipped
+ * here unchanged -- only its own file entries get individually swept when
+ * this same directory is that subdirectory's own onboardingDirectory in a
+ * future recursive extension; this function is not itself recursive.
  */
 function backupOnboardingPrivateState(root, deps) {
   const common = resolveGitCommonDirectoryForBackup(root, deps);
@@ -383,7 +395,13 @@ function backupOnboardingPrivateState(root, deps) {
   for (const name of readdirSync(onboardingDirectory).sort()) {
     const path = join(onboardingDirectory, name);
     const entryInfo = lstatSync(path);
-    if (!entryInfo.isFile() || entryInfo.isSymbolicLink()) continue;
+    if (entryInfo.isSymbolicLink()) {
+      fail("WT-SESSION-RECOVERY-BACKUP", "onboarding private state directory contains an unsafe symlink entry");
+    }
+    if (entryInfo.isDirectory()) continue;
+    if (!entryInfo.isFile()) {
+      fail("WT-SESSION-RECOVERY-BACKUP", "onboarding private state directory contains an unsafe non-regular entry");
+    }
     const backupPath = backupBeforeMutation(root, deps, `onboarding-private.${name}`, path);
     if (backupPath) backedUp.push(backupPath);
   }
@@ -1778,5 +1796,6 @@ export const sessionCleanupRecoveryInternals = {
   safePrivateFile,
   recoveryJournalPaths,
   backupBeforeMutation,
+  backupOnboardingPrivateState,
   externalRetirementManifestPath,
 };

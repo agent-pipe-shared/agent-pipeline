@@ -56,6 +56,10 @@ import {
 } from "./worktree-lifecycle.mjs";
 import { validateContinuityState } from "./continuity-state.mjs";
 import { main as sessionCleanupMain } from "../scripts/session-cleanup.mjs";
+import {
+  applyProjectAuthorityMigration,
+  planProjectAuthorityMigration,
+} from "./project-authority.mjs";
 
 function fixture(name) {
   const root = mkdtempSync(join(tmpdir(), `session-cleanup-recovery-${name}-`));
@@ -73,6 +77,22 @@ function fixture(name) {
   }, null, 2)}\n`);
   const plan = planOnboardingKickoff({ rootDir: root, goal: "Test cleanup recovery backup net" });
   applyOnboardingKickoff({ plan, expectedPlanSha256: plan.planSha256, activate: true });
+  return root;
+}
+
+// Migrates a fixture() root's portable state to the NEUTRAL authority path
+// (project/pipeline-state.json), the same precondition
+// session-cleanup-binding.test.mjs's own neutralFixture() uses to reach the
+// private-runtime cleanup-binding/release-receipt storage this file's
+// "closed-receipt-invalid" fixture below depends on -- mirrored here rather
+// than imported cross-file to avoid a fixture-shape coupling between two
+// independently-maintained test files.
+function neutralFixture(name) {
+  const root = fixture(name);
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const plan = planProjectAuthorityMigration({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(applyProjectAuthorityMigration(plan, { rootDir: root, activate: true }).status, "applied");
   return root;
 }
 
@@ -485,6 +505,144 @@ test("backupBeforeMutation fails closed on a DANGLING symlinked source, not a si
       sessionCleanupRecoveryInternals.backupBeforeMutation(root, {}, "absent-test", trulyAbsent),
       null,
     );
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// The same fail-closed obligation, but for the DIRECTORY SWEEP rather than a
+// single named source: backupOnboardingPrivateState() used to `continue`
+// past a non-regular entry (a symlink, a fifo, a device node -- anything
+// lstat does not report as a plain file) instead of refusing, exactly the
+// shape a symlink attack or a damaged private store would take, and exactly
+// the failure mode backupBeforeMutation() itself already fails closed on
+// above (still-open F3 sibling gap disclosed in this item's 2026-08-19
+// round-2 implementation status). This is the regression test for that fix.
+test("backupOnboardingPrivateState fails closed on a non-regular entry in the private onboarding directory instead of silently skipping it", () => {
+  const root = fixture("onboarding-sweep-fail-closed");
+  try {
+    const onboardingDirectory = onboardingPrivateDir(root);
+    mkdirSync(onboardingDirectory, { recursive: true, mode: 0o700 });
+    const realFile = join(root, "real-onboarding-symlink-target.txt");
+    writeFileSync(realFile, "not a private onboarding file, just a symlink target\n");
+    const symlinkEntry = join(onboardingDirectory, "a-symlinked-entry");
+    symlinkSync(realFile, symlinkEntry);
+    assert.throws(
+      () => sessionCleanupRecoveryInternals.backupOnboardingPrivateState(root, {}),
+      (error) => error?.code === "WT-SESSION-RECOVERY-BACKUP",
+      "a non-regular entry in the private onboarding directory must fail closed, never silently skip",
+    );
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+// F2's still-uncovered piece (2026-08-19 round-2 implementation status):
+// quarantine-private-receipt is reached only through binding.status
+// "closed-receipt-invalid" (readOnboardingSessionCleanupBinding in
+// onboarding-continuity.mjs), which itself requires a NEUTRAL project (state
+// at project/pipeline-state.json), zero active session descriptors, and a
+// private release receipt whose bytes exist but fail MAC verification --
+// reachable only by first driving a real coordinator-close private release
+// to completion (so a real, validly-MACed receipt gets written), then
+// corrupting that receipt's own bytes so a re-read fails closed to
+// "invalid". Mirrors the fixture shape
+// session-cleanup-binding.test.mjs's "neutral coordinator-close release..."
+// test already proved end to end via the CLI; built directly here (not
+// imported) against this file's own primitives per this file's own stated
+// convention (driving planSessionCleanupRecovery/applySessionCleanupRecovery
+// directly rather than through the session-cleanup.mjs CLI wrapper).
+test("quarantine-private-receipt is reachable through a real closed-receipt-invalid binding and converges cleanly to closed-unbound", () => {
+  const root = neutralFixture("quarantine-private-receipt");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-recovery-quarantine"]);
+    assert.equal(started.code, 0);
+    const statePath = join(root, "project", "pipeline-state.json");
+    const active = JSON.parse(readFileSync(statePath, "utf8"));
+    mkdirSync(join(root, "specs"), { recursive: true });
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    const resultBytes = "quarantine recovery result\n";
+    const evidenceBytes = "quarantine recovery close evidence\n";
+    writeFileSync(join(root, "specs", "quarantine-result.md"), resultBytes);
+    writeFileSync(join(root, "evidence", "quarantine-close.md"), evidenceBytes);
+    active.continuity.authority.result = {
+      path: "specs/quarantine-result.md",
+      sha256: createHash("sha256").update(resultBytes).digest("hex"),
+    };
+    active.continuity.queueHead = { ...active.continuity.queueHead, nextAction: "close", dispatch: null };
+    assert.equal(validateContinuityState(active.continuity, active.activeFeature.id).ok, true);
+    writeFileSync(statePath, `${JSON.stringify(active, null, 2)}\n`);
+    gitRun(root, ["config", "user.email", "fixture@example.invalid"]);
+    gitRun(root, ["config", "user.name", "Fixture"]);
+    gitRun(root, ["add", "project/pipeline-state.json", "specs/quarantine-result.md", "evidence/quarantine-close.md"]);
+    gitRun(root, ["commit", "-q", "-m", "fixture: quarantine recovery close preimage"]);
+    const descriptor = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    });
+    assert.equal(cleanupSession(root, descriptor, { allowAbsent: true }).ok, true);
+    retireSessionDescriptor(root, descriptor);
+    const closed = {
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: "2026-08-19T12:00:00.000Z",
+      closedFeatures: [{
+        id: active.activeFeature.id,
+        planPath: active.activeFeature.planPath,
+        phaseAtClose: active.activeFeature.phase,
+        closedAt: "2026-08-19T12:00:00.000Z",
+        closedBy: "close-coordinator",
+        forCommit: gitRun(root, ["rev-parse", "HEAD"]),
+        continuityClose: {
+          schema: "pipeline.continuity-close.v0",
+          featureId: active.activeFeature.id,
+          expectedRevision: active.continuity.revision,
+          result: structuredClone(active.continuity.authority.result),
+          closeEvidence: {
+            path: "evidence/quarantine-close.md",
+            sha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+          },
+        },
+        coordinatorClose: {
+          schema: "pipeline.close-coordinator-reference.v1",
+          lifecycleId: "quarantine-private-receipt",
+          stateSha256: "a".repeat(64),
+          revision: 2,
+          phase: "feature-close-prepared",
+        },
+      }],
+    };
+    writeFileSync(statePath, `${JSON.stringify(closed, null, 2)}\n`);
+    // First convergence: a private, coordinator-close release writes a real,
+    // validly-MACed private release receipt and clears the private binding
+    // -- this is the ONLY way a genuine receipt (not a hand-fabricated one)
+    // ends up on disk for the corruption step below to act on.
+    const releasePlan = planSessionCleanupRecovery({ rootDir: root });
+    assert.equal(releasePlan.status, "ready");
+    assert.equal(releasePlan.recovery, "release-closed-feature");
+    const released = applySessionCleanupRecovery({
+      rootDir: root, expectedPlanSha256: releasePlan.planSha256, activate: true,
+    });
+    assert.equal(released.status, "recovered");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+    const receiptPath = join(
+      onboardingPrivateDir(root), "session-cleanup-release-receipt.json",
+    );
+    const receiptBytes = readFileSync(receiptPath);
+    const receiptDrift = JSON.parse(receiptBytes);
+    receiptDrift.bindingSha256 = "d".repeat(64);
+    writeFileSync(receiptPath, `${JSON.stringify(receiptDrift)}\n`, { mode: 0o600 });
+    const invalidBinding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(invalidBinding.status, "closed-receipt-invalid");
+    assert.match(invalidBinding.privateReceiptSha256, /^[a-f0-9]{64}$/u);
+    const plan = planSessionCleanupRecovery({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "quarantine-private-receipt");
+    assert.equal(plan.applyAction.requiresConfirmation, false);
+    assert.equal(plan.expectedBindingStatus, "closed-unbound");
+    const applied = applySessionCleanupRecovery({
+      rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+    });
+    assert.equal(applied.status, "recovered");
+    const finalBinding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(finalBinding.status, "closed-unbound");
+    assert.equal(finalBinding.privateReceiptStatus, "quarantined");
+    assert.equal(finalBinding.releasePlanSha256, plan.planSha256);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
