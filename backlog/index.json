@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c18c953c17859e636ed69973dba07662b98fe0ea55e2592de2b69a8f3ef2288e"
+    "transitionHead": "15c06e26452b7992c25a7e61050e5fc4fc1911810d523839455096187558f163"
   },
   "counts": {
-    "open": 75,
+    "open": 74,
     "in_progress": 7,
-    "closed": 211
+    "closed": 212
   },
   "items": [
     {
@@ -2940,11 +2940,15 @@
     },
     {
       "id": "pipeline.triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (2026-08-08 Nova GF-054 block). Finding surfaced by a read-only research fork."
+      "source": "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (2026-08-08 Nova GF-054 block). Finding surfaced by a read-only research fork.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "ea997092c9ac2d9821acbe2e122fde75c8549f27",
+      "closureEvidence": "backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md"
     },
     {
       "id": "pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching",
