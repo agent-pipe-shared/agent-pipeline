@@ -142,3 +142,10 @@ content-v1:dd4c651733fc54fa15348f7bb3dc75465a6327a2cd8e0e6b6cafc590f04fb43f:plug
 # (the restricted attribution store's own keyGeneration shape check requires a string), not a
 # secret or credential. Deliberately not quoting the assigned literal here -- see the source
 # line itself -- because the exact "KEY... = "..."" shape is what trips this rule.
+# PHX-WP-CHECKPOINT67-PUSH (2026-08-19): confirmed false positive, verified by direct content
+# inspection against the raw gitleaks match (scratch/gitleaks-single-finding.json), not by
+# rule/pattern alone.
+content-v1:77159af8b199d45fcabdd13fdac69e2e9b37c7144680a08f90decf3dd5823d3c:governance/events/human/3-evt-gmw-revoke-fe36b8abcccb9227a11e33c3bc80dbb1-0.json:generic-api-key:1:1026
+# ^ the matched value is this governance event envelope's own idempotencyKey field
+# ("gmw-revoke-fe36b8abcccb9227a11e33c3bc80dbb1-0"), the same GMW request-id-derived shape
+# already covered by the PHX-WP-GITLEAKS-ATTRIBUTION-KEY-FP entry above -- not a credential.
