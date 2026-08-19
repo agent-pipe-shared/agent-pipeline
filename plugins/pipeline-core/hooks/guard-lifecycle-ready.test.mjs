@@ -1955,6 +1955,109 @@ test("NVA-LCGUARD-1: adopt-remote admits exactly the plan and apply shapes and n
 });
 
 /**
+ * NVA-W5-GUARDADMIT-1 (backlog:
+ * 2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md).
+ * `intake-consent-apply`, `intake-capture-apply`, and `intake-design-questions-apply` are
+ * `mutates: true, automatedArgvShape: null` entries in ONBOARDING_SUBCOMMANDS (Wave 4 onboarding
+ * coordinator, NVA-W4-COORD-1) -- GUARDDERIVE-1's derived admission never covers them, so a
+ * Bash-invoked automated call to any of the three was refused with GUARD-LIFECYCLE-NOT-READY
+ * despite being a registered, mutating onboarding subcommand exactly like every sibling that
+ * already has its own hand-written admission branch. Each admits exactly ONE narrow, positional
+ * shape (see the guard's own comment beside these branches for why the shape was chosen).
+ */
+test("NVA-W5-GUARDADMIT-1: intake-consent-apply admits exactly the full-bundle shape and no wider one", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const language of ["de", "en"]) {
+      for (const profile of ["epic", "feature", "mini"]) {
+        const command = `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language ${language} --profile ${profile} --activate`;
+        assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      }
+    }
+    for (const command of [
+      // missing --granted entirely
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate`,
+      // missing --git-author-name/--git-author-email pair
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --language en --profile epic --activate`,
+      // missing --language/--profile pair
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic`,
+      // invalid --language enum value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language fr --profile epic --activate`,
+      // invalid --profile enum value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile bogus --activate`,
+      // empty --git-author-name value
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name '' --git-author-email 'po@example.com' --language en --profile epic --activate`,
+      // flag-shaped --git-author-email value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email --bogus --language en --profile epic --activate`,
+      // wrong order: --git-author-email pair before --git-author-name pair
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-email 'po@example.com' --git-author-name 'PO Name' --language en --profile epic --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root /tmp/other --granted --git-author-name 'PO Name' --git-author-email 'po@example.com' --language en --profile epic --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-W5-GUARDADMIT-1: intake-capture-apply admits exactly the --text/--activate shape and no wider one", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text 'the PO said something material' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const bad of [
+      // missing --text entirely
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text 'material'`,
+      // empty --text value
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text '' --activate`,
+      // whitespace-only --text value
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text '   ' --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root '${path}' --text 'material' --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' intake-capture-apply --root /tmp/other --text 'material' --activate`,
+      // an unrelated onboarding subcommand does not smuggle in this shape
+      `node '${ONBOARDING_SCRIPT}' intake-consent-apply --root '${path}' --text 'material' --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-W5-GUARDADMIT-1: intake-design-questions-apply admits exactly the --answers-json/--activate shape and no wider one", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const answersJson = JSON.stringify([{ question: "Q1?", answer: "A1" }]);
+    const command = `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json '${answersJson}' --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    for (const bad of [
+      // missing --answers-json entirely
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json '${answersJson}'`,
+      // empty --answers-json value
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json '' --activate`,
+      // flag-shaped --answers-json value (smuggled flag instead of a value)
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json --bogus --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root '${path}' --answers-json '${answersJson}' --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' intake-design-questions-apply --root /tmp/other --answers-json '${answersJson}' --activate`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+/**
  * NVA-LCGUARD-3 (backlog: 2026-08-17-lifecycle-guard-omits-the-operator-authority-repair-
  * shape.md). collectOperatorContinuityAuthorityAction() (lib/project-onboarding-v3.mjs)
  * tells a session that gets `operator-authority-required` back from plan-repair to rerun

@@ -1837,12 +1837,57 @@ function sanctionedOnboardingArgs(rawArgs, root) {
     && typeof args[5] === "string" && args[5].trim() !== ""
     && args[6] === "--language" && ["de", "en"].includes(args[7])
     && args.length === 8) return true;
-  return args[0] === "kickoff" && args[1] === "apply"
+  if (args[0] === "kickoff" && args[1] === "apply"
     && exactRoot(args, root, 2) && args[4] === "--goal"
     && typeof args[5] === "string" && args[5].trim() !== ""
     && args[6] === "--language" && ["de", "en"].includes(args[7])
     && args[8] === "--plan-sha256" && HEX.test(args[9] ?? "")
-    && args[10] === "--activate" && args.length === 11;
+    && args[10] === "--activate" && args.length === 11) return true;
+  // NVA-W5-GUARDADMIT-1 (backlog:
+  // 2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md).
+  // Wave 4 onboarding coordinator, step 1-3 (NVA-W4-COORD-1). These three ONBOARDING_SUBCOMMANDS
+  // entries are `mutates: true, automatedArgvShape: null`, so GUARDDERIVE-1's derived admission
+  // above never covers them -- design.md SSb's claim that no guard change is needed was FALSE for
+  // this reason (see the comment beside the table entries in scripts/project-onboarding-v3.mjs).
+  // Each branch below admits exactly ONE narrow, positional shape -- the same discipline every
+  // other mutating branch in this function already applies -- rather than the full optional-flag
+  // grammar parse() accepts for these subcommands.
+  //
+  // intake-consent-apply's own function (applyOnboardingIntakeConsent, onboarding-continuity.mjs)
+  // always requires --granted (there is no shape where it may be omitted: `if (granted !== true)
+  // fail(...)` is unconditional). --git-author-name/--git-author-email/--language/--profile are
+  // individually optional there (each field is filled only once, then ignored on replay), but
+  // design SSa.5 point 1 frames this command as bundling consent PLUS "any still-missing required
+  // values ... in one bundled ask" -- so a caller that always supplies the full bundle is both the
+  // documented usage and always safe (an already-filled field is silently ignored, never
+  // overwritten). The full-bundle shape is therefore the one admitted here; a caller that omits
+  // one of these fields still falls through to refusal, exactly like every other narrow branch in
+  // this function -- reported as a deliberate, disclosed scoping choice (no construction site
+  // exists yet to ground a narrower or wider shape against).
+  if (args[0] === "intake-consent-apply"
+    && exactRoot(args, root, 1)
+    && args[3] === "--granted"
+    && args[4] === "--git-author-name" && typeof args[5] === "string" && args[5].trim() !== "" && !args[5].startsWith("--")
+    && args[6] === "--git-author-email" && typeof args[7] === "string" && args[7].trim() !== "" && !args[7].startsWith("--")
+    && args[8] === "--language" && ["de", "en"].includes(args[9])
+    && args[10] === "--profile" && ["epic", "feature", "mini"].includes(args[11])
+    && args[12] === "--activate" && args.length === 13) return true;
+  // intake-capture-apply's own function (applyOnboardingIntakeCapture) requires --text to be a
+  // non-empty string; --text.trim() !== "" mirrors the same idiom the kickoff --goal branches
+  // above already apply to a free-form caller text value.
+  if (args[0] === "intake-capture-apply"
+    && exactRoot(args, root, 1)
+    && args[3] === "--text" && typeof args[4] === "string" && args[4].trim() !== ""
+    && args[5] === "--activate" && args.length === 6) return true;
+  // intake-design-questions-apply's own function (applyOnboardingIntakeDesignQuestions) parses
+  // --answers-json as a JSON array of {question, answer} entries; --answers-json is checked only
+  // loosely (non-empty, not flag-shaped) here, the same idiom the adopt-remote --remote and
+  // plan-partial-authority --source branches above already apply to a free-form caller value --
+  // deep JSON-shape validation stays the library's job, not this shell-argv allowlist's.
+  return args[0] === "intake-design-questions-apply"
+    && exactRoot(args, root, 1)
+    && args[3] === "--answers-json" && typeof args[4] === "string" && args[4].trim() !== "" && !args[4].startsWith("--")
+    && args[5] === "--activate" && args.length === 6;
 }
 
 function sanctionedMigrationArgs(args, root) {
