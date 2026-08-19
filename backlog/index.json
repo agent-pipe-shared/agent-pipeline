@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "0cfe48b7813b4695cf14306ef5717a2da88459bc0ee67f3b7e559cb03d56a733"
+    "transitionHead": "1c89a6c3304fcbf9a181e25d8a42a40739f6587624cf5a618a78696835c92665"
   },
   "counts": {
     "open": 51,
-    "in_progress": 6,
-    "closed": 242
+    "in_progress": 5,
+    "closed": 243
   },
   "items": [
     {
@@ -1049,12 +1049,16 @@
     },
     {
       "id": "pipeline.evidence-bound-review-retry-economics",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization review of formal review and dispatch retries",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "cd95c3334105adfdcd90eddcea524240e0cd5c16",
+      "closureEvidence": "backlog/items/2026-07-20-evidence-bound-review-retry-economics.md"
     },
     {
       "id": "pipeline.execution-model-switchback",

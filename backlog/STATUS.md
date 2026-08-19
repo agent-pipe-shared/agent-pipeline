@@ -90,7 +90,7 @@
 | pipeline.elephant-direct-implementation-under-afk-authorization | closed | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
-| pipeline.evidence-bound-review-retry-economics | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.evidence-bound-review-retry-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.explicit-final-acceptance-gate | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | 2026-08-17 | — |
@@ -308,5 +308,5 @@
 ## Counts
 
 - open: 51
-- in_progress: 6
-- closed: 242
+- in_progress: 5
+- closed: 243
