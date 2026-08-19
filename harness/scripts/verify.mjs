@@ -67,6 +67,7 @@ const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
 const phase26Result = process.env.PIPELINE_PHASE26_RESULT ?? null;
 const phase3Result = process.env.PIPELINE_PHASE3_RESULT ?? null;
+const reviewRetryInput = process.env.PIPELINE_REVIEW_RETRY_INPUT ?? null;
 const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
 
 const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
@@ -473,6 +474,7 @@ const TEST_SUITES = [
   { name: "check-directory-contract-tests", file: join(scriptDir, "check-directory-contract.test.mjs") },
   { name: "check-gitignore-anchoring-tests", file: join(scriptDir, "check-gitignore-anchoring.test.mjs") },
   { name: "check-review-retry-plan-tests", file: join(scriptDir, "check-review-retry-plan.test.mjs") },
+  { name: "review-retry-plan-check", file: join(scriptDir, "check-review-retry-plan.mjs"), args: reviewRetryInput ? ["--review-retry-input", reviewRetryInput] : [] },
   { name: "check-session-bootstrap-directory-contract-tests", file: join(scriptDir, "check-session-bootstrap-directory-contract.test.mjs") },
   { name: "codex-sandbox-preflight-host-control-tests", file: join(scriptDir, "codex-sandbox-preflight-host-control.test.mjs") },
   { name: "generate-vendored-canon-tests", file: join(scriptDir, "generate-vendored-canon.test.mjs") },
@@ -638,7 +640,7 @@ if (startedCandidate.status === "dirty") {
             phase3Result,
           },
         });
-        steps.push(...verifyRun.steps.map(({ name, exitCode }) => ({ name, exitCode })));
+        steps.push(...verifyRun.steps.map(({ name, exitCode, durationMs, reused }) => ({ name, exitCode, durationMs, reused })));
         verifyRunEvidence = createPublicVerifyRunEvidence({
           runId: verifyRun.runId,
           policySha256: verifyRun.policySha256,
