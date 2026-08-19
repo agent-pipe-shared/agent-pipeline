@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.publication-authority-lacks-execution-time-criticalproof-reverification
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "77e28eda"
+closure_evidence: "docs/adr/0066-publication-approval-time-signature-accepted-tradeoff.md"
 source: "Noted as a remaining gap during PHX-WP-PUBLICATION-UNIFICATION (commit 41c7711d, 2026-08-19), which proved the publication-authority approve/authorize migration onto the shared pipeline.po-approval-proof.v1 contract was already functionally complete; recorded as a to-be-filed follow-up in backlog/items/2026-08-02-unified-human-authorization-ux.md's 2026-08-19 progress note. This item is that filing, backed by a fresh full read of both code paths."
 ---
 
@@ -159,4 +163,19 @@ current state before this filing) is not an acceptable third option.
   chain's guarantees, why they're judged sufficient for a release-only,
   single-destination, fixed-executor path, and what would revisit the
   decision) and closes this item on landing.
+- **Date:** 2026-08-19
+
+### Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** `docs/adr/0066-publication-approval-time-signature-accepted-tradeoff.md`
+  (commit `77e28eda`) documents the asymmetry, the CAS/lock/phase-invariant
+  and fixed-executor guarantees that carry trust forward instead of a
+  repeated signature check, why that is judged sufficient for publication's
+  release-only, structurally main-locked (v1), fixed-executor path, and the
+  trigger conditions (destination scope widening, executor boundary
+  loosening, a concrete CAS/lock incident) that would revisit Direction 1.
+  No code changed — Direction 1 (binding the proof into the CAS record and
+  re-verifying at push time) was explicitly not implemented, per the PO's
+  Direction 2 choice.
 - **Date:** 2026-08-19
