@@ -40,6 +40,12 @@ function run(command, args, options = {}) {
     cwd: options.cwd,
     encoding: "utf8",
     timeout: options.timeout ?? 5_000,
+    // spawnSync's default killSignal (SIGTERM) can be trapped or otherwise
+    // ignored by a stuck child (observed with `git` against a hung remote),
+    // in which case spawnSync blocks until the child actually exits instead
+    // of settling near `timeout` -- the "unsettled top-level await" hang.
+    // SIGKILL cannot be trapped, so it guarantees the call settles.
+    killSignal: options.killSignal ?? "SIGKILL",
     shell: false,
     env: options.env ?? process.env,
   });

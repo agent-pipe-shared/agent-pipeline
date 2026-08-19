@@ -484,3 +484,39 @@ test("availability CLI reads only neutral channel authority and otherwise defaul
   assert.equal(JSON.parse(consumer.stdout).channel, "stable");
   assert.equal(JSON.parse(consumer.stdout).channelSource, "distribution-default");
 });
+
+test("a remote git process that ignores SIGTERM still settles within timeoutMs, not the process's own runtime", () => {
+  // Regression for the SessionStart "unsettled top-level await" warning
+  // (backlog/items/2026-08-19-staleness-check-unsettled-top-level-await-warning.md):
+  // spawnSync's default killSignal is SIGTERM, which a stuck/misbehaving `git`
+  // process can trap or otherwise fail to honor. Without a forced-kill
+  // fallback, the synchronous call blocks until the child actually exits --
+  // here simulated as 3s -- instead of settling near the caller-provided
+  // timeoutMs, which is exactly the shape of a hang that outlives the host's
+  // own hook-execution timeout in production.
+  const { remote, source, pluginRoot } = fixture("hung-ls-remote");
+  const timeoutMs = 200;
+  const spawn = (command, args, opts) => {
+    if (args.includes("ls-remote")) {
+      return spawnSync("bash", ["-c", "trap '' TERM; sleep 3"], opts);
+    }
+    return spawnSync(command, args, opts);
+  };
+  const start = Date.now();
+  const value = inspectPipelineUpdateAvailability(source, {
+    remoteUrl: remote,
+    pluginRoot,
+    policy: null,
+    selfApplication: true,
+    timeoutMs,
+    spawn,
+  });
+  const elapsed = Date.now() - start;
+  assert.ok(
+    elapsed < timeoutMs * 5,
+    `expected the call to settle near timeoutMs=${timeoutMs}ms (allowing kill/process overhead), took ${elapsed}ms instead`,
+  );
+  assert.equal(value.status, "unknown");
+  assert.equal(value.reason, "timeout");
+  assert.equal(value.blocking, false);
+});
