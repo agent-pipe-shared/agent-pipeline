@@ -1027,7 +1027,13 @@ export function planBacklogTransition(items, events, input) {
   const nextItems = [...items];
   nextItems[index] = updated;
   const nextEvents = [...events, event];
-  errors.push(...validateTransitionLedger(nextEvents, nextItems));
+  // The gate rejects bad WRITES, not the past: a tolerated pre-existing DRIFT
+  // finding elsewhere in the ledger (see classifyBacklogFindings) must not
+  // block this append. Route through the same classify-then-filter pattern
+  // checkBacklogState uses instead of pushing validateTransitionLedger's raw
+  // output straight into blocking errors.
+  const classified = classifyBacklogFindings(validateTransitionLedger(nextEvents, nextItems), { events: nextEvents });
+  errors.push(...classified.filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.INTEGRITY).map((entry) => entry.finding));
   const projection = errors.length === 0 ? projectBacklog(nextItems, nextEvents) : null;
   return { ok: errors.length === 0, errors, items: nextItems, events: nextEvents, event, projection };
 }
@@ -1051,7 +1057,13 @@ export function planBacklogEvidenceAmendment(items, events, input) {
   event.entryHash = transitionHash(event);
   const nextItems = [...items]; nextItems[index] = updated;
   const nextEvents = [...events, event];
-  errors.push(...validateTransitionLedger(nextEvents, nextItems));
+  // The gate rejects bad WRITES, not the past: a tolerated pre-existing DRIFT
+  // finding elsewhere in the ledger (see classifyBacklogFindings) must not
+  // block this append. Route through the same classify-then-filter pattern
+  // checkBacklogState uses instead of pushing validateTransitionLedger's raw
+  // output straight into blocking errors.
+  const classified = classifyBacklogFindings(validateTransitionLedger(nextEvents, nextItems), { events: nextEvents });
+  errors.push(...classified.filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.INTEGRITY).map((entry) => entry.finding));
   return { ok: errors.length === 0, errors, items: nextItems, events: nextEvents, event, projection: errors.length ? null : projectBacklog(nextItems, nextEvents) };
 }
 
@@ -1069,7 +1081,13 @@ export function planElephantAfkLedgerRepair(items, events, input) {
   const event = { schema: TRANSITION_SCHEMA, sequence: events.length + 1, id: AFK_REPAIR_ID, from: null, to: "open", at: input.at, actor: input.actor, reason: AFK_REPAIR_REASON, evidence: { kind: "missing-initial-ledger-repair", commit: input.evidenceCommit, reference: record.path, sourceSha256: createHash("sha256").update(record.metadata.source).digest("hex") }, previousHash: events.at(-1)?.entryHash ?? null, entryHash: "" };
   event.entryHash = transitionHash(event);
   const nextEvents = [...events, event];
-  errors.push(...validateTransitionLedger(nextEvents, items));
+  // The gate rejects bad WRITES, not the past: a tolerated pre-existing DRIFT
+  // finding elsewhere in the ledger (see classifyBacklogFindings) must not
+  // block this append. Route through the same classify-then-filter pattern
+  // checkBacklogState uses instead of pushing validateTransitionLedger's raw
+  // output straight into blocking errors.
+  const classified = classifyBacklogFindings(validateTransitionLedger(nextEvents, items), { events: nextEvents });
+  errors.push(...classified.filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.INTEGRITY).map((entry) => entry.finding));
   return { ok: errors.length === 0, errors, items, events: nextEvents, event, projection: errors.length ? null : projectBacklog(items, nextEvents) };
 }
 
@@ -1089,7 +1107,13 @@ export function planManagedOnboardingLedgerRepair(items, events, input) {
   const event = { schema: TRANSITION_SCHEMA, sequence: events.length + 1, id: MANAGED_ONBOARDING_REPAIR_ID, from: null, to: "open", at: input.at, actor: input.actor, reason: "Admit the existing open 0.4.7 managed-onboarding success-contract item; no implementation or closure is claimed.", evidence: { kind: "missing-initial-ledger-repair", commit: input.evidenceCommit, reference: record.path, itemSha256: input.itemSha256 }, previousHash: events.at(-1)?.entryHash ?? null, entryHash: "" };
   event.entryHash = transitionHash(event);
   const nextEvents = [...events, event];
-  errors.push(...validateTransitionLedger(nextEvents, items));
+  // The gate rejects bad WRITES, not the past: a tolerated pre-existing DRIFT
+  // finding elsewhere in the ledger (see classifyBacklogFindings) must not
+  // block this append. Route through the same classify-then-filter pattern
+  // checkBacklogState uses instead of pushing validateTransitionLedger's raw
+  // output straight into blocking errors.
+  const classified = classifyBacklogFindings(validateTransitionLedger(nextEvents, items), { events: nextEvents });
+  errors.push(...classified.filter((entry) => entry.severity === BACKLOG_FINDING_SEVERITY.INTEGRITY).map((entry) => entry.finding));
   return { ok: errors.length === 0, errors, items, events: nextEvents, event, projection: errors.length ? null : projectBacklog(items, nextEvents) };
 }
 

@@ -1317,6 +1317,34 @@ function rescopeInput(root, amendsSequence, overrides = {}) {
     JSON.stringify({ preExisting, errors: planned.errors }));
 }
 
+{
+  // NVA-W5-05: planBacklogTransition, planBacklogEvidenceAmendment,
+  // planElephantAfkLedgerRepair, and planManagedOnboardingLedgerRepair used
+  // to push validateTransitionLedger's RAW (unclassified) output straight
+  // into their own blocking errors, mirroring the exact bug BS33 covers for
+  // planBacklogItemHashRescopeAmendment. This case exercises
+  // planElephantAfkLedgerRepair against a ledger carrying the same tolerated
+  // pre-existing DRIFT finding shape (a malformed-OID event at/below
+  // LEDGER_DRIFT_CUTOFF_SEQUENCE).
+  const driftItem = item({ id: "pipeline.drift-example" });
+  const driftEvent = event({
+    id: "pipeline.drift-example",
+    evidence: { kind: "baseline-migration", commit: "181b7730" },
+  });
+  const afkItem = item({ id: AFK_REPAIR_ID, source: AFK_REPAIR_SOURCE, status: "open", created: "2026-07-23", type: "workflow-improvement" });
+  const items = [driftItem, afkItem];
+  const events = [driftEvent];
+  const preExisting = validateTransitionLedger(events, items);
+  const planned = planElephantAfkLedgerRepair(items, events, afkRepairInput());
+  check("BS34 (NVA-W5-05) a tolerated pre-existing DRIFT finding elsewhere in the ledger does not block a valid AFK ledger repair",
+    preExisting.some((finding) => finding === "ledger event 1: evidence.commit must be a full lowercase Git commit OID")
+      && planned.ok
+      && planned.errors.length === 0
+      && planned.events.length === 2
+      && planned.event.evidence.kind === "missing-initial-ledger-repair",
+    JSON.stringify({ preExisting, errors: planned.errors }));
+}
+
 for (const root of roots) rmSync(root, { recursive: true, force: true });
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);
