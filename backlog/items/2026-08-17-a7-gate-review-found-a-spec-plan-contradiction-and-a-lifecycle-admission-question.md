@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a7-gate-review-found-a-spec-plan-contradiction-and-a-lifecycle-admission-question
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "Nova A Slice A7 comprehensive gate Critic review (continuation dispatch), 2026-08-17, findings F3 (major) and F4 (minor). Both are documentation/spec-conformance questions deliberately NOT resolved unilaterally by the Elephant, per spec.md's own rule that a contradiction fails closed to the applicable human gate rather than being silently narrowed."
 ---
@@ -145,3 +145,12 @@ diagnostic gate. A short comment could also be added at
 `apply-legacy-v2-revocation-recovery` comment's style, to make this
 reasoning locally discoverable without needing this trace again. Neither is
 required to close F4's ambiguity — the ambiguity itself is now resolved.
+
+## Closure, 2026-08-19
+
+Both findings resolved: F3 confirmed PO-accepted 2026-08-19 (see above).
+F4's ambiguity is resolved by direct code trace — reading (a), the code
+is correctly gated, no fix needed; the only remaining action is an
+optional, non-blocking documentation reword, not required to close this
+item's own ambiguity. No further code or design work is pending against
+this item. Closing.
