@@ -17,6 +17,8 @@ try {
   const optional = sessionStartDecision(root);
   assert.equal(optional.governed, false);
   assert.match(optional.message, /optional project workflow/u);
+  assert.match(optional.message, /before any project work/u);
+  assert.doesNotMatch(optional.message, /before running any Pipeline command/u);
   assert.match(optional.context, /ask whether it should be installed/u);
   assert.match(optional.context, /End that turn and wait/u);
   assert.match(optional.context, /do not invoke pipeline-core:pipeline-start/u);
