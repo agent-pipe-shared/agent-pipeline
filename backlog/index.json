@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1c89a6c3304fcbf9a181e25d8a42a40739f6587624cf5a618a78696835c92665"
+    "transitionHead": "995270f6294948ce54f15b402ac9e3c0f0ff0d094bc2ba42badfb802547ee059"
   },
   "counts": {
-    "open": 51,
+    "open": 50,
     "in_progress": 5,
-    "closed": 243
+    "closed": 244
   },
   "items": [
     {
@@ -299,12 +299,16 @@
     },
     {
       "id": "pipeline.backlog-index-json-does-not-project-tracking-or-deferred-status",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-19",
       "source": "PO, in-session, 2026-08-19, in response to the new backlog/README.md Ledger section: 'der index Jason des backlogs sollte dann aber auch Ziel sprints oder status wie pausiert/deffered kennen oder?' (the backlog's index.json should also know target sprints or a status like paused/deferred, right?)",
-      "deferred": true
+      "deferred": false,
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "dd1ce985c2dcc7548700cc3cb7d040f7f4f505e5",
+      "closureEvidence": "backlog/items/2026-08-19-backlog-index-json-does-not-project-tracking-or-deferred-status.md"
     },
     {
       "id": "pipeline.backlog-ledger-baseline-migration-commit-unreachable",

@@ -29,7 +29,7 @@
 | pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.authority-gate-verdict-need-not-survive-checkout | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.backlog-delivery-status-reconciliation | closed | workflow-improvement | pipeline | 2026-07-25 | Nova A / issue #57 |
-| pipeline.backlog-index-json-does-not-project-tracking-or-deferred-status | open | workflow-improvement | pipeline | 2026-08-19 | — |
+| pipeline.backlog-index-json-does-not-project-tracking-or-deferred-status | closed | workflow-improvement | pipeline | 2026-08-19 | — |
 | pipeline.backlog-ledger-baseline-migration-commit-unreachable | closed | defect | pipeline | 2026-08-11 | — |
 | pipeline.backlog-ledger-closure-reason-misleading | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.backlog-plan-writers-skip-drift-classification | closed | defect | pipeline | 2026-08-18 | — |
@@ -307,6 +307,6 @@
 
 ## Counts
 
-- open: 51
+- open: 50
 - in_progress: 5
-- closed: 243
+- closed: 244
