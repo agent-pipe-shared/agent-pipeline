@@ -4,6 +4,10 @@ id: pipeline.staleness-check-unsettled-top-level-await-warning
 type: defect
 owner: pipeline
 status: closed
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 8e8072ee475b261c38f847392e867060cc081666
+closure_evidence: backlog/items/2026-08-19-staleness-check-unsettled-top-level-await-warning.md
 created: 2026-08-19
 source: "PO, live, 2026-08-19: same session transcript as the greenfield ask-before-install-duty item, terminal output: 'SessionStart:startup hook error / Failed with non-blocking status code: Warning: Detected unsettled top-level await at file:///.../plugins/pipeline-core/hooks/staleness-check.mjs:208'."
 ---
