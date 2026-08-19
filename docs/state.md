@@ -3,7 +3,23 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 47)
+**Last updated:** 2026-08-19 (checkpoint 48)
+
+---
+
+## CHECKPOINT — 2026-08-19 (48): the true floor reached — every remaining gap is now confirmed, hard-blocked on the PO's physical Ed25519 key; nothing further is dispatchable this session (READ THIS FIRST)
+
+Since checkpoint 47: `PHX-WP-BACKLOG-CONTRADICTION-REINVESTIGATE` (commit `a2a2bcc7`) found the prior "10 contradictions" classification was itself wrong for at least one item (missed a later superseding closure) and re-investigated all 10 properly — **all 10 resolved as genuine missed-closure cases, zero fabrication, zero left contradicted.** `PHX-WP-HAC11-D1-DESIGN-SPEC` (commit `22d8ef09`) did the missing design specification for H-AC-11 D-1 AND implemented it (validator, schema, governance-event wiring, builder function, 11 files, all tests pass) — only the final GMW-CLI call-site wiring stays deferred, correctly, on a real prerequisite (increment 1's own CLI wiring doesn't exist yet). `PHX-WP-PUBLICATION-EXECUTION-REVERIFY` was asked to strengthen publication to match push/deploy's pattern as a "not-PO-decision" fix — investigation proved this framing WRONG: the real execution gate (`publication-executor.mjs`) is deliberately isolated from the mutable JSON store `criticalProof` lives in, by design; mirroring push/deploy would need a genuine trust-boundary migration — correctly routed back to the item's own already-correct "needs PO decision" classification.
+
+**`reconcile-backlog-ledger.mjs --activate` ran clean**: one last schema-shape fix (`f86b9cbd`, `closure_repository: nova` → `self`, since the schema only accepts `self` or `project:<slug>` and this item's `owner` can't satisfy the `project:` form's match rule) cleared the dry-run to zero blocking findings, then `--activate` recorded 177 transitions across 94 items. `check-backlog-state.mjs` dropped to exactly ONE remaining failure: ledger event 41's `itemSha256` (the genesis event for `managed-onboarding-success-contract`) went stale after a later, legitimate content edit — **no supported amendment mechanism exists for this** (investigated and ruled out: genesis-event re-issue, evidence-amendment overlay, reconcile's own transitions — none touch a stale `itemSha256` without unsafely rewriting the append-only hash chain). Filed as its own item (`2026-08-19-ledger-genesis-event-hash-rebind-has-no-amendment-mechanism.md`, commit `df7f04c6`) — needs a design decision (new amendment kind vs. a documented chain-reissue ceremony), correctly not force-fixed.
+
+**The GMW window expired mid-session** (checked live: `status: "expired"`, same scope `GS-6,TP-2,TP-3,TP-5,TP-6` as before). Two small mechanical gaps surfaced from the last round's own new files (`human-decision-attribution.test.mjs`, `handover-rotate.test.mjs` unregistered in `verify.mjs`; `handover-rotate.mjs` missing its SPDX header). The SPDX header was a genuine stage-0 fast-path fix (1 file, 1 line, no test file) and landed directly (`e08c7492`). **Registering the 2 test suites in `harness/scripts/verify.mjs` was attempted directly and REFUSED by TP-3** — confirmed live, not assumed: `guard-testpath.mjs` blocked the edit outright, `gates.push_approval` is `signature` mode so there is no in-session activation, and the guard's own message names the exact HGO command sequence needed. **This is now the one concrete, small, ready-to-clear item waiting on the PO**:
+```
+node plugins/pipeline-core/scripts/guard-human-override.mjs plan --repo <this-repo> --request-sha256 6588f5d8697af436946ad2fb3ac0691c2917d952aa04a7957c114f24400bc5da
+```
+(then `prepare-authorization` / `emit-signature-digest` / `authorize-by-signature`, per `docs/push-release-flow.md`'s HGO section) — this single ceremony would also be the natural moment to also clear the standing `el-01-has-in-session-tripwire`/`technical-lock-for-pipeline-consent` `hooks.json` TP-4 wiring and `guard-testpath-override-ot09`'s TP-7 fix, since all four are the same class of blocker.
+
+**Full state: Verify now has exactly 5 known-red suites** (the 3 from checkpoint 44/47 — `guard-testpath-override-ot09`, `product-capability-inventory` piece 2, the two `backlog-*` ledger suites now further narrowed to the single event-41 case — plus the 2 new unregistered-suite findings from this round), **every one confirmed, this session, to require either the PO's physical Ed25519 key or a design decision already precisely named** — none are a dispatchable gap. Security-scan remains clean. **There is nothing left to dispatch without the PO.**
 
 ---
 
