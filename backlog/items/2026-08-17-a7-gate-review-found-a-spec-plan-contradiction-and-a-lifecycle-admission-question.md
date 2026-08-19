@@ -95,3 +95,53 @@ digest was re-hashed to match. PO explicitly confirmed 2026-08-19 that this
 reconciliation is correct and complete — F3 is resolved. **F4 remains
 genuinely open** (own due date 2026-08-30, does not block the Nova A 0.6.0
 candidate) — item stays `open` for F4 only.
+
+### F4 design, 2026-08-19
+
+Traced the actual provenance of `--plan-sha256` end to end, per the item's
+own stated next step. Conclusion: **reading (a) — the code is correctly
+gated; `spec.md` §1.1's sentence is imprecisely scoped. No code fix is
+needed.**
+
+`sanctionedPoAuthorityRebindArgs`'s `po-authority-rebind-apply` branch
+(`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:2007-2015`, current
+line numbers — shifted from the finding's original `~1487`/`~1523`/`~1746`
+estimates) admits the command purely by argv SHAPE (`--plan-sha256 <hex>
+--updated-at <ISO> --activate`), with no live diagnostic-condition check at
+that call site — confirmed exactly as F4 describes. But the guard is only
+ONE of two independent gates. The actual state-writer,
+`runPoAuthorityRebindApply` (`plugins/pipeline-core/scripts/pipeline-state.mjs:4882-4926`),
+re-derives the plan from scratch against the CURRENT live repository state
+— `buildPoAuthorityRebindPlan` (`pipeline-state.mjs:4067-4112`) computes
+`planSha256` purely from the sha256 of the actual on-disk PRD/spec/state
+file bytes (`physicalRebindFile` reads, not caller input) — and REFUSES
+with "PO authority rebind plan is stale; zero mutation" the moment the
+caller-supplied `--plan-sha256` doesn't match that live recomputation
+(`pipeline-state.mjs:4896-4898`), then checks it a SECOND time immediately
+before the actual mutation for same-run drift (`:4903-4907`, "preimage
+drifted"). The only caller-supplied input besides the digest itself is
+`--updated-at`, an ISO timestamp validated for format only — it does not
+feed the digest's preimage.
+
+This means `--plan-sha256` cannot be forged or replayed: producing a value
+that passes `runPoAuthorityRebindApply`'s check requires the exact sha256 a
+genuine `po-authority-rebind-plan` run against the CURRENT live state would
+itself produce — computationally equivalent to actually having run the
+real diagnostic-gated planner at that moment. The guard's argv-shape-only
+admission is therefore not a security gap; the live-state verification the
+finding was looking for happens one layer down, in the state-writer itself,
+exactly the same way it already does for the file's OTHER two digest-bound
+applies (`po-authority-decision-apply`, `po-authority-acknowledge-apply`),
+neither of which has a guard-level condition check either — this is the
+established, consistent pattern for this whole family, not a one-off gap.
+
+**Recommended follow-up (optional, documentation-only, no behavior
+change):** reword `spec.md` §1.1 to state that the guard admits
+`po-authority-rebind-apply` by argv shape alone because the digest-bound
+apply is self-verifying against live state in the underlying state-writer,
+distinguishing it from the read-only `-plan` recovery lane's own guard-level
+diagnostic gate. A short comment could also be added at
+`guard-lifecycle-ready.mjs:2007` mirroring the existing
+`apply-legacy-v2-revocation-recovery` comment's style, to make this
+reasoning locally discoverable without needing this trace again. Neither is
+required to close F4's ambiguity — the ambiguity itself is now resolved.
