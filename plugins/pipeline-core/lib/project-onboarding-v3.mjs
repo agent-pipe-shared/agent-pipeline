@@ -78,7 +78,7 @@ import {
 } from "./project-authority.mjs";
 import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
-import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1 } from "./critical-human-proof-policy.mjs";
+import { CRITICAL_HUMAN_PROOF_POLICY_PATH, CRITICAL_HUMAN_PROOF_POLICY_V1, CRITICAL_HUMAN_PROOF_POLICY_V3 } from "./critical-human-proof-policy.mjs";
 import { readMachinePlane } from "./machine-plane.mjs";
 
 const SOURCE = "pipeline.user.yaml";
@@ -4057,7 +4057,7 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint) {
     mutation: false,
     requiresConfirmation: false,
     guidance: "this machine has never been asked how a push approval is cleared, and every setting today resolves silently to the strictest default; ask the PO once, in plain language: \"signature\" proves each approval with a detached Ed25519 signature whose private key never leaves the PO's own terminal (recommended); \"chat\" instead records an attribution in the session -- a labelled record, not a proof. Accept exactly \"signature\" or \"chat\" as the answer, never invent one. "
-      + `If "signature": walk the PO through creating their signing key, proposing (never demanding) ${poKeyDirectoryHint ?? "a directory outside every repository"} as the default location -- let them choose a different absolute path if they prefer, but it must stay outside any checkout. The PO then runs \`node plugins/pipeline-core/scripts/po-human-approval.mjs setup --repo-root <this repository> --directory <the chosen directory>\` THEMSELVES, in their own terminal -- never through a tool call, and never with the key read, moved, or copied afterward. `
+      + `If "signature": ALSO ask the PO's name up front, in the SAME turn as the signature/chat question -- never discover the name requirement mid-ceremony as a second, failed call (backlog: 2026-08-18-po-key-trust-anchor-onboarding.md). Then walk the PO through creating their signing key, proposing (never demanding) ${poKeyDirectoryHint ?? "a directory outside every repository"} as the default location -- let them choose a different absolute path if they prefer, but it must stay outside any checkout. The PO then runs \`node plugins/pipeline-core/scripts/po-human-approval.mjs setup --repo-root <this repository> --directory <the chosen directory> --human-name "<the name they gave>"\` THEMSELVES, in their own terminal -- never through a tool call, and never with the key read, moved, or copied afterward. `
       + "Once answered, write the chosen mode into this repository's committed gates.push_approval in pipeline.user.yaml (repository plane, ADR-0056), and record the same answer -- plus the key directory, if \"signature\" -- in the machine-scoped configuration plane (machine-plane.mjs) so no later repository on this machine is asked again.",
     expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
   };
@@ -4609,6 +4609,95 @@ function withPendingPushApprovalSetupAsk(observed, fs) {
   return { ...observed, pushApprovalSetupAction: collectPushApprovalPreferenceAction(defaultPoKeyDirectoryHint(fs)) };
 }
 
+// PO decision 2026-08-19 (backlog: 2026-08-18-po-key-trust-anchor-onboarding.md,
+// Option A): a machine that already answered the push-approval question above
+// (a signing key already exists somewhere on this machine) still leaves EVERY
+// subsequent project on it with no propagated trust anchor -- nothing before
+// this read the machine plane's already-known authority and offered to carry
+// its public digest into a new project. Read-only, additive, never writes
+// project/critical-human-proof.json itself: GS-2 (guard-gate-strength.mjs) is
+// a deliberate, unliftable protection ("an agent that can weaken its own gate
+// has no gate"); this only proposes the pre-composed snippet and command a
+// human (or the existing signed HGO Edit ceremony) runs themselves. Must not
+// be read as touching PO-KEYDIR-01(A)'s repo-scoped-by-default directory
+// decision (backlog: 2026-08-10-po-key-directory-default-should-be-repo-
+// scoped-not-machine-wide.md) -- this is about the ANCHOR artifact, not
+// where the private key lives -- and must not give po-gate-authority.mjs
+// (submit-plan/approve-plan) any new dependency on signature-key
+// infrastructure, which it has none of today and this change does not add.
+function detectExistingLocalTrustAnchor(fs) {
+  const readPlane = fs.readMachinePlane ?? readMachinePlane;
+  const plane = readPlane();
+  if (plane.status !== "valid") return null;
+  const directory = plane.plane?.poKeyDirectory;
+  if (typeof directory !== "string" || directory.length === 0) return null;
+  const path = join(directory, "trust-policy.json");
+  if (!fs.existsSync(path)) return null;
+  let parsed;
+  try { parsed = JSON.parse(fs.readFileSync(path, "utf8")); } catch { return null; }
+  if (typeof parsed?.keyReference !== "string" || parsed.keyReference.length === 0) return null;
+  if (typeof parsed?.publicKeySha256 !== "string" || !/^[a-f0-9]{64}$/u.test(parsed.publicKeySha256)) return null;
+  return {
+    directory, keyReference: parsed.keyReference, publicKeySha256: parsed.publicKeySha256,
+    humanName: typeof parsed.humanName === "string" && parsed.humanName.length > 0 ? parsed.humanName : null,
+  };
+}
+
+// True when THIS repository's own committed trust-anchor policy already
+// carries the given digest -- read-only. Absent, unreadable or malformed
+// resolves to "not confirmed present" (never blocks the guidance on an
+// unparseable file; worst case is a redundant, harmless reminder, never a
+// false "already done").
+function repositoryAlreadyHasTrustAnchor(root, fs, publicKeySha256) {
+  const path = safePath(root, CRITICAL_HUMAN_PROOF_POLICY_PATH, fs);
+  if (!fs.existsSync(path)) return false;
+  let parsed;
+  try { parsed = JSON.parse(fs.readFileSync(path, "utf8")); } catch { return false; }
+  if (parsed?.schema === CRITICAL_HUMAN_PROOF_POLICY_V3 && Array.isArray(parsed.trustAnchors)) {
+    return parsed.trustAnchors.some((anchor) => anchor?.publicKeySha256 === publicKeySha256);
+  }
+  return parsed?.trustAnchor?.publicKeySha256 === publicKeySha256;
+}
+
+// A generous single-line bound for a short acknowledgment token ("done",
+// "skip", ...) -- this field exists only to close the collect-input action's
+// shape consistently with every other one in this file (all require
+// minBytes >= 1); the actual deliverable is the guidance text's snippet.
+const TRUST_ANCHOR_ACK_MAX_BYTES = 16;
+function proposeTrustAnchorMaterializationAction(anchor) {
+  const snippet = JSON.stringify([{ keyReference: anchor.keyReference, publicKeySha256: anchor.publicKeySha256 }], null, 2);
+  return {
+    kind: "collect-input",
+    input: {
+      name: "trustAnchorMaterializationAcknowledged",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: TRUST_ANCHOR_ACK_MAX_BYTES,
+      singleLine: true,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    guidance: `this machine already has a signing key (${anchor.humanName ?? "a recorded PO"} at ${anchor.directory}), but this repository's ${CRITICAL_HUMAN_PROOF_POLICY_PATH} has no matching trust anchor yet -- propose this ready-to-use "trustAnchors" entry to the PO rather than making them rediscover the file's shape: ${snippet}. The PO themselves (or the existing signed HGO Edit ceremony, human-guard-override.mjs -- guard-gate-strength.mjs forbids any agent write to this file directly) adds this entry to ${CRITICAL_HUMAN_PROOF_POLICY_PATH}'s "trustAnchors" array (creating the file with schema "${CRITICAL_HUMAN_PROOF_POLICY_V3}" if it does not exist yet) and commits it. This is informational only, never mutating -- reply with a short acknowledgment ("done" or "skip") once the PO has seen it, whether or not they acted on it now.`,
+    expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
+  };
+}
+
+// Sibling of `withPendingPushApprovalSetupAsk()` immediately above -- the
+// OPPOSITE gate (fires only once the machine HAS already answered), proposing
+// a repository-scoped materialization snippet instead of the machine-scoped
+// question.
+function withPendingTrustAnchorGuidanceAsk(observed, fs) {
+  if (observed.repository?.mode !== "local") return observed;
+  if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
+  if (unresolvedMachinePushApprovalSetup(fs)) return observed;
+  const anchor = detectExistingLocalTrustAnchor(fs);
+  if (anchor === null) return observed;
+  if (repositoryAlreadyHasTrustAnchor(observed.root, fs, anchor.publicKeySha256)) return observed;
+  return { ...observed, trustAnchorGuidanceAction: proposeTrustAnchorMaterializationAction(anchor) };
+}
+
 function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "onboarding", runner, operatorAuthority = null) {
   if (!activate || typeof planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(planSha256)) return v4Inspection(rootDir, fs, intent, runner);
   if (operation === "portable") {
@@ -4616,9 +4705,9 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate, intent = "
     // digest was produced with, or the digests never match and the apply is a
     // silent no-op that loops the caller back to adoption-required.
     const plan = planProjectOnboardingV3({ rootDir, deps: fs, runner: v4Inspection(rootDir, fs, intent, runner).runner });
-    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs);
+    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return withPendingTrustAnchorGuidanceAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs), fs);
     applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
-    return withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs);
+    return withPendingTrustAnchorGuidanceAsk(withPendingPushApprovalSetupAsk(withPendingAuthorIdentityAsk(v4Inspection(rootDir, fs, intent, runner), fs), fs), fs);
   }
   const beforeApply = v4Inspection(rootDir, fs, intent, runner);
   if (operation === "repair" && beforeApply.status === "continuity-damaged") {
