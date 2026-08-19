@@ -219,3 +219,43 @@ implementing `--execute` for real (currently an unconditional-throw stub)
 and wiring the hard-size-gate hook into `hooks.json` (a TP-class
 protected-surface change needing its own authorized ceremony). Neither is
 closed by this round.
+
+### Progress note — 2026-08-19, round 4
+
+Per the PO's explicit "dann zeremonie machen" decision, a follow-up dispatch
+(`PHX-WP-HANDOVER-SIZE-GATE-HOOK`, commit `35bb44a0`) built the hard-size-gate
+hook itself: `plugins/pipeline-core/hooks/guard-handover-size.mjs` — a
+fail-open PreToolUse guard that reads the calibrated handover path from
+`project/pipeline.json`'s `handover` key (a plain path string in this repo's
+established schema, not an object — a calibration-shape finding the dispatch
+explicitly documented rather than silently resolving) and calls
+`handover-rotate.mjs`'s own exported `runCli --check-size` in-process, denying
+only an Edit/Write/NotebookEdit that targets the calibrated handover file
+while it is already over its configured 12,000-byte default budget.
+`guard-handover-size.test.mjs`, 14/14 pass, independently re-run by the
+Elephant. Deliberately NOT wired into `hooks.json` by this dispatch (that is
+the actual TP-4 ceremony, kept as its own separately-authorized step) and
+`handover-rotate.mjs` left unchanged. Merged fast-forward to `sprint_phoenix`
+(commit `35bb44a0`), worktree cleaned up.
+
+**Live status against this repo's own `docs/state.md`:** 530,402 bytes vs. the
+12,000-byte default budget — over budget, `decision: deny`. Once wired in, any
+further Edit/Write to `docs/state.md` would be blocked by this guard until a
+rotation brings it back under budget (the rotation already ran once this
+session, round 3 above; growth since then already exceeds the default budget
+again — a live illustration of exactly the "grows every session" problem this
+item was opened for).
+
+**Ceremony attempt, in progress:** the Elephant attempted the actual
+`hooks.json` wiring edit directly, expecting the ordinary TP-4 override route
+already used successfully elsewhere this session. Instead `guard-testpath.mjs`'s
+override planner returned `status=author-repair-required`
+("the target is Pipeline plugin source, so an override is author repair and
+needs an explicit author source root, which a guard cannot select on the
+human's behalf") — a different, more involved ceremony path than the plain
+in-repo TP override used for e.g. the earlier v4-schema `pipeline-state.mjs`
+fix. A read-only research dispatch is investigating what
+`--author-source-root` value is correct and whether the edit is meant to land
+in the local marketplace plugin source first (then get vendored/synced into
+this repo) rather than directly in this repo's `plugins/pipeline-core/`.
+Item stays open pending that research and the resulting ceremony.
