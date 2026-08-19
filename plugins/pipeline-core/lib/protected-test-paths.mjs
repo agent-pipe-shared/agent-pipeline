@@ -287,15 +287,6 @@ function ruleForCandidate(rules, candidate) {
   return rules.find((rule) => rule.re.test(normalized)) ?? null;
 }
 
-function ruleForEmbeddedPaths(rules, text) {
-  if (typeof text !== "string" || text === "") return null;
-  for (const token of text.match(PATH_TOKEN) ?? []) {
-    const rule = ruleForCandidate(rules, token);
-    if (rule !== null) return { rule, candidate: token };
-  }
-  return null;
-}
-
 function hit(rule, candidate, lane) {
   return { rule, candidate, lane };
 }
@@ -312,18 +303,99 @@ function operands(argv) {
   return values;
 }
 
-function powershellHit(command, rules) {
+/**
+ * PowerShell candidates: the raw write-cmdlet operand, plus any path-shaped sub-tokens
+ * embedded inside it (an operand can carry characters PATH_TOKEN would otherwise split on,
+ * e.g. a quoted argument with an inner separator) — the same coverage
+ * `protectedTestPathShellHit()`'s PowerShell branch always gave, now expressed as candidates
+ * rather than as an inline rule check.
+ */
+function powershellWriteTargets(command) {
   const words = command.trim().split(/\s+/u);
-  if (words.length < 2) return null;
-  if (!POWERSHELL_WRITE_VERBS.has(normalizedExecutable(words[0]))) return null;
+  if (words.length < 2) return [];
+  if (!POWERSHELL_WRITE_VERBS.has(normalizedExecutable(words[0]))) return [];
+  const targets = [];
   for (const word of words.slice(1)) {
     const stripped = word.replace(/^["']|["']$/gu, "");
-    const direct = ruleForCandidate(rules, stripped);
-    if (direct !== null) return hit(direct, stripped, "powershell-write-cmdlet");
-    const embedded = ruleForEmbeddedPaths(rules, stripped);
-    if (embedded !== null) return hit(embedded.rule, embedded.candidate, "powershell-write-cmdlet");
+    targets.push({ candidate: stripped, lane: "powershell-write-cmdlet" });
+    for (const token of stripped.match(PATH_TOKEN) ?? []) {
+      if (token === stripped) continue;
+      targets.push({ candidate: token, lane: "powershell-write-cmdlet" });
+    }
   }
-  return null;
+  return targets;
+}
+
+/**
+ * Extract every write-target CANDIDATE a shell command's syntax shows it touching —
+ * redirect targets, write-capable-executable/git-write-verb operands, and path-shaped tokens
+ * inside an opaque interpreter payload or an unparseable command — unfiltered by any
+ * protected-path rule set. This is the "one definition" this module's header describes:
+ * `protectedTestPathShellHit()` below is a thin filter over this list, and
+ * `GUARD-DEVPLAN-SHELL` (guard-lifecycle-ready.mjs) reuses this SAME extraction for the
+ * dev-plan lifecycle gate's shell lane, which has no rule set of its own to filter by — which
+ * is exactly why this function takes no `rules` argument.
+ *
+ * A raw `>` on a protected path is the textbook shape from the item's own report. It is read
+ * off the parse when the grammar accepts the command, and off the raw text when it does not —
+ * an unparseable command is refused by the grammar today, but that refusal is liftable by an
+ * HGO grammar capability, and an authority gate built on this extraction must not evaporate
+ * the moment the grammar objection is cleared.
+ *
+ * @returns {Array<{candidate: string, lane: string}>} every candidate this command's syntax
+ *   shows writing to, in the order a caller would test them against a rule set — not
+ *   filtered, not deduplicated.
+ */
+export function extractShellWriteTargets({ command, root, toolName = "Bash", platform = process.platform } = {}) {
+  if (typeof command !== "string" || command.trim() === "") return [];
+
+  if (toolName === "PowerShell") return powershellWriteTargets(command);
+
+  const targets = [];
+  const parsed = parseGuardCommand(command, root, { platform });
+  if (parsed.parseStatus === "accepted") {
+    for (const redirect of parsed.redirects) {
+      if (redirect.direction !== ">") continue;
+      targets.push({ candidate: redirect.target, lane: "redirect" });
+    }
+    for (const segment of parsed.segments) {
+      const executable = normalizedExecutable(segment.executable);
+      const argv = [...segment.argv];
+
+      const codeFlags = OPAQUE_CODE_FLAGS.get(executable);
+      if (codeFlags !== undefined && argv.some((arg) => codeFlags.includes(arg.toLowerCase()))) {
+        const payload = argv.join(" ");
+        for (const token of payload.match(PATH_TOKEN) ?? []) {
+          targets.push({ candidate: token, lane: "opaque-interpreter-code" });
+        }
+        continue;
+      }
+
+      const inPlace = IN_PLACE_EXECUTABLES.has(executable)
+        && argv.some((arg) => IN_PLACE_FLAGS.has(arg) || /^-[a-z]*i[a-z]*$/u.test(arg));
+      const gitWrite = ["git"].includes(executable) && GIT_WRITE_VERBS.has(gitVerb(argv) ?? "");
+      if (!WRITE_EXECUTABLES.has(executable) && !inPlace && !gitWrite) continue;
+
+      for (const operand of operands(argv)) {
+        targets.push({ candidate: operand, lane: gitWrite ? "git-working-tree-write" : "write-command" });
+      }
+    }
+    return targets;
+  }
+
+  // Unparseable: no authoritative argv exists, so fall back to path tokens in the raw text,
+  // gated on the text also naming a write-capable executable or a `>` redirect. Deliberately
+  // narrower than the gate-strength lane's unconditional name match, for the reason in this
+  // module's header — a protected suite is meant to be run.
+  const lowered = command.replace(/\\/gu, "/").toLowerCase();
+  const writerNamed = />[^>]/u.test(command)
+    || [...WRITE_EXECUTABLES, ...IN_PLACE_EXECUTABLES].some((name) => containsWholeToken(lowered, name))
+    || [...OPAQUE_CODE_FLAGS.keys()].some((name) => containsWholeToken(lowered, name));
+  if (!writerNamed) return [];
+  for (const token of command.match(PATH_TOKEN) ?? []) {
+    targets.push({ candidate: token, lane: "unparsed-command" });
+  }
+  return targets;
 }
 
 /**
@@ -336,60 +408,37 @@ export function protectedTestPathShellHit({ command, rules, root, toolName = "Ba
   if (typeof command !== "string" || command.trim() === "") return null;
   if (!Array.isArray(rules) || rules.length === 0) return null;
 
-  if (toolName === "PowerShell") return powershellHit(command, rules);
+  for (const target of extractShellWriteTargets({ command, root, toolName, platform })) {
+    const rule = ruleForCandidate(rules, target.candidate);
+    if (rule !== null) return hit(rule, target.candidate, target.lane);
+  }
 
-  // A raw `>` on a protected path is the textbook shape from the item's own report. It is
-  // read off the parse when the grammar accepts the command, and off the raw text when it
-  // does not — an unparseable command is refused by the grammar today, but that refusal is
-  // liftable by an HGO grammar capability, and this authority gate must not evaporate the
-  // moment the grammar objection is cleared.
-  const parsed = parseGuardCommand(command, root, { platform });
-  if (parsed.parseStatus === "accepted") {
-    for (const redirect of parsed.redirects) {
-      if (redirect.direction !== ">") continue;
-      const rule = ruleForCandidate(rules, redirect.target);
-      if (rule !== null) return hit(rule, redirect.target, "redirect");
-    }
-    for (const segment of parsed.segments) {
-      const executable = normalizedExecutable(segment.executable);
-      const argv = [...segment.argv];
-
-      const codeFlags = OPAQUE_CODE_FLAGS.get(executable);
-      if (codeFlags !== undefined && argv.some((arg) => codeFlags.includes(arg.toLowerCase()))) {
-        const payload = argv.join(" ");
-        const embedded = ruleForEmbeddedPaths(rules, payload);
-        if (embedded !== null) return hit(embedded.rule, embedded.candidate, "opaque-interpreter-code");
-        const haystack = payload.replace(/\\/gu, "/").toLowerCase();
+  // Opaque-interpreter-code basename-needle fallback: intrinsically RULE-derived (it searches
+  // a payload for a protected rule's own basename LITERAL, not a candidate the command text
+  // alone determines — unlike everything extractShellWriteTargets() extracts above). It has
+  // no analog for GUARD-DEVPLAN-SHELL, which has no rule set to derive a needle from, so it
+  // stays here rather than in the shared, rule-independent extraction function. This is what
+  // catches TPSHELL-1's `join(dir,'guard-push.test.mjs')` case — the embedded-path loop above
+  // sees only the bare basename token, which the full protected-path regex never matches on
+  // its own.
+  if (toolName !== "PowerShell") {
+    const parsed = parseGuardCommand(command, root, { platform });
+    if (parsed.parseStatus === "accepted") {
+      for (const segment of parsed.segments) {
+        const executable = normalizedExecutable(segment.executable);
+        const codeFlags = OPAQUE_CODE_FLAGS.get(executable);
+        if (codeFlags === undefined) continue;
+        const argv = [...segment.argv];
+        if (!argv.some((arg) => codeFlags.includes(arg.toLowerCase()))) continue;
+        const haystack = argv.join(" ").replace(/\\/gu, "/").toLowerCase();
         for (const { rule, needle } of protectedTestPathBasenameNeedles(rules)) {
           if (containsWholeToken(haystack, needle)) return hit(rule, needle, "opaque-interpreter-code");
         }
-        continue;
-      }
-
-      const inPlace = IN_PLACE_EXECUTABLES.has(executable)
-        && argv.some((arg) => IN_PLACE_FLAGS.has(arg) || /^-[a-z]*i[a-z]*$/u.test(arg));
-      const gitWrite = ["git"].includes(executable) && GIT_WRITE_VERBS.has(gitVerb(argv) ?? "");
-      if (!WRITE_EXECUTABLES.has(executable) && !inPlace && !gitWrite) continue;
-
-      for (const operand of operands(argv)) {
-        const rule = ruleForCandidate(rules, operand);
-        if (rule !== null) return hit(rule, operand, gitWrite ? "git-working-tree-write" : "write-command");
       }
     }
-    return null;
   }
 
-  // Unparseable: no authoritative argv exists, so fall back to path tokens in the raw text,
-  // gated on the text also naming a write-capable executable or a `>` redirect. Deliberately
-  // narrower than the gate-strength lane's unconditional name match, for the reason in this
-  // module's header — a protected suite is meant to be run.
-  const lowered = command.replace(/\\/gu, "/").toLowerCase();
-  const writerNamed = />[^>]/u.test(command)
-    || [...WRITE_EXECUTABLES, ...IN_PLACE_EXECUTABLES].some((name) => containsWholeToken(lowered, name))
-    || [...OPAQUE_CODE_FLAGS.keys()].some((name) => containsWholeToken(lowered, name));
-  if (!writerNamed) return null;
-  const embedded = ruleForEmbeddedPaths(rules, command);
-  return embedded === null ? null : hit(embedded.rule, embedded.candidate, "unparsed-command");
+  return null;
 }
 
 /** The subcommand of a `git` invocation, skipping the recognised global options. */
