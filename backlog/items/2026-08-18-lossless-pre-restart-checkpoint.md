@@ -70,3 +70,16 @@ Critically, this item is NOT standalone. It is one of three sibling items filed 
 **Risks/dependencies:** 1) Direct scope overlap with P0-0 (fresh-repo-onboarding-intake-first-transaction) as shown above -- both name project-onboarding-v3.mjs and 'restart barrier' as affected artifact, and P0-0 step 2 textually restates this item's Proposal. Triaging them independently/out of order risks duplicate or conflicting implementations. 2) Partial overlap with P1-4 (intake-values-restart-resilient-immediately): different payload (raw material paste vs. already-answered discrete fields: git author/language/profile) but the same restart-barrier mechanism and same file (project-onboarding-v3.mjs) would likely need touching for both -- worth at least noting in the same triage pass to avoid two separate goldfish dispatches editing overlapping code regions. 3) Any new evidence-file schema should reuse resume-hint.mjs's existing sanitization primitives (FORBIDDEN_SHAPES, secretAssignment, opaqueToken, MAX_FIELD_BYTES discipline) rather than reimplementing secret-filtering from scratch -- diverging filters is a known source of security drift. 4) This item and its two siblings all derive from a single external test report (docs/pipeline-greenfield-happy-path-handover.md in test repo Rune_Test1_Codex_060_52, which I could not read -- it lives outside this checkout) -- the item's own text is the only available account of what P0-1 actually observed; I could not cross-check against the raw report. 5) The batch of roughly 35 other 2026-08-18-dated backlog items in this repo suggests a large Wave-4 triage session is already underway/planned; sequencing (which items get triaged in what order, whether P0-0 and P0-1 land in the same PO conversation) is itself a process decision the PO should make, not something this analysis can force. 6) Implementation of either Option A or Option B touches project-onboarding-v3.mjs (4814 lines) and the restart-barrier machinery, which per CLAUDE.md's own guardrail notes is an area with documented HGO-signature-binding fragility (statusSha256 drift) -- any dispatch here should be scoped carefully and reviewed by Critic per the self-application rule.
 
 **Estimated complexity:** medium
+
+## Implementation status, 2026-08-19 (Wave 4, dispatch NVA-W4-COORD-1)
+
+Phase 1 of the subsuming coordinator (`fresh-repo-onboarding-intake-first-transaction`)
+landed on trunk (commit `75055e4e`): the private `pipeline.onboarding-intake-checkpoint.v1`
+schema and `applyOnboardingIntakeCapture` now losslessly persist material-input
+chunks as content-addressed evidence files before any restart barrier — this
+item's acceptance-test mechanism exists in code. Not yet done: unit/crash-injection
+test coverage for the new capture path (follow-up dispatch in flight), and steps
+4-6 of the coordinator (staging generation, authority binding, CLI retirement),
+which this item's own acceptance test (a full restart round-trip producing a
+content-equivalent design-input.md) actually needs end-to-end. Stays `open`,
+still tracked as subsumed — do not close until the parent item closes.

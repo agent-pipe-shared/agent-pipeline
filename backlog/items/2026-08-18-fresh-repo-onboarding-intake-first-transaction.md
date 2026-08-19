@@ -88,3 +88,47 @@ Two other backlog items were opened on 2026-08-18 from the SAME report section (
 5) No conflicting prior PO decision found: grep of docs/state.md turned up no existing 'Wave-4' or item-specific mentions, so this triage is starting clean, not overriding a standing decision.
 
 **Estimated complexity:** large
+
+## Implementation status, 2026-08-19 (Wave 4, dispatch NVA-W4-COORD-1, Phase 1 of the design)
+
+Phase 1 of `specs/wave4-onboarding-coordinator/design.md` (steps 1-3 of the
+coordinator: consent+values capture, lossless material-input capture, the
+one bundled design-question round) is implemented and landed on trunk
+(commit `75055e4e`, cherry-picked from dispatch worktree commit `246bcc40`):
+the `pipeline.onboarding-intake-checkpoint.v1` private checkpoint schema,
+CAS-protected read/write primitives reusing `writeExclusiveSynced()`/
+`acquireLock()` unchanged, and the three apply functions
+(`applyOnboardingIntakeConsent`/`applyOnboardingIntakeCapture`/
+`applyOnboardingIntakeDesignQuestions`) plus their CLI subcommands
+(`intake-consent-apply`/`intake-capture-apply`/`intake-design-questions-apply`)
+in `plugins/pipeline-core/lib/onboarding-continuity.mjs` and
+`plugins/pipeline-core/scripts/project-onboarding-v3.mjs`. Pre-existing
+suites re-verified green on trunk after landing, no regressions:
+`project-onboarding-v3.test.mjs` 128/128, `onboarding-continuity.test.mjs`
+163/163, `check-consumer-safe-paths.test.mjs` 9/9.
+
+**Not yet done:**
+- Unit/crash-injection/CAS-drift tests for the new module additions
+  themselves (the pre-existing suites above cover no new code paths) — a
+  follow-up dispatch is in flight for this as of this update.
+- Steps 4-6 of the design (staging generation from the checkpoint, binding
+  as the sole authority-publishing transaction reusing
+  `applyOnboardingKickoffPromotion`, CLI retirement/migration story for the
+  existing kickoff/promote two-phase model) — a fully separate, unstarted
+  follow-up, deliberately out of scope for this dispatch.
+- **A genuine design-vs-code contradiction was found and named, not fixed:**
+  design §b claims no `guard-lifecycle-ready.mjs` change is needed once the
+  three subcommands are added to `ONBOARDING_SUBCOMMANDS`. This is false —
+  `sanctionedOnboardingArgs()`'s derived admission (GUARDDERIVE-1) only ever
+  covers `mutates: false` commands; every existing mutating onboarding
+  subcommand has its own hand-written exact-argv-shape admission branch, and
+  none exists yet for the three new ones. A Bash-invoked automated call to
+  any of them under a governed session is still refused by
+  `GUARD-LIFECYCLE-NOT-READY` until a follow-up dispatch adds that branch
+  deliberately. Filed as its own scoped follow-up, not patched inside this
+  implementation task.
+
+Item stays `open` — Phase 1's core module exists and is committed but is not
+yet test-covered, and the coordinator as a whole (steps 4-6, the actual
+authority-binding transaction this item's acceptance test needs) has not
+started.

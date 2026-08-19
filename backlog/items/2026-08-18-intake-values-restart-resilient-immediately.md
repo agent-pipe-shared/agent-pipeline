@@ -65,3 +65,19 @@ asked again after a restart.
 **Risks/dependencies:** Must not repurpose resume-hint.json (explicitly non-authoritative and discardable -- using it as the source of truth reintroduces the exact bug). Whoever implements this must read the full 2026-08-17 git-identity item before touching collectAuthorIdentityAction()'s guidance again. Conceptually overlaps the deferred SS6 bootstrap-question taxonomy referenced in machine-plane.mjs -- worth a Triage note that this is a narrow field-scoped slice, not a substitute, so a future SS6 pass doesn't have to unwind a conflicting mechanism. New private-state file must not collide with codex-onboarding-runtime.mjs's existing files (restart-barrier.json, current-readback.json, tickets/, .writer-lock) in the same directory.
 
 **Estimated complexity:** medium
+
+## Implementation status, 2026-08-19 (Wave 4, dispatch NVA-W4-COORD-1)
+
+Phase 1 of the subsuming coordinator (`fresh-repo-onboarding-intake-first-transaction`)
+landed on trunk (commit `75055e4e`): `applyOnboardingIntakeConsent` persists
+`gitAuthor`/`language`/`profile` into the private intake checkpoint the
+instant each is answered, filling only still-null fields on replay — this
+item's acceptance test (no already-answered mandatory question re-asked
+after a restart) is implemented for these three values. The git-identity
+"hold, don't set until first commit" constraint from the 2026-08-17 decision
+is preserved (`gitAuthor` is stored in the checkpoint, not written to git
+config). Not yet done: unit test coverage for this path (follow-up dispatch
+in flight) and wiring the checkpoint's held values back into the actual
+collect-input call sites so a restart truly skips the re-ask end-to-end
+(part of the coordinator's still-unbuilt steps 4-6). Stays `open`, still
+tracked as subsumed — do not close until the parent item closes.
