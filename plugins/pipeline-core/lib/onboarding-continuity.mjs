@@ -6240,7 +6240,19 @@ export function applyOnboardingKickoffPromotion({
     if (notYetWritten(historyBefore)) {
       const temp = join(dirname(paths.history), `.${HISTORY_BASENAME}.promotion-${suffix}.tmp`);
       writeExclusiveSynced(temp, bytes.historyBytes, 0o600);
+      // SSc.4: the two earlier boundaries KICKOFF_FAULT_STAGES already tests for
+      // applyOnboardingKickoff -- additive, "promotion-history-published" (the
+      // directory-fsync boundary below) is unchanged and stays the name every
+      // existing test pins.
+      if (deps.crashAt === "promotion-history-temp-fsync") {
+        simulatedCrash = true;
+        throw new SimulatedKickoffCrash("promotion-history-temp-fsync");
+      }
       renameSync(temp, paths.history);
+      if (deps.crashAt === "promotion-history-rename") {
+        simulatedCrash = true;
+        throw new SimulatedKickoffCrash("promotion-history-rename");
+      }
       fsyncDirectory(dirname(paths.history));
       if (deps.crashAt === "promotion-history-published") {
         simulatedCrash = true;
@@ -6273,7 +6285,15 @@ export function applyOnboardingKickoffPromotion({
       mkdirSync(dirname(paths.handover), { recursive: true });
       const handoverTemp = join(dirname(paths.handover), `.${basename(paths.handover)}.promotion-${suffix}.tmp`);
       writeExclusiveSynced(handoverTemp, bytes.handoverBytes, 0o644);
+      if (deps.crashAt === "promotion-handover-temp-fsync") {
+        simulatedCrash = true;
+        throw new SimulatedKickoffCrash("promotion-handover-temp-fsync");
+      }
       renameSync(handoverTemp, paths.handover);
+      if (deps.crashAt === "promotion-handover-rename") {
+        simulatedCrash = true;
+        throw new SimulatedKickoffCrash("promotion-handover-rename");
+      }
       fsyncDirectory(dirname(paths.handover));
       if (deps.crashAt === "promotion-handover-published") {
         simulatedCrash = true;
@@ -6282,7 +6302,15 @@ export function applyOnboardingKickoffPromotion({
     }
     const stateTemp = join(dirname(paths.state), `.${basename(paths.state)}.promotion-${suffix}.tmp`);
     writeExclusiveSynced(stateTemp, bytes.stateBytes, 0o600);
+    if (deps.crashAt === "promotion-state-temp-fsync") {
+      simulatedCrash = true;
+      throw new SimulatedKickoffCrash("promotion-state-temp-fsync");
+    }
     renameSync(stateTemp, paths.state);
+    if (deps.crashAt === "promotion-state-rename") {
+      simulatedCrash = true;
+      throw new SimulatedKickoffCrash("promotion-state-rename");
+    }
     fsyncDirectory(dirname(paths.state));
     if (deps.crashAt === "promotion-state-published") {
       simulatedCrash = true;

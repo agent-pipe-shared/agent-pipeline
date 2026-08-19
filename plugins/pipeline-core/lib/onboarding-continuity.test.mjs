@@ -1322,10 +1322,27 @@ check("authentic post-privatization kickoff seed promotes revision 1 to revision
   assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
 });
 
+// SSc.4: the two earlier per-target boundaries (temp-fsync, rename), additive
+// to the four pre-existing "-published" (directory-fsync) commit-boundary
+// hooks -- matching KICKOFF_FAULT_STAGES' finer per-target-per-boundary
+// granularity for the three targets applyOnboardingKickoffPromotion writes
+// with an inline temp/rename/fsync sequence (history, handover, state).
+// cleanupBinding is deliberately excluded: its write goes through
+// replacePromotedPrivateCleanupBinding()'s own try/catch, which remaps any
+// non-KickoffError exception (SimulatedKickoffCrash extends Error, not
+// KickoffError) into KICKOFF-PROMOTION-PRIVATE-WRITE -- finer-grained
+// injection there would require restructuring that shared helper (also used
+// by the unrelated cleanup-recovery apply path), out of this dispatch's scope.
 for (const stage of [
+  "promotion-history-temp-fsync",
+  "promotion-history-rename",
   "promotion-history-published",
+  "promotion-handover-temp-fsync",
+  "promotion-handover-rename",
   "promotion-handover-published",
   "promotion-cleanup-binding-published",
+  "promotion-state-temp-fsync",
+  "promotion-state-rename",
   "promotion-state-published",
 ]) {
   check(`post-privatization promotion ${stage} crash recovers with the same bound plan`, () => {
@@ -1526,9 +1543,15 @@ check("a foreign handover write is drift, not a prefix to roll forward over", ()
 });
 
 for (const stage of [
+  "promotion-history-temp-fsync",
+  "promotion-history-rename",
   "promotion-history-published",
+  "promotion-handover-temp-fsync",
+  "promotion-handover-rename",
   "promotion-handover-published",
   "promotion-cleanup-binding-published",
+  "promotion-state-temp-fsync",
+  "promotion-state-rename",
   "promotion-state-published",
 ]) {
   check(`promotion crash at ${stage} leaves the provisional kickoff anchors byte for byte`, () => {
