@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-18
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9d6a79fed034d256d5550b322a51929b54f60b89
+closure_evidence: backlog/items/2026-08-18-critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate.md
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (2026-08-17 continued entries). Finding surfaced by a read-only research fork."
 ---
 

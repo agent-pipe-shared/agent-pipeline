@@ -6,6 +6,10 @@ owner: pipeline
 status: closed
 created: 2026-08-08
 due: 2026-08-22
+closed_at: 2026-08-19
+closure_repository: self
+closure_commit: 9d6a79fed034d256d5550b322a51929b54f60b89
+closure_evidence: backlog/items/2026-08-08-the-harness-classifier-blocks-the-onboarding-action-the-pipeline-just-authorized.md
 source: "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Third measured instance of this class; the first two were on the push path."
 ---
 
