@@ -34,7 +34,7 @@ Triage `Decision:` line, found **12 of 54** items already explicitly,
 formally deferred to another sprint, none excluded by the automated pass:
 
 - `2026-07-27-recovery-preview-ack-unstable-getter-poisons-replay-ledger.md` (Alfred)
-- `2026-08-02-unified-human-authorization-ux.md` — partial: real current-scope work remains alongside the deferred remainder (kept in Wave 5, not excluded)
+- `2026-08-02-unified-human-authorization-ux.md` — **correction, 2026-08-19: full exclude, not partial.** Originally listed here as "partial" on the assumption real current-scope work remained; re-reading the item's own 2026-08-17 "Sprint deferral" section during Wave 5 round 4 found it explicitly states the ENTIRE remaining scope (PRD-approval migration, the adoption-enforcement check — everything not already delivered by ADR-0055/0056) is deferred to Sprint Alfred, not just part of it. Should have been a full exclude from the original sweep; no implementation action taken on it in Wave 5.
 - `2026-08-07-maintenance-window-selectivity-is-untested-at-both-levels.md` (Alfred)
 - `2026-08-07-technical-lock-for-pipeline-consent-before-onboarding-complete.md` (Alfred)
 - `2026-08-07-lifecycle-guard-does-not-know-the-human-signing-commands.md` (Alfred) — a Wave-5-round-1 dispatch (NVA-W5-06) implemented part of it anyway before this gap was noticed; see that item's own 2026-08-19 note
