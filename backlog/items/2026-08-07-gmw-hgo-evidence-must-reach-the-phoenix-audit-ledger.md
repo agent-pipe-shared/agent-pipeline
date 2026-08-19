@@ -216,3 +216,38 @@ mapping above.
 - **Evidence:** commit(s) landing this progress note (see this file's own git
   history from this date forward).
 - **Date:** 2026-08-19
+
+### Progress note — HGO half attempted and correctly stopped, real scope found (2026-08-19, `PHX-WP-HGO-LEDGER-EMISSION`)
+
+A follow-up dispatch, briefed to mirror the GMW pattern for HGO's CLI
+(`scripts/guard-human-override.mjs`), stopped BEFORE writing any code once it
+found the briefing's own premise was wrong — verified against source, not
+assumed:
+
+- `scripts/guard-human-override.mjs` calls only `authorizeHumanGuardOverride`/
+  `authorizeHumanGuardOverrideBySignature`/`planHumanGuardOverride`/
+  `prepareHumanGuardOverrideAuthorization`/`verifyHumanGuardOverrideAudit`. It
+  has **no** call site for `recordHumanGuardDenial` or
+  `consumeHumanGuardOverride` at all — those two live exclusively in
+  `hooks/guard-gate-strength.mjs` (a synchronous PreToolUse hook, not a CLI),
+  outside the briefing's scoped file.
+- `authorize`/`authorize-by-signature` alone ARE wireable from the CLI (the
+  exact field sourcing — `authorizedAt`/`expiresAt` ISO→epoch-ms conversion,
+  a second `planHumanGuardOverride()` call to reconstruct the capability — is
+  resolvable), but `buildOverrideDecisions` has no standalone "requested"
+  builder for HGO: only `transition:"denied"` emits `[requested, denied]`
+  together, and the design's own §7.3 states the `requested` record is
+  created at denial time, which a `granted`-only wiring would link to a
+  decision that never exists — `HGL-LIFECYCLE` is a shape check, not a
+  stream-referential-existence check, so this would mechanically pass while
+  leaving a permanent dangling reference in the append-only ledger.
+- **PO/Elephant decision needed, not a Goldfish call:** (a) re-scope a
+  follow-up to cover `hooks/guard-gate-strength.mjs` too (denial+
+  consumption's real location), landing denial+authorize+consumption
+  together in one coordinated change, or (b) accept a documented,
+  disclosed increment-1 gap for HGO's portable wiring entirely (no HGO
+  emission at all yet), mirroring how §14 of the design doc already carries
+  other disclosed gaps.
+- No code changed; zero files touched beyond the dispatch's own record.
+  Item stays open, now correctly scoped rather than under a wrong premise.
+- **Date:** 2026-08-19
