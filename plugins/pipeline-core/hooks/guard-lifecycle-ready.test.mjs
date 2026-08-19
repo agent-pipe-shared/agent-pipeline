@@ -1779,7 +1779,7 @@ test("GUARDDERIVE-1: the guard's admitted plan* set is the CLI table's derivatio
     // legitimately extend it, but never by accident -- this assertion has to be edited
     // deliberately alongside the table.
     assert.deepEqual([...derived].sort(), [
-      "intake-generate-plan", "plan", "plan-manifest-repair", "plan-partial-authority",
+      "bootstrap-bind-plan", "intake-generate-plan", "plan", "plan-manifest-repair", "plan-partial-authority",
       "plan-readback", "plan-reinstall", "plan-repair", "plan-runtime", "plan-source-recovery",
     ]);
     // Every derived name really is admitted by the real guard in the bare lifecycleArgv
@@ -2087,6 +2087,57 @@ test("NVA-W5-GUARDADMIT-1: intake-generate-apply admits exactly the --plan-sha25
     ]) {
       assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-W5-COORD-STEP5-2: bootstrap-bind-apply admits exactly the --plan-sha256/--activate shape and no wider one, under exact session readiness", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const sha = "a".repeat(64);
+    // The live nextAction promotionApplyAction() constructs for the coordinator-sourced branch
+    // (planBoundApplyAction(), onboarding-continuity.mjs) always carries a trailing
+    // `--runner <runner>` pair too; withoutRunnerFlag() strips the first matching pair before any
+    // branch runs, so both the runner-bearing and runner-less shapes below are admitted identically.
+    const command = `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    const withRunner = `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --runner codex --plan-sha256 ${sha} --activate`;
+    assert.equal(isSanctionedLifecycleCommand(withRunner, path), true, withRunner);
+    for (const bad of [
+      // missing --plan-sha256 entirely
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --activate`,
+      // missing --activate
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${sha}`,
+      // malformed / short / non-hex --plan-sha256
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${"a".repeat(63)} --activate`,
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${"g".repeat(64)} --activate`,
+      // extra trailing arg / wrong length
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root '${path}' --plan-sha256 ${sha} --activate --extra flag`,
+      // wrong --root
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-apply --root /tmp/other --plan-sha256 ${sha} --activate`,
+      // bootstrap-bind-plan (read-only, GUARDDERIVE-1-covered) does not smuggle in the apply shape
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-plan --root '${path}' --plan-sha256 ${sha} --activate`,
+      // an unrelated onboarding subcommand does not smuggle in this shape
+      `node '${ONBOARDING_SCRIPT}' intake-generate-apply --root '${path}' --plan-sha256 ${sha} --activate --extra bootstrap-bind-apply`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(bad, path), false, bad);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("NVA-W5-COORD-STEP5-2: bootstrap-bind-plan admits the bare lifecycle argv via GUARDDERIVE-1's derived admission", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const command = `node '${ONBOARDING_SCRIPT}' bootstrap-bind-plan --root '${path}'`;
+    assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+    const withRunner = `node '${ONBOARDING_SCRIPT}' bootstrap-bind-plan --root '${path}' --runner codex`;
+    assert.equal(isSanctionedLifecycleCommand(withRunner, path), true, withRunner);
+    // an --activate-shaped call is never admitted for the plan half (mutates: false)
+    assert.equal(isSanctionedLifecycleCommand(
+      `node '${ONBOARDING_SCRIPT}' bootstrap-bind-plan --root '${path}' --plan-sha256 ${"a".repeat(64)} --activate`,
+      path,
+    ), false);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 

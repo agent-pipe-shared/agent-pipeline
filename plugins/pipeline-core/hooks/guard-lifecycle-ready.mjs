@@ -1988,7 +1988,19 @@ function sanctionedOnboardingArgs(rawArgs, root) {
   // applyOnboardingIntakeGenerate() requires expectedPlanSha256, mirroring the same
   // --plan-sha256/HEX/--activate shape the kickoff-apply and adopt-remote-apply branches above
   // already use for a digest-bound apply step.
-  return args[0] === "intake-generate-apply"
+  if (args[0] === "intake-generate-apply"
+    && exactRoot(args, root, 1)
+    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
+    && args[5] === "--activate" && args.length === 6) return true;
+  // bootstrap-bind-apply (Wave 4 onboarding coordinator step 5, NVA-W5-COORD-STEP5-2, design.md
+  // SSa.5 point 5, SSc.3). applyOnboardingBootstrapBind() requires expectedPlanSha256 like every
+  // other digest-bound apply step -- the same --plan-sha256/HEX/--activate shape intake-generate-apply
+  // above already uses. The nextAction promotionApplyAction() constructs for the coordinator-sourced
+  // branch (planBoundApplyAction(), onboarding-continuity.mjs) always carries a trailing
+  // `--runner <runner>` pair too, but withoutRunnerFlag() at the top of this function strips the
+  // first `--runner <claude|codex>` pair found anywhere in argv before any branch below ever runs
+  // -- so the shape checked here is the POST-STRIPPING one, identical to intake-generate-apply's.
+  return args[0] === "bootstrap-bind-apply"
     && exactRoot(args, root, 1)
     && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
     && args[5] === "--activate" && args.length === 6;
