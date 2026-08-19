@@ -5,7 +5,9 @@
   },
   "permissions": {
     "allow": [
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(node plugins/pipeline-core/scripts/project-onboarding-v3.mjs *)",
+      "Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push *)"
     ]
   },
   "enabledPlugins": {
