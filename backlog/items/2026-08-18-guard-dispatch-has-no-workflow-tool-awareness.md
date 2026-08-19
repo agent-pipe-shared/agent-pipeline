@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-dispatch-has-no-workflow-tool-awareness
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "self-observation during dispatch NVA-WFDISP-1, 2026-08-18 (briefed disclosure of a confirmed gap: guard-dispatch.mjs has zero Workflow-tool awareness)"
 ---
@@ -114,3 +114,20 @@ matcher (TP-4). An attempted edit to `hooks.json` this same session
 resolved to `status=author-repair-required`, not the signable HGO class —
 no in-session route exists for it at all. Do not infer closure from the
 TP-3 ceremony's suite count.
+
+### Resolved, 2026-08-19 — the actual `hooks.json` matcher wiring landed
+
+The PO ran the attended-author edit outside this session
+(`scratch/apply-po-author-fixes-2026-08-19.mjs`), adding `Workflow` to
+`guard-dispatch.mjs`'s `PreToolUse` matcher (was `Task|Agent`, now
+`Task|Agent|Workflow`) — the exact runtime gap this item's Triage
+identified as still open after `NVA-W5-01`. Committed by the Elephant as
+`5283618e` (bundled in one commit together with an unrelated
+`guard-handover-size.mjs` wiring change to the same TP-4 file, since
+`hooks.json`'s protection does not permit splitting the edit into two
+commits in-session). A live Workflow-tool dispatch is now actually
+routed through `extractWorkflowDispatches()`'s template-conformance
+check, closing the gap between "hook logic is Workflow-aware" (landed
+earlier) and "the runtime matcher actually invokes it" (landed now).
+**Closing this item.**
+- **Date:** 2026-08-19

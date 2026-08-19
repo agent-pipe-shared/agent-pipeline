@@ -211,3 +211,21 @@ are still open; piece 1 now has a live, current `pendingProtectedEdit`
 ready for a signed ceremony (the previous one had gone stale/unreachable),
 piece 2 is unchanged and explicitly deferred per the incremental-extraction
 rule. Status intentionally left `open` — no closure claimed.
+
+### Progress, 2026-08-19 — piece 1 (the `hooks.json` wiring) landed
+
+The PO ran the attended-author edit outside this session
+(`scratch/apply-po-author-fixes-2026-08-19.mjs`), wiring
+`guard-handover-size.mjs` into `hooks.json`'s `Edit|Write|NotebookEdit`
+matcher — the exact `pendingProtectedEdit` recorded above. Committed by
+the Elephant as `5283618e` (bundled with the unrelated
+`guard-dispatch.mjs` Workflow-matcher fix from a sibling item, since
+`hooks.json` cannot be split into two commits in-session). The hard
+size gate on `docs/state.md` is now actually enforced at write time, not
+just built and unit-tested.
+
+**Piece 2 (the one-time extraction pass, ADR-0066 Decision 7) remains
+open and unstarted** — unchanged from the prior section, still deferred
+per the incremental-extraction rule (no rotation event is currently
+running). Status stays `open` until piece 2 lands.
+- **Date:** 2026-08-19

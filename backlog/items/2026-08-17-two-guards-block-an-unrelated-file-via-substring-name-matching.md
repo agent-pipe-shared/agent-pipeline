@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.two-guards-block-an-unrelated-file-via-substring-name-matching
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "Live consumer-project happy-path test, D:\\Dev\\HA, 2026-08-17, runner Claude, version 0.5.5+claude.20260817142605.6465407 -- relayed and independently re-verified against this checkout's own current source before filing."
 ---
@@ -132,3 +132,25 @@ item's own Proposal), then apply the accompanying one-line fix to
 ceremony, digest, or session command is involved — this is a plain,
 attended, out-of-session edit to a TP-1 protected test path. Status
 stays open until the PO does this.
+
+### Resolved, 2026-08-19 — Part B ceremony completed by the PO
+
+The PO ran the attended-author edit outside this session
+(`scratch/apply-po-author-fixes-2026-08-19.mjs`), landing the fix
+exactly as scoped above, plus the same boundary-anchor bug found to
+recur identically at two more sites while preparing the fix (GG-15's
+quoted `git add`, GG-16's quoted `Remove-Item`) — included with an
+explicit `FIX_SIBLINGS` toggle rather than silently expanding scope.
+Chosen anchor: a negative lookbehind
+`(?<![a-zA-Z0-9_])secrets\.yaml\b`, not this item's own suggested
+`(?:^|[/\\])secrets\.yaml\b` — the path-boundary form would have broken
+existing bare (`git add secrets.yaml`) and quoted
+(`git add "secrets.yaml"`) fixtures that have no leading `/`/`\`.
+Committed by the Elephant as `c6a99c8d` (the `guard-git.mjs` fix) and
+`70069a74` (the new `fakesecrets.yaml` ALLOW test case in
+`guard-git.test.mjs`). Verified: `node --test
+plugins/pipeline-core/hooks/guard-git.test.mjs` 220/220 green at the
+time (224/224 as of the later GIT-01 work in a separate item). Both
+Part A (2026-08-17) and Part B (2026-08-19) are now landed on trunk —
+**closing this item.**
+- **Date:** 2026-08-19
