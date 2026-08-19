@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.inherited-still-open-claims-need-a-re-check-before-dispatch-no-durable-home
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch ('Correction logged for the record (methodological, not just this session's)' entry). Finding surfaced by a read-only research fork."
 ---
@@ -47,3 +47,13 @@ that area rather than trusting the inherited characterization.
   home (CLAUDE.md Hard Rule vs. operating-model process section); not
   something to add ad hoc mid an unrelated rotation pass.
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+CLAUDE.md (repo root, Hard Rules section, line 24) now contains the exact rule verbatim: '**Re-verify an inherited "still open"/"still needed" claim before dispatching work on it.** Before briefing a dispatch to address a backlog item or piece of work characterized as "still open" by an earlier survey, session, or another agent's report, re-read that item's own current Triage/status text and check `git log` for the area — trusting the inherited characterization without a fresh live check produced three separate stale-claim incidents in one 2026-08-18 session block (methodological, not one-off).' This is precisely the rule the item's Proposal called for and precisely the missing 'durable home' the item's Description says did not exist. `git show` confirms it was added by commit 96cf12d5 'docs: widen ADR-0056 conflict scope text and add three small process rules' (2026-08-18 17:10:35), which postdates the item's own creation commit 0c1924fc (2026-08-18 13:51:06) by about 3.3 hours, same day. The item's own Triage ('not yet decided — filed to preserve the finding') was never updated to reflect that the rule now has a home.

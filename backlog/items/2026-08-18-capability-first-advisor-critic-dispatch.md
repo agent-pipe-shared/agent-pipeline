@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.capability-first-advisor-critic-dispatch
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-2 (priority P1)"
 ---
@@ -63,3 +63,13 @@ no PTY wait, and no model attempt.
 **Risks/dependencies:** 1) The item's own 'Affected artifact' phrase is misleading: it points at 'selected-sandbox preflight' as if it were one coordinator, but lib/selected-sandbox-disposition.mjs / scripts/invocation-preflight.mjs / scripts/selected-sandbox-launch.mjs are a separate reducer+manual-launcher subsystem NOT wired into the live advisor/critic dispatch path (confirmed by the launcher's own header comment and ADR-0062) -- whoever picks up this item must be pointed at codex-advisory-bootstrap.mjs / advisory-host-bridge.mjs / codex-sandbox-select.mjs instead, or they will fix the wrong files. 2) Any change here should stay inside ADR-0062's frozen boundary (no new authority store, no change to pipeline.control-execution-exchange.v1) -- Option 2 doesn't touch that DTO at all, which is part of why it's lower risk than Option 1. 3) The Claude same-runner advisory chain (advisor-consult/SKILL.md 'Claude consultation' section) was not independently verified for the same ordering issue in this pass -- worth a quick follow-up check before considering the fix complete for 'Advisor' generally, not just the Codex half. 4) Existing test files that will need updates regardless of chosen option: codex-advisory-bootstrap.test.mjs, advisory-host-bridge.test.mjs, advisor-consult-v3.test.mjs, sandboxed-readonly-host-bridge.test.mjs. 5) No dependency on other named Wave-4 items was found in docs/state.md (grepped, no hits) or in the item file itself; this appears independent of other open Pipeline work as far as this read went.
 
 **Estimated complexity:** small
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+The item's Triage-accepted decision ("move the codex-executable check before consent/evidence-bundle in codex-advisory-bootstrap.mjs, and add an equivalent cheap non-spawning pre-check to advisor-consult/SKILL.md's trigger gate") is fully implemented. plugins/pipeline-core/scripts/codex-advisory-bootstrap.mjs lines 90-100: `resolveSystemExecutable("codex")` (throws "Codex executable is unavailable" if absent) now runs at lines 90-92, BEFORE the pipeline.user.yaml/advisor_export-declined consent check (lines 93-95) and the evidence-bundle build (lines 96-100) — this is the reordered sequence the design proposal called for (previously the executable check ran last). plugins/pipeline-core/skills/advisor-consult/SKILL.md's "Trigger gate" section step 2 (lines 26-33) now explicitly resolves the codex executable "still ahead of any consent request or evidence-bundle assembly," mirroring step 1's onboarding-readiness-first ordering. Both named implementation surfaces from the accepted design are done in the current code/doc.

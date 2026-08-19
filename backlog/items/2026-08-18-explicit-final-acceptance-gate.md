@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.explicit-final-acceptance-gate
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-6 (priority P1)"
 ---
@@ -66,3 +66,13 @@ Grounding in the actual repo: the closest existing status model is the '🟡-Mer
 **Risks/dependencies:** 1) Overlaps but is not a duplicate of backlog/items/2026-08-18-full-push-preflight-before-signature.md (same 2026-08-18 batch, same trigger report family) — that item is a mechanical pre-signature coordinator, this one is a reporting/vocabulary fix; both touch the push boundary and should be triaged with awareness of each other so they don't produce two independent, inconsistent 'is this really done' checks. 2) Touches roles/goldfish.md GF-09, whose report is already token-capped (~1000 tokens/40 lines) and whose format changes have caused truncation regressions before (per GF-09-D's own history note about 'seven long dispatches... ended with a fragment... instead of their report') — any addition to the mandatory report shape needs to stay inside that budget or risks reintroducing truncation. 3) templates/handover.md's 🟡-Merge v2 marker legend is referenced by a HARD RULE (mandatory rollback anchor per 🟡 row) — adding a new marker value must not silently exempt it from or conflict with that rollback-anchor requirement. 4) The item's own named trigger document (docs/pipeline-greenfield-happy-path-handover.md, Rune test repo Rune_Test1_Codex_060_52) is external and not present in this checkout, so the Wave-4 triage is working from the item's own summary of that report, not the primary source — worth flagging to the PO that independent confirmation of the trigger incident (beyond this item's paraphrase) hasn't been possible from within this repo. 5) No conflicting or duplicate backlog item was found proposing the same five-facet acceptance model; this is a net-new gap, not already covered elsewhere in the 2026-08-18 batch.
 
 **Estimated complexity:** small
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+All four parts of the Triage-accepted hybrid decision are implemented, confirmed by direct read: (1) docs/operating-model.md lines 300-306 add the glossary distinction "Implementation complete" (the Goldfish/Elephant-visible DoD and verify... pass, distinct from PO-accepted) vs. "PO-accepted" (only PO-accepted work may be described as fully done). (2) templates/handover.md lines 56 and 87 add a new marker value, blue-circle 'implementation complete, PO acceptance pending' (verify + any required independent review/manual checks already passed; no rollback anchor required), distinct from the pre-existing yellow-circle/checkmark/refresh markers. (3) CLAUDE.md's Hard Rules (visible in this session's project instructions) include "Never report 'done' while any check is still open," explicitly citing "2026-08-18, greenfield happy-path finding P1-6" (this item's own trigger). (4) roles/goldfish.md line 95, GF-09 section 6 'Open items,' now requires naming every outstanding review/manual check explicitly by category (verify: pending, independent review: pending/deferred, manual/browser check: pending, PO acceptance: open), matching the item's stated acceptance test almost verbatim. All four named implementation surfaces from the Triage decision are done in the current files.

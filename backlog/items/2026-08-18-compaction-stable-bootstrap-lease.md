@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.compaction-stable-bootstrap-lease
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-3 (priority P1)"
 ---
@@ -64,3 +64,13 @@ not re-run as long as the lease and digests remain unchanged.
 **Risks/dependencies:** 1) Affected-artifact mismatch: neither file named in the item's own Affected-artifact section is the actual defect site for the Codex case that generated the report -- pipeline-start-preflight.mjs is unrelated to compact, and the real gap (codex-session-start-hint.mjs / codex-hooks.json) isn't named at all. Any dispatch built directly from the item's Proposal text without this correction would very likely edit the wrong files (echoes the CLAUDE.md hunt-list-contamination and stale-claim-reverification rules already in force in this repo). 2) Overlaps backlog/items/2026-08-09-codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript.md, which already touches codex-session-start-hint.mjs's compact-handling gap from a different angle (the PRIOR_ROLLOUT_TRANSCRIPT_LINE addition) -- worth sequencing or combining rather than two separate dispatches editing the same file's compact path. 3) guard-lifecycle-ready.mjs (2561 lines, no 'compact' handling found) re-derives readiness fresh from disk on every guarded tool call rather than caching a 'bootstrap done' flag, so a redundant full re-bootstrap is a wasted-tokens problem, not a correctness/gate problem -- this bounds the urgency and the blast radius of getting the fix wrong. 4) Whatever ships should stay inside continuity-state.mjs's existing CAS/schema discipline (pipeline.continuity.v0, CONTINUITY_STATE_MAX_BYTES=8192) rather than inventing a parallel one, per this repo's evident pattern of one canonical state object.
 
 **Estimated complexity:** small
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+plugins/pipeline-core/hooks/codex-hooks.json line 6 already includes "compact" in its SessionStart matcher. plugins/pipeline-core/hooks/codex-session-start-hint.mjs now imports decideOutput, loadStateSafe, shouldActivate from ./post-compact-reground.mjs (line 10) and defines a compactStdout() function (lines 145-155), documented with a comment tagged "NVA-W4-09" (lines 136-144: "on a compact SessionStart, do not unconditionally instruct a full re-bootstrap. Reuse post-compact-reground.mjs's own exported projection logic"). main() (line 165) calls compactStdout() FIRST (line 166) — if shouldActivate(input) is true (a genuine compact event) it emits the lightweight PCR-style re-ground signal via loadStateSafe+decideOutput and returns immediately (lines 166-169), only falling through to the full-bootstrap sessionStartDecision() otherwise (line 171). This is exactly the Triage-accepted Option B design ("reuse post-compact-reground.mjs's existing exported projection logic on source==='compact'; do not build a new lease schema") — implemented, not merely proposed.

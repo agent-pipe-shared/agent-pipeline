@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.four-critic-preimage-pins-drifted-or-never-valid
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-12
 source: "NVA-BL-42-FIX dispatch, 2026-08-12, while fixing the single stale critic.md pin this item's sibling (NVA-BL-42) named. The fix measured all 9 pins against their baseline-creation commit and found 5 non-matching, not the 1 originally believed."
 ---
@@ -97,3 +97,13 @@ Not designed here. At minimum:
   `goldfish-deep` investigation plus Critic review, per the item's own
   Direction section.
 - **Date:** 2026-08-17
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+Ran `node --test plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.test.mjs` directly: all 4 assertions pass (`ok 1..4`), including 'F1 current Critic execution surfaces remain byte-identical to the protected baseline'. The item's own 2026-08-17 Triage recorded a live failing mismatch on `harness/review-protocol.md` (actual `184a5140...` vs expected `624852e5...`); that no longer reproduces. `git log` on `plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json` shows commit `0bae45d3` (2026-08-18 00:03, 'fix(codex-isolated-critic-preimage): re-pin roles/critic.md and stop the test hiding later stale pins') and `943d1930` (2026-08-18 17:41, 'fix(codex-isolated-critic-preimage): re-pin the three remaining stale entries') — the latter's commit message explicitly names all three remaining never-valid/drifted entries (`harness/review-protocol.md`, `codex-critic-dispatch.schema.json`, `codex-critic-host.mjs`) and states each was reviewed against its full diff-since-last-pin before re-pinning, matching the item's own Direction guidance. Both commits postdate the item's last 'still fails' Triage entry. Caveat: the suite is still not registered in `harness/scripts/verify.mjs` (grep for the suite name: no match) — but the item's own 'Direction' section explicitly frames that registration gap as 'the standing gap this connects to', pointing at a separate backlog item (`2026-08-07-unregistered-suite-is-red-and-invisible-to-verify.md`), not this item's own core scope (the four stale/never-valid pins), which is what is now fixed.

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, over docs/state.md lines 3489-5929 (the T7 Critic round entry, ~2026-08-06). Finding surfaced by a read-only research fork, verified against current source before filing."
 ---
@@ -67,3 +67,13 @@ strict lane — bringing the two lanes' binding scope into parity.
   unrelated handover-rotation extraction work, not itself the task at
   hand.
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+plugins/pipeline-core/hooks/guard-push.mjs lines 1672-1698 now contain an explicit `else if (approval?.remote !== pushBinding.remote || approval?.destination !== pushBinding.destination)` branch immediately after the pre-existing forCommit check, applying regardless of pushGate.approval mode (i.e. covering the chat/standing-approved lane the item names, not only the 'required' lane). The inline comment explicitly cites 'PUSHBIND-1 (backlog: push-approval-general-mode-lane-does-not-bind-remote-or-destination, 2026-08-18)' and explains precisely the gap being closed: 'a waived/chat approval... never reaches [authorizeRecordedPush], so the SAME approved commit could authorize a push to a DIFFERENT remote/destination... this binding check is always meaningful once forCommit itself already matches.' git log confirms commit 60111c6e 'fix(guard-push): bind general-mode approval to the exact remote and destination' as the landing commit. The backlog item's own status field (still 'open', no Triage/Closure recorded) was not updated to reflect the fix.

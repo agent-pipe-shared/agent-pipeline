@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "PO, 2026-08-18, in-session while planning an incremental extraction pass over docs/state.md's oldest sections (ADR-0066 Decision 6/7): the PO read the mechanism's actual behavior back and said 'das macht auch keinen Sinn und sollte angepasst werden' (that doesn't make sense either and should be adjusted)."
 ---
@@ -86,3 +86,13 @@ not investigated here.
   regardless of whether the repo-wide marker already exists from an
   earlier, narrower pass.
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+plugins/pipeline-core/scripts/handover-rotate.mjs now implements exactly the fix the item's Proposal called for. `ACK_MARKER_SCHEMA = "pipeline.handover-rotation-extraction-ack.v2"` (line 54); the file's own header comment (lines 30-38, 65-81) states: 'ADR-0066 Decision 6 (the section-scoped extraction gate, schema v2 as of 2026-08-18)... The marker records title + content-hash pairs, not a repo-wide boolean: a section never acknowledged still refuses rotation, and a section edited after acknowledgment but before rotation refuses again too (its hash no longer matches).' Functions `sectionContentHash()`, `readAckMarker()`, `getAcknowledgedSections()` implement this; an old-schema (v1) marker is treated as fully absent, never grandfathered (lines 78-81). This lands via commit cda02208 'fix(handover-rotate): scope the extraction-acknowledgment marker to sections (schema v2)', with a follow-up hardening commit ec18303e adding repository-containment checks. CLAUDE.md itself was also updated (commit c2cd3cd3 'update stale handover-rotation extraction hard rule to schema v2') to describe this same fix. The item's own frontmatter (status: open) and Triage ('not yet decided — filed to preserve the finding') were never updated to reflect that the code-level gap is now closed — this is exactly the kind of drift the task asked me to catch.

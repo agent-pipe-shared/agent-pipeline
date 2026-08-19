@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.signing-ceremony-designed-for-the-verifier-not-the-signer
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-09-05
 source: "PO, 2026-08-08, forwarding findings from the Phoenix project as ONE package for Nova/0.5.4 rather than separate tickets. Trimmed 2026-08-09 on the PO's instruction — 'nur was du reproduzieren kannst, rest komplett verwerfen' — after the Elephant walked the whole ceremony live and measured every claim against this code."
@@ -303,3 +303,13 @@ plugins/pipeline-core/scripts/signing-ceremony.test.mjs`, 5/5 pass, including
 an abort-before-install case (declining the confirmation installs nothing)
 and a stale-commit mismatch case (GMW-CANDIDATE-COMMIT-MISMATCH surfaced
 plainly when the tree moves between prepare and install).
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+plugins/pipeline-core/scripts/signing-ceremony.mjs (the single orchestrating entry point that was this item's last remaining open piece per its own 2026-08-17/18 history) exists. Ran `node --test plugins/pipeline-core/scripts/signing-ceremony.test.mjs` directly in this session: 5/5 pass (end-to-end prepare->present+sign->install->verify with exactly one confirmation; abort-before-install on decline; GMW-CANDIDATE-COMMIT-MISMATCH surfaced plainly on a stale commit; argv-closure cases) -- independently reproducing the item's own claimed result. The script's own comments confirm the two hard constraints hold: 'the confirmation prompt and the OpenSSL ... process's own inherited stdio' and 'This command never reads or supplies your passphrase.' Spot-checked two of the eight underlying findings directly in current code (not the item's prose): finding 1 (GMW disclosure) -- plugins/pipeline-core/lib/guard-maintenance-window.mjs:1151-1153 now prints 'candidate commit:', 'candidate tree:', and the exact invalidation note ('a commit landing after this point, before install, invalidates this signature...') in the confirmation block; finding 6 (single bad capability record poisoning the whole store) -- plugins/pipeline-core/lib/human-guard-override.mjs:2721-2822 now collects a `skippedInvalidRecords` list per-record instead of failing the whole store. Both match the item's own closure claims exactly. Note: the item's own frontmatter still reads `status: open`, which is stale relative to both its own recorded history and the code -- a status-field bookkeeping gap, not a code gap.

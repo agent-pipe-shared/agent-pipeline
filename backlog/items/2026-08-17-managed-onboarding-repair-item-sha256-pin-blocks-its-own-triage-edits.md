@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "Surfaced by the 2026-08-17 full-backlog triage pass: filling in this item's own Triage section broke check-backlog-state.mjs."
 ---
@@ -81,3 +81,13 @@ patch to ledger-integrity code.
   "mechanical governance, control integrity" work, matching Alfred's own
   scope.
 - **Date:** 2026-08-17
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+A new evidence kind 'item-hash-rescope-amendment' and function planBacklogItemHashRescopeAmendment() now exist in plugins/pipeline-core/lib/backlog-state.mjs (lines 1096-1141), explicitly citing this backlog item in its docstring ('Narrow a missing-initial-ledger-repair byte pin to the item's pre-Triage content ... backlog/items/2026-08-17-managed-onboarding-repair-item-sha256-pin-blocks-its-own-triage-edits.md'). plugins/pipeline-core/scripts/check-backlog-state.mjs lines 535-539 now look up the latest item-hash-rescope-amendment for a given missing-initial-ledger-repair event and check the amendment's itemSha256 against the item's pre-Triage bytes instead of the full current file. Directly verified the fix works in practice: backlog/items/2026-07-25-managed-onboarding-success-contract.md now HAS its '## Triage, 2026-08-18' section filled in (previously this broke the gate per the item's own account), and running `node plugins/pipeline-core/scripts/check-backlog-state.mjs` produces no itemSha256-binding failure — only two unrelated pre-existing DRIFT findings, ending 'Backlog state, transition ledger, closure evidence, and generated projections are valid.' This is exactly Proposal option (b) from the item. Implemented by commits ff4f8205 ('feat(backlog-state): finish append-only item-hash-rescope-amendment for managed-onboarding item'), 07f29a2f ('fix(backlog-state): classify item-hash-rescope-amendment findings'), 9d4b34f4 ('chore(backlog): append the managed-onboarding item-hash-rescope amendment').

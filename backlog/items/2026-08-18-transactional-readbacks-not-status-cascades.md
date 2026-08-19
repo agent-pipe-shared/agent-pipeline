@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.transactional-readbacks-not-status-cascades
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-8 (priority P1)"
 ---
@@ -62,3 +62,13 @@ mutating action and one overall readback.
 **Risks/dependencies:** Overlaps two sibling Wave-4 items from the same source report and same triage batch, worth resolving together rather than independently: pipeline.per-phase-progress-message-budget (P2-1, backlog/items/2026-08-18-per-phase-progress-message-budget.md) wants routine internal readbacks kept OFF the human-facing turn stream -- a design here must keep the new inspect payload as an internal/tool-result artifact, not something echoed verbatim into chat, or the two items will conflict; pipeline.universal-human-command-renderer (P0-3, backlog/items/2026-08-18-universal-human-command-renderer.md) is about a different rendering path (human-executable HGO commands) but shares the same "coordinator output shape" theme and the same source document, so triaging both in the same session avoids two separate design passes over related code. There's also a real dependency on guardrails/token-budget.md's TB-01/TB-04 concerns and the standing PO/memory note that dispatch bootstrap cost is already too high (50k-150k tokens/dispatch) -- any consolidated payload should be sized deliberately (e.g. omit full handover-doc text, include only its path/hash/section) rather than assumed free. "Candidate" status is not currently a first-class field inside pipeline-state.mjs's own state; wiring it into a consolidated readback means integrating release-version-plan.mjs / check-release-state-consistency.mjs, which is genuinely new plumbing, not a relabeling exercise. Finally, the item's own evidence (docs/pipeline-greenfield-happy-path-handover.md) lives only in the external test repo Rune_Test1_Codex_060_52 and could not be read from this checkout, so the PO or whoever ran that test should confirm the exact call sequence observed before final scoping -- my grounding is from reading the actual pipeline-state.mjs behavior, not from the cited report.
 
 **Estimated complexity:** medium
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+plugins/pipeline-core/scripts/pipeline-state.mjs now has a consolidated, zero-write `inspect` subcommand (registered in the command list at line 437, implemented at case "inspect" line 6187) returning one JSON payload (activeFeature, phase, planApproved, lifecycle, pushApproval, closedFeaturesCount, nextAction) reusing the richer structured-JSON pattern, exactly matching this item's own Design-proposal Recommendation (hybrid of options 2+3). `git log --oneline --grep="NVA-W4-07" --all` resolves to commit e6a27960 "feat(pipeline-state): add consolidated read-only inspect subcommand", matching the code comment's own dispatch id at line 6173. templates/prompts/goldfish-task.md references `pipeline-state.mjs inspect` (confirmed via grep) as the required orientation step, satisfying the item's "documentation update to the dispatch templates" ask. The backlog item file itself was never updated with an Implementation-status section and frontmatter stays `status: open`, but the described code gap (no single consolidated readback) no longer exists.

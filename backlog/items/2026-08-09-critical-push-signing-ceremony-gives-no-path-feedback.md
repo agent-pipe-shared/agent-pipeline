@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critical-push-signing-ceremony-gives-no-path-feedback
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "Independent read-only analysis of the PO's private Codex+Pipeline 0.5.4 happy-path re-test (fifth local candidate, final successful session, 2026-08-09), cross-checked against direct code reading of po-human-approval.mjs. Corrects an earlier self-report from inside that same Codex session, which misidentified the failing subcommand."
 due: 2026-08-16
@@ -67,3 +67,13 @@ actually landed, or what to call instead of a wrong guess.
   correctness defect and not blocking current work.
 - **Assignment (if accepted):** next available Nightwing slot.
 - **Date:** 2026-08-17
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+plugins/pipeline-core/scripts/po-human-approval.mjs now implements both of the item's Direction bullets, tagged NVA-CLI-FEEDBACK-1 with an explicit comment citing this exact backlog item's filename (line 352-353). (1) Path feedback: every writing subcommand's returned result object now carries a 'paths' field naming what it wrote (e.g. lines 1001, 1008, 1013, 1141), and the full result including 'paths' is printed to stdout via process.stdout.write(JSON.stringify(runHumanApproval(),...)) at line 1160 — so a caller sees the written path(s) on success rather than having to guess/poll. (2) Closest-match subcommand suggestion: KNOWN_COMMANDS (line 357) plus a Levenshtein-distance suggestSubcommand() (lines 359-422) render 'Unknown subcommand "X". Did you mean "Y"?' for an unrecognized subcommand, bounded by SUBCOMMAND_SUGGESTION_MAX_DISTANCE so it never guesses wildly — this directly covers the item's own worked example (a guessed 'authorize-critical' would now get a concrete suggestion instead of only a bare usage dump). Frontmatter/Triage still literally says status: open / deferred to Sprint Nightwing, but that status text is stale relative to the actual current code.

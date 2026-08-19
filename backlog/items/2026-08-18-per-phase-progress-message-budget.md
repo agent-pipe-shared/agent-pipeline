@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.per-phase-progress-message-budget
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-1 (priority P2)"
 ---
@@ -64,3 +64,13 @@ PRD approval, and none between approval and the result.
 **Risks/dependencies:** 1) Overlap with P1-8 (transactional-readbacks-not-status-cascades): both items came from the same source report and address related noise; triage them together or note the relationship explicitly, otherwise risk drafting two rules that either conflict or leave a gap between 'chat narration' and 'tool readback' noise. 2) The item's source evidence (docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P2-1) lives only in the external test repo Rune_Test1_Codex_060_52, not in this checkout -- I could not independently read the original observation, only the backlog item's own paraphrase of it; the Triage should note this provenance limitation. 3) No enforcement mechanism exists or is proposed for this rule (unlike, e.g., guard-lifecycle-ready.mjs for shell commands) -- it relies on Elephant self-discipline the same way EL-17 does, so its real-world compliance rate is unverifiable except by later Critic/PO review of session trajectories; consider whether EL-17's existing 'Check' pattern (a Critic reviewing session trajectories flags violations) should be extended to cover this new rule too. 4) The related, higher-priority 2026-08-10 turn/wall-clock-cost item's own forensic pass found progress-message count was NOT among the actual dominant cost drivers in the one session it audited -- so this item should be triaged on its own merits (signal-to-noise for the PO reading along) rather than folded into that cost-reduction effort's success metric, to avoid setting an expectation this change won't deliver (it improves readability, not wall-clock time).
 
 **Estimated complexity:** small
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+roles/elephant.md lines 287-291 now contain '### EL-31 (MUST) -- Bounded PO-facing progress messages per phase', stating the exact rule from the item's own Triage 'Decision: Accepted': at most one start message and one completion message per lifecycle phase (explicitly anchored to operating-model.md §4's 8-phase list), named exceptions for a decision point/blockage/>60s step (soft heuristic), and a 'Check' clause specifying a trajectory review for compliance -- matching the item's own Wave-4 design-proposal recommendation almost verbatim, including the cross-reference rationale to the Rune report. The item's frontmatter status field (still 'open') was not updated to reflect the rule landing -- for a workflow-improvement item whose Proposal is a prose convention, this rule text IS the deliverable, and it exists.

@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.a-schema-less-project-pipeline-yaml-has-no-known-repair-path
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "Relayed by the PO 2026-08-17 from a live D:\\Dev\\HA (native Windows Claude) session's handover, which attributed this to runner-profile-migration-v3.mjs's generator omitting a schema field. That specific root-cause attribution is checked against source and appears WRONG -- filed here with the corrected, narrower, still-unresolved finding."
 ---
@@ -251,3 +251,13 @@ an inherited 'still open' claim" rule (`CLAUDE.md` Hard rules).
   commit message body has no such trailer, which is a minor process-hygiene
   gap (dispatch attribution), not a functional one; not investigated further
   here as it is outside this item's own scope.
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+Directly confirmed via grep, not trusted from the item's own Investigation prose: `plugins/pipeline-core/lib/manifest.mjs:711` defines `function detectSchemaLessRepair(manifest, { schemaPath, rootDir, now })`; `:746` and `:800` show `validateManifest()`/`loadManifest()` both accept a `selfHeal = false` option that, per the surrounding code comments, defaults to surfacing `.repair.available` without silently accepting, and only flips `status` to `"ok"` when `selfHeal: true` is explicitly passed. `plugins/pipeline-core/lib/project-onboarding-v3.mjs:2922` contains the literal string `"canonical_manifest_schema_missing_repairable"` — the new diagnostic code the item describes replacing the old dead-end `canonical_manifest_requires_owner_repair` for this specific repairable case. All of this matches the item's own account of commit `e4d2a036` ('fix(manifest): self-heal a schema-less-but-otherwise-valid project manifest', 2026-08-18T14:31:39+02:00). The item's frontmatter `status: open` is stale — the item's own text already flags this explicitly ('did not change this item's status: frontmatter... a future Elephant/PO session... should treat the fix above as already shipped when re-triaging this item, not as still-open work'), which my independent code read confirms is accurate.

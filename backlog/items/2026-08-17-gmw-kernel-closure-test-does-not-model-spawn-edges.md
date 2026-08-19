@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gmw-kernel-closure-test-does-not-model-spawn-edges
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-17
 source: "Critic round-2 review of NVA-A7FIX-2 (4736d913..ad512e80), finding F-B, 2026-08-17."
 ---
@@ -72,3 +72,13 @@ Not designed here. Two directions worth weighing when this is picked up:
   confirmed not blocking current Nova/Phoenix delivery.
 - **Assignment (if accepted):** next available Alfred slot.
 - **Date:** 2026-08-17
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs now contains a full spawn-edge scanner (SPAWN_EXEC_PATH_RE, SCRIPT_PATH_CONST_RE, spawnEdgeSpecifiers(), resolveScriptPathIdentifier()) that follows spawnSync(process.execPath, [...]) calls the same way it follows import/export...from, tracing identifiers back to fileURLToPath(new URL(...)) constants and failing closed (throwing) on any unclassifiable shape (lines 32-171 header + implementation). The three previously-missing writer scripts (scripts/pipeline-state.mjs, scripts/po-gate-profile-repair.mjs, scripts/project-onboarding-v3.mjs) are now present in NEVER_LIFTABLE_KERNEL_PATHS (plugins/pipeline-core/lib/guard-maintenance-window.mjs lines 217, 218, 221). Ran the test directly: 'PASS GMWKC01 ... PASS GMWKC02 ... 2 passed, 0 failed'. Fixed by commits ad512e80 ('fix(guards): close the GMW kernel's transitive-closure gap with a test') and 73b7abbe ('fix(guard-maintenance-window): close spawn-edge and static-import gaps in the kernel-closure array').

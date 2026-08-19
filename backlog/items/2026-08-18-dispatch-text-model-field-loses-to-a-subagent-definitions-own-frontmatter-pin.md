@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.dispatch-text-model-field-loses-to-a-subagent-definitions-own-frontmatter-pin
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch ('The round's own route violation, and where it came from' entry). Finding surfaced by a read-only research fork."
 ---
@@ -56,3 +56,13 @@ MP-07-class escalation cannot silently no-op again.
   the mechanism is cheap, but deciding whether/how to add tooling
   enforcement is a separate, considered call.
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+policies/model-policy.md lines 127-133 now contain a full "MP-29" section ("A subagent definition's own frontmatter model: pin overrides dispatch-TEXT model naming; only the tool-layer model parameter is authoritative"), documenting the exact mechanism, the live incident (Critic dispatch with "opus at max" that ran on sonnet due to plugins/pipeline-core/agents/critic.md's frontmatter pin), a required tool-layer-parameter rule, and a "how to check" procedure — precisely what the item's Proposal asked to be documented. Additionally, CLAUDE.md's "Model discipline" Hard Rule (visible in this session's project instructions) now states: "a target subagent definition's own frontmatter model: pin overrides it, so an actual escalation needs the tool-layer model parameter on the dispatch call (policies/model-policy.md MP-29)" — both named artifacts from the item's Affected-artifact section have been updated. The documentation gap the item describes no longer exists.

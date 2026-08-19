@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-12
 source: "NVA-BL-75, 2026-08-12, surfaced while measuring override-reachability for backlog/items/2026-08-08-a-guard-reclassification-changed-what-a-signature-can-lift.md. Explicitly disclosed by the dispatch as a measurement, not a claimed exploit."
 ---
@@ -87,3 +87,13 @@ briefed. Whoever picks this up should:
 - **Assignment (if accepted):** next available Alfred slot — needs the
   target-vs-tool decision (question 1) before implementation.
 - **Date:** 2026-08-17
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+Read plugins/pipeline-core/lib/human-guard-override.mjs's eligibility() function directly (lines 1601-1652, the Bash-command redirect-target loop the item names). It now contains an explicit decision citing this exact item by path in an inline comment: 'PO decision 2026-08-18 #7 (backlog/items/2026-08-12-cross-repository-redirect-eligibility-does-not-consult-the-sensitive-path-boundary.md)'. The code (lines 1645-1647) now returns `{ eligible: false, code: 'HGO-NONOVERRIDABLE-CROSS-BOUNDARY' }` outright for BOTH 'refused' and 'cross-boundary' classifyPath() results on a Bash redirect target -- never routing it through crossBoundaryEligible() at all. This is a stronger, categorical fix (a Bash redirect is declared to never be a 'permitted target type' for the cross-repository-target liftable class) than the item's own Direction 1/2 suggestion (threading hardBoundaryPath() into the check). Traced to commit fcdee923 ('fix(human-guard-override): redirect targets are never a permitted cross-repo target type'). Confirmed the item's own exact measured test case is now pinned: guard-lifecycle-ready.test.mjs:3378 lists `printf implementation 2>/etc/passwd` with expected reach `never-liftable:external-operator-required:HGO-EXTERNAL-PROJECT-BOUNDARY`, replacing the old `liftable-by-signature:cross-repository-target` behavior the item measured and flagged. The item's Triage text ('needs the target-vs-tool decision before implementation') is stale as of this fix.

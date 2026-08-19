@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-restart-cannot-recover-operational-context-from-its-own-prior-transcript
 type: idea
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-09
 source: "PO observation of a live Codex greenfield test session, 2026-08-09 (three rollout files, two restarts), plus independent forensic confirmation that the sanitized resume-hint card cannot carry this class of information by design."
 due: 2026-08-23
@@ -285,3 +285,13 @@ proper spec for it rather than a quick patch.
   verification step, consistent with how every earlier re-triage of this item
   was itself PO-live-tested).
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+plugins/pipeline-core/hooks/codex-session-start-hint.mjs:59-68 defines PRIOR_ROLLOUT_TRANSCRIPT_LINE, an unconditional instruction directing a restarting Codex session to locate and read its own most recent prior rollout transcript under $CODEX_HOME/sessions (or ~/.codex/sessions), bounded to the most recent handful of tool-call/result/error entries, with an explicit honesty clause if none is found — wired into the governed-branch context array emitted on every session start (line 111). Confirmed genuinely wired, not dead code: codex-hooks.json:10-11 invokes exactly this hook script on startup/resume/clear/compact. Confirmed tested: codex-session-start-hint.test.mjs:40 asserts the emitted context matches /locate and read your own most recent PRIOR Codex rollout transcript/. This closes the code-observable gap the item describes (previously nothing in the codebase instructed a restart to consult its own prior transcript, and the resume-hint card is structurally barred from carrying raw transcript/path data). The item's own last entry (2026-08-18) notes live PO confirmation in a real Codex restart is still pending — that is a validation/testing step, not a remaining code gap, and the code itself is present, wired, and unit-tested.

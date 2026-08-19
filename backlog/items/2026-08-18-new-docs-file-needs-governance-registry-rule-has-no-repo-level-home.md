@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.new-docs-file-needs-governance-registry-rule-has-no-repo-level-home
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (an ADR-0064-registration incident and a matching self-inflicted OG-DOC-UNCLASSIFIED gap hit again this same session on docs/state-archive/...). Finding surfaced by a read-only research fork, corroborated independently by this session's own experience."
 ---
@@ -57,3 +57,13 @@ as the mechanical check that enforces it.
   this session, but the general rule still deserves a repo-level home so
   it stops recurring across sessions/agents.
 - **Date:** 2026-08-18
+
+## Closure, 2026-08-19 (verified live against current code, not against status text)
+
+Confirmed resolved in code by an independent, code-first verification pass
+(Workflow task wdyd7rk9g, 2026-08-19) run in response to a PO directive to
+actively check every open backlog item against current code rather than
+trusting frontmatter status. The item's own frontmatter/Triage text had not
+been updated to reflect the landed fix; this closure catches that drift.
+
+guardrails/quality-gates.md lines 117-121 now contain '## QG-12 -- A new `docs/**` file needs a matching governance registry entry', stating verbatim the rule the item says has no repo-level home: any commit adding a new docs/** file MUST add a matching governance/observation-doc-governance.json entry, enforced by check-observation-governance.mjs with OG-DOC-UNCLASSIFIED. git log shows this was added by commit 96cf12d5 'docs: widen ADR-0056 conflict scope text and add three small process rules' (2026-08-18 17:10), which explicitly diffs guardrails/quality-gates.md (+6 lines) alongside CLAUDE.md and docs/adr/0056. The backlog item's own frontmatter/Triage (status: open, Decision: 'not yet decided') was never updated to reflect this landed fix -- a case of the rule being resolved in code without the item file being told.
