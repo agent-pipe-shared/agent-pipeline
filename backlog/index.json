@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "93220d1f382beb13c8a66752d01eb7d4435aec494e8ad375e60b543ed3358778"
+    "transitionHead": "7c729cad6e21cd25ca8838c112f0197ab901e51ada1c68f7f70252162644a6e5"
   },
   "counts": {
-    "open": 10,
+    "open": 9,
     "in_progress": 20,
-    "closed": 132,
+    "closed": 133,
     "rejected": 2,
     "deferred": 11
   },
@@ -711,11 +711,15 @@
     },
     {
       "id": "pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19."
+      "source": "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19.",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "c3bf83b74b8a520633220c520703cbafb80f726f",
+      "closureEvidence": ".gitleaksignore"
     },
     {
       "id": "pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger",

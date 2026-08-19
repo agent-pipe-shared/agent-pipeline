@@ -3,10 +3,22 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "c3bf83b74b8a520633220c520703cbafb80f726f"
+closure_evidence: ".gitleaksignore"
 source: "Found while gathering full harness/scripts/verify.mjs evidence for the HGO Part C Critic round-2 delta re-review (dispatch PHX-WP-HGO-FAILCLOSED-IMPL-C), 2026-08-19."
 ---
+
+## Closed — 2026-08-19
+
+Fix landed same day (`c3bf83b7`) but this item's own status metadata was
+never updated at the time — caught during the pre-push backlog sweep.
+`.gitleaksignore` content-fingerprint entry added; `security-scan.mjs`
+confirmed clean multiple times since (most recently at push candidate
+`85b718cf`).
 
 # gitleaks blocks security-scan on a version-tag constant, not a credential
 

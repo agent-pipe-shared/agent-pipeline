@@ -69,7 +69,7 @@
 | pipeline.gate-strength-override-route-advertised-not-offered | deferred | defect | pipeline | 2026-08-08 | — |
 | pipeline.gate-strength-shell-comment-understates-its-own-scope | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.gitignore-evidence-rule-swallows-durable-spec-artifacts | closed | defect | pipeline | 2026-08-16 | — |
-| pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag | open | defect | pipeline | 2026-08-19 | — |
+| pipeline.gitleaks-false-positive-in-guard-maintenance-window-attribution-key-generation-tag | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger | closed | requirement | pipeline | 2026-08-07 | — |
 | pipeline.gmw-prepare-cli-authorship-mode-invalid-on-every-call | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.governance-product-verify-suites-deregistered | closed | defect | pipeline | 2026-08-07 | — |
@@ -183,8 +183,8 @@
 
 ## Counts
 
-- open: 10
+- open: 9
 - in_progress: 20
-- closed: 132
+- closed: 133
 - rejected: 2
 - deferred: 11
