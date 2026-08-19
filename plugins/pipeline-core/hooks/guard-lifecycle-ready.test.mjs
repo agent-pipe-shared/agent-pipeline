@@ -679,6 +679,52 @@ test("only bounded rg search pipelines and platform null redirect are read-only"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+// backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md
+test("the small named &&-chain allowlist and trailing 2>/dev/null admit exactly the backlog's triggering shapes and nothing more", () => {
+  const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-and-chain-outside-"));
+  try {
+    for (const command of [
+      'git rev-parse HEAD && git log --oneline -5 && echo "---status---" && git status --porcelain',
+      "mkdir -p scratch/probe && ls -la scratch/probe",
+      'grep -rl "pattern" backlog/items/ 2>/dev/null',
+      "git status && git log -n 10 --oneline",
+      "git rev-parse HEAD && git log --max-count=3",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    }
+    assert.deepEqual(evaluateLifecycleReadyGuard(
+      bash('git rev-parse HEAD && git log --oneline -5 && echo "---status---" && git status --porcelain'),
+      { projectDir: path, requireProjectOnboardingReadyFn() { deny("repository-control-path-invalid"); } },
+    ), { exitCode: 0, stderr: "" });
+
+    for (const command of [
+      // (a) an allowlisted command name chained with a mutating/cross-reaching one.
+      "git log && rm -rf /tmp/x",
+      "git status && git push",
+      // (b) mkdir -p targeting a path outside the permitted-write predicate.
+      `mkdir -p ${outside} && ls -la ${outside}`,
+      // (c) a trailing 2>/dev/null on a command that is not independently read-only.
+      "rm -rf /tmp/x 2>/dev/null",
+      // (d) a chain longer than the chosen bound, or an operator this design never admits.
+      "echo 1 && echo 2 && echo 3 && echo 4 && echo 5 && echo 6 && echo 7",
+      "git status ; git log",
+      "git status || git log",
+      "git rev-parse HEAD && git log --oneline -5 | head -n 5",
+      // Disclosed exclusions: an unrecognized git log flag, and a git global -c flag
+      // (never a subcommand match), both fail closed by construction.
+      "git log --all && git status",
+      "git -c core.pager=evil log && git status",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
 test("redirect-looking quoted data stays argv while hostile composition is typed and denied", () => {
   const path = root();
   try {
