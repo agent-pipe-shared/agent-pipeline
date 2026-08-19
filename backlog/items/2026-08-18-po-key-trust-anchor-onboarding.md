@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.po-key-trust-anchor-onboarding
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-7 (priority P1)"
 ---
@@ -89,3 +89,67 @@ No functional gap results: GS-2 gate-strength protection of
 project/critical-human-proof.json is unaffected regardless: this item
 was always a UX convenience (surfacing a ready-to-use snippet), never a
 protection mechanism.
+
+## Closure, 2026-08-19 — PO decision: build directly, complete, explicit exception
+
+PO decision (2026-08-19): implement Option A to completion, directly in
+this Elephant session as an explicit, disclosed exception to the normal
+dispatch requirement (3 prior dispatch attempts on this exact item made
+no committed progress). The shared-helper half of the original
+Recommendation (co-designing with `full-push-preflight-before-signature`)
+does not apply: that sibling item already closed separately with its own
+preflight logic, so retrofitting it here would be an unrelated,
+regression-risking refactor of already-shipped, tested code — not
+attempted.
+
+**Landed, both remaining Option A pieces:**
+
+1. **Human-name-upfront fix** (the "two keys created, identity corrected"
+   friction). `collectPushApprovalPreferenceAction()`'s guidance
+   (`plugins/pipeline-core/lib/project-onboarding-v3.mjs`) now explicitly
+   asks for the PO's name in the SAME turn as the signature/chat question,
+   and the shown `po-human-approval.mjs setup` command now includes
+   `--human-name "<the name they gave>"` — the ceremony's mandatory-name
+   requirement can no longer be discovered mid-ceremony as a second,
+   failed call.
+2. **Trust-anchor propagation guidance** (the actual deliverable). Three
+   new pure, read-only functions: `detectExistingLocalTrustAnchor()`
+   (reads the machine plane's `poKeyDirectory`, then that directory's
+   `trust-policy.json`, exactly the file `po-human-approval.mjs setup`
+   itself writes), `repositoryAlreadyHasTrustAnchor()` (reads this
+   repository's own `project/critical-human-proof.json` and checks
+   whether the detected digest is already present, v3 `trustAnchors` set
+   or legacy singular `trustAnchor`), and
+   `proposeTrustAnchorMaterializationAction()` (builds the ready-to-use
+   `trustAnchors` JSON snippet + a plain-language description of the
+   commit/HGO-ceremony step). Wired as `withPendingTrustAnchorGuidanceAsk()`,
+   the mirror-image sibling of `withPendingPushApprovalSetupAsk()` (fires
+   only once the machine HAS already answered, i.e. a machine-wide key
+   already exists), composed into both `applyLifecycle()` call sites.
+   **Never writes `project/critical-human-proof.json` itself** — GS-2
+   (`guard-gate-strength.mjs`) is a deliberate, unliftable protection;
+   this only proposes what a human (or the existing signed HGO Edit
+   ceremony) would write. Does not touch PO-KEYDIR-01(A)'s repo-scoped
+   directory default, and adds no dependency from `po-gate-authority.mjs`
+   (submit-plan/approve-plan) on signature-key infrastructure — both
+   preserved invariants confirmed by inspection, not just by omission.
+
+Realistic acceptance criterion met (per this item's own Recommendation,
+since "no manual JSON/git step occurs" is not achievable without
+weakening GS-2): at most one pre-composed, copy-pasteable human step,
+proposed automatically, and the ceremony's human-name requirement no
+longer causes a failed first attempt.
+
+**Evidence:** `node --test plugins/pipeline-core/lib/project-onboarding-v3.test.mjs`
+— 129/129 pass (128 pre-existing + 1 new regression test covering both
+the "no anchor yet" surfacing case and the "anchor already present"
+silence case). `node --test harness/scripts/check-consumer-safe-paths.test.mjs`
+— 9/9 pass.
+
+**Deliberately not done:** no independent Critic review has run yet for
+this diff — per CLAUDE.md's self-application policy, that is expected
+before PO acceptance, not before this item's own implementation is
+considered complete. Implementation complete; Critic review and PO
+acceptance pending, not silently claimed.
+
+Item closed on this basis.
