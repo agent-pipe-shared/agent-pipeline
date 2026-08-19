@@ -8,9 +8,10 @@ named in `backlog/items/2026-08-19-publication-authority-lacks-execution-time-cr
 re-verification `plugins/pipeline-core/lib/critical-action-authorization.mjs` implements for push/deploy —
 publication deliberately does NOT adopt that shape; this ADR is the recorded reason why not.
 
-**Governs:** `plugins/pipeline-core/lib/publication-authority.mjs`, `plugins/pipeline-core/scripts/publication-executor.mjs`,
-`plugins/pipeline-core/hooks/guard-push.mjs` (`enforcePublicationAuthorization`, lines 936-980),
-`plugins/pipeline-core/scripts/pipeline-state.mjs` (`publication-approve`, `state.publicationCriticalProofs`).
+**Governs:** plugins/pipeline-core/lib/publication-authority.mjs, plugins/pipeline-core/scripts/publication-executor.mjs, plugins/pipeline-core/hooks/guard-push.mjs, plugins/pipeline-core/scripts/pipeline-state.mjs
+
+(Specifically within the latter two: `guard-push.mjs`'s `enforcePublicationAuthorization`, and
+`pipeline-state.mjs`'s `publication-approve` subcommand and `state.publicationCriticalProofs` field.)
 
 ## Context
 
