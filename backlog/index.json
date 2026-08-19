@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c51ec4ea988c99454e1498e1f3639672120355079bb644254f8cc23ffc983084"
+    "transitionHead": "e7fc07b1312bbe3a2a1b736aa7cc8efaa37e397062e8d1d7ae3a3694fa669c5b"
   },
   "counts": {
-    "open": 56,
+    "open": 55,
     "in_progress": 7,
-    "closed": 232
+    "closed": 233
   },
   "items": [
     {
@@ -2247,11 +2247,15 @@
     },
     {
       "id": "pipeline.po-key-trust-anchor-onboarding",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-18",
-      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-7 (priority P1)"
+      "source": "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P1-7 (priority P1)",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "7bc32a977e3b96b97edde411ced94964948d1311",
+      "closureEvidence": "backlog/items/2026-08-18-po-key-trust-anchor-onboarding.md"
     },
     {
       "id": "pipeline.po-language-is-set-without-asking-and-cannot-be-changed",
