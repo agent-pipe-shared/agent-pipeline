@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.unified-human-authorization-ux
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "0000000000000000000000000000000000000000"
+closure_evidence: "backlog/items/2026-08-02-unified-human-authorization-ux.md"
 created: 2026-08-02
 source: "PO product-direction decision during Sprint Cyborg CYB-4 PO-proof UX review, 2026-08-02"
 tracking: Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed.
@@ -172,7 +176,22 @@ the adapter contract only, no desktop-app implementation, per its own scope
 boundary; found and disclosed one narrow coupling (`verifyPoApprovalProof`'s
 `crypto.verify(null,...)` assumes EdDSA-family keys, would need a small change
 for an ECDSA/P-256 Passkey credential) as a documented future-work note, not a
-blocker. **Remaining open scope:** the publication-authority execution-time
-asymmetry noted under #2 is not yet filed as its own backlog item; filing it
-is the one clearly-identified next step. Item stays open pending that filing
-and any further PO direction.
+blocker. **Remaining open scope, now filed separately:** the publication-authority
+execution-time asymmetry noted under #2 is now its own backlog item
+(`2026-08-19-publication-authority-lacks-execution-time-criticalproof-reverification.md`)
+— investigation there confirmed it is a real gap needing a PO decision between
+two named directions, correctly not resolved here.
+
+## Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved as far as this session can take it. All 5
+  work packages from the 2026-08-18 scoping pass have a landed or properly-filed
+  disposition (see above); the one remaining substantive question (publication's
+  execution-time trust boundary) now has its own tracked item with its own PO
+  decision pending, rather than sitting as an unfiled note under this umbrella
+  item.
+- **Rationale:** This item's own purpose — scope and track the
+  `unified-human-authorization-ux` remaining program — is fulfilled: every
+  named work package has a real disposition, and the one still-open technical
+  question is durably tracked in its own right-sized item instead of here.
+- **Date:** 2026-08-19
