@@ -152,7 +152,7 @@
 | pipeline.ledger-drift-classification-has-no-reachability-cutoff | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-event-403-has-a-short-hash-evidence-commit | closed | defect | pipeline | 2026-08-12 | — |
 | pipeline.license-check-declared-path-absence-still-reads-as-scanner-error | closed | defect | pipeline | 2026-08-11 | — |
-| pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | open | requirement | pipeline | 2026-08-17 | — |
+| pipeline.lifecycle-event-schema-has-no-non-dispatch-correlation-shape | open | defect | pipeline | 2026-08-17 | — |
 | pipeline.lifecycle-guard-allowlist-still-misses-apply-partial-authority-and-adopt-remote | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.lifecycle-guard-does-not-know-the-human-signing-commands | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes | closed | defect | pipeline | 2026-08-16 | — |
