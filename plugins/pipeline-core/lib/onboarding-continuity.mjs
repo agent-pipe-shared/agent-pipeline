@@ -526,11 +526,41 @@ function validateHistory(value) {
       && typeof entry.handover.path === "string" && safePath(entry.handover.path)
       && (entry.handover.beforeSha256 === null || SHA256_RE.test(entry.handover.beforeSha256))
       && SHA256_RE.test(entry.handover.afterSha256)));
+  // Wave 4 onboarding coordinator, step 5 (specs/wave4-onboarding-coordinator/design.md
+  // SSc.3/SSa.5 point 5, NVA-W5-COORD-STEP5-1). A coordinator-sourced binding has no
+  // kickoff predecessor by construction (SS0): the private history it writes has exactly
+  // ONE entry, of a NEW kind ("bootstrap-binding") that carries what a "kickoff-promotion"
+  // entry carries minus the fields that name a predecessor (`previousTransactionSha256`,
+  // `kickoffFeatureId`, `beforeStateSha256`). `specPath`/`designInputPath`/`handover` are
+  // NOT optional here (unlike the promotion-entry shape's legacy-replay allowances): every
+  // coordinator-sourced binding this module ever writes carries all three, so the keyset is
+  // closed rather than combinatorial.
+  const bootstrapBindingEntryKeys = new Set([
+    "kind", "transactionSha256", "profile", "featureId", "planPath", "specPath",
+    "prdSha256", "specSha256", "designInputPath", "designInputSha256", "afterStateSha256", "handover",
+  ]);
+  const validBootstrapBinding = (entry) => exactKeys(entry, bootstrapBindingEntryKeys)
+    && entry.kind === "bootstrap-binding"
+    && SHA256_RE.test(entry.transactionSha256)
+    && PROMOTION_PROFILES.has(entry.profile)
+    && SAFE_FEATURE_ID.test(entry.featureId)
+    && typeof entry.planPath === "string" && typeof entry.specPath === "string"
+    && entry.specPath !== entry.planPath && safePath(entry.planPath) && safePath(entry.specPath)
+    && ["prdSha256", "specSha256", "designInputSha256", "afterStateSha256"].every((key) => SHA256_RE.test(entry[key]))
+    && typeof entry.designInputPath === "string"
+    && (() => { try { safeRelativePath(entry.designInputPath, "promotion design input"); return true; } catch { return false; } })()
+    && exactKeys(entry.handover, new Set(["path", "beforeSha256", "afterSha256"]))
+    && typeof entry.handover.path === "string" && safePath(entry.handover.path)
+    // Unlike the promotion-entry shape, `beforeSha256` is NEVER a real digest here: the
+    // absent-pristine precondition (SSc.3) means the configured handover cannot already exist.
+    && entry.handover.beforeSha256 === null
+    && SHA256_RE.test(entry.handover.afterSha256);
   if (!exactKeys(value, new Set(["schema", "transactions"]))
     || value.schema !== KICKOFF_HISTORY_SCHEMA
     || !Array.isArray(value.transactions)
     || value.transactions.length < 1
-    || !validKickoff(value.transactions[0])
+    || !(validKickoff(value.transactions[0])
+      || (value.transactions.length === 1 && validBootstrapBinding(value.transactions[0])))
     || !value.transactions.slice(1).every((entry, index) => validPromotion(entry, value.transactions[index]))) {
     fail("KICKOFF-HISTORY-MALFORMED", "private continuity history is malformed");
   }
@@ -3930,7 +3960,25 @@ export function reconstructOnboardingKickoffPlan(options = {}) {
   return buildOnboardingKickoffPlan({ ...options, allowAppliedReplay: true });
 }
 
-function promotionApplyAction(onboardingScript, root, profile, featureId, planPath, prdPath, specPath, designInputPath, planSha256, runner) {
+// `coordinatorSourced`: the bootstrap-bind-apply CLI subcommand (Wave 4 onboarding
+// coordinator step 5, design SSa.5 point 5) is a single flat argv token, mirroring
+// intake-generate-apply, not the compound `kickoff promote apply` form -- and it
+// takes NO --profile/--id/--*-path flags, because those are all derived from the
+// intake checkpoint (deriveIntakeFeatureId, INTAKE_STAGING_DIRNAME) rather than
+// caller-supplied. It calls applyOnboardingKickoffPromotion() directly (bypassing
+// the v4Inspection wrapper), so its expected output shape is this module's own
+// KICKOFF_PROMOTION_APPLY_SCHEMA, not "pipeline.project-onboarding.v4".
+function promotionApplyAction(onboardingScript, root, profile, featureId, planPath, prdPath, specPath, designInputPath, planSha256, runner, coordinatorSourced = false) {
+  if (coordinatorSourced) {
+    return planBoundApplyAction(
+      onboardingScript,
+      ["bootstrap-bind-apply"],
+      ["--root", root],
+      runner,
+      planSha256,
+      KICKOFF_PROMOTION_APPLY_SCHEMA,
+    );
+  }
   return planBoundApplyAction(
     onboardingScript,
     ["kickoff", "promote", "apply"],
@@ -4197,6 +4245,11 @@ function promotionResult(plan, status, mutated, spawn = defaultGitSpawn) {
 }
 
 function validatePromotionPlan(plan) {
+  // Wave 4 onboarding coordinator, step 5 (design SSc.3): `plan.kickoff === null`
+  // marks a coordinator-sourced binding -- no kickoff predecessor exists by
+  // construction (SS0). This is an ADDITIVE alternative to the existing
+  // kickoff-sourced shape below, never a replacement or a loosening of it.
+  const coordinatorSourced = isObject(plan) && plan.kickoff === null;
   if (!exactKeys(plan, PROMOTION_PLAN_KEYS) || plan.schema !== KICKOFF_PROMOTION_PLAN_SCHEMA
     || !new Set(["local", "host-managed"]).has(plan.repositoryCapability)
     || !isAbsolute(plan.onboardingScript ?? "") || !SHA256_RE.test(plan.planSha256 ?? "")
@@ -4208,13 +4261,18 @@ function validatePromotionPlan(plan) {
     || !exactKeys(plan.authority.prd, new Set(["path", "sha256"]))
     || !exactKeys(plan.authority.spec, new Set(["path", "sha256"]))
     || !exactKeys(plan.authority.designInput, new Set(["path", "sha256"]))
-    || !exactKeys(plan.kickoff, new Set(["featureId", "transactionSha256", "stateSha256", "historySha256", "revision"]))
-    // `handover` and `cleanupBinding` are each independently optional: a promotion
-    // applied before either existed replays without it, so all four combinations
-    // are admitted rather than enumerated as a growing list of literal key sets.
+    || !(coordinatorSourced
+      || exactKeys(plan.kickoff, new Set(["featureId", "transactionSha256", "stateSha256", "historySha256", "revision"])))
+    // `handover` and `cleanupBinding` are each independently optional for a
+    // kickoff-sourced plan (a promotion applied before either existed replays
+    // without it); a coordinator-sourced plan always carries a handover target
+    // (SSc.3: the binding IS the first write) and NEVER a cleanupBinding target
+    // (no prior kickoff session-cleanup binding exists to promote).
     || !isObject(plan.targets)
     || plan.targets.state === undefined || plan.targets.history === undefined
     || Object.keys(plan.targets).some((key) => !["state", "history", "handover", "cleanupBinding"].includes(key))
+    || (coordinatorSourced && plan.targets.handover === undefined)
+    || (coordinatorSourced && plan.targets.cleanupBinding !== undefined)
     || !exactKeys(plan.targets.state, PROMOTION_TARGET_KEYS.state)
     || !exactKeys(plan.targets.history, PROMOTION_TARGET_KEYS.history)
     || (plan.targets.handover !== undefined && (!exactKeys(plan.targets.handover, PROMOTION_TARGET_KEYS.handover)
@@ -4222,10 +4280,18 @@ function validatePromotionPlan(plan) {
       || !SHA256_RE.test(plan.targets.handover.afterSha256 ?? "")
       // An ABSENT handover is a legitimate preimage -- a project whose calibration
       // names a handover the kickoff never wrote -- so `null` is admitted here and
-      // nowhere else. Any other non-digest value is a malformed plan.
+      // nowhere else. Any other non-digest value is a malformed plan. A
+      // coordinator-sourced plan's handover is ALWAYS absent-before (no other
+      // shape is reachable under the absent-pristine precondition, SSc.3).
       || !(plan.targets.handover.beforeSha256 === null || SHA256_RE.test(plan.targets.handover.beforeSha256 ?? ""))
+      || (coordinatorSourced && plan.targets.handover.beforeSha256 !== null)
       || sha256(Buffer.from(plan.targets.handover.content, "utf8")) !== plan.targets.handover.afterSha256))
-    || (plan.targets.cleanupBinding !== undefined && !exactKeys(plan.targets.cleanupBinding, PROMOTION_TARGET_KEYS.cleanupBinding))) {
+    || (plan.targets.cleanupBinding !== undefined && !exactKeys(plan.targets.cleanupBinding, PROMOTION_TARGET_KEYS.cleanupBinding))
+    // A coordinator-sourced plan's state/history targets have no preimage at all
+    // (the four CAS targets are absent, SSc.3) -- `beforeSha256: null` marks that,
+    // in place of the kickoff-sourced shape's real prior-commit digest.
+    || (coordinatorSourced && (plan.targets.state.beforeSha256 !== null || plan.targets.history.beforeSha256 !== null))
+    || (!coordinatorSourced && !(SHA256_RE.test(plan.targets.state.beforeSha256 ?? "") && SHA256_RE.test(plan.targets.history.beforeSha256 ?? "")))) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion plan is not closed and valid");
   }
   if (plan.targets.handover !== undefined) {
@@ -4248,11 +4314,18 @@ function validatePromotionPlan(plan) {
   const root = physicalRoot(plan.root);
   const selected = authorityPaths(root);
   if (root !== plan.root || plan.targets.state.path !== selected.state
-    || plan.targets.history.path !== HISTORY_BASENAME
-    || ![plan.authority.prd.sha256, plan.authority.spec.sha256, plan.authority.designInput.sha256, plan.kickoff.transactionSha256,
-      plan.kickoff.stateSha256, plan.kickoff.historySha256, plan.targets.state.beforeSha256,
-      plan.targets.state.afterSha256, plan.targets.history.beforeSha256, plan.targets.history.afterSha256]
-      .every((value) => SHA256_RE.test(value ?? ""))) {
+    || plan.targets.history.path !== HISTORY_BASENAME) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion plan bindings are invalid");
+  }
+  if (coordinatorSourced) {
+    if (![plan.authority.prd.sha256, plan.authority.spec.sha256, plan.authority.designInput.sha256,
+      plan.targets.state.afterSha256, plan.targets.history.afterSha256].every((value) => SHA256_RE.test(value ?? ""))) {
+      fail("KICKOFF-PROMOTION-PLAN", "coordinator-sourced promotion plan bindings are invalid");
+    }
+  } else if (![plan.authority.prd.sha256, plan.authority.spec.sha256, plan.authority.designInput.sha256, plan.kickoff.transactionSha256,
+    plan.kickoff.stateSha256, plan.kickoff.historySha256, plan.targets.state.beforeSha256,
+    plan.targets.state.afterSha256, plan.targets.history.beforeSha256, plan.targets.history.afterSha256]
+    .every((value) => SHA256_RE.test(value ?? ""))) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion plan bindings are invalid");
   }
   const state = plan.targets.state.value;
@@ -4266,16 +4339,37 @@ function validatePromotionPlan(plan) {
     || state.continuity.authority.prd.sha256 !== plan.authority.prd.sha256
     || state.continuity.authority.spec.path !== input.specPath
     || state.continuity.authority.spec.sha256 !== plan.authority.spec.sha256
-    || !Number.isSafeInteger(plan.kickoff.revision)
+    || !validateContinuityState(state.continuity, input.featureId).ok) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion continuity postimage is invalid");
+  }
+  if (coordinatorSourced) {
+    if (state.continuity.revision !== 0 || state.continuity.resume.mode !== "resume-on-next-turn"
+      || state.continuity.resume.sourceRevision !== 0) {
+      fail("KICKOFF-PROMOTION-PLAN", "coordinator-sourced continuity postimage is invalid");
+    }
+  } else if (!Number.isSafeInteger(plan.kickoff.revision)
     || ![0, 1].includes(plan.kickoff.revision)
     || state.continuity.revision !== plan.kickoff.revision + 1
-    || state.continuity.resume.sourceRevision !== state.continuity.revision
-    || !validateContinuityState(state.continuity, input.featureId).ok) {
+    || state.continuity.resume.sourceRevision !== state.continuity.revision) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion continuity postimage is invalid");
   }
   validateHistory(plan.targets.history.value);
   const history = plan.targets.history.value.transactions;
-  if (history.length !== 2 || history[1].kind !== "kickoff-promotion"
+  if (coordinatorSourced) {
+    if (history.length !== 1 || history[0].kind !== "bootstrap-binding"
+      || history[0].transactionSha256 !== plan.transactionSha256
+      || history[0].profile !== plan.profile
+      || history[0].featureId !== input.featureId
+      || history[0].planPath !== input.planPath
+      || history[0].specPath !== input.specPath
+      || history[0].prdSha256 !== plan.authority.prd.sha256
+      || history[0].specSha256 !== plan.authority.spec.sha256
+      || history[0].designInputPath !== input.designInputPath
+      || history[0].designInputSha256 !== plan.authority.designInput.sha256
+      || history[0].afterStateSha256 !== plan.targets.state.afterSha256) {
+      fail("KICKOFF-PROMOTION-PLAN", "coordinator-sourced promotion history postimage is invalid");
+    }
+  } else if (history.length !== 2 || history[1].kind !== "kickoff-promotion"
     || plan.kickoff.stateSha256 !== plan.targets.state.beforeSha256
     || plan.kickoff.historySha256 !== plan.targets.history.beforeSha256
     || history[0].transactionSha256 !== plan.kickoff.transactionSha256
@@ -4294,29 +4388,33 @@ function validatePromotionPlan(plan) {
     || history[1].afterStateSha256 !== plan.targets.state.afterSha256) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion history postimage is invalid");
   }
-  const cleanupBinding = plan.targets.cleanupBinding ?? null;
-  if ((plan.kickoff.revision === 1) !== (cleanupBinding !== null)
-    || (cleanupBinding !== null && (!SHA256_RE.test(cleanupBinding.beforeSha256)
-      || !SHA256_RE.test(cleanupBinding.afterSha256)
-      || canonicalJson(history[1].cleanupBinding) !== canonicalJson(cleanupBinding)))) {
-    fail("KICKOFF-PROMOTION-PLAN", "promotion private cleanup binding target is invalid");
+  if (!coordinatorSourced) {
+    const cleanupBinding = plan.targets.cleanupBinding ?? null;
+    if ((plan.kickoff.revision === 1) !== (cleanupBinding !== null)
+      || (cleanupBinding !== null && (!SHA256_RE.test(cleanupBinding.beforeSha256)
+        || !SHA256_RE.test(cleanupBinding.afterSha256)
+        || canonicalJson(history[1].cleanupBinding) !== canonicalJson(cleanupBinding)))) {
+      fail("KICKOFF-PROMOTION-PLAN", "promotion private cleanup binding target is invalid");
+    }
   }
   const stateBytes = expectedStateBytes(state);
   const historyBytes = expectedHistoryBytes(plan.targets.history.value);
-  const kickoffHistoryBytes = expectedHistoryBytes({
-    schema: KICKOFF_HISTORY_SCHEMA,
-    transactions: [history[0]],
-  });
   if (sha256(stateBytes) !== plan.targets.state.afterSha256 || sha256(historyBytes) !== plan.targets.history.afterSha256) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion postimage digest is invalid");
   }
-  if (sha256(kickoffHistoryBytes) !== plan.targets.history.beforeSha256) {
-    fail("KICKOFF-PROMOTION-PLAN", "promotion kickoff history binding is invalid");
+  if (!coordinatorSourced) {
+    const kickoffHistoryBytes = expectedHistoryBytes({
+      schema: KICKOFF_HISTORY_SCHEMA,
+      transactions: [history[0]],
+    });
+    if (sha256(kickoffHistoryBytes) !== plan.targets.history.beforeSha256) {
+      fail("KICKOFF-PROMOTION-PLAN", "promotion kickoff history binding is invalid");
+    }
   }
   if (canonicalSha256(promotionBinding(plan)) !== plan.planSha256
     || canonicalJson(plan.applyAction) !== canonicalJson(promotionApplyAction(
       plan.onboardingScript, plan.root, input.profile, input.featureId, input.planPath,
-      input.prdPath, input.specPath, input.designInputPath, plan.planSha256, plan.runner,
+      input.prdPath, input.specPath, input.designInputPath, plan.planSha256, plan.runner, coordinatorSourced,
     ))) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion action binding is invalid");
   }
