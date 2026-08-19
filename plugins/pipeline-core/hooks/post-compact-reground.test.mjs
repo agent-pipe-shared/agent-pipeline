@@ -162,6 +162,49 @@ check("German runtime renders German without an inferred language", () => {
   assert.doesNotMatch(message, /Active duty|Validated continuity/);
 });
 
+check("extractLiveStateNarrative finds the top-of-file-to-heading boundary", () => {
+  const withHeading = "# Title\n\nLive paragraph one.\n\nLive paragraph two.\n\n## Archived history\n\n| Date | Summary |\n|---|---|\n";
+  const extracted = extractLiveStateNarrative(withHeading);
+  assert.equal(extracted, "# Title\n\nLive paragraph one.\n\nLive paragraph two.");
+  assert.equal(extracted.includes("Archived history"), false);
+  assert.equal(extracted.includes("Date | Summary"), false);
+
+  const withoutHeading = "# Title\n\nOnly live content, nothing archived yet.";
+  assert.equal(extractLiveStateNarrative(withoutHeading), withoutHeading);
+
+  for (const empty of ["", "   \n\n  ", null, undefined, 42]) {
+    assert.equal(extractLiveStateNarrative(empty), null);
+  }
+});
+
+check("loadStateNarrativeExcerptSafe fails closed on a missing path, never throws", () => {
+  const root = freshRoot("narrative-missing");
+  assert.doesNotThrow(() => {
+    assert.equal(loadStateNarrativeExcerptSafe(join(root, "docs", "state.md")), null);
+  });
+});
+
+check("decideOutput with rootDir embeds the docs/state.md live excerpt bilingually and respects the archive boundary", () => {
+  const root = freshRoot("narrative-e2e");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  const liveNarrative = "**Last updated:** today -- something happened.\n\nA live paragraph with real content.";
+  const archivedTail = "## Archived history\n\n| Date range | Summary | Archive |\n|---|---|---|\n| old | old stuff | old.md |\n";
+  writeFileSync(join(root, "docs", "state.md"), `# Project state\n\n${liveNarrative}\n\n${archivedTail}`);
+
+  const enResult = decideOutput({ source: "compact" }, outer(), { rootDir: root });
+  const enMessage = enResult.payload.systemMessage;
+  assert.ok(enMessage.includes("A live paragraph with real content."));
+  assert.equal(enMessage.includes("old stuff"), false);
+  assert.match(enMessage, /If anything above is unclear or looks incomplete, read docs\/state\.md directly before risking duplicate work\./);
+
+  const deValue = outer({ runtime: { humanFacingLanguage: "de", activeDuty: "Koordinator", sessionCleanup: null } });
+  const deResult = decideOutput({ source: "compact" }, deValue, { rootDir: root });
+  const deMessage = deResult.payload.systemMessage;
+  assert.ok(deMessage.includes("A live paragraph with real content."));
+  assert.equal(deMessage.includes("old stuff"), false);
+  assert.match(deMessage, /Falls hier etwas unklar ist oder unvollständig wirkt, lies docs\/state\.md direkt, bevor du doppelte Arbeit riskierst\./);
+});
+
 check("host payload mirrors deterministic context and exposes pure projection", () => {
   const decided = decideOutput({ source: "compact" }, outer());
   const parsed = JSON.parse(decided.stdout);
