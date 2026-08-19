@@ -42,7 +42,7 @@ function fixture({ items = [], events = [], evidenceFiles = [] } = {}) {
     const lines = Object.entries(meta).map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
     writeFileSync(
       join(base, "backlog", "items", item.name),
-      `---\n${lines.join("\n")}\n---\n\n# ${meta.id}\n\n## Description\n\nFixture body.\n`,
+      `---\n${lines.join("\n")}\n---\n\n# ${meta.id}\n\n## Description\n\nFixture body.\n${item.body ?? ""}`,
     );
   }
   // Committed as its own step, separate from the "fixture" commit above: the tool's
@@ -79,12 +79,13 @@ function fixture({ items = [], events = [], evidenceFiles = [] } = {}) {
   return { base, head };
 }
 
-const ITEM = (id, status, extra = {}) => ({
+const ITEM = (id, status, extra = {}, body = "") => ({
   name: `2026-07-01-${id}.md`,
   metadata: {
     id: `pipeline.${id}`, type: "defect", owner: "pipeline", status,
     created: "2026-07-01", source: "fixture", ...extra,
   },
+  body,
 });
 
 let passed = 0;
@@ -407,6 +408,51 @@ try {
     assert.equal(applied.ok, false);
     assert.equal(applied.wrote, false);
     assert.equal(readFileSync(join(base, "backlog", "transitions.ndjson"), "utf8"), before, "nothing is written when the item file's baseline containment cannot be confirmed");
+  });
+
+  check("RBL20 the generated index.json projects an item's own tracking value verbatim, and omits it when absent", () => {
+    const { base } = fixture({
+      items: [
+        ITEM("chi", "open", { tracking: "specs/foo/plan.md" }),
+        ITEM("psi", "open"),
+      ],
+    });
+    const result = applyBacklogReconciliation(base, { at: "2026-08-19" });
+    assert.equal(result.ok, true, result.findings.join("; "));
+    const index = JSON.parse(readFileSync(join(base, "backlog", "index.json"), "utf8"));
+    const chi = index.items.find((entry) => entry.id === "pipeline.chi");
+    const psi = index.items.find((entry) => entry.id === "pipeline.psi");
+    assert.equal(chi.tracking, "specs/foo/plan.md");
+    assert.equal(Object.hasOwn(psi, "tracking"), false, "an item with no tracking value must omit the field, never null/empty string");
+  });
+
+  check("RBL21 the generated index.json marks a Decision: deferred Triage item as deferred: true", () => {
+    const { base } = fixture({
+      items: [
+        ITEM("omega", "open", {}, "\n## Triage\n\n- **Decision:** deferred — owned by another sprint.\n"),
+      ],
+    });
+    const result = applyBacklogReconciliation(base, { at: "2026-08-19" });
+    assert.equal(result.ok, true, result.findings.join("; "));
+    const index = JSON.parse(readFileSync(join(base, "backlog", "index.json"), "utf8"));
+    const omega = index.items.find((entry) => entry.id === "pipeline.omega");
+    assert.equal(omega.deferred, true);
+  });
+
+  check("RBL22 an item with no Triage section, or a Triage Decision that is not deferred, projects deferred: false", () => {
+    const { base } = fixture({
+      items: [
+        ITEM("notriage", "open"),
+        ITEM("acceptedtriage", "open", {}, "\n## Triage\n\n- **Decision:** accepted — scheduled.\n"),
+      ],
+    });
+    const result = applyBacklogReconciliation(base, { at: "2026-08-19" });
+    assert.equal(result.ok, true, result.findings.join("; "));
+    const index = JSON.parse(readFileSync(join(base, "backlog", "index.json"), "utf8"));
+    const noTriage = index.items.find((entry) => entry.id === "pipeline.notriage");
+    const accepted = index.items.find((entry) => entry.id === "pipeline.acceptedtriage");
+    assert.equal(noTriage.deferred, false);
+    assert.equal(accepted.deferred, false);
   });
 
   console.log(`\n${passed} passed, ${failed} failed`);

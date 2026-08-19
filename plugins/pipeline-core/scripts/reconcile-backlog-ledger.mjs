@@ -87,7 +87,7 @@ function readItems(root) {
       findings.push(`${path}: no usable item id`);
       continue;
     }
-    items.push({ path, metadata: parsed.item.metadata });
+    items.push({ path, metadata: parsed.item.metadata, body: parsed.item.body });
   }
   return { items, findings };
 }
@@ -295,7 +295,7 @@ export function planBacklogReconciliation(root = DEFAULT_ROOT, { at = null, comm
     events: chain,
     items,
     projection: blocked.length === 0
-      ? projectBacklog(items.map((item) => ({ metadata: item.metadata })), chain)
+      ? projectBacklog(items.map((item) => ({ metadata: item.metadata, body: item.body })), chain)
       : null,
   };
 }
@@ -303,20 +303,31 @@ export function planBacklogReconciliation(root = DEFAULT_ROOT, { at = null, comm
 export function applyBacklogReconciliation(root = DEFAULT_ROOT, options = {}) {
   const plan = planBacklogReconciliation(root, options);
   if (!plan.ok) return { ...plan, wrote: false };
-  if (plan.planned.length === 0) return { ...plan, wrote: false };
-  // APPEND ONLY. Re-serialising the whole chain through canonicalJson would rewrite
-  // existing entries' BYTES (key order normalises), and an append-only hash-chained
-  // audit ledger must not have its history rewritten — the hashes would still verify,
-  // which is exactly what makes that failure mode quiet. It also invalidates every
-  // content-bound external reference into the file, e.g. the .gitleaksignore
-  // false-positive fingerprints, which bind path:rule:line:column.
-  const existing = existsSync(join(root, LEDGER_PATH)) ? readFileSync(join(root, LEDGER_PATH), "utf8") : "";
-  const appended = `${plan.planned.map((event) => canonicalJson(event)).join("\n")}\n`;
-  const targets = [
-    { path: LEDGER_PATH, after: existing.trim() === "" ? appended : `${existing.replace(/\n*$/u, "\n")}${appended}` },
-    { path: STATUS_PATH, after: plan.projection.statusText },
-    { path: INDEX_PATH, after: plan.projection.indexText },
-  ];
+  const targets = [];
+  if (plan.planned.length > 0) {
+    // APPEND ONLY. Re-serialising the whole chain through canonicalJson would rewrite
+    // existing entries' BYTES (key order normalises), and an append-only hash-chained
+    // audit ledger must not have its history rewritten — the hashes would still verify,
+    // which is exactly what makes that failure mode quiet. It also invalidates every
+    // content-bound external reference into the file, e.g. the .gitleaksignore
+    // false-positive fingerprints, which bind path:rule:line:column.
+    const existing = existsSync(join(root, LEDGER_PATH)) ? readFileSync(join(root, LEDGER_PATH), "utf8") : "";
+    const appended = `${plan.planned.map((event) => canonicalJson(event)).join("\n")}\n`;
+    targets.push({ path: LEDGER_PATH, after: existing.trim() === "" ? appended : `${existing.replace(/\n*$/u, "\n")}${appended}` });
+  }
+  // The projection files (STATUS.md/index.json) are regenerated whenever their
+  // deterministic bytes drift from what's on disk — not only when a new ledger
+  // event was appended. A projection-shape change (e.g. a new derived field)
+  // needs the exact same `--activate` path to bring already-in-sync items'
+  // generated files current, without inventing a ledger event that never
+  // happened.
+  if (plan.projection) {
+    const currentStatus = existsSync(join(root, STATUS_PATH)) ? readFileSync(join(root, STATUS_PATH), "utf8") : "";
+    if (currentStatus !== plan.projection.statusText) targets.push({ path: STATUS_PATH, after: plan.projection.statusText });
+    const currentIndex = existsSync(join(root, INDEX_PATH)) ? readFileSync(join(root, INDEX_PATH), "utf8") : "";
+    if (currentIndex !== plan.projection.indexText) targets.push({ path: INDEX_PATH, after: plan.projection.indexText });
+  }
+  if (targets.length === 0) return { ...plan, wrote: false };
   const journalPath = join(root, JOURNAL_PATH);
   const before = targets.map((target) => ({ path: target.path, before: readFileSync(join(root, target.path), "utf8") }));
   writeFileSync(journalPath, `${JSON.stringify({ schema: "pipeline.backlog-reconcile-transaction.v1", files: before })}\n`, { flag: "wx" });
@@ -347,9 +358,13 @@ if (isDirectInvocation(import.meta.url)) {
   }
   const byItem = new Map();
   for (const event of result.planned) byItem.set(event.id, (byItem.get(event.id) ?? 0) + 1);
-  console.log(result.planned.length === 0
-    ? "Backlog ledger already records every item's asserted status; nothing to reconcile."
-    : `${activate ? "Recorded" : "Would record"} ${result.planned.length} transition(s) across ${byItem.size} item(s).`);
+  if (result.planned.length === 0) {
+    console.log(activate && result.wrote
+      ? "Backlog ledger already records every item's asserted status; nothing to reconcile. The generated projections (STATUS.md/index.json) were refreshed to match current item data."
+      : "Backlog ledger already records every item's asserted status; nothing to reconcile.");
+  } else {
+    console.log(`${activate ? "Recorded" : "Would record"} ${result.planned.length} transition(s) across ${byItem.size} item(s).`);
+  }
   for (const [id, count] of [...byItem].sort()) console.log(`  ${id}: ${count} transition(s)`);
   process.exit(0);
 }

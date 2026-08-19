@@ -303,6 +303,30 @@ export function itemPreTriageContent(text) {
   return match ? text.slice(0, match.index) : text;
 }
 
+// Matches "Decision:" (optionally markdown-bolded) immediately followed by
+// "deferred", case-insensitively — the exact worked-example phrasing
+// convention documented in backlog/README.md's Triage rules
+// ("**Decision:** deferred — ...", see e.g.
+// backlog/items/2026-08-07-adr-0047-numbering-collision.md).
+const TRIAGE_DECISION_DEFERRED_PATTERN = /Decision:\**\s*deferred/iu;
+
+/**
+ * Derive the `deferred` projection field from an item's own `## Triage`
+ * section: true only when that section (and no other part of the file) has
+ * a `Decision:` line whose value contains "deferred". An item with no
+ * `## Triage` section, or a Triage section whose Decision does not read
+ * "deferred", is not deferred.
+ */
+export function isTriageDeferred(text) {
+  if (typeof text !== "string") return false;
+  const match = TRIAGE_HEADING_PATTERN.exec(text);
+  if (!match) return false;
+  const rest = text.slice(match.index);
+  const nextHeading = rest.slice(match[0].length).search(/^## /mu);
+  const section = nextHeading === -1 ? rest : rest.slice(0, match[0].length + nextHeading);
+  return TRIAGE_DECISION_DEFERRED_PATTERN.test(section);
+}
+
 /** Validate the closed, authority-bound evidence repair carried by v2 events. */
 export function validateBacklogEvidenceAmendment(evidence, { label = "evidence amendment", readDispositionBytes = null, authorizeAmendment = null } = {}) {
   const errors = [];
@@ -929,7 +953,7 @@ function markdownCell(value) {
 export function projectBacklog(items, events) {
   const ordered = [...items].sort((left, right) => left.metadata.id.localeCompare(right.metadata.id));
   const counts = Object.fromEntries(BACKLOG_STATUSES.map((status) => [status, 0]));
-  const projectedItems = ordered.map(({ metadata }) => {
+  const projectedItems = ordered.map(({ metadata, body }) => {
     counts[metadata.status] += 1;
     const output = {
       id: metadata.id,
@@ -938,6 +962,7 @@ export function projectBacklog(items, events) {
       owner: metadata.owner,
       created: metadata.created,
       source: metadata.source,
+      deferred: isTriageDeferred(body),
     };
     if (own(metadata, "tracking")) output.tracking = metadata.tracking;
     if (metadata.status === "closed") {
