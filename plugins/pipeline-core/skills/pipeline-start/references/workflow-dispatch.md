@@ -132,6 +132,30 @@ exact sequence (bare-agentType failure → blocked Edit attempt → futile
 scriptPath retry → successful corrected-inline-script retry) cost three
 attempts before landing.
 
+## Never trust a returned result — always check the worktree directly
+
+A Workflow run's own returned value (the `agent()` call's resolved result,
+the top-level `Workflow` tool result, a `TaskOutput` summary) is a claim, not
+evidence — treat it exactly like an untrusted subagent report, never as
+confirmation that work landed. This holds in BOTH directions, not just the
+empty-result case below: an agent can report success while nothing is
+committed, AND a truncated/empty-looking result can still sit on top of
+complete, correct, already-tested work in its worktree. Confirmed live
+2026-08-19: a 2-agent parallel Workflow round returned `["",""]` — both
+`agent()` calls resolved to the empty string, `agents_empty_result: 2` in
+the usage summary — yet both worktrees held substantial, mostly-correct
+diffs (one of the two also contained a real, independently-confirmed
+regression a pre-existing test caught only once the diff was actually run,
+not from reading the diff or trusting the report). The Elephant must
+NEVER decide a Workflow round's outcome from the tool result alone:
+after every `agent()`/Workflow completion — success-looking or not —
+run `git worktree list` to find the worktree(s), `git status --short` /
+`git diff` to see what is actually there, and run the DoD-specified test
+suites directly before doing anything else with the result (cherry-pick,
+close a backlog item, report to the PO). Silence or emptiness in the
+returned result is not evidence of "nothing happened" any more than a
+cheerful-sounding report is evidence that everything happened.
+
 ## Recovering a truncated dispatch
 
 Do not discard a truncated dispatch's work without first checking: `git
