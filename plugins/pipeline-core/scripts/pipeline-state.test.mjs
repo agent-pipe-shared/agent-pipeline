@@ -449,6 +449,10 @@ function invokeCaptured(argv, deps) {
   assert.equal(stateAfter.continuity.revision, 3, "the apply must bump continuity.revision");
   assert.equal(stateAfter.continuity.authority.prd.sha256, sha256Hex(Buffer.from(prdAfter, "utf8")),
     "the apply must rebind continuity.authority.prd.sha256 to the marker-carrying bytes");
+  // Critic F-A, 2026-08-19: the --by attribution must actually reach a
+  // persisted artifact, not only the ephemeral plan payload.
+  assert.deepEqual(stateAfter.poGateAcknowledgement, { by: "PO", at: plan.plannedAt },
+    "the apply must durably record who acknowledged and when");
 
   // Re-running the plan against the now-acknowledged PRD must refuse: the
   // marker is already present, and the route is one-shot per PRD.

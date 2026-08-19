@@ -4605,6 +4605,18 @@ function buildPoAuthorityAcknowledgePlan(dir, deps, existing, plannedAt = deps.n
   const nextState = structuredClone(state);
   nextState.continuity = nextContinuity;
   nextState.updatedAt = plannedAt;
+  // Critic finding F-A, 2026-08-19 (dispatch W4-CRITIC-2B round 2): --by was
+  // required and digest-bound (round-1 fix) but never reached a persisted
+  // artifact -- accepted at the CLI, then discarded. `planApproval` (the
+  // sibling attribution field for approve-plan/bind-plan-spec) is not
+  // reusable here: it does not exist yet at acknowledgement time (this route
+  // refuses if state.planApproved === true) and its own exactObjectKeys
+  // validator is closed to a fixed key set that predates this route. A new,
+  // separate top-level field records it durably instead -- `state` itself
+  // carries no exact-keys validator in this file (confirmed: only
+  // `state.schema` is checked at each call site, never the full key set),
+  // so this is additive, not a schema change to anything already validated.
+  nextState.poGateAcknowledgement = { by, at: plannedAt };
   if (nextState.gateEstimate !== undefined) return { ok: false, code: "PO-ACK-STATE" };
   const payload = {
     schema: PO_ACK_PLAN_SCHEMA,
