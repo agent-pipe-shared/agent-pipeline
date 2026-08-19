@@ -23,9 +23,20 @@
  *     --ttl-seconds <n> --reason <text> [--feature-id <id>] [--plan <path>] [--spec <path>]
  *   guard-maintenance-window.mjs install --repo-root <path> --request <path> \
  *     --proof <external-public-json> --plan <repo-path> --spec <repo-path> \
- *     [--authority <external-public-json>]
+ *     [--authority <external-public-json>] [--attribution-key-file <external-path>]
  *   guard-maintenance-window.mjs status --repo-root <path>
  *   guard-maintenance-window.mjs close --repo-root <path>
+ *
+ * PHX-WP-HAC11-D1-GMW-WIRING (design §5.4, Increment 2/D-1): `install` additionally,
+ * ONLY when `--attribution-key-file` is supplied, appends ONE restricted machine-local
+ * `pipeline.human-decision-attribution.v1` event carrying the free-text rationale and the
+ * verified signer's `{keyReference, publicKeySha256}` -- the two values §5.1 keeps out of
+ * the portable ledger entirely. This is additive enrichment, never a required part of
+ * install: absent the flag, behavior is byte-identical to before this change, and even
+ * when present, a failure appending the restricted record (bad key length, store error,
+ * anything) is caught and reported on a new `attribution` field on the returned value,
+ * never thrown, never unarming the window or masking `install`'s own success. `close`
+ * is unchanged -- §5.4 scopes D-1 to `install` only.
  *
  * PHX-WP-GMW-LEDGER-EMISSION (backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md,
  * PO decision 2026-08-18; design specs/sprint-phoenix-epic/design/gmw-hgo-evidence-intake-into-the-human-ledger.md
@@ -51,7 +62,8 @@
  */
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { resolve } from "node:path";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
 import { readPublicRepositoryFile } from "../lib/threat-model-approval-request.mjs";
@@ -63,14 +75,17 @@ import {
   installGuardMaintenanceWindow,
   prepareGuardMaintenanceWindowRequest,
 } from "../lib/guard-maintenance-window.mjs";
-import { canonicalSha256, parseStrictJson } from "../lib/governance-event.mjs";
+import { canonicalSha256, parseStrictJson, sealGovernanceEvent } from "../lib/governance-event.mjs";
+import { createRestrictedAuthorization, putRestrictedGovernanceEvent } from "../lib/governance-event-store.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
 import { appendHumanGovernanceDecision, queryHumanGovernanceDecisions } from "../lib/human-governance-ledger.mjs";
 import {
+  WINDOW_PACKAGE_ID,
   WINDOW_REASON_CODE_CLOSED,
   WINDOW_REASON_CODE_NOT_ARMED,
   buildAppendIntent,
+  buildWindowAttributionEvent,
   buildWindowGrantDecision,
   buildWindowRequestDecision,
   buildWindowRevocationDecision,
@@ -87,13 +102,13 @@ const DEFAULT_FEATURE_ID = "sprint-nova-epic";
 const DEFAULT_PLAN = "specs/sprint-nova-epic/prd_sprint-nova-epic.md";
 const DEFAULT_SPEC = "specs/sprint-nova-epic/spec.md";
 
-const usage = "Usage: guard-maintenance-window.mjs prepare --repo-root <path> --scope <ids> --ttl-seconds <n> --reason <text> [--feature-id <id>] [--plan <path>] [--spec <path>] | install --repo-root <path> --request <path> --proof <external-public-json> --plan <repo-path> --spec <repo-path> [--authority <external-public-json>] | status --repo-root <path> | close --repo-root <path>";
+const usage = "Usage: guard-maintenance-window.mjs prepare --repo-root <path> --scope <ids> --ttl-seconds <n> --reason <text> [--feature-id <id>] [--plan <path>] [--spec <path>] | install --repo-root <path> --request <path> --proof <external-public-json> --plan <repo-path> --spec <repo-path> [--authority <external-public-json>] [--attribution-key-file <external-path>] | status --repo-root <path> | close --repo-root <path>";
 
 export function parseArgs(argv) {
   const [command, ...tokens] = argv;
   const values = { command, repoRoot: process.cwd() };
   const supplied = new Set();
-  const known = new Set(["featureId", "plan", "spec", "repoRoot", "scope", "ttlSeconds", "reason", "request", "authority", "proof"]);
+  const known = new Set(["featureId", "plan", "spec", "repoRoot", "scope", "ttlSeconds", "reason", "request", "authority", "proof", "attributionKeyFile"]);
   for (let index = 0; index < tokens.length; index += 1) {
     const key = tokens[index];
     if (!key.startsWith("--")) return { error: usage };
@@ -118,6 +133,89 @@ function externalJson(repoRoot, path) {
   const source = resolve(path);
   if (source === root || source.startsWith(`${root}/`)) throw new Error("authority and proof must be supplied outside the repository");
   return JSON.parse(readFileSync(source, "utf8"));
+}
+
+// ---------------------------------------------------------------------------------
+// PHX-WP-HAC11-D1-GMW-WIRING: restricted attribution wiring (design §5.4, D-1).
+// ---------------------------------------------------------------------------------
+
+/** `path` must be supplied outside the repository — mirrors `externalJson`'s boundary discipline, but the restricted-zone key is raw bytes, never JSON. */
+function externalKeyFile(repoRoot, path) {
+  const root = resolve(repoRoot);
+  const source = resolve(path);
+  if (source === root || source.startsWith(`${root}/`)) throw new Error("attribution key file must be supplied outside the repository");
+  const bytes = readFileSync(source);
+  if (bytes.byteLength !== 32) {
+    const error = new Error("attribution key file must contain exactly 32 bytes");
+    error.code = "GMW-ATTRIBUTION-KEY-LENGTH";
+    throw error;
+  }
+  return bytes;
+}
+
+/** Pinned string; the restricted store's own `keyGeneration` shape check requires one, and there is no library default. */
+const ATTRIBUTION_KEY_GENERATION = "gmw-attribution-v1";
+
+// 180 days: design §5.4 states no library default exists for D-1 retention -- this is
+// this dispatch's own judgment call (PHX-WP-HAC11-D1-GMW-WIRING), documented in its
+// final report. Long enough that a later audit of a maintenance-window install still
+// finds the attribution record; short enough to respect the restricted zone's own
+// "erasable, machine-local, minimized" design intent (§3.4) rather than defaulting to
+// an effectively-unbounded retention.
+const ATTRIBUTION_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
+
+/**
+ * The restricted store's root: genuinely outside the repository (required by
+ * governance-event-store.mjs's GES-RESTRICTED-IN-REPOSITORY check), keyed by the
+ * authoritative repository fingerprint so distinct repositories never collide. No new
+ * CLI flag carries this path -- this briefing named only `--attribution-key-file` --
+ * so this mirrors the codebase's own existing outside-repo convention
+ * (external-push-ledger.mjs's `join(homedir(), ".pipeline", ...)`) rather than
+ * inventing a second one. Documented as a deviation in this dispatch's final report.
+ */
+function attributionStoreRoot(fingerprint) {
+  return join(homedir(), ".pipeline", "governance-restricted", "guard-maintenance-window", fingerprint);
+}
+
+/**
+ * Best-effort, fail-open enrichment (design §5.4). A failure here — bad key length,
+ * store error, encryption error, anything — must never fail `install`, never unarm the
+ * already-armed window, and never replace `install`'s own success return value; it is
+ * only ever surfaced on the returned `attribution` field, mirroring the `close` branch's
+ * own best-effort ledger try/catch shape elsewhere in this file.
+ */
+async function appendWindowAttribution({ repo, fingerprint, rationale, reasonCode, proof, nowMs, keyFilePath }) {
+  try {
+    const key = externalKeyFile(repo.primaryRoot, keyFilePath);
+    const draft = buildWindowAttributionEvent({
+      repositoryFingerprint: fingerprint,
+      packageId: WINDOW_PACKAGE_ID,
+      authorityClass: "product-owner",
+      reasonCode,
+      rationale,
+      // The verified signer identity, read rather than re-derived: `proof.keyReference`
+      // is the claim `verifyAgainstTrustAnchors` already matched, and
+      // sha256(proof.publicKey) is PROVABLY equal to the trust anchor's own verified
+      // `publicKeySha256` once `installGuardMaintenanceWindow` has already returned
+      // without throwing -- `verifyPoApprovalProof` (lib/po-approval-proof.mjs) requires
+      // exactly that equality to accept in every posture (empty or populated anchor set).
+      // This reads the already-verified value; it does not duplicate unverified logic.
+      keyReference: proof.keyReference,
+      publicKeySha256: sha256(proof.publicKey),
+      occurredAtEpochMs: nowMs,
+    });
+    const sealed = sealGovernanceEvent(draft);
+    const expiresAtEpochMs = nowMs + ATTRIBUTION_RETENTION_MS;
+    const storeRoot = attributionStoreRoot(fingerprint);
+    const authorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "put" });
+    const stored = await putRestrictedGovernanceEvent({
+      repositoryRoot: repo.primaryRoot, storeRoot, repositoryFingerprint: fingerprint,
+      authorization, key, keyGeneration: ATTRIBUTION_KEY_GENERATION, expiresAtEpochMs, event: sealed,
+    });
+    return { appended: true, recordId: stored.recordId, expiresAtEpochMs: stored.expiresAtEpochMs };
+  } catch (error) {
+    return { appended: false, code: error.code ?? "GMW-ATTRIBUTION-FAILED" };
+  }
 }
 
 // ---------------------------------------------------------------------------------
@@ -301,7 +399,20 @@ export async function run(argv = process.argv.slice(2)) {
       }
       throw error;
     }
-    return { ok: true, value: window, ledger };
+
+    // PHX-WP-HAC11-D1-GMW-WIRING (design §5.4): additive, best-effort, only when the
+    // flag is supplied. Runs AFTER installGuardMaintenanceWindow has already returned
+    // without throwing -- never before arming, never inside the fail-closed pre-arm
+    // block above.
+    let attribution = null;
+    if (args.attributionKeyFile) {
+      const grantReasonCode = justAppendedGrant !== null ? justAppendedGrant.decision.reasonCode : liveGrant.reasonCode;
+      attribution = await appendWindowAttribution({
+        repo, fingerprint, rationale: request?.subject?.reason, reasonCode: grantReasonCode,
+        proof, nowMs, keyFilePath: args.attributionKeyFile,
+      });
+    }
+    return { ok: true, value: window, ledger, attribution };
   }
 
   if (args.command === "status") {

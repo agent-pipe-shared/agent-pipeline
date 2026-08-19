@@ -20,13 +20,14 @@
  */
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { generateKeyPairSync, createHash, sign } from "node:crypto";
+import { generateKeyPairSync, createHash, randomBytes, sign } from "node:crypto";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
 import { canonicalizeJson } from "../lib/governance-event.mjs";
+import { createRestrictedAuthorization, queryRestrictedGovernanceEvent } from "../lib/governance-event-store.mjs";
 import { queryHumanGovernanceDecisions } from "../lib/human-governance-ledger.mjs";
 import { PO_APPROVAL_PROOF_SCHEMA } from "../lib/po-approval-proof.mjs";
 import { derivePoGateRepositoryFingerprint } from "../lib/po-gate-authority.mjs";
@@ -277,4 +278,109 @@ test("boundary: the emitted portable decisions never carry natural-person attrib
   assert.equal(asText.includes(root), false, "no absolute filesystem path leaks into the portable record");
 
   assert.deepEqual([...installed.ledger, closed.ledger.receipt].every((receipt) => receipt.outcome === "appended"), true);
+});
+
+// ---------------------------------------------------------------------------------
+// PHX-WP-HAC11-D1-GMW-WIRING: `install --attribution-key-file` restricted-zone wiring
+// (design §5.4, Increment 2/D-1). `os.homedir()` is dynamic per-call on Node (reads
+// $HOME each time), so pointing HOME at a fresh temp directory isolates each test's
+// restricted store without touching the real machine-local store.
+// ---------------------------------------------------------------------------------
+
+const ATTRIBUTION_STORE_SEGMENTS = [".pipeline", "governance-restricted", "guard-maintenance-window"];
+
+async function withIsolatedHome(fn) {
+  const home = await mkdtemp(path.join(os.tmpdir(), "gmw-attribution-home-"));
+  const previous = process.env.HOME;
+  process.env.HOME = home;
+  try { return await fn(home); }
+  finally {
+    if (previous === undefined) delete process.env.HOME; else process.env.HOME = previous;
+    await rm(home, { recursive: true, force: true });
+  }
+}
+
+test("install with --attribution-key-file appends exactly one restricted attribution record with no correlator", async (t) => {
+  await withIsolatedHome(async (home) => {
+    const { root, fingerprint, keys } = await fixture();
+    t.after(() => rm(root, { recursive: true, force: true }));
+    const { intent, request } = prepareRequest({ root });
+    const external = await mkdtemp(path.join(os.tmpdir(), "gmw-ledger-ext-"));
+    const requestPath = path.join(root, "request.json");
+    await writeFile(requestPath, JSON.stringify(request));
+    const proofPath = path.join(external, "proof.json");
+    await writeFile(proofPath, JSON.stringify(proofFor(keys, intent.sha256)));
+    const key = randomBytes(32);
+    const keyFilePath = path.join(external, "attribution.key");
+    await writeFile(keyFilePath, key);
+
+    const installed = await run([
+      "install", "--repo-root", root, "--request", requestPath, "--proof", proofPath,
+      "--plan", "plan.md", "--spec", "spec.md", "--attribution-key-file", keyFilePath,
+    ]);
+    assert.equal(installed.ok, true);
+    assert.equal(installed.value.status, "active");
+    assert.equal(installed.attribution.appended, true);
+    assert.equal(typeof installed.attribution.recordId, "string");
+
+    const storeRoot = path.join(home, ...ATTRIBUTION_STORE_SEGMENTS, fingerprint);
+    const authorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "query", recordId: installed.attribution.recordId });
+    const { event } = await queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot, repositoryFingerprint: fingerprint, authorization, key, recordId: installed.attribution.recordId });
+    assert.equal(event.payloadSchema, "pipeline.human-decision-attribution.v1");
+    assert.equal(event.storageProfile, "restricted-machine-local");
+    assert.equal(event.eventId.startsWith("evt-attribution-"), true, "a fresh random id, never derived from the portable decisionId");
+    assert.equal(event.idempotencyKey.startsWith("attribution-"), true);
+    assert.equal(event.candidate.state, "omitted-by-policy");
+    assert.equal(event.correlation.requestId.state, "omitted-by-policy");
+
+    const payload = event.payload;
+    assert.deepEqual(Object.keys(payload).sort(), ["authorityClass", "identityAssurance", "keyReference", "packageId", "publicKeySha256", "rationale", "reasonCode", "schema", "timeBucketEpochMs"]);
+    assert.equal(payload.rationale, FREE_TEXT_REASON, "rationale matches subject.reason verbatim");
+    assert.equal(payload.packageId, "guard-maintenance-window");
+    assert.equal(payload.authorityClass, "product-owner");
+    assert.equal(payload.identityAssurance, "locally-attributed");
+    assert.equal(Object.hasOwn(payload, "decisionId"), false);
+    assert.equal(payload.timeBucketEpochMs % (24 * 60 * 60 * 1000), 0, "day-bucketed, never an exact timestamp");
+
+    const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: root, repositoryFingerprint: fingerprint });
+    const granted = decisions.find((entry) => entry.event === "granted");
+    assert.notEqual(event.eventId, `evt-${granted.decisionId}`);
+    assert.notEqual(event.idempotencyKey, granted.decisionId);
+  });
+});
+
+test("install without --attribution-key-file: unchanged behavior, no restricted-store interaction", async (t) => {
+  const { root, keys } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const { installed } = await installedWindow({ root, keys });
+  assert.equal(installed.ok, true);
+  assert.equal(installed.value.status, "active");
+  assert.equal(installed.attribution, null);
+  assert.equal(installed.ledger.length, 2);
+});
+
+test("install with a corrupt/wrong-length attribution key file: install still succeeds, attribution reports failure", async (t) => {
+  const { root, fingerprint, keys } = await fixture();
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const { intent, request } = prepareRequest({ root });
+  const external = await mkdtemp(path.join(os.tmpdir(), "gmw-ledger-ext-"));
+  const requestPath = path.join(root, "request.json");
+  await writeFile(requestPath, JSON.stringify(request));
+  const proofPath = path.join(external, "proof.json");
+  await writeFile(proofPath, JSON.stringify(proofFor(keys, intent.sha256)));
+  const keyFilePath = path.join(external, "attribution.key");
+  await writeFile(keyFilePath, randomBytes(31)); // wrong length, never a real secret
+
+  const installed = await run([
+    "install", "--repo-root", root, "--request", requestPath, "--proof", proofPath,
+    "--plan", "plan.md", "--spec", "spec.md", "--attribution-key-file", keyFilePath,
+  ]);
+  assert.equal(installed.ok, true);
+  assert.equal(installed.value.status, "active", "the window still arms");
+  assert.equal(installed.ledger.length, 2, "the portable ledger is still appended");
+  assert.equal(installed.attribution.appended, false);
+  assert.equal(installed.attribution.code, "GMW-ATTRIBUTION-KEY-LENGTH");
+
+  const { decisions } = await queryHumanGovernanceDecisions({ repositoryRoot: root, repositoryFingerprint: fingerprint });
+  assert.equal(decisions.length, 2, "no extra/partial ledger side effect from the failed attribution append");
 });
