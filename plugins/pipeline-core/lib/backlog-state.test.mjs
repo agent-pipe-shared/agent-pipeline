@@ -11,6 +11,8 @@ import { fileURLToPath } from "node:url";
 import {
   BACKLOG_TYPES,
   EVIDENCE_AMENDMENT_SCHEMA,
+  ITEM_HASH_AMENDMENT_KIND,
+  ITEM_HASH_AMENDMENT_TARGETS,
   ITEM_SCHEMA,
   PRE_PUBLIC_CORE_REACHABILITY_KIND,
   PRE_PUBLIC_CORE_REACHABILITY_TARGETS,
@@ -24,10 +26,12 @@ import {
   planBacklogReachabilityRepair,
   planBacklogTransition,
   planElephantAfkLedgerRepair,
+  planItemHashAmendment,
   planManagedOnboardingLedgerRepair,
   planPrePublicCoreReachabilityRepair,
   projectBacklog,
   renderBacklogItem,
+  resolveItemHashAmendmentOverlay,
   transitionHash,
   validateBacklogEvidenceAmendment,
   validateBacklogItem,
@@ -39,10 +43,12 @@ import {
   applyBacklogEvidenceAmendment,
   applyBacklogTransition,
   applyElephantAfkLedgerRepair,
+  applyItemHashAmendment,
   applyManagedOnboardingLedgerRepair,
   applySentinelBacklogRecovery,
   applySentinelScopeExtension,
   checkBacklogState,
+  itemHashAmendmentFindings,
   loadBacklogState,
   planSentinelBacklogRecovery,
   planSentinelScopeExtension,
@@ -1296,6 +1302,267 @@ function managedRepairInput(root, overrides = {}) {
   check("BS26 a second pre-public-core reachability repair run is refused rather than appending duplicates",
     !duplicateRejected.ok && duplicateRejected.errors.some((error) => error.includes("already appended")),
     duplicateRejected.errors.join("; "));
+}
+
+/**
+ * PHX-WP-LEDGER-AMENDMENT-KIND: item-hash-amendment repairs ledger event 41's
+ * (the managed-onboarding genesis event) stale itemSha256 binding via one
+ * appended, hash-chained event -- never by rewriting event 41's own bytes.
+ * ITEM_HASH_AMENDMENT_TARGETS pins the real event 41's exact entryHash, so
+ * (like BS12's reachability fixture) any pure-function test against that
+ * authorized target must replay the REAL historical prefix; there is no way
+ * to fabricate a synthetic chain that reproduces a fixed SHA-256 entryHash.
+ * Mirrors BS12's own historicalItems derivation so planItemHashAmendment's
+ * internal validateTransitionLedger call sees every id the 41-event prefix
+ * references, not just the target's.
+ */
+function historicalManagedOnboardingFixture() {
+  const canonical = loadBacklogState(process.cwd(), { checkCommit: false });
+  const historicalEvents = canonical.events.slice(0, 41);
+  const terminalById = new Map();
+  for (const evt of historicalEvents) terminalById.set(evt.id, evt);
+  const historicalItems = canonical.items
+    .filter((entry) => terminalById.has(entry.metadata.id))
+    .map((entry) => {
+      const terminal = terminalById.get(entry.metadata.id);
+      const metadata = { ...entry.metadata, status: terminal.to };
+      if (terminal.to === "closed") {
+        const closure = [...historicalEvents].reverse().find((evt) => evt.id === terminal.id && evt.evidence?.kind !== "reachability-amendment");
+        metadata.closure_commit = closure.evidence.commit;
+        metadata.closure_evidence = closure.evidence.reference;
+      } else {
+        for (const key of ["closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]) delete metadata[key];
+      }
+      return { ...entry, metadata };
+    });
+  return { historicalEvents, historicalItems };
+}
+const MANAGED_ONBOARDING_TARGET = "backlog/items/2026-07-25-managed-onboarding-success-contract.md";
+
+{
+  // (a) A correctly repaired stale itemSha256: planning succeeds, the
+  // genesis event's own bytes stay untouched (its recorded itemSha256 is
+  // still the original, stale one), and the overlay now carries the
+  // corrected binding. A second application attempt is refused.
+  const { historicalEvents, historicalItems } = historicalManagedOnboardingFixture();
+  const genesisEvent = historicalEvents[40];
+  const currentBytes = readFileSync(join(process.cwd(), MANAGED_ONBOARDING_TARGET));
+  const currentSha256 = createHash("sha256").update(currentBytes).digest("hex");
+  const input = {
+    at: "2026-08-19",
+    actor: "hotfix-phx-ledger-itemsha256-repair",
+    commit: "1a685d26f6839928193c69e5d6ee04d170491827",
+    supersedesSequence: 41,
+    itemSha256: currentSha256,
+  };
+  const planned = planItemHashAmendment(historicalItems, historicalEvents, input);
+  const repaired = planned.ok ? [...historicalEvents, planned.event] : historicalEvents;
+  const overlay = resolveItemHashAmendmentOverlay(repaired);
+  const rejectedReplay = planItemHashAmendment(historicalItems, repaired, input);
+  check("BS29 item hash amendment repairs event 41's stale itemSha256 without rewriting it, and replay is refused",
+    planned.ok
+      && planned.event.sequence === 42
+      && planned.event.previousHash === historicalEvents.at(-1).entryHash
+      && planned.event.from === planned.event.to
+      && genesisEvent.entryHash === "48d371f383d42919d565cdb3caab6e4f51ba9803d1fbbfd29c0e44339fe32a5e"
+      && genesisEvent.evidence.itemSha256 !== currentSha256
+      && overlay.get(41) === currentSha256
+      && !rejectedReplay.ok
+      && rejectedReplay.errors.some((error) => error.includes("already appended")),
+    [...planned.errors, ...rejectedReplay.errors].join("; "));
+}
+
+{
+  // (b) Hash-chain integrity end-to-end: a tampered amendment (wrong target
+  // binding, or a broken previousHash chain) is refused and contributes no
+  // overlay; with no amendment at all, the original stale binding still
+  // applies unchanged.
+  const { historicalEvents, historicalItems } = historicalManagedOnboardingFixture();
+  const currentSha256 = createHash("sha256").update(readFileSync(join(process.cwd(), MANAGED_ONBOARDING_TARGET))).digest("hex");
+  const input = {
+    at: "2026-08-19",
+    actor: "hotfix-phx-ledger-itemsha256-repair",
+    commit: "1a685d26f6839928193c69e5d6ee04d170491827",
+    supersedesSequence: 41,
+    itemSha256: currentSha256,
+  };
+  const planned = planItemHashAmendment(historicalItems, historicalEvents, input);
+
+  const noAmendmentOverlay = resolveItemHashAmendmentOverlay(historicalEvents);
+  const noAmendmentStillStale = !noAmendmentOverlay.has(41);
+
+  const wrongTarget = structuredClone(planned.event);
+  wrongTarget.evidence.supersedesEntryHash = "f".repeat(64);
+  wrongTarget.entryHash = transitionHash(wrongTarget);
+  const wrongTargetLedger = [...historicalEvents, wrongTarget];
+  const wrongTargetErrors = validateTransitionLedger(wrongTargetLedger, historicalItems);
+  const wrongTargetOverlay = resolveItemHashAmendmentOverlay(wrongTargetLedger);
+
+  const brokenChain = structuredClone(planned.event);
+  brokenChain.previousHash = "a".repeat(64);
+  const brokenChainErrors = validateTransitionLedger([...historicalEvents, brokenChain], historicalItems);
+
+  check("BS30 a tampered or missing item hash amendment never silently repairs the stale binding",
+    planned.ok
+      && noAmendmentStillStale
+      && wrongTargetErrors.some((error) => error.includes("does not bind the authorized historical event"))
+      && !wrongTargetOverlay.has(41)
+      && brokenChainErrors.some((error) => error.includes("previousHash does not bind the preceding ledger event")),
+    [...planned.errors, ...wrongTargetErrors, ...brokenChainErrors].join("; "));
+}
+
+{
+  // (c) An amendment can never launder undetected real content drift: even a
+  // structurally valid, git-provenance-bound amendment only supersedes the
+  // RECORDED hash the live check compares current bytes against -- it never
+  // removes that comparison. Wired through the actual script entrypoint
+  // (checkBacklogState -> loadBacklogState), not a re-implementation of its
+  // logic, so this exercises the real consulted-overlay code path.
+  const { historicalEvents, historicalItems } = historicalManagedOnboardingFixture();
+  const root = fixtureRoot();
+  const amendedBytes = readFileSync(join(process.cwd(), MANAGED_ONBOARDING_TARGET));
+  const amendedSha256 = createHash("sha256").update(amendedBytes).digest("hex");
+  // Only the ONE item this check actually cares about is written to the
+  // fixture root's disk; the other 35 ids referenced by the historical
+  // prefix are intentionally absent (each contributes its own unrelated
+  // "id does not name a current backlog item" noise finding, ignored by
+  // the targeted assertion below). planItemHashAmendment itself still needs
+  // the FULL historicalItems set so its own internal validateTransitionLedger
+  // call does not itself fail on that same unrelated noise.
+  write(root, MANAGED_ONBOARDING_TARGET, amendedBytes);
+  git(root, ["init", "-q"]);
+  git(root, ["add", MANAGED_ONBOARDING_TARGET]);
+  git(root, ["-c", "user.email=tests@example.invalid", "-c", "user.name=Pipeline Tests", "commit", "-qm", "amendment fixture"]);
+  const amendmentCommit = git(root, ["rev-parse", "HEAD"]);
+  const input = {
+    at: "2026-08-19",
+    actor: "hotfix-phx-ledger-itemsha256-repair",
+    commit: amendmentCommit,
+    supersedesSequence: 41,
+    itemSha256: amendedSha256,
+  };
+  const planned = planItemHashAmendment(historicalItems, historicalEvents, input);
+  const repairedLedger = [...historicalEvents, planned.event];
+  write(root, "backlog/transitions.ndjson", `${repairedLedger.map((evt) => JSON.stringify(evt)).join("\n")}\n`);
+
+  const bound = checkBacklogState(root, { checkCommit: false });
+  const staleFinding = "ledger event 41: itemSha256 does not bind the current item bytes";
+
+  // Further, undetected drift after the amendment: working-tree bytes no
+  // longer match what the (still structurally and provenance-valid)
+  // amendment claims. The amendment's own commit/provenance is untouched.
+  write(root, MANAGED_ONBOARDING_TARGET, Buffer.concat([amendedBytes, Buffer.from("\ntampered\n")]));
+  const drifted = checkBacklogState(root, { checkCommit: false });
+
+  check("BS31 an item hash amendment supersedes only the recorded hash; undetected further drift still fails the live check",
+    planned.ok
+      && !bound.findings.includes(staleFinding)
+      && drifted.findings.includes(staleFinding),
+    [`BOUND: ${bound.findings.join("; ")}`, `DRIFTED: ${drifted.findings.join("; ")}`].join(" | "));
+}
+
+{
+  // itemHashAmendmentFindings mirrors reachabilityAmendmentFindings (BS22):
+  // the amendment's claimed commit must actually contain content hashing to
+  // its claimed itemSha256, and its reference must exist.
+  const root = fixtureRoot();
+  const reference = "backlog/items/example.md";
+  const bytes = Buffer.from("status: open\n");
+  write(root, reference, bytes);
+  git(root, ["init", "-q"]);
+  git(root, ["add", reference]);
+  git(root, ["-c", "user.email=tests@example.invalid", "-c", "user.name=Pipeline Tests", "commit", "-qm", "fixture"]);
+  const commit = git(root, ["rev-parse", "HEAD"]);
+  const validEvent = { sequence: 2, evidence: { kind: ITEM_HASH_AMENDMENT_KIND, commit, reference, itemSha256: createHash("sha256").update(bytes).digest("hex") } };
+  const tamperedEvent = { sequence: 2, evidence: { ...validEvent.evidence, itemSha256: createHash("sha256").update("wrong").digest("hex") } };
+  const missingEvent = { sequence: 2, evidence: { ...validEvent.evidence, reference: "backlog/items/missing.md" } };
+  check("BS33 item hash amendment provenance binds the claimed commit content to itemSha256",
+    itemHashAmendmentFindings(root, validEvent).length === 0
+      && itemHashAmendmentFindings(root, tamperedEvent).some((finding) => finding.includes("itemSha256 does not bind the claimed amendment commit"))
+      && itemHashAmendmentFindings(root, missingEvent).some((finding) => finding.includes("reference is missing")),
+    [...itemHashAmendmentFindings(root, tamperedEvent), ...itemHashAmendmentFindings(root, missingEvent)].join("; "));
+}
+
+{
+  // applyItemHashAmendment guards: refuses without the checker's exact
+  // stale-binding finding present, and refuses a supersedesSequence outside
+  // the frozen ITEM_HASH_AMENDMENT_TARGETS registry -- no ledger mutation in
+  // either case.
+  const root = fixtureRoot();
+  const other = item();
+  write(root, "backlog/items/example.md", renderBacklogItem(other));
+  write(root, "backlog/transitions.ndjson", `${canonicalJson(event())}\n`);
+  writeBacklogProjections(root, { checkCommit: false });
+  const before = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const rejectedNoFinding = applyItemHashAmendment(root, { at: "2026-08-19", actor: "hotfix-phx-ledger-itemsha256-repair", commit: "a".repeat(40), supersedesSequence: 41, itemSha256: "b".repeat(64) }, { checkCommit: false });
+  const unauthorizedTarget = Number.isSafeInteger(41) && !Object.keys(ITEM_HASH_AMENDMENT_TARGETS).map(Number).includes(999) ? 999 : 998;
+  const rejectedUnauthorizedTarget = applyItemHashAmendment(root, { at: "2026-08-19", actor: "hotfix-phx-ledger-itemsha256-repair", commit: "a".repeat(40), supersedesSequence: unauthorizedTarget, itemSha256: "b".repeat(64) }, { checkCommit: false });
+  check("BS32 item hash amendment apply refuses without its exact stale-binding finding and refuses an unauthorized target",
+    !rejectedNoFinding.ok && !rejectedUnauthorizedTarget.ok
+      && rejectedNoFinding.findings.some((finding) => finding.includes("nothing else about that target unexpected"))
+      && rejectedUnauthorizedTarget.findings.some((finding) => finding.includes("nothing else about that target unexpected"))
+      && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8") === before,
+    [...rejectedNoFinding.findings, ...rejectedUnauthorizedTarget.findings].join("; "));
+}
+
+{
+  // BS34: the target-scoped precondition tolerates unrelated, pre-existing
+  // noise elsewhere in the ledger (a busy, concurrently-dispatched shared
+  // repo) but still refuses outright if applying the plan would leave the
+  // target's own finding unresolved. Uses a status-consistent rendering of
+  // the target item (matching what the truncated 41-event history itself
+  // implies -- "open") rather than the live repo's current, further-evolved
+  // status, so this fixture's own item/ledger pair is internally
+  // self-consistent and the noise stays confined to the unrelated item.
+  const { historicalEvents, historicalItems } = historicalManagedOnboardingFixture();
+  const managedSnapshot = historicalItems.find((entry) => entry.metadata.id === MANAGED_REPAIR_ID);
+  const amendedBytes = Buffer.from(renderBacklogItem(managedSnapshot));
+  const amendedSha256 = createHash("sha256").update(amendedBytes).digest("hex");
+  const root = fixtureRoot();
+  write(root, MANAGED_ONBOARDING_TARGET, amendedBytes);
+  // Unrelated noise: a second, totally independent item with its own,
+  // unrelated defect (an invalid closure_commit), simulating another
+  // dispatch's out-of-scope breakage landing concurrently.
+  const noisyItem = item({ id: "pipeline.unrelated-noise", status: "closed", closed_at: "2026-08-19", closure_repository: "self", closure_commit: "not-an-oid", closure_evidence: "backlog/items/example.md" });
+  noisyItem.path = "backlog/items/unrelated-noise.md";
+  write(root, noisyItem.path, renderBacklogItem(noisyItem));
+  git(root, ["init", "-q"]);
+  git(root, ["add", MANAGED_ONBOARDING_TARGET]);
+  git(root, ["-c", "user.email=tests@example.invalid", "-c", "user.name=Pipeline Tests", "commit", "-qm", "amendment fixture"]);
+  const amendmentCommit = git(root, ["rev-parse", "HEAD"]);
+  write(root, "backlog/transitions.ndjson", `${historicalEvents.map((evt) => JSON.stringify(evt)).join("\n")}\n`);
+  const input = {
+    at: "2026-08-19",
+    actor: "hotfix-phx-ledger-itemsha256-repair",
+    commit: amendmentCommit,
+    supersedesSequence: 41,
+    itemSha256: amendedSha256,
+  };
+  const applied = applyItemHashAmendment(root, input, { checkCommit: false });
+  const afterApply = checkBacklogState(root, { checkCommit: false });
+  const staleFinding = "ledger event 41: itemSha256 does not bind the current item bytes";
+  const unrelatedFinding = "backlog/items/unrelated-noise.md: closure_commit must be a full lowercase Git commit OID";
+
+  // A plan that leaves the target's own finding unresolved (a wrong claimed
+  // itemSha256, so the live-bytes check still fails afterward) is refused,
+  // even though the same unrelated noise is present.
+  const rootTwo = fixtureRoot();
+  write(rootTwo, MANAGED_ONBOARDING_TARGET, amendedBytes);
+  write(rootTwo, noisyItem.path, renderBacklogItem(noisyItem));
+  git(rootTwo, ["init", "-q"]);
+  git(rootTwo, ["add", MANAGED_ONBOARDING_TARGET]);
+  git(rootTwo, ["-c", "user.email=tests@example.invalid", "-c", "user.name=Pipeline Tests", "commit", "-qm", "amendment fixture"]);
+  const commitTwo = git(rootTwo, ["rev-parse", "HEAD"]);
+  write(rootTwo, "backlog/transitions.ndjson", `${historicalEvents.map((evt) => JSON.stringify(evt)).join("\n")}\n`);
+  const wrongHashInput = { ...input, commit: commitTwo, itemSha256: "0".repeat(64) };
+  const rejectedWrongHash = applyItemHashAmendment(rootTwo, wrongHashInput, { checkCommit: false });
+
+  check("BS34 item hash amendment tolerates unrelated pre-existing noise but refuses a plan that leaves its own target unresolved",
+    applied.wrote && !applied.ok
+      && !afterApply.findings.includes(staleFinding)
+      && afterApply.findings.includes(unrelatedFinding)
+      && !rejectedWrongHash.ok && !rejectedWrongHash.wrote,
+    [...applied.findings, ...afterApply.findings, ...rejectedWrongHash.findings].join("; "));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

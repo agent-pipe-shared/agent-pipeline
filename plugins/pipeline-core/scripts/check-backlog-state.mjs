@@ -16,6 +16,8 @@ import { fileURLToPath } from "node:url";
 
 import {
   INDEX_SCHEMA,
+  ITEM_HASH_AMENDMENT_KIND,
+  ITEM_HASH_AMENDMENT_TARGETS,
   ITEM_SCHEMA,
   PRE_PUBLIC_CORE_REACHABILITY_KIND,
   PRE_PUBLIC_CORE_REACHABILITY_TARGETS,
@@ -29,10 +31,12 @@ import {
   planBacklogReachabilityRepair,
   planBacklogTransition,
   planElephantAfkLedgerRepair,
+  planItemHashAmendment,
   planManagedOnboardingLedgerRepair,
   planPrePublicCoreReachabilityRepair,
   projectBacklog,
   renderBacklogItem,
+  resolveItemHashAmendmentOverlay,
   transitionHash,
   validateProjectClosureReadback,
   validateSentinelRecoveryCatalog,
@@ -250,6 +254,29 @@ export function reachabilityAmendmentFindings(root, event) {
   return findings;
 }
 
+/**
+ * An item-hash-amendment's claimed commit must actually contain content
+ * hashing to the claimed itemSha256 -- provenance for the corrected binding,
+ * independent of whether current item bytes still match it (that live check
+ * happens separately, every run, in loadBacklogState).
+ */
+export function itemHashAmendmentFindings(root, event) {
+  const label = `ledger event ${event.sequence}`;
+  const reference = event?.evidence?.reference;
+  if (!regularFile(root, reference)) return [`${label}: item hash amendment reference is missing`];
+  const historical = spawnSync("git", ["show", `${event.evidence.commit}:${reference}`], {
+    cwd: root,
+    encoding: null,
+  });
+  const historicalSha = historical.status === 0
+    ? createHash("sha256").update(historical.stdout).digest("hex")
+    : null;
+  if (historicalSha !== event.evidence.itemSha256) {
+    return [`${label}: itemSha256 does not bind the claimed amendment commit`];
+  }
+  return [];
+}
+
 function atomicWrite(path, content) {
   const temporary = `${path}.tmp-${process.pid}`;
   writeFileSync(temporary, content, { flag: "wx" });
@@ -403,13 +430,24 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
     authorizeAmendment: authorizeAmendment ?? authorizeCanonicalEvidenceAmendment,
     authorizeOrdinaryEvidence: authorizeOrdinaryEvidence ?? ((input) => authorizeCanonicalOrdinaryEvidence(root, input)),
   }));
+  // A valid, registry-authorized item-hash-amendment event supersedes only
+  // the RECORDED itemSha256 a genesis event is compared against; it never
+  // skips the comparison itself. Current item bytes must still hash to
+  // exactly one value -- the amendment's, when present and valid, otherwise
+  // the genesis event's own -- so a later, undetected content drift past the
+  // amendment still fails this check (PHX-WP-LEDGER-AMENDMENT-KIND).
+  const itemHashOverlay = resolveItemHashAmendmentOverlay(ledger.events);
   for (const event of ledger.events) {
     if (event?.id === "pipeline.managed-onboarding-success-contract" && event?.evidence?.kind === "missing-initial-ledger-repair") {
       const bytes = itemBytes.get(event.id);
-      if (typeof bytes !== "string" || event.evidence.itemSha256 !== createHash("sha256").update(bytes).digest("hex")) findings.push(`ledger event ${event.sequence}: itemSha256 does not bind the current item bytes`);
+      const expectedItemSha256 = itemHashOverlay.get(event.sequence) ?? event.evidence.itemSha256;
+      if (typeof bytes !== "string" || expectedItemSha256 !== createHash("sha256").update(bytes).digest("hex")) findings.push(`ledger event ${event.sequence}: itemSha256 does not bind the current item bytes`);
     }
     if (event?.evidence?.kind === "reachability-amendment" || event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND) {
       findings.push(...reachabilityAmendmentFindings(root, event));
+    }
+    if (event?.evidence?.kind === ITEM_HASH_AMENDMENT_KIND) {
+      findings.push(...itemHashAmendmentFindings(root, event));
     }
   }
 
@@ -845,6 +883,58 @@ export function applyPrePublicCoreReachabilityRepair(root = DEFAULT_ROOT, input,
   return transaction.ok
     ? { ...current, ok: true, findings: [], wrote: true, transitions: planned.appended }
     : { ...current, ok: false, findings: transaction.findings, wrote: false, transitions: [] };
+}
+
+/**
+ * Repair exactly one authorized item-hash-amendment target (a genesis
+ * event's stale itemSha256 binding) through the common transaction journal.
+ *
+ * The precondition is scoped to the target, not to global repo cleanliness:
+ * it requires the target's own exact stale-binding finding to be the ONLY
+ * finding that mentions that target's ledger sequence, item id, or item
+ * reference, and refuses if the resulting plan introduces any new finding
+ * about that same target. Every sibling one-shot repair in this module
+ * instead requires the checker's ENTIRE finding set to be exactly one
+ * expected entry; on a live, continuously multi-dispatched shared ledger
+ * that stricter shape would make a narrowly authorized, independently
+ * verified repair hostage to unrelated, out-of-scope defects elsewhere in
+ * the backlog. Regenerating STATUS.md/index.json still requires the checker
+ * to be fully clean (matching loadBacklogState's own fail-closed contract
+ * for projections); when it is not, only the ledger event is written and
+ * the projections are left for a later, fully clean pass to regenerate
+ * (PHX-WP-LEDGER-AMENDMENT-KIND).
+ */
+export function applyItemHashAmendment(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const target = Number.isSafeInteger(input?.supersedesSequence) ? ITEM_HASH_AMENDMENT_TARGETS[input.supersedesSequence] : undefined;
+  const expectedFinding = target ? `ledger event ${input.supersedesSequence}: itemSha256 does not bind the current item bytes` : null;
+  const relatedToTarget = (finding) => target !== undefined
+    && (finding.startsWith(`ledger event ${input.supersedesSequence}:`) || finding.startsWith(`${target.reference}:`) || finding.includes(target.id));
+  const relatedFindings = current.findings.filter(relatedToTarget);
+  if (!expectedFinding || relatedFindings.length !== 1 || relatedFindings[0] !== expectedFinding) {
+    return { ...current, ok: false, findings: ["item hash amendment requires its target's exact stale-binding finding, with nothing else about that target unexpected", ...current.findings], wrote: false, transition: null };
+  }
+  if (options.checkCommit !== false && !localCommitExists(root, input?.commit)) {
+    return { ...current, ok: false, findings: ["item hash amendment commit is not reachable"], wrote: false, transition: null };
+  }
+  const planned = planItemHashAmendment(current.items, current.events, input);
+  if (!planned.event) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const newTargetFindings = planned.errors.filter((finding) => finding.startsWith(`ledger event ${planned.event.sequence}:`) || relatedToTarget(finding));
+  if (newTargetFindings.length > 0) {
+    return { ...current, ok: false, findings: ["item hash amendment plan introduced a new finding about its own target", ...newTargetFindings], wrote: false, transition: null };
+  }
+  const referenceFindings = itemHashAmendmentFindings(root, planned.event);
+  if (referenceFindings.length > 0) return { ...current, ok: false, findings: referenceFindings, wrote: false, transition: null };
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [{ path: LEDGER_PATH, after: `${ledgerBefore}${JSON.stringify(planned.event)}\n` }];
+  if (planned.projection) {
+    targets.push({ path: STATUS_PATH, after: planned.projection.statusText });
+    targets.push({ path: INDEX_PATH, after: planned.projection.indexText });
+  }
+  const transaction = writeBacklogTransaction(root, targets, options);
+  if (!transaction.ok) return { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+  const remaining = current.findings.filter((finding) => finding !== expectedFinding);
+  return { ...current, ok: remaining.length === 0, findings: remaining, wrote: true, transition: planned.event };
 }
 
 function cli() {

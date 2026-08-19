@@ -44,6 +44,7 @@ const CANONICAL_REPOSITORY_FILE_PATH = /^(?!\/)(?!.*\\)(?!.*\/\/)(?!.*\/$)(?!\.{
 const HASH = /^[a-f0-9]{64}$/u;
 const EVIDENCE_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "previousClosureCommit", "resultSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"]);
 const REACHABILITY_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "supersedesSequence", "supersedesEntryHash", "referenceBlobOid", "referenceSha256"]);
+const ITEM_HASH_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "supersedesSequence", "supersedesEntryHash", "itemSha256"]);
 const V2_EVIDENCE_AMENDMENT_KEYS = new Set(["schema", "kind", "targetSequence", "targetEntryHash", "targetCommit", "replacementCommit", "reference", "dispositionSha256", "idempotencyKey"]);
 const V2_ORDINARY_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "legacyStatus"]);
 const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
@@ -69,6 +70,25 @@ const REACHABILITY_REPAIR_TARGETS = Object.freeze({
 // ids (e.g. the licensing item) have more than one affected historical event.
 const PRE_PUBLIC_CORE_REACHABILITY_ACTOR = "hotfix-phx-ledger-reach-repair";
 export const PRE_PUBLIC_CORE_REACHABILITY_KIND = "pre-public-core-reachability-amendment";
+// Sibling to the two reachability registries above; a distinct amendment
+// kind for a distinct problem. Reachability amendments prove a historical
+// evidence.commit is still reachable without changing what it asserts. An
+// item-hash amendment instead supersedes a genesis event's own stale
+// itemSha256 binding after a LATER, legitimate content edit changed the
+// item's real bytes -- the genesis event's bytes and the hash chain are
+// never touched; only a new, appended event carries the corrected binding.
+// Frozen and keyed by physical sequence, exactly like
+// PRE_PUBLIC_CORE_REACHABILITY_TARGETS, so no caller-supplied sequence
+// outside this registry can ever be repaired (PHX-WP-LEDGER-AMENDMENT-KIND).
+const ITEM_HASH_AMENDMENT_ACTOR = "hotfix-phx-ledger-itemsha256-repair";
+export const ITEM_HASH_AMENDMENT_KIND = "item-hash-amendment";
+export const ITEM_HASH_AMENDMENT_TARGETS = Object.freeze({
+  41: Object.freeze({
+    id: MANAGED_ONBOARDING_REPAIR_ID,
+    entryHash: "48d371f383d42919d565cdb3caab6e4f51ba9803d1fbbfd29c0e44339fe32a5e",
+    reference: "backlog/items/2026-07-25-managed-onboarding-success-contract.md",
+  }),
+});
 export const PRE_PUBLIC_CORE_REACHABILITY_TARGETS = Object.freeze({
   1: Object.freeze({ id: "pipeline.closed-input-channel-review-economics", entryHash: "b1ccddfe9258d12d225776a6a19ce74439c46bfd996c64e3d4d3fe652d3017f6", status: "in_progress" }),
   2: Object.freeze({ id: "pipeline.critic-context-isolation", entryHash: "bef951e5f3ce086c33f9a52750e2fc454eb37563ae754cdfe1cf04a5a5915beb", status: "in_progress" }),
@@ -548,10 +568,12 @@ function validateTransitionShape(event, label, { readDispositionBytes = null, au
     && event?.evidence?.kind === "reachability-amendment";
   const prePublicCoreReachability = event.from === event.to
     && event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND;
+  const itemHashAmendment = event.from === event.to
+    && event?.evidence?.kind === ITEM_HASH_AMENDMENT_KIND;
   const v2Amendment = isV2EvidenceAmendment(event);
   const afkRepair = event.id === AFK_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
   const managedRepair = event.id === MANAGED_ONBOARDING_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
-  if (event.from === event.to && !amendment && !reachabilityAmendment && !prePublicCoreReachability) errors.push(`${label}: transition must change status`);
+  if (event.from === event.to && !amendment && !reachabilityAmendment && !prePublicCoreReachability && !itemHashAmendment) errors.push(`${label}: transition must change status`);
   if (!validDate(asString(event.at))) errors.push(`${label}: at must be an ISO calendar date`);
   if (!ITEM_ID.test(asString(event.actor))) errors.push(`${label}: actor must be a lowercase stable identifier`);
   if (asString(event.reason).trim().length === 0) errors.push(`${label}: reason must be non-empty`);
@@ -582,7 +604,9 @@ function validateTransitionShape(event, label, { readDispositionBytes = null, au
         ? REACHABILITY_AMENDMENT_KEYS
         : prePublicCoreReachability
           ? REACHABILITY_AMENDMENT_KEYS
-          : afkRepair
+          : itemHashAmendment
+            ? ITEM_HASH_AMENDMENT_KEYS
+            : afkRepair
           ? AFK_REPAIR_EVIDENCE_KEYS
           : managedRepair
             ? new Set(["kind", "commit", "reference", "itemSha256"])
@@ -641,6 +665,28 @@ function validateTransitionShape(event, label, { readDispositionBytes = null, au
       }
       if (target2 && event.evidence.supersedesEntryHash !== target2.entryHash) {
         errors.push(`${label}: reachability amendment does not bind the authorized historical event`);
+      }
+    }
+    if (itemHashAmendment) {
+      for (const key of ["supersedesSequence", "supersedesEntryHash", "itemSha256"]) {
+        if (!own(event.evidence, key)) errors.push(`${label}: item-hash-amendment is missing ${key}`);
+      }
+      if (!Number.isSafeInteger(event.evidence.supersedesSequence) || event.evidence.supersedesSequence < 1) {
+        errors.push(`${label}: supersedesSequence must be a positive integer`);
+      }
+      if (!HASH.test(asString(event.evidence.supersedesEntryHash))) errors.push(`${label}: supersedesEntryHash must be a SHA-256 hex digest`);
+      if (!HASH.test(asString(event.evidence.itemSha256))) errors.push(`${label}: itemSha256 must be a SHA-256 hex digest`);
+      const itemHashTarget = Number.isSafeInteger(event.evidence.supersedesSequence)
+        ? ITEM_HASH_AMENDMENT_TARGETS[event.evidence.supersedesSequence]
+        : undefined;
+      if (!itemHashTarget
+        || itemHashTarget.id !== event.id
+        || event.actor !== ITEM_HASH_AMENDMENT_ACTOR
+        || event.evidence.reference !== itemHashTarget.reference) {
+        errors.push(`${label}: item hash amendment is not an authorized target`);
+      }
+      if (itemHashTarget && event.evidence.supersedesEntryHash !== itemHashTarget.entryHash) {
+        errors.push(`${label}: item hash amendment does not bind the authorized historical event`);
       }
     }
     if (afkRepair && !HASH.test(asString(event.evidence.sourceSha256))) errors.push(`${label}: sourceSha256 must be a SHA-256 hex digest`);
@@ -762,6 +808,8 @@ export function validateTransitionLedger(events, items, { commitExists = null, r
         if (event.to !== prior) errors.push(`${label}: reachability amendment must preserve status`);
       } else if (event?.evidence?.kind === PRE_PUBLIC_CORE_REACHABILITY_KIND) {
         if (event.to !== prior) errors.push(`${label}: reachability amendment must preserve status`);
+      } else if (event?.evidence?.kind === ITEM_HASH_AMENDMENT_KIND) {
+        if (event.to !== prior) errors.push(`${label}: item hash amendment must preserve status`);
       } else if (!(FORWARD_TRANSITIONS[prior] ?? []).includes(event.to)) errors.push(`${label}: ${prior} may only move to ${(FORWARD_TRANSITIONS[prior] ?? []).join(" or ") || "no further status"}`);
     }
     if (BACKLOG_STATUSES.includes(event.to)) stateById.set(event.id, event.to);
@@ -1267,4 +1315,104 @@ export function planPrePublicCoreReachabilityRepair(items, events, input, { comm
 function exactPrePublicCoreReferenceKeys(value) {
   return Object.keys(value).sort().join("\n")
     === ["sequence", "reference", "referenceBlobOid", "referenceSha256"].sort().join("\n");
+}
+
+/**
+ * Resolve the itemSha256 override recorded by a valid item-hash-amendment
+ * event, keyed by the physical sequence of the genesis event it targets.
+ * Only a structurally sound, registry-authorized amendment whose superseded
+ * event still matches the frozen target (id, entryHash, reference) counts;
+ * a malformed, unauthorized, or mistargeted event contributes no override,
+ * so the caller's normal itemSha256 check against current item bytes still
+ * applies unchanged -- an amendment can never bypass that check, only
+ * supply the corrected hash it is compared against (PHX-WP-LEDGER-AMENDMENT-KIND).
+ */
+export function resolveItemHashAmendmentOverlay(events) {
+  const overlay = new Map();
+  if (!Array.isArray(events)) return overlay;
+  for (const event of events) {
+    if (event?.evidence?.kind !== ITEM_HASH_AMENDMENT_KIND) continue;
+    const evidence = event.evidence;
+    const target = Number.isSafeInteger(evidence.supersedesSequence)
+      ? ITEM_HASH_AMENDMENT_TARGETS[evidence.supersedesSequence]
+      : undefined;
+    const superseded = Number.isSafeInteger(evidence.supersedesSequence)
+      ? events[evidence.supersedesSequence - 1]
+      : undefined;
+    if (!target
+      || target.id !== event.id
+      || event.from !== event.to
+      || event.actor !== ITEM_HASH_AMENDMENT_ACTOR
+      || evidence.reference !== target.reference
+      || evidence.supersedesEntryHash !== target.entryHash
+      || !HASH.test(asString(evidence.itemSha256))
+      || superseded?.id !== event.id
+      || superseded?.entryHash !== target.entryHash
+      || superseded?.evidence?.reference !== evidence.reference) {
+      continue;
+    }
+    overlay.set(evidence.supersedesSequence, evidence.itemSha256);
+  }
+  return overlay;
+}
+
+/**
+ * Plan exactly one authorized item-hash-amendment event that supersedes a
+ * genesis event's stale itemSha256 binding after a later, legitimate item
+ * content edit. Mirrors planPrePublicCoreReachabilityRepair's shape: a
+ * frozen per-sequence target registry (ITEM_HASH_AMENDMENT_TARGETS) is the
+ * only source of authorized targets, so no caller-supplied sequence outside
+ * that registry can ever be repaired. The superseded event's own bytes and
+ * the hash chain are never touched; only a new, appended event carries the
+ * corrected binding.
+ */
+export function planItemHashAmendment(items, events, input) {
+  const errors = [];
+  const expectedKeys = ["at", "actor", "commit", "supersedesSequence", "itemSha256"];
+  if (!isPlainObject(input) || Object.keys(input).sort().join("\n") !== expectedKeys.sort().join("\n")) {
+    return { ok: false, errors: ["item hash amendment input shape is invalid"], items, events, projection: null };
+  }
+  if (input.actor !== ITEM_HASH_AMENDMENT_ACTOR || !validDate(asString(input.at))) {
+    errors.push("item hash amendment authority binding is invalid");
+  }
+  if (!OID.test(asString(input.commit))) errors.push("item hash amendment commit is invalid");
+  if (!HASH.test(asString(input.itemSha256))) errors.push("item hash amendment itemSha256 is invalid");
+  const target = Number.isSafeInteger(input.supersedesSequence) ? ITEM_HASH_AMENDMENT_TARGETS[input.supersedesSequence] : undefined;
+  if (!target) errors.push("item hash amendment target is not authorized");
+  if (events.some((event) => event?.evidence?.kind === ITEM_HASH_AMENDMENT_KIND && event?.evidence?.supersedesSequence === input.supersedesSequence)) {
+    errors.push("item hash amendment was already appended for this target");
+  }
+  const historical = target && Number.isSafeInteger(input.supersedesSequence) ? events[input.supersedesSequence - 1] : undefined;
+  if (target && (historical?.id !== target.id || historical?.entryHash !== target.entryHash || historical?.evidence?.reference !== target.reference)) {
+    errors.push("item hash amendment target does not bind canonical history");
+  }
+  const record = target ? items.find((entry) => entry?.metadata?.id === target.id) : undefined;
+  if (target && !record) errors.push("item hash amendment target item is missing");
+  if (errors.length) return { ok: false, errors, items, events, projection: null };
+
+  const status = record.metadata.status;
+  const event = {
+    schema: TRANSITION_SCHEMA,
+    sequence: events.length + 1,
+    id: target.id,
+    from: status,
+    to: status,
+    at: input.at,
+    actor: input.actor,
+    reason: `Supersede stale itemSha256 recorded by ledger event ${input.supersedesSequence} after a later, legitimate content edit; the earlier event's own bytes and the hash chain remain untouched.`,
+    evidence: {
+      kind: ITEM_HASH_AMENDMENT_KIND,
+      commit: input.commit,
+      reference: target.reference,
+      supersedesSequence: input.supersedesSequence,
+      supersedesEntryHash: target.entryHash,
+      itemSha256: input.itemSha256,
+    },
+    previousHash: events.at(-1)?.entryHash ?? null,
+    entryHash: "",
+  };
+  event.entryHash = transitionHash(event);
+  const nextEvents = [...events, event];
+  errors.push(...validateTransitionLedger(nextEvents, items));
+  return { ok: errors.length === 0, errors, items, events: nextEvents, event, projection: errors.length === 0 ? projectBacklog(items, nextEvents) : null };
 }
