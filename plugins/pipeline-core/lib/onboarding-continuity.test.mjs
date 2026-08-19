@@ -20,6 +20,7 @@ import {
   createPoGateProfileReceipt,
   derivePoGateRepositoryFingerprint,
   PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
+  poGateProfileProjectionPaths,
   poGateProfileReceiptPath,
   serializePoGateProfileReceipt,
   validatePoGateAuthority,
@@ -29,6 +30,8 @@ import { mkdtempTestScratch } from "./test-tmpdir.mjs";
 
 import {
   KICKOFF_FAULT_STAGES,
+  KICKOFF_PROMOTION_PLAN_SCHEMA,
+  KICKOFF_PROMOTION_APPLY_SCHEMA,
   INTAKE_CHECKPOINT_SCHEMA,
   INTAKE_CONSENT_APPLY_SCHEMA,
   INTAKE_CAPTURE_APPLY_SCHEMA,
@@ -36,6 +39,8 @@ import {
   INTAKE_GENERATE_PLAN_SCHEMA,
   INTAKE_GENERATE_APPLY_SCHEMA,
   INTAKE_STAGING_DIRNAME,
+  applyOnboardingBootstrapBind,
+  planOnboardingBootstrapBind,
   applyOnboardingContinuityRepair,
   applyOnboardingIntakeCapture,
   applyOnboardingIntakeConsent,
@@ -2082,13 +2087,21 @@ function publishPoGateProfile(root) {
   const gitCommonDir = join(root, ".git");
   writeFileSync(join(root, "pipeline.user.yaml"),
     "schema: pipeline.user.v1\nlanguage:\n  human_facing: en\n  agent_facing: en\n");
-  writeFileSync(join(root, ".claude", "pipeline.yaml"),
-    "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n");
+  // Layout-aware: `resolveProjectAuthorityPaths` (via poGateProfileProjectionPaths)
+  // resolves the runtime manifest to `.claude/pipeline.yaml` for a legacy fixture
+  // and `project/pipeline.yaml` for a neutral one -- writing unconditionally to
+  // `.claude/pipeline.yaml` left a neutral-layout caller's receipt bound to bytes
+  // `validatePoGateAuthority`'s own readProjection() never reads back, which
+  // resolves as PO-PROFILE-RECEIPT-STALE rather than a real profile mismatch.
+  const { manifest } = poGateProfileProjectionPaths(root);
+  const manifestAbsolute = join(root, manifest);
+  mkdirSync(dirname(manifestAbsolute), { recursive: true });
+  writeFileSync(manifestAbsolute, "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\n");
   const receipt = createPoGateProfileReceipt({
     repositoryFingerprint: derivePoGateRepositoryFingerprint({ gitCommonDir, primaryRoot: root }),
     primaryRoot: root,
     sourceBytes: readFileSync(join(root, "pipeline.user.yaml")),
-    runtimeBytes: readFileSync(join(root, ".claude", "pipeline.yaml")),
+    runtimeBytes: readFileSync(manifestAbsolute),
     updatedAt: "2026-08-08T00:00:00.000Z",
   });
   const path = poGateProfileReceiptPath(gitCommonDir);
@@ -3037,5 +3050,124 @@ for (const key of INTAKE_GENERATE_STAGING_KEYS) {
     });
   }
 }
+
+// Wave 4 onboarding coordinator, step 5 (design SSa.5 point 5, SSc.3,
+// NVA-W5-COORD-STEP5-1). bootstrap-bind-plan/bootstrap-bind-apply: the thin
+// adapter over planOnboardingKickoffPromotion/applyOnboardingKickoffPromotion
+// via the new coordinator-sourced ("no kickoff predecessor") branch.
+function bootstrapBindReadyRoot(name, { poLanguage = "en" } = {}) {
+  const root = readyToGenerateRoot(`bootstrap-bind-${name}`);
+  const generatePlan = planOnboardingIntakeGenerate({ rootDir: root });
+  applyOnboardingIntakeGenerate({ rootDir: root, expectedPlanSha256: generatePlan.planSha256, activate: true });
+  const prdAbsolute = join(root, generatePlan.targets.prd.path);
+  const specAbsolute = join(root, generatePlan.targets.spec.path);
+  const specBytes = readFileSync(specAbsolute);
+  // The staging PRD is an explicitly unreviewed draft (design SSa.4/SSc.3): it
+  // must be edited to carry the three PO-gate markers before binding, exactly
+  // as promotionSeed()'s own hand-authored PRD fixture does for the
+  // kickoff-sourced path above.
+  writeFileSync(prdAbsolute, [
+    `<!-- po-language: ${poLanguage} -->`,
+    `<!-- technical-spec-sha256: ${digest(specBytes)} -->`,
+    PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER,
+    readFileSync(prdAbsolute, "utf8"),
+  ].join("\n"));
+  return { root, featureId: generatePlan.featureId };
+}
+
+check("planOnboardingBootstrapBind / applyOnboardingBootstrapBind: happy path binds with no kickoff predecessor", () => {
+  const { root, featureId } = bootstrapBindReadyRoot("happy");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  assert.equal(plan.schema, KICKOFF_PROMOTION_PLAN_SCHEMA);
+  assert.equal(plan.kickoff, null);
+  assert.equal(plan.feature.id, featureId);
+  assert.equal(plan.targets.state.beforeSha256, null);
+  assert.equal(plan.targets.history.beforeSha256, null);
+  assert.equal(plan.targets.handover.beforeSha256, null);
+  assert.equal(plan.targets.cleanupBinding, undefined);
+  assert.equal(plan.targets.state.value.continuity.revision, 0);
+
+  const applied = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(applied.schema, KICKOFF_PROMOTION_APPLY_SCHEMA);
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.mutated, true);
+  assert.equal(applied.continuity.status, "valid");
+
+  const state = JSON.parse(readFileSync(join(root, plan.targets.state.path), "utf8"));
+  assert.equal(state.activeFeature.id, featureId);
+  assert.equal(state.activeFeature.planPath, plan.feature.planPath);
+  assert.equal(state.continuity.revision, 0);
+  assert.equal(existsSync(join(root, INTAKE_STAGING_DIRNAME)), true, "staging dir still exists post-bind (never removed by this transaction)");
+  const history = JSON.parse(readFileSync(promotionHistoryPath(root), "utf8"));
+  assert.equal(history.transactions.length, 1);
+  assert.equal(history.transactions[0].kind, "bootstrap-binding");
+  assert.equal(history.transactions[0].featureId, featureId);
+  assert.equal(readFileSync(join(root, plan.targets.handover.path), "utf8"), plan.targets.handover.content);
+});
+
+check("applyOnboardingBootstrapBind: a second apply against the same already-bound plan is a byte-null replay", () => {
+  const { root } = bootstrapBindReadyRoot("replay");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  // applyOnboardingBootstrapBind always reconstructs its own comparison plan
+  // via allowAppliedReplay: true (mirroring applyProjectOnboardingKickoffPromotionV4's
+  // convention), so a caller re-running apply with the ORIGINAL plan's digest --
+  // exactly what the CLI's own --plan-sha256 contract requires -- hits the
+  // internal exact-postimage fast path and returns a byte-null replay.
+  const replayed = applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  assert.equal(replayed.status, "replayed");
+  assert.equal(replayed.mutated, false);
+  assert.deepEqual(reconstructOnboardingKickoffPromotionPlan({
+    rootDir: root, profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
+    prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path, designInputPath: plan.authority.designInput.path,
+    coordinatorSourced: true,
+  }), plan);
+});
+
+check("planOnboardingBootstrapBind: requires an existing intake checkpoint", () => {
+  const root = fixture("bootstrap-bind-no-checkpoint", { neutral: true });
+  expectIntakeError("BOOTSTRAP-BIND-PRECONDITION", () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+check("planOnboardingBootstrapBind: refuses a checkpoint short of transactionState generated", () => {
+  const root = readyToGenerateRoot("bootstrap-bind-not-generated");
+  expectIntakeError("BOOTSTRAP-BIND-PRECONDITION", () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+check("planOnboardingBootstrapBind: refuses once already bound (not absent-pristine)", () => {
+  const { root } = bootstrapBindReadyRoot("already-bound");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  expectKickoffError("KICKOFF-PROMOTION-NOT-PRISTINE", () => planOnboardingBootstrapBind({ rootDir: root }));
+});
+
+check("applyOnboardingBootstrapBind: activation is required", () => {
+  const { root } = bootstrapBindReadyRoot("activation");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  expectKickoffError("BOOTSTRAP-BIND-ACTIVATION-REQUIRED", () => applyOnboardingBootstrapBind({
+    rootDir: root, expectedPlanSha256: plan.planSha256,
+  }));
+});
+
+// SSd point 1: the coordinator's generated planPath must satisfy the PO plan
+// gate's CURRENT contract -- the regression this design names explicitly
+// (backlog/items/2026-08-07-a-promoted-feature-can-never-pass-the-plan-gate.md),
+// prevented structurally by reusing applyOnboardingKickoffPromotion verbatim
+// rather than reimplementing a second binder that could re-diverge from it.
+check("a coordinator-sourced binding satisfies the PO plan gate's current contract (SSd point 1)", () => {
+  const { root } = bootstrapBindReadyRoot("po-gate");
+  const plan = planOnboardingBootstrapBind({ rootDir: root });
+  applyOnboardingBootstrapBind({ rootDir: root, expectedPlanSha256: plan.planSha256, activate: true });
+  const topology = publishPoGateProfile(root);
+  const authority = validatePoGateAuthority({
+    ...topology,
+    expectedPlanSha256: plan.authority.prd.sha256,
+    expectedSpecSha256: plan.authority.spec.sha256,
+  });
+  assert.equal(authority.ok, true, JSON.stringify(authority));
+  assert.equal(authority.code, "PO-GATE-AUTHORITY-VALID");
+  assert.equal(authority.value.planPath, plan.authority.prd.path);
+  assert.equal(authority.value.specPath, plan.authority.spec.path);
+});
 
 console.log(`${passed} onboarding continuity/kickoff checks passed.`);

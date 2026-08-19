@@ -4426,15 +4426,137 @@ function validatePromotionPlan(plan) {
   };
 }
 
+// Wave 4 onboarding coordinator, step 5 (design SSc.3/SSa.5 point 5). Builds the
+// "coordinator-sourced, no kickoff predecessor" plan variant: no recognisedKickoff
+// seed exists (SS0 -- the coordinator never writes a provisional kickoff at all),
+// so the four CAS targets (state/history/handover; cleanupBinding never applies)
+// are ABSENT rather than equal to a recognised kickoff's postimage. Mirrors
+// buildOnboardingKickoffPlan's own "nothing exists yet" precondition
+// (absent-pristine) and initialContinuity() helper -- the same "birth" shape,
+// reused rather than re-derived, applied here to the promotion transaction's
+// shape instead of the kickoff transaction's.
+function buildCoordinatorSourcedPromotionPlan({
+  input, observed, profile, runner, repositoryCapability, onboardingScript, allowAppliedReplay,
+}) {
+  const replay = allowAppliedReplay && observed.continuity.status === "valid";
+  if (observed.continuity.status !== "absent-pristine" && !replay) {
+    fail("KICKOFF-PROMOTION-NOT-PRISTINE", "coordinator-sourced binding is permitted only for absent-pristine continuity");
+  }
+  if (replay) {
+    const entries = observed.history?.transactions;
+    const entry = entries?.at(-1);
+    const authority = promotionArtifacts(observed.root, input, { checkMarkers: false });
+    if (entries?.length !== 1 || entry?.kind !== "bootstrap-binding"
+      || entry.profile !== input.profile || entry.featureId !== input.featureId
+      || entry.planPath !== input.planPath || entry.specPath !== input.specPath
+      || entry.prdSha256 !== authority.prd.sha256
+      || entry.specSha256 !== authority.spec.sha256 || entry.designInputPath !== input.designInputPath
+      || entry.designInputSha256 !== authority.designInput.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
+      || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
+      || observed.state?.continuity?.featureId !== input.featureId
+      || observed.state?.continuity?.authority?.prd?.sha256 !== authority.prd.sha256
+      || observed.state?.continuity?.authority?.spec?.sha256 !== authority.spec.sha256) {
+      fail("KICKOFF-PROMOTION-REPLAY", "coordinator-sourced binding replay does not match the exact completed postimage");
+    }
+    const binding = {
+      schema: KICKOFF_PROMOTION_PLAN_SCHEMA, root: observed.root, repositoryCapability, profile: input.profile,
+      feature: { id: input.featureId, planPath: input.planPath }, authority,
+      kickoff: null,
+      targets: {
+        state: { path: authorityPaths(observed.root).state, beforeSha256: null, afterSha256: observed.stateObservation.sha256, value: observed.state },
+        history: { path: HISTORY_BASENAME, beforeSha256: null, afterSha256: observed.historyObservation.sha256, value: observed.history },
+        handover: replayHandoverTarget(entry, input, authority),
+      },
+      transactionSha256: entry.transactionSha256, onboardingScript, runner,
+    };
+    const planSha256 = canonicalSha256(binding);
+    const plan = {
+      ...binding, planSha256,
+      applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner, true),
+    };
+    validatePromotionPlan(plan);
+    return plan;
+  }
+  const authority = promotionArtifacts(observed.root, input, { checkMarkers: !allowAppliedReplay });
+  const featureId = input.featureId;
+  const continuity = initialContinuity({
+    featureId, prdPath: authority.prd.path, prdSha256: authority.prd.sha256,
+    specPath: authority.spec.path, specSha256: authority.spec.sha256,
+    language: authority.poLanguage,
+  });
+  const next = {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: featureId, planPath: input.planPath, phase: "design" },
+    planApproved: false,
+    continuity,
+  };
+  const valid = validateContinuityState(next.continuity, featureId);
+  if (!valid.ok) fail("KICKOFF-PROMOTION-PLAN", `coordinator-sourced continuity was rejected (${valid.code})`);
+  const afterStateSha256 = sha256(expectedStateBytes(next));
+  const handoverContentBytes = promotionHandoverContent({
+    featureId, prdPath: authority.prd.path, specPath: authority.spec.path,
+    designInputPath: authority.designInput.path, profile: input.profile,
+  });
+  const handoverTarget = {
+    path: observed.handoverPath,
+    beforeSha256: null,
+    afterSha256: sha256(Buffer.from(handoverContentBytes, "utf8")),
+    content: handoverContentBytes,
+  };
+  const transaction = {
+    schema: "pipeline.codex-onboarding-bootstrap-binding-transaction.v1",
+    root: observed.root, repositoryCapability, profile: input.profile, feature: { id: featureId, planPath: input.planPath },
+    afterStateSha256,
+    prdSha256: authority.prd.sha256, specPath: authority.spec.path, specSha256: authority.spec.sha256,
+    designInputPath: authority.designInput.path, designInputSha256: authority.designInput.sha256,
+    handover: { path: handoverTarget.path, beforeSha256: handoverTarget.beforeSha256, afterSha256: handoverTarget.afterSha256 },
+  };
+  const transactionSha256 = canonicalSha256(transaction);
+  const history = {
+    schema: KICKOFF_HISTORY_SCHEMA,
+    transactions: [{
+      kind: "bootstrap-binding", transactionSha256,
+      profile: input.profile, featureId, planPath: input.planPath, specPath: input.specPath,
+      prdSha256: authority.prd.sha256, specSha256: authority.spec.sha256,
+      designInputPath: authority.designInput.path, designInputSha256: authority.designInput.sha256,
+      afterStateSha256,
+      handover: { path: handoverTarget.path, beforeSha256: handoverTarget.beforeSha256, afterSha256: handoverTarget.afterSha256 },
+    }],
+  };
+  const binding = {
+    schema: KICKOFF_PROMOTION_PLAN_SCHEMA, root: observed.root, repositoryCapability, profile: input.profile,
+    feature: { id: featureId, planPath: input.planPath }, authority,
+    kickoff: null,
+    targets: {
+      state: { path: authorityPaths(observed.root).state, beforeSha256: null, afterSha256: afterStateSha256, value: next },
+      history: { path: HISTORY_BASENAME, beforeSha256: null, afterSha256: sha256(expectedHistoryBytes(history)), value: history },
+      handover: handoverTarget,
+    },
+    transactionSha256, onboardingScript, runner,
+  };
+  const planSha256 = canonicalSha256(binding);
+  const plan = {
+    ...binding, planSha256,
+    applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, featureId, input.planPath, input.prdPath, input.specPath, input.designInputPath, planSha256, runner, true),
+  };
+  validatePromotionPlan(plan);
+  return plan;
+}
+
 function buildKickoffPromotionPlan({
   rootDir, profile, featureId, planPath, prdPath, specPath, designInputPath,
   runner = "codex",
   repositoryCapability = "local", onboardingScript = DEFAULT_ONBOARDING_SCRIPT,
-  spawn = defaultGitSpawn, allowAppliedReplay = false,
+  spawn = defaultGitSpawn, allowAppliedReplay = false, coordinatorSourced = false,
 } = {}) {
   if (!isAbsolute(onboardingScript)) fail("KICKOFF-PROMOTION-PLAN", "onboarding script must be absolute");
   const input = promotionInput({ profile, featureId, planPath, prdPath, specPath, designInputPath });
   const observed = observeDetailed({ rootDir, repositoryCapability, spawn });
+  if (coordinatorSourced) {
+    return buildCoordinatorSourcedPromotionPlan({
+      input, observed, profile: input.profile, runner, repositoryCapability, onboardingScript, allowAppliedReplay,
+    });
+  }
   if (observed.continuity.status !== "valid") fail("KICKOFF-PROMOTION-STATE", "promotion requires valid continuity");
   const kickoff = recognisedKickoff(observed, spawn);
   if (kickoff === null && allowAppliedReplay) {
@@ -5655,6 +5777,75 @@ export function applyOnboardingIntakeGenerate({
   };
 }
 
+// Wave 4 onboarding coordinator, step 5 (design SSa.5 point 5, SSc.3,
+// NVA-W5-COORD-STEP5-1). `bootstrap-bind-plan`/`bootstrap-bind-apply`: a thin
+// adapter over planOnboardingKickoffPromotion/applyOnboardingKickoffPromotion
+// (SS0's central choice -- the binder is reused near-verbatim, never
+// reimplemented). Every input (profile/featureId/planPath/prdPath/specPath/
+// designInputPath) is DERIVED from the already-durable intake checkpoint and
+// its step-4-generated staging paths -- never caller-supplied -- so the CLI
+// surface is `--root [--runner] [--plan-sha256] [--activate]` only, mirroring
+// intake-generate-plan/apply's own precedent rather than kickoff-promote's
+// wider --profile/--id/--*-path flag set.
+function resolveBootstrapBindInputs({ rootDir, repositoryCapability = "local", spawn = defaultGitSpawn } = {}) {
+  const observed = readOnboardingIntakeCheckpoint({ rootDir, repositoryCapability, spawn });
+  if (observed.status !== "present") {
+    fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires an existing intake checkpoint");
+  }
+  const checkpoint = observed.value;
+  if (checkpoint.transactionState !== "generated") {
+    fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires transactionState generated (run intake-generate-apply first)");
+  }
+  if (!PROMOTION_PROFILES.has(checkpoint.values.profile)) {
+    fail("BOOTSTRAP-BIND-PRECONDITION", "coordinator-sourced binding requires a profile already recorded on the checkpoint");
+  }
+  const featureId = deriveIntakeFeatureId(checkpoint);
+  const prdPath = `${INTAKE_STAGING_DIRNAME}/prd_${featureId}.md`;
+  const specPath = `${INTAKE_STAGING_DIRNAME}/spec.md`;
+  const designInputPath = `${INTAKE_STAGING_DIRNAME}/design-input.md`;
+  return {
+    root: observed.paths.root, profile: checkpoint.values.profile, featureId,
+    planPath: prdPath, prdPath, specPath, designInputPath,
+  };
+}
+
+export function planOnboardingBootstrapBind({
+  rootDir, runner = "codex", repositoryCapability = "local",
+  onboardingScript = DEFAULT_ONBOARDING_SCRIPT, spawn = defaultGitSpawn,
+} = {}) {
+  const resolved = resolveBootstrapBindInputs({ rootDir, repositoryCapability, spawn });
+  return buildKickoffPromotionPlan({
+    rootDir: resolved.root, profile: resolved.profile, featureId: resolved.featureId,
+    planPath: resolved.planPath, prdPath: resolved.prdPath, specPath: resolved.specPath,
+    designInputPath: resolved.designInputPath, runner, repositoryCapability, onboardingScript, spawn,
+    coordinatorSourced: true,
+  });
+}
+
+export function applyOnboardingBootstrapBind({
+  rootDir, repositoryCapability = "local", runner = "codex",
+  onboardingScript = DEFAULT_ONBOARDING_SCRIPT, expectedPlanSha256, activate = false, deps = {},
+} = {}) {
+  if (activate !== true) fail("BOOTSTRAP-BIND-ACTIVATION-REQUIRED", "coordinator-sourced binding apply requires explicit activation");
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const resolved = resolveBootstrapBindInputs({ rootDir, repositoryCapability, spawn });
+  // Mirrors applyProjectOnboardingKickoffPromotionV4's own convention exactly
+  // (lib/project-onboarding-v3.mjs): apply ALWAYS reconstructs its comparison
+  // plan with allowAppliedReplay: true, whether this is the first apply (falls
+  // through to the ordinary build path, admission deferred to the direct
+  // promotionArtifacts() call inside applyOnboardingKickoffPromotion itself) or
+  // a replay of an already-committed binding.
+  const plan = buildKickoffPromotionPlan({
+    rootDir: resolved.root, profile: resolved.profile, featureId: resolved.featureId,
+    planPath: resolved.planPath, prdPath: resolved.prdPath, specPath: resolved.specPath,
+    designInputPath: resolved.designInputPath, runner, repositoryCapability, onboardingScript, spawn,
+    coordinatorSourced: true, allowAppliedReplay: true,
+  });
+  return applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256, activate, deps: { ...deps, spawn },
+  });
+}
+
 function resultFromPersisted(plan, status, mutated, spawn = defaultGitSpawn) {
   const readback = projectReadContinuityStatus(readSanctionedState(plan.root));
   if (readback.code !== "CS-STATUS-ACTIVE" || readback.continuity.status !== "valid") {
@@ -6008,21 +6199,29 @@ export function applyOnboardingKickoffPromotion({
     const handoverBefore = plan.targets.handover === undefined
       ? { status: "exact" }
       : currentTarget(paths.handover, plan.targets.handover.beforeSha256);
-    const exactPreimage = stateBefore.status === "exact" && historyBefore.status === "exact"
-      && cleanupBindingBefore.status === "exact" && handoverBefore.status === "exact";
+    // Wave 4 onboarding coordinator, step 5 (design SSc.3): a coordinator-sourced
+    // plan (`plan.kickoff === null`) has NO preimage at all -- the "before" state
+    // of state/history/handover is genuinely absent, never a real prior digest, so
+    // `currentTarget`'s "absent" status is what a not-yet-written target looks
+    // like, in place of the kickoff-sourced shape's "exact" (matches a real
+    // committed prior digest). Kickoff-sourced behaviour is UNCHANGED: for it this
+    // reduces to exactly `before.status === "exact"`, the original expression.
+    const notYetWritten = (before) => (plan.kickoff === null ? before.status === "absent" : before.status === "exact");
+    const exactPreimage = notYetWritten(stateBefore) && notYetWritten(historyBefore)
+      && cleanupBindingBefore.status === "exact" && notYetWritten(handoverBefore);
     // The handover joins the recoverable prefix on the same terms as the cleanup
     // binding: either it already carries the postimage (this step completed before
     // the crash) or it still carries the preimage (it did not). Anything else is a
     // third party having written the file, which is drift and must not roll
     // forward over it.
-    const recoverPrefix = stateBefore.status === "exact" && history.status === "exact"
+    const recoverPrefix = notYetWritten(stateBefore) && history.status === "exact"
       && (cleanupBinding.status === "exact" || cleanupBindingBefore.status === "exact")
-      && (handover.status === "exact" || handoverBefore.status === "exact")
+      && (handover.status === "exact" || notYetWritten(handoverBefore))
       && stateLock.recovered === true && privateLock.recovered === true;
     if (!exactPreimage && !recoverPrefix) {
       fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion target preimage drifted");
     }
-    if (exactPreimage) {
+    if (exactPreimage && plan.kickoff !== null) {
       const observed = observeDetailed({ rootDir: plan.root, repositoryCapability: plan.repositoryCapability, spawn: deps.spawn ?? defaultGitSpawn });
       const seed = recognisedKickoff(observed, deps.spawn ?? defaultGitSpawn);
       if (seed === null) fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion kickoff seed drifted");
@@ -6038,7 +6237,7 @@ export function applyOnboardingKickoffPromotion({
     }
     const suffix = (deps.randomUUID ?? randomUUID)().replaceAll("-", "");
     if (!/^[a-f0-9]{32,64}$/iu.test(suffix)) fail("KICKOFF-PROMOTION-RANDOM-UNAVAILABLE", "promotion temporary-name source is invalid");
-    if (historyBefore.status === "exact") {
+    if (notYetWritten(historyBefore)) {
       const temp = join(dirname(paths.history), `.${HISTORY_BASENAME}.promotion-${suffix}.tmp`);
       writeExclusiveSynced(temp, bytes.historyBytes, 0o600);
       renameSync(temp, paths.history);
@@ -6070,7 +6269,7 @@ export function applyOnboardingKickoffPromotion({
     // not complete. The reverse order would leave a crash between them showing a
     // promoted State beside a handover still naming the kickoff, which is the
     // exact state this target exists to prevent.
-    if (plan.targets.handover !== undefined && handoverBefore.status === "exact") {
+    if (plan.targets.handover !== undefined && notYetWritten(handoverBefore)) {
       mkdirSync(dirname(paths.handover), { recursive: true });
       const handoverTemp = join(dirname(paths.handover), `.${basename(paths.handover)}.promotion-${suffix}.tmp`);
       writeExclusiveSynced(handoverTemp, bytes.handoverBytes, 0o644);
