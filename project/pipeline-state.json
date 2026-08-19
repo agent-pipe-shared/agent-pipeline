@@ -163,11 +163,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-        "sha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723"
+        "sha256": "81d0213b4c3c2f114d49bbebba4423515feef89b086152964eab7e489b1c32eb"
       },
       "spec": {
         "path": "specs/sprint-phoenix-epic/spec.md",
-        "sha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
+        "sha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f"
       },
       "result": null
     },
@@ -235,9 +235,9 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-phoenix-epic",
     "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-    "planSha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723",
+    "planSha256": "81d0213b4c3c2f114d49bbebba4423515feef89b086152964eab7e489b1c32eb",
     "specPath": "specs/sprint-phoenix-epic/spec.md",
-    "specSha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287",
+    "specSha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f",
     "profile": "epic",
     "profileSha256": "26494e6fbe5634bf4b7bbd698f5348b74f766bb3bcb715d926f5def107d50ba0",
     "submittedBy": "Elephant",
@@ -266,9 +266,9 @@
       "receiptSha256": "708c217f156dd2b00fdaca9071494fa0ee4e917ed17e00c1c1379ec583eb60c9",
       "repositoryFingerprint": "92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35",
       "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      "planSha256": "83051d18451ca64b85e1cc23ec8101eb46baa88513fceb3b5f444c8d96a61723",
+      "planSha256": "81d0213b4c3c2f114d49bbebba4423515feef89b086152964eab7e489b1c32eb",
       "specPath": "specs/sprint-phoenix-epic/spec.md",
-      "specSha256": "badebcb8fbc09334642c8c1465647934af9cad567dc71b2709da4dc1276b7287"
+      "specSha256": "5eeef75ccea0a49e512634d8ae8d899bee672e3635d7e9f461fc99b6f034ed5f"
     },
     "priorInvalidationSha256": "7ea3bf1823f41e25df7f7a4da8499eb6b5d58eb25d3adfcbf3392ce4fe3ac1f2"
   },
