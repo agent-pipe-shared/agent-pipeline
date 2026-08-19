@@ -129,57 +129,24 @@
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-devplan.test.mjs
  */
-import { existsSync, readFileSync } from "node:fs";
-import { createHash } from "node:crypto";
-import { dirname, join, relative, isAbsolute, posix, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { readFileSync } from "node:fs";
 
-import { loadManifest, gateConfig } from "../lib/manifest.mjs";
-import {
-  LEGACY_STATE,
-  NEUTRAL_STATE,
-  resolveProjectAuthorityPaths,
-  validatePortablePipelineState,
-} from "../lib/project-authority.mjs";
-import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
+import { devPlanGateVerdict } from "../lib/guard-devplan-policy.mjs";
 import { writeTargetPath } from "../lib/tool-write-target.mjs";
-import { DEFAULT_EXEMPT_PREFIXES } from "../lib/guard-devplan-policy.mjs";
 
-// The exempt prefixes, and the full reasoning for each, live in
-// `lib/guard-devplan-policy.mjs` so the shipped obligations reference can be
-// GENERATED from the same constant this gate enforces. It has to be a separate
-// module rather than an export here: this file is a hook SCRIPT that runs its
-// whole decision at import time and calls process.exit(), so a reader that
-// merely wants to know the policy cannot import it -- the importing process
-// dies. One owner, two readers, no hand-copied second list.
-
-// The plugin root this guard is itself running from -- same self-location resolution
-// guard-lifecycle-ready.mjs / guard-human-override.mjs already use (`resolve(dirname(
-// fileURLToPath(import.meta.url)), "..")`), reused rather than a second mechanism, so a
-// path this hook prints resolves inside a consumer's installed plugin, never a path
-// that exists only in this repository's own source checkout (backlog: 2026-08-08-
-// shipped-artifacts-assume-the-pipelines-own-repository.md).
-const PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-
-/**
- * Runnable reference to pipeline-state.mjs under the plugin actually enforcing this
- * guard. Degrades to a locate-it hint (never a broken path or an empty string) if the
- * script cannot be found under PLUGIN_ROOT.
- */
-function pipelineStateScriptRef() {
-  const script = join(PLUGIN_ROOT, "scripts", "pipeline-state.mjs");
-  return existsSync(script)
-    ? script
-    : "pipeline-state.mjs (locate it under your installed pipeline-core plugin's scripts directory)";
-}
+// The exempt prefixes, the full decision logic and the full reasoning for each step now
+// live in `lib/guard-devplan-policy.mjs` (`devPlanGateVerdict()`) so both this hook and the
+// shipped obligations reference can be GENERATED from / call the same one owner. It has to
+// be a separate module rather than logic inlined here: this file is a hook SCRIPT that
+// calls process.exit(), so a reader that merely wants to know or reuse the policy (e.g.
+// guard-lifecycle-ready.mjs's GUARD-DEVPLAN-SHELL, the Bash|PowerShell lane of this same
+// gate) cannot import a script that dies on import -- it imports the pure function instead.
+// One owner, two readers (three counting the obligations generator), no hand-copied second
+// copy of the decision.
 
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
   process.exit(code);
-}
-
-function normalize(p) {
-  return String(p ?? "").replace(/\\/g, "/").toLowerCase();
 }
 
 // ---- read tool input (fail-open) --------------------------------------------------
@@ -194,167 +161,8 @@ if (!filePath) process.exit(0);
 
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 
-// ---- resolve absolute file_path against the project root (C1 fix) ----------------
-// See header "ABSOLUTE PATHS AND THE PROJECT ROOT" for the full rationale.
-let relPath = filePath;
-if (isAbsolute(filePath)) {
-  const rel = relative(projectDir, filePath);
-  const relSlashes = rel.replace(/\\/g, "/");
-  const outsideRoot = rel === ".." || relSlashes.startsWith("../") || isAbsolute(rel);
-  if (outsideRoot) process.exit(0); // not this project's file -- allow unconditionally
-  relPath = rel;
-}
-// Collapse ".."/"." traversal segments BEFORE the prefix match (see header "TRAVERSAL
-// HARDENING"). No-op for a path already free of traversal segments. Slashify backslashes
-// FIRST, then collapse with POSIX semantics explicitly -- platform-native `path.normalize`
-// only treats "\" as a separator on win32; on POSIX hosts (e.g. Linux CI) a literal "\"
-// in the input is just an ordinary filename character to it, so a backslash-form traversal
-// like "docs\\..\\src\\foo.ts" would pass through UNCOLLAPSED and then wrongly match the
-// "docs/" exempt prefix once the later case-insensitive slash normalization runs. Using
-// `posix.normalize()` on an already-slashified string collapses "docs/../src/foo.ts" the
-// same way on every host OS.
-relPath = posix.normalize(relPath.replace(/\\/g, "/"));
-const normalizedPath = normalize(relPath);
-
-// ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
-// PO directive 2026-08-12: "scratch sollte immer zugelassen werden weil wie tmp pfad auch
-// wenn pipeline nicht ready ist muss scratch immer gehen" (backlog:
-// 2026-08-08-the-scratch-cleanup-mechanism-exists-but-no-event-calls-it.md). `scratch/`
-// must behave exactly like a host tmp path, so this is the same shape as the
-// outside-the-project-root allow above: exit 0 BEFORE the manifest and state are read at
-// all, not a late entry in a list.
-//
-// `scratch/` is also in DEFAULT_EXEMPT_PREFIXES below and stays there (that constant is the
-// single owner the shipped obligations reference is generated from). But the prefix list is
-// consulted at the very END of this hook -- after the manifest read, the state read, the
-// portable-State check and the plan/spec authority-immutability check, each of which can
-// decide first. A neutral State carrying a machine-local `sessionCleanup` binding, for one,
-// refuses EVERY write before the list is ever reached. Membership in that list therefore
-// made scratch/ *exempt*; it did not make it *unconditional*, and the difference is exactly
-// what a consumer hit when `Write(scratch/resume-card.json)` was refused in draft phase.
-//
-// Deliberately placed AFTER the traversal collapse above, never before it: `scratch/../src/
-// foo.ts` collapses to `src/foo.ts` first and is correctly NOT allowed here. The trailing
-// slash keeps the scope at "under `scratch/` at the project root" -- a file literally named
-// `scratch`, or a sibling `scratchpad/`, is unaffected. No other exemption is widened.
-// Tests: DP28/DP28b (unconditional) and DP29a-d (scope) in guard-devplan.test.mjs.
-if (normalizedPath.startsWith("scratch/")) process.exit(0);
-
-// ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
-const manifestResult = loadManifest(projectDir);
-if (manifestResult.status === "absent") process.exit(0);
-if (manifestResult.status === "invalid" && manifestResult.manifest === undefined) {
-  // Genuine YAML syntax failure -- the manifest could not even be parsed into a
-  // structure, so there is nothing to read a gate config off. See file header WARN.
-  const reason = manifestResult.errors?.[0]?.reason ?? "YAML error";
-  emit(1, [
-    `[guard-devplan] WARN: .claude/pipeline.yaml is not readable (${reason}).`,
-    `Dev-Plan gate is being skipped (fail-open) -- please repair the manifest file.`,
-  ]);
-}
-// status "ok", OR "invalid" with a structurally parsed manifest (schema/semantic
-// errors elsewhere -- e.g. an as-yet-unschematized exemptPaths field, see DEVIATION
-// NOTE above): still usable for this hook's own gate slice.
-const manifest = manifestResult.manifest;
-const gate = gateConfig(manifest, "dev-plan");
-if (!gate || gate.mode === "off") process.exit(0);
-
-// ---- state: activeFeature / planApproved (fail-open on absent, WARN on malformed) --
-const projectAuthority = resolveProjectAuthorityPaths({ rootDir: projectDir });
-const statePath = join(
-  projectDir,
-  projectAuthority.status === "ready"
-    ? projectAuthority.state
-    : (existsSync(join(projectDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE),
-);
-let stateRaw;
-try {
-  stateRaw = readFileSync(statePath, "utf8");
-} catch {
-  process.exit(0); // no state file at all -- fail-open
-}
-let state;
-try {
-  state = JSON.parse(stateRaw);
-} catch (e) {
-  emit(1, [
-    `[guard-devplan] WARN: ${statePath} contains invalid JSON (${e.message}).`,
-    `Dev-Plan gate is being skipped (fail-open) -- please repair the state file (rewrite only via ` +
-      `${pipelineStateScriptRef()}, never by hand).`,
-  ]);
-}
-
-const activeFeature = state && typeof state === "object" ? state.activeFeature : undefined;
-if (!activeFeature || typeof activeFeature !== "object" || typeof activeFeature.id !== "string" || activeFeature.id === "") {
-  process.exit(0); // no active feature -- nothing to enforce
-}
-
-if (statePath === join(projectDir, NEUTRAL_STATE)) {
-  const portability = validatePortablePipelineState(state);
-  if (!portability.ok) {
-    emit(gate.mode === "warn" ? 1 : 2, [
-      `[guard-devplan] ${gate.mode === "warn" ? "WARN" : "BLOCKED"}: neutral State contains private cleanup identity (${portability.code}).`,
-      "Repair through the sanctioned cleanup recovery transaction; direct State edits are not authority.",
-    ]);
-  }
-}
-
-function fileSha256(path) {
-  try { return createHash("sha256").update(readFileSync(resolve(projectDir, path))).digest("hex"); }
-  catch { return null; }
-}
-
-const submitted = state.planSubmission;
-const approvalAuthority = state.planApproval?.poGateAuthority;
-const planPath = typeof submitted?.planPath === "string"
-  ? submitted.planPath
-  : approvalAuthority?.planPath;
-const specPath = typeof submitted?.specPath === "string"
-  ? submitted.specPath
-  : approvalAuthority?.specPath;
-const lifecycle = derivePlanLifecycle(state, {
-  ...(typeof planPath === "string" ? { planSha256: fileSha256(planPath) } : {}),
-  ...(typeof specPath === "string" ? { specSha256: fileSha256(specPath) } : {}),
-});
-if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
-  process.exit(0);
-}
-
-// ---- exempt paths -------------------------------------------------------------------
-const exemptPrefixes = [...DEFAULT_EXEMPT_PREFIXES];
-if (lifecycle.status === "draft"
-  && typeof activeFeature.planPath === "string"
-  && activeFeature.planPath !== "") {
-  exemptPrefixes.push(activeFeature.planPath);
-}
-if (Array.isArray(gate.exemptPaths)) {
-  for (const p of gate.exemptPaths) if (typeof p === "string" && p !== "") exemptPrefixes.push(p);
-}
-
-const authoritativePaths = [planPath, specPath]
-  .filter((path) => typeof path === "string")
-  .map(normalize);
-const touchesAuthority = authoritativePaths.some((path) => normalizedPath === path);
-const isDraftAuthority = lifecycle.status === "draft" && touchesAuthority;
-const isExempt = isDraftAuthority
-  || (!touchesAuthority
-    && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix))));
-if (isExempt) process.exit(0);
-
-// ---- verdict --------------------------------------------------------------------------
-const lifecycleReason = lifecycle.nextAction === "reopen-design"
-  ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
-  : lifecycle.status === "awaiting-approval"
-    ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
-    : lifecycle.status === "approved"
-      ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
-      : "The feature is still in draft design and has no implementation authority.";
-const message = [
-  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" lifecycle is "${lifecycle.status ?? "invalid"}".`,
-  `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(no planPath recorded in state)"}`,
-  `File: ${filePath}`,
-  `Why: ${lifecycleReason}`,
-];
-
-if (gate.mode === "warn") emit(1, message);
-emit(2, message); // mode "blocking" (or any unrecognized non-"off" value -- errs safe)
+// ---- decide (pure), then translate the verdict into this hook's exit protocol -----
+const result = devPlanGateVerdict({ filePath, projectDir });
+if (result.verdict === "allow") process.exit(0);
+if (result.verdict === "warn") emit(1, [result.reason]);
+emit(2, [result.reason]); // verdict "block"
