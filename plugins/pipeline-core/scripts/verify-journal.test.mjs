@@ -265,6 +265,19 @@ test("ADR-0065 candidate (c): the real recovery-preview-attestation-tests regist
   assert.equal(registration.inputs.nonFiles.some((entry) => entry.kind.startsWith("declared-tree:")), false);
 });
 
+test("ADR-0065 candidate (c) continuation (NVA-W5-ADR65C-2): the real control-catalog-schema-tests registration declares exactly its own two files, never the repository root", () => {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const suiteFile = join(repoRoot, "plugins", "pipeline-core", "lib", "control-catalog-schema.test.mjs");
+  const [registration] = compileVerifySuites({ repoRoot, suites: [{ name: "control-catalog-schema-tests", file: suiteFile, dependsOn: [] }], candidateTree: "9".repeat(40) });
+  assert.deepEqual(registration.inputs.files.map((file) => file.path), [
+    "plugins/pipeline-core/lib/control-catalog-schema.mjs",
+    "plugins/pipeline-core/lib/control-catalog-schema.test.mjs",
+  ]);
+  for (const file of registration.inputs.files) assert.match(file.fileSha256, /^[a-f0-9]{64}$/u);
+  assert.deepEqual(registration.inputs.nonFiles.map((entry) => entry.kind), ["suite-arguments", "suite-dependencies"]);
+  assert.equal(registration.inputs.nonFiles.some((entry) => entry.kind.startsWith("declared-tree:")), false);
+});
+
 test("ADR-0065 candidate (b): a Tier-B suite that reaches an undeclared path fails under the REAL Node permission model, not a mock", () => {
   const f = fixture();
   const allowedFile = join(f.root, "tierb-allowed.mjs");

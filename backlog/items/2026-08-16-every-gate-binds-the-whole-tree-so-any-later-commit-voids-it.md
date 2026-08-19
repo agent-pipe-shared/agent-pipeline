@@ -108,3 +108,31 @@ dependency chain, needs its own declaration shape design) and
 `afk-ledger-tests`/`state-budget-tests` (both write outside the repo tree
 via `os.tmpdir()`, not a fit for the current scratch-clean Tier-B model
 without a `--allow-fs-write` design extension). Item stays `open`.
+
+### Progress, 2026-08-19 (continued, `NVA-W5-ADR65C-2`)
+
+`control-catalog-schema-tests` promoted to a Tier-B declared-input entry:
+`control-catalog-schema.mjs` has zero imports of its own (pure module, no
+fs/child_process), and its test file imports only `node:assert/strict`
+plus this one module — no fs, no child_process, no `os.tmpdir()` — so its
+entire real input is these two files; no `--allow-fs-write` needed. Confirmed
+live under the real Node `--permission` model with exactly the two declared
+files (`--allow-fs-read` on each), no others. 19/19
+`verify-journal.test.mjs`, 1/1 `control-catalog-schema.test.mjs`.
+
+A repo-wide scan (all registered `*.test.mjs` suites with a 1:1 source
+file) found 15 total zero-import-source candidates beyond the 3 already
+promoted; of those, 11 remain unpromoted after this dispatch because
+either the test file itself imports `node:fs` (`control-waiver-lifecycle-tests`,
+`dispatch-policy-tests` — read fixtures from outside the two-file pattern)
+or the source/test pair imports a second source module that itself is not
+zero-import (`security-evidence-fixture-matrix-tests` pulls in
+`security-evidence-evaluator.mjs`, which is not a clean fit — not
+inspected further this dispatch) or were simply not reached given the
+tool budget: `stack-run-outcome-tests`, `sdlc-run-graph-tests`,
+`sdlc-efficiency-metrics-tests`, `check-ownership-tests`,
+`parallel-dispatch-planner-tests`, `critic-packet-governance-tests`,
+`backlog-dispatch-reference-tests`, `control-catalog-migration-tests`
+each showed the same clean two-file, zero-fs/zero-cp shape as
+`control-catalog-schema-tests` in the same scan and are good candidates
+for the next dispatch in this series. Item stays `open`.

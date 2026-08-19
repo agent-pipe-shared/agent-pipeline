@@ -335,6 +335,17 @@ const TIER_B_DECLARATIONS = Object.freeze({
       "plugins/pipeline-core/lib/recovery-preview-attestation.test.mjs",
     ]),
   }),
+  // ADR-0065 candidate (c), continuation (NVA-W5-ADR65C-2): same shape again. Confirmed live
+  // before this dispatch: control-catalog-schema.mjs has zero imports of its own (pure module,
+  // no fs/child_process), and its test file imports only "node:assert/strict" plus this one
+  // module -- no fs, no child_process, no os.tmpdir -- so its entire real input is these two
+  // files; no --allow-fs-write needed.
+  "control-catalog-schema-tests": Object.freeze({
+    reads: Object.freeze([
+      "plugins/pipeline-core/lib/control-catalog-schema.mjs",
+      "plugins/pipeline-core/lib/control-catalog-schema.test.mjs",
+    ]),
+  }),
 });
 
 function tierBDeclaredFiles({ suite, rel, implementationSha256, repoRoot, declaration }) {
