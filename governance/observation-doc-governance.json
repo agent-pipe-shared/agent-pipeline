@@ -238,6 +238,13 @@
       },
       {
         "audience": "maintainer",
+        "lifecycle": "normative-record",
+        "paths": [
+          "docs/state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md"
+        ]
+      },
+      {
+        "audience": "maintainer",
         "lifecycle": "review-candidate",
         "paths": [
           "docs/codex-isolated-critic-foundation.md",

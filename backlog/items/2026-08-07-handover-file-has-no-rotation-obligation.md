@@ -186,3 +186,36 @@ mark ack'd/archivable; (2) actually adding those markers to `docs/state.md`
 `--execute` for real (currently a stub); (4) the remaining ~13,700 lines of
 `docs/state.md` never literally read line-by-line, only grep-swept — a fully
 exhaustive extraction pass, if wanted, is further work beyond this round.
+
+### Progress note — 2026-08-19, round 3
+
+A follow-up pair of dispatches (`PHX-WP-STATE-ARCHIVE-COMPLETE`, then
+`PHX-WP-STATE-ARCHIVE-FINISH` finishing its documented remaining steps)
+closed the gap round 2 left open: item (4) above (the remaining ~13,700
+unread lines) and the live rotation itself.
+
+**Extraction:** a full, sequential Read-tool pass over the entire range
+never before read line-by-line — `docs/state.md` lines 13686–19155,
+covering the "Pipeline general/Nova-Cyborg-release history" block through
+every dated "Nova ..." section down to "Open items and next block" — found
+**no new durable/standing rule requiring extraction**. Every rule-shaped
+statement encountered was already covered by the prior two rounds'
+extractions (`guardrails/security.md` SEC-10; `guardrails/quality-gates.md`
+QG-08/QG-09; `roles/elephant.md` EL-01/EL-09/EL-22/EL-29 addenda).
+
+**Rotation:** with extraction now complete, PO authorized (2026-08-19
+in-session decision) archiving all three candidate ranges (Nova-inherited
+history, Phoenix pre-restart history, oldest-era + open-items tail) — none
+deleted. `docs/state.md` is reduced from 19,155 lines to its live head
+(ending at line 4989, with a new "## Archived history" pointer table); the
+archived range (original lines 4977–19155) is preserved verbatim in
+`docs/state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md`,
+whose own Provenance section carries the full extraction-pass summary.
+Full account: [ADR-0064's 2026-08-19 addendum](../../docs/adr/0064-handover-rotation-extraction-archive-hard-size-gate.md#addendum--2026-08-19-extraction-pass-complete-live-rotation-has-run).
+
+**Item stays open.** ADR-0064's own Follow-up section still lists real
+remaining work this round did not do and was not scoped to do:
+implementing `--execute` for real (currently an unconditional-throw stub)
+and wiring the hard-size-gate hook into `hooks.json` (a TP-class
+protected-surface change needing its own authorized ceremony). Neither is
+closed by this round.

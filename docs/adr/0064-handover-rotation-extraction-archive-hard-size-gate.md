@@ -201,3 +201,44 @@ file that was never part of this repository's own review/commit history.
 - Revisit whether `HANDOVER_MAX_BYTES = 12,000` (inherited default) is
   appropriate for Phoenix once real rotation cadence is observed here,
   mirroring the open question already tracked on Nova's ADR-0066.
+
+## Addendum — 2026-08-19: extraction pass complete; live rotation has run
+
+Dispatch `PHX-WP-STATE-ARCHIVE-COMPLETE` (with a follow-up finishing
+dispatch `PHX-WP-STATE-ARCHIVE-FINISH` writing this addendum and the
+matching backlog note) closed the Decision 5/6 gap this ADR left open at
+acceptance time:
+
+**Extraction pass is now complete.** A full, sequential Read-tool pass over
+the entire remaining range this ADR's own Decision 5 marked unread — lines
+13686–19155 of `docs/state.md` as it stood before this round, covering the
+"Pipeline general/Nova-Cyborg-release history" block through every dated
+"Nova ..." section down to "Open items and next block" — found **no new
+durable/standing rule requiring extraction**. Every rule-shaped statement
+encountered in this range was already captured, verbatim or in substance,
+by the two prior extraction rounds: `guardrails/security.md` SEC-10,
+`guardrails/quality-gates.md` QG-08/QG-09 (this round's read additionally
+confirmed QG-12's coverage of the "no 'X cannot happen because Y' without a
+test" pattern found here), and `roles/elephant.md`'s EL-01/EL-09/EL-22/EL-29
+addenda. Full detail and the exact statement-to-extraction mapping are
+recorded in the archive file's own Provenance section (see below).
+
+**Live rotation has run.** `docs/state.md` is reduced from 19,155 lines to
+its live head, ending at line 4989 (a new "## Archived history" section with
+a pointer table). The archived range (original lines 4977–19155) is
+preserved verbatim in `docs/state-archive/2026-08-19--pre-restart-and-nova-
+inherited-history.md`, whose own `## Provenance` section documents the
+source range, the PO authorization (2026-08-19 in-session decision to
+archive all three candidate ranges, none deleted), and the extraction-pass
+summary above in full. Committed together with the ADR-0064-required
+inventory entry in `governance/observation-doc-governance.json` classifying
+the new archive file (`audience: maintainer`, `lifecycle: normative-record`).
+
+**Still open, unchanged by this addendum:** the Follow-up items above —
+`--execute` in `handover-rotate.mjs` remains an unconditionally-refusing
+stub, and the hard-size-gate hook is not wired into `hooks.json` (both
+explicitly out of scope for the dispatches that produced this addendum;
+the hook wiring in particular is a TP-class protected-surface change
+needing its own authorized ceremony). This addendum closes only the
+extraction-completeness and one-time-rotation questions Decision 5/6 left
+open — it does not close this ADR's Follow-up section.
