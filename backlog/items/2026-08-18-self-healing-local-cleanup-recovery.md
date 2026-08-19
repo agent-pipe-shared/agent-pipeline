@@ -134,13 +134,47 @@ that regression was real, live, and has since been fixed directly
 (commit 9d8cd787) — noted here only because the same review surfaced
 it, not because this item caused it.
 
-**Not further reworked this session** (context budget exhausted after
-1 full review round on this item; per this repo's "cap Critic rounds
-at two" practice a second round remains available before this item
-should be closed again). Needs, in order: (1) re-observe continuity
-after a mutating recovery before returning `ready` (F1); (2) add
-direct test coverage for `quarantine-private-receipt` and the
-external-retirement backup path, plus at least one test per
-fail-closed branch (F2); (3) fix the two silent-skip helpers to
-actually fail closed, or correct the commit's claim (F3); (4) a
-Critic re-review once (1)-(3) land.
+## Implementation status, 2026-08-19 round 2 (STILL open — F1/F3 fixed, F2 partially, F4/F5 not started)
+
+Per this repo's own "cap Critic rounds at two, then self-verify"
+practice (round 1 was this item's only Critic dispatch; this is the
+self-verification pass, not a second dispatch):
+
+- **F1 (fixed, commit 94a020d4):** `readyLifecycleResult()` now
+  re-observes `continuity` via `classifyOnboardingContinuity`
+  immediately after a successful mutating auto-apply, mirroring the
+  exact call `afterRuntimeLifecycleResult` already makes for its own
+  first observation — no second primitive.
+- **F2 (substantially addressed, commit 1ebf1004):** the highest-
+  priority gap — `retire-externally-archived-orphans` (the ONE kind
+  that deletes a pre-existing file, where the `.bak` net most directly
+  replaces the removed human gate) — now has direct test coverage
+  through a real external-archive scenario, proving the backup exists
+  with exact pre-deletion bytes before the manifest is unlinked. Two
+  new regression tests also cover `backupBeforeMutation`'s fail-closed
+  branches (live symlink, dangling symlink). **Still uncovered:**
+  `quarantine-private-receipt` — reaching it needs a
+  coordinator-close-shaped fixture this file's own test comments
+  already flagged as absent; not built this round, named here rather
+  than silently dropped.
+- **F3 (fixed for the reported defect, commit 1ebf1004):**
+  `backupBeforeMutation`'s absence check switched from
+  `existsSync` (follows symlinks, silently returned null for a
+  dangling symlink) to an `lstatSync`-based check (fails closed on
+  both a live and a dangling symlink; only a genuine ENOENT is treated
+  as absent). `backupOnboardingPrivateState`'s own silent-skip of
+  non-regular directory entries is UNCHANGED — a separate, smaller,
+  still-disclosed gap, not touched this round.
+- **F4/F5 (not addressed):** the bare `catch {}` discarding typed
+  failure codes, and the undocumented-but-verified-correct
+  external-manifest path-convention coupling, remain open. Both minor,
+  both already disclosed with no owner/expiry claimed.
+
+Verification: `session-cleanup-recovery.test.mjs` (8/8, was 5/5),
+`project-onboarding-v3.test.mjs` (128/128),
+`session-cleanup-binding.test.mjs` (45/45),
+`pipeline-start-scratch-lifecycle.test.mjs` (6/6),
+`check-consumer-safe-paths` (9/9) all pass.
+
+Commits (full sequence): 3d5fda6d, 9d8cd787 (unrelated sibling-commit
+regression fix, not this item's own defect), 94a020d4, 1ebf1004.

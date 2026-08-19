@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.atomic-prd-approval-without-mutation
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Rune happy-path handover report, greenfield test of pipeline 0.6.0+codex.20260818162535.96cf805, test repo Rune_Test1_Codex_060_52 (external, not this checkout): docs/pipeline-greenfield-happy-path-handover.md, Section 9, item P0-2 (priority P0)"
 ---
@@ -107,10 +107,37 @@ after the round-1 fix (00b768cb/ee72a712/cd725129):
   oversight, but worth a PO sanity-check against the item's own
   wording.
 
-**Not further reworked this session** (context budget exhausted after
-2 review rounds, per this repo's own "cap Critic rounds at two, then
-self-verify" practice — self-verification was not reached either).
-Needs, in order: (1) persist `by` into `continuity` or a new
-`state.planApproval`-adjacent field (F-A); (2) finalize the
-`NVA-W4-2B` dispatch record to a terminal outcome (F-B, no code
-change needed); (3) a third Critic round once (1)/(2) land.
+## Closure, 2026-08-19 (round 3: F-A/F-B/F-C fixed, self-verified)
+
+Per this repo's own "cap Critic rounds at two, then self-verify"
+practice: round 2's two major findings and one of its two minor
+findings are now fixed, tested, and self-verified (no third Critic
+dispatch — round 3 was self-review against the same evidence a Critic
+would check).
+
+- **F-A (fixed, commit 2e5d1c91):** `po-authority-acknowledge-apply`
+  now writes a new top-level `state.poGateAcknowledgement = { by, at
+  }` field, mirroring `planApproval`'s `approvedBy`/`specBoundBy`
+  pattern (not reusable directly — wrong lifecycle stage, closed
+  key-set validator). New test asserts the field's exact value after
+  apply.
+- **F-B (fixed):** `evidence/dispatch-record-NVA-W4-2B.json` finalized
+  to a terminal outcome with covering `changedFiles`; `00b768cb` now
+  passes `dispatch-authorship-verify.mjs`. `ee72a712`'s missing
+  `Dispatch:` trailer is NOT retroactively fixed (would require
+  amending an already-landed commit, against this session's
+  never-rewrite-history discipline) — a disclosed, permanent gap.
+- **F-C (fixed, commit cd725129):** `guard-lifecycle-ready.mjs` now
+  admits `po-authority-acknowledge-apply` in the not-ready lane.
+- **F-D (accepted as-is, not a defect):** the mechanism mutates the
+  bound PRD's bytes by design — the item's own accepted Triage
+  decision (Option 2), which the Critic could not see by the
+  anti-contamination convention. The item's title/Description remain
+  aspirationally worded relative to the narrower accepted scope; this
+  is a wording mismatch, not a functional gap.
+
+Verification: `pipeline-state.test.mjs`, `po-gate-authority.test.mjs`
+(62/62), `onboarding-continuity.test.mjs` (162/162),
+`guard-lifecycle-ready.test.mjs` (114/114) all pass.
+
+Commits (full sequence): 00b768cb, ee72a712, cd725129, 2e5d1c91.
