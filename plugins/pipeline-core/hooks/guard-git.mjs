@@ -259,7 +259,7 @@ import { spawnSync } from "node:child_process";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { commitMessageFindings, markerPolicyMode } from "../lib/commit-message-policy.mjs";
+import { commitMessageFindings, commitTypeFindings, markerPolicyMode } from "../lib/commit-message-policy.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv } from "../lib/git-cmd.mjs";
 import {
   LEGACY_GUARD_AUDIT,
@@ -996,9 +996,10 @@ function allowWithOverride(status, expiresAt) {
 //
 // The marker half (`AI-Assisted: true`) is config-gated and defaults to off -- see
 // ../lib/commit-message-policy.mjs for why the two halves are not the same kind of rule.
+let inspection;
 {
   const markerMode = markerPolicyMode(projectConfig);
-  const inspection = commitMessageFindings(cmd, {
+  inspection = commitMessageFindings(cmd, {
     readFile: (path) => {
       // Message files are read from inside the project only. A `-F ../../elsewhere` is not
       // followed: this check exists to read what is about to be committed here. A refusal
@@ -1027,6 +1028,25 @@ function allowWithOverride(status, expiresAt) {
   }
   if (warningOnly.length > 0) {
     notices.push("[git-guard] WARN: commit message carries no `AI-Assisted: true` line (GIT-03; commitTrailerPolicy is \"warn\").");
+  }
+}
+
+// ---- GIT-01: the commit subject must start with an admitted Conventional Commit type -------
+//
+// Independent from GIT-03 above: `emit()` calls `process.exit()`, so this only runs at all
+// when the GIT-03 block above did not already exit. `inspection.message === null` correctly
+// skips the check for an editor commit (CMP7's "not looked at, never clean" case) and for a
+// non-`git commit` command -- no new special-casing needed.
+if (inspection.message !== null) {
+  const subjectLine = inspection.message.split("\n")[0];
+  const typeCheck = commitTypeFindings(subjectLine);
+  if (typeCheck.findings.length > 0) {
+    emit(2, [
+      `BLOCKED (git-guard GIT-01, plugin pipeline-core): ${typeCheck.findings.map((f) => f.detail).join(" and ")}.`,
+      `Codes: ${typeCheck.findings.map((f) => f.code).join(", ")}.`,
+      "guardrails/git.md GIT-01: the subject line must start with an admitted Conventional Commit type.",
+      "Rewrite the message with an admitted type prefix (feat/fix/docs/refactor/test/chore/build/ci/perf/style).",
+    ]);
   }
 }
 
