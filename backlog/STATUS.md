@@ -126,7 +126,7 @@
 | pipeline.published-lifecycle-event-schema-still-enumerates-cancellation | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.push-gate-reads-evidence-from-a-location-the-prescribed-verify-run-never-writes-to | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-guard-worktree-target | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
-| pipeline.push-release-flow-unusable-for-third-party-adopters | open | defect | pipeline | 2026-08-07 | — |
+| pipeline.push-release-flow-unusable-for-third-party-adopters | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.readonly-command-guard-classification | closed | workflow-improvement | pipeline | 2026-07-26 | — |
 | pipeline.ready-gate-env-var-runner-authority | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.reconcile-lock-reuse-lexical-path-comparison | closed | defect | pipeline | 2026-08-11 | — |
@@ -174,8 +174,8 @@
 
 ## Counts
 
-- open: 11
+- open: 10
 - in_progress: 25
-- closed: 118
+- closed: 119
 - rejected: 1
 - deferred: 11

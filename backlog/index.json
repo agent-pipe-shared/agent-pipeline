@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e8a6c166bf8b4725e9487a4c34be7059308c77f930dec74e58a7c9d02500a08d"
+    "transitionHead": "d70fc9c9c8ad4cfc2b6ebfc046bf6202a1c82e0c17c7b4ce2c50b2fc5bbf0569"
   },
   "counts": {
-    "open": 11,
+    "open": 10,
     "in_progress": 25,
-    "closed": 118,
+    "closed": 119,
     "rejected": 1,
     "deferred": 11
   },
@@ -1334,11 +1334,15 @@
     },
     {
       "id": "pipeline.push-release-flow-unusable-for-third-party-adopters",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-07",
-      "source": "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'"
+      "source": "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "e2fcf75cde2e698f0fcd1565718d3fc6b5369c45",
+      "closureEvidence": "backlog/items/2026-08-07-push-release-flow-unusable-for-third-party-adopters.md"
     },
     {
       "id": "pipeline.readonly-command-guard-classification",
