@@ -7,6 +7,8 @@
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
+**Recovered Sentinel-epic normative documents** (retained per `backlog/items/2026-07-20-spec-retention-on-close.md`, enforced by `governance/spec-retention.json` + `check-spec-retention.mjs`; this section must keep linking all seven — do not prune it when trimming older checkpoints): [PRD](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md), [Spec](../specs/2026-07-19-sprint-sentinel-epic/spec.md), [acceptance matrix](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md), [reconciliation design](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md), [recovery record](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md), [platform-support contract](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md), [Windows blockers scope](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
+
 ---
 
 ## CHECKPOINT — 2026-08-19 (59): Critic round 2 (delta) FAIL, 2 findings — both disposed directly per round-cap policy, no 3rd dispatch; HGO Part C's Critic gate is now closed (READ THIS FIRST)
