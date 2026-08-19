@@ -3,11 +3,23 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 61)
+**Last updated:** 2026-08-19 (checkpoint 62)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
 **Recovered Sentinel-epic normative documents** (retained per `backlog/items/2026-07-20-spec-retention-on-close.md`, enforced by `governance/spec-retention.json` + `check-spec-retention.mjs`; this section must keep linking all seven — do not prune it when trimming older checkpoints): [PRD](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md), [Spec](../specs/2026-07-19-sprint-sentinel-epic/spec.md), [acceptance matrix](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md), [reconciliation design](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md), [recovery record](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md), [platform-support contract](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md), [Windows blockers scope](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md).
+
+---
+
+## CHECKPOINT — 2026-08-19 (62): closed `gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger` (`e5b3af60`) — it had decided-but-unapplied closure text; split the real remaining gap into its own item (READ THIS FIRST)
+
+**Found and fixed a decided-but-unapplied closure.** The item's own history (extensive, five progress notes across four dispatches, 2026-08-07 through 2026-08-19) already concluded "closing this item as partially delivered" — but the frontmatter still said `status: open`; the narrative decision was never actually applied to the record. Applied it: `status: closed`, evidence citing `b1c57d2c` (H-AC-12 amendment), `3504b707`/`bdd4517c` (GMW ledger emission), `025f9e1a` (HGO hook-side emission), `bce05e53` (HGO hook-side test coverage) — all four commits independently re-verified to exist and match their claimed content, not trusted from the item's own prose.
+
+**Split out the one real remaining gap:** `backlog/items/2026-08-19-hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check.md` — HGO's CLI-side `granted` ledger emission was attempted three times across this item's history and correctly reverted each time it got close: it's a genuine architectural conflict (fail-closed-arming per the design's §8.1 vs. the arm-time `HGO-DRIFT` re-derivation in `human-guard-override.mjs`), proven live via a full deny→authorize→consume round-trip test, not a scoping gap a tighter Goldfish briefing would fix. Needs a PO design decision among 3 disclosed candidate directions before any further dispatch attempts it.
+
+**Process note for future ledger work:** hit and self-corrected a real mistake here — ran `reconcile-backlog-ledger.mjs --activate` once before fixing the closure item's `closure_commit` to a full Git OID (schema requires full lowercase SHA, not abbreviated), which baked the wrong short SHA into the hash-chained `transitions.ndjson`. Since the ledger is append-only/hash-chained by design, the fix was NOT to hand-patch the bad entry (would break the chain) — it was to `git checkout --` the still-uncommitted ledger projection files (transitions.ndjson/index.json/STATUS.md) back to their last-committed state and re-run reconciliation cleanly against the now-correct item file. This only works because the bad entries had never been committed; had they landed, this would need `check-backlog-state.mjs`'s dedicated evidence-amendment machinery instead (`planBacklogEvidenceAmendment`), which is a much heavier, JSON-Result-bound mechanism — reason to `check-backlog-state.mjs` BEFORE committing ledger changes, always.
+
+**Next step:** the maintenance-window PO gate from checkpoint 60/61 is still the binding blocker for the final-gates sequence. While waiting, more Phoenix-scope backlog can be worked — `backlog/items/2026-08-19-closed-shell-grammar-still-rejects-common-readonly-composition.md` was next in the previously-stated order.
 
 ---
 
