@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: self
+closure_commit: 1ca28ded4fab926f46a8eb4c00637a805c4f9f07
+closure_evidence: backlog/items/2026-08-19-sentinel-epic-acceptance-matrix-archive-drift.md
 source: "Surfaced by the Nova Wave 4 candidate verify run (2026-08-19): check-spec-retention.mjs FAILs 'sprint-sentinel-epic archive bytes differ from active acceptance authority' / 'archive digest is stale for acceptance'. Confirmed pre-existing and unrelated to Wave 4/5 work by commit c1434d49 ('revert(spec-retention): restore sprint-sentinel-epic's frozen PRD content', 2026-08-18), which already verified the drift predates that session entirely -- specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md's last edit before that was commit 86deb0cb ('chore(release): prepare 0.4.0 candidate', 2026-07-24)."
 ---
 
