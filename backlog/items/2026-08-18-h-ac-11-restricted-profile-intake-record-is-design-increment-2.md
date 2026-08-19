@@ -57,3 +57,23 @@ name one, before this item is assigned.
 - **Rationale:** PO's direct choice.
 - **Assignment:** Candidate for a bounded dispatch before this sprint closes — not deferred to a named future sprint.
 - **Date:** 2026-08-18
+
+### Progress note — 2026-08-19 (design completed, mostly implemented)
+
+A first attempt (`PHX-WP-HAC11-D1-ATTRIBUTION-RECORD`) correctly stopped:
+the design document's §5.4 was only a two-sentence sketch, not an
+implementation spec. A follow-up dispatch (`PHX-WP-HAC11-D1-DESIGN-SPEC`,
+commit `22d8ef09`) wrote the missing design specification directly into
+§5.4 (the closed 9-key `pipeline.human-decision-attribution.v1` payload
+shape, the validator module's exact contract, the producer/consumer wiring
+points) and implemented it: `lib/human-decision-attribution.mjs` (validator),
+`governance/schemas/human-decision-attribution.schema.json`, the
+`governance-event.mjs` wiring, and a new `buildWindowAttributionEvent`
+builder — 11 files, all new/existing tests pass (108 cases across 5 suites,
+zero regressions). **Not implemented:** the final CLI call site in
+`scripts/guard-maintenance-window.mjs` (reading `subject.reason`/
+`proof.keyReference` at `install`) — correctly deferred, since it depends
+on increment 1's own portable-side CLI wiring for that script, which does
+not exist in this checkout yet. Item stays open for that one remaining,
+genuinely-blocked-on-a-prerequisite piece; the design and core producer are
+done.
