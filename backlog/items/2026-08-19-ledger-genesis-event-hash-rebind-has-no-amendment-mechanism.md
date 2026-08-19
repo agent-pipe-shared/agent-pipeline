@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.ledger-genesis-event-hash-rebind-has-no-amendment-mechanism
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-19"
+closure_repository: "self"
+closure_commit: "05c851b75f7ff4c1fa10c390aa20524fda4a31b8"
+closure_evidence: "backlog/items/2026-08-19-ledger-genesis-event-hash-rebind-has-no-amendment-mechanism.md"
 source: "Found by PHX-WP-LEDGER-EVENT41-HASH-FIX while resolving the last remaining backlog-state-check failure, 2026-08-19."
 ---
 
@@ -82,4 +86,29 @@ Not designed here — two directions, neither built:
 - **Assignment:** Dispatch-ready — design-tier Goldfish designs the amendment
   schema/vocabulary, wires `check-backlog-state.mjs`'s `itemSha256` check to
   consult it, applies it to repair event 41, and closes this item on landing.
+- **Date:** 2026-08-19
+
+### Triage — closed 2026-08-19
+
+- **Decision:** closed — resolved.
+- **Rationale:** Direction 1 built as decided. `plugins/pipeline-core/lib/backlog-state.mjs`
+  adds a new `item-hash-amendment` evidence kind mirroring the existing
+  reachability-amendment pattern: a frozen per-sequence target registry
+  (`ITEM_HASH_AMENDMENT_TARGETS`, pinned by entryHash) authorizes exactly
+  event 41 and no other target; `resolveItemHashAmendmentOverlay` resolves a
+  valid amendment's corrected hash for the checker to compare current item
+  bytes against, and `check-backlog-state.mjs`'s `itemSha256` check now
+  consults it. The genesis event's own bytes and the hash chain remain
+  untouched — one new, correctly hash-chained `item-hash-amendment` event
+  (sequence 459) supersedes the stale binding (commit
+  `05c851b75f7ff4c1fa10c390aa20524fda4a31b8`; mechanism commit `ce1707cc`).
+  `node plugins/pipeline-core/scripts/check-backlog-state.mjs` prints
+  "Backlog state, transition ledger, closure evidence, and generated
+  projections are valid." Two unrelated, pre-existing findings from a
+  different, already-landed dispatch (a short-SHA `closure_commit` on
+  `backlog/items/2026-08-19-publication-authority-lacks-execution-time-
+  criticalproof-reverification.md`, and the ledger event that referenced it)
+  briefly blocked a fully clean run mid-session; they were out of this
+  item's scope and were not touched here, and were independently resolved
+  by a separate fix (commit `6134ade9`).
 - **Date:** 2026-08-19
