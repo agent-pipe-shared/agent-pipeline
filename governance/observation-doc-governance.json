@@ -217,6 +217,7 @@
           "docs/adr/0063-fork-disposition-approval-proof.md",
           "docs/adr/0064-handover-rotation-extraction-archive-hard-size-gate.md",
           "docs/adr/0065-port-authorize-critical-ceremony.md",
+          "docs/adr/0066-publication-approval-time-signature-accepted-tradeoff.md",
           "docs/adr/README.md"
         ]
       },
