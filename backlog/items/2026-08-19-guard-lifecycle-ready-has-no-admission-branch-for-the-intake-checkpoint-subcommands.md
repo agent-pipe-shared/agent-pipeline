@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
 source: "Nova Wave 4, dispatch NVA-W4-COORD-1 (intake-checkpoint coordinator Phase 1) — found and named while implementing, not fixed in that dispatch's scope"
 ---
@@ -61,4 +61,35 @@ other mutating onboarding subcommands already have.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-Not yet triaged.
+- **Decision:** accepted, dispatched to `goldfish-deep` (correctly reclassified from
+  an earlier premature "mechanical" characterization — the real optional/free-form
+  flag shapes needed genuine per-subcommand design judgment, see `docs/state.md`'s
+  self-correction paragraph, 2026-08-19).
+- **Assignment:** `NVA-W5-GUARDADMIT-1` (goldfish-deep, worktree-isolated).
+- **Date:** 2026-08-19
+
+## Closure, 2026-08-19
+
+`NVA-W5-GUARDADMIT-1` added the three admission branches its own briefing named
+(`intake-consent-apply`, `intake-capture-apply`, `intake-design-questions-apply`),
+commit `70bd1fb3`, merged to trunk by fast-forward. The dispatch's own report
+correctly flagged that it could not add a `verify.mjs` suite registration for an
+unrelated linter (TP-3) — not applicable here, `guard-lifecycle-ready.test.mjs`
+is already a registered suite, no new registration needed.
+
+While reviewing the merged result, found the item's own scope (and the dispatch
+briefing built from it) was already stale: a 4th mutating subcommand,
+`intake-generate-apply` (Wave 4 coordinator step 4, landed via a separate dispatch
+AFTER this item was originally filed), has the identical `mutates: true,
+automatedArgvShape: null` gap with no admission branch either — `docs/state.md`
+had already flagged this exact drift in an earlier paragraph this session. Added
+the 4th branch directly (small, mechanical, exact mirror of the just-landed
+pattern — commit `0b2386fd`), with its own test.
+
+**Evidence:** `node --test plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`
+— 119/119 pass (up from 118, the new `intake-generate-apply` test included).
+`node --test harness/scripts/check-consumer-safe-paths.test.mjs` — 9/9 pass.
+All four intake-checkpoint subcommands (`intake-consent-apply`,
+`intake-capture-apply`, `intake-design-questions-apply`, `intake-generate-apply`)
+now have their own exact-argv-shape admission branch, matching the discipline
+every other mutating onboarding subcommand already has.
