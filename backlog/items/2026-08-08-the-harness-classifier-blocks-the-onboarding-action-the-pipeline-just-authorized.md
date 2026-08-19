@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.harness-classifier-blocks-authorized-onboarding-action
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-08
 due: 2026-08-22
 source: "Happy-path test of the local 0.5.4 build in a fresh directory, 2026-08-08. Third measured instance of this class; the first two were on the push path."
@@ -258,3 +258,14 @@ dispatch also did not touch `harness/scripts/verify.mjs`'s suite
 registration (left for the centralized post-merge integration pass) and
 did not re-verify Direction 1's already-passing argv-closure suites beyond
 reading them.
+
+## Closure, 2026-08-19
+
+PO decision: run `apply --activate` against this repo now. Executed
+exactly the previously-computed plan (`planSha256`
+`6c70c42075746b00c8153dee8be0bf8fe4060fb18f86f91e22f11a3edb7b63e2`),
+commit `a4897d15`. `.claude/settings.json` now carries both entries;
+`settings-allowlist-merge-tests` is already registered in `verify.mjs`
+from this session's earlier 107-suite TP-3 ceremony. All directions
+(1: guard-closure verification, 2: granularity, 3: ownership, plus the
+actual apply) are now complete. Closing.

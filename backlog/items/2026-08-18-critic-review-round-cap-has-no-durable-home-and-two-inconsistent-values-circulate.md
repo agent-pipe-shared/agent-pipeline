@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-18
 source: "Incremental handover-rotation extraction pass (ADR-0066 Decision 6/7), 2026-08-18, second rotation batch (2026-08-17 continued entries). Finding surfaced by a read-only research fork."
 ---
@@ -130,6 +130,24 @@ edited without a corresponding regeneration). Confirmed by reverting those
 4 vendored files to their committed content and re-running `--check`: they
 still report stale. Left untouched (out of this dispatch's scope) —
 reported here for the orchestrator to file/track separately.
+
+## Closure, 2026-08-19
+
+The follow-up finding this item was left open for — `harness/review-protocol.md`
+§3's inconsistent "max 3 fresh local rework cycles" / up-to-4-Critic-dispatches
+reading — was resolved with a fresh PO decision: QG-13 governs (commit
+`6af5cab7`). All three stale count references in `review-protocol.md`
+(§3's cycle-cap rule, and both cells of the §4 escalation-ladder table row)
+now defer to QG-13 by reference instead of restating a number, and the
+escalation-ladder wording was corrected to match QG-13's actual mechanism
+(exceeding the cap routes to Elephant self-verification, not automatically
+to a PO escalation). The protected-preimage pin for this file was
+re-verified byte-for-byte and updated through the file's own documented
+process (independently recomputed sha256, not copied from a test
+assertion). The separately-noted `generate-vendored-canon.mjs --check`
+pre-existing drift finding is unrelated to this item's substance and was
+already resolved elsewhere this session (the canon regeneration work
+earlier in this session's history). Closing.
 
 **Evidence:**
 
