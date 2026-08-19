@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-08-19 (checkpoint 67)
+**Last updated:** 2026-08-19 (checkpoint 68)
 
 **Project calibration:** [`project/pipeline.json`](../project/pipeline.json) — the resolved authority tier (ADR-0046/ADR-0054).
 
@@ -17,6 +17,16 @@
 |---|---|---|
 | 2026-08-11 to 2026-08-19 | Checkpoints 1-60 (2026-08-11 through 2026-08-19 checkpoint 60): superseded session narrative; durable decisions already live in ADRs/backlog/guardrails per this repo's own standing convention, not uniquely in this prose. | [docs/state-archive/2026-08-19--checkpoints-1-through-60.md](state-archive/2026-08-19--checkpoints-1-through-60.md) |
 | through 2026-08-19 | First real rotation: everything from the 2026-08-08 restart checkpoint through the inherited Nova/Cyborg-release history and every older era down to the open-items tail — extraction pass completed first (original pre-rotation line range 4977–19155; see the archive file's own provenance section and the ADR-0064 addendum dated 2026-08-19) | [state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md](state-archive/2026-08-19--pre-restart-and-nova-inherited-history.md) |
+
+## CHECKPOINT — 2026-08-19 (68): full Verify GREEN (406/406) and security-scan CLEAN; moving to the push-approval ceremony (READ THIS FIRST)
+
+**Full `harness/scripts/verify.mjs` is fully green: 406/406 suites, exit 0**, including `security-scan=0`. One real fix landed on the way: a gitleaks false positive on `governance/events/human/3-evt-gmw-revoke-....json`'s own `idempotencyKey` field (same class as the prior attribution-key false positive), fixed via `.gitleaksignore` content-fingerprint entry (`44245bf5`), independently confirmed via a standalone `security-scan.mjs` run before re-running full Verify.
+
+**Operational note, not a code defect:** the first full-Verify attempt after the gitleaksignore fix hung for 30+ minutes on `session-cleanup-binding-tests` — diagnosed as CPU contention from an unrelated, concurrent Claude Code session's own heavy test run in the sibling Nova repo (confirmed via `ps aux`; that suite passed standalone in 5.4s once isolated). The orphaned `verify.mjs` process (still alive despite `TaskStop` reporting success) was killed directly; a retry completed cleanly. Two config-file gates required `git stash push -u`/`pop` around each run: both `verify.mjs`'s own candidate preflight and `security-scan.mjs`'s candidate snapshot refuse on ANY working-tree dirt (tracked or untracked), including this repo's own standing-dirty `dispatch-record.json`/`project/pipeline-state.json` files — not previously exercised this explicitly in this session's checkpoints.
+
+**Next:** the push-approval ceremony (`gates.push_approval: signature`, `docs/push-release-flow.md`) at this exact candidate, then `git push origin sprint_phoenix` — the PO's "clean cut and push" instruction, final step.
+
+---
 
 ## CHECKPOINT — 2026-08-19 (67): shell-grammar topic CLOSED (round-2 Critic PASS, backlog item closed); handover rotated (checkpoints 1-60 archived, file was over its size cap); starting the PO's "clean cut and push" sequence (READ THIS FIRST)
 
