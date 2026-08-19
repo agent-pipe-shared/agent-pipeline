@@ -78,6 +78,42 @@ Per [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop):
 5. The triage decision is documented **in the item itself** (section "Triage" in the template) — never only verbally or in chat.
 6. **If this item is later cited as a spec/reference input to a Goldfish or Critic dispatch**, its Triage section (and any appended Closure/PO-decision-implementation section) MUST be stripped first via `plugins/pipeline-core/scripts/backlog-item-strip-for-dispatch.mjs` before the path is named in the dispatch — never the raw item path. Triage prose records a prior human/Critic decision *about* the item, and handing it over unstripped lets a later reviewer read that verdict as background about the very thing it is independently judging (PO decision 2026-08-18 #19; see `templates/prompts/critic-review.md`/`goldfish-task.md` and `backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md`).
 
+## Ledger
+
+The backlog has THREE generated files, never edited by hand, each with a
+distinct job. Confusing them — or, worse, deriving a count by grepping
+`backlog/items/*.md` directly — is the single most common source of stale
+backlog claims in this repository (`grep -l "status: open"` false-positives
+on historical prose that merely *mentions* `status: open`; a live count must
+never be hand-derived this way).
+
+| File | What it is | What it's for |
+|---|---|---|
+| [`backlog/index.json`](index.json) | Machine source of truth: every item's `id`/`status`/`type`/`owner`/`created`/`source`, plus a top-level `counts: {open, in_progress, closed}` object and the ledger head hash it was generated from (`generatedFrom.transitionHead`). | **The one place to read a live backlog count from.** `node -e "console.log(require('./backlog/index.json').counts)"`, or `plugins/pipeline-core/scripts/check-state-numeric-claims.mjs` if the count is being cited in `docs/state.md` prose. |
+| [`backlog/STATUS.md`](STATUS.md) | Human-readable table view of the same data (ID / Status / Type / Owner / Created / Tracking), one row per item, alphabetically sorted. | Skimming the whole backlog by eye; not for deriving a count (no summary line — read `index.json` for that). |
+| [`backlog/transitions.ndjson`](transitions.ndjson) | Append-only, hash-chained (`entryHash`/`previousHash`) NDJSON audit log — one JSON object per status transition, each carrying `from`/`to`/`reason`/`evidence` (a commit + a reference path) and a `sequence` number. | The tamper-evident history of *why* an item moved status, not just that it did. Never truncated or rewritten — the chain itself is the integrity check. |
+
+**Regenerating all three:** `node plugins/pipeline-core/scripts/reconcile-backlog-ledger.mjs`
+(read-only plan) then `--activate` (writes). It reads every item file's
+CURRENT `status:` and closure frontmatter and records exactly that — it
+implements nothing and reviews nothing itself; each emitted transition's
+`reason` says so explicitly. Because the ledger only knows `open` →
+`in_progress` → `closed` as a strict order, an item that jumped straight
+from `open` to `closed` in its own file still gets TWO chained ledger
+entries (open→in_progress, then in_progress→closed) to preserve that order —
+this is expected, not a bug.
+
+**The recurring failure mode this exists to name:** closing an item (flipping
+`status:` in its file) and reconciling the ledger are two separate,
+manually-sequenced steps. Forgetting the second one is exactly Mode 1 of
+`backlog/items/2026-08-19-backlog-status-drifts-from-code-across-compaction-with-no-hardening.md`
+— `verify.mjs`'s `backlog-state-check`/`backlog-ledger-reconciliation-tests`
+catch it, but only when Verify happens to run, after the drift already
+exists. That item's piece 1 (`GG-22`, a `guard-git.mjs` commit-time rule
+that blocks an unrelated commit while a status change sits unreconciled) is
+the structural fix — check that item's own status before assuming
+reconciliation is still a manual habit rather than a guarded one.
+
 ## Release cycle (SHA phase)
 
 As long as the pipeline is versioned in the SHA phase ([ADR-0002](../docs/adr/0002-versioning-sha-then-semver.md)), **every commit to `main` propagates immediately** to the bound projects — there is no bundled release step in between. This makes **triage itself the actual release gate**: an accepted item that gets implemented and merged takes effect immediately on every machine/project that next refreshes. From the SemVer phase onward, bundled releases with a CHANGELOG entry are added (the switchover criterion is documented as its own backlog item).
