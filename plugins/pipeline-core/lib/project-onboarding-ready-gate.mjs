@@ -34,6 +34,17 @@ export const PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES = Object.freeze([
   "app-server-execution-denied",
   "app-server-not-running",
   "app-server-unavailable",
+  // Wave 4 onboarding coordinator, step 6 (NVA-BL-INTAKEBIND-1, design.md
+  // SSa.4): this allowlist was never updated when step 6 added these three
+  // new v4Inspection statuses, so a repo genuinely sitting at one of them
+  // failed closed with the wrong typed error (PORG-INVALID-OBSERVATION
+  // instead of PORG-NOT-READY) below at line 152's NON_READY_STATUSES.has()
+  // check -- blocking any narrow admission keyed off error.lifecycleStatus
+  // for this window (see guard-lifecycle-ready.mjs's bootstrap-binding-
+  // required staging-authoring admission).
+  "intake-required",
+  "intake-design-questions-required",
+  "bootstrap-binding-required",
 ]);
 
 const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);

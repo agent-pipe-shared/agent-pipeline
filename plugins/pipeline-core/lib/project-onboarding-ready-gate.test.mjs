@@ -142,7 +142,7 @@ test("the gate accepts \"claude\" and \"codex\" explicitly and threads the exact
 test("every controlling non-ready lifecycle status is preserved and denied without forwarding diagnostics", () => {
   const path = root();
   try {
-    assert.equal(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length, 27);
+    assert.equal(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length, 30);
     for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
       assert.throws(() => requireProjectOnboardingReady({
         rootDir: path,
@@ -160,6 +160,31 @@ test("every controlling non-ready lifecycle status is preserved and denied witho
         assert.equal(error.lifecycleStatus, status);
         assert.equal(error.message.includes("private/raw/diagnostic"), false);
         assert.equal(error.message.includes(path), false);
+        return true;
+      });
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+// NVA-BL-INTAKEBIND-1 (AC-2): the Wave 4 onboarding coordinator's three new
+// v4Inspection statuses (design.md SSa.4) must be recognized as controlling
+// non-ready statuses -- a repo observed at any of them must fail as
+// PORG-NOT-READY with the matching lifecycleStatus, never fall through to the
+// fail-closed-on-unknown-status PORG-INVALID-OBSERVATION branch.
+test("intake-required, intake-design-questions-required, and bootstrap-binding-required fail closed as PORG-NOT-READY, not PORG-INVALID-OBSERVATION", () => {
+  const path = root();
+  try {
+    for (const status of ["intake-required", "intake-design-questions-required", "bootstrap-binding-required"]) {
+      assert(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.includes(status), status);
+      assert.throws(() => requireProjectOnboardingReady({
+        rootDir: path,
+        intent: "session",
+        runner: "codex",
+        inspect: () => ({ ...readyResult(path, "session"), status }),
+      }), (error) => {
+        assert(error instanceof ProjectOnboardingReadyError);
+        assert.equal(error.code, "PORG-NOT-READY");
+        assert.equal(error.lifecycleStatus, status);
         return true;
       });
     }
