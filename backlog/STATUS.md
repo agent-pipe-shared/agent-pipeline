@@ -120,7 +120,7 @@
 | pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table | closed | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.guard-lifecycle-ready-blocks-claude-memory-writes | closed | defect | pipeline | 2026-07-29 | — |
-| pipeline.guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands | open | workflow-improvement | pipeline | 2026-08-19 | — |
+| pipeline.guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands | closed | workflow-improvement | pipeline | 2026-08-19 | — |
 | pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.guard-lifecycle-ready-runner-allowlist-incomplete | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-maintenance-window-rejects-a-fresh-setup1-authority-file | closed | defect | pipeline | 2026-08-09 | — |
@@ -303,6 +303,6 @@
 
 ## Counts
 
-- open: 58
+- open: 57
 - in_progress: 7
-- closed: 230
+- closed: 231

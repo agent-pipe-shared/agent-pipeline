@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "47ea41d46a51116f1f31ada7518518b12132f3481f61e60e3c704098fa31cc41"
+    "transitionHead": "4fdb26fa542477d50c463009575ce447415c4aef65b500143aae14714ec0bf57"
   },
   "counts": {
-    "open": 58,
+    "open": 57,
     "in_progress": 7,
-    "closed": 230
+    "closed": 231
   },
   "items": [
     {
@@ -1293,11 +1293,15 @@
     },
     {
       "id": "pipeline.guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Nova Wave 4, dispatch NVA-W4-COORD-1 (intake-checkpoint coordinator Phase 1) — found and named while implementing, not fixed in that dispatch's scope"
+      "source": "Nova Wave 4, dispatch NVA-W4-COORD-1 (intake-checkpoint coordinator Phase 1) — found and named while implementing, not fixed in that dispatch's scope",
+      "closedAt": "2026-08-19",
+      "closureRepository": "self",
+      "closureCommit": "6cc76ee3602b0f2b59700bea5d6223b25a17adc4",
+      "closureEvidence": "backlog/items/2026-08-19-guard-lifecycle-ready-has-no-admission-branch-for-the-intake-checkpoint-subcommands.md"
     },
     {
       "id": "pipeline.guard-lifecycle-ready-rejects-plan-runtime-intent-argv",
