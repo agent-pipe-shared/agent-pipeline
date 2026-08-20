@@ -3,6 +3,42 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
+## Current handover — local Nova 0.6.0 candidate preparation (2026-08-20)
+
+The requested candidate version remains **`0.6.0`**. A local build must use
+only build metadata, in the form `0.6.0+<runner>.<UTC-datetime>.<functional-oid>`;
+this is not a semver patch bump to `0.6.1`.
+
+The backlog is ledger-consistent at **39 open / 3 in progress / 259 closed**.
+Closed items are ignored. Of the 39 open items, **34 are explicitly deferred**
+to Alfred, Nightwing, Phoenix, Nova B, or a later scope and are not Nova-A
+release work. The remaining Nova-relevant work is:
+
+- in progress: `pipeline.afk-assumption-mode` and
+  `pipeline.session-keep-awake`, both candidate/release-pending;
+- in progress but design-only: `pipeline.execution-model-switchback` — no
+  implementation dispatch has started, and its non-rewinding ledger status is
+  documented in the item;
+- open: `pipeline.handover-file-has-no-rotation-obligation`,
+  `pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible`,
+  `pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery`,
+  `pipeline.long-dispatches-truncate-before-emitting-their-report`, and
+  `pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost`.
+
+The local-selector correction is included in the candidate preparation: the
+project settings no longer enable the release marketplace selector. A local
+user-scope install must select `pipeline-core@agent-pipeline-local`; the
+release selector must not be enabled alongside it. The installed local cache
+still needs to be refreshed and the next session restarted/reloaded before the
+new hook guard code can be observed.
+
+Candidate preparation is committed through `49f4db4a`. A previous Verify run
+covered 383 suites and was otherwise green except for the known
+`human-guard-override-tests` host/marketplace exception; its backlog-state
+finding was caused by the temporary status-file/ledger mismatch and is not
+used as final candidate evidence. Final Verify and the exact build-metadata
+stamp remain pending on the next clean candidate commit.
+
 **Last updated:** 2026-08-19 — PO decided the full backlog-triage block, the deniedRoots and Alfred-pull-forward decisions, reported 2 live external greenfield-test bugs (Codex/Windows, Claude/Windows) both now fixed, and instructed an immediate push to the feature branch (token-budget urgency) regardless of the still-open Critic FAIL. New candidate `0.6.0+{claude,codex}.20260819185528.6e30c76` (commit `4203e344`); push-approval ceremony in progress. Earlier same-day history (Wave 5 rounds 1-3, TP-3 ceremony, round-2 Critic orphan through the TP-3 GMW ceremony) is archived below.
 
 **Final Nova A 0.6.0 T1 Critic gate review returned FAIL (round 1 of the QG-13 cap of 2, `claude-opus-5 at max`).** 4 findings, disposed without PO confirmation (unanswered `AskUserQuestion`, proceeded per standing auto-mode guidance): **F1** (state-numeric-claims-tests registers only its own fixture, not the live checker) — corrected, already resolved earlier (commit `1083229b`), entry was stale. **F2** (29/31 commits lack a `Dispatch:` trailer, incl. `0b2386fd` authored directly by this Elephant) — accepted as a disclosed self-application deviation, not laundered. **F3+F4** (Critic dispatched against `exitCode:1`; that exception has no recorded owner/expiry) — same standing `human-guard-override-tests=1` marketplace-mirror exception; owner PO (André), no confirmed expiry, proposed 2026-08-26 checkpoint (placeholder). Round 2 was launched then orphaned (see archive below); round 3 not yet run. **This candidate therefore still carries an unresolved Critic FAIL** — every stamp/push since is per explicit PO instruction, not a passed high-risk gate.
@@ -253,4 +289,3 @@ Verify against the step-6 tree: clean after one self-inflicted `test-tmpdir-budg
   ist vor Staging, Commit oder Push wiederherzustellen. Dies autorisiert weder
   einen `main`-Merge noch einen Statusübergang oder einen weitergehenden
   Guard-Bypass.
-
