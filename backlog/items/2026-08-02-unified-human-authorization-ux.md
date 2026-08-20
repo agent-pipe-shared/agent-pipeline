@@ -98,6 +98,8 @@ introduced.
 
 ### Sprint deferral (2026-08-17)
 
+- **Decision:** deferred — remaining scope owned by Sprint Alfred.
+
 Remaining scope deferred to Sprint Alfred ("Agent-first architecture,
 mechanical governance, measurable rigor, and control integrity" —
 ADR-0043's 2026-08-17 amendment). PRD-approval migration and the adoption-

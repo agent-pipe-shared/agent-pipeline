@@ -54,7 +54,7 @@ has not arrived yet would guess at the seams.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Decision:** deferred — owned by Sprint Nightwing.
 - **Rationale:** the PO's own original framing already names this an
   efficiency pass to do once several files are ready for modularisation
   together, not urgent. Matches Sprint Nightwing's confirmed scope

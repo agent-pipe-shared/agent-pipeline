@@ -123,7 +123,7 @@ discoverable only by reading its source.** Three cheap moves, in order of return
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Decision:** deferred — owned by Sprint Nightwing.
 - **Rationale:** matches Sprint Nightwing's confirmed scope exactly —
   "Product experience: onboarding, configuration, documentation and
   low-friction adoption" (`docs/adr/0043-post-go-live-sprint-model.md`'s

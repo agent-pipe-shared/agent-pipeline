@@ -60,7 +60,7 @@ recovers) to proactive (never hits the wall).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Nightwing ("Product experience:
+- **Decision:** deferred — owned by Sprint Nightwing ("Product experience:
   onboarding, configuration, documentation and low-friction adoption" —
   ADR-0043's 2026-08-17 amendment). Both findings are proactive-check
   additions to an already-correct, already fail-closed happy path — exactly

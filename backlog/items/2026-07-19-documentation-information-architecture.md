@@ -15,7 +15,7 @@ This public baseline record was recovered from the Sentinel PRD. It records scop
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Decision:** deferred — owned by Sprint Nightwing.
 - **Rationale:** already informally confirmed as Nightwing scope in
   `backlog/evidence/2026-07-24-sprint-portfolio-assignment.md`; now
   formalized against `docs/adr/0043-post-go-live-sprint-model.md`'s

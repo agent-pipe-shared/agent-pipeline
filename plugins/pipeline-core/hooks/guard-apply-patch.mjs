@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Extract apply_patch paths and run the existing write-path guards per path. */
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -17,6 +17,48 @@ const GUARDS = [
   // per-file admission decision is made for.
   { path: fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url)), args: ["--runner", "codex"] },
 ];
+const MAX_PARALLEL_GUARDS = 12;
+const CHILD_TIMEOUT_MS = 4_000;
+
+function runGuard({ path, args, input }) {
+  return new Promise((resolve) => {
+    let settled = false;
+    let stderr = "";
+    const child = spawn(process.execPath, [path, ...args], {
+      cwd: process.cwd(),
+      env: process.env,
+      stdio: ["pipe", "ignore", "pipe"],
+    });
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      finish({ status: null, signal: "SIGTERM", timedOut: true });
+    }, CHILD_TIMEOUT_MS);
+    const finish = (result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      resolve({ ...result, stderr });
+    };
+    child.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    child.on("error", (error) => finish({ status: null, error }));
+    child.on("close", (status, signal) => finish({ status, signal }));
+    child.stdin.end(input);
+  });
+}
+
+async function runGuardsInParallel(jobs) {
+  const results = [];
+  let next = 0;
+  async function worker() {
+    while (next < jobs.length) {
+      const job = jobs[next++];
+      results.push({ job, result: await runGuard(job) });
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(MAX_PARALLEL_GUARDS, jobs.length) }, worker));
+  return results;
+}
+
 function block(reason) {
   process.stderr.write(`BLOCKED (guard-apply-patch, plugin pipeline-core): ${reason}\n`);
   process.exit(2);
@@ -94,20 +136,24 @@ if (beginCount !== 1 || endCount !== 1 || paths.length === 0) block("non-empty a
 // apply_patch on its own -- either fact changing should make that suite
 // fail, forcing a reader to reconsider this comment rather than silently
 // drift past it.
+const jobs = paths.flatMap((filePath) => GUARDS.map((guard) => ({
+  ...guard,
+  filePath,
+  input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: filePath } }),
+})));
 let exitCode = 0;
 const stderr = [];
-for (const filePath of paths) {
-  for (const guard of GUARDS) {
-    const result = spawnSync(process.execPath, [guard.path, ...guard.args], {
-      cwd: process.cwd(), env: process.env, encoding: "utf8",
-      input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: filePath } }),
-      shell: false,
-      timeout: 4_000,
-    });
-    if (result.stderr) stderr.push(result.stderr.trimEnd());
-    if (result.status === 2) exitCode = 2;
-    else if (result.status === 1 && exitCode === 0) exitCode = 1;
-    else if (![0, 1, 2].includes(result.status)) { exitCode = 2; stderr.push(`[guard-apply-patch] Guard failed for ${filePath}.`); }
+const results = await runGuardsInParallel(jobs);
+for (const { job, result } of results) {
+  if (result.stderr) stderr.push(result.stderr.trimEnd());
+  if (result.timedOut) {
+    exitCode = 2;
+    stderr.push(`[guard-apply-patch] Guard timed out for ${job.filePath}.`);
+  } else if (result.status === 2) exitCode = 2;
+  else if (result.status === 1 && exitCode === 0) exitCode = 1;
+  else if (![0, 1, 2].includes(result.status)) {
+    exitCode = 2;
+    stderr.push(`[guard-apply-patch] Guard failed for ${job.filePath}.`);
   }
 }
 if (stderr.length > 0) process.stderr.write(`${stderr.filter(Boolean).join("\n")}\n`);

@@ -280,6 +280,8 @@ scope for both NVA-SIGENTRY-1 and NVA-SIGDISCLOSE-1.
 
 ### Release-gate decision, 2026-08-18
 
+- **Decision:** deferred — remaining scope owned by Sprint Alfred.
+
 - **Decision:** confirmed and queued for dispatch — deferred to Sprint
   Alfred.
 - **Rationale:** the only remaining piece, Direction step 1 (a new,

@@ -74,7 +74,7 @@ of the authority directory. Runner-independent and platform-independent.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Alfred.
+- **Decision:** deferred — owned by Sprint Alfred.
 - **Rationale:** an authority verdict that need not survive a checkout is a
   control-integrity gap — Sprint Alfred's confirmed scope
   (`docs/adr/0043-post-go-live-sprint-model.md`'s 2026-08-17 amendment).

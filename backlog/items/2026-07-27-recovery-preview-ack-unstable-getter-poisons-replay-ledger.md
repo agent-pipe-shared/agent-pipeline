@@ -62,7 +62,7 @@ line, not a time-triggered item; does not block CYB-A0's closure.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Alfred.
+- **Decision:** deferred — owned by Sprint Alfred.
 - **Rationale:** matches Alfred's scope ("mechanical governance, measurable
   rigor, and control integrity") — a small, mechanical robustness hardening
   with no live impact today (the item's own Impact assessment: availability-

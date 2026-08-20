@@ -198,6 +198,8 @@ one dispatch's context.
 
 ### Sprint deferral (2026-08-17)
 
+- **Decision:** deferred — remaining points owned by Sprint Alfred.
+
 Points 1-3 deferred to Sprint Alfred ("Agent-first architecture, mechanical
 governance, measurable rigor, and control integrity" — ADR-0043's
 2026-08-17 amendment) — session-identity plumbing and a push-gate advisory

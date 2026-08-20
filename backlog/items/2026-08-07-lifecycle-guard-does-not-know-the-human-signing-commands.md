@@ -68,7 +68,7 @@ Not designed here. Two candidates, and the second is the one that matters:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, still open — deferred to Sprint Alfred. Verified
+- **Decision:** deferred — owned by Sprint Alfred. Verified
   live: `isHumanPoSigningCommand()`
   (`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:1221-1224`) still
   checks only `["setup", "approve", "approve-all"]` — `approve-critical`,

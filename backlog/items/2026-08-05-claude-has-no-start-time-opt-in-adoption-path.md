@@ -47,7 +47,7 @@ Owner: PO. Due: 2026-09-05.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accept-deferred.
+- **Decision:** deferred — owned by Sprint Nightwing.
 - **Rationale:** re-verified 2026-08-07: `plugins/pipeline-core/hooks/` has a
   Codex-only session-start hint (`codex-session-start-hint.mjs`) with no
   Claude equivalent; no commit since filing adds a bare-repo, pre-plugin-

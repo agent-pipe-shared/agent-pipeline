@@ -74,6 +74,25 @@ check("every extracted path is subjected to the configured write guard", () => {
   blocked(run(patch, { root }), /PATCH-LOCK/);
 });
 
+check("multi-file patches use bounded parallel guard fan-out", () => {
+  const source = readFileSync(guard, "utf8");
+  assert.match(source, /const MAX_PARALLEL_GUARDS = 12/u);
+  assert.match(source, /async function runGuardsInParallel\(jobs\)/u);
+  assert.match(source, /Promise\.all\(Array\.from\(\{ length: Math\.min\(MAX_PARALLEL_GUARDS/u);
+  const patch = [
+    "*** Begin Patch",
+    ...Array.from({ length: 16 }, (_, index) => [
+      `*** Update File: docs/parallel-${index}.md`,
+      "@@",
+      "-old",
+      "+new",
+    ]).flat(),
+    "*** End Patch",
+  ].join("\n");
+  const result = run(patch);
+  assert.equal(result.status, 0, result.stderr);
+});
+
 check("every governed patch target requires dispatch-ready lifecycle without path exemptions", () => {
   const root = fixture();
   writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
@@ -174,8 +193,8 @@ check("architectural invariant: evaluateLifecycleReadyGuard's own outer tool-nam
 
 check("architectural invariant: guard-apply-patch.mjs's spawn loop synthesizes a bare Edit shape for guard-lifecycle-ready.mjs, never the original apply_patch tool_name or command envelope (regression pin: this is the only translation boundary before evaluateLifecycleReadyGuard, which does not itself recognize apply_patch)", () => {
   const source = readFileSync(guard, "utf8");
-  const loopStart = source.indexOf("for (const filePath of paths)");
-  assert.ok(loopStart >= 0, "expected to find the per-path translation loop in guard-apply-patch.mjs");
+  const loopStart = source.indexOf("const jobs = paths.flatMap");
+  assert.ok(loopStart >= 0, "expected to find the per-path translation jobs in guard-apply-patch.mjs");
   const loopBlock = source.slice(loopStart);
   assert.match(loopBlock, /input:\s*JSON\.stringify\(\{\s*tool_name:\s*"Edit",\s*tool_input:\s*\{\s*file_path:\s*filePath\s*\}\s*\}\)/su);
   assert.doesNotMatch(loopBlock, /tool_name:\s*toolName/u);

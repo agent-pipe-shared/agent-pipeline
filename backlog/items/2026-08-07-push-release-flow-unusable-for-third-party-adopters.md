@@ -281,6 +281,8 @@ commitment to any of them:
 
 ### Release-gate decision, 2026-08-18
 
+- **Decision:** deferred — remaining scope owned by Sprint Alfred.
+
 - **Decision:** confirmed and queued for dispatch — deferred to Sprint
   Alfred.
 - **Rationale:** the 2026-08-11 PO decision ("human intent captured once,

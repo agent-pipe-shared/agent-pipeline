@@ -73,7 +73,7 @@ Not designed here. Candidates worth considering, not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Alfred ("Agent-first
+- **Decision:** deferred — owned by Sprint Alfred ("Agent-first
   architecture, mechanical governance, measurable rigor, and control
   integrity" — ADR-0043's 2026-08-17 amendment). Candidate 1 (per-run
   evidence files, `verify-latest.json` as a pointer updated only by whichever

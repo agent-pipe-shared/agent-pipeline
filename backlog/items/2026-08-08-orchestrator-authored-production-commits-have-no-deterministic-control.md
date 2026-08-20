@@ -109,6 +109,8 @@ record less true rather than more.
 
 ### Update, 2026-08-18 — release-bar triage: direction 1 decided
 
+- **Decision:** deferred — remaining scope owned by Sprint Alfred.
+
 - **Decision:** decided, queued for dispatch. Direction 1 (a decidable
   commit-message-type check for a delivery/review range, independent of
   the authorship-control question above) was flagged in the 2026-08-11

@@ -59,6 +59,8 @@ non-architecture tasks).
 
 ### Update, 2026-08-18 — release-bar triage: reassigned off Nova A/B to Sprint Alfred
 
+- **Decision:** deferred — owned by Sprint Alfred.
+
 - **Decision:** unchanged on substance (accepted, real observation, needs a
   measurement pass before any fix, not resolvable by reading alone this
   triage pass) — correcting only the assignment. "Nova A" and "Nova B" are

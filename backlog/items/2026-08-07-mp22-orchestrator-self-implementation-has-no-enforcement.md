@@ -209,6 +209,8 @@ date.
 
 ## Sprint update, 2026-08-17
 
+- **Decision:** deferred — owned by Sprint Alfred.
+
 Deferred to Sprint Alfred — "mechanical governance, measurable rigor, and
 control integrity" is this item's charter almost verbatim, and the
 2026-08-11 decision already turned it into a design pass, not an urgent

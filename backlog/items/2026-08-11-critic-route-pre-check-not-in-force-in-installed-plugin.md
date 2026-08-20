@@ -77,7 +77,7 @@ dispatch. Two things would close it:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Alfred.
+- **Decision:** deferred — owned by Sprint Alfred.
 - **Rationale:** matches Alfred's confirmed scope — "mechanical governance,
   measurable rigor, and control integrity" (`docs/adr/0043-post-go-live-
   sprint-model.md`, 2026-08-17 amendment). Both proposed directions

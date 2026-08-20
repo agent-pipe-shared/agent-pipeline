@@ -59,7 +59,7 @@ agent-executable path, not as a universal wrapper around every refusal.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Decision:** deferred — owned by Sprint Nightwing.
 - **Rationale:** matches Nightwing's scope ("product experience: onboarding
   ... low-friction adoption") — session-ergonomics friction during ordinary
   agent work (a benign, agent-executable-recoverable denial escalating to a

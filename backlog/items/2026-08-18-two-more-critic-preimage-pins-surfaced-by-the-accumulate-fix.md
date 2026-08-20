@@ -88,6 +88,8 @@ today, so this blocks nothing, same as its siblings.
 
 ### Re-triaged, 2026-08-18 (0.6.0 release sweep)
 
+- **Decision:** deferred — duplicate covered by the Sprint Alfred item.
+
 - **Decision:** accepted, open — not a new problem: both files this item
   names (`codex-critic-dispatch.schema.json`, `codex-critic-host.mjs`) are
   the exact same two "never-valid" entries

@@ -100,7 +100,7 @@ Not designed here. Candidates, explicitly not a commitment:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Alfred. Re-verified 2026-08-17:
+- **Decision:** deferred — owned by Sprint Alfred. Re-verified 2026-08-17:
   `plugins/pipeline-core/agents/critic.md:4` and
   `plugins/pipeline-core/agents/goldfish-deep.md:4` both still carry
   `model: sonnet` — unresolved. The practical dispatch-layer mitigation

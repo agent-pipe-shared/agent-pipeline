@@ -88,7 +88,7 @@ that no longer exists. Reproducible wherever `po-authority-decision-plan` runs.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Alfred. Re-verified 2026-08-17:
+- **Decision:** deferred — owned by Sprint Alfred. Re-verified 2026-08-17:
   both cited literals (`plugins/pipeline-core/scripts/pipeline-state.mjs:4203`,
   `:4481` — line numbers shifted from the original `:4326`/`:4052` but the
   same unconditional `status: "unavailable"` object literal is still there,

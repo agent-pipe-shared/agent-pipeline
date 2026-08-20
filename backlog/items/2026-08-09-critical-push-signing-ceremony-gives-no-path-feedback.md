@@ -63,7 +63,7 @@ actually landed, or what to call instead of a wrong guess.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, deferred to Sprint Nightwing.
+- **Decision:** deferred — owned by Sprint Nightwing.
 - **Rationale:** matches Nightwing's confirmed scope — "product experience
   ... and low-friction adoption" (`docs/adr/0043-post-go-live-sprint-model.md`,
   2026-08-17 amendment) — this is exactly a CLI-ergonomics/feedback gap

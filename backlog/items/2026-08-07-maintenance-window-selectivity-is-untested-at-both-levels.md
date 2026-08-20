@@ -91,7 +91,7 @@ level — the point is the invariant, not the case count.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted, still open — deferred to Sprint Alfred. Re-verified
+- **Decision:** deferred — owned by Sprint Alfred. Re-verified
   the item's own framing: this is explicitly "not a live defect but an
   untested invariant" (selectivity was empirically confirmed intact against
   a real signed window). Adding the missing negative-case coverage

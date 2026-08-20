@@ -58,7 +58,7 @@ Two consequences worth naming before anyone implements this:
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** accepted — deferred to a dedicated design round, not this AFK block.
+- **Decision:** deferred — owned by a dedicated future design round, not this AFK block.
 - **Rationale:** the item explicitly scopes itself as "Direction, not a design" — declaring per-gate input paths, verifying declarations rather than trusting them, and sharing the lever with the verify-growth item (`pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost`, itself only partly accepted this same block for exactly the reason that its own part 3, selective-vs-full tiering, "trades away a real guarantee" and needs a PO-visible decision) are real architecture questions, not a same-session patch. Rushing an implementation here risks exactly the "envelope is a lie" failure mode the item itself warns against (consequence 2). This also touches the push/release gate chain directly, which is Critic-mandatory/Design-tier surface per MP-07 — not proportionate for an unattended AFK block to design and accept unilaterally.
 - **Assignment (if accepted):** a future dedicated design session, paired with `pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost` (shared mechanism: per-suite/per-gate declared inputs). Not folded into the 0.5.5 candidate.
 - **Date:** 2026-08-16

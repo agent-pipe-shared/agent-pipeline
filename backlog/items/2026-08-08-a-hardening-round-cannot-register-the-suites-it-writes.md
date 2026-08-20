@@ -115,6 +115,8 @@ improved and the mechanism has not.
 
 ### Update, 2026-08-18 — directions 1/2 named to a specific still-open Sprint
 
+- **Decision:** deferred — owned by Sprint Alfred.
+
 Directions 1 and 2 (whether suite registration is the same risk class as
 editing `verify.mjs`'s logic, and if so making the TP-3 ceremony batchable)
 were recorded as "fully open" with no assignment or target window, which the

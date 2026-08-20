@@ -121,6 +121,8 @@ Constraints any design must hold:
 
 ### Sprint deferral (2026-08-17)
 
+- **Decision:** deferred — owned by Sprint Alfred.
+
 Deferred to Sprint Alfred ("Agent-first architecture, mechanical governance,
 measurable rigor, and control integrity" — ADR-0043's 2026-08-17
 amendment) — SECURITY/GUARDRAIL-class design work, matches Alfred's scope

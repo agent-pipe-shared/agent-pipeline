@@ -15,7 +15,7 @@ This public baseline record was recovered from the Sentinel PRD. It records scop
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** no change — already assigned to Sprint Phoenix, per
+- **Decision:** deferred — owned by Sprint Phoenix. No change — already assigned per
   `backlog/evidence/2026-07-24-sprint-portfolio-assignment.md`'s "Confirmed
   later-Sprint assignment" table (PO-confirmed 2026-07-24, predates and is
   unaffected by the 2026-08-17 Alfred/Nightwing/Batman confirmation).

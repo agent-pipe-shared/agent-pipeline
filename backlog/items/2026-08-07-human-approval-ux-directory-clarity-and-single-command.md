@@ -147,6 +147,8 @@ Related, same family: the confirmation prompt is English-only
 
 ### Release-gate decision, 2026-08-18
 
+- **Decision:** deferred — remaining scope owned by Sprint Alfred.
+
 - **Decision:** confirmed and queued for dispatch — deferred to Sprint
   Alfred.
 - **Rationale:** the remaining scope (a `sign-intent --request <path>` flag
