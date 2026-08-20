@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-19
 closed_at: 2026-08-20
 closure_repository: self
-closure_commit: b5354f25
+closure_commit: b5354f250e2ff10698062fa4927f471f5fc3357a
 closure_evidence: plugins/pipeline-core/hooks/onboarding-consent-guard.test.mjs
 source: "PO, live, 2026-08-19: full session transcript from a fresh Claude Code v2.1.235 greenfield session in a separate, ungoverned test repo (~/src/Rune_Test1_Claude_060_53). Quoted directly by the PO with the exact terminal output."
 ---
