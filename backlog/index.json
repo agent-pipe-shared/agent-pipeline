@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "60d24f6d1993cfc9dfe1f0b861262940a6fa919fa1bd09cb4cd6995d086c3867"
+    "transitionHead": "11042a07c8cafe26a82e2f3c3559efe881e2f916fe9e4d017d6436b4c4851ac6"
   },
   "counts": {
-    "open": 40,
+    "open": 39,
     "in_progress": 3,
-    "closed": 258
+    "closed": 259
   },
   "items": [
     {
@@ -1331,12 +1331,16 @@
     },
     {
       "id": "pipeline.greenfield-ask-before-install-duty-ignored-live",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
       "source": "PO, live, 2026-08-19: full session transcript from a fresh Claude Code v2.1.235 greenfield session in a separate, ungoverned test repo (~/src/Rune_Test1_Claude_060_53). Quoted directly by the PO with the exact terminal output.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-20",
+      "closureRepository": "self",
+      "closureCommit": "b5354f25",
+      "closureEvidence": "plugins/pipeline-core/hooks/onboarding-consent-guard.test.mjs"
     },
     {
       "id": "pipeline.greenfield-onboarding-writes-mixed-authority-tiers",
