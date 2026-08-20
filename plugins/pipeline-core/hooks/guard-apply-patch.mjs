@@ -20,6 +20,14 @@ const GUARDS = [
 const MAX_PARALLEL_GUARDS = 12;
 const CHILD_TIMEOUT_MS = 4_000;
 
+function killGuardProcess(child) {
+  if (child.pid === undefined) return;
+  if (process.platform !== "win32") {
+    try { process.kill(-child.pid, "SIGKILL"); return; } catch {}
+  }
+  try { child.kill("SIGKILL"); } catch {}
+}
+
 function runGuard({ path, args, input }) {
   return new Promise((resolve) => {
     let settled = false;
@@ -28,10 +36,13 @@ function runGuard({ path, args, input }) {
       cwd: process.cwd(),
       env: process.env,
       stdio: ["pipe", "ignore", "pipe"],
+      detached: process.platform !== "win32",
     });
     const timer = setTimeout(() => {
-      child.kill("SIGTERM");
-      finish({ status: null, signal: "SIGTERM", timedOut: true });
+      child.stdin.destroy();
+      child.stderr.destroy();
+      killGuardProcess(child);
+      finish({ status: null, signal: "SIGKILL", timedOut: true });
     }, CHILD_TIMEOUT_MS);
     const finish = (result) => {
       if (settled) return;
@@ -139,7 +150,11 @@ if (beginCount !== 1 || endCount !== 1 || paths.length === 0) block("non-empty a
 const jobs = paths.flatMap((filePath) => GUARDS.map((guard) => ({
   ...guard,
   filePath,
-  input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: filePath } }),
+      input: JSON.stringify({
+        tool_name: "Edit",
+        session_id: input.session_id ?? input.sessionId,
+        tool_input: { file_path: filePath },
+      }),
 })));
 let exitCode = 0;
 const stderr = [];

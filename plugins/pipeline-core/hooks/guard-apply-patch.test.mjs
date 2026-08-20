@@ -155,7 +155,7 @@ check("the lifecycle guard is invoked per patched path with an explicit codex ru
   const root = fixture();
   writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
   const patch = "*** Begin Patch\n*** Update File: src/a.mjs\n*** End Patch";
-  const input = JSON.stringify({ tool_name: "apply_patch", tool_input: { command: patch } });
+  const input = JSON.stringify({ tool_name: "apply_patch", session_id: "apply-patch-session", tool_input: { command: patch } });
   const result = spawnSync(process.execPath, [guard], {
     cwd: root,
     env: { ...process.env, CLAUDE_PROJECT_DIR: root, CLAUDECODE: "1" },
@@ -196,9 +196,12 @@ check("architectural invariant: guard-apply-patch.mjs's spawn loop synthesizes a
   const loopStart = source.indexOf("const jobs = paths.flatMap");
   assert.ok(loopStart >= 0, "expected to find the per-path translation jobs in guard-apply-patch.mjs");
   const loopBlock = source.slice(loopStart);
-  assert.match(loopBlock, /input:\s*JSON\.stringify\(\{\s*tool_name:\s*"Edit",\s*tool_input:\s*\{\s*file_path:\s*filePath\s*\}\s*\}\)/su);
+  assert.match(loopBlock, /tool_name:\s*"Edit"/u);
+  assert.match(loopBlock, /session_id:\s*input\.session_id\s*\?\?\s*input\.sessionId/u);
+  assert.match(loopBlock, /tool_input:\s*\{\s*file_path:\s*filePath\s*\}/u);
   assert.doesNotMatch(loopBlock, /tool_name:\s*toolName/u);
   assert.doesNotMatch(loopBlock, /tool_name:\s*"apply_patch"/u);
+  assert.match(loopBlock, /session_id:\s*input\.session_id\s*\?\?\s*input\.sessionId/u);
 });
 
 if (process.exitCode) process.exit(process.exitCode);

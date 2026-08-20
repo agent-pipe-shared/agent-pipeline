@@ -115,6 +115,7 @@ const GOVERNANCE_MARKERS = [
 ].filter((value, index, values) => values.indexOf(value) === index);
 const READY_RECEIPT_KEYS = ["intent", "schema", "status"];
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+const ONBOARDING_CONSENT_MARK_SCRIPT = fileURLToPath(new URL("../scripts/onboarding-consent-mark.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
 const LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
@@ -2509,6 +2510,29 @@ function isBootstrapBindingStagingAuthoringWrite(input, root) {
   return prdMatch !== null && INTAKE_FEATURE_ID_PATTERN.test(prdMatch[1]);
 }
 
+function onboardingConsentMarkerPath(root, sessionId) {
+  return join(root, ".claude", `.pipeline-install-consent-${sessionId}.json`);
+}
+
+function onboardingConsentBlocked(input, root) {
+  const toolName = String(input?.tool_name ?? "");
+  if (!WRITE_TOOLS.includes(toolName)) return null;
+  const sessionId = typeof input?.session_id === "string" && input.session_id !== ""
+    ? input.session_id
+    : null;
+  if (!sessionId) return null;
+  const markerPath = onboardingConsentMarkerPath(root, sessionId);
+  const exists = existsSync(markerPath);
+  if (exists) return null;
+  const command = `node "${ONBOARDING_CONSENT_MARK_SCRIPT}" record --root "${root}" --session-id "${sessionId}" --answer yes|no`;
+  return verdict(
+    2,
+    "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): GUARD-ONBOARDING-CONSENT-REQUIRED: "
+      + `Ask the user, then run this consent-record action with the observed answer:\n${command}\n`
+      + "After recording yes or no, retry the identical write action.\n",
+  );
+}
+
 /**
  * ADR-0059 Decision 5 / NOVA-LCR-HGO-2: everything below -- the LAUNCH_SCRIPT
  * external-restart refusal and the onboarding-readiness gate (denial code
@@ -2667,7 +2691,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   } catch {
     return blocked();
   }
-  if (!governed) return verdict(0);
+  if (!governed) return onboardingConsentBlocked(input, root) ?? verdict(0);
   if (toolName === "Bash" && isHumanPoSigningCommand(input.tool_input.command, root)) {
     return externalPoSigningOnly();
   }

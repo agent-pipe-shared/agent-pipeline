@@ -193,6 +193,35 @@ test("ordinary non-governed repositories remain untouched and never inspect life
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("ungoverned write tools require one session consent record, while Bash and missing sessions fail open", () => {
+  for (const toolName of ["Edit", "Write", "NotebookEdit"]) {
+    const path = root();
+    try {
+      const input = toolName === "NotebookEdit"
+        ? { tool_name: toolName, session_id: "session-positive", tool_input: { notebook_path: "src/game.ipynb" } }
+        : { tool_name: toolName, session_id: "session-positive", tool_input: { file_path: "src/game.js" } };
+      const blocked = evaluateLifecycleReadyGuard(input, { projectDir: path });
+      assert.equal(blocked.exitCode, 2, toolName);
+      assert.match(blocked.stderr, /GUARD-ONBOARDING-CONSENT-REQUIRED/u, toolName);
+      assert.match(blocked.stderr, /onboarding-consent-mark\.mjs.*record/u, toolName);
+      assert.match(blocked.stderr, /retry the identical/u, toolName);
+
+      writeFileSync(join(path, ".claude", ".pipeline-install-consent-session-positive.json"), "{}\n");
+      assert.deepEqual(evaluateLifecycleReadyGuard(input, { projectDir: path }), { exitCode: 0, stderr: "" });
+    } finally { rmSync(path, { recursive: true, force: true }); }
+  }
+
+  const noSessionPath = root();
+  const bashPath = root();
+  try {
+    assert.deepEqual(evaluateLifecycleReadyGuard(edit(), { projectDir: noSessionPath }), { exitCode: 0, stderr: "" });
+    assert.deepEqual(evaluateLifecycleReadyGuard(bash("printf unchanged"), { projectDir: bashPath }), { exitCode: 0, stderr: "" });
+  } finally {
+    rmSync(noSessionPath, { recursive: true, force: true });
+    rmSync(bashPath, { recursive: true, force: true });
+  }
+});
+
 test("source, calibration, lock, and runtime-only markers activate exact session readiness", () => {
   const markers = [
     ".agent-pipeline/core.lock.json",
