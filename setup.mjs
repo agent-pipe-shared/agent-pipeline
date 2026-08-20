@@ -1547,7 +1547,7 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   // CLI. This is correct only at this entry point -- a library helper below
   // must never guess the same thing about a project it does not observe.
   const env = deps.env ?? process.env;
-  const runner = env.CLAUDECODE === "1" ? "claude" : "codex";
+  const runner = env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex";
   if (opts.help) {
     console.log(
       `Usage: node setup.mjs [--defaults] [--configure-advisor-export] [--publish-po-profile] [--migrate-agents-adapter] [--help]

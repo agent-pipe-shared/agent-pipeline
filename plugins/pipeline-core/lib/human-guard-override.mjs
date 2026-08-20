@@ -733,6 +733,7 @@ function readJson(path) {
 function pluginIdentity(pluginRoot) {
   const root = physicalRoot(pluginRoot);
   const manifestPath = join(root, ".codex-plugin", "plugin.json");
+  const agyManifestPath = join(root, "plugin.json");
   const adapterPath = join(root, "hooks", "codex-pretool-guard.mjs");
   const grammarPath = join(root, "hooks", "guard-command-grammar.mjs");
   const policyPath = join(root, "lib", "human-guard-override.mjs");
@@ -740,28 +741,32 @@ function pluginIdentity(pluginRoot) {
   const cliPath = join(root, "scripts", "guard-human-override.mjs");
   for (const path of [
     manifestPath,
+    agyManifestPath,
     adapterPath,
     grammarPath,
     policyPath,
     windowsPrivatePath,
     cliPath,
   ]) {
+    if (!existsSync(path)) continue;
     const info = lstatSync(path);
     if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(path) !== path) {
       fail("HGO-PLUGIN", "loaded plugin file identity is unsafe");
     }
   }
   let manifest;
-  try { manifest = JSON.parse(readFileSync(manifestPath, "utf8")); }
+  const activeManifestPath = existsSync(manifestPath) ? manifestPath : (existsSync(agyManifestPath) ? agyManifestPath : null);
+  if (!activeManifestPath) fail("HGO-PLUGIN", "loaded plugin manifest is missing");
+  try { manifest = JSON.parse(readFileSync(activeManifestPath, "utf8")); }
   catch { fail("HGO-PLUGIN", "loaded plugin manifest is malformed"); }
-  if (manifest?.name !== "pipeline-core" || typeof manifest.version !== "string") {
+  if ((manifest?.name !== "pipeline-core" && manifest?.name !== "agent-pipeline-core") || (typeof manifest.version !== "string" && !existsSync(agyManifestPath))) {
     fail("HGO-PLUGIN", "loaded plugin identity is invalid");
   }
   return {
     root,
     name: manifest.name,
-    version: manifest.version,
-    manifestSha256: sha(readFileSync(manifestPath)),
+    version: manifest.version || "0.0.0",
+    manifestSha256: sha(readFileSync(activeManifestPath)),
     adapterSha256: sha(readFileSync(adapterPath)),
     grammarSha256: sha(readFileSync(grammarPath)),
     policySha256: sha(readFileSync(policyPath)),
@@ -787,6 +792,7 @@ function policyIdentity(root, pluginRoot, denials) {
     ".claude/pipeline.json",
     "project/guard-config.json",
     "project/pipeline.json",
+    ".agents/hooks.json",
   ].map((path) => {
     const absolute = join(root, path);
     if (!existsSync(absolute)) return { path, status: "absent", sha256: null };

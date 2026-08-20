@@ -237,7 +237,7 @@ function resolveRunner(flags, env) {
     if (!RUNNERS.has(flags.runner)) throw new Error(`Invalid --runner: ${flags.runner}\n${USAGE}`);
     return flags.runner;
   }
-  return env.CLAUDECODE === "1" ? "claude" : "codex";
+  return env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex";
 }
 
 function ownerNonce(flags, env, { platform = process.platform, assessWindowsPrivate = assessWindowsPrivatePath } = {}) {

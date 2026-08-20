@@ -4483,7 +4483,7 @@ function recoverRebindTransaction(dir, planSha256, nonce, io, stateIo) {
  * environment -- it only receives this already-resolved value.
  */
 function resolvePoRebindRunner(explicitRunner, env) {
-  return explicitRunner ?? (env.CLAUDECODE === "1" ? "claude" : "codex");
+  return explicitRunner ?? (env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex");
 }
 
 // ---- NVA-W4-2B: atomic PO-plan-acknowledgement without PRD mutation ----

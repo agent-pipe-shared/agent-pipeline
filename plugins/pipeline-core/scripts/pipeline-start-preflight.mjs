@@ -50,7 +50,7 @@ export function normalBootstrapPayloadReceipt(payload) {
 }
 
 function readInstalledPluginList(runner) {
-  const executable = runner === "claude" ? "claude" : "codex";
+  const executable = runner === "claude" ? "claude" : runner === "antigravity" ? "agy" : "codex";
   const result = spawnSync(executable, ["plugin", "list", "--json"], {
     encoding: "utf8",
     shell: false,
@@ -279,7 +279,7 @@ export function observePipelineStartPreflight({
   // Resolved BEFORE the reads below: both the source-manifest read and the
   // installed-plugin-list read must resolve through this same runner
   // identity, so each runner reads and reports its own distribution only.
-  const runner = env.CLAUDECODE === "1" ? "claude" : "codex";
+  const runner = env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex";
   const manifestRelativePath = runner === "claude" ? ".claude-plugin/plugin.json" : ".codex-plugin/plugin.json";
   let version;
   try {

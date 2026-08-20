@@ -174,7 +174,7 @@ const APPLY_SHAPED_COMMANDS = new Set(
 // threads this value explicitly -- it never raises and never passes
 // `undefined` onward to a library helper.
 function resolveActiveRunner(env) {
-  return env.CLAUDECODE === "1" ? "claude" : "codex";
+  return env.CLAUDECODE === "1" ? "claude" : (env.ANTIGRAVITY_AGENT === "1" || env.AI_AGENT === "antigravity") ? "antigravity" : "codex";
 }
 
 function usage() {
