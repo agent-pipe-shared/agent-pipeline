@@ -8,7 +8,7 @@ created: 2026-08-07
 source: "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
 closed_at: 2026-08-20
 closure_repository: self
-closure_commit: cf45a357
+closure_commit: cf45a357d77fee34e5f5aea8b633d8cdcbd5df93
 closure_evidence: backlog/items/2026-08-07-handover-file-has-no-rotation-obligation.md
 ---
 
