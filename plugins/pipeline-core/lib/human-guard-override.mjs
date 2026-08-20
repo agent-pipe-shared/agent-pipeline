@@ -919,6 +919,7 @@ function protectedPath(path) {
     || normalized === ".agent-pipeline" || normalized.startsWith(".agent-pipeline/")
     || normalized === ".git" || normalized.startsWith(".git/")
     || normalized === ".codex" || normalized.startsWith(".codex/")
+    || normalized === ".agents" || normalized.startsWith(".agents/")
     || /(^|\/)(?:secrets?|credentials?|tokens?|id_rsa|id_ed25519)(?:[./_-]|$)/u.test(normalized);
 }
 
@@ -926,6 +927,7 @@ function hardBoundaryPath(path) {
   const normalized = path.toLowerCase();
   return normalized === ".git" || normalized.startsWith(".git/")
     || normalized === ".codex" || normalized.startsWith(".codex/")
+    || normalized === ".agents" || normalized.startsWith(".agents/")
     || normalized === ".agent-pipeline" || normalized.startsWith(".agent-pipeline/")
     || /(^|\/)(?:secrets?|credentials?|tokens?|id_rsa|id_ed25519)(?:[./_-]|$)/u.test(normalized);
 }
