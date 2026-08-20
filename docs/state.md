@@ -9,7 +9,7 @@
 
 The requested candidate remains **`0.6.0`**. The local candidate is a
 build-metadata checkpoint, not a semver patch bump and not an official
-published release. The backlog is currently **39 open / 3 in progress / 259
+published release. The backlog is currently **38 open / 3 in progress / 260
 closed**; **34** non-closed items are deferred to Alfred, Nightwing, Phoenix,
 Nova B, or later scope and are not Nova-A release work.
 
@@ -19,8 +19,7 @@ Nova-A-relevant work still recorded here:
   `pipeline.session-keep-awake` (candidate/release pending);
 - in progress, design-only: `pipeline.execution-model-switchback` (no
   implementation dispatch started);
-- open: `pipeline.handover-file-has-no-rotation-obligation`,
-  `pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible`,
+- open: `pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible`,
   `pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery`,
   `pipeline.long-dispatches-truncate-before-emitting-their-report`, and
   `pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost`.
@@ -86,5 +85,5 @@ through the existing archive index and files:
   completion or go-live claim is made by this handover.
 - For this task, Nova B is explicitly out of scope.
 
-**Last updated:** 2026-08-20 — Decision 7 extraction audit completed for the
-current live handover; no rotation or extraction marker was written.
+**Last updated:** 2026-08-20 — Decision 7 extraction audit completed and the
+handover item closed; no rotation or extraction marker was written.

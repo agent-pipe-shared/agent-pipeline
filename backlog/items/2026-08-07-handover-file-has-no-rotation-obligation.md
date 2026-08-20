@@ -3,9 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.handover-file-has-no-rotation-obligation
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-07
 source: "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'."
+closed_at: 2026-08-20
+closure_repository: self
+closure_commit: cf45a357
+closure_evidence: backlog/items/2026-08-07-handover-file-has-no-rotation-obligation.md
 ---
 
 # `docs/state.md` grows every session and is never rotated; the context-economy gate was placed on the file that grows slowly
