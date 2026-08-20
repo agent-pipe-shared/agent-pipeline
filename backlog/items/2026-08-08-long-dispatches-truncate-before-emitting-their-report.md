@@ -489,3 +489,62 @@ one) for the announced-then-abandoned-pause failure mode; (2) whether the
 nested `run_in_background` non-resumption pattern recurs, and if so a
 scoped fix. Not a re-litigation of the shipped closing-allowance mechanism,
 which stays as-is.
+
+### Nova A final-wave investigation, 2026-08-20 — both gaps remain unclosed
+
+- **Decision:** no implementation and no closure. The two requested gaps were
+  investigated independently and neither has both a deterministic observable
+  signal and a safe, bounded fix that can be implemented within this task's
+  allowed paths. Nova B was not inspected, implemented, or dispatched.
+
+- **Gap 1 — announced pause, then no resume:** the announcement itself is an
+  observable transcript event, but abandonment is defined by the *absence* of a
+  later turn. The repository has no durable pause record, resume deadline, or
+  host liveness/turn-delivery event that binds that absence to the paused
+  dispatch. `stop_reason` is explicitly ruled out by the prior forensic
+  evidence: `null` occurred on both a confirmed-clean and a confirmed-
+  truncated final block. A report-shape check also cannot help because the
+  observed last message was complete and grammatical. Therefore no
+  deterministic detector can distinguish “deliberate pause awaiting a later
+  turn” from “deliberate pause abandoned” using the currently documented
+  dispatch evidence.
+
+- **Gap 2 — nested `run_in_background` does not resume its parent:** the
+  repository-local continuity contract makes only the broader host capability
+  observable. Without explicit host evidence, `continuity-status` projects
+  `resume-on-next-turn` and says the host has no guaranteed background wakeup;
+  with explicit evidence it projects `immediate`. That contract does not model
+  a nested background job, a parent-dispatch identity, a child completion
+  event, or a parent-wakeup acknowledgement. No repository-local dispatch
+  contract found in the scoped search supplies those correlations. The
+  2026-08-16 fork observation therefore remains a candidate observation, not
+  proof of a recurring defect.
+
+- **Ruled-out fixes:** changing the shipped closing allowance would target a
+  different budget-exhaustion mechanism and is forbidden here. A prompt-only
+  “resume after pause” instruction cannot prove that a host will deliver a
+  later turn. A generic background-capability flag cannot prove nested
+  parent/child delivery. Neither is deterministic or testable from the
+  permitted backlog/ADR paths, so neither was implemented.
+
+- **Smallest next authorized experiment:** run a Nova-A-only controlled probe
+  outside this backlog-only change with (a) a durable parent dispatch ID,
+  explicit pause announcement, remaining-budget value, and bounded expected
+  resume deadline, and (b) a unique nested-job ID, parent ID, child completion
+  event, task-notification event, and parent-resumed/parent-terminal event.
+  Repeat each scenario across the available host modes and record the event
+  sequence from machine output, not transcript reconstruction. The experiment
+  may support a design only if it reproduces the failure and supplies a stable
+  predicate such as `pause-record + deadline-expired-without-resume` or
+  `child-complete + no-parent-wakeup`. Any implementation would then require a
+  separately authorized runtime/orchestration change and focused behavioral
+  tests; it is outside this task.
+
+- **Verification and limitations:** repository HEAD matched the expected base
+  `ec49e8d34a0829f888b7d049f4971a8db8ccf5e9`; the supplied dispatch record was
+  pending with no commits. No runtime/orchestration code, template, Nova B
+  material, or closing-allowance mechanism was changed. This update is a
+  backlog-only investigation record; no implementation test applies. The
+  required `git diff --check` was run. Full Verify was not run or claimed.
+
+- **Status:** `open` — no fabricated closure; Nova-A scope is preserved.
