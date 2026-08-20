@@ -1,8 +1,4 @@
 {
-  "statusLine": {
-    "type": "command",
-    "command": "node plugins/pipeline-core/scripts/statusline-context.mjs"
-  },
   "permissions": {
     "allow": [
       "Bash(git push *)",
@@ -10,15 +6,10 @@
       "Bash(node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push *)"
     ]
   },
-  "enabledPlugins": {
-    "pipeline-core@agent-pipeline": true
+  "statusLine": {
+    "type": "command",
+    "command": "node plugins/pipeline-core/scripts/statusline-context.mjs"
   },
-  "extraKnownMarketplaces": {
-    "agent-pipeline": {
-      "source": {
-        "source": "github",
-        "repo": "agent-pipe-shared/agent-pipeline"
-      }
-    }
-  }
+  "enabledPlugins": {},
+  "extraKnownMarketplaces": {}
 }
