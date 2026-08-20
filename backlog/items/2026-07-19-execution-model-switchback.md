@@ -224,3 +224,32 @@ The canonical ledger retains this item at `in_progress`; it does not permit a
 rewind to `open`. The current evidence is design-only and no implementation
 dispatch has started. It is intentionally carried forward as a real
 Nova-relevant design gap, not as a completion claim.
+
+### Model-identity-only implementation, 2026-08-20 (dispatch NVA-MODEL-IDENTITY-01)
+
+Implemented the PO-approved model-identity-only slice for Nova A. The
+statusLine context process now writes a session-bound
+`pipeline.main-session-model-identity.v1` snapshot containing only the real
+statusLine model identity, session id, host-introspection label, event id, and
+timestamp. `post-compact-reground.mjs` reads that snapshot only when the
+compact SessionStart input identifies the same session and exposes it as
+additive model-identity evidence. This slice is session-bound only; it does
+not contain or claim a candidate commit/tree binding. The evidence remains local-caller-trusted
+and non-cryptographic; it is not provider attestation. The existing full route
+reconciliation remains unchanged and still requires a real `effort` signal.
+Effort is explicitly out of scope here and is absent from the new schema,
+writer, reader, tests, and acceptance claims.
+
+Remaining host-wiring gate: `.claude/settings.json` still has no live
+`statusLine` command wiring in this repository, and this repository cannot
+empirically confirm the actual host statusLine stdin field names. An attended
+TP-4 host step must wire the command and capture one real host invocation,
+confirming `session_id` plus `model.display_name` (or the accepted model
+fallback) before this evidence can be treated as live production observation.
+Until that gate is satisfied, this item remains `in_progress`; no closure or
+Full Verify claim is made.
+
+Remaining candidate-binding gate: no actual repository commit/tree observation
+is carried by this schema or produced by the statusLine path. A future slice
+must source and validate that binding from a real repository observation before
+the evidence may be described as candidate-bound.

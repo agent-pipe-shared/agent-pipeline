@@ -66,6 +66,10 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import {
+  buildModelIdentityObservation,
+  writeModelIdentityObservation,
+} from "../lib/main-session-route-attestation.mjs";
 
 // ---- small numeric helper (pure) -----------------------------------------------------------
 function toFiniteNumber(v) {
@@ -246,6 +250,11 @@ export function run() {
   process.stdout.write(status.line + "\n");
   if (status.sessionId) {
     writeUsageFile(rootDir, status.sessionId, status.usedPct, status.totalTokens, new Date().toISOString(), status.contextWindowSize);
+    const observation = buildModelIdentityObservation(input, {
+      nowIso: new Date().toISOString(),
+      eventId: `statusline-${status.sessionId}-${Date.now()}`,
+    });
+    if (observation) writeModelIdentityObservation(rootDir, observation);
   }
   process.exit(0); // NEVER blocks, regardless of outcome
 }

@@ -17,6 +17,11 @@ import {
   resolveRegroundProjection,
   shouldActivate,
 } from "./post-compact-reground.mjs";
+import {
+  buildModelIdentityObservation,
+  readModelIdentityObservation,
+  writeModelIdentityObservation,
+} from "../lib/main-session-route-attestation.mjs";
 import { STATE_EXCERPT_MAX_BYTES, STATE_EXCERPT_TRUNCATION_MARKER } from "../lib/bootstrap-payload-budget.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./post-compact-reground.mjs", import.meta.url));
@@ -242,6 +247,37 @@ check("compact never treats an absent host main-session identity as route eviden
   const projection = resolveRegroundProjection(outer());
   assert.equal(projection.mainSessionRoute.code, "MSR-UNVERIFIED");
   assert.equal(projection.mainSessionRoute.action, null);
+});
+
+check("model identity evidence is session-bound without effort or candidate binding", () => {
+  const root = freshRoot("model-identity");
+  const input = {
+    source: "compact",
+    session_id: "session-a",
+    model: { display_name: "gpt-5.6-sol" },
+  };
+  const observation = buildModelIdentityObservation(input, {
+    nowIso: "2026-08-20T20:00:00.000Z",
+    eventId: "statusline-session-a-01",
+  });
+  assert.deepEqual(observation, {
+    schema: "pipeline.main-session-model-identity.v1",
+    subject: "main-session",
+    source: "host-introspection",
+    sessionId: "session-a",
+    eventId: "statusline-session-a-01",
+    modelId: "gpt-5.6-sol",
+    observedAt: "2026-08-20T20:00:00.000Z",
+  });
+  assert.equal(Object.hasOwn(observation, "effort"), false);
+  assert.equal(writeModelIdentityObservation(root, observation), true);
+  assert.deepEqual(readModelIdentityObservation(root, "session-a"), observation);
+  assert.equal(readModelIdentityObservation(root, "session-b"), null);
+
+  const decided = decideOutput(input, outer(), { rootDir: root });
+  assert.deepEqual(decided.projection.mainSessionRoute.modelIdentity, observation);
+  assert.equal(decided.projection.mainSessionRoute.code, "MSR-UNVERIFIED");
+  assert.equal(Object.hasOwn(decided.projection.mainSessionRoute.modelIdentity, "effort"), false);
 });
 
 check("stringify-write-reload preserves semantic projection and state bytes", () => {

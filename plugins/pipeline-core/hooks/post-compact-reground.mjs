@@ -11,6 +11,7 @@ import {
 } from "../lib/continuity-state.mjs";
 import { buildContinuationLine } from "../lib/interaction-continuity.mjs";
 import { reconcileMainSessionRoute } from "../lib/main-session-route.mjs";
+import { readModelIdentityObservation } from "../lib/main-session-route-attestation.mjs";
 import {
   boundedNarrativeExcerpt,
   boundedPayload,
@@ -127,9 +128,9 @@ function phaseRouteId(phase) {
  * host-introspection sourced.  This hook never writes a switchback or infers
  * identity from a dispatched child.
  */
-function mainSessionRouteProjection(input, phase) {
+function mainSessionRouteProjection(input, phase, rootDir = null) {
   const context = isObject(input?.pipelineMainSessionRoute) ? input.pipelineMainSessionRoute : {};
-  return reconcileMainSessionRoute({
+  const route = reconcileMainSessionRoute({
     profile: context.profile,
     phase: phaseRouteId(phase),
     runner: context.runner,
@@ -137,13 +138,20 @@ function mainSessionRouteProjection(input, phase) {
     reportedEventIds: context.reportedEventIds ?? [],
     poException: context.poException ?? null,
   });
+  const sessionId = typeof input?.session_id === "string"
+    ? input.session_id
+    : typeof context.sessionId === "string" ? context.sessionId : null;
+  return {
+    ...route,
+    modelIdentity: rootDir ? readModelIdentityObservation(rootDir, sessionId) : null,
+  };
 }
 
 /**
  * Produce the complete deterministic post-compact projection. This projection
  * never attests authority freshness, provider identity, or OS isolation.
  */
-export function resolveRegroundProjection(state, input = null) {
+export function resolveRegroundProjection(state, input = null, { rootDir = null } = {}) {
   if (!isObject(state) || state.schema !== OUTER_SCHEMA) {
     return stoppedProjection("PCR-OUTER-INVALID");
   }
@@ -182,7 +190,7 @@ export function resolveRegroundProjection(state, input = null) {
     dispatchEligibility: { allowed: dispatch.allowed, code: dispatch.code },
     decisionTxn: structuredClone(continuity.decisionTxn),
     recovery: structuredClone(continuity.recovery),
-    mainSessionRoute: mainSessionRouteProjection(input, phase),
+    mainSessionRoute: mainSessionRouteProjection(input, phase, rootDir),
   };
 }
 
@@ -254,7 +262,7 @@ export function buildRegroundMessage(stateOrProjection, { stateNarrative = null 
  */
 export function decideOutput(input, state, { rootDir = null } = {}) {
   if (!shouldActivate(input)) return { stdout: "", json: false };
-  const projection = resolveRegroundProjection(state, input);
+  const projection = resolveRegroundProjection(state, input, { rootDir });
   const bounded = boundedPayload(projection, { mode: "compact" });
   const stateNarrative = rootDir
     ? loadStateNarrativeExcerptSafe(join(rootDir, "docs", "state.md"))
