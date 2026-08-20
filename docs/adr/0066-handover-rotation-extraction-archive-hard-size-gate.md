@@ -196,6 +196,29 @@ this ADR authorizes. Until that pass completes, the live `docs/state.md`
 cannot be safely rotated for real; the mechanism can and should still be
 built and tested against synthetic/small fixtures now.
 
+## Decision 7 extraction audit — 2026-08-20 (`NVA-HANDOVER-EXTRACT-01`)
+
+The current live handover was read in full (313 lines, 31,443 bytes). Every
+normative statement in it was classified as an existing durable rule, current
+candidate/open-work state, or historical provenance. The durable rules found
+already had authoritative homes; no new policy or guardrail file was needed:
+
+| Rule or standing instruction | Authoritative home |
+|---|---|
+| `docs/state.md` is the sole public current/open/next handover; durable decisions do not live there | [ADR-0012](0012-handover-canonicalization.md), [ADR-0015](0015-self-application.md) |
+| Goldfish/Elephant/Critic separation, fixed dispatch briefing, and Verify-before-Critic sequencing | [Operating Model](../operating-model.md), [ADR-0026](0026-role-split-elephant-goldfish-critic.md), [ADR-0014](0014-critic-contract.md) |
+| Repository directory, scratch, evidence, and archive placement | [ADR-0063](0063-repository-directory-contract.md) |
+| Retention of normative PRD/Spec authority and the Sentinel recovery surface | `governance/spec-retention.json`, [Sentinel recovery package](../../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md) |
+| Verify, security, Critic, push, and approval gate behavior | [quality-gates](../../guardrails/quality-gates.md), [ADR-0017](0017-push-policy-standing-approval.md), [ADR-0027](0027-gate-philosophy.md), [ADR-0065](0065-a-voided-gate-is-re-earned-from-declared-inputs.md) |
+| Honest runner/model/isolation claims and functional-equivalent disclosure | [ADR-0035](0035-codex-native-normal-critic.md), [ADR-0036](0036-runner-honest-profiles-v2.md), [ADR-0014](0014-critic-contract.md) |
+
+Candidate OIDs, Verify and Critic outcomes, backlog counts, open items, PO
+instructions, historical authorizations, and release facts are state/evidence
+rather than reusable rules. They remain in the bounded current snapshot or
+the existing archive links; none was silently converted into a standing
+policy. The extraction is complete for the live handover's current sections.
+This audit does not acknowledge any future edited section.
+
 ## Consequences
 
 **Positive.** Bootstrap cost for a fresh session is bounded going forward,

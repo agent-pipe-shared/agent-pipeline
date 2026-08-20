@@ -229,3 +229,14 @@ open and unstarted** — unchanged from the prior section, still deferred
 per the incremental-extraction rule (no rotation event is currently
 running). Status stays `open` until piece 2 lands.
 - **Date:** 2026-08-19
+
+### Completion, 2026-08-20 — `NVA-HANDOVER-EXTRACT-01`
+
+Decision 7 is complete for the current live handover. The full 313-line
+`docs/state.md` was audited. Durable rules were mapped to their existing
+authoritative ADR, policy, guardrail, or governed specification homes and
+the audit was recorded in ADR-0066. Current candidate/open-work facts and
+the existing archive provenance were retained in a reduced canonical
+handover. No rotation was performed and no extraction acknowledgment marker
+was written: a future edited section must be re-audited and acknowledged at
+its current content before it is rotated. Nova B was not inspected.
