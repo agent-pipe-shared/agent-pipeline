@@ -3,352 +3,930 @@
   "$id": "pipeline.runner-usage.v1",
   "title": "Runner-native raw usage with an honest common projection",
   "type": "object",
-  "required": ["schema", "runner", "source", "scope", "route", "raw", "common"],
+  "required": [
+    "schema",
+    "runner",
+    "source",
+    "scope",
+    "route",
+    "raw",
+    "common"
+  ],
   "additionalProperties": false,
   "properties": {
-    "schema": { "const": "pipeline.runner-usage.v1" },
-    "runner": { "enum": ["claude", "codex"] },
-    "source": { "type": "object" },
-    "scope": { "type": "object" },
-    "route": { "type": "object" },
-    "raw": { "$ref": "#/$defs/rawUsageObject" },
+    "schema": {
+      "const": "pipeline.runner-usage.v1"
+    },
+    "runner": {
+      "enum": [
+        "claude",
+        "codex",
+        "antigravity"
+      ]
+    },
+    "source": {
+      "type": "object"
+    },
+    "scope": {
+      "type": "object"
+    },
+    "route": {
+      "type": "object"
+    },
+    "raw": {
+      "$ref": "#/$defs/rawUsageObject"
+    },
     "common": {
       "type": "object",
-      "required": ["inputTokens", "outputTokens", "cachedInputTokens", "cacheCreationInputTokens", "cacheReadInputTokens", "reasoningOutputTokens", "billedCost", "estimatedCost"],
+      "required": [
+        "inputTokens",
+        "outputTokens",
+        "cachedInputTokens",
+        "cacheCreationInputTokens",
+        "cacheReadInputTokens",
+        "reasoningOutputTokens",
+        "billedCost",
+        "estimatedCost"
+      ],
       "additionalProperties": false,
       "properties": {
-        "inputTokens": { "$ref": "#/$defs/measuredMetric" },
-        "outputTokens": { "$ref": "#/$defs/measuredMetric" },
-        "cachedInputTokens": { "$ref": "#/$defs/measuredMetric" },
-        "cacheCreationInputTokens": { "$ref": "#/$defs/measuredMetric" },
-        "cacheReadInputTokens": { "$ref": "#/$defs/measuredMetric" },
-        "reasoningOutputTokens": { "$ref": "#/$defs/measuredMetric" },
-        "billedCost": { "$ref": "#/$defs/billedMetric" },
-        "estimatedCost": { "$ref": "#/$defs/estimatedMetric" }
+        "inputTokens": {
+          "$ref": "#/$defs/measuredMetric"
+        },
+        "outputTokens": {
+          "$ref": "#/$defs/measuredMetric"
+        },
+        "cachedInputTokens": {
+          "$ref": "#/$defs/measuredMetric"
+        },
+        "cacheCreationInputTokens": {
+          "$ref": "#/$defs/measuredMetric"
+        },
+        "cacheReadInputTokens": {
+          "$ref": "#/$defs/measuredMetric"
+        },
+        "reasoningOutputTokens": {
+          "$ref": "#/$defs/measuredMetric"
+        },
+        "billedCost": {
+          "$ref": "#/$defs/billedMetric"
+        },
+        "estimatedCost": {
+          "$ref": "#/$defs/estimatedMetric"
+        }
       }
     }
   },
   "oneOf": [
     {
       "properties": {
-        "runner": { "const": "claude" },
-        "source": { "$ref": "#/$defs/claudeTurnSource" },
-        "scope": { "$ref": "#/$defs/turnScope" },
-        "route": { "$ref": "#/$defs/claudeRoute" }
+        "runner": {
+          "const": "claude"
+        },
+        "source": {
+          "$ref": "#/$defs/claudeTurnSource"
+        },
+        "scope": {
+          "$ref": "#/$defs/turnScope"
+        },
+        "route": {
+          "$ref": "#/$defs/claudeRoute"
+        }
       }
     },
     {
       "properties": {
-        "runner": { "const": "claude" },
-        "source": { "$ref": "#/$defs/claudeSessionSource" },
-        "scope": { "$ref": "#/$defs/sessionScope" },
-        "route": { "$ref": "#/$defs/claudeRoute" }
+        "runner": {
+          "const": "claude"
+        },
+        "source": {
+          "$ref": "#/$defs/claudeSessionSource"
+        },
+        "scope": {
+          "$ref": "#/$defs/sessionScope"
+        },
+        "route": {
+          "$ref": "#/$defs/claudeRoute"
+        }
       }
     },
     {
       "properties": {
-        "runner": { "const": "codex" },
-        "source": { "$ref": "#/$defs/codexTurnSource" },
-        "scope": { "$ref": "#/$defs/turnScope" },
-        "route": { "$ref": "#/$defs/codexRoute" }
+        "runner": {
+          "const": "codex"
+        },
+        "source": {
+          "$ref": "#/$defs/codexTurnSource"
+        },
+        "scope": {
+          "$ref": "#/$defs/turnScope"
+        },
+        "route": {
+          "$ref": "#/$defs/codexRoute"
+        }
       }
     },
     {
       "properties": {
-        "runner": { "const": "codex" },
-        "source": { "$ref": "#/$defs/workspaceAggregateSource" },
-        "scope": { "$ref": "#/$defs/workspaceAggregateScope" },
-        "route": { "$ref": "#/$defs/unboundRoute" }
+        "runner": {
+          "const": "codex"
+        },
+        "source": {
+          "$ref": "#/$defs/workspaceAggregateSource"
+        },
+        "scope": {
+          "$ref": "#/$defs/workspaceAggregateScope"
+        },
+        "route": {
+          "$ref": "#/$defs/unboundRoute"
+        }
+      }
+    },
+    {
+      "properties": {
+        "runner": {
+          "const": "antigravity"
+        },
+        "source": {
+          "$ref": "#/$defs/antigravityTurnSource"
+        },
+        "scope": {
+          "$ref": "#/$defs/turnScope"
+        },
+        "route": {
+          "$ref": "#/$defs/antigravityRoute"
+        }
       }
     }
   ],
   "$defs": {
-    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
     "claudeTurnSource": {
       "type": "object",
-      "required": ["kind", "version", "eventSha256", "threadId", "turnId"],
+      "required": [
+        "kind",
+        "version",
+        "eventSha256",
+        "threadId",
+        "turnId"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "claude-transcript-usage" },
-        "version": { "type": "string", "minLength": 1 },
-        "eventSha256": { "$ref": "#/$defs/sha256" },
-        "threadId": { "type": "string", "minLength": 1 },
-        "turnId": { "type": "string", "minLength": 1 }
+        "kind": {
+          "const": "claude-transcript-usage"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eventSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "threadId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "turnId": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "claudeSessionSource": {
       "type": "object",
-      "required": ["kind", "version", "eventSha256", "threadId"],
+      "required": [
+        "kind",
+        "version",
+        "eventSha256",
+        "threadId"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "claude-transcript-usage" },
-        "version": { "type": "string", "minLength": 1 },
-        "eventSha256": { "$ref": "#/$defs/sha256" },
-        "threadId": { "type": "string", "minLength": 1 }
+        "kind": {
+          "const": "claude-transcript-usage"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eventSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "threadId": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "codexTurnSource": {
       "type": "object",
-      "required": ["kind", "version", "eventSha256", "threadId", "turnId"],
+      "required": [
+        "kind",
+        "version",
+        "eventSha256",
+        "threadId",
+        "turnId"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "codex-turn-completed-usage" },
-        "version": { "type": "string", "minLength": 1 },
-        "eventSha256": { "$ref": "#/$defs/sha256" },
-        "threadId": { "type": "string", "minLength": 1 },
-        "turnId": { "type": "string", "minLength": 1 }
+        "kind": {
+          "const": "codex-turn-completed-usage"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eventSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "threadId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "turnId": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "workspaceAggregateSource": {
       "type": "object",
-      "required": ["kind", "version", "eventSha256"],
+      "required": [
+        "kind",
+        "version",
+        "eventSha256"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "workspace-analytics-export" },
-        "version": { "type": "string", "minLength": 1 },
-        "eventSha256": { "$ref": "#/$defs/sha256" }
+        "kind": {
+          "const": "workspace-analytics-export"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eventSha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "antigravityTurnSource": {
+      "type": "object",
+      "required": [
+        "kind",
+        "version",
+        "eventSha256",
+        "threadId",
+        "turnId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "antigravity-exec-json"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "eventSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "threadId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "turnId": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "turnScope": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "turn" },
-        "dispatchId": { "type": "string", "minLength": 1 }
+        "kind": {
+          "const": "turn"
+        },
+        "dispatchId": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "sessionScope": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "session" },
-        "dispatchId": { "type": "string", "minLength": 1 }
+        "kind": {
+          "const": "session"
+        },
+        "dispatchId": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "workspaceAggregateScope": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "workspace-account-aggregate" }
+        "kind": {
+          "const": "workspace-account-aggregate"
+        }
       }
     },
     "claudeSelector": {
       "type": "object",
-      "required": ["kind", "value"],
+      "required": [
+        "kind",
+        "value"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "const": "alias" },
-        "value": { "enum": ["fable", "haiku", "opus", "sonnet"] }
+        "kind": {
+          "const": "alias"
+        },
+        "value": {
+          "enum": [
+            "fable",
+            "haiku",
+            "opus",
+            "sonnet"
+          ]
+        }
       }
     },
     "codexSelector": {
       "oneOf": [
         {
           "type": "object",
-          "required": ["kind", "value"],
+          "required": [
+            "kind",
+            "value"
+          ],
           "additionalProperties": false,
-          "properties": { "kind": { "const": "model-id" }, "value": { "const": "gpt-5.6-sol" } }
+          "properties": {
+            "kind": {
+              "const": "model-id"
+            },
+            "value": {
+              "const": "gpt-5.6-sol"
+            }
+          }
         },
         {
           "type": "object",
-          "required": ["kind", "value"],
+          "required": [
+            "kind",
+            "value"
+          ],
           "additionalProperties": false,
-          "properties": { "kind": { "const": "model-id" }, "value": { "const": "gpt-5.6-terra" } }
+          "properties": {
+            "kind": {
+              "const": "model-id"
+            },
+            "value": {
+              "const": "gpt-5.6-terra"
+            }
+          }
         }
       ]
     },
     "requestedClaude": {
       "type": "object",
-      "required": ["selector", "effort"],
+      "required": [
+        "selector",
+        "effort"
+      ],
       "additionalProperties": false,
       "properties": {
-        "selector": { "$ref": "#/$defs/claudeSelector" },
-        "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] }
+        "selector": {
+          "$ref": "#/$defs/claudeSelector"
+        },
+        "effort": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max",
+            "not-applicable"
+          ]
+        }
       }
     },
     "requestedCodex": {
       "type": "object",
-      "required": ["selector", "effort"],
+      "required": [
+        "selector",
+        "effort"
+      ],
       "additionalProperties": false,
       "properties": {
-        "selector": { "$ref": "#/$defs/codexSelector" },
-        "effort": { "enum": ["xhigh", "max"] }
+        "selector": {
+          "$ref": "#/$defs/codexSelector"
+        },
+        "effort": {
+          "enum": [
+            "xhigh",
+            "max"
+          ]
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "selector": { "properties": { "value": { "const": "gpt-5.6-terra" } }, "required": ["value"] } }, "required": ["selector"] },
-          "then": { "properties": { "effort": { "const": "xhigh" } } }
+          "if": {
+            "properties": {
+              "selector": {
+                "properties": {
+                  "value": {
+                    "const": "gpt-5.6-terra"
+                  }
+                },
+                "required": [
+                  "value"
+                ]
+              }
+            },
+            "required": [
+              "selector"
+            ]
+          },
+          "then": {
+            "properties": {
+              "effort": {
+                "const": "xhigh"
+              }
+            }
+          }
         }
       ]
     },
     "receiptReference": {
       "type": "object",
-      "required": ["schema", "repoRelativePath", "sha256", "resultSha256", "routeEvidenceSha256"],
+      "required": [
+        "schema",
+        "repoRelativePath",
+        "sha256",
+        "resultSha256",
+        "routeEvidenceSha256"
+      ],
       "additionalProperties": false,
       "properties": {
-        "schema": { "const": "pipeline.route-receipt.v1" },
-        "repoRelativePath": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" },
-        "sha256": { "$ref": "#/$defs/sha256" },
-        "resultSha256": { "$ref": "#/$defs/sha256" },
-        "routeEvidenceSha256": { "$ref": "#/$defs/sha256" }
+        "schema": {
+          "const": "pipeline.route-receipt.v1"
+        },
+        "repoRelativePath": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "resultSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "routeEvidenceSha256": {
+          "$ref": "#/$defs/sha256"
+        }
       }
     },
     "effective": {
       "oneOf": [
         {
           "type": "object",
-          "required": ["status", "modelId"],
+          "required": [
+            "status",
+            "modelId"
+          ],
           "additionalProperties": false,
           "properties": {
-            "status": { "const": "observed" },
-            "modelId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$" }
+            "status": {
+              "const": "observed"
+            },
+            "modelId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$"
+            }
           }
         },
         {
           "type": "object",
-          "required": ["status", "reasonCode"],
+          "required": [
+            "status",
+            "reasonCode"
+          ],
           "additionalProperties": false,
           "properties": {
-            "status": { "const": "unknown" },
-            "reasonCode": { "const": "effective-model-not-observed" }
+            "status": {
+              "const": "unknown"
+            },
+            "reasonCode": {
+              "const": "effective-model-not-observed"
+            }
           }
         }
       ]
     },
     "boundClaudeRoute": {
       "type": "object",
-      "required": ["status", "requested", "binding", "receipt", "effective"],
+      "required": [
+        "status",
+        "requested",
+        "binding",
+        "receipt",
+        "effective"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "const": "bound" },
-        "requested": { "$ref": "#/$defs/requestedClaude" },
-        "binding": { "$ref": "usage-route-binding.schema.json" },
-        "receipt": { "$ref": "#/$defs/receiptReference" },
-        "effective": { "$ref": "#/$defs/effective" }
+        "status": {
+          "const": "bound"
+        },
+        "requested": {
+          "$ref": "#/$defs/requestedClaude"
+        },
+        "binding": {
+          "$ref": "usage-route-binding.schema.json"
+        },
+        "receipt": {
+          "$ref": "#/$defs/receiptReference"
+        },
+        "effective": {
+          "$ref": "#/$defs/effective"
+        }
       }
     },
     "boundCodexRoute": {
       "type": "object",
-      "required": ["status", "requested", "binding", "receipt", "effective"],
+      "required": [
+        "status",
+        "requested",
+        "binding",
+        "receipt",
+        "effective"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "const": "bound" },
-        "requested": { "$ref": "#/$defs/requestedCodex" },
-        "binding": { "$ref": "usage-route-binding.schema.json" },
-        "receipt": { "$ref": "#/$defs/receiptReference" },
-        "effective": { "$ref": "#/$defs/effective" }
+        "status": {
+          "const": "bound"
+        },
+        "requested": {
+          "$ref": "#/$defs/requestedCodex"
+        },
+        "binding": {
+          "$ref": "usage-route-binding.schema.json"
+        },
+        "receipt": {
+          "$ref": "#/$defs/receiptReference"
+        },
+        "effective": {
+          "$ref": "#/$defs/effective"
+        }
       }
     },
     "unboundRoute": {
       "type": "object",
-      "required": ["status", "effective"],
+      "required": [
+        "status",
+        "effective"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "const": "unbound" },
+        "status": {
+          "const": "unbound"
+        },
         "effective": {
           "type": "object",
-          "required": ["status", "reasonCode"],
+          "required": [
+            "status",
+            "reasonCode"
+          ],
           "additionalProperties": false,
           "properties": {
-            "status": { "const": "unknown" },
-            "reasonCode": { "enum": ["dispatch-context-missing", "receipt-missing", "receipt-invalid", "binding-mismatch"] }
+            "status": {
+              "const": "unknown"
+            },
+            "reasonCode": {
+              "enum": [
+                "dispatch-context-missing",
+                "receipt-missing",
+                "receipt-invalid",
+                "binding-mismatch"
+              ]
+            }
           }
         }
       }
     },
-    "claudeRoute": { "oneOf": [{ "$ref": "#/$defs/boundClaudeRoute" }, { "$ref": "#/$defs/unboundRoute" }] },
-    "codexRoute": { "oneOf": [{ "$ref": "#/$defs/boundCodexRoute" }, { "$ref": "#/$defs/unboundRoute" }] },
+    "claudeRoute": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/boundClaudeRoute"
+        },
+        {
+          "$ref": "#/$defs/unboundRoute"
+        }
+      ]
+    },
+    "codexRoute": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/boundCodexRoute"
+        },
+        {
+          "$ref": "#/$defs/unboundRoute"
+        }
+      ]
+    },
     "rawUsageNode": {
       "oneOf": [
-        { "type": "number", "minimum": 0 },
+        {
+          "type": "number",
+          "minimum": 0
+        },
         {
           "type": "object",
           "minProperties": 1,
-          "additionalProperties": { "$ref": "#/$defs/rawUsageNode" }
+          "additionalProperties": {
+            "$ref": "#/$defs/rawUsageNode"
+          }
         }
       ]
     },
     "rawUsageObject": {
       "type": "object",
       "minProperties": 1,
-      "additionalProperties": { "$ref": "#/$defs/rawUsageNode" }
+      "additionalProperties": {
+        "$ref": "#/$defs/rawUsageNode"
+      }
     },
     "observedCell": {
       "type": "object",
-      "required": ["status", "value", "sourceField", "comparison"],
+      "required": [
+        "status",
+        "value",
+        "sourceField",
+        "comparison"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "const": "observed" },
-        "value": { "type": "number", "minimum": 0 },
-        "sourceField": { "type": "string", "minLength": 1 },
-        "comparison": { "enum": ["same-runner-only", "none"] }
+        "status": {
+          "const": "observed"
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "sourceField": {
+          "type": "string",
+          "minLength": 1
+        },
+        "comparison": {
+          "enum": [
+            "same-runner-only",
+            "none"
+          ]
+        }
       }
     },
     "estimatedCell": {
       "type": "object",
-      "required": ["status", "value", "source", "asOf", "formula", "currency", "comparison"],
+      "required": [
+        "status",
+        "value",
+        "source",
+        "asOf",
+        "formula",
+        "currency",
+        "comparison"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "const": "estimated" },
-        "value": { "type": "number", "minimum": 0 },
-        "source": { "type": "string", "minLength": 1 },
-        "asOf": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
-        "formula": { "type": "string", "minLength": 1 },
-        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
-        "comparison": { "enum": ["same-runner-only", "none"] }
+        "status": {
+          "const": "estimated"
+        },
+        "value": {
+          "type": "number",
+          "minimum": 0
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1
+        },
+        "asOf": {
+          "type": "string",
+          "format": "date",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+        },
+        "formula": {
+          "type": "string",
+          "minLength": 1
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "comparison": {
+          "enum": [
+            "same-runner-only",
+            "none"
+          ]
+        }
       }
     },
     "unknownCell": {
       "type": "object",
-      "required": ["status", "reasonCode"],
+      "required": [
+        "status",
+        "reasonCode"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "const": "unknown" },
-        "reasonCode": { "enum": ["source-omitted", "scope-unbound", "receipt-missing", "billing-unavailable", "semantics-unproven"] }
+        "status": {
+          "const": "unknown"
+        },
+        "reasonCode": {
+          "enum": [
+            "source-omitted",
+            "scope-unbound",
+            "receipt-missing",
+            "billing-unavailable",
+            "semantics-unproven"
+          ]
+        }
       }
     },
     "unavailableCell": {
       "type": "object",
-      "required": ["status", "reasonCode"],
+      "required": [
+        "status",
+        "reasonCode"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "const": "unavailable" },
-        "reasonCode": { "const": "runner-does-not-emit" }
+        "status": {
+          "const": "unavailable"
+        },
+        "reasonCode": {
+          "const": "runner-does-not-emit"
+        }
       }
     },
     "inapplicableCell": {
       "type": "object",
-      "required": ["status", "reasonCode"],
+      "required": [
+        "status",
+        "reasonCode"
+      ],
       "additionalProperties": false,
       "properties": {
-        "status": { "const": "inapplicable" },
-        "reasonCode": { "const": "metric-not-defined-for-scope" }
+        "status": {
+          "const": "inapplicable"
+        },
+        "reasonCode": {
+          "const": "metric-not-defined-for-scope"
+        }
       }
     },
     "measuredMetric": {
       "oneOf": [
-        { "$ref": "#/$defs/observedCell" },
-        { "$ref": "#/$defs/unknownCell" },
-        { "$ref": "#/$defs/unavailableCell" },
-        { "$ref": "#/$defs/inapplicableCell" }
+        {
+          "$ref": "#/$defs/observedCell"
+        },
+        {
+          "$ref": "#/$defs/unknownCell"
+        },
+        {
+          "$ref": "#/$defs/unavailableCell"
+        },
+        {
+          "$ref": "#/$defs/inapplicableCell"
+        }
       ]
     },
     "billedMetric": {
       "oneOf": [
-        { "$ref": "#/$defs/observedCell" },
-        { "$ref": "#/$defs/unknownCell" },
-        { "$ref": "#/$defs/unavailableCell" }
+        {
+          "$ref": "#/$defs/observedCell"
+        },
+        {
+          "$ref": "#/$defs/unknownCell"
+        },
+        {
+          "$ref": "#/$defs/unavailableCell"
+        }
       ]
     },
     "estimatedMetric": {
       "oneOf": [
-        { "$ref": "#/$defs/estimatedCell" },
-        { "$ref": "#/$defs/unknownCell" },
-        { "$ref": "#/$defs/unavailableCell" },
-        { "$ref": "#/$defs/inapplicableCell" }
+        {
+          "$ref": "#/$defs/estimatedCell"
+        },
+        {
+          "$ref": "#/$defs/unknownCell"
+        },
+        {
+          "$ref": "#/$defs/unavailableCell"
+        },
+        {
+          "$ref": "#/$defs/inapplicableCell"
+        }
+      ]
+    },
+    "antigravitySelector": {
+      "type": "object",
+      "required": [
+        "kind",
+        "value"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "model-id"
+        },
+        "value": {
+          "enum": [
+            "gemini-3.1-pro-high",
+            "gemini-3.7-flash-high",
+            "gemini-3.7-flash-low"
+          ]
+        }
+      }
+    },
+    "requestedAntigravity": {
+      "type": "object",
+      "required": [
+        "selector",
+        "effort"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "selector": {
+          "$ref": "#/$defs/antigravitySelector"
+        },
+        "effort": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+          ]
+        }
+      }
+    },
+    "boundAntigravityRoute": {
+      "type": "object",
+      "required": [
+        "status",
+        "requested",
+        "binding",
+        "receipt",
+        "effective"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "const": "bound"
+        },
+        "requested": {
+          "$ref": "#/$defs/requestedAntigravity"
+        },
+        "binding": {
+          "$ref": "usage-route-binding.schema.json"
+        },
+        "receipt": {
+          "$ref": "#/$defs/receiptReference"
+        },
+        "effective": {
+          "$ref": "#/$defs/effective"
+        }
+      }
+    },
+    "antigravityRoute": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/boundAntigravityRoute"
+        },
+        {
+          "$ref": "#/$defs/unboundRoute"
+        }
       ]
     }
   }

@@ -119,7 +119,7 @@ const cases = [
     }
   }],
   ["runner allowlist, cardinality, uniqueness, and enabled default are enforced", () => {
-    for (const enabled of [[], ["claude", "claude"], ["claude", "codex", "claude"], ["claude", "antigravity"]]) {
+    for (const enabled of [[], ["claude", "claude"], ["claude", "codex", "claude"], ["claude", "unknown_runner"], ["claude", "codex", "antigravity", "extra"]]) {
       const value = completeIntent(); value.runners.enabled = enabled;
       const checked = validatePipelineUserV3(value);
       assert.equal(checked.ok, false, `unexpected acceptance for ${JSON.stringify(enabled)}`);
@@ -128,11 +128,24 @@ const cases = [
     const value = completeIntent(); value.runners.enabled = ["claude"]; value.runners.default = "codex";
     const checked = validatePipelineUserV3(value);
     assert.equal(checked.ok, false); assert.ok(has(checked, "$.runners", "contract"));
+
+    const agyEnabled = completeIntent();
+    agyEnabled.runners.enabled = ["claude", "codex", "antigravity"];
+    agyEnabled.runners.default = "antigravity";
+    assert.equal(validatePipelineUserV3(agyEnabled).ok, true);
   }],
-  ["normal Codex Critic uses the registered Terra high route", () => {
-    const route = registry.duties.critic_normal.codex;
-    assert.equal(route.selector.value, "gpt-5.6-terra");
-    assert.equal(route.effort, "high");
+  ["normal Antigravity and Codex Critic use registered routes", () => {
+    const codexRoute = registry.duties.critic_normal.codex;
+    assert.equal(codexRoute.selector.value, "gpt-5.6-terra");
+    assert.equal(codexRoute.effort, "high");
+
+    const agyRoute = registry.duties.critic_normal.antigravity;
+    assert.equal(agyRoute.selector.value, "gemini-3.7-flash-high");
+    assert.equal(agyRoute.effort, "high");
+
+    const agyHighRisk = registry.duties.critic_high_risk.antigravity;
+    assert.equal(agyHighRisk.selector.value, "gemini-3.1-pro-high");
+    assert.equal(agyHighRisk.effort, "max");
   }],
   ["keep-awake accepts only its explicit boolean and legacy V3 absence remains compatible", () => {
     const enabled = completeIntent();

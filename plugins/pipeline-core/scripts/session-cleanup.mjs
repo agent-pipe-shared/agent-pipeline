@@ -222,7 +222,7 @@ function required(flags, name) {
   return flags[name];
 }
 
-const RUNNERS = new Set(["claude", "codex"]);
+const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 
 /**
  * Resolve the invoking runner at this CLI entry boundary (ADR-0051): an

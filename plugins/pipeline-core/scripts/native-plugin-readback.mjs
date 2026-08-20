@@ -41,11 +41,11 @@ function assertKeys(value, keys, label) {
 export function prepareNativeReadback(input) {
   assertKeys(input, ["transactionId", "provider", "pluginId", "sourceOid", "loadedRootKind", "manifest", "loadedChain"], "prepare");
   if (!/^[A-Za-z0-9._-]{1,80}$/.test(input.transactionId)) throw new Error("transactionId invalid");
-  if (!new Set(["claude", "codex"]).has(input.provider) || input.pluginId !== "pipeline-core") throw new Error("provider/plugin invalid");
-  if (input.loadedRootKind !== (input.provider === "claude" ? "claude-project-scope" : "codex-provider-cache")) throw new Error("loadedRootKind invalid");
+  if (!new Set(["claude", "codex", "antigravity"]).has(input.provider) || input.pluginId !== "pipeline-core") throw new Error("provider/plugin invalid");
+  if (input.loadedRootKind !== (input.provider === "claude" ? "claude-project-scope" : input.provider === "antigravity" ? "antigravity-project-scope" : "codex-provider-cache")) throw new Error("loadedRootKind invalid");
   assertHex(input.sourceOid, "sourceOid");
   assertKeys(input.manifest, ["relativePath", "name", "version", "digest"], "manifest");
-  if (input.manifest.name !== "pipeline-core" || input.manifest.relativePath !== (input.provider === "claude" ? ".claude-plugin/plugin.json" : ".codex-plugin/plugin.json") || typeof input.manifest.version !== "string" || input.manifest.version === "") throw new Error("manifest invalid");
+  if (input.manifest.name !== "pipeline-core" || input.manifest.relativePath !== (input.provider === "claude" ? ".claude-plugin/plugin.json" : input.provider === "antigravity" ? "plugin.json" : ".codex-plugin/plugin.json") || typeof input.manifest.version !== "string" || input.manifest.version === "") throw new Error("manifest invalid");
   assertHex(input.manifest.digest, "manifest.digest");
   if (!Array.isArray(input.loadedChain) || input.loadedChain.length === 0) throw new Error("loadedChain invalid");
   const seen = new Set();
@@ -134,8 +134,8 @@ export function validateNativeReadback(state) {
   assertKeys(state, STATE_KEYS, "native readback state");
   if (state.schema !== SCHEMA || !PHASES.includes(state.phase) || !Number.isInteger(state.revision) || state.revision < 0) throw new Error("native readback invalid");
   if (state.revision === 0 ? state.priorStateSha256 !== null : !/^[0-9a-f]{64}$/.test(state.priorStateSha256 ?? "")) throw new Error("native readback prior digest invalid");
-  if (!new Set(["claude", "codex"]).has(state.provider) || state.pluginId !== "pipeline-core") throw new Error("native provider invalid");
-  if (state.loadedRootKind !== (state.provider === "claude" ? "claude-project-scope" : "codex-provider-cache")) throw new Error("loadedRootKind invalid");
+  if (!new Set(["claude", "codex", "antigravity"]).has(state.provider) || state.pluginId !== "pipeline-core") throw new Error("native provider invalid");
+  if (state.loadedRootKind !== (state.provider === "claude" ? "claude-project-scope" : state.provider === "antigravity" ? "antigravity-project-scope" : "codex-provider-cache")) throw new Error("loadedRootKind invalid");
   assertHex(state.sourceOid, "sourceOid");
   assertKeys(state.manifest, ["relativePath", "name", "version", "digest"], "manifest");
   assertHex(state.manifest.digest, "manifest.digest");

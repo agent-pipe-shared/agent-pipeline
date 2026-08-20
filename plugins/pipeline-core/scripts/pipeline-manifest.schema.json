@@ -113,7 +113,7 @@
         "required": ["runner", "selector", "effort", "unavailability", "evidenceRequirement", "resolutionStatus"],
         "additionalProperties": false,
         "properties": {
-          "runner": { "type": "string", "enum": ["claude", "codex"] },
+          "runner": { "type": "string", "enum": ["claude", "codex", "antigravity"] },
           "selector": {
             "type": "object",
             "required": ["kind", "value"],

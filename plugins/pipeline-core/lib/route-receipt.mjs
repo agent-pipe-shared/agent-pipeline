@@ -19,7 +19,7 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const GIT_OBJECT_ID = /^[a-f0-9]{40,64}$/;
 const EFFORTS = ["low", "medium", "high", "xhigh", "max", "not-applicable"];
 const PROVIDERS = ["anthropic", "openai"];
-const RUNNERS = ["claude", "codex"];
+const RUNNERS = ["claude", "codex", "antigravity"];
 const P3B_DIRECT_TERRA_RECEIPT_ADAPTER_SCHEMA = "pipeline.route-receipt-adapter.p3b-direct-terra.v1";
 
 export const P3B_DIRECT_TERRA_RECEIPT_ADAPTER = Object.freeze({

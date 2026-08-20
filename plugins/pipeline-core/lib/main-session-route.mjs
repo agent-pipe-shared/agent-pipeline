@@ -38,7 +38,7 @@ function observedMainSession(value) {
     || value.subject !== "main-session"
     || value.source !== "host-introspection"
     || !SAFE_ID.test(value.eventId ?? "")
-    || !["claude", "codex"].includes(value.runner)
+    || !["claude", "codex", "antigravity"].includes(value.runner)
     || typeof value.modelId !== "string" || value.modelId.length === 0
     || typeof value.effort !== "string" || value.effort.length === 0) return null;
   return {
@@ -53,7 +53,7 @@ function matchesException(exception, observed) {
   return isObject(exception)
     && exception.authority === "po"
     && SAFE_ID.test(exception.id ?? "")
-    && ["claude", "codex"].includes(exception.runner)
+    && ["claude", "codex", "antigravity"].includes(exception.runner)
     && typeof exception.modelId === "string" && exception.modelId.length > 0
     && typeof exception.effort === "string" && exception.effort.length > 0
     && exception.runner === observed.runner

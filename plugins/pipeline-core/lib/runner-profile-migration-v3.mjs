@@ -574,16 +574,26 @@ function preWriteMetadata(target) {
       ownerMode: "authority-update-only",
     };
   }
-  const manifestTarget = loadRuntimeProjectionV3OwnedKeys().targets.find((entry) => entry.path === target.path);
-  if (!manifestTarget) throw new Error(`V3 pre-write metadata has no declared runtime target: ${target.path}`);
-  return {
-    dataClass: "project-runtime-projection",
-    logicalTargetRoot: target.path.startsWith(".claude/") ? ".claude" : ".codex",
-    // Planning is deliberately Git-independent. This enum states policy
-    // dependence without probing or pretending to observe index/tracking state.
-    trackingStatus: "repository-policy-dependent",
-    ownerMode: manifestTarget.ownedKeys.length === 0 ? "preserve-only" : "owned-keys-preserve-unowned",
-  };
+  const manifest = loadRuntimeProjectionV3OwnedKeys();
+  const manifestTarget = manifest.targets.find((entry) => entry.path === target.path);
+  if (manifestTarget) {
+    return {
+      dataClass: "project-runtime-projection",
+      logicalTargetRoot: target.path.startsWith(".claude/") ? ".claude" : ".codex",
+      trackingStatus: "repository-policy-dependent",
+      ownerMode: manifestTarget.ownedKeys.length === 0 ? "preserve-only" : "owned-keys-preserve-unowned",
+    };
+  }
+  const mirrorTarget = manifest.neutralAuthorityMirrors?.find((entry) => entry.path === target.path);
+  if (mirrorTarget) {
+    return {
+      dataClass: "project-runtime-projection",
+      logicalTargetRoot: "project",
+      trackingStatus: "repository-policy-dependent",
+      ownerMode: "owned-keys-preserve-unowned",
+    };
+  }
+  throw new Error(`V3 pre-write metadata has no declared runtime target: ${target.path}`);
 }
 function publicTarget(target) {
   return {

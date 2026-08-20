@@ -193,5 +193,25 @@ try {
   rmSync(v3Root, { recursive: true, force: true });
 }
 
+check("RP37 Antigravity runner provider is google", expectedProviderForRunner("antigravity") === "google");
+check("RP38 Antigravity design and implement capabilities match Gemini models",
+  projectRunnerAssignment("antigravity", { capability: "design", effort: "high" }).model === "gemini-3.1-pro-high"
+  && projectRunnerAssignment("antigravity", { capability: "implement", effort: "high" }).model === "gemini-3.7-flash-high"
+  && projectRunnerAssignment("antigravity", { capability: "mechanic", effort: "low" }).model === "gemini-3.7-flash-low"
+);
+check("RP39 Antigravity aliases resolve accurately",
+  projectRunnerAssignment("antigravity", { model: "flash-high", effort: "high" }).model === "gemini-3.7-flash-high"
+  && projectRunnerAssignment("antigravity", { model: "pro-high", effort: "high" }).model === "gemini-3.1-pro-high"
+);
+check("RP40 Antigravity direct routes validate against observed model-ids",
+  validateDirectRoute({
+    runner: "antigravity",
+    selector: { kind: "model-id", value: "gemini-3.1-pro-high" },
+    effort: "high",
+    unavailability: "defer",
+    evidenceRequirement: "dispatch-receipt",
+  }).ok
+);
+
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);

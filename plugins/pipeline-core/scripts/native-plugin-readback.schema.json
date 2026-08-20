@@ -10,7 +10,7 @@
     "revision": { "type": "integer", "minimum": 0 },
     "priorStateSha256": { "$ref": "#/$defs/nullableSha256" },
     "phase": { "enum": ["prepared", "update-observed", "reload-observed", "trust-observed", "fresh-session-observed", "verified", "blocked"] },
-    "provider": { "enum": ["claude", "codex"] },
+    "provider": { "enum": ["claude", "codex", "antigravity"] },
     "pluginId": { "const": "pipeline-core" },
     "sourceOid": { "$ref": "#/$defs/oid" },
     "loadedRootKind": { "enum": ["claude-project-scope", "codex-provider-cache"] },

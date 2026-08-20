@@ -48,7 +48,7 @@ export const PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES = Object.freeze([
 ]);
 
 const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);
-const RUNNERS = new Set(["claude", "codex"]);
+const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 const NON_READY_STATUSES = new Set(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES);
 const RESULT_KEYS = [
   "appServer",

@@ -12,6 +12,7 @@ import {
   UsageIngestionError,
   ingestClaudeUsage,
   ingestCodexUsage,
+  ingestAntigravityUsage,
   validateRunnerUsageEnvelope,
   validateUsageRouteBinding,
 } from "./runner-usage-v1.mjs";
@@ -459,3 +460,31 @@ check("U30 ingestion has no repository persistence side effect", () => {
 
 console.log(`runner-usage-v1: ${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;
+
+const agyRawBytes = Buffer.from(JSON.stringify({
+  type: "turn.completed",
+  usage: {
+    input_tokens: 150,
+    output_tokens: 300,
+    cached_tokens: 100
+  }
+}), "utf8");
+const agyEnvelope = ingestAntigravityUsage({
+  version: "antigravity-exec-json.v1",
+  nativeEventBytes: agyRawBytes,
+  sourceContext: {
+    schema: "pipeline.usage-source-context.v1",
+    trust: "runner-wrapper",
+    runner: "antigravity",
+    scope: { kind: "turn" },
+    source: { threadId: "t1", turnId: "t2" }
+  }
+});
+
+check("U31 Antigravity turn.completed maps tokens correctly", () => {
+  assert.equal(agyEnvelope.schema, "pipeline.runner-usage.v1");
+  assert.equal(agyEnvelope.runner, "antigravity");
+  assert.equal(agyEnvelope.common.inputTokens.value, 150);
+  assert.equal(agyEnvelope.common.outputTokens.value, 300);
+  assert.equal(agyEnvelope.common.cachedInputTokens.value, 100);
+});

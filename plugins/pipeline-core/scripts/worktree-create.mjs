@@ -31,7 +31,7 @@ readiness gate (ADR-0051). When omitted, this CLI entry boundary derives it
 from CLAUDECODE in its own environment, mirroring pipeline-start-preflight.mjs;
 an explicit --runner always wins and an invalid explicit value fails closed.
 `;
-const RUNNERS = new Set(["claude", "codex"]);
+const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;

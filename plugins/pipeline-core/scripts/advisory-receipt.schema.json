@@ -27,7 +27,7 @@
       "required": ["runner", "selector", "effort"],
       "additionalProperties": false,
       "properties": {
-        "runner": { "enum": ["claude", "codex"] },
+        "runner": { "enum": ["claude", "codex", "antigravity"] },
         "selector": {
           "type": "object",
           "required": ["kind", "value"],

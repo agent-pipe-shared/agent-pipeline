@@ -218,7 +218,7 @@ function parse(args) {
     else if (arg === "--remote") { const remote = args[index + 1]; if (!remote || remote.startsWith("--")) return { error: "--remote requires one remote URL" }; output.remote = remote; index += 1; }
     else if (arg === "--ref") { const ref = args[index + 1]; if (!ref || ref.startsWith("--")) return { error: "--ref requires one refs/heads branch" }; output.ref = ref; index += 1; }
     else if (arg === "--intent") { const intent = args[index + 1]; if (!["onboarding", "bootstrap", "session", "dispatch"].includes(intent)) return { error: "--intent must be onboarding, bootstrap, session, or dispatch" }; output.intent = intent; index += 1; }
-    else if (arg === "--runner") { const runner = args[index + 1]; if (!["claude", "codex"].includes(runner)) return { error: "--runner must be claude or codex" }; output.runner = runner; index += 1; }
+    else if (arg === "--runner") { const runner = args[index + 1]; if (!["claude", "codex", "antigravity"].includes(runner)) return { error: "--runner must be claude or codex or antigravity" }; output.runner = runner; index += 1; }
     else if (arg === "--goal") { const goal = args[index + 1]; if (goal === undefined) return { error: "--goal requires one argv text element" }; output.goal = goal; index += 1; }
     else if (arg === "--language") { const language = args[index + 1]; if (!["de", "en"].includes(language)) return { error: "--language must be de or en" }; output.language = language; index += 1; }
     else if (arg === "--profile") { const profile = args[index + 1]; if (!["epic", "feature", "mini"].includes(profile)) return { error: "--profile must be epic, feature, or mini" }; output.profile = profile; index += 1; }

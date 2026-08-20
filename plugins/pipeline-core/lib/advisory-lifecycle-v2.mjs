@@ -35,7 +35,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const STATES = Object.freeze(["available", "degraded", "unavailable", "disabled", "unknown"]);
 const OBSERVED_ROUTE_STATES = Object.freeze(["available", "unavailable", "unknown"]);
 const PROFILES = Object.freeze(["epic", "feature", "mini"]);
-const RUNNERS = Object.freeze(["claude", "codex"]);
+const RUNNERS = Object.freeze(["claude", "codex", "antigravity"]);
 const TRIGGER_REASONS = Object.freeze([
   "architecture-tradeoff", "decision-ambiguity", "evidence-conflict", "recovery-choice", "risk-review",
 ]);

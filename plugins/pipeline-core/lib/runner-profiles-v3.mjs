@@ -224,11 +224,11 @@ function validateRoot(value, errors) {
     const enabled = value.runners.enabled;
     if (!Array.isArray(enabled)
       || enabled.length < 1
-      || enabled.length > 2
+      || enabled.length > 3
       || new Set(enabled).size !== enabled.length
-      || enabled.some((runner) => !["claude", "codex"].includes(runner))
-      || !["claude", "codex"].includes(value.runners.default)
-      || !enabled.includes(value.runners.default)) add(errors, "$.runners", "contract", "runner declaration must contain one or two unique registered runners and its enabled default", "supply a valid enabled/default runner pair");
+      || enabled.some((runner) => !["claude", "codex", "antigravity"].includes(runner))
+      || !["claude", "codex", "antigravity"].includes(value.runners.default)
+      || !enabled.includes(value.runners.default)) add(errors, "$.runners", "contract", "runner declaration must contain one to three unique registered runners and its enabled default", "supply a valid enabled/default runner pair");
   }
   if (validateClosedObject(value.usage, "$.usage", ["common_projection", "raw_persistence"], errors, "restore exactly the V3 usage contract")
     && (value.usage.common_projection !== "pipeline.runner-usage.v1" || value.usage.raw_persistence !== "none")) add(errors, "$.usage", "contract", "usage persistence contract is not registered", "restore the V3 usage contract");

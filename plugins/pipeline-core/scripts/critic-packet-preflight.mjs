@@ -55,7 +55,7 @@ const PACKET_ID = /^[a-f0-9]{32}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const REFERENCE_KINDS = new Set(["spec", "calibration", "guardrail", "evidence"]);
-const RUNNERS = new Set(["claude", "codex"]);
+const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 
 export class CriticPacketError extends Error {
   constructor(code, message) {

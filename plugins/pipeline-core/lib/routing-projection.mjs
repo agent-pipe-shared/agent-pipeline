@@ -13,6 +13,7 @@ const DIRECT_EVIDENCE_REQUIREMENTS = new Set(["dispatch-receipt"]);
 const RUNNER_PROVIDERS = Object.freeze({
   claude: "anthropic",
   codex: "openai",
+  antigravity: "google",
 });
 
 const AUTHORITY_RAW = readFileSync(join(CONFIG_DIR, "routing-authority.json"), "utf8");

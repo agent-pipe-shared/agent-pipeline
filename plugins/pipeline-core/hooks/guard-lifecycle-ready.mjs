@@ -147,7 +147,7 @@ const HEX = /^[a-f0-9]{64}$/u;
 // restated here. See sanctionedOnboardingArgs() below for what this set does and does
 // NOT relax.
 const AUTOMATED_LIFECYCLE_ARGV_COMMANDS = automatedLifecycleArgvCommands();
-const VALID_RUNNERS = new Set(["claude", "codex"]);
+const VALID_RUNNERS = new Set(["claude", "codex", "antigravity"]);
 // Every write-capable tool this gate admits. NotebookEdit was absent from both this list
 // and from every hooks.json matcher until 2026-08-06, so a .ipynb write returned verdict(0)
 // -- allow -- without the session ever proving a ready bootstrap. Its target arrives as
@@ -1778,7 +1778,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
  */
 function withoutRunnerFlag(args) {
   for (let i = 0; i < args.length - 1; i += 1) {
-    if (args[i] === "--runner" && ["claude", "codex"].includes(args[i + 1])) {
+    if (args[i] === "--runner" && ["claude", "codex", "antigravity"].includes(args[i + 1])) {
       return [...args.slice(0, i), ...args.slice(i + 2)];
     }
   }

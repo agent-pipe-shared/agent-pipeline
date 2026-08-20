@@ -11,7 +11,7 @@ export const CRITIC_EXPORT_PACKET_BOUNDARY = "candidate-diff-and-allowlisted-ref
 const GATE_STATES = new Set(["not-observed", "approved", "additional-check-required", "denied"]);
 const PACKET_KEYS = ["schema", "packetId", "createdAt", "expiresAt", "request", "ruleset", "route", "candidate", "diff", "diffPaths", "references", "governance", "checkout", "cleanupCapability", "bindings"];
 const REFERENCE_KINDS = new Set(["spec", "calibration", "guardrail", "evidence"]);
-const RUNNERS = new Set(["claude", "codex"]);
+const RUNNERS = new Set(["claude", "codex", "antigravity"]);
 const PROVIDER_BY_RUNNER = Object.freeze({ claude: "anthropic", codex: "openai" });
 
 function stable(value) {

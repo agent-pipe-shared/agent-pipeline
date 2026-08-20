@@ -929,6 +929,29 @@ function generateAgyHooks(rootDir) {
             { type: "command", command: `node "${pluginRoot}/hooks/guard-handover-size.mjs"`, timeout: 10 }
           ]
         }
+      ],
+      Stop: [
+        {
+          hooks: [
+            { type: "command", command: `node "${pluginRoot}/hooks/stop-suggest.mjs"`, timeout: 10 }
+          ]
+        }
+      ],
+      SessionStart: [
+        {
+          matcher: "startup|resume|clear",
+          hooks: [
+            { type: "command", command: `node "${pluginRoot}/hooks/staleness-check.mjs"`, timeout: 15 },
+            { type: "command", command: `node "${pluginRoot}/hooks/setup-check.mjs"`, timeout: 10 },
+            { type: "command", command: `node "${pluginRoot}/hooks/codex-session-start-hint.mjs"`, timeout: 3 }
+          ]
+        },
+        {
+          matcher: "compact",
+          hooks: [
+            { type: "command", command: `node "${pluginRoot}/hooks/post-compact-reground.mjs"`, timeout: 10 }
+          ]
+        }
       ]
     }
   };
@@ -1835,7 +1858,7 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
     force: opts.force,
   });
 
-  if (answers?.runners?.includes("antigravity")) {
+  if (runner === "antigravity") {
     const agyHooksPath = join(rootDir, ".agents", "hooks.json");
     if (!existsSync(join(rootDir, ".agents"))) mkdirSync(join(rootDir, ".agents"), { recursive: true });
     writeFileSync(agyHooksPath, generateAgyHooks(rootDir));
