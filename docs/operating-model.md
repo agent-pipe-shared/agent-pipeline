@@ -51,7 +51,7 @@ readiness, and the **Critic** evaluates the result.
 
 The concrete runner integration differs by host. Claude has the richer native
 plugin/hook surface. Codex has its own plugin manifest and pre-tool guard
-adapter. Other runtimes can use the methodology, but must not claim equivalent
+adapter. Antigravity acts as a headless execution host through the CLI, mapped equivalently to Claude's hook surface via `.agents/hooks.json`. Other runtimes can use the methodology, but must not claim equivalent
 hook, tool, isolation or model-routing enforcement without their own evidence.
 
 ### Dispatch briefing fields
@@ -368,7 +368,7 @@ Ergebnis.
 
 Die konkrete Runner-Integration hängt vom Host ab. Claude besitzt die
 umfangreichere native Plugin-/Hook-Oberfläche. Codex besitzt ein eigenes
-Plugin-Manifest und einen PreTool-Guard-Adapter. Andere Runtimes können die
+Plugin-Manifest und einen PreTool-Guard-Adapter. Antigravity fungiert als headless Execution-Host über die CLI und bildet Claudes Hook-Oberfläche via `.agents/hooks.json` äquivalent ab. Andere Runtimes können die
 Methode nutzen, dürfen aber ohne eigene Evidenz keine gleichwertige Hook-,
 Tool-, Isolations- oder Model-Routing-Durchsetzung behaupten.
 

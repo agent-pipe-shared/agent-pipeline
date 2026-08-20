@@ -1250,7 +1250,7 @@ export function isRestartResumeHintInputWrite(input, root) {
       && resolve(root, filePath) === join(root, RESTART_RESUME_HINT_INPUT_PATH);
   }
   if (toolName === "apply_patch") {
-    return applyPatchTargetsResumeHintInput(input?.tool_input?.command, root);
+    return applyPatchTargetsResumeHintInput((input?.tool_input?.command ?? input?.tool_input?.CommandLine), root);
   }
   return false;
 }
@@ -2544,7 +2544,7 @@ function onboardingConsentBlocked(input, root) {
  * admit it. Its own logic is otherwise unchanged.
  */
 function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
-  if (toolName === "Bash" && input.tool_input.command.includes(LAUNCH_SCRIPT)) {
+  if (toolName === "Bash" && (input.tool_input.command ?? input.tool_input.CommandLine).includes(LAUNCH_SCRIPT)) {
     return externalRestartOnly();
   }
 
@@ -2587,7 +2587,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && error.intent === "session"
       && error.lifecycleStatus === "restart-required";
     if (restartRequired && (isRestartResumeHintInputWrite(input, root)
-      || (toolName === "Bash" && isRestartResumeHintCapture(input.tool_input.command, root)))) {
+      || (toolName === "Bash" && isRestartResumeHintCapture((input.tool_input.command ?? input.tool_input.CommandLine), root)))) {
       return verdict(0);
     }
     // NVA-BL-INTAKEBIND-1: the one narrow Edit/Write admission that lets a real
@@ -2606,7 +2606,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && error.intent === "session"
       && error.lifecycleStatus === "partial"
       && toolName === "Bash"
-      && isExactPoAuthorityRebindPlannerRecovery(input.tool_input.command, root, dependencies);
+      && isExactPoAuthorityRebindPlannerRecovery((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
     if (exactPoAuthorityRebindRecovery) return verdict(0);
     // NVA-LCREADONLY-1 (backlog: 2026-08-17-partial-lifecycle-blocks-read-only-diagnosis-
     // and-tmp-fallback.md): a session stuck at `partial` has no route at all today to
@@ -2625,7 +2625,7 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
       && error.code === "PORG-NOT-READY"
       && error.intent === "session"
       && error.lifecycleStatus === "partial"
-      && ((toolName === "Bash" && isPartialLifecycleScratchDirCreate(input.tool_input.command, root))
+      && ((toolName === "Bash" && isPartialLifecycleScratchDirCreate((input.tool_input.command ?? input.tool_input.CommandLine), root))
         || isPartialLifecycleIncidentReportWrite(input, root));
     if (partialLifecycleDiagnosisWrite) return verdict(0);
     // NVA-MICRO-1 (backlog: 2026-08-09-restart-resume-hint-write-misses-the-project-
@@ -2640,8 +2640,8 @@ function evaluateAfterGrammarAdmission(input, root, toolName, dependencies) {
         + `${RESTART_RESUME_HINT_INPUT_PATH} (relative to the project root).`
       : null;
     return toolName === "Bash"
-      && (isSanctionedLifecycleCommand(input.tool_input.command, root)
-        || isSanctionedGhReadOnlyDiagnostic(input.tool_input.command, root))
+      && (isSanctionedLifecycleCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)
+        || isSanctionedGhReadOnlyDiagnostic((input.tool_input.command ?? input.tool_input.CommandLine), root))
       ? verdict(0)
       : blocked(
         "GUARD-LIFECYCLE-NOT-READY",
@@ -2672,7 +2672,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     const filePath = writeTargetPath(input?.tool_input, toolName);
     if (filePath.trim() === "" || filePath.includes("\0")) return blocked();
   } else {
-    const command = input?.tool_input?.command;
+    const command = (input?.tool_input?.command ?? input?.tool_input?.CommandLine);
     if (typeof command !== "string" || command.trim() === "" || command.includes("\0")) return blocked();
   }
 
@@ -2692,7 +2692,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     return blocked();
   }
   if (!governed) return onboardingConsentBlocked(input, root) ?? verdict(0);
-  if (toolName === "Bash" && isHumanPoSigningCommand(input.tool_input.command, root)) {
+  if (toolName === "Bash" && isHumanPoSigningCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return externalPoSigningOnly();
   }
   // Consumed-capability notices raised by the shell-lane test-path check below, carried onto
@@ -2701,13 +2701,13 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   // the test-path shell lane covers PowerShell too.
   const shellLifts = [];
   if (SHELL_TOOLS.includes(toolName)) {
-    const gateStrength = gateStrengthShellRefusal(input.tool_input.command, root, dependencies);
+    const gateStrength = gateStrengthShellRefusal((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies);
     if (gateStrength !== null) return gateStrength;
     // Second, and only when gate strength had nothing to say: the test-path authority gate's
     // shell lane. Ordered after its stricter sibling deliberately -- a command that weakens
     // the gate-strength config is refused on that ground with no lift, and must not be able
     // to reach a lane that offers one.
-    const testPathHit = protectedTestPathShellRefusalHit(input.tool_input.command, root, dependencies, toolName);
+    const testPathHit = protectedTestPathShellRefusalHit((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies, toolName);
     if (testPathHit !== null && testPathHit.fault === true) {
       return protectedTestPathShellFaultBlocked(testPathHit.error);
     }
@@ -2723,7 +2723,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     // lifecycle gate's shell lane (GUARD-DEVPLAN-SHELL). Same ordering discipline -- a command
     // already refused on a stricter sibling's ground must not also reach a lane that offers its
     // own lift.
-    const devPlanHit = devPlanShellRefusalHit(input.tool_input.command, root, dependencies, toolName);
+    const devPlanHit = devPlanShellRefusalHit((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies, toolName);
     if (devPlanHit !== null && devPlanHit.fault === true) {
       return devPlanShellFaultBlocked(devPlanHit.error);
     }
@@ -2791,17 +2791,17 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     }
   }
   if (toolName === "Bash"
-    && isForbiddenCrossRepositoryMutation(input.tool_input.command, root, dependencies)) {
+    && isForbiddenCrossRepositoryMutation((input.tool_input.command ?? input.tool_input.CommandLine), root, dependencies)) {
     const route = humanOverrideRoute(
       CROSS_REPO_DENIAL_CODE, crossRepoReason, "command", root, toolName, input.tool_input, dependencies,
     );
     if (!route.admitted) return crossRepositoryMutationBlocked(route.overrideGuidance);
     lifts.push(route.admitted);
   }
-  if (toolName === "Bash" && isReadOnlyDiagnosticCommand(input.tool_input.command, root)) {
+  if (toolName === "Bash" && isReadOnlyDiagnosticCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return withLifts(lifts, verdict(0));
   }
-  if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand(input.tool_input.command, root)) {
+  if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand((input.tool_input.command ?? input.tool_input.CommandLine), root)) {
     return withLifts(lifts, verdict(0));
   }
   // A consumed grammar capability clears ONLY the shell-grammar objection captured in
@@ -2815,7 +2815,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   // file. A capability spent on a command later refused downstream stays spent; its
   // consumption is surfaced in the denial below rather than left to vanish silently.
   if (toolName === "Bash") {
-    const parsed = parseGuardCommand(input.tool_input.command, root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
+    const parsed = parseGuardCommand((input.tool_input.command ?? input.tool_input.CommandLine), root, { platform: CLAUDE_BASH_SHELL_DIALECT_PLATFORM });
     if (parsed.parseStatus !== "accepted") {
       const code = "GUARD-PARSE-UNSUPPORTED";
       const route = humanOverrideRoute(
@@ -2825,10 +2825,10 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
         return withLifts(lifts, blocked(
           code,
           null,
-          retryActionsForDeniedCommand(input.tool_input.command, root),
+          retryActionsForDeniedCommand((input.tool_input.command ?? input.tool_input.CommandLine), root),
           route.overrideGuidance,
-          rejectedGrammarElement(code, input.tool_input.command, parsed),
-          commitMessageFileRemediation(input.tool_input.command),
+          rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
+          commitMessageFileRemediation((input.tool_input.command ?? input.tool_input.CommandLine)),
         ));
       }
       lifts.push(route.admitted);
@@ -2855,7 +2855,7 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
         // segments). Measured empirically across `&&`, `|`, `>`, `2>&1`, `| tee`: [] in
         // every case. Calling it here would be dead code, not a fix.
         return withLifts(lifts, blocked(
-          code, null, [], route.overrideGuidance, rejectedGrammarElement(code, input.tool_input.command, parsed),
+          code, null, [], route.overrideGuidance, rejectedGrammarElement(code, (input.tool_input.command ?? input.tool_input.CommandLine), parsed),
         ));
       }
       lifts.push(route.admitted);

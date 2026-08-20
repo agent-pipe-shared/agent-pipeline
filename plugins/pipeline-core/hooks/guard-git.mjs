@@ -295,7 +295,7 @@ function pipelineStateScriptRef() {
 let cmd = "";
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
-  cmd = String(input?.tool_input?.command ?? "");
+  cmd = String(input?.tool_input?.command ?? input?.tool_input?.CommandLine ?? "");
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }

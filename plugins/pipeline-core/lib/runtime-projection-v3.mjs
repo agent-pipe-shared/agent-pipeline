@@ -181,6 +181,15 @@ function v2CompatibilityIntent(intent) {
     compatibilityIntent.gates = { ...compatibilityIntent.gates };
     delete compatibilityIntent.gates.push_approval;
   }
+  if (compatibilityIntent.runners !== null && typeof compatibilityIntent.runners === "object") {
+    const v2Enabled = (compatibilityIntent.runners.enabled ?? []).filter((r) => ["claude", "codex", "antigravity"].includes(r));
+    compatibilityIntent.runners = {
+      enabled: v2Enabled.length > 0 ? v2Enabled : ["claude"],
+      default: ["claude", "codex", "antigravity"].includes(compatibilityIntent.runners.default)
+        ? compatibilityIntent.runners.default
+        : (v2Enabled[0] ?? "claude"),
+    };
+  }
   return {
     ...compatibilityIntent,
     schema: "pipeline.user.v2",

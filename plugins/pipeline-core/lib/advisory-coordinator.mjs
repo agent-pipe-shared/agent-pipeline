@@ -19,7 +19,7 @@ import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "
 
 const SUCCESS = "answered";
 const FAILURE_STATUSES = new Set(["unavailable", "failed", "timed-out", "permission-denied"]);
-const PROVIDER = Object.freeze({ claude: "anthropic", codex: "openai" });
+const PROVIDER = Object.freeze({ claude: "anthropic", codex: "openai", antigravity: "google" });
 const CONSULT_TOOLS = Object.freeze(["Read", "Grep", "Glob"]);
 const SELECTED_CODEX_CONSULT_TOOLS = Object.freeze([...CONSULT_TOOLS, "Bash"]);
 
@@ -180,7 +180,7 @@ function nativePayload(input, step, attempt) {
 function routeSteps(contract, runner) {
   const route = contract[runner];
   if (!route || route.state !== "default") return [];
-  if (runner === "codex") {
+  if (runner === "codex" || runner === "antigravity") {
     return [{ kind: "consult", adapter: route.adapter, runner, selector: route.selector, effort: route.effort, attempts: 1 }];
   }
   const nativeOpus = route.fallbacks?.find((entry) => entry.adapter === "native-opus");

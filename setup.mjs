@@ -109,6 +109,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
+import { existsSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -898,6 +899,43 @@ export function resolveWarnDisposition({ force, interactive }) {
 
 // ---- compile targets (pure builders; I/O happens in the caller) ---------------------------------
 /** @param {object|null} existing - previously-parsed settings.json, or null if absent/corrupt */
+export 
+function generateAgyHooks(rootDir) {
+  const hooksDir = join(rootDir, ".agents");
+  if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
+  const pluginRoot = "plugins/pipeline-core";
+  const agyHooks = {
+    $comment: "Antigravity hooks projection (Wave 3). Strictly maps Antigravity tools (run_command, write_to_file, replace_file_content, invoke_subagent) to the exact same guards as Claude Code.",
+    hooks: {
+      PreToolUse: [
+        {
+          matcher: "invoke_subagent",
+          hooks: [{ type: "command", command: `node "${pluginRoot}/hooks/guard-dispatch.mjs"`, timeout: 10 }]
+        },
+        {
+          matcher: "run_command",
+          hooks: [
+            { type: "command", command: `node "${pluginRoot}/hooks/guard-lifecycle-ready.mjs" --runner antigravity` },
+            { type: "command", command: `node "${pluginRoot}/hooks/guard-git.mjs"`, timeout: 10 },
+            { type: "command", command: `node "${pluginRoot}/hooks/guard-push.mjs"`, timeout: 10 }
+          ]
+        },
+        {
+          matcher: "write_to_file|replace_file_content",
+          hooks: [
+            { type: "command", command: `node "${pluginRoot}/hooks/guard-lifecycle-ready.mjs" --runner antigravity` },
+            { type: "command", command: `node "${pluginRoot}/hooks/guard-gate-strength.mjs"` },
+            { type: "command", command: `node "${pluginRoot}/hooks/guard-testpath.mjs"`, timeout: 10 },
+            { type: "command", command: `node "${pluginRoot}/hooks/guard-devplan.mjs"`, timeout: 10 },
+            { type: "command", command: `node "${pluginRoot}/hooks/guard-handover-size.mjs"`, timeout: 10 }
+          ]
+        }
+      ]
+    }
+  };
+  return JSON.stringify(agyHooks, null, 2) + "\n";
+}
+
 export function compileSettingsJson(existing, answers, sourceHash) {
   const base =
     existing && typeof existing === "object"
@@ -1797,6 +1835,13 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
     rl,
     force: opts.force,
   });
+
+  if (answers?.runners?.includes("antigravity")) {
+    const agyHooksPath = join(rootDir, ".agents", "hooks.json");
+    if (!existsSync(join(rootDir, ".agents"))) mkdirSync(join(rootDir, ".agents"), { recursive: true });
+    writeFileSync(agyHooksPath, generateAgyHooks(rootDir));
+    console.log("  .agents/hooks.json: compiled (Antigravity active).");
+  }
 
   if (rl) rl.close();
   printNextSteps();

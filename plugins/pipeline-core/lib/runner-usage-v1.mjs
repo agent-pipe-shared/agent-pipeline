@@ -31,6 +31,7 @@ const GIT_OBJECT = /^[a-f0-9]{40}$/;
 const CLAUDE_TURN_VERSION = "claude-transcript-usage.v1";
 const CLAUDE_SESSION_VERSION = "claude-transcript-session-usage.v1";
 const CODEX_VERSION = "codex-exec-json.v1";
+const ANTIGRAVITY_VERSION = "antigravity-exec-json.v1";
 const CLAUDE_FIELDS = new Set([
   "input_tokens",
   "output_tokens",
@@ -39,6 +40,11 @@ const CLAUDE_FIELDS = new Set([
   "cache_creation",
 ]);
 const CLAUDE_CACHE_FIELDS = new Set(["ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens"]);
+const ANTIGRAVITY_FIELDS = new Set([
+  "input_tokens",
+  "output_tokens",
+  "cached_tokens",
+]);
 const CODEX_FIELDS = new Set([
   "input_tokens",
   "cached_input_tokens",
@@ -51,6 +57,7 @@ export const USAGE_ROUTE_BINDING_SCHEMA_PATH = BINDING_SCHEMA_PATH;
 export const SUPPORTED_NATIVE_USAGE_SOURCES = Object.freeze({
   claude: Object.freeze([CLAUDE_TURN_VERSION, CLAUDE_SESSION_VERSION]),
   codex: Object.freeze([CODEX_VERSION]),
+  antigravity: Object.freeze([ANTIGRAVITY_VERSION]),
 });
 
 export class UsageIngestionError extends Error {
@@ -268,6 +275,13 @@ function parseClaude(version, event) {
   fail("native-version-unsupported", "Claude usage version is not registered");
 }
 
+
+function parseAntigravity(version, event) {
+  if (version !== ANTIGRAVITY_VERSION) fail("native-version-unsupported", "Antigravity usage version is not registered");
+  if (!exactKeys(event, ["type", "usage"]) || event.type !== "turn.completed") fail("native-event-shape", "unsupported Antigravity exec JSON event shape");
+  return { raw: numericUsage(event.usage, ANTIGRAVITY_FIELDS), nativeIds: null, scopeKind: "turn" };
+}
+
 function parseCodex(version, event) {
   if (version !== CODEX_VERSION) fail("native-version-unsupported", "Codex usage version is not registered");
   if (!exactKeys(event, ["type", "usage"]) || event.type !== "turn.completed") fail("native-event-shape", "unsupported Codex exec JSON turn.completed event shape");
@@ -282,8 +296,12 @@ function validScope(value, expectedKind) {
 }
 
 function resolveSourceContext(runner, parsed, sourceContext) {
+  if (runner === "antigravity") {
+    if (sourceContext === undefined || sourceContext === null) fail("source-context-missing", "Antigravity turn usage requires trusted source context");
+    // continue
+  }
   if (sourceContext === undefined || sourceContext === null) {
-    if (runner === "codex") fail("source-context-missing", "Codex turn usage requires trusted app-server thread and turn context");
+    if (runner === "codex" || runner === "antigravity") fail("source-context-missing", `${runner} turn usage requires trusted context`);
     return { ids: parsed.nativeIds, scope: { kind: parsed.scopeKind }, trusted: false };
   }
   if (!exactKeys(sourceContext, ["schema", "trust", "runner", "source", "scope"])
@@ -291,7 +309,7 @@ function resolveSourceContext(runner, parsed, sourceContext) {
     || sourceContext.runner !== runner
     || !isObject(sourceContext.source)
     || !validScope(sourceContext.scope, parsed.scopeKind)) fail("source-context-invalid", "source context must be one exact trusted runner-wrapper shape");
-  const expectedTrust = runner === "codex" ? "codex-app-server" : "runner-wrapper";
+  const expectedTrust = runner === "codex" ? "codex-app-server" : runner === "antigravity" ? "runner-wrapper" : "runner-wrapper";
   if (sourceContext.trust !== expectedTrust) fail("source-context-untrusted", "source context is not trusted for this runner");
   const idKeys = parsed.scopeKind === "turn" ? ["threadId", "turnId"] : ["threadId"];
   if (!exactKeys(sourceContext.source, idKeys) || !idKeys.every((key) => nonemptyString(sourceContext.source[key]))) fail("source-context-invalid", "trusted source context must contain the exact scope identifiers");
@@ -335,6 +353,18 @@ function commonProjection(runner, raw, route) {
       estimatedCost: routeCost,
     };
   }
+  if (runner === "antigravity") {
+    return {
+      inputTokens: rawMetric(raw, "input_tokens"),
+      outputTokens: rawMetric(raw, "output_tokens"),
+      cachedInputTokens: rawMetric(raw, "cached_tokens"),
+      cacheCreationInputTokens: unavailable(),
+      cacheReadInputTokens: unavailable(),
+      reasoningOutputTokens: unavailable(),
+      billedCost: routeCost,
+      estimatedCost: routeCost,
+    };
+  }
   return {
     inputTokens: rawMetric(raw, "input_tokens"),
     outputTokens: rawMetric(raw, "output_tokens"),
@@ -354,6 +384,7 @@ function unbound(reasonCode) {
 function requestedShapeValid(runner, requested) {
   if (!exactKeys(requested, ["selector", "effort"]) || !exactKeys(requested.selector, ["kind", "value"])) return false;
   if (runner === "claude") return requested.selector.kind === "alias" && ["fable", "haiku", "opus", "sonnet"].includes(requested.selector.value) && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
+  if (runner === "antigravity") return requested.selector.kind === "model-id" && ["gemini-3.1-pro-high", "gemini-flash-lite"].includes(requested.selector.value) && requested.effort === "not-applicable";
   return requested.selector.kind === "model-id"
     && ["gpt-5.6-sol", "gpt-5.6-terra"].includes(requested.selector.value)
     && ["xhigh", "max"].includes(requested.effort)
@@ -423,11 +454,11 @@ function trustedEvidenceShapeValid(value) {
     && isHash(value.sha256) && isHash(value.resultSha256)
     && nonemptyString(value.effectiveDuty)
     && (value.effectiveWorktype === null || nonemptyString(value.effectiveWorktype))
-    && ["claude", "codex"].includes(value.effectiveRunner)
+    && ["claude", "codex", "antigravity"].includes(value.effectiveRunner)
     && exactKeys(value.effectiveSelector, ["kind", "value"])
     && value.effectiveSelector.kind === "model-id"
     && nonemptyString(value.effectiveSelector.value)
-    && ["anthropic", "openai"].includes(value.effectiveProvider)
+    && ["anthropic", "openai", "google"].includes(value.effectiveProvider)
     && nonemptyString(value.effectiveModelId)
     && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(value.effectiveEffort);
 }
@@ -531,11 +562,20 @@ function bindRoute({ runner, source, scope, eventSha256, routeContext, repoRoot 
 export function ingestRunnerUsage({ runner, version, nativeEventBytes, sourceContext, routeContext, repoRoot } = {}) {
   if (!SUPPORTED_NATIVE_USAGE_SOURCES[runner]?.includes(version)) fail("native-source-unsupported", "runner and version are not a registered native usage source");
   const parsedEvent = parseNativeEvent(nativeEventBytes);
-  const parsed = runner === "claude" ? parseClaude(version, parsedEvent.event) : parseCodex(version, parsedEvent.event);
+  let parsed;
+  if (runner === "claude") parsed = parseClaude(version, parsedEvent.event);
+  else if (runner === "codex") parsed = parseCodex(version, parsedEvent.event);
+  else if (runner === "antigravity") parsed = parseAntigravity(version, parsedEvent.event);
+  
   const context = resolveSourceContext(runner, parsed, sourceContext);
-  const source = runner === "claude"
-    ? { kind: "claude-transcript-usage", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, ...(parsed.scopeKind === "turn" ? { turnId: context.ids.turnId } : {}) }
-    : { kind: "codex-turn-completed-usage", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, turnId: context.ids.turnId };
+  let source;
+  if (runner === "claude") {
+    source = { kind: "claude-transcript-usage", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, ...(parsed.scopeKind === "turn" ? { turnId: context.ids.turnId } : {}) };
+  } else if (runner === "codex") {
+    source = { kind: "codex-turn-completed-usage", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, turnId: context.ids.turnId };
+  } else if (runner === "antigravity") {
+    source = { kind: "antigravity-exec-json", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, turnId: context.ids.turnId };
+  }
   const route = context.trusted
     ? bindRoute({ runner, source, scope: context.scope, eventSha256: parsedEvent.eventSha256, routeContext, repoRoot })
     : unbound("dispatch-context-missing");
@@ -559,4 +599,9 @@ export function ingestClaudeUsage(options = {}) {
 
 export function ingestCodexUsage(options = {}) {
   return ingestRunnerUsage({ ...options, runner: "codex" });
+}
+
+
+export function ingestAntigravityUsage(options = {}) {
+  return ingestRunnerUsage({ ...options, runner: "antigravity" });
 }
