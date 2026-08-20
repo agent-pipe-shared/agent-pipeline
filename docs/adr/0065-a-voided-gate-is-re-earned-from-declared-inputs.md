@@ -170,22 +170,43 @@ Clarification:
   rest, the rest keep today's guarantee unchanged. A declaration that cannot be
   enforced is not accepted at a narrower scope than the tree.
 
-- **3. Selective execution is out of scope, and is made structurally
-  impossible, not merely discouraged.** Both backlog items exclude it in their
-  own words — *"selective execution weakens the guarantee … needs a PO-visible
-  decision"* and *"trades away a real guarantee"* — and the second item's Triage
-  defers its part 3 to the PO explicitly. This ADR designs only the
-  binding/voiding question. Concretely: **every registered suite produces a
-  terminal receipt in every run**, whether by execution (`executeSuite`) or by
-  content-proven reuse (`reuseSuite`, `verify-journal.mjs:376-391`, which
-  re-verifies the source log's digest and length and refuses on
-  `VERIFY-REUSE-LOG-DRIFT`). `createPublicVerifyRunEvidence` already refuses to
-  report `passed` unless `terminalReceiptCount === registeredSuiteCount`
-  (`verify-resume.mjs:107`). Reuse-with-proof is not selection-without-proof:
-  coverage is identical, the count is identical, and the difference is confined
-  to whether a suite's bytes were re-executed or its unchanged inputs were
-  demonstrated. This ADR must not be cited as authority for tiering, sampling,
-  or a "fast" Verify.
+- **3. Selective execution is permitted only for working Verify runs, with a
+  full boundary before candidate and push.** The PO-approved shape is a lower-
+  assurance work tier, not a replacement for the gate. A working run may use
+  the deterministic selective set below; a candidate- or push-bound run MUST
+  include every registered suite and retain the exact candidate binding and
+  freshness checks. A selective run can never produce candidate/push evidence;
+  omission is not reuse because omitted suites have no terminal receipt.
+
+  **Membership rule.** A suite is eligible for the working selective set only
+  when its registration has (a) a stable suite id, (b) a complete declared
+  input set, (c) an enforceable runtime declaration, and (d) a passing fresh
+  `durationMs`. The set is the union of suites whose declared inputs intersect
+  the changed-input closure since the previous work receipt and an explicit
+  always-run set for invariants that cannot be localized. The closure includes
+  the implementation, arguments, dependencies, environment contract, declared
+  files/non-files, and registration/policy inputs. Missing metadata, reused-
+  only or failed evidence, ambiguous ownership, or an input outside the
+  declaration makes a suite ineligible and therefore full. No name-based
+  exception may make an otherwise ineligible suite selective.
+
+  **Evidence and acceptance.** A selective work artifact records `mode:
+  "selective"`, sorted `registeredSuiteIds`, `selectedSuiteIds`,
+  `omittedSuiteIds`, a digest of the changed-input closure and selection rule,
+  and per-suite `exitCode`, `durationMs`, `reused`, and declared-input digest.
+  Acceptance requires the lists to be disjoint and exhaustive, stable sorting,
+  every selected id to satisfy the membership rule, and no candidate/push
+  `passed` result unless `mode: "full"` and selected count equals registered
+  count. Existing receipt validation remains authoritative; `reused: true` is
+  never actual measured suite cost.
+
+  **Full-gate boundary.** Candidate freeze/preparation and every push preflight
+  MUST invoke full Verify at the candidate commit with no selective omission.
+  Full acceptance requires one terminal result for every registered suite,
+  exact start/finish candidate binding, zero exit failures, and evidence bound
+  to that candidate. Any later commit voids it, even when it misses every
+  declared input; the result must be re-earned. Push approval and security
+  bindings remain unchanged.
 
 - **4. `checkEvidenceFreshness` does not change, and nothing becomes
   schema-incompatible.** `push-prepare.mjs:131-141` and
@@ -245,18 +266,37 @@ Clarification:
   the re-earning is cheap. `verify.mjs` is TP-3 protected, and this decision is
   precisely why no change to it is required.
 
-- **8. Open question for the PO — deliberately not answered here.** Should
-  cross-candidate receipt reuse be permitted for the evidence that backs a
-  *candidate freeze or a push*, or only during working runs? A reused receipt
-  proves "this suite's declared inputs are unchanged," which is exactly as
-  strong as the declaration — sound for Tier B, and merely equal-to-today for
-  Tier A. The proposed default is that push/release-bound Verify runs force
-  full re-execution (`--no-reuse`), buying nothing back for the case the item
-  complained about least. But the *strength* of a release gate is a
-  guarantee-level decision of the same family the second backlog item's own
-  Triage already reserved for the PO, and picking it here to look complete
-  would be the wrong kind of confidence. Recorded as open; the mechanism works
-  under either answer, and the flag is one boolean.
+- **8. Candidate and push remain full even when work is selective.** The PO
+  approved this boundary on 2026-08-19. Cross-candidate reuse may remain an
+  optimization inside a full run only when every registered suite still gets a
+  terminal, input-validated receipt; it must not turn a candidate/push run into
+  a selective run or relax any release policy requiring fresh execution. This
+  design authorizes no change to `verify.mjs`, candidate freshness, or push
+  approval.
+
+- **9. Current data does not support a safe named selective set.** The current
+  `evidence/verify-latest.json` contains 383 suite steps, but 379 are reused
+  receipts and only four have fresh `durationMs`; three of those four fail.
+  Reused receipt time is not measured suite cost, and failed fresh evidence
+  cannot establish eligibility. The smallest next measurement is one stable,
+  successful full Verify run at the intended candidate baseline with every
+  suite fresh (`reused: false`), preserving each suite's `durationMs`, declared-
+  input digest, and exit code. Until that artifact exists, no named selective
+  membership list is safe; unmeasured or failed suites remain full by rule.
+
+## Consolidation rule
+
+Every proposed new Verify suite must name exactly one invariant, its owner, its
+declared inputs, and the existing suite or suites checked for overlap. Admit it
+only when no existing suite already pins that invariant at the same boundary;
+otherwise extend the owner suite or consolidate into one stronger replacement,
+not a duplicate. The proposal must include a deterministic acceptance check, a
+fresh measured duration, and a receipt/input declaration. A suite that merely
+restates an existing invariant, differs only in fixture or assertion wording,
+or cannot declare and enforce its inputs is rejected or folded into the owner.
+Removing or merging an existing suite requires evidence that the survivor still
+covers the invariant. Consolidation never permits deleting a candidate or push
+full-gate check merely to reduce cost.
 
 ## Consequences
 
@@ -369,6 +409,7 @@ session a full Verify run on 2026-08-16 (`docs/state.md:7183`, fixed by
 `a3197af3`) — register this file in
 `governance/observation-doc-governance.json` in the same commit that creates it,
 or `check-doc-contracts.mjs` will fail with `OG-DOC-UNCLASSIFIED`. Both backlog
-items stay open: this ADR satisfies part 2 of the verify-growth item and none of
-parts 3 or 4. Resubmit with the first real measurement of a Tier-B narrowing
+items stay open: this pass supplies the design for parts 3 and 4, while
+implementation, a named membership list, and the fresh measurement remain
+outstanding. Resubmit with the first real measurement of a Tier-B narrowing
 against a live mid-run commit, or by **2026-09-30**, whichever is first.

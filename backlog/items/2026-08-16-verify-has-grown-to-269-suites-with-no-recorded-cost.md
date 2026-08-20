@@ -136,3 +136,29 @@ inputs — mostly covered by ADR-0065, candidates a/b landed, candidate c
 not started), 3 (the concrete selective-set design itself, now
 data-unblocked), and 4 (the consolidation rule) remain open. Item stays
 `open`.
+
+### Nova A design pass, 2026-08-20 — selective work tier, full release boundary, and consolidation
+
+The PO-approved shape is now concrete: selective Verify is a work-only tier;
+candidate freeze/preparation and push preflight remain full Verify boundaries.
+The design is recorded in ADR-0065. A suite is eligible for the selective work
+set only with a stable id, complete and runtime-enforceable declared inputs, and
+a successful fresh `durationMs`. Selection is the declared-input intersection
+with the changed-input closure plus an explicit always-run invariant set.
+Unmeasured, reused-only, failed, ambiguous, or declaration-escaping suites are
+full by default. A selective artifact must record mode, exhaustive sorted
+registered/selected/omitted ids, selection-rule and changed-input digests, and
+per-suite `exitCode`, `durationMs`, `reused`, and declared-input digest. It can
+never satisfy candidate or push freshness; those require every registered suite
+and exact candidate binding. A new suite must name one invariant and demonstrate
+non-overlap with existing coverage, otherwise it is consolidated into the
+existing owner suite.
+
+This pass deliberately does not publish a named selective membership list. The
+current `evidence/verify-latest.json` has 383 steps: 379 reused receipts and
+only four fresh measurements, of which three failed. Reused `durationMs` values
+are receipt overhead, not measured suite cost. The smallest safe next
+measurement is one successful stable full Verify run at the intended candidate
+baseline with every suite fresh (`reused: false`) and its per-suite duration,
+declared-input digest, and exit code retained. Parts 2-4 remain open; Nova B is
+not inspected or implemented.
