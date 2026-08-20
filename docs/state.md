@@ -5,9 +5,11 @@
 
 ## Current handover — local Nova 0.6.0 candidate preparation (2026-08-20)
 
-The requested candidate version remains **`0.6.0`**. A local build must use
-only build metadata, in the form `0.6.0+<runner>.<UTC-datetime>.<functional-oid>`;
-this is not a semver patch bump to `0.6.1`.
+The requested candidate version remains **`0.6.0`**. The local candidate is
+stamped with build metadata in the form `0.6.0+<runner>.<UTC-datetime>.<functional-oid>`;
+the two manifests therefore carry `0.6.0+claude.20260820200609.40d3b47` and
+`0.6.0+codex.20260820200609.40d3b47`. This is not a semver patch bump to
+`0.6.1`.
 
 The backlog is ledger-consistent at **39 open / 3 in progress / 259 closed**.
 Closed items are ignored. Of the 39 open items, **34 are explicitly deferred**
@@ -32,12 +34,32 @@ release selector must not be enabled alongside it. The installed local cache
 still needs to be refreshed and the next session restarted/reloaded before the
 new hook guard code can be observed.
 
-Candidate preparation is committed through `49f4db4a`. A previous Verify run
-covered 383 suites and was otherwise green except for the known
-`human-guard-override-tests` host/marketplace exception; its backlog-state
-finding was caused by the temporary status-file/ledger mismatch and is not
-used as final candidate evidence. Final Verify and the exact build-metadata
-stamp remain pending on the next clean candidate commit.
+The functional candidate is commit
+`40d3b474770d8eec612b4c2ea39399044a3fca88`, tree
+`c037981ceeae357363513d442ca5e20cafae84e8`. Verify run
+`verify-1787256261778-c1dbffc59f30c426` executed all **383 registered suites**
+against that exact binding. Its only non-zero steps were the known
+`human-guard-override-tests` host/marketplace exception, the historical
+`backlog-state-check` drift findings, and a transient full-run
+`security-scan` error. The isolated security scan was rerun successfully:
+Gitleaks, Semgrep, and license checks were clean; OSV was correctly skipped
+because this repository has no package sources. The candidate is therefore a
+local install checkpoint with disclosed Verify exceptions, not an official
+published release.
+
+The manifest stamp is commit `08b8f7a131aca4e8e6f22a79dcdf145d545ce746` and
+is deliberately bound to the functional pre-stamp OID `40d3b47`. The
+generated test directory was retained under the ignored
+`scratch/test-tmp-archive-20260820-01`; it was moved within the repository,
+not deleted.
+
+The backlog cleanup is complete for this handover: closed items remain
+ignored; **34** non-closed items are explicitly deferred to Alfred, Nightwing,
+Phoenix, Nova B, or later scope; the remaining tracked work is **39 open / 3
+in progress / 259 closed**, with the relevant five open and three in-progress
+items listed above. The next session should refresh the local user-scope
+`pipeline-core@agent-pipeline-local` marketplace/cache and reload or restart
+so the current hook code and these manifest versions are installed.
 
 **Last updated:** 2026-08-19 — PO decided the full backlog-triage block, the deniedRoots and Alfred-pull-forward decisions, reported 2 live external greenfield-test bugs (Codex/Windows, Claude/Windows) both now fixed, and instructed an immediate push to the feature branch (token-budget urgency) regardless of the still-open Critic FAIL. New candidate `0.6.0+{claude,codex}.20260819185528.6e30c76` (commit `4203e344`); push-approval ceremony in progress. Earlier same-day history (Wave 5 rounds 1-3, TP-3 ceremony, round-2 Critic orphan through the TP-3 GMW ceremony) is archived below.
 
