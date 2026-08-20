@@ -3,7 +3,7 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.execution-model-switchback"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "open"
+status: "in_progress"
 created: "2026-07-19"
 source: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md"
 tracking: "Sentinel recovery baseline; no completion claim."
@@ -220,7 +220,7 @@ and follow-up package above. **Date:** 2026-08-18
 
 ### Status correction, 2026-08-20
 
-This item is returned from `in_progress` to `open`: the current evidence is
-design-only and no implementation dispatch has started. It is intentionally
-carried forward as a real Nova-relevant design gap rather than represented as
-active implementation work.
+The canonical ledger retains this item at `in_progress`; it does not permit a
+rewind to `open`. The current evidence is design-only and no implementation
+dispatch has started. It is intentionally carried forward as a real
+Nova-relevant design gap, not as a completion claim.
