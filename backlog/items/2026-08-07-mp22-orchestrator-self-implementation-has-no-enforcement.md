@@ -205,6 +205,7 @@ date.
   completed task" concretely looks like (what triggers it, what the
   orchestrator does instead of finishing personally). Not yet a dispatchable
   spec.
+- **Decision:** deferred — owned by Sprint Alfred.
 - **Date:** 2026-08-11
 
 ## Sprint update, 2026-08-17

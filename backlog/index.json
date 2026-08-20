@@ -128,7 +128,7 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Critic round 1 of the 0.5.3 candidate, 2026-08-07 — the Critic reported its own route violation from direct same-dispatch evidence; the cause was found in the shipped agent definitions afterwards.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.agent-never-asks-po-for-key-directory-invents-one-instead",
@@ -189,7 +189,7 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Full command-level analysis of the PO's Codex greenfield happy path against the 0.5.4 candidate (rollout 019fe56c + 019fe56f, 2026-08-09), read from the Codex rollout logs rather than the chat transcript.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones",
@@ -263,7 +263,7 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Reported by the Phoenix session of 2026-08-08 after a PO authority decision it had to resolve; verified against the source in this repository before filing.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.authority-gate-bypassable-by-choosing-a-different-write-tool",
@@ -285,7 +285,7 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed by the Phoenix session of 2026-08-08, which caught it in its own work; generalised and verified against the source here.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.backlog-delivery-status-reconciliation",
@@ -412,7 +412,7 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Turn-efficiency root-cause analysis of the PO's private Claude+Pipeline 0.5.4 happy-path test run, 2026-08-09 (sanitized, no PO-identifying data).",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module",
@@ -421,7 +421,7 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "PO, 2026-08-08, on raising the pipeline-start byte budget 15,000 -> 18,000: optimisation is worth doing, but as an efficiency pass later, when more files still need to become modules — not as a detour inside the 0.5.4 hardening block.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason",
@@ -522,7 +522,7 @@
       "owner": "pipeline",
       "created": "2026-08-05",
       "source": "PO observation, Sprint Nova session 2026-08-05, in the same session that reproduced the setup.mjs marketplace collision by hand",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.cli-docs-generated-from-parser",
@@ -815,7 +815,7 @@
       "owner": "pipeline",
       "created": "2026-08-11",
       "source": "Critic review (FAIL, F3) of NVA-BL-42 (plugins/pipeline-core/agents/critic.md, goldfish-deep.md, templates/prompts/critic-review.md, commit 08684e7874b79c04a44601c487f343be0dfaefa5), 2026-08-11.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.critical-human-proof-not-materialized-for-signature-mode",
@@ -872,7 +872,7 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Independent read-only analysis of the PO's private Codex+Pipeline 0.5.4 happy-path re-test (fifth local candidate, final successful session, 2026-08-09), cross-checked against direct code reading of po-human-approval.mjs. Corrects an earlier self-report from inside that same Codex session, which misidentified the failing subcommand.",
-      "deferred": false,
+      "deferred": true,
       "closedAt": "2026-08-19",
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
@@ -1028,7 +1028,7 @@
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "deferred": false,
+      "deferred": true,
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
@@ -1038,7 +1038,7 @@
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "deferred": false,
+      "deferred": true,
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
@@ -1074,7 +1074,7 @@
       "owner": "pipeline",
       "created": "2026-08-16",
       "source": "PO, 2026-08-16 push-flow analysis: 'der push ist durch zu viele sachen viel zu schwierig und umständlich geworden. Man kann nicht zeitnah einfach mal pushen selbst nach freigabe nicht.' Named Block F in that session and agreed for filing; the measurements below were taken in the same session.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.evidence-bound-review-retry-economics",
@@ -1288,7 +1288,7 @@
       "owner": "pipeline",
       "created": "2026-08-17",
       "source": "PO observation, 2026-08-17, live during a session dispatching several goldfish-deep and Critic subagents back-to-back for Nova A Windows bugfix work.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.goldfish-critic-dispatch-truncation-costs-recurring-recovery-time",
@@ -1410,7 +1410,7 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Live observation of the PO's private Codex+Pipeline 0.5.4 happy-path test run (fifth local candidate), 2026-08-09 (sanitized, no PO-identifying data).",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane",
@@ -1632,7 +1632,7 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Observed 2026-08-08 during the 0.5.4 hardening block itself: the SETUP-2b dispatch was refused when registering its own new suite, correctly stopped rather than routing around the guard, and the registration is still outstanding. Second confirmed instance of the guard-testpath gap already recorded in docs/state.md.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.harness-classifier-blocks-authorized-onboarding-action",
@@ -1706,7 +1706,7 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO decision and observation during the first live guard-maintenance-window signing on 2026-08-07: the wrong key directory was used twice before the trust mismatch surfaced, and the PO was handed two commands where only the first is theirs.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.human-authorization-prompts-ignore-the-configured-language-profile",
@@ -1889,7 +1889,7 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Reported by the ONECMD-1 dispatch (2026-08-07) as an adjacent finding it deliberately left alone rather than fixing outside its briefed scope.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.lifecycle-guard-omits-the-partial-authority-repair-it-prescribes",
@@ -1959,7 +1959,7 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Observation from a parallel Phoenix session on the marketplace snapshot that each guard hook carries only one maintenance-window test, sharpened and empirically checked against the live TP-2/TP-6/TP-7 window during the 2026-08-07 Nova session.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.maintenance-window-signature-voided-by-unrelated-write",
@@ -2055,7 +2055,7 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "Critic rounds 1 and 2 of the 0.5.3 candidate, 2026-08-07 — both independently found the same class of violation, round 2 with the sharper spec-ref.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.multi-cli-efficiency-pilots",
@@ -2325,7 +2325,7 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Critic delta re-review v2, 2026-08-08 (backlog/evidence/2026-08-08-critic-delta-v2-verdict.md, Findings A and B). The pattern recurred nine minutes after the commit that acknowledged it.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.over-broad-ignore-rule-swallows-closure-evidence",
@@ -2830,7 +2830,7 @@
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, live during the 0.5.2 main-release session, 2026-08-07 — verbatim: 'Eine Entwickler Agent-Pipeline die nicht pushen und releasen kann ist unbrauchbar, außerdem viel zu unhandlich mit so vielen Freigaben.'",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.raw-apply_patch-is-unconditionally-admitted-by-the-outer-lifecycle-gate",
@@ -2878,7 +2878,7 @@
       "owner": "pipeline",
       "created": "2026-07-27",
       "source": "CYB-A0 round-2 Critic re-review (new-issue N1), found while verifying the fix for round-1 F1-F5 in plugins/pipeline-core/lib/recovery-preview-attestation.mjs",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.recovery-preview-callback-attestation",
@@ -2900,7 +2900,7 @@
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "deferred": false,
+      "deferred": true,
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
@@ -3014,7 +3014,7 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "SCRATCH-1 dispatch, 2026-08-08, reported as its own open item. The PO had asked the question directly the same night: 'hoffe nur es gibt einen Event der die Sachen auch wieder aufräumt'.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.securedirectory-only-acl-hardens-the-leaf-of-a-recursive-mkdir-not-shared-intermediates",
@@ -3189,7 +3189,7 @@
       "owner": "pipeline",
       "created": "2026-08-12",
       "source": "Independently reported by three separate goldfish dispatches (NVA-BL-40-FIX, NVA-BL-42-FIX, NVA-BL-64) in one wave, 2026-08-12, each hitting the same shared-single-slot evidence artifact while running their own closing `verify.mjs`.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.shipped-artifacts-assume-the-pipelines-own-repository",
@@ -3237,7 +3237,7 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "PO, 2026-08-08, forwarding findings from the Phoenix project as ONE package for Nova/0.5.4 rather than separate tickets. Trimmed 2026-08-09 on the PO's instruction — 'nur was du reproduzieren kannst, rest komplett verwerfen' — after the Elephant walked the whole ceremony live and measured every claim against this code.",
-      "deferred": false,
+      "deferred": true,
       "closedAt": "2026-08-19",
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
@@ -3302,7 +3302,7 @@
       "owner": "pipeline",
       "created": "2026-08-12",
       "source": "Cross-repo observation from a sibling Phoenix session, relayed by the PO into this Nova session for filing.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.staleness-check-unsettled-top-level-await-warning",
@@ -3324,7 +3324,7 @@
       "owner": "pipeline",
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "deferred": false,
+      "deferred": true,
       "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
@@ -3374,7 +3374,7 @@
       "owner": "pipeline",
       "created": "2026-08-08",
       "source": "Elephant, 2026-08-08, GF-057. Third confirmed instance across two blocks; each one verified at a line before filing. The first (GF-056) was walked around with a shell write, the second and third were reported and stopped.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.test-suites-use-host-tmp-instead-of-the-repos-own-scratch-convention",
@@ -3487,7 +3487,7 @@
       "owner": "pipeline",
       "created": "2026-08-09",
       "source": "Independent read-only analysis of the PO's private Codex+Pipeline 0.5.4 happy-path re-test (fifth local candidate, final successful session), 2026-08-09.",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.two-more-critic-preimage-pins-surfaced-by-the-accumulate-fix",
@@ -3496,7 +3496,7 @@
       "owner": "pipeline",
       "created": "2026-08-18",
       "source": "Surfaced by NVA-MICRO-3's fix to codex-isolated-critic-protected-preimage.test.mjs's assertion loop (fail-fast -> accumulate-all-mismatches, closing 2026-08-10-preimage-repin-disclosure-incomplete-for-roles-critic), 2026-08-18. The accumulate fix's own designed effect exposed two more mismatches beyond the one it was written to find.",
-      "deferred": false,
+      "deferred": true,
       "closedAt": "2026-08-18",
       "closureRepository": "self",
       "closureCommit": "d5e5fed754098037f7142d786a122128880c2459",
@@ -3509,7 +3509,7 @@
       "owner": "pipeline",
       "created": "2026-08-02",
       "source": "PO product-direction decision during Sprint Cyborg CYB-4 PO-proof UX review, 2026-08-02",
-      "deferred": false,
+      "deferred": true,
       "tracking": "Current CYB-4 helper is a compatible first adapter only; no programme-wide migration or closure is claimed."
     },
     {
