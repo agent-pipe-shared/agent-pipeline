@@ -874,7 +874,7 @@ function freshIntent(runner) {
     schema: "pipeline.user.v3",
     language: { human_facing: "en", agent_facing: "en" },
     agent_runtime: "other",
-    runners: { enabled: ["claude", "codex"], default: runner },
+    runners: { enabled: ["claude", "codex", ...(runner === "antigravity" ? ["antigravity"] : [])], default: runner },
     routing: { profiles: clone(registry.profiles), duties: clone(registry.duties) },
     usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 3 },
