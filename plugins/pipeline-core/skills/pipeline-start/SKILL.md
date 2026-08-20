@@ -286,7 +286,8 @@ optionally fanned out with the Workflow tool) rather than written directly
 by this session; a `mini`-profile plan is the sole exception and may be
 implemented directly. Build the dispatch briefing from
 `templates/prompts/goldfish-task.md` (never freehand); for the Workflow-tool
-variant, see `references/workflow-dispatch.md` for its additive
+variant, see `plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`
+for its additive
 requirements. This is a followed instruction, not a technically
 guard-enforced rule — no guard blocks or detects a non-dispatched write, so
 skipping the dispatch right here produces no refusal to catch it: get this
