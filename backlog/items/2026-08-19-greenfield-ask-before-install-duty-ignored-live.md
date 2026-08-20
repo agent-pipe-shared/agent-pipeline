@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.greenfield-ask-before-install-duty-ignored-live
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: 2026-08-20
+closure_repository: self
+closure_commit: b5354f25
+closure_evidence: plugins/pipeline-core/hooks/onboarding-consent-guard.test.mjs
 source: "PO, live, 2026-08-19: full session transcript from a fresh Claude Code v2.1.235 greenfield session in a separate, ungoverned test repo (~/src/Rune_Test1_Claude_060_53). Quoted directly by the PO with the exact terminal output."
 ---
 
@@ -219,3 +223,12 @@ entries to read). **Deferred rather than a third automated retry** — two
 full-budget zero-output attempts is the point to stop and hand this to a
 dedicated future session with room to diagnose the dispatch-side failure
 itself, not just re-attempt the same task.
+
+### Closure, 2026-08-20
+
+Both directions are now implemented. Direction 1 is present in commit
+`b7982cdb`; Direction 2 is implemented in commit `b5354f25` with a
+session-scoped marker recorder and PreToolUse coverage for Edit, Write, and
+NotebookEdit. A missing session remains fail-open, Bash remains outside the
+MVP scope, and the marker clears the gate for either recorded answer (`yes`
+or `no`). Focused evidence: the consent guard and recorder tests both pass.
