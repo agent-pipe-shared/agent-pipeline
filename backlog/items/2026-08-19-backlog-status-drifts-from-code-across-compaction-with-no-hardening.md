@@ -3,8 +3,12 @@ schema: pipeline.backlog-item.v1
 id: pipeline.backlog-status-drifts-from-code-across-compaction-with-no-hardening
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: 2026-08-20
+closure_repository: self
+closure_commit: a4fd67f885bab2a67ff5e1de9431b4c390fe02c7
+closure_evidence: plugins/pipeline-core/hooks/guard-git.test.mjs
 source: "PO, live, 2026-08-19: 'irgendwas stimmt da einfach nicht mit dieser SDLC pipeline und der umsetzung. sobald ein compact dazwischen kommt, wird der status in den items nicht sauber aktualisiert. Es wird etwas umgesetzt und dann aber nicht im backlog kommentiert. Das braucht unbedingt eine haertung weil diese backlog cleaning jobs finden hier pro session 5x statt und kosten viel budget.' Triggered directly by two incidents in the same session: (1) 7 Wave-4 items were closed (commits 0f8bdafc, 8d3fd44f) without closed_at/closure_commit/etc. frontmatter or a ledger reconciliation pass, only caught because a verify run happened to fail; (2) a stale '15/17 Wave-4 closed' claim was carried forward across a mid-session compaction and written into docs/state.md as fact without being re-checked against the actual item files (true figure: 7/17)."
 ---
 
@@ -252,3 +256,15 @@ pattern this correction asked for. Landed via a signed TP-3 HGO ceremony,
 commit `1083229b`. Piece 2 (both 2 and 2b) is now fully closed. Piece 1
 (`GG-22`, fully designed above) is dispatched separately this same
 session (Wave 5). Item stays `open` until piece 1 lands.
+
+### Closure, 2026-08-20
+
+Piece 1 landed in `guard-git.mjs` with focused coverage in
+`guard-git.test.mjs`: the six GG-22 cases all pass, including blocking an
+unreconciled backlog status change before unrelated commits and allowing the
+backlog-only reconciliation path. The complete guard test suite passes
+`230/230 cases passed`.
+
+Piece 2 and piece 2b were already landed and documented above. Both modes of
+backlog drift are therefore covered: the commit-time GG-22 guard and the
+live numeric-claim verify check.
