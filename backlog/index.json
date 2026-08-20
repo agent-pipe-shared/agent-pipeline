@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "11042a07c8cafe26a82e2f3c3559efe881e2f916fe9e4d017d6436b4c4851ac6"
+    "transitionHead": "050e1633b78fd17a03007593dc513b0a05988cb6bfc8f0f2059c3073a41f3ebb"
   },
   "counts": {
-    "open": 39,
+    "open": 38,
     "in_progress": 3,
-    "closed": 259
+    "closed": 260
   },
   "items": [
     {
@@ -1587,12 +1587,16 @@
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-07",
       "source": "PO, 2026-08-07: 'state wird aber auch hoffentlich nicht unendlich lang sondern irgendwann wieder leer :) wenn etwas dauerhaft als regel geschrieben wird, dann muss es in adrs'.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-20",
+      "closureRepository": "self",
+      "closureCommit": "cf45a357d77fee34e5f5aea8b633d8cdcbd5df93",
+      "closureEvidence": "backlog/items/2026-08-07-handover-file-has-no-rotation-obligation.md"
     },
     {
       "id": "pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped",
