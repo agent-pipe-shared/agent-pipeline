@@ -8,9 +8,8 @@ the exact candidate and its required evidence.
 | --- | --- | --- |
 | Codex | The runner-native continuation contract may project and read back one generation-bound native goal. | Background supervision, hidden input channels, automatic unblock or a broader execution capability. |
 | Claude Code | The same bounded continuation contract has its own adapter and conformance coverage. | A claim that another runner's evidence proves Claude behavior. |
-| Antigravity | An `alpha-documentation-only` third-runner descriptor identifies Gemini as its model family and fails selection closed. | AGY discovery, installation, authentication, network access, invocation or an advertised execution capability. |
+| Antigravity | Native plugin integration, hook mapping, and standard lifecycle continuation equivalence with Codex and Claude. | Global marketplace publishing or automatic global network discovery (handled via Workspace-local plugins.json). |
 
-The Antigravity Alpha boundary is deliberately not direct AGY delivery. That
 work remains the separately tracked `#69` scope with `sprint:NONE`.
 
 Runner evidence and platform evidence are independent. In particular, the

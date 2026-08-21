@@ -325,3 +325,32 @@ descriptor without a cleanup manifest may be included in the same plan only
 when it separately proves normally retirable; it never inherits the archive
 exception. The recovery never accepts a scratch file, generated output,
 implementation worktree, present path, or path-prefix guess.
+
+## Installation across Runners
+
+The pipeline integrates differently depending on the active runner:
+
+### Codex / Claude Code
+Installation relies on the global marketplace system:
+```bash
+claude plugin install pipeline-core@agent-pipeline-local
+```
+This command links the active project or global environment to the pipeline.
+
+### Antigravity (AGY)
+Antigravity utilizes a decentralized, workspace-local GitOps approach for customizations. Instead of a global `install` command, you commit the plugin mapping directly into your repository:
+
+1. Create `.agents/plugins.json` in your project root:
+```json
+{
+  "entries": [
+    { "path": "../relative/path/to/agent-pipeline/plugins/pipeline-core" }
+  ]
+}
+```
+2. Initialize the pipeline once using the standard setup script:
+```bash
+node ../relative/path/to/agent-pipeline/setup.mjs --runner antigravity
+```
+
+This ensures that any team member who clones the repository immediately benefits from the pipeline logic without running local installation commands. When switching between beta, stable, or local test versions of the pipeline, simply update the `path` value in `.agents/plugins.json` and commit the change.
