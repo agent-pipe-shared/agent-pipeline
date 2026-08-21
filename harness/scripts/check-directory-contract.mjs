@@ -66,6 +66,7 @@ const decoder = new TextDecoder("utf-8", { fatal: true });
  * falling back to an unnamed location).
  */
 export const KNOWN_TOP_LEVEL_DIRS = Object.freeze({
+  ".agents": "Antigravity-runner agent/config definitions (parallel-runner support) — pre-existing repository infrastructure, not an ADR-0063 kind.",
   ".claude": "Plugin/runtime config and state (guard-config.json, pipeline.json/yaml, settings) — ADR-0063's \"plugin-owned private runtime state\" row names this family of paths.",
   ".claude-plugin": "Marketplace manifest metadata for the pipeline-core plugin — pre-existing repository infrastructure, not an ADR-0063 kind.",
   ".codex": "Codex-runner agent/config definitions (parallel-runner support) — pre-existing repository infrastructure, not an ADR-0063 kind.",

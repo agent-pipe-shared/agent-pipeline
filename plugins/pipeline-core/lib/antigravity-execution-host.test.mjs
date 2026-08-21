@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: SUL-1.0
+
 import { discoverAgyPath, invokeAgy, AGY_ERROR_TAXONOMY, parseAgyOutput } from "./antigravity-execution-host.mjs";
 import { writeFileSync, chmodSync, rmSync, mkdirSync } from "fs";
 import { join } from "path";

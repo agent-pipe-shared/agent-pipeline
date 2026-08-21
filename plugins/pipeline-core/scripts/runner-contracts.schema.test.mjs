@@ -39,7 +39,7 @@ const PHASES = ["design_phase", "execution_phase", "advisory"];
 const DUTIES = ["implement", "mechanic", "deep", "test_author", "critic_normal", "critic_high_risk", "readiness"];
 const STATES = ["default", "opt-in", "off", "unavailable", "unknown"];
 const METRICS = ["inputTokens", "outputTokens", "cachedInputTokens", "cacheCreationInputTokens", "cacheReadInputTokens", "reasoningOutputTokens", "billedCost", "estimatedCost"];
-const SOURCES = ["claude-transcript-usage", "codex-turn-completed-usage", "workspace-analytics-export"];
+const SOURCES = ["claude-transcript-usage", "codex-turn-completed-usage", "workspace-analytics-export", "antigravity-exec-json"];
 const SCOPES = ["turn", "session", "workspace-account-aggregate"];
 const P3B_OWNED_MODULES = [
   "../lib/runner-profile-migration-v2.mjs",
@@ -183,11 +183,11 @@ function validateSchemas(user, usage, binding) {
   add(usage.properties?.schema?.const === usage.$id, "usage instance/schema id agreement");
   add(exactKeys(usage.properties, ["schema", "runner", "source", "scope", "route", "raw", "common"]), "usage exact root keys/no durable sink");
   add(exactKeys(usage.properties?.common?.properties, METRICS) && sameMembers(usage.properties?.common?.required ?? [], METRICS) && usage.properties?.common?.additionalProperties === false, "usage metric registry");
-  const sourceKinds = [usage.$defs?.claudeTurnSource?.properties?.kind?.const, usage.$defs?.codexTurnSource?.properties?.kind?.const, usage.$defs?.workspaceAggregateSource?.properties?.kind?.const];
+  const sourceKinds = [usage.$defs?.claudeTurnSource?.properties?.kind?.const, usage.$defs?.codexTurnSource?.properties?.kind?.const, usage.$defs?.workspaceAggregateSource?.properties?.kind?.const, usage.$defs?.antigravityTurnSource?.properties?.kind?.const];
   const scopeKinds = [usage.$defs?.turnScope?.properties?.kind?.const, usage.$defs?.sessionScope?.properties?.kind?.const, usage.$defs?.workspaceAggregateScope?.properties?.kind?.const];
   add(sameMembers(sourceKinds, SOURCES), "usage source registry");
   add(sameMembers(scopeKinds, SCOPES), "usage scope registry");
-  add((usage.oneOf ?? []).length === 4, "usage exact source/scope pair registry");
+  add((usage.oneOf ?? []).length === 5, "usage exact source/scope pair registry");
   add(usage.$defs?.rawUsageObject?.type === "object" && usage.$defs?.rawUsageNode?.oneOf?.[0]?.type === "number" && usage.$defs?.rawUsageNode?.oneOf?.[1]?.type === "object", "raw numeric usage-subobject boundary");
   add(usage.$defs?.estimatedCell?.properties?.status?.const === "estimated" && usage.$defs?.billedMetric?.oneOf?.every((entry) => entry.$ref !== "#/$defs/estimatedCell"), "estimated and billed cost stay distinct");
   const statusDefs = ["observedCell", "estimatedCell", "unknownCell", "unavailableCell", "inapplicableCell"].map((key) => usage.$defs?.[key]?.properties?.status?.const);
