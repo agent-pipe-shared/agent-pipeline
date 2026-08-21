@@ -13,14 +13,11 @@ to the `operating-model.md`.
 Unlike Codex, Antigravity does not rely on a global `plugin install` marketplace 
 command for local plugins. To install the Agent-Pipeline in an Antigravity project:
 
-1. Reference this repository via a `.agents/plugins.json` manifest in your target project:
-   ```json
-   {
-     "entries": [
-       { "path": "/absolute/or/relative/path/to/agent-pipeline/plugins/pipeline-core" }
-     ]
-   }
+1. Run the Antigravity installer script from the pipeline repository:
+   ```bash
+   node /path/to/agent-pipeline/install-agy.mjs
    ```
+   (Select "Workspace-Local" to generate the `.agents/plugins.json` for your project)
 2. Initialize the pipeline in your project by invoking the agent and running the start command:
    ```bash
    agy --execute "/pipeline-start"

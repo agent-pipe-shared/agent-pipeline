@@ -340,14 +340,11 @@ This command links the active project or global environment to the pipeline.
 ### Antigravity (AGY)
 Antigravity utilizes a decentralized, workspace-local GitOps approach for customizations. Instead of a global `install` command, you commit the plugin mapping directly into your repository:
 
-1. Create `.agents/plugins.json` in your project root:
-```json
-{
-  "entries": [
-    { "path": "../relative/path/to/agent-pipeline/plugins/pipeline-core" }
-  ]
-}
+1. Run the Antigravity installer script from the pipeline repository:
+```bash
+node ../relative/path/to/agent-pipeline/install-agy.mjs
 ```
+(Select "Workspace-Local" to generate the `.agents/plugins.json` for your project)
 2. Initialize the pipeline in your project by invoking the agent and running the start command:
 ```bash
 agy --execute "/pipeline-start"
