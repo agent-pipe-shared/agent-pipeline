@@ -21,7 +21,7 @@ command for local plugins. To install the Agent-Pipeline in an Antigravity proje
      ]
    }
    ```
-2. Run the standard pipeline initialization command in your target project:
+2. Initialize the pipeline in your project by invoking the agent and running the start command:
    ```bash
-   node /path/to/agent-pipeline/setup.mjs --runner antigravity
+   agy --execute "/pipeline-start"
    ```

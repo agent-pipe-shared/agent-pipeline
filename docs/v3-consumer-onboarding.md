@@ -348,9 +348,9 @@ Antigravity utilizes a decentralized, workspace-local GitOps approach for custom
   ]
 }
 ```
-2. Initialize the pipeline once using the standard setup script:
+2. Initialize the pipeline in your project by invoking the agent and running the start command:
 ```bash
-node ../relative/path/to/agent-pipeline/setup.mjs --runner antigravity
+agy --execute "/pipeline-start"
 ```
 
 This ensures that any team member who clones the repository immediately benefits from the pipeline logic without running local installation commands. When switching between beta, stable, or local test versions of the pipeline, simply update the `path` value in `.agents/plugins.json` and commit the change.
