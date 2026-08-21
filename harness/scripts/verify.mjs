@@ -231,6 +231,7 @@ const TEST_SUITES = [
   { name: "pipeline-state-revocation-tests", file: join(pluginScriptsDir, "pipeline-state-revocation.test.mjs") },
   { name: "pipeline-state-rebind-runner-tests", file: join(pluginScriptsDir, "pipeline-state-rebind-runner.test.mjs") },
   { name: "codex-pretool-guard-tests", file: join(hooksDir, "codex-pretool-guard.test.mjs") },
+  { name: "antigravity-pretool-guard-tests", file: join(hooksDir, "antigravity-pretool-guard.test.mjs") },
   { name: "codex-session-start-hint-tests", file: join(hooksDir, "codex-session-start-hint.test.mjs") },
   { name: "guard-push-tests", file: join(hooksDir, "guard-push.test.mjs") },
   { name: "guard-push-v2-tests", file: join(hooksDir, "guard-push-v2.test.mjs") },

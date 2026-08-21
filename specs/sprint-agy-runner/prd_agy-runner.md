@@ -6,7 +6,7 @@
 > **Feature ID:** `sprint-agy-runner`
 > **Profile / Rigor / Risk:** Epic / Rigor 2 / Klasse Hoch (Kerninfrastruktur & Runner-Integration)
 > **Status:** `entwurf` (wartet auf PO-Freigabe zur ersten Implementierungs-Wave)
-> **Referenzen:** Issues [#69](https://github.com/agent-pipe-shared/agent-pipeline/issues/69), [#92](https://github.com/agent-pipe-shared/agent-pipeline/issues/92), [#15](https://github.com/agent-pipe-shared/agent-pipeline/issues/15); ADRs [0006](docs/adr/0006-model-effort-policy.md), [0036](docs/adr/0036-runner-honest-profiles-v2.md), [0051](docs/adr/0051-dual-runner-tri-platform-development-contract.md), [0057](docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md).
+> **Referenzen:** Issues [#69](https://github.com/agent-pipe-shared/agent-pipeline/issues/69), [#92](https://github.com/agent-pipe-shared/agent-pipeline/issues/92), [#15](https://github.com/agent-pipe-shared/agent-pipeline/issues/15); ADRs [0006](../../docs/adr/0006-model-effort-policy.md), [0036](../../docs/adr/0036-runner-honest-profiles-v2.md), [0051](../../docs/adr/0051-dual-runner-tri-platform-development-contract.md), [0057](../../docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md).
 
 ---
 
@@ -29,7 +29,7 @@ Die Unterstützung umfasst zwingend **beide Schichten**:
    - Ein Agent darf weder seine eigenen Guardrails modifizieren noch Tests unbemerkt aushebeln können.
    - Antigravity nutzt daher clientseitige `PreToolUse`- und `SessionStart`-Hooks (`hooks.json` in `.agents/`), die unerlaubte Befehle (z. B. ungeprüftes `git push`, unautorisierte Dateimodifikationen vor Freigabe) vor der Ausführung abfangen und den Exit-Code 2 liefern.
 
-2. **Runner-Autarkie ([ADR-0057](docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md) Decision 2a):**
+2. **Runner-Autarkie ([ADR-0057](../../docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md) Decision 2a):**
    - Kein Runner darf Vorbedingung für einen anderen sein. Antigravity muss jeden unterstützten Lifecycle-Schritt vollständig autark ohne Claude- oder Codex-Präsenz abschließen können.
 
 3. **Keine erfundene Parität ([#92](https://github.com/agent-pipe-shared/agent-pipeline/issues/92)):**
@@ -55,17 +55,17 @@ Basierend auf den Modellstärken und Kostenstrukturen gilt folgende feste Zuordn
 ## 4. Scope
 
 - **Konfiguration & Mappings:**
-  - [`plugins/pipeline-core/config/runner-mappings.json`](plugins/pipeline-core/config/runner-mappings.json): Gemini-Direktselektoren und Aliase.
-  - [`plugins/pipeline-core/config/routing-authority.json`](plugins/pipeline-core/config/routing-authority.json): Worktypes & Duties für `antigravity`.
-  - [`plugins/pipeline-core/config/runner-profiles-v3.json`](plugins/pipeline-core/config/runner-profiles-v3.json): Profil-Definitionen für `antigravity`.
-  - [`pipeline.user.schema.json`](pipeline.user.schema.json): Zulassung von `antigravity` in `runners.enabled` und `runners.default`.
+  - [`plugins/pipeline-core/config/runner-mappings.json`](../../plugins/pipeline-core/config/runner-mappings.json): Gemini-Direktselektoren und Aliase.
+  - [`plugins/pipeline-core/config/routing-authority.json`](../../plugins/pipeline-core/config/routing-authority.json): Worktypes & Duties für `antigravity`.
+  - [`plugins/pipeline-core/config/runner-profiles-v3.json`](../../plugins/pipeline-core/config/runner-profiles-v3.json): Profil-Definitionen für `antigravity`.
+  - [`pipeline.user.schema.json`](../../pipeline.user.schema.json): Zulassung von `antigravity` in `runners.enabled` und `runners.default`.
 
 - **Execution Plane & CLI-Integration:**
   - `plugins/pipeline-core/lib/antigravity-execution-host.mjs`: Headless CLI Wrapper (`agy --prompt --output-format json`).
   - Result-Parser, Token-Usage-Normalisierung, Fehler-Taxonomie (`AGY-INVOCATION-ERROR`, `AGY-AUTH-REQUIRED` etc.).
 
 - **Onboarding & Lifecycle:**
-  - [`plugins/pipeline-core/lib/project-onboarding-v3.mjs`](plugins/pipeline-core/lib/project-onboarding-v3.mjs) & [`project-onboarding-ready-gate.mjs`](plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs): Threading von `runner: "antigravity"` ohne harte Abweisung.
+  - [`plugins/pipeline-core/lib/project-onboarding-v3.mjs`](../../plugins/pipeline-core/lib/project-onboarding-v3.mjs) & [`project-onboarding-ready-gate.mjs`](../../plugins/pipeline-core/lib/project-onboarding-ready-gate.mjs): Threading von `runner: "antigravity"` ohne harte Abweisung.
   - Integration von Antigravity in `RUNNERS_WITHOUT_APP_SERVER`.
 
 - **Harte Guardrails & Hooks:**
@@ -77,7 +77,7 @@ Basierend auf den Modellstärken und Kostenstrukturen gilt folgende feste Zuordn
 
 - **Dokumentation & ADRs:**
   - `docs/adr/0067-tri-runner-antigravity-integration.md`: Formale Entscheidung.
-  - Aktualisierung von [`docs/runner-support.md`](docs/runner-support.md) und [`docs/runner-platform-conformance.md`](docs/runner-platform-conformance.md).
+  - Aktualisierung von [`docs/runner-support.md`](../../docs/runner-support.md) und [`docs/runner-platform-conformance.md`](../../docs/runner-platform-conformance.md).
 
 ---
 
@@ -96,7 +96,7 @@ Basierend auf den Modellstärken und Kostenstrukturen gilt folgende feste Zuordn
 2. **Risiko: Regressionsbrüche bei bestehenden Claude/Codex-Tests.**
    - *Mitigation:* Jede Wave wird mit `node harness/scripts/verify.mjs` gegen die gesamte bestehende Suite (380+ Tests) validiert.
 3. **Risiko: Plattform-Unterschiede (Linux / macOS / Windows).**
-   - *Mitigation:* Saubere Pfad-Normalisierung und Shell-Portabilität gemäß [ADR-0051](docs/adr/0051-dual-runner-tri-platform-development-contract.md) / [ADR-0057](docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md).
+   - *Mitigation:* Saubere Pfad-Normalisierung und Shell-Portabilität gemäß [ADR-0051](../../docs/adr/0051-dual-runner-tri-platform-development-contract.md) / [ADR-0057](../../docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md).
 
 ---
 

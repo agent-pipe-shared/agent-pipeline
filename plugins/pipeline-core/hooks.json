@@ -1,53 +1,15 @@
 {
-  "$comment": "Antigravity hooks projection (Wave 3). Strictly maps Antigravity tools (run_command, write_to_file, replace_file_content, invoke_subagent) to the exact same guards as Claude Code.",
-  "hooks": {
+  "$comment": "Antigravity hooks projection (sprint_agy). Maps Antigravity tool lifecycle events to the unified antigravity-pretool-guard and antigravity-stop-hook adapters.",
+  "pipeline-core": {
+    "enabled": true,
     "PreToolUse": [
       {
-        "matcher": "invoke_subagent",
+        "matcher": "run_command|write_to_file|replace_file_content|invoke_subagent",
         "hooks": [
           {
             "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/guard-dispatch.mjs\"",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "run_command",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs\" --runner antigravity"
-          },
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/guard-git.mjs\"",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/guard-push.mjs\"",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "replace_file_content|write_to_file",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/guard-testpath.mjs\"",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/guard-devplan.mjs\"",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/guard-handover-size.mjs\"",
-            "timeout": 10
+            "command": "node \"hooks/antigravity-pretool-guard.mjs\"",
+            "timeout": 30
           }
         ]
       }
@@ -57,40 +19,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/stop-suggest.mjs\"",
-            "timeout": 10
-          }
-        ]
-      }
-    ],
-    "SessionStart": [
-      {
-        "matcher": "startup|resume|clear",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/staleness-check.mjs\"",
+            "command": "node \"hooks/antigravity-stop-hook.mjs\"",
             "timeout": 15
-          },
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/setup-check.mjs\"",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/codex-session-start-hint.mjs\"",
-            "timeout": 3
-          }
-        ]
-      },
-      {
-        "matcher": "compact",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node \"plugins/pipeline-core/hooks/post-compact-reground.mjs\"",
-            "timeout": 10
           }
         ]
       }
