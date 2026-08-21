@@ -35,7 +35,7 @@ function exactKeys(value, names) {
 }
 
 function providerForRunner(runner) {
-  return runner === "claude" ? "anthropic" : runner === "codex" ? "openai" : null;
+  return runner === "claude" ? "anthropic" : runner === "codex" ? "openai" : runner === "antigravity" ? "google" : null;
 }
 
 function validIdentity(identity) {
@@ -81,7 +81,7 @@ export function validateAdvisoryReceipt(receipt, schema = loadAdvisoryReceiptSch
     return { ok: false, reason: "dispatch-binding" };
   }
   if (!exactKeys(configuredRoute, ["runner", "selector", "effort"])
-    || !["claude", "codex"].includes(configuredRoute.runner)
+    || !["claude", "codex", "antigravity"].includes(configuredRoute.runner)
     || !exactKeys(configuredRoute.selector, ["kind", "value"])
     || !["alias", "model-id"].includes(configuredRoute.selector.kind)
     || !MODEL_ID.test(configuredRoute.selector.value ?? "")

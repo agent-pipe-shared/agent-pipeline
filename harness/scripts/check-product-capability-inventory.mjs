@@ -24,7 +24,7 @@ const SURFACE_KINDS = new Set([
   "skill", "agent-role", "human-role", "profile", "duty", "hook", "guard",
   "verify-phase", "governance-extension", "template-extension", "setup", "publication", "release",
 ]);
-const RUNNERS = new Set(["runner-neutral", "codex", "claude", "host-only"]);
+const RUNNERS = new Set(["runner-neutral", "codex", "claude", "antigravity", "host-only"]);
 const PLATFORMS = new Set(["all", "linux", "wsl", "macos", "windows"]);
 const OPERATING_SHAPES = new Set(["solo", "small-team", "multi-team"]);
 const DOCUMENTS = new Set(["README", "FLOW", "OPERATING_MODEL", "SETUP"]);
@@ -355,10 +355,10 @@ export function validateInventory({
       for (const value of capability[key] ?? []) if (!allowed.has(value)) fail(findings, `${label}.${key} has invalid value ${value}`);
       if (!Array.isArray(capability[key]) || capability[key].length === 0) fail(findings, `${label}.${key} must be nonempty for an available support matrix`);
     }
-    if (!hasExactKeys(capability.runnerDispositions, ["claude", "codex"])) {
+    if (!hasExactKeys(capability.runnerDispositions, ["claude", "codex", "antigravity"])) {
       fail(findings, `${label}.runnerDispositions has unexpected shape`);
     } else {
-      for (const runner of ["claude", "codex"]) {
+      for (const runner of ["claude", "codex", "antigravity"]) {
         const disposition = capability.runnerDispositions[runner];
         const dispositionLabel = `${label}.runnerDispositions.${runner}`;
         if (!hasExactKeys(disposition, ["status", "reasonCode"])) {
@@ -373,14 +373,14 @@ export function validateInventory({
           fail(findings, `${dispositionLabel} supported must have null reasonCode`);
         }
         if (disposition.status !== "supported" && (typeof disposition.reasonCode !== "string" || !REASON_CODE.test(disposition.reasonCode))) {
-          fail(findings, `${runner === "codex" ? "Codex" : "Claude"} ${disposition.status} ${dispositionLabel} requires a safe nonempty lowercase-hyphenated reasonCode`);
+          fail(findings, `${runner === "codex" ? "Codex" : runner === "antigravity" ? "Antigravity" : "Claude"} ${disposition.status} ${dispositionLabel} requires a safe nonempty lowercase-hyphenated reasonCode`);
         }
         const declared = capability.runners?.includes(runner) || capability.runners?.includes("runner-neutral");
         if (declared && disposition.status === "unavailable") {
-          fail(findings, `${runner === "codex" ? "Codex" : "Claude"} support matrix conflicts with ${dispositionLabel}`);
+          fail(findings, `${runner === "codex" ? "Codex" : runner === "antigravity" ? "Antigravity" : "Claude"} support matrix conflicts with ${dispositionLabel}`);
         }
         if (!declared && disposition.status !== "unavailable") {
-          fail(findings, `${runner === "codex" ? "Codex" : "Claude"} support matrix conflicts with ${dispositionLabel}`);
+          fail(findings, `${runner === "codex" ? "Codex" : runner === "antigravity" ? "Antigravity" : "Claude"} support matrix conflicts with ${dispositionLabel}`);
         }
       }
     }

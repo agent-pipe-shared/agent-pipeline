@@ -2855,6 +2855,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\""
       ],
       "runners": [
+        "antigravity",
         "claude"
       ],
       "runnerDispositions": {
@@ -2865,6 +2866,10 @@
         "codex": {
           "status": "unavailable",
           "reasonCode": "claude-host-hook-contract"
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
         }
       },
       "platforms": [
@@ -2929,6 +2934,10 @@
         "codex": {
           "status": "host-dependent",
           "reasonCode": "host-hook-lifecycle"
+        },
+        "antigravity": {
+          "status": "unavailable",
+          "reasonCode": "pending-integration"
         }
       },
       "platforms": [
@@ -3347,6 +3356,7 @@
         "verify-phase:harness/scripts/verify.mjs:yaml-lite-tests"
       ],
       "runners": [
+        "antigravity",
         "runner-neutral"
       ],
       "runnerDispositions": {
@@ -3355,6 +3365,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -3417,6 +3431,7 @@
         "governance-extension:governance/examples/policies:policies"
       ],
       "runners": [
+        "antigravity",
         "runner-neutral"
       ],
       "runnerDispositions": {
@@ -3425,6 +3440,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -3468,6 +3487,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\""
       ],
       "runners": [
+        "antigravity",
         "claude"
       ],
       "runnerDispositions": {
@@ -3478,6 +3498,10 @@
         "codex": {
           "status": "unavailable",
           "reasonCode": "claude-host-hook-contract"
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
         }
       },
       "platforms": [
@@ -3519,6 +3543,7 @@
         "human-role:roles/goldfish.md:goldfish"
       ],
       "runners": [
+        "antigravity",
         "runner-neutral"
       ],
       "runnerDispositions": {
@@ -3527,6 +3552,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -3570,6 +3599,7 @@
         "verify-phase:harness/scripts/verify.mjs:parallel-sprint-integration-tests"
       ],
       "runners": [
+        "antigravity",
         "runner-neutral"
       ],
       "runnerDispositions": {
@@ -3578,6 +3608,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -3618,6 +3652,7 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-update-channel-tests"
       ],
       "runners": [
+        "antigravity",
         "runner-neutral"
       ],
       "runnerDispositions": {
@@ -3626,6 +3661,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -3673,6 +3712,7 @@
         "release:plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs:codex-plugin-validator-parity"
       ],
       "runners": [
+        "antigravity",
         "claude",
         "codex",
         "runner-neutral"
@@ -3685,6 +3725,10 @@
         "codex": {
           "status": "host-dependent",
           "reasonCode": "validator-parity-pending"
+        },
+        "antigravity": {
+          "status": "supported",
+          "reasonCode": null
         }
       },
       "platforms": [
@@ -3730,6 +3774,7 @@
         "release:plugins/pipeline-core/scripts/neutral-range-plan.mjs:neutral-range-plan"
       ],
       "runners": [
+        "antigravity",
         "runner-neutral"
       ],
       "runnerDispositions": {
@@ -3738,6 +3783,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -3787,6 +3836,7 @@
         "skill:plugins/pipeline-core/skills/pipeline-start/SKILL.md:pipeline-start"
       ],
       "runners": [
+        "antigravity",
         "claude",
         "codex",
         "runner-neutral"
@@ -3797,6 +3847,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -3846,6 +3900,7 @@
         "setup:setup.mjs:setup"
       ],
       "runners": [
+        "antigravity",
         "claude",
         "codex",
         "runner-neutral"
@@ -3856,6 +3911,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -3913,6 +3972,7 @@
         "agent-role:plugins/pipeline-core/agents/readiness-reviewer.md:readiness-reviewer"
       ],
       "runners": [
+        "antigravity",
         "claude",
         "codex",
         "runner-neutral"
@@ -3923,6 +3983,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -3994,6 +4058,7 @@
         "template-extension:templates/three-scope-fixtures.md:three-scope-fixtures.md"
       ],
       "runners": [
+        "antigravity",
         "runner-neutral"
       ],
       "runnerDispositions": {
@@ -4002,6 +4067,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -4074,6 +4143,7 @@
         "duty:pipeline.user.yaml:test_author"
       ],
       "runners": [
+        "antigravity",
         "claude",
         "codex",
         "runner-neutral"
@@ -4084,6 +4154,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
@@ -4127,6 +4201,7 @@
         "profile:pipeline.user.yaml:mini"
       ],
       "runners": [
+        "antigravity",
         "claude",
         "codex",
         "runner-neutral"
@@ -4137,6 +4212,10 @@
           "reasonCode": null
         },
         "codex": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "antigravity": {
           "status": "supported",
           "reasonCode": null
         }
