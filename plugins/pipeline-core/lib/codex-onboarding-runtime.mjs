@@ -171,7 +171,7 @@ function targetPaths() { return loadRuntimeProjectionV3OwnedKeys().targets.filte
  * an environment sniff and never a fallback (ADR-0057 decision 2): an unknown
  * runner keeps the Codex-strength barrier rather than losing it silently.
  */
-const RUNNERS_WITHOUT_NATIVE_RUNTIME_READBACK = new Set(["claude"]);
+const RUNNERS_WITHOUT_NATIVE_RUNTIME_READBACK = new Set(["claude", "antigravity"]);
 export function requiresNativeRuntimeReadback(runner) {
   return !RUNNERS_WITHOUT_NATIVE_RUNTIME_READBACK.has(runner);
 }

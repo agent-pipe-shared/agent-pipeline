@@ -22,7 +22,7 @@ const INTENTS = new Set(["onboarding", "bootstrap", "session", "dispatch"]);
  * at all, for any intent, so its component is `not-applicable` — distinct from
  * `not-requested`, which means one intent does not need an existing concept.
  */
-export const RUNNERS_WITHOUT_APP_SERVER = new Set(["claude"]);
+export const RUNNERS_WITHOUT_APP_SERVER = new Set(["claude", "antigravity"]);
 const EXECUTION_DENIED = new Set(["EPERM", "EACCES", "EROFS"]);
 const RECOVER_CODES = new Set([
   "CAS-DAEMON-UNREACHABLE",

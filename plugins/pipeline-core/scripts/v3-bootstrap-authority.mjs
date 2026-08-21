@@ -41,7 +41,7 @@ const SCHEMA = "pipeline.v3-bootstrap-authority.v1";
  * gate rather than evidence. Such a runner reports the honest
  * `runtimeReadback: "not-applicable"` and never claims `"current"`.
  */
-const RUNNERS_WITHOUT_NATIVE_READBACK = new Set(["claude"]);
+const RUNNERS_WITHOUT_NATIVE_READBACK = new Set(["claude", "antigravity"]);
 
 function diagnostic(path, code, message, repair) {
   return { path, code, message, repair };
@@ -249,7 +249,7 @@ function deriveCliRunner(root, deps = {}) {
     const raw = (deps.readFileSync ?? readFileSync)(join(root, "pipeline.user.yaml"), "utf8");
     const declared = parseYaml(raw)?.runners;
     const selected = declared?.default;
-    return (selected === "claude" || selected === "codex")
+    return (selected === "claude" || selected === "codex" || selected === "antigravity")
       && Array.isArray(declared?.enabled)
       && declared.enabled.includes(selected)
       ? selected
