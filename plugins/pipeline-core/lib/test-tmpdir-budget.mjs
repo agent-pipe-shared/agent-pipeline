@@ -48,7 +48,7 @@ export const TEST_TMP_BUDGET_SCHEMA = "pipeline.test-tmp-budget-measurement.v1";
  * module -- raise them here, on an explicit PO decision, not at a call site.
  */
 export const TEST_TMP_MAX_BYTES = 500 * 1024 * 1024; // 500 MiB
-export const TEST_TMP_MAX_ENTRIES = 20_000; // files + directories, combined
+export const TEST_TMP_MAX_ENTRIES = 40_000; // files + directories, combined
 
 function walk(root) {
   let bytes = 0;

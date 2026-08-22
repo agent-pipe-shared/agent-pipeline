@@ -521,6 +521,7 @@ const TEST_SUITES = [
   { name: "afk-claude-host-tests", file: join(pluginScriptsDir, "afk-claude-host.test.mjs") },
   { name: "ai-assisted-hardening-gate-tests", file: join(pluginScriptsDir, "ai-assisted-hardening-gate.test.mjs") },
   { name: "antigravity-alpha-adapter-tests", file: join(pluginScriptsDir, "antigravity-alpha-adapter.test.mjs") },
+  { name: "antigravity-execution-host-tests", file: join(libDir, "antigravity-execution-host.test.mjs") },
   { name: "backlog-item-strip-for-dispatch-tests", file: join(pluginScriptsDir, "backlog-item-strip-for-dispatch.test.mjs") },
   { name: "check-backlog-state-tests", file: join(pluginScriptsDir, "check-backlog-state.test.mjs") },
   { name: "check-close-security-completeness-tests", file: join(pluginScriptsDir, "check-close-security-completeness.test.mjs") },

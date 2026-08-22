@@ -50,7 +50,7 @@ if (args.includes("--timeout-test")) {
 } else if (args.includes("--malformed-test")) {
   console.log("no json for you");
 } else {
-  console.log(JSON.stringify({ result: "done", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }}));
+  console.log(JSON.stringify({ result: "done", model: "gemini-observed", usage: { input_tokens: 5, output_tokens: 10, cached_tokens: 0 }}));
 }
 `);
   chmodSync(mockAgy, 0o755);
@@ -79,6 +79,14 @@ if (args.includes("--timeout-test")) {
     // EPH09: Not installed
     const res6 = await invokeAgy({ agyPath: "/does/not/exist/agy", prompt: "test", cwd: root, timeoutMs: 1000 });
     check("EPH09 Detects missing binary", !res6.ok && res6.code === AGY_ERROR_TAXONOMY.NOT_INSTALLED);
+    // EPH10: Model mismatch
+    const res7 = await invokeAgy({ agyPath: mockAgy, prompt: "test", model: "gemini-requested", cwd: root, timeoutMs: 1000 });
+    check("EPH10 Detects model mismatch", !res7.ok && res7.code === AGY_ERROR_TAXONOMY.MODEL_MISMATCH);
+    
+    // EPH11: Model match
+    const res8 = await invokeAgy({ agyPath: mockAgy, prompt: "test", model: "gemini-observed", cwd: root, timeoutMs: 1000 });
+    check("EPH11 Accepts matching model", res8.ok && res8.payload.model === "gemini-observed");
+
     
     console.log(`\n${passed}/${passed + failed} checks passed.`);
     process.exit(failed === 0 ? 0 : 1);

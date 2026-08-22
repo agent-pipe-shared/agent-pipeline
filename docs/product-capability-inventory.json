@@ -677,6 +677,12 @@
       "member": "ai-assisted-hardening-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "antigravity-execution-host-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -3005,6 +3011,7 @@
         "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
+      "verify-phase:harness/scripts/verify.mjs:antigravity-execution-host-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",

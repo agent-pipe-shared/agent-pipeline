@@ -52,9 +52,9 @@ result, a passed Critic gate, or Full Verify.
 ### Durable-rule and history pointers
 
 The Decision 7 extraction audit and authoritative rule map are in
-[ADR-0066](adr/0066-handover-rotation-extraction-archive-hard-size-gate.md).
+[ADR-0066](adr/0066-handover-rotation-extraction-archive-hard-size-gate.md.
 The extraction completion is recorded in
-[the basis backlog item](../backlog/items/2026-08-07-handover-file-has-no-rotation-obligation.md).
+[the basis backlog item](../backlog/items/2026-08-07-handover-file-has-no-rotation-obligation.md.
 The canonical handover, dispatch, gate, directory, retention, and runner
 rules remain in the ADR/policy/guardrail homes listed by that audit.
 
@@ -63,19 +63,19 @@ through the existing archive index and files:
 
 | Period | Archive |
 |---|---|
-| 2026-08-19 Wave 5 / TP-3 | [wave5-tp3.md](state-archive/2026-08-19--wave5-execution-round1-through-tp3-ceremony.md) |
-| 2026-08-19 Critic round 2 / GMW | [critic-r2-gmw.md](state-archive/2026-08-19--critic-round2-orphan-through-tp3-gmw-ceremony.md) |
-| 2026-08-19 step 6 dispatch and landing | [step6.md](state-archive/2026-08-19--step6-dispatch-through-landing.md) |
-| 2026-08-18 daytime history | [observation-publication-queue.md](state-archive/2026-08-19--observation-publication-queue.md) |
-| 2026-07-19 to 2026-07-25 | [open-items-and-next-block.md](state-archive/2026-08-19--open-items-and-next-block.md) |
-| 2026-08-11 to 2026-08-18 | [nova-055-afk-block-through-sentinel-cyborg-reconciliation.md](state-archive/2026-08-18--nova-055-afk-block-through-sentinel-cyborg-reconciliation.md) |
-| 2026-07-30 to 2026-08-07 | [oldest-nova-047-history.md](state-archive/2026-08-18--oldest-nova-047-history.md) |
+| 2026-08-19 Wave 5 / TP-3 | [wave5-tp3.md](state-archive/2026-08-19--wave5-execution-round1-through-tp3-ceremony.md |
+| 2026-08-19 Critic round 2 / GMW | [critic-r2-gmw.md](state-archive/2026-08-19--critic-round2-orphan-through-tp3-gmw-ceremony.md |
+| 2026-08-19 step 6 dispatch and landing | [step6.md](state-archive/2026-08-19--step6-dispatch-through-landing.md |
+| 2026-08-18 daytime history | [observation-publication-queue.md](state-archive/2026-08-19--observation-publication-queue.md |
+| 2026-07-19 to 2026-07-25 | [open-items-and-next-block.md](state-archive/2026-08-19--open-items-and-next-block.md |
+| 2026-08-11 to 2026-08-18 | [nova-055-afk-block-through-sentinel-cyborg-reconciliation.md](state-archive/2026-08-18--nova-055-afk-block-through-sentinel-cyborg-reconciliation.md |
+| 2026-07-30 to 2026-08-07 | [oldest-nova-047-history.md](state-archive/2026-08-18--oldest-nova-047-history.md |
 
 ## Operational head
 
 - Project calibration: [`project/pipeline.json`](../project/pipeline.json).
 - Required gate: `node harness/scripts/verify.mjs`.
-- Formal decisions: [`docs/adr/README.md`](adr/README.md); no state-local
+- Formal decisions: [`docs/adr/README.md`](adr/README.md; no state-local
   override is active.
 - No reusable full-bootstrap receipt is stored publicly; run the full
   bootstrap. Machine-local installation details and private receipts are not
@@ -89,10 +89,10 @@ through the existing archive index and files:
 handover item closed; no rotation or extraction marker was written.
 
 ### Sentinel Links
-- [prd](specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md)
-- [spec](specs/2026-07-19-sprint-sentinel-epic/spec.md)
-- [acceptance](specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md)
-- [design](specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md)
-- [recovery](specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md)
-- [platformSupport](specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md)
-- [windowsBlockers](specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md)
+- specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md
+- specs/2026-07-19-sprint-sentinel-epic/spec.md
+- specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md
+- specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md
+- specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md
+- specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md
+- specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md

@@ -11,6 +11,7 @@ export const AGY_ERROR_TAXONOMY = {
   TIMEOUT: "AGY-TIMEOUT",
   NONZERO_EXIT: "AGY-NONZERO-EXIT",
   OUTPUT_MALFORMED: "AGY-OUTPUT-MALFORMED",
+  MODEL_MISMATCH: "AGY-MODEL-MISMATCH",
 };
 
 export function discoverAgyPath(env = process.env) {
@@ -56,7 +57,7 @@ export async function invokeAgy({ agyPath, prompt, model, effort, cwd, timeoutMs
   const args = [
     "--prompt", prompt,
     "--output-format", "json",
-    "--dangerously-skip-permissions"
+    "--sandbox"
   ];
   if (model) args.push("--model", model);
   if (effort) args.push("--effort", effort);
@@ -93,7 +94,12 @@ export async function invokeAgy({ agyPath, prompt, model, effort, cwd, timeoutMs
 
       try {
         const payload = parseAgyOutput(stdoutData);
-                resolve({ ok: true, payload, stdout: stdoutData });
+        const observedModel = payload.model || payload.modelIdentity || "unknown";
+        if (model && observedModel !== "unknown" && observedModel !== model) {
+          resolve({ ok: false, code: AGY_ERROR_TAXONOMY.MODEL_MISMATCH, message: `Model mismatch: requested ${model}, observed ${observedModel}` });
+          return;
+        }
+        resolve({ ok: true, payload, stdout: stdoutData, observedModel });
       } catch (err) {
         resolve({ ok: false, code: AGY_ERROR_TAXONOMY.OUTPUT_MALFORMED, message: "Failed to parse JSON output", stdout: stdoutData });
       }
