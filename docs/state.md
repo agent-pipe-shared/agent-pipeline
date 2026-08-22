@@ -3,51 +3,27 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-## Current handover — local Nova 0.6.0 candidate preparation (2026-08-20)
+## Current handover — Antigravity CLI 3rd Runner Integration & Hardening (2026-08-23)
 
-### Current open work
+### Current completed & open work
 
-The requested candidate remains **`0.6.0`**. The local candidate is a
-build-metadata checkpoint, not a semver patch bump and not an official
-published release. The backlog is currently **38 open / 3 in progress / 260
-closed**; **34** non-closed items are deferred to Alfred, Nightwing, Phoenix,
-Nova B, or later scope and are not Nova-A release work.
-
-Nova-A-relevant work still recorded here:
-
-- in progress: `pipeline.afk-assumption-mode` and
-  `pipeline.session-keep-awake` (candidate/release pending);
-- in progress, design-only: `pipeline.execution-model-switchback` (no
-  implementation dispatch started);
-- open: `pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible`,
-  `pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery`,
-  `pipeline.long-dispatches-truncate-before-emitting-their-report`, and
-  `pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost`.
-
-The next session should refresh the local user-scope
-`pipeline-core@agent-pipeline-local` marketplace/cache and reload or restart
-before relying on newly installed hook code or manifest versions. The push
-approval ceremony remains open; no push or release operation is performed by
-this handover task.
+The feature **`sprint-agy-runner`** (Issues #69, #92, #15; ADR-0067) is **fully implemented, hardened, and verified**:
+- **Dimension A (Interactive Session):** PreToolUse guardrails (`antigravity-pretool-guard.mjs`) and `.agents/hooks.json` enforce command grammar, workspace containment, phase-gating, and git push guards with exit code 2.
+- **Dimension B (Headless Dispatch):** `antigravity-execution-host.mjs` executes headless `agy` invocations with `--sandbox` isolation, Gemini model mapping, and token usage normalization to `pipeline.runner-usage.v1`.
+- **Tri-Runner Architecture:** Antigravity is a first-class third runner alongside Claude Code and Codex ([ADR-0067](adr/0067-tri-runner-antigravity-integration.md)).
+- **Upstream Rebase & Push:** Rebased cleanly onto `/home/skar667/src/agent-pipeline-shared_nova` (`feat/sprint-nova-codex-v046`, commit `94c5577a`) and pushed to `origin/feat/agy_nova`.
 
 ### Candidate and gate status
 
-The functional candidate is commit
-`40d3b474770d8eec612b4c2ea39399044a3fca88`, tree
-`c037981ceeae357363513d442ca5e20cafae84e8`. The recorded Verify run
-`verify-1787256261778-c1dbffc59f30c426` covered 383 registered suites and
-retained disclosed non-zero results: the known
-`human-guard-override-tests` host/marketplace exception, historical backlog
-state drift findings, and a transient full-run security-scan error. The
-isolated security scan was subsequently clean; OSV was skipped because this
-repository has no package sources. This remains a local-install checkpoint
-with disclosed exceptions.
+The current candidate is commit **`a43ca0fd8af35982e36b817f914016bfd1548e69`**, tree **`76f4284f829aee5737a682d05e7896b93dfaabaf`**.
+- **Deterministic Verify:** Full `node harness/scripts/verify.mjs` run executed **385 registered suites**, all **385 passed (0 failed, exit code 0)**, recorded in `evidence/verify-latest.json`.
+- **T1 Critic Review:** Independent Critic Review (`critic` subagent) completed with **`PASS`** (0 findings, trajectory consistent, all 11 audit gates deliberately verified).
+- **Human Approval Request:** Bound detached push request generated at `/tmp/external-dir/request-422b265c4f08-critical-push.json`.
 
-The final Nova-A T1 Critic review still carries an unresolved FAIL; round 2
-was orphaned and round 3 remains open. A prior handover recorded a PO-directed
-push ceremony as in progress; this current handover makes no new push or
-release claim and does not authorize one. It also does not claim a new Verify
-result, a passed Critic gate, or Full Verify.
+### Next session instructions
+
+1. Restart the Antigravity session (CLI `agy` or IDE reload).
+2. Run `agy --execute "/pipeline-start"` to initialize the runtime context and activate client-side hooks.
 
 ### Durable-rule and history pointers
 
