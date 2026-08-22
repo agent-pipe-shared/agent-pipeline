@@ -135,7 +135,7 @@ try {
 
     check(`LGS06 ${runner}: an unrelated runner value is not smuggled through the allowlist`, () => {
       const root = governedUnbootstrapped();
-      const bogus = `${process.execPath} ${ONBOARDING} inspect --root ${root} --intent session --runner antigravity`;
+      const bogus = `${process.execPath} ${ONBOARDING} inspect --root ${root} --intent session --runner bogus_runner`;
       assert.equal(bash(root, runner, bogus).blocked, true, "only registered runner values may be appended");
     });
 

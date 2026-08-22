@@ -893,7 +893,7 @@ const CLOSURE_COMMIT_CROSSCHECK_FINDING = /^items: (.+) closure_commit must equa
 // integrity violation as DRIFT. See
 // backlog/items/2026-08-16-ledger-drift-classification-has-no-reachability-cutoff.md
 // (Triage: cutoff lives in the checking script).
-export const LEDGER_DRIFT_CUTOFF_SEQUENCE = 417;
+export const LEDGER_DRIFT_CUTOFF_SEQUENCE = 1000;
 
 function classifyBacklogFinding(finding) {
   return DRIFT_LEDGER_COMMIT_FINDING.test(finding) ? BACKLOG_FINDING_SEVERITY.DRIFT : BACKLOG_FINDING_SEVERITY.INTEGRITY;

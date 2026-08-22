@@ -90,6 +90,7 @@
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.elephant-direct-implementation-under-afk-authorization | closed | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch | closed | defect | pipeline | 2026-08-09 | — |
+| pipeline.enforce-kickoff-po-questions | open | workflow-improvement | pipeline | 2026-08-21 | — |
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.evidence-bound-review-retry-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -150,6 +151,8 @@
 | pipeline.kickoff-apply-action-drops-runner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery | open | defect | pipeline | 2026-08-09 | — |
+| pipeline.kickoff-staging-directory-mismatch | open | defect | pipeline | 2026-08-21 | — |
+| pipeline.kickoff-untracked-files-missing-from-commits | open | defect | pipeline | 2026-08-21 | — |
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.ledger-drift-classification-has-no-reachability-cutoff | closed | defect | pipeline | 2026-08-16 | — |
 | pipeline.ledger-event-403-has-a-short-hash-evidence-commit | closed | defect | pipeline | 2026-08-12 | — |
@@ -309,6 +312,6 @@
 
 ## Counts
 
-- open: 38
+- open: 41
 - in_progress: 3
 - closed: 260

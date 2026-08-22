@@ -179,16 +179,16 @@
       "member": "guard-testpath"
     },
     {
-      "surfaceId": "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
-      "kind": "hook",
-      "path": "plugins/pipeline-core/hooks/codex-hooks.json",
-      "member": "PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\""
-    },
-    {
       "surfaceId": "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/codex-hooks.json",
       "member": "PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/codex-hooks.json",
+      "member": "PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\""
     },
     {
       "surfaceId": "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
@@ -419,12 +419,6 @@
       "member": "pipeline-start"
     },
     {
-      "surfaceId": "template-extension:templates/CLAUDE.project.md:CLAUDE.project.md",
-      "kind": "template-extension",
-      "path": "templates/CLAUDE.project.md",
-      "member": "CLAUDE.project.md"
-    },
-    {
       "surfaceId": "template-extension:templates/adr.md:adr.md",
       "kind": "template-extension",
       "path": "templates/adr.md",
@@ -435,6 +429,12 @@
       "kind": "template-extension",
       "path": "templates/architecture-doc.md",
       "member": "architecture-doc.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/CLAUDE.project.md:CLAUDE.project.md",
+      "kind": "template-extension",
+      "path": "templates/CLAUDE.project.md",
+      "member": "CLAUDE.project.md"
     },
     {
       "surfaceId": "template-extension:templates/costs.md:costs.md",
@@ -681,6 +681,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "antigravity-alpha-adapter-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "antigravity-pretool-guard-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
@@ -2999,6 +3005,7 @@
         "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:ai-assisted-hardening-tests",
         "verify-phase:harness/scripts/verify.mjs:antigravity-alpha-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:antigravity-pretool-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",

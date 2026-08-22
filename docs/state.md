@@ -87,3 +87,12 @@ through the existing archive index and files:
 
 **Last updated:** 2026-08-20 — Decision 7 extraction audit completed and the
 handover item closed; no rotation or extraction marker was written.
+
+### Sentinel Links
+- [prd](specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md)
+- [spec](specs/2026-07-19-sprint-sentinel-epic/spec.md)
+- [acceptance](specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md)
+- [design](specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md)
+- [recovery](specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md)
+- [platformSupport](specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md)
+- [windowsBlockers](specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md)
