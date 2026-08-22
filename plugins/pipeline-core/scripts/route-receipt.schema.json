@@ -15,7 +15,7 @@
     "requestedDuty": { "type": "string" },
     "requestedWorktype": { "type": ["string", "null"] },
     "requestedRunner": { "type": "string", "enum": ["claude", "codex", "antigravity"] },
-    "requestedProvider": { "type": "string", "enum": ["anthropic", "openai"] },
+    "requestedProvider": { "type": "string", "enum": ["anthropic", "openai", "google"] },
     "requestedSelector": {
       "type": "object",
       "required": ["kind", "value"],
@@ -38,7 +38,7 @@
         "value": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$" }
       }
     },
-    "effectiveProvider": { "type": "string", "enum": ["anthropic", "openai"] },
+    "effectiveProvider": { "type": "string", "enum": ["anthropic", "openai", "google"] },
     "effectiveModelId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$" },
     "effectiveEffort": { "type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
     "resolutionEvidence": {

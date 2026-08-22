@@ -20,13 +20,15 @@ import {
 } from "./runner-profile-migration-v2.mjs";
 import { loadRunnerProfilesV2Registry, validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
 import { planRuntimeProjectionV2, readRuntimeProjectionV2Baselines } from "./runtime-projection-v2.mjs";
-import { ingestClaudeUsage, ingestCodexUsage } from "./runner-usage-v1.mjs";
+import { ingestClaudeUsage, ingestCodexUsage, ingestAntigravityUsage } from "./runner-usage-v1.mjs";
+import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FIXTURES = join(HERE, "..", "fixtures", "runner-usage-v1");
 const CLAUDE_EVENT = readFileSync(join(FIXTURES, "claude-turn.json"));
 const CODEX_EVENT = readFileSync(join(FIXTURES, "codex-turn-completed.json"));
+const ANTIGRAVITY_EVENT = readFileSync(join(FIXTURES, "antigravity-turn.json"));
 const registry = loadRunnerProfilesV2Registry();
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
@@ -137,7 +139,7 @@ function boundUsage(root, { runner, nativeEvent, requested, duty, effectiveModel
   const candidateTree = "b".repeat(40);
   const resultSha256 = sha256(`${dispatchId}:result`);
   const routeEvidenceSha256 = sha256(`${dispatchId}:route-evidence`);
-  const provider = runner === "claude" ? "anthropic" : "openai";
+  const provider = runner === "claude" ? "anthropic" : runner === "codex" ? "openai" : "google";
   const dispatchBinding = { dispatchId, queueRevision: 0, candidateCommit, candidateTree, requestedDuty: duty, requestedWorktype: null };
   const trustedEvidence = {
     source: evidenceSource,
@@ -301,6 +303,37 @@ check("C02 native Claude and Codex usage bind only through receipts and never pe
     const broken = ingestCodexUsage({ version: "codex-exec-json.v1", nativeEventBytes: CODEX_EVENT, sourceContext: codexTerra.sourceContext, routeContext: mismatched, repoRoot: root });
     assert.deepEqual(broken.route, { status: "unbound", effective: { status: "unknown", reasonCode: "binding-mismatch" } });
     assert.deepEqual(filesSnapshot(root), before, "usage ingestion writes neither raw events nor telemetry state");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+
+check("C03 native Antigravity usage binds correctly using v3 definitions", () => {
+  const root = fixtureRoot();
+  try {
+    const registryV3 = loadRunnerProfilesV3Registry();
+    const intent = {
+      schema: "pipeline.user.v3",
+      language: { human_facing: "de", agent_facing: "en" },
+      agent_runtime: "other",
+      runners: { enabled: ["antigravity"], default: "antigravity" },
+      critic_export: clone(registryV3.criticExportPolicy),
+      routing: { profiles: clone(registryV3.profiles), duties: clone(registryV3.duties) },
+      usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
+      autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
+      gates: { dev_plan: "blocking", push: "blocking", security: "warn", claude_md_max_lines: 300 },
+    };
+    assert.equal(validatePipelineUserV3(intent).ok, true);
+
+    const agyUsage = boundUsage(root, {
+      runner: "antigravity", nativeEvent: ANTIGRAVITY_EVENT, requested: intent.routing.duties.critic_high_risk.antigravity,
+      duty: "critic_high_risk", effectiveModelId: "gemini-3.1-pro-high", effectiveEffort: "max", evidenceSource: "host",
+    });
+
+    const agyTurnUsage = ingestAntigravityUsage({ version: "antigravity-exec-json.v1", nativeEventBytes: ANTIGRAVITY_EVENT, sourceContext: agyUsage.sourceContext, routeContext: agyUsage.routeContext, repoRoot: root });
+    assert.deepEqual(agyTurnUsage.raw, JSON.parse(ANTIGRAVITY_EVENT).usage);
+    assert.deepEqual(agyTurnUsage.route.effective, { status: "observed", modelId: "gemini-3.1-pro-high" });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

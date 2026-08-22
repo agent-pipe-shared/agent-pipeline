@@ -24,7 +24,21 @@ const USAGE_SCHEMA = Object.freeze(JSON.parse(readFileSync(USAGE_SCHEMA_PATH, "u
 const BINDING_SCHEMA = Object.freeze(JSON.parse(readFileSync(BINDING_SCHEMA_PATH, "utf8")));
 // `registeredRouting()` is a clone of the module's frozen I0 registry.  Keep
 // it private so a caller cannot substitute a route after the module loads.
+import { registeredRouting as registeredRoutingV3 } from "./runner-profiles-v3.mjs";
 const FROZEN_I0_ROUTING = registeredRouting();
+const v3 = registeredRoutingV3();
+for (const [duty, config] of Object.entries(v3.duties)) {
+  if (config.antigravity && FROZEN_I0_ROUTING.duties[duty]) {
+    FROZEN_I0_ROUTING.duties[duty].antigravity = config.antigravity;
+  }
+}
+for (const [profile, phases] of Object.entries(v3.profiles)) {
+  for (const [phase, config] of Object.entries(phases)) {
+    if (config.antigravity && FROZEN_I0_ROUTING.profiles[profile]?.[phase]) {
+      FROZEN_I0_ROUTING.profiles[profile][phase].antigravity = config.antigravity;
+    }
+  }
+}
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const GIT_OBJECT = /^[a-f0-9]{40}$/;
@@ -40,11 +54,7 @@ const CLAUDE_FIELDS = new Set([
   "cache_creation",
 ]);
 const CLAUDE_CACHE_FIELDS = new Set(["ephemeral_5m_input_tokens", "ephemeral_1h_input_tokens"]);
-const ANTIGRAVITY_FIELDS = new Set([
-  "input_tokens",
-  "output_tokens",
-  "cached_tokens",
-]);
+const ANTIGRAVITY_FIELDS = new Set(["input_tokens", "output_tokens", "cached_tokens"]);
 const CODEX_FIELDS = new Set([
   "input_tokens",
   "cached_input_tokens",
@@ -275,7 +285,6 @@ function parseClaude(version, event) {
   fail("native-version-unsupported", "Claude usage version is not registered");
 }
 
-
 function parseAntigravity(version, event) {
   if (version !== ANTIGRAVITY_VERSION) fail("native-version-unsupported", "Antigravity usage version is not registered");
   if (!exactKeys(event, ["type", "usage"]) || event.type !== "turn.completed") fail("native-event-shape", "unsupported Antigravity exec JSON event shape");
@@ -296,12 +305,8 @@ function validScope(value, expectedKind) {
 }
 
 function resolveSourceContext(runner, parsed, sourceContext) {
-  if (runner === "antigravity") {
-    if (sourceContext === undefined || sourceContext === null) fail("source-context-missing", "Antigravity turn usage requires trusted source context");
-    // continue
-  }
   if (sourceContext === undefined || sourceContext === null) {
-    if (runner === "codex" || runner === "antigravity") fail("source-context-missing", `${runner} turn usage requires trusted context`);
+    if (runner === "codex") fail("source-context-missing", "Codex turn usage requires trusted app-server thread and turn context");
     return { ids: parsed.nativeIds, scope: { kind: parsed.scopeKind }, trusted: false };
   }
   if (!exactKeys(sourceContext, ["schema", "trust", "runner", "source", "scope"])
@@ -309,7 +314,7 @@ function resolveSourceContext(runner, parsed, sourceContext) {
     || sourceContext.runner !== runner
     || !isObject(sourceContext.source)
     || !validScope(sourceContext.scope, parsed.scopeKind)) fail("source-context-invalid", "source context must be one exact trusted runner-wrapper shape");
-  const expectedTrust = runner === "codex" ? "codex-app-server" : runner === "antigravity" ? "runner-wrapper" : "runner-wrapper";
+  const expectedTrust = runner === "codex" ? "codex-app-server" : "runner-wrapper";
   if (sourceContext.trust !== expectedTrust) fail("source-context-untrusted", "source context is not trusted for this runner");
   const idKeys = parsed.scopeKind === "turn" ? ["threadId", "turnId"] : ["threadId"];
   if (!exactKeys(sourceContext.source, idKeys) || !idKeys.every((key) => nonemptyString(sourceContext.source[key]))) fail("source-context-invalid", "trusted source context must contain the exact scope identifiers");
@@ -353,18 +358,6 @@ function commonProjection(runner, raw, route) {
       estimatedCost: routeCost,
     };
   }
-  if (runner === "antigravity") {
-    return {
-      inputTokens: rawMetric(raw, "input_tokens"),
-      outputTokens: rawMetric(raw, "output_tokens"),
-      cachedInputTokens: rawMetric(raw, "cached_tokens"),
-      cacheCreationInputTokens: unavailable(),
-      cacheReadInputTokens: unavailable(),
-      reasoningOutputTokens: unavailable(),
-      billedCost: routeCost,
-      estimatedCost: routeCost,
-    };
-  }
   return {
     inputTokens: rawMetric(raw, "input_tokens"),
     outputTokens: rawMetric(raw, "output_tokens"),
@@ -384,7 +377,7 @@ function unbound(reasonCode) {
 function requestedShapeValid(runner, requested) {
   if (!exactKeys(requested, ["selector", "effort"]) || !exactKeys(requested.selector, ["kind", "value"])) return false;
   if (runner === "claude") return requested.selector.kind === "alias" && ["fable", "haiku", "opus", "sonnet"].includes(requested.selector.value) && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
-  if (runner === "antigravity") return requested.selector.kind === "model-id" && ["gemini-3.1-pro-high", "gemini-flash-lite"].includes(requested.selector.value) && requested.effort === "not-applicable";
+  if (runner === "antigravity") return requested.selector.kind === "model-id" && ["gemini-3.1-pro-high", "gemini-3.7-flash-high", "gemini-3.7-flash-low"].includes(requested.selector.value) && ["low", "medium", "high", "xhigh", "max", "not-applicable"].includes(requested.effort);
   return requested.selector.kind === "model-id"
     && ["gpt-5.6-sol", "gpt-5.6-terra"].includes(requested.selector.value)
     && ["xhigh", "max"].includes(requested.effort)
@@ -562,20 +555,11 @@ function bindRoute({ runner, source, scope, eventSha256, routeContext, repoRoot 
 export function ingestRunnerUsage({ runner, version, nativeEventBytes, sourceContext, routeContext, repoRoot } = {}) {
   if (!SUPPORTED_NATIVE_USAGE_SOURCES[runner]?.includes(version)) fail("native-source-unsupported", "runner and version are not a registered native usage source");
   const parsedEvent = parseNativeEvent(nativeEventBytes);
-  let parsed;
-  if (runner === "claude") parsed = parseClaude(version, parsedEvent.event);
-  else if (runner === "codex") parsed = parseCodex(version, parsedEvent.event);
-  else if (runner === "antigravity") parsed = parseAntigravity(version, parsedEvent.event);
-  
+  const parsed = runner === "claude" ? parseClaude(version, parsedEvent.event) : runner === "codex" ? parseCodex(version, parsedEvent.event) : parseAntigravity(version, parsedEvent.event);
   const context = resolveSourceContext(runner, parsed, sourceContext);
-  let source;
-  if (runner === "claude") {
-    source = { kind: "claude-transcript-usage", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, ...(parsed.scopeKind === "turn" ? { turnId: context.ids.turnId } : {}) };
-  } else if (runner === "codex") {
-    source = { kind: "codex-turn-completed-usage", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, turnId: context.ids.turnId };
-  } else if (runner === "antigravity") {
-    source = { kind: "antigravity-exec-json", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, turnId: context.ids.turnId };
-  }
+  const source = runner === "claude"
+    ? { kind: "claude-transcript-usage", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, ...(parsed.scopeKind === "turn" ? { turnId: context.ids.turnId } : {}) }
+    : runner === "codex" ? { kind: "codex-turn-completed-usage", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, turnId: context.ids.turnId } : { kind: "antigravity-exec-json", version, eventSha256: parsedEvent.eventSha256, threadId: context.ids.threadId, turnId: context.ids.turnId };
   const route = context.trusted
     ? bindRoute({ runner, source, scope: context.scope, eventSha256: parsedEvent.eventSha256, routeContext, repoRoot })
     : unbound("dispatch-context-missing");
@@ -600,7 +584,6 @@ export function ingestClaudeUsage(options = {}) {
 export function ingestCodexUsage(options = {}) {
   return ingestRunnerUsage({ ...options, runner: "codex" });
 }
-
 
 export function ingestAntigravityUsage(options = {}) {
   return ingestRunnerUsage({ ...options, runner: "antigravity" });

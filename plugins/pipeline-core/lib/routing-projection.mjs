@@ -170,7 +170,7 @@ export function validateDirectRoute(route) {
     || !MANIFEST_EFFORTS.has(route.effort)
     || !DIRECT_UNAVAILABILITY.has(route.unavailability)
     || !DIRECT_EVIDENCE_REQUIREMENTS.has(route.evidenceRequirement)) {
-    return { ok: false, reason: "invalid direct route shape" };
+    return { ok: false, reason: "invalid direct route shape", debug: { route, MANIFEST_EFFORTS: [...MANIFEST_EFFORTS], DIRECT_UNAVAILABILITY: [...DIRECT_UNAVAILABILITY], DIRECT_EVIDENCE_REQUIREMENTS: [...DIRECT_EVIDENCE_REQUIREMENTS] } };
   }
   let mapping;
   try { mapping = mappingFor(route.runner); } catch { return { ok: false, reason: "unknown direct route runner" }; }
