@@ -57,7 +57,7 @@ routing:
         selector:
           kind: "model-id"
           value: "gemini-3.1-pro-high"
-        state: "default"
+        state: "unavailable"
         status: "pipeline.antigravity-sandbox-execution-receipt.v1"
       claude:
         adapter: "native-fable"
@@ -108,7 +108,7 @@ routing:
         selector:
           kind: "model-id"
           value: "gemini-3.1-pro-high"
-        state: "default"
+        state: "unavailable"
         unavailable: "defer"
       claude:
         effort: "max"
@@ -133,7 +133,7 @@ routing:
         selector:
           kind: "model-id"
           value: "gemini-3.7-flash-high"
-        state: "default"
+        state: "unavailable"
         unavailable: "defer"
       claude:
         effort: "high"
@@ -158,7 +158,7 @@ routing:
         selector:
           kind: "model-id"
           value: "gemini-3.7-flash-high"
-        state: "opt-in"
+        state: "unavailable"
         unavailable: "defer"
       claude:
         effort: "medium"
@@ -183,7 +183,7 @@ routing:
         selector:
           kind: "model-id"
           value: "gemini-3.7-flash-high"
-        state: "default"
+        state: "unavailable"
         unavailable: "defer"
       claude:
         effort: "medium"
@@ -208,7 +208,7 @@ routing:
         selector:
           kind: "model-id"
           value: "gemini-3.7-flash-low"
-        state: "opt-in"
+        state: "unavailable"
         unavailable: "defer"
       claude:
         effort: "medium"
@@ -233,7 +233,7 @@ routing:
         selector:
           kind: "model-id"
           value: "gemini-3.7-flash-high"
-        state: "default"
+        state: "unavailable"
         unavailable: "defer"
       claude:
         effort: "high"
@@ -258,7 +258,7 @@ routing:
         selector:
           kind: "model-id"
           value: "gemini-3.7-flash-high"
-        state: "opt-in"
+        state: "unavailable"
         unavailable: "defer"
       claude:
         effort: "high"
@@ -285,7 +285,7 @@ routing:
           selector:
             kind: "model-id"
             value: "gemini-3.1-pro-high"
-          state: "default"
+          state: "unavailable"
           unavailable: "defer"
         claude:
           effort: "xhigh"
@@ -310,7 +310,7 @@ routing:
           selector:
             kind: "model-id"
             value: "gemini-3.7-flash-high"
-          state: "default"
+          state: "unavailable"
           unavailable: "defer"
         claude:
           effort: "high"
@@ -336,7 +336,7 @@ routing:
           selector:
             kind: "model-id"
             value: "gemini-3.1-pro-high"
-          state: "default"
+          state: "unavailable"
           unavailable: "defer"
         claude:
           effort: "high"
@@ -361,7 +361,7 @@ routing:
           selector:
             kind: "model-id"
             value: "gemini-3.7-flash-high"
-          state: "default"
+          state: "unavailable"
           unavailable: "defer"
         claude:
           effort: "medium"
@@ -387,7 +387,7 @@ routing:
           selector:
             kind: "model-id"
             value: "gemini-3.7-flash-high"
-          state: "default"
+          state: "unavailable"
           unavailable: "defer"
         claude:
           effort: "high"
@@ -412,7 +412,7 @@ routing:
           selector:
             kind: "model-id"
             value: "gemini-3.7-flash-high"
-          state: "default"
+          state: "unavailable"
           unavailable: "defer"
         claude:
           effort: "medium"
