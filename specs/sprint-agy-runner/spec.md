@@ -147,3 +147,53 @@ Gemini token counts (`input_tokens`, `output_tokens`, `cached_tokens`) mapped in
    - Full runner conformance suite passing for all 3 runners (`claude`, `codex`, `antigravity`).
    - Draft and accept `docs/adr/0067-tri-runner-antigravity-integration.md`.
    - Full Verify pass.
+
+---
+
+## 6. Rollback Path & Incident Recovery
+
+### 6.1 Pre-Push Rollback
+Before pushing changes to remote origin, rollback is an ordinary local git reset or branch discard (`git reset --hard` / `git checkout`). No remote state or persistent external storage is altered.
+
+### 6.2 Post-Push / Production Rollback
+Since this integration delivers local runner profiles, adapter libraries, and schema additions without destructive migrations:
+1. **Revert Strategy:** Forward git revert commit of the runner integration commits (`git revert`).
+2. **State & Database Impact:** None. No remote database migrations, cloud state modifications, or external schema breaks exist.
+3. **Consumer Recovery:** Reverting removes `antigravity` from `runners.enabled` / `runner-profiles-v3.json`, returning the system fail-closed to the dual-runner baseline (`claude` and `codex`).
+
+---
+
+## 7. Backward-Compatibility & Consumer Protection
+
+### 7.1 Existing Runner Contracts
+All existing `claude` and `codex` routes, profile schemas, duties, and tool bindings remain 100% byte-compatible and functionally identical:
+- Existing `claude` and `codex` selectors in `runner-profiles-v3.json` are unchanged.
+- `pipeline.user.schema.json` and `pipeline-manifest.schema.json` maintain full backward-compatibility; `antigravity` is an additive runner option.
+- Runner conformance test suite `p3b-runner-conformance.test.mjs` explicitly verifies that Claude and Codex routing projections are preserved.
+
+### 7.2 Consumer Protection During Rollout
+Consumers who do not enable `antigravity` experience zero configuration changes. For uncertified duties, Antigravity defaults to `state: "unavailable"` in the frozen V3 profiles, preventing accidental dispatch until explicit certification is established.
+
+---
+
+## 8. Threat Model & Trust Boundary References
+
+1. **Authorization Boundaries:** Documented in `docs/nova-execution-plane-threat-model.md`.
+2. **Sandbox & Egress Restrictions:** The execution host enforces `--sandbox` isolation and validates provider identity (`google` / Gemini models) before command execution.
+3. **PreToolUse Guardrails:** Native Antigravity hooks (`antigravity-pretool-guard.mjs`) enforce command grammar restrictions, workspace containment, and lifecycle phase gating before tool execution.
+
+---
+
+## 9. Governance & Policy Checklist Conformance
+
+| Checklist Item | Status | Verification & Evidence |
+|---|---|---|
+| 1. Data-privacy review | MET | No PII or personal data collected or transmitted. Only local configuration and local execution. |
+| 2. Threat model current & bound | MET | `docs/nova-execution-plane-threat-model.md` updated with Antigravity boundaries and residual controls. |
+| 3. License headers | MET | All new source files carry `// SPDX-License-Identifier: MIT` license headers. |
+| 4. Rollback path documented | MET | Documented in Section 6 above. |
+| 5. Third-party licenses | MET | Zero new third-party npm dependencies added; conforms to `license-allowlist.json`. |
+| 6. Secrets handling | MET | No credentials committed; local `agy` authentication context used. |
+| 7. Backward compatibility | MET | Documented in Section 7 above; verified by conformance suite. |
+| 8. Owner assigned for deferred risk | MET | PO owns future live runner certification and external broker integrations. |
+
