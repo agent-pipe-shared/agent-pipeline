@@ -79,6 +79,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0064](0064-release-preflight-consent-reuses-the-uniform-approval-ceremony.md) | Release-preflight consent is a fourth critical-action kind, not a fourth ceremony — reuses `po-human-approval.mjs authorize-critical` under ADR-0061 instead of inventing a new mechanism | accepted | 2026-08-17 |
 | [0065](0065-a-voided-gate-is-re-earned-from-declared-inputs.md) | A voided Verify gate is cheaply re-earned from per-suite declared inputs (finishing the existing `verify-resume.mjs` mechanism), not preserved by a coarser commit-diff envelope — Security and push approval stay whole-tree/whole-commit by design | accepted | 2026-08-17 |
 | [0066](0066-handover-rotation-extraction-archive-hard-size-gate.md) | The handover rotates via extraction-then-archive (`docs/state-archive/`), gated by two independent triggers — block/feature-boundary rotation AND a hard size cap that fires even mid-sprint, closing ADR-0060 Decision 5 | accepted | 2026-08-17 |
+| [0067](0067-tri-runner-antigravity-integration.md) | Elevate Google Antigravity CLI (`agy`) with Gemini models to a full 3rd runner with hard hook enforcement, headless dispatch and honest profile mapping, extending ADR-0051/0057 | accepted | 2026-08-22 |
 
 ### Resubmissions
 
