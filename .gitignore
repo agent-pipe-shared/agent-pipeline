@@ -61,6 +61,13 @@ project/resume-hint.json
 .claude/.usage-*.json
 .claude/.stop-suggest-*.json
 .claude/.pipeline-install-consent-*.json
+# Per-session model-identity evidence (43a8c799) — same class as the three above:
+# machine-regenerated per session_id, never a durable audit trail. It shipped
+# without an ignore rule, so every session left an untracked file that made
+# verify.mjs's candidate preflight reject the tree as dirty before a single suite
+# ran (`binding: preflight-rejected`) — the same unsatisfiable-gate shape already
+# recorded above for `/evidence/`.
+.claude/.main-session-model-identity-*.json
 *.usage-*.json
 *.stop-suggest-*.json
 
