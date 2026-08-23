@@ -23,6 +23,19 @@
 # This is a generic template rule -- fixture content, not a real company's actual
 # ruleset. A project adopting the pipeline replaces/extends this with its own rules,
 # scoped via `paths.include`/`paths.exclude` to its actual module layout.
+#
+# `paths.include: "/core/**"` (leading slash) verified empirically 2026-08-23 (task
+# AGY-FIX-SEMGREP, closing critic finding F19): semgrep 1.170.0, `semgrep scan --json
+# --project-root <root> --config <this-file> <root>` with `<root>` matching the
+# `rootDir` argument `semgrep.mjs` actually passes (project root == scan root, the
+# shape the security-scan phase invokes). Under that shape the anchored form matches
+# only a top-level `core/**` and correctly excludes a nested `other/core/**` sibling;
+# the unanchored form `core/**` (pre-ffef3677) additionally matched the nested sibling
+# -- a false positive the anchoring fixes. A naive fixture scan nested inside an
+# unrelated outer git repo (no `--project-root` override) misleadingly showed 0
+# matches for the anchored form because semgrep anchored to the outer repo's root
+# instead -- an artifact of that nesting, not of this glob. Full commands/output:
+# evidence/dispatch-record-AGY-FIX-SEMGREP.json.
 
 rules:
   - id: core-must-not-import-features
