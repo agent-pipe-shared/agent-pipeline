@@ -18,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"hooks/antigravity-stop-hook.mjs\"",
+            "command": "/home/skar667/.local/share/fnm/node-versions/v24.19.0/installation/bin/node \"hooks/antigravity-stop-hook.mjs\"",
             "timeout": 15
           }
         ]
@@ -27,7 +27,7 @@
     "PreInvocation": [
       {
         "type": "command",
-        "command": "node \"hooks/antigravity-start-hint.mjs\"",
+        "command": "/home/skar667/.local/share/fnm/node-versions/v24.19.0/installation/bin/node \"hooks/antigravity-start-hint.mjs\"",
         "timeout": 5
       }
     ]
