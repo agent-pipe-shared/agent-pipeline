@@ -258,6 +258,34 @@ returns `status: "author-repair-required"` rather than `"planned"` — and the
 same section states that needing such a path is a stop condition. No agent tier
 can perform this edit; it requires a human-decided route.
 
+## PO disposition, 2026-08-23
+
+The PO reviewed the three findings above that have no code remedy and accepted
+them as **closed**: F2 (authorship trailers on the 34 published commits), F14
+(commit-message contract on four published commits), and the historical half of
+F10 (protected-test-path writes inside the reviewed range).
+
+Closed here means the residual defect is accepted and carried, not repaired.
+The commits stay as they are, and the facts recorded above stay on the record as
+the permanent description of what is wrong with them. Nothing in this section
+makes the underlying range authorship-verifiable.
+
+The forward-looking obligations are unchanged and are not covered by this
+acceptance: every commit after `51dd7fc6` carries a `Dispatch:` trailer and a
+dispatch record, and F10's open mechanism question below stays open — an
+accepted historical gap is not an explanation of how those writes happened.
+
+**F11 — closed by human application.** The paragraph above recorded F11 as
+open and not dispatchable, which was accurate at the time: the test belongs in
+`guard-push.test.mjs` (TP-5), and per `templates/prompts/agent-obligations.md`
+§2 no agent tier can write a protected test path in a source checkout. The PO
+resolved it on the only available route by applying the test body by hand
+(commit `ea1432e9`), adding `PG12u1` — the block fires for each of `specs/`,
+`docs/` and `backlog/` — and `PG12u2`, which pins the scope so an uncommitted
+file elsewhere does not become a push refusal. `guard-push.mjs:1659` is the
+only working-tree status check in the file, so the scope assertion is exact
+rather than assumed.
+
 ## Why the removed `pre-push` hook existed (PO statement, 2026-08-23)
 
 Recorded so that the removal in `a8f861cc` is not later read as tidying up.
