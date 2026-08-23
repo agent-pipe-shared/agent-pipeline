@@ -7,23 +7,101 @@
 
 ### Current completed & open work
 
-The feature **`sprint-agy-runner`** (Issues #69, #92, #15; ADR-0067) is **fully implemented, hardened, and verified**:
-- **Dimension A (Interactive Session):** PreToolUse guardrails (`antigravity-pretool-guard.mjs`) and `.agents/hooks.json` enforce command grammar, workspace containment, phase-gating, and git push guards with exit code 2.
-- **Dimension B (Headless Dispatch):** `antigravity-execution-host.mjs` executes headless `agy` invocations with `--sandbox` isolation, Gemini model mapping, and token usage normalization to `pipeline.runner-usage.v1`.
-- **Tri-Runner Architecture:** Antigravity is a first-class third runner alongside Claude Code and Codex ([ADR-0067](adr/0067-tri-runner-antigravity-integration.md)).
-- **Upstream Rebase & Push:** Rebased cleanly onto `/home/skar667/src/agent-pipeline-shared_nova` (`feat/sprint-nova-codex-v046`, commit `94c5577a`) and pushed to `origin/feat/agy_nova`.
+The feature **`sprint-agy-runner`** (Issues #69, #92, #15; ADR-0067) is
+implementation-complete. It is **not** verified, not review-cleared and not
+PO-accepted: the required gate is red and the delta Critic review returned FAIL.
+- **Dimension A (Interactive Session):** PreToolUse guardrails
+  (`antigravity-pretool-guard.mjs`), registered for Antigravity through
+  `.agents/plugins.json`. Whether that registration actually loads is the open
+  question recorded as D7 below.
+- **Dimension B (Headless Dispatch):** `antigravity-execution-host.mjs`
+  executes headless `agy` invocations with `--sandbox` isolation, Gemini model
+  mapping, and token usage normalization to `pipeline.runner-usage.v1`.
+- **Tri-Runner Architecture:** Antigravity is a first-class third runner
+  alongside Claude Code and Codex
+  ([ADR-0067](adr/0067-tri-runner-antigravity-integration.md)).
+- **Upstream rebase:** rebased onto the nova checkout's
+  `feat/sprint-nova-codex-v046` (commit `94c5577a`) and pushed to
+  `origin/sprint_agy`, which stands at `70fd1bc7`. Every commit after that point
+  is local and unpushed.
 
 ### Candidate and gate status
 
-The current candidate is commit **`a43ca0fd8af35982e36b817f914016bfd1548e69`**, tree **`76f4284f829aee5737a682d05e7896b93dfaabaf`**.
-- **Deterministic Verify:** Full `node harness/scripts/verify.mjs` run executed **385 registered suites**, all **385 passed (0 failed, exit code 0)**, recorded in `evidence/verify-latest.json`.
-- **T1 Critic Review:** Independent Critic Review (`critic` subagent) completed with **`PASS`** (0 findings, trajectory consistent, all 11 audit gates deliberately verified).
-- **Human Approval Request:** Bound detached push request generated at `/tmp/external-dir/request-422b265c4f08-critical-push.json`.
+Candidate: commit **`ea1432e96904f13f52cf591678b239d2f6a6d563`**, tree
+**`ba4df6fc5ad6661f021e9129dfac2cc07c58525b`**.
+
+- **Deterministic Verify — RED.** `node harness/scripts/verify.mjs` bound the
+  candidate exactly at start and finish (`binding: "exact"`), 385 registered
+  suites and 385 terminal receipts. **384 passed, 1 failed:**
+  `human-guard-override-tests`. The failing case asserts that this machine's
+  local marketplace plugin-tree copy is byte-identical to this checkout
+  (`HGO-EXTERNAL-MARKETPLACE`). 18 files diverge. It is pre-existing drift, not
+  a regression from the correction wave: `guard-apply-patch.mjs` diverges too,
+  and its last change `dc84c177` is an ancestor of the reviewed base. The gate
+  cannot go green until the marketplace resync happens, which makes the resync a
+  gate dependency rather than the independent follow-up it was planned as.
+- **Critic review — FAIL.** The first full review of `92037494..51dd7fc6`
+  returned FAIL (3 blockers, 9 majors, 7 minors;
+  `specs/sprint-agy-runner/evidence/2026-08-23-critic-review-agy-runner.md`). A
+  correction wave of seven Goldfish dispatches plus Elephant-authored records
+  addressed every finding; F2, F14 and the historical half of F10 have no code
+  remedy and are PO-accepted as closed, disclosed in that record. The bounded
+  delta review of the correction range then returned **FAIL** as well — 5
+  majors, 2 minors, no proven blocker:
+  `specs/sprint-agy-runner/evidence/2026-08-23-delta-critic-review-agy-runner.md`.
+- **Security gate:** not yet run against this candidate.
+- **Push:** no approval exists for any commit in this range. `gates.push_approval`
+  is `signature`, so a push needs a detached Ed25519 proof bound to the exact
+  candidate ([ADR-0056](adr/0056-push-approval-mode.md);
+  [`docs/push-release-flow.md`](push-release-flow.md)).
+
+### Open items
+
+1. **D7 — the Antigravity enforcement layer is very likely not loading, and it
+   is the most urgent item here.** `.agents/plugins.json` registers
+   `"path": "plugins"`, but `install-agy.mjs` defines that field as a plugin
+   root — the directory holding `plugin.json`, which is `plugins/pipeline-core`.
+   `48591844` once bypassed this file entirely "for reliable loading". If the
+   entry does not resolve, the whole PreToolUse layer fails open, which is a
+   live candidate root cause both for the push escape the PO observed and for
+   F10, whose mechanism the first review had to leave unexplained. No fix was
+   applied because relative-path support is unverifiable without a running
+   Antigravity runner, and the alternatives (absolute path, relative path,
+   writing `.agents/hooks.json` directly) trade off against CLAUDE.md's
+   machine-path rule. PO decision required. Full analysis in the delta review
+   record and in
+   [the backlog item](../backlog/items/2026-08-23-antigravity-plugin-registration-points-one-level-above-the-plugin-root.md).
+2. **Delta-review findings D1–D6** are unaddressed. Fixing them creates further
+   unreviewed commits, which collides with the PO's standing instruction of one
+   review round without a re-critic. Sequencing is a PO decision.
+3. **Marketplace resync and version bump**, PO-approved to follow the review,
+   now also required for a green gate (see above). The local marketplace is
+   machine-wide and also serves the nova checkout.
+4. `pipeline-state.mjs inspect` reports `activeFeature: sprint-nova-epic`,
+   inherited from the rebase; it does not name this feature.
+5. Repo consolidation between this checkout and nova is undecided. The nova
+   branch tip `94c5577a` is a strict ancestor of this branch.
+6. `specs/sprint-agy-runner/prd_agy-runner.md` §2 still names `hooks.json` in
+   `.agents/`; the file was migrated to `plugins.json` in `ffa55f78`. The PRD is
+   the approved design artifact and predates the reviewed range, so it was left
+   for a PO decision rather than edited.
+7. A verify suite that asserts on a path outside the repository makes the
+   deterministic gate machine-dependent: the same commit is green or red
+   depending on marketplace state. Design question for the gate, separate from
+   the resync itself.
+8. The briefed subagent tool budget sits below an unannounced harness `maxTurns`
+   cliff:
+   `backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`.
+9. Orchestrator notes and Critic dispatch scratch share one `scratch/`
+   directory, so verdict-bearing material sits where a dispatched Critic is
+   guaranteed to look:
+   `backlog/items/2026-08-23-elephant-notes-and-critic-scratch-share-one-directory.md`.
 
 ### Next session instructions
 
 1. Restart the Antigravity session (CLI `agy` or IDE reload).
-2. Run `agy --execute "/pipeline-start"` to initialize the runtime context and activate client-side hooks.
+2. Run `agy --execute "/pipeline-start"` to initialize the runtime context and
+   activate client-side hooks.
 
 ### Durable-rule and history pointers
 
