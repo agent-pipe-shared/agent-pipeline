@@ -347,5 +347,131 @@ check("Antigravity pretool guard blocks agent self-approval for approve-push", (
   rmSync(root, { recursive: true, force: true });
 });
 
+// 3. Restored Antigravity Hardening Layer (ADR-0014 read-only Critic contract)
+
+check("Antigravity pretool guard blocks a critic subagent defined with write tools enabled", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "define_subagent",
+      args: { name: "critic-reviewer", enable_write_tools: true },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /enable_write_tools: false/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a non-critic subagent defined with write tools enabled (neighbour case)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "define_subagent",
+      args: { name: "goldfish-implementor", enable_write_tools: true },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a critic subagent correctly defined with enable_write_tools: false", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "define_subagent",
+      args: { name: "critic-reviewer", enable_write_tools: false },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks a critic dispatch prompt carrying prose (Contamination Rule)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: "Please examine this file and review it.",
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard does not treat a paths-only critic dispatch as prose (neighbour case)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: "specs/feat-1/prd.md\ndocs/adr/0014-critic-contract.md",
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.doesNotMatch(res.reason ?? "", /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline node -e execution (containment)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "node -e \"console.log(1)\"" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline python -c execution (containment)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "python -c \"print(1)\"" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows running a node script file, not inline code (neighbour case)", () => {
+  const root = mkdtempSync(join(tmpdir(), "agy-pretool-bare-"));
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "node scratch/script.mjs" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
 console.log(`\nAll ${passed} antigravity-pretool-guard tests passed.`);
 

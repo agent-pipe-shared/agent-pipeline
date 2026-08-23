@@ -290,6 +290,21 @@ export async function runAntigravityPreToolGuard(rawInput) {
   catch { deny("Antigravity PreToolUse input is not valid JSON; pipeline guards fail closed."); }
 
   const normalized = normalizeAntigravityToolInput(input);
+
+  // --- Antigravity Hardening Layer: Enforced Read-Only Critic ---
+  // define_subagent is classified as a read-only tool call below (it defines
+  // an agent, it does not itself act), so this check must run BEFORE that
+  // isReadOnly short-circuit -- otherwise a critic subagent defined with write
+  // tools enabled would never reach anything that could refuse it, defeating
+  // ADR-0014's machine-enforced read-only Critic contract.
+  if (normalized.toolName === "define_subagent") {
+    const subagentInput = normalized.toolInput ?? {};
+    if (String(subagentInput.name ?? "").toLowerCase().includes("critic")
+      && subagentInput.enable_write_tools !== false) {
+      deny("BLOCKED (Hardening Layer): Critic subagent must be defined with enable_write_tools: false to guarantee read-only isolation (ADR-0014).");
+    }
+  }
+
   if (normalized.isReadOnly) {
     allow();
     return;
@@ -334,6 +349,25 @@ export async function runAntigravityPreToolGuard(rawInput) {
     ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
   ].some((marker) => existsSync(join(projectRoot, marker)));
 
+  // --- Antigravity Hardening Layer: critic dispatch contamination + inline exec containment ---
+  if (toolName === "Task" && String(toolInput.subagent_type ?? "").toLowerCase().includes("critic")) {
+    const prompt = toolInput.prompt || "";
+    // Disallow prose instructions (Paths Only Contamination Rule): a Critic
+    // dispatch built from the template carries paths/refs, never conversational
+    // steering -- roles/critic.md, templates/prompts/critic-review.md §2.
+    if (/\b(you are|please|examine|look at|review)\b/i.test(prompt)) {
+      deny("BLOCKED (Hardening Layer): Critic dispatch prompt contains prose. Only paths and refs are allowed (Contamination Rule).");
+    }
+  }
+
+  if (toolName === "Bash") {
+    const trimCmd = command.trim();
+    // Layer 1: OS-level / interpreter inline code execution containment.
+    if (/\b(?:node|python3?|ruby|perl|php)\s+-[ec]\b/.test(trimCmd)) {
+      deny("BLOCKED (Hardening Layer): Inline code execution (e.g. node -e, python -c) is blocked. Write code to a scratch file in the workspace first to respect filesystem containment guards.");
+    }
+  }
+  // -----------------------------------------------------------------------
 
   const isLifecycleTool = toolName === "Bash" && isSanctionedLifecycleCommand(command, projectRoot);
 
