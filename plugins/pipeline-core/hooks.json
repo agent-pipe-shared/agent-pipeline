@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo \"plugin hook ran\" >> /tmp/plugin-hook.log && node \"hooks/antigravity-pretool-guard.mjs\"",
+            "command": "/home/skar667/.local/share/fnm/node-versions/v24.19.0/installation/bin/node \"hooks/antigravity-pretool-guard.mjs\"",
             "timeout": 30
           }
         ]
