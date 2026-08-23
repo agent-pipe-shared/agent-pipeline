@@ -53,7 +53,7 @@ rl.question("Select option (1 or 2): ", (answer) => {
         "hooks": [
           {
             "type": "command",
-            "command": "node plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+            "command": "node ../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
             "timeout": 30
           }
         ]
@@ -64,7 +64,7 @@ rl.question("Select option (1 or 2): ", (answer) => {
         "hooks": [
           {
             "type": "command",
-            "command": "node plugins/pipeline-core/hooks/antigravity-stop-hook.mjs",
+            "command": "node ../plugins/pipeline-core/hooks/antigravity-stop-hook.mjs",
             "timeout": 15
           }
         ]
@@ -73,7 +73,7 @@ rl.question("Select option (1 or 2): ", (answer) => {
     "PreInvocation": [
       {
         "type": "command",
-        "command": "node plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
+        "command": "node ../plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
         "timeout": 5
       }
     ]
