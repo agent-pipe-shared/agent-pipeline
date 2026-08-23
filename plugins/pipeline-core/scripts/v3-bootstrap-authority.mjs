@@ -8,7 +8,7 @@
  * the source and every runtime projection, while this common reader also
  * requires the current private native Codex readback before returning ready.
  */
-import { lstatSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -387,43 +387,33 @@ export function main(args = process.argv.slice(2), {
   }
   const runner = options.runner ?? deriveCliRunner(options.root, deps);
   const result = validateV3BootstrapAuthority({ rootDir: options.root, deps, runner });
-  
-  if (result.status === "ready") {
-    // Install native git pre-push hook to prevent sub-process push evasion
-    try {
-      const hooksDir = join(options.root, ".git", "hooks");
-      if (existsSync(join(options.root, ".git"))) {
-        if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
-        const hookPath = join(hooksDir, "pre-push");
-        const hookContent = `#!/bin/sh
-# Pipeline Enforcer: Route native git pushes through the pipeline guard
-# This ensures sub-processes (like python or bash scripts) that attempt
-# to push are subject to the exact same approval rules as the agent's shell.
 
-if [ -n "$CLAUDE_PROJECT_DIR" ] || [ -n "$ANTIGRAVITY_SESSION_ID" ] || [ -n "$CODEX_SESSION_ID" ]; then
-    # We are in an agent session. Synthesize the Claude Code payload so guard-push can evaluate it!
-    PAYLOAD="{\\"tool_input\\": {\\"command\\": \\"git push $1\\"}}"
-    echo "$PAYLOAD" | node plugins/pipeline-core/hooks/guard-push.mjs
-    if [ $? -ne 0 ]; then
-        echo "BLOCKED (Git Hook): Push rejected by pipeline guard-push.mjs."
-        exit 1
-    fi
-fi
-exit 0
-`;
-        writeFileSync(hookPath, hookContent, { encoding: "utf8", mode: 0o755 });
-      }
-    } catch (e) {
-      // ignore
-    }
-
-    if (process.env.ANTIGRAVITY_SESSION_ID) {
-      // Very simple heuristic to detect if the session was likely started without --sandbox
-      // In many environments, the dangerously-skip-permissions flag is passed in the env or the sandbox omits certain mounts.
-      if (process.env.AGY_DANGEROUSLY_SKIP_PERMISSIONS || !process.env.BWRAP_ACTIVE) {
-        process.stderr.write("\\n\\x1b[33mWarning: This Antigravity session appears to be running without the `--sandbox` flag. OS-level filesystem and network containment (Layer 1) cannot be guaranteed. Malicious or compromised sub-processes may escape the intended boundaries.\\x1b[0m\\n\\n");
-      }
-    }
+  // AGY-FIX-PUSHGUARD: this function previously also installed a `.git/hooks/pre-push`
+  // script here ("to prevent sub-process push evasion"). That workaround is removed --
+  // not repaired -- because it does not live at the right layer: writing a git hook is
+  // out of this validator's authority, per-checkout (never reaches a consumer's actual
+  // installed plugin path, which `plugins/pipeline-core/hooks/guard-push.mjs` -- a path
+  // relative to THIS repository's own source checkout -- silently assumed), and, as
+  // shipped, fails OPEN (an unconditional `exit 0`) whenever none of its three named
+  // environment variables happen to be set in whatever process actually runs the push.
+  // `po-guarded-push.mjs`'s own header already documents the invariant this silently
+  // broke: "There are no actual git hooks installed ... guard-push only intercepts an
+  // agent's own Bash/PowerShell tool calls inside a session." The sub-process-mediated
+  // push this workaround targeted is a residual, documented gap of every PreToolUse
+  // command-line guard (see `lib/protected-test-paths.mjs`'s "NOT COVERED" section for
+  // the identical class of effect on the write lane) -- not a defect this validator, or
+  // any other PreToolUse guard, can close by construction.
+  if (result.status === "ready" && process.env.ANTIGRAVITY_SESSION_ID) {
+    // Neither `AGY_DANGEROUSLY_SKIP_PERMISSIONS` nor `BWRAP_ACTIVE` is a variable this
+    // codebase, or bubblewrap itself, sets or reads anywhere else (repository grep,
+    // 2026-08-23) -- a heuristic keyed on either would be fabricated evidence, not a
+    // real signal. This warning is honest about what it cannot verify instead: whether
+    // OS-level sandbox containment (Layer 1, e.g. the `--sandbox` flag) is actually
+    // active for this process. Unconditional for every Antigravity session; stderr
+    // only, never a failure -- the previous string was also unconditionally broken
+    // (escaped `\n`/`\x1b[...]` inside an ordinary double-quoted string print literal
+    // backslash-n and backslash-x1b instead of a newline and a colour code).
+    process.stderr.write("\n\x1b[33mWarning: This Antigravity session cannot verify from within itself whether OS-level filesystem and network containment (Layer 1, e.g. the `--sandbox` flag) is active. Malicious or compromised sub-processes may escape the intended boundaries if it is not.\x1b[0m\n\n");
   }
 
   write(`${JSON.stringify(result, null, 2)}\n`);

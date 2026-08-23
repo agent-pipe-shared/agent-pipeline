@@ -225,13 +225,40 @@ function manifestFindingText(finding) {
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let rawCommand = "";
+// The declared execution directory for THIS exact command, when the host adapter
+// supplies one. Antigravity's `run_command` tool carries its own `Cwd` argument,
+// distinct from the directory the adapter happens to spawn this guard process in
+// -- neither Claude Code's nor Codex's Bash tool has an equivalent field, and
+// their `process.cwd()` already IS the real execution directory. Left `null` for
+// every existing caller that never populates it (AGY-FIX-PUSHGUARD route 1: without
+// this, a declared execution directory that differs from the guard's own spawn cwd
+// makes every check below evaluate the WRONG repository's evidence/approval state
+// while the real push targets a different one).
+let declaredCwd = null;
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
   rawCommand = String(input?.tool_input?.command ?? "");
+  const cwdCandidate = typeof input?.tool_input?.cwd === "string" && input.tool_input.cwd.trim() !== ""
+    ? input.tool_input.cwd
+    : (typeof input?.cwd === "string" && input.cwd.trim() !== "" ? input.cwd : null);
+  declaredCwd = cwdCandidate;
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }
 if (!rawCommand) process.exit(0);
+
+/**
+ * Resolve the directory THIS push command actually executes in. Prefers a host-
+ * declared cwd over the guard process's own `process.cwd()` -- see `declaredCwd`
+ * above for why the two can legitimately differ. Never anchors the critical-proof
+ * boundary (`fallbackProjectDir`, further down) -- that function stays deliberately
+ * pinned to the GOVERNED session's own directory (PG12s13), never to a declared
+ * push target, which is exactly the widening this helper must not cause there.
+ */
+function resolveShellCwd() {
+  if (typeof declaredCwd !== "string" || declaredCwd.trim() === "") return process.cwd();
+  return isAbsolute(declaredCwd) ? declaredCwd : resolve(process.cwd(), declaredCwd);
+}
 
 /**
  * `guard-git` owns validation and one-time consumption of the documented
@@ -359,7 +386,7 @@ function parsePushBinding(rawCmd) {
     return { ok: false, reason: "push refspec is deleting, forced, or otherwise source-ambiguous" };
   }
 
-  const shellCwd = process.cwd();
+  const shellCwd = resolveShellCwd();
   const candidateDir = gitC ? (isAbsolute(gitC) ? gitC : resolve(shellCwd, gitC)) : shellCwd;
   const rootResult = spawnSync("git", ["-C", candidateDir, "rev-parse", "--show-toplevel"], {
     encoding: "utf8",
@@ -419,7 +446,7 @@ function resolveDeclaredPushProject(rawCmd, allowWrapper = true) {
     const tokens = tokenizeArgv(segment.trim());
     const gitIndex = gitInvocationIndex(tokens);
     if (gitIndex !== -1) {
-      let candidate = process.cwd();
+      let candidate = resolveShellCwd();
       let pushIndex = gitIndex + 1;
       if (tokens[gitIndex + 1] === "-C" && tokens[gitIndex + 2]) {
         candidate = isAbsolute(tokens[gitIndex + 2]) ? tokens[gitIndex + 2] : resolve(process.cwd(), tokens[gitIndex + 2]);
