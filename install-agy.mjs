@@ -52,10 +52,21 @@ rl.question("Select option (1 or 2): ", (answer) => {
     config.entries.push({ path: PLUGIN_CORE_PATH });
     writeFileSync(targetFile, JSON.stringify(config, null, 2) + "\n");
     console.log(`\nSuccess! Pipeline registered in: ${targetFile}`);
-    console.log("You can now run 'agy' in your project to start the pipeline onboarding.\n");
   } else {
-    console.log(`\nPipeline is already registered in: ${targetFile}\n`);
+    console.log(`\nPipeline is already registered in: ${targetFile}`);
   }
+
+  console.log("\n=== Important Environment Verification ===");
+  console.log("The Agent Pipeline uses platform-neutral hooks (e.g. `node hooks/...`).");
+  console.log("This requires `node` to be available in the PATH of the Antigravity Daemon.");
+  console.log("If you launch Antigravity via an IDE or desktop shortcut, it may not source your ~/.bashrc or ~/.zshrc.");
+  console.log("If the daemon cannot find `node`, security hooks will SILENTLY FAIL OPEN!");
+  
+  console.log("\nTo ensure node is permanently in your system path (e.g. for fnm users):");
+  console.log("  sudo ln -s $(which node) /usr/local/bin/node");
+  console.log("  (Or ensure your desktop environment loads your PATH correctly)\n");
+  
+  console.log("You can now restart your Antigravity daemon and run 'agy' in your project to start the pipeline onboarding.\n");
   
   rl.close();
 });
