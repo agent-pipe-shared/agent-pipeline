@@ -143,7 +143,14 @@ each other and the choice is the PO's — a machine-absolute path works but
 violates CLAUDE.md and breaks on the second machine; a relative path is
 policy-clean but unproven; writing `.agents/hooks.json` directly is the route
 history already fell back to. Applying an unverifiable change to a control that
-is currently failing open would replace a known-bad state with an unknown one.
+is currently failing open would be the wrong move — but not for the reason that
+phrasing suggests. The current state is not unknown, it is known-inert, and
+`48591844` is the evidence; a change that is at worst also inert cannot be
+worse. The real reason is that an unconfirmed fix to a security control reads
+as a fixed control: the commit would claim the registration was corrected, the
+layer would appear restored everywhere it is described, and no guard would have
+been observed to fire. That is the exact shape of F5 in the first review — a
+control that existed in source, was believed to work, and never executed.
 
 ## Disposition of the first review's findings
 

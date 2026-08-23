@@ -64,9 +64,22 @@ It is a live candidate root cause for two things previously left open:
 
 The obvious edit (`plugins` → `plugins/pipeline-core`) is not verifiable from a
 Claude Code session: no Antigravity runner is available to test whether the
-runner resolves relative paths, or against which base. Applying an unverifiable
-change to a control that is currently failing open would replace a known-bad
-state with an unknown one.
+runner resolves relative paths, or against which base.
+
+To be precise about the reason, because the loose version of it would mislead
+the decision: the current state is not *unknown*, it is known-inert — the layer
+is off, and `48591844` is the empirical evidence. A change that is at worst
+also inert therefore cannot be worse than what is there now, and "trading
+known-bad for unknown" would be the wrong way to describe it.
+
+The actual reason not to apply it unattended is different: an unconfirmed fix
+to a security control reads as a fixed control. The commit would say the
+registration was corrected, the layer would appear restored in every artifact
+describing it, and nobody would have observed a single guard fire. That is the
+same failure shape as F5 of the first review, where a control existed in the
+source, was believed to work, and had never executed. Repeating it here — on
+the registration that decides whether ANY of those guards load — is the outcome
+worth avoiding, not the edit itself.
 
 The three candidate routes trade off against each other and the choice is the
 PO's:

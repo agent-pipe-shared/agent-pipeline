@@ -82,6 +82,13 @@ the gap is stated rather than chased.
 2. **Delta-review findings D1–D6** are unaddressed. Fixing them creates further
    unreviewed commits, which collides with the PO's standing instruction of one
    review round without a re-critic. Sequencing is a PO decision.
+   **D2 is not one finding among the five — it gates the remediation path
+   itself.** The contamination detector denies any dispatch text containing the
+   word `review`, so in the Antigravity lane the mandated Critic dispatch
+   (built from `templates/prompts/critic-review.md`, whose own path matches)
+   cannot be issued at all. If the answer here is "fix the findings, then
+   re-review", D2 has to be fixed first or that sequence is unexecutable in
+   that lane.
 3. **Marketplace resync and version bump**, PO-approved to follow the review,
    now also required for a green gate (see above). The local marketplace is
    machine-wide and also serves the nova checkout.
