@@ -908,6 +908,30 @@ function signedPushRepo(prefix, {
     stderrIncludes: ["PUSH-PROOF-NOT-CONSUMED"],
   });
 }
+{
+  // PG12u1 -- the methodological uncommitted-work block. An otherwise fully attested
+  // push is refused while specs/, docs/ or backlog/ carry uncommitted work: a push that
+  // leaves its own spec, decision record or evidence behind publishes a commit whose
+  // reasoning nobody can reconstruct. `git status --porcelain` counts untracked files,
+  // which is exactly the case `git commit -a` silently misses.
+  // Neighbour non-fire case: PG12s1 above is this same fixture with a clean tree, allowed.
+  for (const scoped of ["specs", "docs", "backlog"]) {
+    const { dir } = signedPushRepo(`signed-uncommitted-${scoped}`);
+    mkdirSync(join(dir, scoped), { recursive: true });
+    writeFileSync(join(dir, scoped, "stray-note.md"), "uncommitted work\n");
+    check(`PG12u1 block an attested push while ${scoped}/ carries uncommitted work`, PUSH_CMD, dir, BLOCK, {
+      stderrIncludes: ["Uncommitted changes detected in specs/, docs/, or backlog/"],
+    });
+  }
+}
+{
+  // PG12u2 -- the block is scoped to those three directories, and stays scoped. An
+  // uncommitted file anywhere else is not this guard's business and must not become a
+  // push refusal. guard-push.mjs:1659 is the only working-tree status check in the file.
+  const { dir } = signedPushRepo("signed-uncommitted-elsewhere");
+  writeFileSync(join(dir, "stray-note.md"), "uncommitted work\n");
+  check("PG12u2 allow an attested push while an unrelated path carries uncommitted work", PUSH_CMD, dir, ALLOW);
+}
 // ---- PG12s13/s14 the anchor must belong to the GOVERNED session, not to the push target --
 //
 // T6 Critic, F1 (major). The attestation reads its trust anchor and its state from
