@@ -1,0 +1,177 @@
+# Critic review — `sprint-agy-runner`, range `92037494..51dd7fc6` (2026-08-23)
+
+Independent read-only Critic review of the 35 unreviewed commits following the
+last recorded PASS. Dispatched from `templates/prompts/critic-review.md`,
+paths/refs only.
+
+- **Review object:** 35 enumerated commits, `70fd1bc7` … `51dd7fc6`
+  (range `92037494..51dd7fc6` confirmed to cover exactly those SHAs).
+- **Spec:** `specs/sprint-agy-runner/spec.md`, `specs/sprint-agy-runner/prd_agy-runner.md`
+- **Requested route:** `claude-opus-5` at `max` (MP-07: guardrail/security diff).
+- **Effective identity:** `claude-opus-5` (1M variant), observed from direct
+  same-dispatch route evidence. No route contradiction.
+- **T1 assurance:** `functional-equivalent-read-only; OS isolation not asserted`.
+- **Critic's own notes:** `scratch/critic-agyrunner-fb78580dd44d/critic-notes.md`
+  (gitignored; this file is the durable record).
+
+## Verdict: **FAIL**
+
+Trajectory check: **inconsistent** (see F2, F6, F10). Briefing violations: none.
+
+## Findings
+
+### Blockers
+
+**F1 — Debug instrumentation shipped in the production Antigravity PreToolUse guard.**
+`plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs` ends with a second
+`node:fs` import and an unconditional `appendFileSync("/tmp/hook-debug2.log", …)`.
+The statement sits at module top level, *outside* the
+`if (isDirectInvocation(import.meta.url))` block, so it runs on every guard
+invocation and on every import of the module. The path is fixed and predictable
+in a shared world-writable directory (symlink-redirect surface, before every
+tool call) and is not tri-platform portable.
+*Spec-ref:* PRD §2 invariant 1; spec §9 checklist row 6 (claimed MET);
+CLAUDE.md machine-specific-absolute-path rule; ADR-0051.
+*Corroborating:* `.gitignore` gained `stdin_dump.json` / `tmp-inbounds.txt`
+(commit `0427f31c`) — debug residue ignored rather than removed.
+
+**F2 — 34 of 35 commits carry no `Dispatch:` trailer.**
+Only `51dd7fc6` is bound. `evidence/` holds one dispatch record for this range
+(`AGY-VERIFYFIX-1`), whose `report.changedFiles` covers a single test file. The
+other records (`NVA-BL-24/25/28/32`) are dated Aug 20 and cover none of these
+commits. Unbound commits include those that *remove* security controls
+(`8088c1fd`), install a git hook (`2887e774`), add push blocks (`8eee0018`) and
+add gates (`4977a9d2`, `01867a57`).
+*Spec-ref:* `templates/prompts/agent-obligations.md` §6;
+`docs/operating-model.md` §3.3; EL-01/EL-16.
+
+**F3 — A validation command silently installs `.git/hooks/pre-push`.**
+`plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs` writes the hook as a
+side effect of `main()` whenever `result.status === "ready"`. Five distinct
+defects in one block:
+1. `writeFileSync(hookPath, …)` is unconditional — destroys an existing
+   consumer `pre-push` hook with no check and no backup.
+2. The whole block is `try { … } catch { /* ignore */ }` — silent failure of a
+   control whose own comment calls it a push-evasion preventer.
+3. The guard body runs only when `CLAUDE_PROJECT_DIR` / `ANTIGRAVITY_SESSION_ID`
+   / `CODEX_SESSION_ID` is set. The agent controls its own child-process
+   environment, so `env -u CLAUDE_PROJECT_DIR git push` skips it entirely —
+   the control does not constrain the party it exists to constrain.
+4. The synthesized payload is `git push $1`, where `$1` in a `pre-push` hook is
+   only the *remote name*. Refspec and all flags — including `--force` — are
+   dropped, and the ref list on the hook's stdin is never read.
+5. It invokes `guard-push.mjs` by repo-relative path, which does not exist in a
+   consumer project installing from the marketplace — there every push is
+   blocked.
+*Spec-ref:* spec §7.2; PRD §5 non-goal; `guardrails/git.md`; ADR-0056.
+
+### Majors
+
+- **F4** — `decision()`, the shared test oracle in
+  `antigravity-pretool-guard.test.mjs`, now returns `allow` on empty or
+  unparseable guard output; previously it threw. Every allow-asserting test in
+  the file passes vacuously if the guard crashes. Both new tests alternate on
+  `|BLOCKED`, which `deny()` prefixes to every denial from any guard.
+  *Spec-ref:* PRD §2 invariant 1; QG-04.
+- **F5** — Commit `8088c1fd` removes the Antigravity hardening layer with no
+  replacement: the `define_subagent` `enable_write_tools: false` check for
+  critic subagents, the critic-dispatch contamination check, and Layer-1
+  inline-code-execution containment (`node -e`, `python -c`, …). An
+  Antigravity-hosted Critic can now be defined *with* write tools.
+  The "to match Codex" rationale does not cover `define_subagent`, which has no
+  Codex analogue. *Spec-ref:* PRD §2 invariant 1; ADR-0014; spec §8.3.
+- **F6** — `evidence/verify-latest.json` is bound to `dc84c177` / tree
+  `24052176`, finished 19:13:03Z; the review tip `51dd7fc6` was committed
+  19:45:44Z — 32 minutes later, uncovered. Additionally, at `dc84c177` the
+  artifact records `exitCode: 0` for every step, while
+  `evidence/dispatch-record-AGY-VERIFYFIX-1.json` (same `rulesetSha`) records
+  the PUSHSEED-2 case failing, and `harness/scripts/verify.mjs:251` shows that
+  suite is part of the gate. Both artifacts cannot be true at that commit.
+  *Spec-ref:* PRD §6 risk 2; spec §5 Wave 6; CLAUDE.md "never report done while
+  a check is open".
+- **F7** — Both installer copies compute
+  `enableAuto = autoAnswer.trim().toLowerCase() !== "n"`, so Enter *and* any
+  answer other than the single letter `n` (`no`, `nein`) enable
+  `toolExecutionPolicy: "always-proceed"` and `artifactReviewMode:
+  "always-proceed"` — an unsafe default that also treats an explicit refusal as
+  consent. *Spec-ref:* `guardrails/security.md`; PRD §2 invariant 1.
+- **F8** — The silent fail-open of the hard-enforcement layer (background
+  daemons not sourcing the shell profile, so hooks never run) is documented in
+  `GEMINI.md` and the installer banner, mitigated only by a manual
+  `sudo ln -s`, with no owner, no expiry and no runtime detection.
+  `antigravity-start-hint.mjs:29-31` additionally wraps its body in a
+  fail-open catch and emits `{}`, silently removing the bootstrap gate the
+  pretool guard depends on. *Spec-ref:* QG-06; spec §9 checklist row 2.
+- **F9** — Spec §8.2 claims the execution host *enforces* `--sandbox`. The
+  implementation only warns, gated on `!process.env.BWRAP_ACTIVE` (not a
+  variable bubblewrap sets, so it fires unconditionally and never blocks), and
+  the message is double-escaped in an ordinary double-quoted JS string, so it
+  prints literal `\n\x1b[33m…` text. *Spec-ref:* spec §8.2, §9 row 2.
+- **F10** — Protected test paths `guard-push.test.mjs` (TP-5) and
+  `critical-human-proof-policy.test.mjs` (TP-9) were modified with no override
+  or ceremony record anywhere in `evidence/`.
+  *Spec-ref:* `project/guard-config.json`; QG-04.
+  *Note recorded by the Critic:* `plugins/pipeline-core/scripts/pipeline-state.test.mjs`
+  was also modified but is **not** protected — TP-5's alternation names
+  `harness/scripts/pipeline-state.test.mjs`, a path that does not exist. That
+  mis-targeting is pre-existing and outside this diff.
+- **F11** — `guard-push.mjs` gains a new hard failure ("Uncommitted changes
+  detected in specs/, docs/, or backlog/") with no test asserting it fires or
+  stays quiet. The only test-side change is a fixture adapted so pre-existing
+  tests keep passing under the new block.
+  *Spec-ref:* spec §5; QG-04.
+- **F12** — `.agents/plugins.json` had two entries; the diff removes the
+  portable relative one and leaves a machine-specific absolute path as the sole
+  entry. *Spec-ref:* CLAUDE.md hard rule; `guardrails/global.md`.
+
+### Minors
+
+- **F13** — `guard-gate-strength.mjs` adds `pipeline.json` both as `GS-10`
+  protected path and to the `governed` marker list, activating gate-strength in
+  any project that happens to have a root `pipeline.json`.
+- **F14** — Non-Conventional and non-English commit subjects (`2887e774`
+  German, `ef967102` no type, `70fd1bc7` empty token); `dc84c177` bundles three
+  concerns.
+- **F15** — German phrase in the agent-facing `plugins/pipeline-core/rules/AGENTS.md`.
+- **F16** — QG-14 and the AGENTS behaviour section are guardrail-class changes
+  outside PRD §4 scope.
+- **F17** — `plugins/pipeline-core/install-agy.mjs` is a byte-identical copy of
+  the root installer with no generator or equality test; both new files carry
+  `SPDX-License-Identifier: SUL-1.0` while spec §9 row 3 asserts MIT, status MET.
+- **F18** — Spec §3 mandates `.agents/hooks.json`; commit `ffa55f78` deletes it
+  and the spec was not updated.
+- **F19** — `governance/examples/policies/semgrep/dependency-direction.yml`
+  include glob changed under a `fix(security)` label, untested and unexercised
+  by the submission's evidence.
+
+## Deliberately not flagged (examined and cleared)
+
+`deny()` exit `0` → `2` (spec §3 conformant); the broadened PO-gate regexes;
+`CRITICAL-PROOF-MODE-CONFLICT` ratchet (covered by the new CHP32 test);
+gate-strength prefix matching (GS-13); the semgrep `--timeout 60` raise;
+dependency reality check (no new package/action/image/plugin in the diff;
+`cap.sca: not-applicable`); gate-strength added to the codex and apply-patch
+guard lists; the bootstrap-lock location under `.git/agent-pipeline/run/`.
+
+Dropped candidates recorded rather than filed: the `approve-push` PO challenge
+as security theatre (the code is printed to the stream the caller reads, so an
+agent can self-serve the second call — dropped because ADR-0056 already calls
+chat mode "an attribution record rather than proof"); the `PreInvocation` hook
+shape inconsistency (no vendor schema to adjudicate); `.gitignore` anchoring of
+the two new filename patterns; the root installer's placement under ADR-0063;
+the `sudo ln -s` recommendation as a PRD §5 non-goal breach.
+
+## Live-state confirmations (Elephant, post-review)
+
+Independently verified after the review, on this host:
+
+- `plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs:690-693` — F1 block
+  present, at module top level, after the `isDirectInvocation` guard.
+- `plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs:392-416` — F3 block
+  present, including the `git push $1` payload and the unconditional write.
+- `git log --format=… 92037494..51dd7fc6` — F2 confirmed: one `Dispatch:`
+  trailer across 35 commits.
+- `.agents/plugins.json` — F12 confirmed: single absolute-path entry.
+- **F1 and F3 are live on this machine, not theoretical:** the repository's
+  `.git/hooks/pre-push` exists (written 2026-08-23), and the debug log target
+  exists and has been appended to.
