@@ -40,6 +40,7 @@
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.bootstrap-skill-grows-by-budget-raise-instead-of-by-module | open | workflow-improvement | pipeline | 2026-08-08 | — |
 | pipeline.bounded-diagnostic-outside-repo-refused-under-wrong-reason | closed | defect | pipeline | 2026-08-08 | — |
+| pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff | open | defect | pipeline | 2026-08-23 | — |
 | pipeline.briefing-model-field-contradicts-agent-definition | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.canonical-verify-evidence-path | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.canonical-worktree-lifecycle | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -312,6 +313,6 @@
 
 ## Counts
 
-- open: 41
+- open: 42
 - in_progress: 3
 - closed: 260

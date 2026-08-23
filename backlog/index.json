@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "458730acb6d469c7b777fed47186a6b01a9eb86b56c3959f637b3568541bc6d8"
+    "transitionHead": "289836db981e6ba6920f93d511a924161752f6be3de823f476759ba4366161a2"
   },
   "counts": {
-    "open": 41,
+    "open": 42,
     "in_progress": 3,
     "closed": 260
   },
@@ -435,6 +435,15 @@
       "closureRepository": "self",
       "closureCommit": "2f466462dbe97bc1330e7578bd21af2d958f1488",
       "closureEvidence": "backlog/items/2026-08-08-a-bounded-diagnostic-outside-the-repo-is-refused-under-the-wrong-reason.md"
+    },
+    {
+      "id": "pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-23",
+      "source": "Direct measurement across one dispatch block, 2026-08-23 (agy-runner Critic-fix wave): five of six Goldfish dispatches ended mid-sentence without committing, every one of them at 50 or 51 tool uses, against briefed base caps of 30-35.",
+      "deferred": false
     },
     {
       "id": "pipeline.briefing-model-field-contradicts-agent-definition",
