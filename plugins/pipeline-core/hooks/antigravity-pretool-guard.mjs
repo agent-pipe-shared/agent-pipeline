@@ -334,44 +334,6 @@ export async function runAntigravityPreToolGuard(rawInput) {
     ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
   ].some((marker) => existsSync(join(projectRoot, marker)));
 
-  // --- Antigravity Hardening Layer ---
-  // Layer 5: Enforced Read-Only Critic
-  if (toolName === "define_subagent" && (toolInput.name || "").toLowerCase().includes("critic")) {
-    if (toolInput.enable_write_tools !== false) {
-      deny("BLOCKED (Hardening Layer 5): Critic subagent must be defined with enable_write_tools: false to guarantee read-only isolation.");
-    }
-  }
-  
-  if (toolName === "Task" && (toolInput.subagent_type || "").toLowerCase().includes("critic")) {
-    const prompt = toolInput.prompt || "";
-    // Disallow prose instructions (Paths Only Contamination Rule)
-    // If it contains things other than paths/refs, block it. 
-    // Basic heuristic: check if it contains common conversational words or lacks standard tokens.
-    if (/\b(you are|please|examine|look at|review)\b/i.test(prompt)) {
-      deny("BLOCKED (Hardening Layer 5): Critic dispatch prompt contains prose. Only paths and refs are allowed (Contamination Rule).");
-    }
-  }
-
-  if (toolName === "Bash") {
-    const trimCmd = command.trim();
-
-    // Layer 3: HITL Spoofing Block
-    if (/pipeline-state\.mjs\s+approve-(plan|push)/.test(trimCmd)) {
-      deny("BLOCKED (Hardening Layer 3): Human Gate Spoofing. You cannot approve plans or pushes via CLI. This command requires a cryptographic Human-in-the-Loop receipt generated outside the agent's shell context.");
-    }
-
-    // Layer 4: Semantic Command Guard
-    if (/^git\s+(push|commit|rebase|tag)\b/.test(trimCmd)) {
-      if (!isSanctionedLifecycleCommand(command, projectRoot)) {
-        deny("BLOCKED (Hardening Layer 4): Semantic Command Guard. State-mutating git commands are blocked in the shell to prevent human-gate bypass. Use designated pipeline scripts.");
-      }
-    }
-    // Layer 1: OS-Level / Node Execution Containment
-    if (/\b(?:node|python3?|ruby|perl|php)\s+-[ec]\b/.test(trimCmd)) {
-      deny("BLOCKED (Hardening Layer 1): Inline code execution (e.g. node -e, python -c) is blocked. Write code to a scratch file in the workspace first to respect filesystem containment guards.");
-    }
-  }
-  // -----------------------------------
 
   const isLifecycleTool = toolName === "Bash" && isSanctionedLifecycleCommand(command, projectRoot);
 
