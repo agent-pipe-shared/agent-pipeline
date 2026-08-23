@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs\"",
+            "command": "node \\"../plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs\\"",
             "timeout": 30
           }
         ]
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"../plugins/pipeline-core/hooks/antigravity-stop-hook.mjs\"",
+            "command": "node \\"../plugins/pipeline-core/hooks/antigravity-stop-hook.mjs\\"",
             "timeout": 15
           }
         ]

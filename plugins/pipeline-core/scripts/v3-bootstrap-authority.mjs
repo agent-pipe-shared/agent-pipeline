@@ -8,7 +8,7 @@
  * the source and every runtime projection, while this common reader also
  * requires the current private native Codex readback before returning ready.
  */
-import { lstatSync, readFileSync } from "node:fs";
+import { lstatSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 import {
@@ -387,7 +387,46 @@ export function main(args = process.argv.slice(2), {
   }
   const runner = options.runner ?? deriveCliRunner(options.root, deps);
   const result = validateV3BootstrapAuthority({ rootDir: options.root, deps, runner });
-  write(`${JSON.stringify(result, null, 2)}\n`);
+  
+  if (result.status === "ready") {
+    // Install native git pre-push hook to prevent sub-process push evasion
+    try {
+      const hooksDir = join(options.root, ".git", "hooks");
+      if (existsSync(join(options.root, ".git"))) {
+        if (!existsSync(hooksDir)) mkdirSync(hooksDir, { recursive: true });
+        const hookPath = join(hooksDir, "pre-push");
+        const hookContent = `#!/bin/sh
+# Pipeline Enforcer: Route native git pushes through the pipeline guard
+# This ensures sub-processes (like python or bash scripts) that attempt
+# to push are subject to the exact same approval rules as the agent's shell.
+
+if [ -n "$CLAUDE_PROJECT_DIR" ] || [ -n "$ANTIGRAVITY_SESSION_ID" ] || [ -n "$CODEX_SESSION_ID" ]; then
+    # We are in an agent session. Synthesize the Claude Code payload so guard-push can evaluate it!
+    PAYLOAD="{\\"tool_input\\": {\\"command\\": \\"git push $1\\"}}"
+    echo "$PAYLOAD" | node plugins/pipeline-core/hooks/guard-push.mjs
+    if [ $? -ne 0 ]; then
+        echo "BLOCKED (Git Hook): Push rejected by pipeline guard-push.mjs."
+        exit 1
+    fi
+fi
+exit 0
+`;
+        writeFileSync(hookPath, hookContent, { encoding: "utf8", mode: 0o755 });
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    if (process.env.ANTIGRAVITY_SESSION_ID) {
+      // Very simple heuristic to detect if the session was likely started without --sandbox
+      // In many environments, the dangerously-skip-permissions flag is passed in the env or the sandbox omits certain mounts.
+      if (process.env.AGY_DANGEROUSLY_SKIP_PERMISSIONS || !process.env.BWRAP_ACTIVE) {
+        process.stderr.write("\\n\\x1b[33mWarning: This Antigravity session appears to be running without the `--sandbox` flag. OS-level filesystem and network containment (Layer 1) cannot be guaranteed. Malicious or compromised sub-processes may escape the intended boundaries.\\x1b[0m\\n\\n");
+      }
+    }
+  }
+
+  write(`${JSON.stringify(result, null, 2)}\\n`);
   return result.status === "ready" ? 0 : 1;
 }
 
