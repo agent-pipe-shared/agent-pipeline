@@ -4,7 +4,7 @@
 /** Translate provider-neutral guard exits into Antigravity PreToolUse decisions. */
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { existsSync, read, realpathSync } from "node:fs";
+import { existsSync, read, realpathSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -338,6 +338,18 @@ export async function runAntigravityPreToolGuard(rawInput) {
   const isLifecycleTool = toolName === "Bash" && isSanctionedLifecycleCommand(command, projectRoot);
 
   const hookSessionId = nativeHookSessionId(input);
+
+  // Methodological Enforcement (Hard Block):
+  const sessionBootstrapMarker = join(projectRoot, ".git", "agent-pipeline", "run", `session-${hookSessionId}`, "requires-bootstrap.lock");
+  const isBootstrap = isBootstrapReadCommand(command);
+
+  if (existsSync(sessionBootstrapMarker)) {
+    if (toolName === "Bash" && isBootstrap) {
+      try { rmSync(sessionBootstrapMarker, { force: true }); } catch (e) {}
+    } else if (["Bash", "Edit", "Write"].includes(toolName)) {
+      deny("BLOCKED (Hardening Layer): Mandatory Session Bootstrap. You must execute 'pipeline-start' before performing any implementation work in this session.");
+    }
+  }
 
   const guardNames = toolName === "Bash"
     ? [
