@@ -28,7 +28,12 @@ PO-accepted: the required gate is red and the delta Critic review returned FAIL.
 ### Candidate and gate status
 
 Candidate: commit **`ea1432e96904f13f52cf591678b239d2f6a6d563`**, tree
-**`ba4df6fc5ad6661f021e9129dfac2cc07c58525b`**.
+**`ba4df6fc5ad6661f021e9129dfac2cc07c58525b`**. That is the commit both the
+Verify run and the delta Critic review bound to. The commits after it are the
+documentation of this review round — the two review records, this handover, two
+backlog items and their ledger reconciliation — and contain no product change.
+A handover that names its own candidate can never be the candidate it names, so
+the gap is stated rather than chased.
 
 - **Deterministic Verify — RED.** `node harness/scripts/verify.mjs` bound the
   candidate exactly at start and finish (`binding: "exact"`), 385 registered
@@ -49,7 +54,10 @@ Candidate: commit **`ea1432e96904f13f52cf591678b239d2f6a6d563`**, tree
   delta review of the correction range then returned **FAIL** as well — 5
   majors, 2 minors, no proven blocker:
   `specs/sprint-agy-runner/evidence/2026-08-23-delta-critic-review-agy-runner.md`.
-- **Security gate:** not yet run against this candidate.
+- **Security gate — GREEN.** `security-scan.mjs` run after the review-round
+  commits: `cap.secrets` pass, `cap.sast` pass, `cap.sca` not-applicable,
+  `verdict.blocking: false`, license-check PASS. Evidence in
+  `evidence/security-latest.v2.verdict.json`.
 - **Push:** no approval exists for any commit in this range. `gates.push_approval`
   is `signature`, so a push needs a detached Ed25519 proof bound to the exact
   candidate ([ADR-0056](adr/0056-push-approval-mode.md);
