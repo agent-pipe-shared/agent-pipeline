@@ -75,8 +75,9 @@ rl.question(`Use (1) Dev Source (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCA
     writeFileSync(targetFile, JSON.stringify(config, null, 2) + "\n");
     console.log(`\nSuccess! Pipeline registered in: ${targetFile}`);
 
-    rl.question("\nEnable Autonomous Execution Mode (auto-apply edits & safe commands without prompt)? [Y/n]: ", (autoAnswer) => {
-      const enableAuto = autoAnswer.trim().toLowerCase() !== "n";
+    rl.question("\nEnable Autonomous Execution Mode (auto-apply edits & safe commands without prompt)? [y/N]: ", (autoAnswer) => {
+      const normalizedAutoAnswer = autoAnswer.trim().toLowerCase();
+      const enableAuto = normalizedAutoAnswer === "y" || normalizedAutoAnswer === "yes";
       if (enableAuto) {
         const settingsFile = answer.trim() === "1"
           ? join(process.cwd(), ".agents", "settings.json")
