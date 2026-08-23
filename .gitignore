@@ -25,6 +25,8 @@ Thumbs.db
 # Temp / scratch
 *.log
 *.tmp
+stdin_dump.json
+tmp-inbounds.txt
 # ANCHORED 2026-08-18 (ADR-0063 point 2, anchoring audit): scratch/'s one
 # stated home is the repo root (docs/adr/0063-repository-directory-contract.md).
 # Onboarding's own consumer-project seed already writes this entry anchored
