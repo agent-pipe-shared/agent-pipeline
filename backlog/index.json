@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "285609ea40f42bc54f094666368815511c2a81114e449b4a2273ea8102966c8d"
+    "transitionHead": "6f6a7401a1011800f27e03165a47051e2520f4c37f634d22958f27939f0142c7"
   },
   "counts": {
-    "open": 44,
+    "open": 46,
     "in_progress": 3,
     "closed": 260
   },
@@ -198,6 +198,15 @@
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "Critic review finding F8, specs/sprint-agy-runner/evidence/2026-08-23-critic-review-agy-runner.md",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-23",
+      "source": "Delta Critic review D7 (specs/sprint-agy-runner/evidence/2026-08-23-delta-critic-review-agy-runner.md), escalated by post-review verification against the object database and working tree",
       "deferred": false
     },
     {
@@ -1080,6 +1089,15 @@
       "closureRepository": "self",
       "closureCommit": "00bd47c1871f9d7c660735aecc2e6eb653e40737",
       "closureEvidence": "plugins/pipeline-core/skills/close-block/SKILL.md"
+    },
+    {
+      "id": "pipeline.elephant-notes-and-critic-scratch-share-one-directory",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-23",
+      "source": "Observed 2026-08-23 while dispatching the sprint-agy-runner delta Critic review; templates/prompts/critic-review.md scratchpad-isolation block",
+      "deferred": false
     },
     {
       "id": "pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch",
