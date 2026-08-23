@@ -703,3 +703,8 @@ if (isDirectInvocation(import.meta.url)) {
 
   await runAntigravityPreToolGuard(rawInput);
 }
+
+import { appendFileSync } from "node:fs";
+try {
+  appendFileSync("/tmp/hook-debug2.log", "hook executed\n");
+} catch (e) {}
