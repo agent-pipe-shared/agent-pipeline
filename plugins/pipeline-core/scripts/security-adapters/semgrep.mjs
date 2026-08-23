@@ -101,7 +101,7 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
   }
 
   const configArg = config.rulesDir || "auto";
-  const args = ["scan", "--json", "--config", configArg, rootDir];
+  const args = ["scan", "--json", "--timeout", "60", "--config", configArg, rootDir];
 
   let scratch;
   try {
