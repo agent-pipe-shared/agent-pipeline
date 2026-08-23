@@ -175,3 +175,39 @@ Independently verified after the review, on this host:
 - **F1 and F3 are live on this machine, not theoretical:** the repository's
   `.git/hooks/pre-push` exists (written 2026-08-23), and the debug log target
   exists and has been appended to.
+
+## Amendment to F5 — the control did not merely get removed; it never fired
+
+Recorded 2026-08-23 during the correction wave, surfaced by the
+`AGY-FIX-HARDENING` dispatch and independently re-verified against the object
+database before being written here.
+
+F5 states that commit `8088c1fd` removed the `define_subagent` check requiring
+`enable_write_tools: false` for critic subagents. That is accurate but
+understates the defect. In the pre-removal revision (`8088c1fd^`,
+`plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs`):
+
+| Line | Content |
+|---|---|
+| 226 | `define_subagent` listed in the `readOnlyTools` set |
+| 234 | `isReadOnly: readOnlyTools.has(name)` — so the tool resolves to `isReadOnly: true` |
+| 293 | `if (normalized.isReadOnly) {` — short-circuits to `allow()` |
+| 339 | the `define_subagent` critic check — 46 lines BELOW the short-circuit |
+
+The check was therefore unreachable. From the moment it was written until
+`8088c1fd` deleted it, every `define_subagent` call was allowed before the
+control was ever consulted.
+
+**Consequence for ADR-0014.** The read-only Critic contract had no machine
+enforcement in the Antigravity lane at any point in that period — only the
+appearance of one. An Antigravity-hosted Critic could have been defined with
+write tools throughout. A reviewer reading only F5 and the correction commit
+would conclude the control was restored to a previously working state; it was
+not, and this record exists so that conclusion is not drawn.
+
+**Current state.** Commit `f41f9959` places the check at line 300, ahead of
+the `isReadOnly` short-circuit at line 308, and adds fire / neighbour-non-fire
+test pairs for it. Verified in the working tree: `readOnlyTools` still contains
+`define_subagent` (unchanged, by design — it IS a read-only tool in every other
+respect), and the check now precedes the short-circuit rather than following
+it. This is the first revision in which the control actually executes.
