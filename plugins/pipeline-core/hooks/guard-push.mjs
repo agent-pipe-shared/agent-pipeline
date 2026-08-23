@@ -1628,11 +1628,11 @@ try {
     );
   }
 
-  // Methodological Agent Guard: Block push if there are uncommitted files (like missing specs).
-  const uncommittedCheck = spawnSync("git", ["status", "--porcelain"], { encoding: "utf8", cwd: evidenceProjectDir });
+  // Methodological Agent Guard: Block push if there are uncommitted files in specs/, docs/, or backlog/
+  const uncommittedCheck = spawnSync("git", ["status", "--porcelain", "--", "specs", "docs", "backlog"], { encoding: "utf8", cwd: evidenceProjectDir });
   if (uncommittedCheck.status === 0 && uncommittedCheck.stdout.trim().length > 0) {
     failures.push(
-      "Uncommitted changes detected in the working tree. Agents often forget to commit new files (e.g. in specs/ or docs/) because 'git commit -a' ignores untracked files. Review your 'git status' and commit these files, or add them to .gitignore, before pushing."
+      "Uncommitted changes detected in specs/, docs/, or backlog/. Agents often forget to commit new files because 'git commit -a' ignores untracked files. Review your 'git status' and commit these files before pushing."
     );
   }
 

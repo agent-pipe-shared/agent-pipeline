@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { sessionStartDecision } from './codex-session-start-hint.mjs';
