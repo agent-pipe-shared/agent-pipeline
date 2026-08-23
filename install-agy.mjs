@@ -11,10 +11,10 @@ const rl = readline.createInterface({
 });
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
-const PLUGIN_CORE_PATH = join(SCRIPT_DIR, "plugins", "pipeline-core");
+const PLUGIN_ROOT = join(SCRIPT_DIR, "plugins");
 
 console.log("\n=== Antigravity Pipeline Installer ===\n");
-console.log(`Pipeline source: ${PLUGIN_CORE_PATH}\n`);
+console.log(`Pipeline source: ${PLUGIN_ROOT}\n`);
 console.log("Antigravity uses GitOps/JSON configs instead of a global marketplace.");
 console.log("Where would you like to install the pipeline?\n");
 console.log("  1) Workspace-Local (Recommended for teams - writes .agents/plugins.json)");
@@ -47,9 +47,9 @@ rl.question("Select option (1 or 2): ", (answer) => {
 
   if (!config.entries) config.entries = [];
   
-  const alreadyExists = config.entries.some(e => e.path === PLUGIN_CORE_PATH);
+  const alreadyExists = config.entries.some(e => e.path === PLUGIN_ROOT);
   if (!alreadyExists) {
-    config.entries.push({ path: PLUGIN_CORE_PATH });
+    config.entries.push({ path: PLUGIN_ROOT });
     writeFileSync(targetFile, JSON.stringify(config, null, 2) + "\n");
     console.log(`\nSuccess! Pipeline registered in: ${targetFile}`);
   } else {
