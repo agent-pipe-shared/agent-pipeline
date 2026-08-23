@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const GUARDS = [
   { path: fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url)), args: [] },
   { path: fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url)), args: [] },
+  { path: fileURLToPath(new URL("./guard-gate-strength.mjs", import.meta.url)), args: [] },
   // Authoritative, not inferred (ADR-0051): guard-lifecycle-ready.mjs is
   // reachable only through this script, which is itself spawned only from
   // codex-pretool-guard.mjs (a Codex-only hook target, registered in no hook

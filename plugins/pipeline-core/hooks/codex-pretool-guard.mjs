@@ -312,7 +312,7 @@ const guardNames = toolName === "Bash"
   : toolName === "apply_patch"
     ? ["guard-apply-patch.mjs"]
     : ["Edit", "Write"].includes(toolName)
-      ? ["guard-testpath.mjs", "guard-devplan.mjs"]
+      ? ["guard-testpath.mjs", "guard-devplan.mjs", "guard-gate-strength.mjs"]
       : [];
 
 const denials = [];

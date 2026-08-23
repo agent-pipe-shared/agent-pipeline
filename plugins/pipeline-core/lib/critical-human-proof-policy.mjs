@@ -387,6 +387,10 @@ export function criticalProofWaiverFor(dir, kind) {
   if (approvalModeKey !== undefined) {
     const configured = readGateApprovalMode(dir, kind);
     if (configured.mode === "chat") {
+      const hasTrustAnchor = policy.trustAnchor !== null || (Array.isArray(policy.trustAnchors) && policy.trustAnchors.length > 0);
+      if (hasTrustAnchor && reason === undefined) {
+        return { waived: false, code: "CRITICAL-PROOF-MODE-CONFLICT" };
+      }
       return {
         waived: true,
         code: null,

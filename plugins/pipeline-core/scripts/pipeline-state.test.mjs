@@ -142,13 +142,23 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   gitAt("add", "-A");
   gitAt("commit", "-q", "-m", "chat approval mode");
 
-  const chatApproval = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"], deps));
-  assert.equal(chatApproval.result, 0, `chat mode must be reachable without a policy file: ${chatApproval.lines.join(" ")}`);
+  // 1. Calling approve-push without --challenge generates a challenge token and exits 1
+  const initialAttempt = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"], deps));
+  assert.equal(initialAttempt.result, 1, `initial attempt must prompt for challenge: ${initialAttempt.lines.join(" ")}`);
+  assert.ok(initialAttempt.lines.some((line) => line.includes("PO-CHALLENGE")));
+  const intermediate = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.ok(intermediate.pendingPushChallenge?.code, "challenge code must be recorded in state");
+  const challengeCode = intermediate.pendingPushChallenge.code;
+
+  // 2. Calling with matching --challenge succeeds with exit 0
+  const chatApproval = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main", "--challenge", challengeCode], deps));
+  assert.equal(chatApproval.result, 0, `chat mode must be reachable with challenge: ${chatApproval.lines.join(" ")}`);
   const recorded = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
   // The record has to say on its face that no proof backed it -- guard-push refuses
   // an approval recorded under a different policy than the one now in force.
   assert.equal(recorded.pushApproval.lastApproved.criticalProofWaiver.kind, "push");
   assert.equal(recorded.pushApproval.lastApproved.criticalProofWaiver.mode, "chat");
+  assert.equal(recorded.pendingPushChallenge, undefined, "challenge must be cleared on approval");
 
   // The other half of the ordering: with the stand-down absent, `signature` is the
   // default and the six-flag ceremony is still demanded. Moving the waiver check

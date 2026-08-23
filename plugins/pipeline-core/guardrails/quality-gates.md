@@ -126,3 +126,14 @@ Rule IDs: `QG-xx`.
 - **MUST NOT** reset the cap by re-labeling continued rework on the same underlying finding as a "new" package or task; only a genuine scope change (a materially different diff, a newly discovered A/G/S touch, or explicit PO direction) licenses a fresh initial round.
 - **Why:** this session's own handover history (`docs/state.md`) recorded two mutually inconsistent values in circulation within the same reviewed range — a "two-round cap" and a later, seemingly PO-confirmed "one Critic round per package, then self-verify" — with the rule itself codified nowhere in a repo-committed artifact (`backlog/items/2026-08-18-critic-review-round-cap-has-no-durable-home-and-two-inconsistent-values-circulate.md`). PO decision 2026-08-18 (decision #5) resolved this as "1 initial Critic round + 1 re-review round" (two Critic dispatches total per package before self-verify takes over), written down once so exactly one number circulates repo-wide.
 - **Verification:** a completion/handover record showing more than two same-package Critic dispatches (initial + one re-review) without a documented scope-change justification is a QG-13 violation to flag in Critic/retro review; the Elephant's own report or state entry states which round — initial or re-review — a given Critic verdict belongs to.
+
+## QG-14 — Web & Browser Deliverable Integrity (DOM, CORS, Protocol Containment)
+
+- Any deliverable intended for web/browser runtime (e.g. HTML/JS/CSS applications, games, or UI components) **MUST** be verified for runtime asset resolution and protocol compatibility.
+- ES module script tags (`<script type="module">`), local fetch requests, and dynamic imports fail under the `file:///` protocol due to browser CORS and origin isolation rules. When building browser deliverables:
+  - If standalone offline execution is required, code **MUST NOT** rely on unbundled ES module imports or CORS-restricted asset fetches over `file:///`, OR
+  - The verification harness and test suite **MUST** launch a local HTTP server (`http://localhost:<port>`) or headless browser harness (e.g. Playwright / Puppeteer) to exercise DOM rendering, script execution, and interaction without browser console errors.
+- Unit-level tests (e.g. Node tests mocking DOM APIs) are necessary but **NOT** sufficient on their own to prove browser deliverable integrity: at least one real DOM / browser load test must verify that the entry point loads and renders cleanly.
+- **Why:** In Greenfield evaluation runs, web applications that passed Node unit tests failed completely in user browser testing because ES modules and asset loading threw CORS errors under `file:///` without an active HTTP server.
+- **Verification:** Critic review checks web deliverable test evidence for headless browser/DOM execution and validates that protocol constraints are addressed in the deliverable documentation and test suite.
+

@@ -316,4 +316,35 @@ check("Antigravity pretool guard blocks shell redirects (> and >>)", () => {
   rmSync(root, { recursive: true, force: true });
 });
 
+check("Antigravity pretool guard blocks replace_file_content to pipeline.user.yaml (GS-1)", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), 'schema: "pipeline.user.v3"\ngates:\n  push_approval: "signature"\n');
+
+  const res = decision(run({
+    toolCall: {
+      name: "replace_file_content",
+      args: { TargetFile: join(root, "pipeline.user.yaml"), TargetContent: "signature", ReplacementContent: "chat" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /guard-gate-strength|GS-1|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks agent self-approval for approve-push", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "run_command",
+      args: { CommandLine: "node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by 'Agent' --remote origin --destination refs/heads/main" },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /PO Gate.*approve-push.*prohibited|BLOCKED/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 console.log(`\nAll ${passed} antigravity-pretool-guard tests passed.`);
+

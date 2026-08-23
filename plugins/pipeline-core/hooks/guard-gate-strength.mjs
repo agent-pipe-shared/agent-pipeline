@@ -111,6 +111,36 @@ export const GATE_STRENGTH_PATHS = Object.freeze([
     path: ".claude/guard-config.json",
     reason: "the legacy-tier guard config carries the same protected-path lists as GS-4 for projects that never migrated (ADR-0054).",
   }),
+  Object.freeze({
+    id: "GS-8",
+    path: "project/pipeline.json",
+    reason: "the project authority configuration declares verify and core settings and must not be edited directly.",
+  }),
+  Object.freeze({
+    id: "GS-9",
+    path: ".claude/pipeline.json",
+    reason: "the legacy-tier project authority configuration declares verify and core settings.",
+  }),
+  Object.freeze({
+    id: "GS-10",
+    path: "pipeline.json",
+    reason: "the root pipeline manifest configuration declares verify and core settings.",
+  }),
+  Object.freeze({
+    id: "GS-11",
+    path: ".claude/policy-lock.yaml",
+    reason: "the policy lock configuration enforces central governance mandate and must not be altered by agents.",
+  }),
+  Object.freeze({
+    id: "GS-12",
+    path: ".claude/policy-lock.json",
+    reason: "the policy lock configuration enforces central governance mandate and must not be altered by agents.",
+  }),
+  Object.freeze({
+    id: "GS-13",
+    path: "project/.onboarding-staging/*",
+    reason: "onboarding staging artifacts are coordinator-managed and must not be modified directly during implementation.",
+  }),
 ]);
 
 export const LIVE_PLUGIN_RULE = Object.freeze({
@@ -163,7 +193,14 @@ export function gateStrengthRuleFor(filePath, projectDir) {
   const rel = relative(root, absolute);
   if (rel.startsWith(`..${sep}`) || rel === "") return null;
   const normalized = rel.split(sep).join("/").toLowerCase();
-  return GATE_STRENGTH_PATHS.find((rule) => rule.path.toLowerCase() === normalized) ?? null;
+  return GATE_STRENGTH_PATHS.find((rule) => {
+    const rPath = rule.path.toLowerCase();
+    if (rPath.endsWith("/*")) {
+      const prefix = rPath.slice(0, -2);
+      return normalized === prefix || normalized.startsWith(`${prefix}/`);
+    }
+    return rPath === normalized;
+  }) ?? null;
 }
 
 if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mjs")) {
@@ -202,8 +239,11 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
 
     // Only defend a repository the Pipeline actually governs; elsewhere these are
     // ordinary filenames.
-    const governed = ["pipeline.user.yaml", "project/pipeline.yaml", ".claude/pipeline.yaml", "project/guard-config.json", ".claude/guard-config.json"]
-      .some((marker) => existsSync(join(resolve(projectDir), marker)));
+    const governed = [
+      "pipeline.user.yaml", "project/pipeline.yaml", ".claude/pipeline.yaml",
+      "project/guard-config.json", ".claude/guard-config.json",
+      "project/pipeline.json", ".claude/pipeline.json", "pipeline.json",
+    ].some((marker) => existsSync(join(resolve(projectDir), marker)));
     if (!governed) process.exit(0);
   }
 

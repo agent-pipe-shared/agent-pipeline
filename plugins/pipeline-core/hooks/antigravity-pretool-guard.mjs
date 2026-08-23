@@ -351,9 +351,12 @@ export async function runAntigravityPreToolGuard(rawInput) {
     }
   }
 
-  // PO Gate Hardening: Block agent from self-approving feature plans
+  // PO Gate Hardening: Block agent from self-approving feature plans and push actions
   if (toolName === "Bash" && /(?:^|\s|\/)(?:pipeline-state(?:\.mjs)?)\s+approve-plan\b/u.test(command)) {
     deny("BLOCKED (PO Gate): Agent self-approval prohibited. 'approve-plan' is an explicit Human/PO decision. You must present the PRD and Technical Specification to the user in chat and request approval. The user must approve the plan by running: pipeline-state approve-plan --by <name>");
+  }
+  if (toolName === "Bash" && /(?:^|\s|\/)(?:pipeline-state(?:\.mjs)?)\s+approve-push\b/u.test(command)) {
+    deny("BLOCKED (PO Gate): Agent self-approval prohibited. 'approve-push' is an explicit Human/PO decision. You must present the candidate commit and git status to the user in chat and request approval. The human operator must approve the push by running: pipeline-state approve-push --by <name> --remote <remote> --destination <destination> [--challenge <challenge>]");
   }
 
   const guardNames = toolName === "Bash"
@@ -362,7 +365,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
       ...(commandIsGitPush(command) ? ["guard-push.mjs"] : []),
     ]
     : ["Edit", "Write"].includes(toolName)
-      ? ["guard-testpath.mjs", "guard-devplan.mjs", "guard-handover-size.mjs"]
+      ? ["guard-testpath.mjs", "guard-devplan.mjs", "guard-gate-strength.mjs", "guard-handover-size.mjs"]
       : toolName === "Task" || toolName === "Agent"
         ? ["guard-dispatch.mjs"]
         : [];

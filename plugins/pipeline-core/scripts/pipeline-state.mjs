@@ -5621,7 +5621,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const expectedFlags = pushWaived
         ? new Set(["by", "remote", "destination"])
         : new Set(["by", "remote", "destination", "proof-request", "proof-authority", "proof"]);
-      const parsed = parseExactFlags(rest, expectedFlags);
+      const parsedWithChallenge = pushWaived ? parseExactFlags(rest, new Set(["by", "remote", "destination", "challenge"])) : { ok: false };
+      const parsed = parsedWithChallenge.ok ? parsedWithChallenge : parseExactFlags(rest, expectedFlags);
       const by = parsed.value?.by;
       if (!parsed.ok || isBlank(by)) {
         console.error(pushWaived
@@ -5650,6 +5651,30 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         || typeof destination !== "string" || !/^refs\/heads\/[A-Za-z0-9._/-]{1,200}$/u.test(destination)) {
         console.error("Error: approve-push requires a safe --remote and full --destination ref.");
         return 2;
+      }
+      if (pushWaived) {
+        const challenge = parsed.value?.challenge;
+        const pending = base?.pendingPushChallenge;
+        const hasValidPending = pending && typeof pending.code === "string"
+          && pending.forCommit === head.commit
+          && pending.remote === remote
+          && pending.destination === destination
+          && pending.expiresAt && new Date(pending.expiresAt).getTime() > Date.now();
+        if (!challenge || !hasValidPending || challenge.trim() !== pending.code) {
+          const code = `PO-${randomBytes(2).toString("hex").toUpperCase()}`;
+          const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+          const challengeState = {
+            ...base,
+            schema: SCHEMA_ID,
+            pendingPushChallenge: { code, forCommit: head.commit, remote, destination, expiresAt },
+            updatedAt: approvedAt,
+          };
+          writeState(dir, challengeState, base);
+          console.error(`[PO-CHALLENGE] Human confirmation required for push approval in chat mode.`);
+          console.error(`Please execute the following command to authorize the push:`);
+          console.error(`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by ${JSON.stringify(by)} --remote ${JSON.stringify(remote)} --destination ${JSON.stringify(destination)} --challenge ${code}`);
+          return 1;
+        }
       }
       const observed = gitCandidate(dir);
       if (!observed.ok || observed.commit !== head.commit) {
@@ -5701,6 +5726,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           : [...consumed, { proofSha256: verified.proof.proofSha256, kind: "push", consumedAt: approvedAt }],
         updatedAt: approvedAt,
       };
+      delete next.pendingPushChallenge;
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
         return 2;
       }

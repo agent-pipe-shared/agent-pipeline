@@ -402,6 +402,23 @@ try {
       "a deliberate waiver was refused although the source has no opinion");
   });
 
+  check("CHP32 an anchored policy with trustAnchor cannot be waived by chat mode without explicit waiver", () => {
+    const base = userYaml(
+      root({
+        schema: "pipeline.critical-human-proof-policy.v1",
+        requiredKinds: ["push"],
+        trustAnchor: {
+          keyReference: "operator-key-1",
+          publicKeySha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        },
+      }),
+      GATES("chat"),
+    );
+    const result = criticalProofWaiverFor(base, "push");
+    assert.equal(result.waived, false);
+    assert.equal(result.code, "CRITICAL-PROOF-MODE-CONFLICT");
+  });
+
   check("CHP13 this repository ships the gate ON", () => {
     // The PO's standing decision: default on here, switchable off elsewhere.
     const repoRoot = new URL("../../..", import.meta.url).pathname;
