@@ -744,13 +744,15 @@ function signedPushRepo(prefix, {
   planSha256 = SIGNED_PLAN_SHA, specSha256 = SIGNED_SPEC_SHA, featureId = "fixture-feature",
   recordProof = true, consume = true, commitOverride = null, mutateApproval = null,
 } = {}) {
-  const { dir, head } = freshRepo(prefix);
+  const { dir } = freshRepo(prefix);
   writeManifest(dir, manifestPush({ approval: "required" }));
-  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
-  const tree = gitAt(dir, "rev-parse", `${head}^{tree}`).stdout.trim();
-
   const threatModelBody = "# fixture threat model\n";
   writeEvidence(dir, THREAT_MODEL_REL, threatModelBody);
+  gitAt(dir, "add", "-A");
+  gitAt(dir, "commit", "-m", "fixture: threat model");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const tree = gitAt(dir, "rev-parse", `${head}^{tree}`).stdout.trim();
   const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
 
   const anchor = anchorKey ?? key;

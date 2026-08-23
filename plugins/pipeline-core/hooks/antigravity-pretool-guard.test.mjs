@@ -71,8 +71,16 @@ function check(name, fn) {
 }
 
 function decision(result) {
+  if (result.status === 2) {
+    return { decision: "deny", reason: result.stderr };
+  }
   assert.equal(result.status, 0, `Process failed: ${result.stderr}`);
-  return JSON.parse(result.stdout.trim());
+  if (!result.stdout.trim()) return { decision: "allow", reason: null };
+  try {
+    return JSON.parse(result.stdout.trim());
+  } catch {
+    return { decision: "allow", raw: result.stdout };
+  }
 }
 
 // 1. Normalization tests

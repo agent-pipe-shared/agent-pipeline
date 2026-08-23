@@ -426,7 +426,7 @@ exit 0
     }
   }
 
-  write(`${JSON.stringify(result, null, 2)}\\n`);
+  write(`${JSON.stringify(result, null, 2)}\n`);
   return result.status === "ready" ? 0 : 1;
 }
 
