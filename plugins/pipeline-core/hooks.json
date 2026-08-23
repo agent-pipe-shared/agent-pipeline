@@ -23,6 +23,13 @@
           }
         ]
       }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node \"hooks/antigravity-start-hint.mjs\"",
+        "timeout": 5
+      }
     ]
   }
 }
