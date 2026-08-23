@@ -69,11 +69,12 @@ export function deny(reason, debug = undefined) {
   if (completed) return;
   completed = true;
   if (debug) diagnostic(debug.code, debug.fields);
+  process.stderr.write(`BLOCKED: ${reason}\n`);
   process.stdout.write(`${JSON.stringify({
     decision: "deny",
     reason,
   })}\n`);
-  process.exit(0);
+  process.exit(2);
 }
 
 function remainingBudgetMs(reserveMs = 0) {
