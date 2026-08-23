@@ -41,7 +41,7 @@ rules:
           - pattern: require("features/$PATH")
     paths:
       include:
-        - "core/**"
+        - "/core/**"
     metadata:
       category: best-practice
       references:
