@@ -30,5 +30,14 @@ command for local plugins. To install the Agent-Pipeline in an Antigravity proje
    (Select "Workspace-Local" to generate the `.agents/plugins.json` for your project. The installer will also print the node PATH verification.)
 2. Initialize the pipeline in your project by invoking the agent and running the start command:
    ```bash
-   agy --execute "/pipeline-start"
+   agy
+   ```
+   (Or run `agy --yolo` for fully autonomous execution without confirmation prompts).
+
+3. To enable autonomous execution (auto-apply edits & safe commands) permanently, the installer can write `.agents/settings.json`:
+   ```json
+   {
+     "toolExecutionPolicy": "always-proceed",
+     "artifactReviewMode": "always-proceed"
+   }
    ```
