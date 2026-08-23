@@ -25,18 +25,18 @@ rl.question("Select option (1 or 2): ", (answer) => {
   if (answer.trim() === "1") {
     const agentsDir = join(process.cwd(), ".agents");
     if (!existsSync(agentsDir)) mkdirSync(agentsDir, { recursive: true });
-    targetFile = join(agentsDir, "plugins.json");
+    targetFile = join(agentsDir, "hooks.json");
   } else if (answer.trim() === "2") {
     const globalDir = join(process.env.HOME || process.env.USERPROFILE, ".gemini", "config");
     if (!existsSync(globalDir)) mkdirSync(globalDir, { recursive: true });
-    targetFile = join(globalDir, "plugins.json");
+    targetFile = join(globalDir, "hooks.json");
   } else {
     console.log("Invalid selection. Exiting.");
     rl.close();
     process.exit(1);
   }
 
-  let config = { entries: [] };
+  let config = {};
   if (existsSync(targetFile)) {
     try {
       config = JSON.parse(readFileSync(targetFile, "utf-8"));
@@ -45,16 +45,42 @@ rl.question("Select option (1 or 2): ", (answer) => {
     }
   }
 
-  if (!config.entries) config.entries = [];
-  
-  const alreadyExists = config.entries.some(e => e.path === PLUGIN_ROOT);
-  if (!alreadyExists) {
-    config.entries.push({ path: PLUGIN_ROOT });
-    writeFileSync(targetFile, JSON.stringify(config, null, 2) + "\n");
-    console.log(`\nSuccess! Pipeline registered in: ${targetFile}`);
-  } else {
-    console.log(`\nPipeline is already registered in: ${targetFile}`);
-  }
+  config["pipeline-core"] = {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "run_command|write_to_file|replace_file_content|invoke_subagent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node plugins/pipeline-core/hooks/antigravity-stop-hook.mjs",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node plugins/pipeline-core/hooks/antigravity-start-hint.mjs",
+        "timeout": 5
+      }
+    ]
+  };
+
+  writeFileSync(targetFile, JSON.stringify(config, null, 2) + "\n");
+  console.log(`\nSuccess! Pipeline registered in: ${targetFile}`);
 
   console.log("\n=== Important Environment Verification ===");
   console.log("The Agent Pipeline uses platform-neutral hooks (e.g. `node hooks/...`).");
