@@ -75,11 +75,12 @@ function decision(result) {
     return { decision: "deny", reason: result.stderr };
   }
   assert.equal(result.status, 0, `Process failed: ${result.stderr}`);
-  if (!result.stdout.trim()) return { decision: "allow", reason: null };
+  const trimmed = result.stdout.trim();
+  assert.ok(trimmed !== "", `guard produced no decision output on stdout (stderr: ${result.stderr})`);
   try {
-    return JSON.parse(result.stdout.trim());
-  } catch {
-    return { decision: "allow", raw: result.stdout };
+    return JSON.parse(trimmed);
+  } catch (error) {
+    assert.fail(`guard produced unparseable decision output: ${trimmed}\n${error.message}`);
   }
 }
 
@@ -328,7 +329,7 @@ check("Antigravity pretool guard blocks replace_file_content to pipeline.user.ya
   }, root));
 
   assert.equal(res.decision, "deny");
-  assert.match(res.reason, /guard-gate-strength|GS-1|BLOCKED/);
+  assert.match(res.reason, /guard-gate-strength|Rule ID: GS-1\b/);
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -342,7 +343,7 @@ check("Antigravity pretool guard blocks agent self-approval for approve-push", (
   }, root));
 
   assert.equal(res.decision, "deny");
-  assert.match(res.reason, /PO Gate.*approve-push.*prohibited|BLOCKED/);
+  assert.match(res.reason, /'approve-push' is an explicit Human\/PO decision/);
   rmSync(root, { recursive: true, force: true });
 });
 

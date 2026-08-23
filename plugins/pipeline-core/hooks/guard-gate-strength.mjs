@@ -242,7 +242,7 @@ if (process.argv[1] && resolve(process.argv[1]).endsWith("guard-gate-strength.mj
     const governed = [
       "pipeline.user.yaml", "project/pipeline.yaml", ".claude/pipeline.yaml",
       "project/guard-config.json", ".claude/guard-config.json",
-      "project/pipeline.json", ".claude/pipeline.json", "pipeline.json",
+      "project/pipeline.json", ".claude/pipeline.json",
     ].some((marker) => existsSync(join(resolve(projectDir), marker)));
     if (!governed) process.exit(0);
   }
