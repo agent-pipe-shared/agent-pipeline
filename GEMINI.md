@@ -18,6 +18,11 @@ If you manage Node.js via `fnm` or `nvm` and launch the daemon in the background
 sudo ln -s $(which node) /usr/local/bin/node
 ```
 
+This condition has no code fix from inside the plugin (a hook that never
+starts cannot report its own absence) and is tracked, with owner and
+expiry per QG-06, as
+`backlog/items/2026-08-23-antigravity-hard-enforcement-layer-has-two-fail-open-paths.md`.
+
 ### Antigravity Installation (Workspace-Local)
 
 Unlike Codex, Antigravity does not rely on a global `plugin install` marketplace 
