@@ -184,7 +184,7 @@ Consumers who do not enable `antigravity` experience zero configuration changes.
 ## 8. Threat Model & Trust Boundary References
 
 1. **Authorization Boundaries:** Documented in `docs/nova-execution-plane-threat-model.md`.
-2. **Sandbox & Egress Restrictions:** The execution host enforces `--sandbox` isolation and validates provider identity (`google` / Gemini models) before command execution.
+2. **Sandbox & Egress Restrictions:** The execution host does not itself enforce `--sandbox` isolation. When an Antigravity session is detected (`ANTIGRAVITY_SESSION_ID` set), `v3-bootstrap-authority.mjs` emits an unconditional, stderr-only warning stating that OS-level filesystem and network containment (Layer 1, e.g. the `--sandbox` flag) cannot be verified from within the session itself; the warning never blocks or fails the check it runs alongside. Whether Layer-1 containment is actually active is therefore outside what this session can confirm about itself — not confirmed absent, not confirmed present, unverifiable from inside. The execution host does validate provider identity (`google` / Gemini models) before command execution.
 3. **PreToolUse Guardrails:** Native Antigravity hooks (`antigravity-pretool-guard.mjs`) enforce command grammar restrictions, workspace containment, and lifecycle phase gating before tool execution.
 
 ---
@@ -200,5 +200,5 @@ Consumers who do not enable `antigravity` experience zero configuration changes.
 | 5. Third-party licenses | MET | Zero new third-party npm dependencies added; conforms to `license-allowlist.json`. |
 | 6. Secrets handling | MET | No credentials committed; local `agy` authentication context used. |
 | 7. Backward compatibility | MET | Documented in Section 7 above; verified by conformance suite. |
-| 8. Owner assigned for deferred risk | MET | PO owns future live runner certification and external broker integrations. |
+| 8. Owner assigned for deferred risk | MET | PO owns future live runner certification and external broker integrations; PO also owns the residual sandbox-containment/push-escape gap recorded in QG-06 form, `backlog/items/2026-08-23-antigravity-sandbox-containment-push-escape-route-unclosed.md`. |
 
