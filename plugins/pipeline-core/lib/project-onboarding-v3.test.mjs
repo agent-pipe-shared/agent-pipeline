@@ -3365,9 +3365,20 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     const produceEvidence = () => spawnSync(process.execPath, [producer, "--root", path, "--out", "evidence/verify-latest.json"], {
       cwd: path, encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: path },
     });
+    // `approve-push`'s chat-mode challenge is written with `console.error`
+    // directly (not the `writeError` dep), so this has to intercept the real
+    // console method to see it -- same shape as `capturedStderr` in
+    // pipeline-state.test.mjs.
     const state = (argv) => {
       const stderr = [];
-      const code = pipelineStateRun(argv, { dir: path, writeError: (value) => stderr.push(String(value)) });
+      const originalError = console.error;
+      console.error = (...values) => { stderr.push(values.join(" ")); };
+      let code;
+      try {
+        code = pipelineStateRun(argv, { dir: path, writeError: (value) => stderr.push(String(value)) });
+      } finally {
+        console.error = originalError;
+      }
       return { code, stderr: stderr.join("") };
     };
     // `gates.push_approval` is read from the COMMITTED bytes, so every step that
@@ -3404,7 +3415,14 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     assert.equal(produceEvidence().status, 0, "a configured, passing verify command must yield evidence");
 
     // (5) The approval itself -- the human step the whole gate exists for.
-    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"]);
+    // Chat mode's first call issues a challenge rather than completing the
+    // approval (ADR-0056); only the follow-up call, echoing that challenge
+    // back, actually clears the gate.
+    const challengeAttempt = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"]);
+    assert.equal(challengeAttempt.code, 1, challengeAttempt.stderr);
+    assert.match(challengeAttempt.stderr, /PO-CHALLENGE/u);
+    const challengeCode = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8")).pendingPushChallenge.code;
+    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x", "--challenge", challengeCode]);
     assert.equal(approved.code, 0, approved.stderr);
 
     const admitted = attemptPush();
@@ -3513,7 +3531,14 @@ test("onboarding materializes project/critical-human-proof.json declaring push, 
         // half exercises `approve-push` to a genuine completed approval
         // (PUSHSEED-2's chat shape) rather than a proxy command: materializing
         // the policy file must not regress the already-satisfiable chat path.
-        const approved = state("approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x");
+        // The first call issues a challenge instead of completing the
+        // approval; the follow-up call, echoing that challenge back, is what
+        // actually clears the gate (ADR-0056).
+        const challengeAttempt = state("approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x");
+        assert.equal(challengeAttempt.status, 1, challengeAttempt.stderr);
+        assert.match(String(challengeAttempt.stderr), /PO-CHALLENGE/u);
+        const challengeCode = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8")).pendingPushChallenge.code;
+        const approved = state("approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x", "--challenge", challengeCode);
         assert.equal(approved.status, 0, approved.stderr);
       }
     }
