@@ -129,6 +129,14 @@ Rule IDs: `QG-xx`.
 
 ## QG-14 — Web & Browser Deliverable Integrity (DOM, CORS, Protocol Containment)
 
+**Scope note:** added during the `sprint-agy-runner` work package. It is
+unrelated to that sprint's declared scope (`specs/sprint-agy-runner/prd_agy-runner.md`
+§4, `specs/sprint-agy-runner/spec.md` §5 — Antigravity runner integration,
+no web/browser deliverable in either), and neither scope document records it
+as an accepted in-sprint addition. Retained here (not deleted) pending a
+separate review of its own — do not treat this entry as sprint-agy-runner-
+approved.
+
 - Any deliverable intended for web/browser runtime (e.g. HTML/JS/CSS applications, games, or UI components) **MUST** be verified for runtime asset resolution and protocol compatibility.
 - ES module script tags (`<script type="module">`), local fetch requests, and dynamic imports fail under the `file:///` protocol due to browser CORS and origin isolation rules. When building browser deliverables:
   - If standalone offline execution is required, code **MUST NOT** rely on unbundled ES module imports or CORS-restricted asset fetches over `file:///`, OR
