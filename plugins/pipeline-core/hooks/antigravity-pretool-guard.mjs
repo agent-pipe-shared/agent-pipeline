@@ -351,6 +351,11 @@ export async function runAntigravityPreToolGuard(rawInput) {
     }
   }
 
+  // PO Gate Hardening: Block agent from self-approving feature plans
+  if (toolName === "Bash" && /(?:^|\s|\/)(?:pipeline-state(?:\.mjs)?)\s+approve-plan\b/u.test(command)) {
+    deny("BLOCKED (PO Gate): Agent self-approval prohibited. 'approve-plan' is an explicit Human/PO decision. You must present the PRD and Technical Specification to the user in chat and request approval. The user must approve the plan by running: pipeline-state approve-plan --by <name>");
+  }
+
   const guardNames = toolName === "Bash"
     ? [
       ...( /\bgit(?:\.exe)?\b/iu.test(command) ? ["guard-git.mjs"] : []),
