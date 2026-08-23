@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7ed807ca45311b3e490cd11ae3f78ddf514744da93666e83468b0718f056bde6"
+    "transitionHead": "285609ea40f42bc54f094666368815511c2a81114e449b4a2273ea8102966c8d"
   },
   "counts": {
-    "open": 43,
+    "open": 44,
     "in_progress": 3,
     "closed": 260
   },
@@ -198,6 +198,15 @@
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "Critic review finding F8, specs/sprint-agy-runner/evidence/2026-08-23-critic-review-agy-runner.md",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.antigravity-sandbox-containment-push-escape-route-unclosed",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-23",
+      "source": "AGY-FIX-PUSHGUARD dispatch (evidence/dispatch-record-AGY-FIX-PUSHGUARD.json) and v3-bootstrap-authority.mjs's own removal-comment for the `.git/hooks/pre-push` workaround it used to install; spec gap closed by AGY-FIX-SPECGAP (specs/sprint-agy-runner/spec.md sec.8.2)",
       "deferred": false
     },
     {
