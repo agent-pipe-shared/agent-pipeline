@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "289836db981e6ba6920f93d511a924161752f6be3de823f476759ba4366161a2"
+    "transitionHead": "7ed807ca45311b3e490cd11ae3f78ddf514744da93666e83468b0718f056bde6"
   },
   "counts": {
-    "open": 42,
+    "open": 43,
     "in_progress": 3,
     "closed": 260
   },
@@ -190,6 +190,15 @@
       "created": "2026-08-09",
       "source": "Full command-level analysis of the PO's Codex greenfield happy path against the 0.5.4 candidate (rollout 019fe56c + 019fe56f, 2026-08-09), read from the Codex rollout logs rather than the chat transcript.",
       "deferred": true
+    },
+    {
+      "id": "pipeline.antigravity-hard-enforcement-layer-has-two-fail-open-paths",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-23",
+      "source": "Critic review finding F8, specs/sprint-agy-runner/evidence/2026-08-23-critic-review-agy-runner.md",
+      "deferred": false
     },
     {
       "id": "pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones",
