@@ -54,40 +54,45 @@ The canonical runner identifier is `"antigravity"`.
 
 ---
 
-## 3. Hard Technical Enforcement Layer (`.agents/hooks.json`)
+## 3. Hard Technical Enforcement Layer (`plugins/pipeline-core/hooks.json`)
 
-Antigravity executes hooks configured in `.agents/hooks.json`.
+Antigravity executes hooks configured in `plugins/pipeline-core/hooks.json`
+(the standalone `.agents/hooks.json` projection was retired in commit
+`ffa55f78`; Antigravity now discovers this plugin via `.agents/plugins.json`
+and reads its hook wiring from this file directly).
 
 ```json
 {
-  "pipeline-pretool-guard": {
+  "pipeline-core": {
     "enabled": true,
     "PreToolUse": [
       {
-        "matcher": "run_command",
+        "matcher": "run_command|write_to_file|replace_file_content|invoke_subagent",
         "hooks": [
           {
             "type": "command",
-            "command": "node plugins/pipeline-core/hooks/guard-git.mjs"
-          },
-          {
-            "type": "command",
-            "command": "node plugins/pipeline-core/hooks/guard-push.mjs"
-          },
-          {
-            "type": "command",
-            "command": "node plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs"
+            "command": "node hooks/antigravity-pretool-guard.mjs",
+            "timeout": 30
           }
         ]
       }
-    ]
-  },
-  "pipeline-session-start": {
-    "enabled": true,
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node hooks/antigravity-stop-hook.mjs",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
     "PreInvocation": [
       {
         "type": "command",
-        "command": "node plugins/pipeline-core/scripts/pipeline-start-preflight.mjs --runner antigravity"
+        "command": "node hooks/antigravity-start-hint.mjs",
+        "timeout": 5
       }
     ]
   }
@@ -190,7 +195,7 @@ Consumers who do not enable `antigravity` experience zero configuration changes.
 |---|---|---|
 | 1. Data-privacy review | MET | No PII or personal data collected or transmitted. Only local configuration and local execution. |
 | 2. Threat model current & bound | MET | `docs/nova-execution-plane-threat-model.md` updated with Antigravity boundaries and residual controls. |
-| 3. License headers | MET | All new source files carry `// SPDX-License-Identifier: MIT` license headers. |
+| 3. License headers | MET | All new source files carry `// SPDX-License-Identifier: SUL-1.0` license headers (verified in `plugins/pipeline-core/hooks/guard-push.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs`, `install-agy.mjs`). |
 | 4. Rollback path documented | MET | Documented in Section 6 above. |
 | 5. Third-party licenses | MET | Zero new third-party npm dependencies added; conforms to `license-allowlist.json`. |
 | 6. Secrets handling | MET | No credentials committed; local `agy` authentication context used. |
