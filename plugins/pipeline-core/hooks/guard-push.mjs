@@ -1628,6 +1628,14 @@ try {
     );
   }
 
+  // Methodological Agent Guard: Block push if there are uncommitted files (like missing specs).
+  const uncommittedCheck = spawnSync("git", ["status", "--porcelain"], { encoding: "utf8", cwd: evidenceProjectDir });
+  if (uncommittedCheck.status === 0 && uncommittedCheck.stdout.trim().length > 0) {
+    failures.push(
+      "Uncommitted changes detected in the working tree. Agents often forget to commit new files (e.g. in specs/ or docs/) because 'git commit -a' ignores untracked files. Review your 'git status' and commit these files, or add them to .gitignore, before pushing."
+    );
+  }
+
   // (b.1) self-application-only anonymous public range and dedicated authenticated
   // SSH-account evidence. The close ritual repeats this preflight immediately before
   // the actual network operation, then fetches the pushed ref from a fresh repository.
