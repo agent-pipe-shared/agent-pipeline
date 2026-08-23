@@ -6,7 +6,10 @@ function main() {
     const input = JSON.parse(readFileSync(0, 'utf8'));
     // invocationNum is 1 on the very first turn of the conversation
     if (input.invocationNum === 1 || input.invocationNum === 0) {
-      const decision = sessionStartDecision(process.cwd());
+      const rootDir = (input.workspacePaths && input.workspacePaths.length > 0) 
+          ? input.workspacePaths[0] 
+          : process.cwd();
+      const decision = sessionStartDecision(rootDir);
       
       process.stdout.write(JSON.stringify({
         injectSteps: [
