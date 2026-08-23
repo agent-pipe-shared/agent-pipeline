@@ -1,5 +1,4 @@
 {
-  "$comment": "Antigravity hooks projection (sprint_agy). Maps Antigravity tool lifecycle events to the unified antigravity-pretool-guard and antigravity-stop-hook adapters.",
   "pipeline-core": {
     "enabled": true,
     "PreToolUse": [
@@ -8,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"hooks/antigravity-pretool-guard.mjs\"",
+            "command": "echo \"plugin hook ran\" >> /tmp/plugin-hook.log && node \"hooks/antigravity-pretool-guard.mjs\"",
             "timeout": 30
           }
         ]
