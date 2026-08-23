@@ -86,11 +86,12 @@ rl.question(`Use (1) Dev Source (${SCRIPT_DIR}) or (2) Local Marketplace (${LOCA
         if (existsSync(settingsFile)) {
           try { settings = JSON.parse(readFileSync(settingsFile, "utf-8")); } catch (e) {}
         }
+        settings.terminalSandbox = true;
         settings.toolExecutionPolicy = "always-proceed";
         settings.artifactReviewMode = "always-proceed";
         mkdirSync(dirname(settingsFile), { recursive: true });
         writeFileSync(settingsFile, JSON.stringify(settings, null, 2) + "\n");
-        console.log(`Autonomous mode configured in: ${settingsFile}`);
+        console.log(`Autonomous sandboxed mode configured in: ${settingsFile}`);
       }
 
       console.log("\n=== Important Environment Verification ===");
