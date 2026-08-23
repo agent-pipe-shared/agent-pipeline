@@ -211,3 +211,90 @@ test pairs for it. Verified in the working tree: `readOnlyTools` still contains
 `define_subagent` (unchanged, by design — it IS a read-only tool in every other
 respect), and the check now precedes the short-circuit rather than following
 it. This is the first revision in which the control actually executes.
+
+## Disclosed, not corrected — F2, F14, and the historical half of F10
+
+Recorded 2026-08-23 as part of the correction wave. Three findings of this
+review have no code remedy, and this section exists so that "all findings
+addressed" is not read as "all findings fixed".
+
+**Why no remedy exists.** All 34 commits F2 names are published: `origin/sprint_agy`
+stands at `70fd1bc7`, inside the reviewed range. Correcting a commit message or
+adding a trailer after the fact requires rewriting history, which CLAUDE.md's
+hard rules forbid without qualification ("never force-push, never rewrite
+history"). The only honest treatment is disclosure.
+
+**F2 — authorship.** Of the 35 commits in `92037494..51dd7fc6`, exactly one
+(`51dd7fc6`) carries a `Dispatch:` trailer. The other 34 carry none, and
+`evidence/` holds no dispatch record covering them. Those commits are
+permanently authorship-unverifiable. This includes the commits that removed
+security controls (`8088c1fd`), installed a git hook (`2887e774`), added push
+blocks (`8eee0018`) and added PO gates (`4977a9d2`, `01867a57`). Every
+correction commit made after `51dd7fc6` does carry the trailer and a dispatch
+record; the gap is bounded to the original range and does not extend forward.
+
+**F14 — commit-message contract.** `2887e774` ("Pipeline Härtungen für Sandbox
+und Push-Hook integriert") is German and carries no Conventional type;
+`ef967102` carries no type; `70fd1bc7`'s subject contains an empty token and a
+double space; `dc84c177` bundles three distinct concerns in one commit. All
+four are published and stay as they are.
+
+**F10 — protected test paths, past edits.** `guard-push.test.mjs` (TP-5) and
+`critical-human-proof-policy.test.mjs` (TP-9) were modified inside the reviewed
+range with no override or ceremony record in `evidence/`. The mechanism by which
+those writes reached protected paths was NOT established — the Antigravity guard
+does wire both the write lane (`guard-testpath.mjs` for `Edit`/`Write`) and the
+shell lane (`guard-lifecycle-ready.mjs` for `Bash`), so the obvious explanation
+does not hold. It is left as an open question rather than an assumed cause.
+The forward-looking half of F10 is closed by construction: no dispatch in the
+correction wave was permitted to write a protected path, and none did.
+
+**F11 remains open and is not dispatchable.** The missing test for the new
+push-guard blocking condition would have to live in `guard-push.test.mjs`
+(TP-5). Per `templates/prompts/agent-obligations.md` §2, the human-guard
+override does not help for Pipeline plugin source in a source checkout —
+`recordHumanGuardDenial()` takes the `eligible.authorCandidate` branch and
+returns `status: "author-repair-required"` rather than `"planned"` — and the
+same section states that needing such a path is a stop condition. No agent tier
+can perform this edit; it requires a human-decided route.
+
+## Why the removed `pre-push` hook existed (PO statement, 2026-08-23)
+
+Recorded so that the removal in `a8f861cc` is not later read as tidying up.
+
+The PO confirmed that the hook was a deliberate workaround for an **observed**
+failure, not a speculative hardening: under the Antigravity runner, pushes were
+actually proceeding outside the Pipeline path, and the guard did not stop them.
+The hook was the attempt to force every push through the guard.
+
+The correction wave established that BOTH the original defect and the
+workaround were real problems:
+
+- The escape route was genuine and is now closed. `antigravity-pretool-guard.mjs`
+  captures Antigravity's own `Cwd` argument into `toolInput.cwd`, but no guard
+  consumed it — guards were spawned pinned to the session root and `guard-push.mjs`
+  bound everything to `process.cwd()`. A command executing in a directory other
+  than the session root had its approval and evidence evaluated against the wrong
+  repository. Neither the Claude Code nor the Codex tool surface carries an
+  equivalent field, so this was Antigravity-specific. Closed in `a8f861cc`.
+- The workaround never functioned. Reproduced during the correction wave against
+  `guard-push.mjs` directly: the hook's synthesized `git push $1` payload is
+  rejected by the guard's own command parser, because `$1` in a `pre-push` hook is
+  the remote name and the refs arrive on stdin. The hook therefore never evaluated
+  a push. Removing it forfeited no working protection.
+- A residual route remains open: a push issued by a process the guarded command
+  merely spawns is invisible to any command-line classifier. This is the class
+  `plugins/pipeline-core/lib/protected-test-paths.mjs` documents in its own
+  "NOT COVERED, stated rather than hidden" section. It is tracked as its own
+  backlog item with owner and expiry.
+
+**Operator follow-up.** A `.git/hooks/pre-push` file installed by the old code
+may still exist in working checkouts. The installer is gone, so it will not be
+recreated — but an existing one still runs, and since its payload is rejected by
+the guard's parser it exits non-zero, which blocks every push from that checkout.
+
+In THIS checkout it was inspected (byte-identical to the generated template, no
+hand modifications) and deleted on PO instruction, 2026-08-23. Its content stays
+recoverable from `a8f861cc^`'s copy of the installer. Any OTHER checkout that ran
+the old bootstrap still has to be cleaned by hand — `.git/` is outside every
+dispatch's scope and outside what a correction commit can reach.
