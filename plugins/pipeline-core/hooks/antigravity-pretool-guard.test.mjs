@@ -492,6 +492,61 @@ check("Antigravity pretool guard still blocks genuine prose 'please review the c
   rmSync(root, { recursive: true, force: true });
 });
 
+// F1: the D2 regex tightening over-corrected -- it also stopped matching a trigger word
+// preceded by markdown emphasis or a quote. These prompts carry a ruleset-sha and a model
+// token (dispatch-policy.mjs's own, separate requirements for a critic-type dispatch) so that
+// the ONLY thing that can produce a denial is the local Contamination Rule regex under test --
+// pre-fix these are wrongly ALLOWED (the actual F1 bug); post-fix they must be DENIED with a
+// Contamination Rule reason.
+const F1_RULESET_AND_MODEL = [
+  "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
+  "model: sonnet",
+].join("\n");
+
+check("Antigravity pretool guard blocks a critic prompt with the trigger word inside markdown bold emphasis (F1)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: `- **review** the tests\n${F1_RULESET_AND_MODEL}`,
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks a critic prompt with the trigger word inside quotes (F1)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: `"Review the diff."\n${F1_RULESET_AND_MODEL}`,
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 // 4. Multi-subagent envelope inspection (D3)
 
 check("Antigravity pretool guard blocks a critic dispatch carrying prose at index 1 of a multi-subagent envelope (D3)", () => {
@@ -528,6 +583,43 @@ check("Antigravity pretool guard allows a multi-subagent envelope when the criti
   }, root));
 
   assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+// F2: guard-dispatch.mjs (the SEPARATE nested guard spawned via canonicalPayload) previously
+// only ever saw Subagents[0]'s shape, even after D3 fixed the LOCAL regex check to loop every
+// entry. This prompt deliberately carries none of the LOCAL check's trigger words ("you are",
+// "please", "examine", "look at", "review") -- so a denial here cannot come from the local
+// regex (D3's own test already covers that path) -- but it does carry "pay attention to",
+// which guard-dispatch.mjs's own contamination policy (dispatch-policy.mjs HUNT-LIST) flags
+// independently of the local check. A ruleset-sha and model token are included so the only
+// finding guard-dispatch.mjs can raise is HUNT-LIST, isolating the nested-guard coverage gap
+// this test is about.
+check("Antigravity pretool guard denies a multi-subagent envelope when guard-dispatch.mjs's own check (not the local regex) flags the critic entry at index 1 (F2)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          { TypeName: "researcher", Role: "Researcher", Prompt: "irrelevant" },
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: [
+              "specs/feat-1/prd.md",
+              "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
+              "model: sonnet",
+              "Pay attention to the auth module changes in this diff.",
+            ].join("\n"),
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /guard-dispatch|BLOCKED/);
   rmSync(root, { recursive: true, force: true });
 });
 
@@ -637,6 +729,63 @@ check("Antigravity pretool guard blocks inline env node -e execution (containmen
 
   assert.equal(res.decision, "deny");
   assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+// F6: D6's `sh|bash` alternative matched a bare `-c` only, missing combined single-dash flag
+// clusters ending in `c` and two shell names entirely.
+
+check("Antigravity pretool guard blocks inline bash -lc execution (containment, F6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash -lc \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline sh -ec execution (containment, F6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "sh -ec \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline zsh -c execution (containment, F6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "zsh -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline dash -c execution (containment, F6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "dash -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a plain bash script invocation, not inline exec (neighbour case, F6)", () => {
+  const root = mkdtempSync(join(tmpdir(), "agy-pretool-bare-"));
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash script.sh" } },
+  }, root));
+
+  assert.equal(res.decision, "allow");
   rmSync(root, { recursive: true, force: true });
 });
 

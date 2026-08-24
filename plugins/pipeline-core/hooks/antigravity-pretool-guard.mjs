@@ -375,12 +375,16 @@ export async function runAntigravityPreToolGuard(rawInput) {
       // Disallow prose instructions (Paths Only Contamination Rule): a Critic
       // dispatch built from the template carries paths/refs, never conversational
       // steering -- roles/critic.md, templates/prompts/critic-review.md §2.
-      // D2 fix: the trigger word must be preceded by whitespace or start-of-string, not
-      // merely a non-word boundary -- a generic \b boundary also matches after a hyphen, so
-      // the old regex denied any prompt naming templates/prompts/critic-review.md (the exact
-      // canonical Critic-dispatch template CLAUDE.md mandates) purely because "review" sits
-      // between "-" and ".".
-      if (/(?:^|\s)(you are|please|examine|look at|review)\b/i.test(prompt)) {
+      // D2 fix: the trigger word must not be preceded by a hyphen, so a prompt naming
+      // templates/prompts/critic-review.md is not denied purely because "review" sits between
+      // "-" and ".".
+      // F1 fix: D2's first attempt (`(?:^|\s)` instead of `\b`) over-corrected -- it also
+      // stopped matching a trigger word preceded by markdown emphasis, a quote, or a bracket
+      // (`- **review** the tests`, `"Review the diff."`). A negative lookbehind that excludes
+      // only word-characters and the hyphen keeps the D2 fix (a hyphen still is not a boundary)
+      // while restoring detection for every other non-word character that can precede a
+      // trigger word in ordinary prose.
+      if (/(?<![\w-])(you are|please|examine|look at|review)\b/i.test(prompt)) {
         deny("BLOCKED (Hardening Layer): Critic dispatch prompt contains prose. Only paths and refs are allowed (Contamination Rule).");
       }
     }
@@ -391,9 +395,14 @@ export async function runAntigravityPreToolGuard(rawInput) {
     // Layer 1: OS-level / interpreter inline code execution containment.
     // D6 fix: also cover sh -c / bash -c, and node's --eval/-p/-pe forms (longer
     // alternatives first so -p does not shadow -pe before backtracking).
+    // F6 fix: D6's `sh|bash` alternative matched a bare `-c` only, missing combined
+    // single-dash flag clusters that still end in `c` (`bash -lc`, `sh -ec`, `sh -exc`) and
+    // two more shell names entirely (`zsh -c`, `dash -c`). Match any `-`-flag cluster of the
+    // named shells that ends in `c` instead of requiring `-c` verbatim; a bare `bash
+    // script.sh` (no `-`-flag at all) still does not match.
     if (
       /\b(?:node|python3?|ruby|perl|php)\s+(?:--eval\b|-(?:pe|p|e|c)\b)/.test(trimCmd)
-      || /\b(?:sh|bash)\s+-c\b/.test(trimCmd)
+      || /\b(?:sh|bash|zsh|dash)\s+-[a-zA-Z]*c\b/.test(trimCmd)
     ) {
       deny("BLOCKED (Hardening Layer): Inline code execution (e.g. node -e, python -c) is blocked. Write code to a scratch file in the workspace first to respect filesystem containment guards.");
     }
@@ -444,16 +453,28 @@ export async function runAntigravityPreToolGuard(rawInput) {
   const denials = [];
   const warnings = [];
 
-  for (const guardName of guardNames) {
+  // F2 fix: guard-dispatch.mjs previously only ever saw `canonicalPayload`, which is built
+  // from `toolInput` alone -- and `toolInput.subagent_type`/`prompt` always derive from
+  // Subagents[0] (see normalizeAntigravityToolInput above). With the Critic at index >= 1 of
+  // a multi-subagent envelope, guard-dispatch.mjs never inspected that entry, even though the
+  // local Contamination Rule check above (D3) already loops every entry. Run guard-dispatch.mjs
+  // once per subagent entry when there is more than one, each with its own entry-shaped
+  // payload; when there is only one entry (or no `subagents` array at all -- the canonical
+  // tool_name/tool_input envelope shape), keep the exact single-invocation behaviour, same
+  // payload, unchanged.
+  const multiSubagentDispatch = (toolName === "Task" || toolName === "Agent")
+    && Array.isArray(normalized.subagents) && normalized.subagents.length > 1;
+
+  function runNestedGuard(guardName, payload, memoryToolInput) {
     const memoryInput = {
       rootDir: projectRoot, sessionId: hookSessionId, toolName,
-      toolInput: toolInput ?? {}, guard: guardName,
+      toolInput: memoryToolInput ?? {}, guard: guardName,
     };
     const remembered = rememberedNativeHookFailure(memoryInput);
     if (remembered) {
       denials.push({ guard: guardName, reason: remembered.reason });
       diagnostic("native-hook-failure-suppressed", { guard: guardName, code: remembered.code });
-      continue;
+      return;
     }
     const guard = fileURLToPath(new URL(`./${guardName}`, import.meta.url));
     const result = boundedSpawn(process.execPath, [guard], {
@@ -464,7 +485,7 @@ export async function runAntigravityPreToolGuard(rawInput) {
         PIPELINE_REQUIRE_TYPED_HUMAN_OVERRIDE: "1",
       },
       encoding: "utf8",
-      input: canonicalPayload,
+      input: payload,
     }, NESTED_GUARD_BUDGETS[guardName] ?? NESTED_GUARD_BUDGETS.default);
     const detail = String(result.stderr ?? "").trim();
     if (result.status === 2) denials.push({
@@ -482,6 +503,26 @@ export async function runAntigravityPreToolGuard(rawInput) {
         reason,
       });
     }
+  }
+
+  for (const guardName of guardNames) {
+    if (guardName === "guard-dispatch.mjs" && multiSubagentDispatch) {
+      for (const entry of normalized.subagents) {
+        const entryToolInput = {
+          ...toolInput,
+          subagent_type: entry?.subagent_type,
+          prompt: entry?.prompt,
+        };
+        const entryPayload = JSON.stringify({
+          tool_name: toolName,
+          tool_input: entryToolInput,
+          cwd: projectRoot,
+        });
+        runNestedGuard(guardName, entryPayload, entryToolInput);
+      }
+      continue;
+    }
+    runNestedGuard(guardName, canonicalPayload, toolInput);
   }
 
   const lifecycleShouldRun = lifecycleGoverned
