@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "ff1614be9dc3a2aaba77f3cba85986efd23f0102bba123c55c53b9ff44c5ee94"
+    "transitionHead": "a03f15b44d495b83d5a19d7e48d4a6204ab542610a61ac9245894cf3c7248602"
   },
   "counts": {
-    "open": 49,
+    "open": 50,
     "in_progress": 3,
     "closed": 260
   },
@@ -3854,6 +3854,15 @@
       "closureRepository": "self",
       "closureCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
       "closureEvidence": "backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md"
+    },
+    {
+      "id": "pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-24",
+      "source": "Third delta Critic review of sprint-agy-runner, finding F3 (specs/sprint-agy-runner/evidence/2026-08-24-delta3-critic-review-agy-runner.md); PO-accepted disposition 2026-08-24",
+      "deferred": false
     },
     {
       "id": "pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty",
