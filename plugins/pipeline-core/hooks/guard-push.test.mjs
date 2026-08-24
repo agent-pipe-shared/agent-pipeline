@@ -2057,6 +2057,84 @@ function deployApprovalState(forArtifact, forEnvironment) {
   });
 }
 
+// ---- D4: declaredCwd / resolveShellCwd() direct coverage, plus the D1 regression (delta
+// Critic review D1/D4) -- resolveShellCwd() and the declaredCwd input it reads had zero
+// direct test before this. runGuard()/check() don't carry a declaredCwd option, so this
+// block adds its own minimal, self-contained spawn helper rather than widening the shared
+// one; it feeds the same module-level `pass`/`failures` the rest of the suite uses. ----
+function runGuardWithDeclaredCwd(command, spawnCwd, declaredCwd, projectDir) {
+  const res = spawnSync(process.execPath, [GUARD], {
+    input: JSON.stringify({ tool_name: "Bash", tool_input: { command, cwd: declaredCwd } }),
+    encoding: "utf8",
+    cwd: spawnCwd,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir },
+    timeout: 10000,
+  });
+  return { code: res.status, stderr: res.stderr ?? "" };
+}
+function checkDeclared(id, ok, detail) {
+  if (ok) {
+    pass++;
+    console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}: ${detail}`);
+    console.log(`FAIL  ${id} -- ${detail}`);
+  }
+}
+function freshRepoIn(parentDir, name) {
+  const dir = join(parentDir, name);
+  mkdirSync(dir);
+  gitAt(dir, "init", "-q", "-b", "main");
+  gitAt(dir, "config", "user.email", "goldfish@example.invalid");
+  gitAt(dir, "config", "user.name", "Goldfish");
+  writeFileSync(join(dir, "README.md"), "fixture\n");
+  gitAt(dir, "add", "README.md");
+  gitAt(dir, "commit", "-q", "-m", "init");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  return { dir, head };
+}
+{
+  // D4a: absolute declaredCwd is used as-is (bare-candidate resolution branch).
+  const target = freshRepo("d4a-target");
+  const decoy = freshRepo("d4a-decoy"); // actual spawn cwd; manifest present, no evidence -> BLOCK if ever used
+  writeManifest(target.dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(target.dir, "evidence/verify-latest.json", { exitCode: 0, commit: target.head });
+  writeManifest(decoy.dir, manifestPush({ approval: "required" }));
+  {
+    const r = runGuardWithDeclaredCwd("git push origin main:refs/heads/feature-test", decoy.dir, target.dir, target.dir);
+    checkDeclared("D4a allow  absolute declaredCwd is used as-is (bare candidate)", r.code === 0 && r.stderr.trim() === "", `exit ${r.code} stderr: ${r.stderr.trim().slice(0, 300)}`);
+  }
+
+  // D4b: relative declaredCwd resolves against process.cwd() (bare-candidate branch).
+  const parent = mkdtempSync(join(tmpdir(), "d4b-parent-"));
+  ALL_DIRS.push(parent);
+  const { dir: relTarget, head: relHead } = freshRepoIn(parent, "target-repo");
+  writeManifest(relTarget, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(relTarget, "evidence/verify-latest.json", { exitCode: 0, commit: relHead });
+  {
+    const r = runGuardWithDeclaredCwd("git push origin main:refs/heads/feature-test", parent, "./target-repo", relTarget);
+    checkDeclared("D4b allow  relative declaredCwd resolves against process.cwd() (bare candidate)", r.code === 0 && r.stderr.trim() === "", `exit ${r.code} stderr: ${r.stderr.trim().slice(0, 300)}`);
+  }
+
+  // D4c (D1 regression): the `-C <relative-path>` branch now honors declaredCwd, not raw
+  // process.cwd() -- proven by spawning in an unrelated decoy while declaring the relative
+  // token's true base explicitly, mirroring D4b's own controlled-parent construction. Fails
+  // red on the pre-D1-fix code (raw process.cwd() = cDecoy.dir, which has no target-repo
+  // subdirectory, so `git -C` fails, evidence never binds to the target, and the decoy's own
+  // required-but-missing evidence blocks) and green after (line ~452 uses resolveShellCwd()).
+  const cParent = mkdtempSync(join(tmpdir(), "d4c-parent-"));
+  ALL_DIRS.push(cParent);
+  const { dir: cTarget, head: cHead } = freshRepoIn(cParent, "target-repo");
+  writeManifest(cTarget, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(cTarget, "evidence/verify-latest.json", { exitCode: 0, commit: cHead });
+  const cDecoy = freshRepo("d4c-decoy"); // spawn cwd; unrelated to cParent
+  writeManifest(cDecoy.dir, manifestPush({ approval: "required" }));
+  {
+    const r = runGuardWithDeclaredCwd("git -C ./target-repo push origin main:refs/heads/feature-test", cDecoy.dir, cParent, cTarget);
+    checkDeclared("D4c allow  -C <relative> branch honors declaredCwd, not raw process.cwd() (D1 regression)", r.code === 0 && r.stderr.trim() === "", `exit ${r.code} stderr: ${r.stderr.trim().slice(0, 400)}`);
+  }
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
