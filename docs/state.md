@@ -78,10 +78,38 @@ Verify run bound to.
   disposition class as the first review's F2 — unrewritable historical
   authorship gaps, GIT-05 forbids rewriting history to add a `Dispatch:`
   trailer retroactively).
-  **A third, delta-scoped Critic review over this correction range is the
-  next required step before any push or PO acceptance claim** — per the
-  standing instruction ("alles weitere wie empfohlen"), this was the approved
-  endpoint of tonight's fix sequence and has not yet been dispatched.
+  **A third, delta-scoped Critic review ran on 2026-08-24 and also returned
+  FAIL** — 4 majors, 3 minors, route `claude-opus-5 at max`:
+  `specs/sprint-agy-runner/evidence/2026-08-24-delta3-critic-review-agy-runner.md`.
+  Two majors are regressions the D-fix wave itself introduced or left open
+  (F1: the D2 regex fix over-corrected into a new false-negative that lets
+  markdown-prefixed prose steer past the Contamination Rule; F2: the D3 fix
+  repairs only the local regex check — `guard-dispatch.mjs`, the nested
+  guard that actually runs contamination/task-frame checks, still only ever
+  sees `Subagents[0]`, so a Critic at index ≥1 still skips it entirely).
+  F1/F2 plus F6 (residual shell inline-exec forms D6 didn't enumerate:
+  `bash -lc`, `zsh -c`, `dash -c`) are dispatched for a fix as
+  `AGY-FIX3-HARDENING` (goldfish-deep) — in progress as of this write, not
+  yet landed. F7 (a stale `spec.md` Wave 3 reference to the retired
+  `.agents/hooks.json` generator) is fixed (commit `c077ac7f`). **F3, F4,
+  and F5 are explicitly NOT self-dispositioned and need a PO decision:**
+  F3 — five `AGY-FIX2-*` goldfish-trailer commits have no
+  `evidence/dispatch-record-*.json` (the dispatches genuinely ran via the
+  Workflow tool this session, but that path evidently doesn't produce the
+  standard dispatch-record artifact `dispatch-authorship-verify.mjs`
+  expects — a tooling gap, not fabricated authorship, but unresolved); F4 —
+  the D4 test-coverage commit (`4244ad7a`, 78 lines of new TP-5 test
+  infrastructure) was labelled `stage-0 (elephant)` but doesn't fit the
+  actual stage-0 criteria (≤~25 diff lines, no test-file change) — a real
+  process misclassification by this session, not repairable after the fact
+  without rewriting history (GIT-05); F5 — the `stage-0` fast-path
+  citation ("`docs/operating-model.md` §3.3") is broken across ~20 files
+  including vendored plugin copies (the section doesn't exist; the real
+  definition lives inline in `roles/elephant.md`) — too large a blast
+  radius to fix unsupervised for a minor finding, left for a dedicated
+  dispatch.
+  This is the third of at most four allowed Critic rounds on this package —
+  one further round remains after the next correction lands.
 - **Security gate — GREEN.** `security-scan.mjs` passed as suite 385/385 in
   the full Verify run above: `cap.secrets` pass, `cap.sast` pass, `cap.sca`
   not-applicable, `verdict.blocking: false`, license-check PASS.
@@ -104,41 +132,50 @@ Verify run bound to.
 
 ### Open items
 
-1. **Delta-scoped Critic review, next step.** Dispatch a Critic review scoped
-   to the diff since `51dd7fc6` (the delta review's reviewed range end) —
-   the correction wave commits plus the marketplace/version-bump/backlog
-   commits — via `templates/prompts/critic-review.md`, never freehand.
-2. **D7 empirical verification is still open.** The `.agents/plugins.json`
+1. **F1/F2/F6 fix (`AGY-FIX3-HARDENING`) needs independent verification once
+   landed**, then a fourth (final, round-budget-capped) delta Critic review
+   scoped to the diff since `fdd98727` (the third review's reviewed head) —
+   via `templates/prompts/critic-review.md`, never freehand.
+2. **F3/F4/F5 need a PO decision** (see the third delta review paragraph
+   above for what each is): F3 (missing `AGY-FIX2-*` dispatch-record
+   artifacts — accept as a disclosed tooling gap, like D5? or require a
+   fix to the Workflow-dispatch path first?), F4 (the D4 test-coverage
+   commit's stage-0 mislabel — accept and disclose, like D5? or is a
+   correction/reclassification needed?), F5 (repoint the ~20-file
+   phantom-anchor citation sweep, or accept the citation as broken and
+   leave it, or add the missing section to `operating-model.md`?).
+3. **D7 empirical verification is still open.** The `.agents/plugins.json`
    path fix is unverified pending a real Antigravity session load check —
    next-session instructions below.
-3. `pipeline-state.mjs inspect` reports `activeFeature: sprint-nova-epic`,
+4. `pipeline-state.mjs inspect` reports `activeFeature: sprint-nova-epic`,
    inherited from the rebase; it does not name this feature. PO decision:
    leave it — nova has its own repo and its own intake happens later, do not
    force a `close-feature` ceremony for this.
-4. Repo consolidation between this checkout and nova is undecided. The nova
+5. Repo consolidation between this checkout and nova is undecided. The nova
    branch tip `94c5577a` is a strict ancestor of this branch.
-5. `specs/sprint-agy-runner/prd_agy-runner.md` §2 was corrected to reference
+6. `specs/sprint-agy-runner/prd_agy-runner.md` §2 was corrected to reference
    `.agents/plugins.json` instead of the stale `hooks.json` name (commit
-   `e7110c7d`).
-6. **Marketplace-attestation-inside-Verify is a design defect, not fixed
+   `e7110c7d`); `spec.md`'s equivalent stale Wave 3 reference is fixed too
+   (commit `c077ac7f`, delta-3 review F7).
+7. **Marketplace-attestation-inside-Verify is a design defect, not fixed
    yet** — it fails the deterministic gate on ordinary active development of
    this very repo, not only on real drift:
    [backlog item](../backlog/items/2026-08-24-verify-marketplace-attestation-blocks-normal-active-development.md).
    PO flagged this as needing an actual fix, not just documentation.
-7. **`verify.mjs` runs 385 suites strictly sequentially — PO wants a 50–70%
+8. **`verify.mjs` runs 385 suites strictly sequentially — PO wants a 50–70%
    wall-clock reduction via a pooled/parallel design, "as soon as possible",
    Advisor-designed for runner-neutrality:**
    [backlog item](../backlog/items/2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md).
    Not started this session; flagged as the next high-priority piece of
    process work after the delta-Critic re-review above.
-8. The briefed subagent tool budget sits below an unannounced harness `maxTurns`
+9. The briefed subagent tool budget sits below an unannounced harness `maxTurns`
    cliff:
    `backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`.
-9. Orchestrator notes and Critic dispatch scratch share one `scratch/`
+10. Orchestrator notes and Critic dispatch scratch share one `scratch/`
    directory, so verdict-bearing material sits where a dispatched Critic is
    guaranteed to look:
    `backlog/items/2026-08-23-elephant-notes-and-critic-scratch-share-one-directory.md`.
-10. **Meta/process feedback from the PO, carried forward (not a repo defect):**
+11. **Meta/process feedback from the PO, carried forward (not a repo defect):**
     sessions spend too long on silent orientation (read/grep archaeology)
     before starting visible work; a session should batch reads and narrate
     briefly rather than disappearing for minutes per turn.
@@ -148,8 +185,11 @@ Verify run bound to.
 1. Restart the Antigravity session (CLI `agy` or IDE reload) to empirically
    check whether D7's `.agents/plugins.json` fix actually makes the
    PreToolUse enforcement layer load.
-2. Dispatch the delta-scoped Critic review (open item 1 above) before any
+2. Confirm `AGY-FIX3-HARDENING` landed and verified, then dispatch the
+   fourth (final round-budget slot) delta-scoped Critic review before any
    push is considered.
+3. Get a PO decision on F3/F4/F5 (open item 2 above) — none are
+   self-dispositioned.
 
 ### Durable-rule and history pointers
 
@@ -187,10 +227,11 @@ through the existing archive index and files:
   completion or go-live claim is made by this handover.
 - For this task, Nova B is explicitly out of scope.
 
-**Last updated:** 2026-08-24 — D1–D7 disposed and (D1/D2/D3/D4/D6/D7) fixed,
-marketplace resynced, trust anchor rotated, version bumped, backlog-state
-fix landed, Verify re-run to confirm the final candidate; delta-scoped
-Critic review still outstanding.
+**Last updated:** 2026-08-24 — D1–D7 disposed and fixed, marketplace
+resynced, trust anchor rotated, version bumped, backlog-state fix landed,
+Verify green (385/385); third delta Critic review ran and returned FAIL
+(F1-F7); F7 fixed, F1/F2/F6 fix dispatched (`AGY-FIX3-HARDENING`, in
+progress), F3/F4/F5 need a PO decision, not yet self-dispositioned.
 
 ### Sentinel Links
 - specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md
