@@ -134,21 +134,29 @@ Verify run bound to.
 
 ### Open items
 
-1. **Rsync the marketplace copy, then re-run Verify for a clean 385/385**,
-   then dispatch a fourth (final, round-budget-capped) delta Critic review
+1. **Marketplace rsync confirmed done by the PO (chat, 2026-08-24) and
+   independently confirmed clean (`diff -rq`, no output).** A final,
+   uninterrupted full Verify run for a clean 385/385 confirmation is still
+   outstanding — a background run was started and then deliberately killed
+   this session before finishing (candidate-drift false-failure risk once
+   further commits landed; correctly identified before it could burn 13
+   minutes for nothing) — then superseded by the verify-tuner/backlog-triage
+   work below. Re-run once no more tree mutation is planned. After a clean
+   run: dispatch the fourth (final, round-budget-capped) delta Critic review
    scoped to the diff since `fdd98727` (the third review's reviewed head) —
-   via `templates/prompts/critic-review.md`, never freehand. The F1/F2/F6
-   fix (`AGY-FIX3-HARDENING`, commit `96581b7f`) is already independently
-   verified (42/42 + 9/9 suites re-run directly), so this round is the
-   remaining gate before a push can even be considered.
-2. **F3/F4/F5 need a PO decision** (see the third delta review paragraph
-   above for what each is): F3 (missing `AGY-FIX2-*` dispatch-record
-   artifacts — accept as a disclosed tooling gap, like D5? or require a
-   fix to the Workflow-dispatch path first?), F4 (the D4 test-coverage
-   commit's stage-0 mislabel — accept and disclose, like D5? or is a
-   correction/reclassification needed?), F5 (repoint the ~20-file
-   phantom-anchor citation sweep, or accept the citation as broken and
-   leave it, or add the missing section to `operating-model.md`?).
+   via `templates/prompts/critic-review.md`, never freehand. F1/F2/F6
+   (`AGY-FIX3-HARDENING`, commit `96581b7f`) are already independently
+   verified (42/42 + 9/9 suites re-run directly).
+2. **F3/F4/F5 dispositions: RESOLVED.** The PO accepted the Elephant's
+   recommendation for all three (2026-08-24). Recorded in
+   `specs/sprint-agy-runner/evidence/2026-08-24-delta3-critic-review-agy-runner.md`
+   ("PO disposition, 2026-08-24 (round 3, F3/F4/F5)"): F3 and F4 accepted as
+   disclosed gaps (same class as D5, no code remedy); F3's underlying
+   tooling gap (Workflow-tool dispatches producing no
+   `dispatch-record-<TASK_ID>.json`) is tracked as its own item,
+   `backlog/items/2026-08-24-workflow-tool-dispatches-produce-no-dispatch-record-artifact.md`;
+   F5 gets a real fix (add the missing `operating-model.md` §3.3 section)
+   rather than a mechanical ~20-file citation sweep — not yet dispatched.
 3. **D7 empirical verification is still open.** The `.agents/plugins.json`
    path fix is unverified pending a real Antigravity session load check —
    next-session instructions below.
@@ -167,35 +175,79 @@ Verify run bound to.
    this very repo, not only on real drift:
    [backlog item](../backlog/items/2026-08-24-verify-marketplace-attestation-blocks-normal-active-development.md).
    PO flagged this as needing an actual fix, not just documentation.
-8. **`verify.mjs` runs 385 suites strictly sequentially — PO wants a 50–70%
-   wall-clock reduction via a pooled/parallel design, "as soon as possible",
-   Advisor-designed for runner-neutrality:**
+8. **`verify.mjs` parallelization: Advisor-reviewed design now exists,
+   implementation not started.** Recorded directly in the backlog item
+   (`## Advisor-reviewed design, 2026-08-24`):
    [backlog item](../backlog/items/2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md).
-   Not started this session; flagged as the next high-priority piece of
-   process work after the delta-Critic re-review above.
-9. The briefed subagent tool budget sits below an unannounced harness `maxTurns`
-   cliff:
+   TP-3 confirmed to protect only `harness/scripts/verify.mjs`, so the
+   rewrite lands almost entirely in `verify-journal.mjs` (no ceremony); one
+   contiguous `await` edit needed in `verify.mjs` itself. Design covers the
+   pooling mechanism, `steps[]`/journal-digest determinism, a mechanically-
+   derived serial lane, and a staged rollout (land at concurrency=1 first).
+   Next step: a `goldfish-deep` dispatch for stage 1 of that rollout — not
+   done this session. Note: a parallel attempt to route the design through
+   the dedicated `pipeline-core:consult-advisor` agent was stopped after 27
+   minutes with no output, per the PO's live call on cost/benefit; the
+   design instead comes from a direct `advisor()` consultation, independently
+   cross-checked against source by the Elephant.
+9. **The briefed subagent tool-budget/`maxTurns`-cliff mismatch: parts 1+2
+   fixed this session** (commit `eccbdadd`) — both dispatch templates'
+   base-cap defaults now fit safely under their real `maxTurns` cliffs and
+   name the cliff explicitly; applied to the vendored plugin copies too.
+   Part 3 (whether `maxTurns: 50`/`30` is enough at all) deliberately not
+   touched, needs measurement first:
    `backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`.
 10. Orchestrator notes and Critic dispatch scratch share one `scratch/`
    directory, so verdict-bearing material sits where a dispatched Critic is
-   guaranteed to look:
+   guaranteed to look — accepted, queued as its own small scoped dispatch,
+   not done this session:
    `backlog/items/2026-08-23-elephant-notes-and-critic-scratch-share-one-directory.md`.
 11. **Meta/process feedback from the PO, carried forward (not a repo defect):**
     sessions spend too long on silent orientation (read/grep archaeology)
     before starting visible work; a session should batch reads and narrate
     briefly rather than disappearing for minutes per turn.
+12. **New backlog item, PO-initiated (2026-08-24): whether Critic/Verify
+    review cadence should batch onto larger collection blocks instead of
+    running on every small diff**, since fine-grained review reliably
+    triggers a re-review round and small fixes end up costing hours —
+    analysis-only item, no disposition yet:
+    `backlog/items/2026-08-24-critic-and-verify-cadence-may-be-too-fine-grained.md`.
+13. **Backlog triage pass completed this session (2026-08-24)** over all 12
+    non-deferred open items not already covered above (`docs(backlog):
+    triage the open, non-deferred backlog items`, commit `581f5ac3`, plus
+    follow-ups). One item closed
+    (`2026-08-10-happy-path-turn-and-wall-clock-cost-is-not-externally-defensible.md`
+    — both remaining concrete pieces confirmed already fixed on re-check,
+    including catching and correcting one initially-wrong claim about a
+    SKILL.md pointer before it became a stale record). Two QG-06
+    residual-risk records confirmed still within their own review horizon
+    (not expired: `2026-08-23-antigravity-hard-enforcement-layer-has-two-fail-open-paths.md`,
+    `2026-08-23-antigravity-sandbox-containment-push-escape-route-unclosed.md`).
+    One item's premise (`2026-08-21-kickoff-staging-directory-mismatch.md`)
+    turned out on closer read to conflate two distinct onboarding
+    mechanisms (`specs/kickoff-*` vs. `project/.onboarding-staging/`) —
+    deferred pending that confirmation rather than fixed on the original
+    framing. `2026-08-16-verify-has-grown-to-269-suites-with-no-recorded-cost.md`
+    confirmed complementary to, not a duplicate of, item 8 above, with a
+    fresh-run synergy noted. Two items already fully triaged/scheduled
+    into the separate Nova A track needed no session action
+    (`2026-08-09-kickoff-promotion-cleanup-readback-has-no-in-session-recovery.md`,
+    `2026-08-08-long-dispatches-truncate-before-emitting-their-report.md`).
 
 ### Next session instructions
 
 1. Restart the Antigravity session (CLI `agy` or IDE reload) to empirically
    check whether D7's `.agents/plugins.json` fix actually makes the
    PreToolUse enforcement layer load.
-2. Rsync the marketplace copy (`AGY-FIX3-HARDENING` already landed and
-   independently verified), re-run Verify for a clean 385/385, then
-   dispatch the fourth (final round-budget slot) delta-scoped Critic review
-   before any push is considered.
-3. Get a PO decision on F3/F4/F5 (open item 2 above) — none are
-   self-dispositioned.
+2. Run a final, uninterrupted full Verify for a clean 385/385 confirmation
+   (marketplace rsync already confirmed clean), then dispatch the fourth
+   (final round-budget slot) delta-scoped Critic review before any push is
+   considered.
+3. Dispatch the F5 fix (add the missing `operating-model.md` §3.3 section)
+   — recommendation accepted by the PO, not yet executed.
+4. Dispatch stage 1 of the verify-parallelization rollout (pool at
+   concurrency=1, per the Advisor-reviewed design in open item 8) to a
+   `goldfish-deep` task.
 
 ### Durable-rule and history pointers
 
