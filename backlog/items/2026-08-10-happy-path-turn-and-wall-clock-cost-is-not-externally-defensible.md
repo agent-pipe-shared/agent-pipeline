@@ -5,6 +5,10 @@ type: workflow-improvement
 owner: pipeline
 status: closed
 created: 2026-08-10
+closed_at: 2026-08-24
+closure_repository: self
+closure_commit: b8e2da3b24c70656988e6dcb20b080a20b7d3baf
+closure_evidence: backlog/items/2026-08-10-happy-path-turn-and-wall-clock-cost-is-not-externally-defensible.md
 source: "PO, 2026-08-10, after reviewing two live greenfield happy-path tests: 'die pipeline nimmt durch ihre ineffizienz einfach zu viel zeit weg. Das ist so noch nicht extern vertretbar... Claude Code braucht jetzt 2h für das mini spiel mit push etc.'"
 ---
 
