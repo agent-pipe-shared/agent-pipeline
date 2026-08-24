@@ -125,3 +125,33 @@ byte-identical before and after. `check-consumer-safe-paths.test.mjs`
 **Part 3 (whether `maxTurns: 50`/`30` is enough at all for this
 repository) remains open** — deliberately not touched, per this item's own
 ordering ("measure before changing it"). Item stays `open`.
+
+## Part 3 measured, 2026-08-24 (interim result)
+
+A read-only research fork gathered empirical tool-use data from this
+session's own `evidence/dispatch-record-*.json` files under the NEW 40/24
+caps and the prior 30-35 regime:
+
+- `AGY-F5-OMSECTION` (small doc-edit, new regime): 15-17 tool uses — well
+  under 40.
+- `AGY-FIX-HARDENING` (substantial guardrail restoration + 8 new tests,
+  prior regime): 27 tool uses — comfortably under even the old 35 cap.
+- `AGY-VERIFYFIX-1` (one of this item's own named truncation incidents):
+  the actual USEFUL work finished at 21 logged tool uses; the truncation
+  was caused by the agent not treating the stated soft cap as binding and
+  continuing to wander past it into unlogged territory until the real
+  ~50 cliff stopped it — confirming the root cause parts 1+2 already fixed
+  (behavioral, not a too-small budget), not evidence that `maxTurns` itself
+  needs raising.
+
+**Interim recommendation: leave `maxTurns` at 50/30 as-is — no evidence
+supports raising it.** Every sample found needed real work well under the
+new 40/24 base caps. **Not fully closed yet:** `AGY-VERIFYTUNER-1` (the one
+genuinely complex task dispatched under the new caps this session — an
+async worker-pool rewrite with real design latitude) was still in flight
+when this measurement ran, so it is the one open data point that could
+still change this conclusion. Re-check its own final tool-use count once it
+completes; if it also finishes comfortably under 40, this closes part 3
+with full confidence. If it genuinely needed more room, that is the first
+real signal to reconsider `maxTurns` itself, and should be re-investigated
+then — not pre-empted here. Item stays `open` pending that one data point.
