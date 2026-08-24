@@ -572,5 +572,73 @@ check("Antigravity pretool guard allows running a node script file, not inline c
   rmSync(root, { recursive: true, force: true });
 });
 
+// 5. Broadened inline-execution containment (D6)
+
+check("Antigravity pretool guard blocks inline sh -c execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "sh -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline bash -c execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline node --eval execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "node --eval \"console.log(1)\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline node -p execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "node -p \"1+1\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline node -pe execution (containment, D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "node -pe \"1+1\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline env node -e execution (containment, already covered pre-D6)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "env node -e \"console.log(1)\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 console.log(`\nAll ${passed} antigravity-pretool-guard tests passed.`);
 

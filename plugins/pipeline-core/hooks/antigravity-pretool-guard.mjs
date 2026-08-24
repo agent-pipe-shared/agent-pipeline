@@ -389,7 +389,12 @@ export async function runAntigravityPreToolGuard(rawInput) {
   if (toolName === "Bash") {
     const trimCmd = command.trim();
     // Layer 1: OS-level / interpreter inline code execution containment.
-    if (/\b(?:node|python3?|ruby|perl|php)\s+-[ec]\b/.test(trimCmd)) {
+    // D6 fix: also cover sh -c / bash -c, and node's --eval/-p/-pe forms (longer
+    // alternatives first so -p does not shadow -pe before backtracking).
+    if (
+      /\b(?:node|python3?|ruby|perl|php)\s+(?:--eval\b|-(?:pe|p|e|c)\b)/.test(trimCmd)
+      || /\b(?:sh|bash)\s+-c\b/.test(trimCmd)
+    ) {
       deny("BLOCKED (Hardening Layer): Inline code execution (e.g. node -e, python -c) is blocked. Write code to a scratch file in the workspace first to respect filesystem containment guards.");
     }
   }
