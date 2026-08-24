@@ -21,6 +21,23 @@ whether anything else in that diff has real security surface. A scaffolding
 file riding along with ordinary feature code forces that heavier tier onto
 work that needed only the standard review.
 
+Neither `kickoff apply` nor `kickoff promote apply` (`applyOnboardingKickoff`/
+`applyOnboardingKickoffPromotion`, `lib/onboarding-continuity.mjs`) ever
+touches Git — by design, the same as the onboarding transaction referenced
+above never touches it either (`project-onboarding-v3.mjs`'s
+`applyProjectOnboardingV3`). When one of those calls reports status `applied`,
+its own written targets are exactly what must be staged and committed next; a
+`ready`-status onboarding that leaves them untracked is not actually done. For
+`kickoff apply` that is `docs/state.md` (or whatever path
+`.claude/pipeline.json`'s `handover` field names — `docs/state.md` by default)
+plus the provisional PRD/Spec pair it just wrote,
+`specs/<feature-id>/prd_<feature-id>.md` and `specs/<feature-id>/spec.md`
+(`<feature-id>` is `kickoff-<goal-hash>` at this stage). For `kickoff promote
+apply` it is the same `docs/state.md` (now updated) plus the promoted
+package's `specs/<promoted-directory>/prd_<short-topic>.md`,
+`specs/<promoted-directory>/spec.md`, and
+`specs/<promoted-directory>/design-input.md`.
+
 Bootstrap questions are answered before any artifact is written. The
 project's operator-facing language is decided by what the PO answers, never
 inferred from the greeting, the repository's contents, or the runner's
