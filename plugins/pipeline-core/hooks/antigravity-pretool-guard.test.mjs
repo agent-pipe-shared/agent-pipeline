@@ -789,5 +789,27 @@ check("Antigravity pretool guard allows a plain bash script invocation, not inli
   rmSync(root, { recursive: true, force: true });
 });
 
+check("Antigravity pretool guard blocks inline bash --login -c execution, a flag before -c (containment, delta-4 F4)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash --login -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard blocks inline bash -o pipefail -c execution, an option+argument before -c (containment, delta-4 F4)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: { name: "run_command", args: { CommandLine: "bash -o pipefail -c \"echo hi\"" } },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Inline code execution/);
+  rmSync(root, { recursive: true, force: true });
+});
+
 console.log(`\nAll ${passed} antigravity-pretool-guard tests passed.`);
 

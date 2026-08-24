@@ -400,9 +400,14 @@ export async function runAntigravityPreToolGuard(rawInput) {
     // two more shell names entirely (`zsh -c`, `dash -c`). Match any `-`-flag cluster of the
     // named shells that ends in `c` instead of requiring `-c` verbatim; a bare `bash
     // script.sh` (no `-`-flag at all) still does not match.
+    // delta-4 Critic F4 fix: F6's fix still required the `-*c` cluster immediately after the
+    // shell name, so a long-form/unrelated flag first (`bash --login -c`, `bash -o pipefail
+    // -c`) bypassed it. Allow any run of whitespace-separated tokens between the shell name
+    // and the `-*c` cluster, not just direct adjacency; a bare `bash script.sh` (no `-`-flag
+    // token anywhere) still does not match, since no token in that command matches `-[a-zA-Z]*c\b`.
     if (
       /\b(?:node|python3?|ruby|perl|php)\s+(?:--eval\b|-(?:pe|p|e|c)\b)/.test(trimCmd)
-      || /\b(?:sh|bash|zsh|dash)\s+-[a-zA-Z]*c\b/.test(trimCmd)
+      || /\b(?:sh|bash|zsh|dash)\b(?:\s+\S+)*?\s+-[a-zA-Z]*c\b/.test(trimCmd)
     ) {
       deny("BLOCKED (Hardening Layer): Inline code execution (e.g. node -e, python -c) is blocked. Write code to a scratch file in the workspace first to respect filesystem containment guards.");
     }
