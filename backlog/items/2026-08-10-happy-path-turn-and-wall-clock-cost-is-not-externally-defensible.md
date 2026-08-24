@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-10
 source: "PO, 2026-08-10, after reviewing two live greenfield happy-path tests: 'die pipeline nimmt durch ihre ineffizienz einfach zu viel zeit weg. Das ist so noch nicht extern vertretbar... Claude Code braucht jetzt 2h für das mini spiel mit push etc.'"
 ---
@@ -380,14 +380,28 @@ above.
 
 ## Triage addendum, 2026-08-24
 
-- **Decision:** accepted (confirming the 2026-08-18 assignment, applied
-  directly rather than re-dispatched).
+- **Decision:** closed-in-substance, both remaining pieces confirmed done.
 - **Rationale:** (a) already closed in substance — no further action. (b)-1
-  is fully specified, one doc-pointer line, no design latitude, stage-0
-  eligible per `roles/elephant.md` — applied directly in this session
-  (`plugins/pipeline-core/skills/pipeline-start/SKILL.md`) rather than
-  spending a dispatch round on a single line. (b)-2 remains explicitly
-  deferred — its own lower-priority item, only if a fourth rediscovery
-  instance recurs.
-- **Assignment:** (b)-1 done this session. (b)-2 unassigned, conditional.
+  turns out to be **already fixed too**: before applying it, checked the
+  current file rather than assuming the 2026-08-19 design was still
+  unimplemented (this repo's own re-verify-before-acting discipline) —
+  `plugins/pipeline-core/skills/pipeline-start/SKILL.md:287-289` already
+  names `templates/prompts/goldfish-task.md` directly, landed same-day as
+  the design in commit `23b92d6f` ("docs(pipeline-start): point Goldfish
+  dispatch to its briefing template", 2026-08-19). No edit needed or made
+  this session. (b)-2 remains explicitly deferred — its own lower-priority
+  item, only if a fourth rediscovery instance recurs.
+- **Assignment:** (a) and (b)-1 both closed in substance, no outstanding
+  action. (b)-2 unassigned, conditional.
 - **Date:** 2026-08-24
+
+## Closure, 2026-08-24
+
+Formally closed. Every concrete piece named in this item's Description and
+Proposal now has either a confirmed landed fix ((a) commit `8ae0de01`
+verified live via `git log -S`; (b)-1 commit `23b92d6f`, confirmed
+pre-existing on re-check rather than assumed) or an explicit, still-valid
+defer ((b)-2, deliberately not designed, conditional on a fourth
+rediscovery instance recurring — its own text already frames it as "a
+possible follow-up, not a requirement of this fix"). No outstanding
+required work remains against this item's own acceptance framing.
