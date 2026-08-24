@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "4b36621ca5cb64c2ada725bc01e1cde2eb59e05d880ebb4dd5f3cd3c4635510c"
+    "transitionHead": "ff1614be9dc3a2aaba77f3cba85986efd23f0102bba123c55c53b9ff44c5ee94"
   },
   "counts": {
-    "open": 48,
+    "open": 49,
     "in_progress": 3,
     "closed": 260
   },
@@ -804,6 +804,15 @@
       "closureRepository": "self",
       "closureCommit": "f57375ff77263a2df70bbb3201feb361912f07f6",
       "closureEvidence": "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs"
+    },
+    {
+      "id": "pipeline.critic-and-verify-cadence-may-be-too-fine-grained",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-24",
+      "source": "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24 (\"seltener Critics und Verifys fahren und diese eher nur an große Sammelblöcke setzen ... dadurch dauern selbst kleine Fixes und kleine Erweiterungen immer viele Stunden\")",
+      "deferred": false
     },
     {
       "id": "pipeline.critic-context-isolation",
