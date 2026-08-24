@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "af49d22274730f425c5ff004ee384188f7d9e13002fe556902df522d820593d1"
+    "transitionHead": "a2ae188a926a012f7e79aa7dad2e2fdb0a7a30752d2eeab7f95d13f312a47270"
   },
   "counts": {
-    "open": 49,
+    "open": 48,
     "in_progress": 3,
-    "closed": 261
+    "closed": 262
   },
   "items": [
     {
@@ -1101,12 +1101,16 @@
     },
     {
       "id": "pipeline.elephant-notes-and-critic-scratch-share-one-directory",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "Observed 2026-08-23 while dispatching the sprint-agy-runner delta Critic review; templates/prompts/critic-review.md scratchpad-isolation block",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-24",
+      "closureRepository": "self",
+      "closureCommit": "3a99503a113c9e2522e51b918a73ff2c340a74e9",
+      "closureEvidence": "backlog/items/2026-08-23-elephant-notes-and-critic-scratch-share-one-directory.md"
     },
     {
       "id": "pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch",

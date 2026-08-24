@@ -94,7 +94,7 @@
 | pipeline.documentation-information-architecture | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.elephant-direct-implementation-under-afk-authorization | closed | workflow-improvement | pipeline | 2026-07-23 | — |
-| pipeline.elephant-notes-and-critic-scratch-share-one-directory | open | defect | pipeline | 2026-08-23 | — |
+| pipeline.elephant-notes-and-critic-scratch-share-one-directory | closed | defect | pipeline | 2026-08-23 | — |
 | pipeline.elephant-writes-production-code-directly-without-a-goldfish-dispatch | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.enforce-kickoff-po-questions | open | workflow-improvement | pipeline | 2026-08-21 | — |
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
@@ -321,6 +321,6 @@
 
 ## Counts
 
-- open: 49
+- open: 48
 - in_progress: 3
-- closed: 261
+- closed: 262
