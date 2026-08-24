@@ -449,7 +449,7 @@ function resolveDeclaredPushProject(rawCmd, allowWrapper = true) {
       let candidate = resolveShellCwd();
       let pushIndex = gitIndex + 1;
       if (tokens[gitIndex + 1] === "-C" && tokens[gitIndex + 2]) {
-        candidate = isAbsolute(tokens[gitIndex + 2]) ? tokens[gitIndex + 2] : resolve(process.cwd(), tokens[gitIndex + 2]);
+        candidate = isAbsolute(tokens[gitIndex + 2]) ? tokens[gitIndex + 2] : resolve(resolveShellCwd(), tokens[gitIndex + 2]);
         pushIndex = gitIndex + 3;
       }
       if (tokens[pushIndex]?.toLowerCase() === "push") {
