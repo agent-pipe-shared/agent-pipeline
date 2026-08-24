@@ -411,6 +411,18 @@ check("Antigravity pretool guard blocks a critic dispatch prompt carrying prose 
   rmSync(root, { recursive: true, force: true });
 });
 
+// Fixture: a minimal but guard-dispatch-compliant Critic briefing (paths + the ruleset-sha
+// and model tokens dispatch-policy.mjs requires of every critic-type dispatch) that also names
+// the canonical CLAUDE.md-mandated template path -- used to prove the D2 collision at the
+// decision level (deny pre-fix, allow post-fix) rather than only at the reason-text level.
+const CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT = [
+  "templates/prompts/critic-review.md",
+  "specs/feat-1/prd.md",
+  "docs/adr/0014-critic-contract.md",
+  "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
+  "model: sonnet",
+].join("\n");
+
 check("Antigravity pretool guard does not treat a paths-only critic dispatch as prose (neighbour case)", () => {
   const root = fixture();
   const res = decision(run({
@@ -421,14 +433,62 @@ check("Antigravity pretool guard does not treat a paths-only critic dispatch as 
           {
             TypeName: "critic",
             Role: "Critic",
-            Prompt: "specs/feat-1/prd.md\ndocs/adr/0014-critic-contract.md",
+            Prompt: [
+              "specs/feat-1/prd.md",
+              "docs/adr/0014-critic-contract.md",
+              "ruleset-sha: b6e2db657d078f023773853e8571a941bb29c2a5",
+              "model: sonnet",
+            ].join("\n"),
           },
         ],
       },
     },
   }, root));
 
-  assert.doesNotMatch(res.reason ?? "", /Contamination Rule/);
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a Critic dispatch naming the canonical templates/prompts/critic-review.md path (D2)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT,
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard still blocks genuine prose 'please review the code' after the D2 regex tightening", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          {
+            TypeName: "critic",
+            Role: "Critic",
+            Prompt: "please review the code",
+          },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
   rmSync(root, { recursive: true, force: true });
 });
 

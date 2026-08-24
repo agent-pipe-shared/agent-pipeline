@@ -355,7 +355,12 @@ export async function runAntigravityPreToolGuard(rawInput) {
     // Disallow prose instructions (Paths Only Contamination Rule): a Critic
     // dispatch built from the template carries paths/refs, never conversational
     // steering -- roles/critic.md, templates/prompts/critic-review.md §2.
-    if (/\b(you are|please|examine|look at|review)\b/i.test(prompt)) {
+    // D2 fix: the trigger word must be preceded by whitespace or start-of-string, not
+    // merely a non-word boundary -- a generic \b boundary also matches after a hyphen, so
+    // the old regex denied any prompt naming templates/prompts/critic-review.md (the exact
+    // canonical Critic-dispatch template CLAUDE.md mandates) purely because "review" sits
+    // between "-" and ".".
+    if (/(?:^|\s)(you are|please|examine|look at|review)\b/i.test(prompt)) {
       deny("BLOCKED (Hardening Layer): Critic dispatch prompt contains prose. Only paths and refs are allowed (Contamination Rule).");
     }
   }
