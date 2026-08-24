@@ -51,4 +51,41 @@ Ensure `project-onboarding-v3.mjs` stages and commits all generated baseline gov
   (b) confirm `.onboarding-staging`'s intended lifecycle (transient vs.
   durable) before deciding whether it belongs in the same commit or in a
   project `.gitignore` entry instead. Not done in this pass.
+
+## Investigation, 2026-08-24 (read-only research fork)
+
+**Root cause is more specific than the item's own framing.** There is no
+staging/commit code in the onboarding library at all —
+`applyProjectOnboardingV3()` (`plugins/pipeline-core/lib/project-onboarding-v3.mjs`,
+own code comment, lines ~136-139) explicitly "never touches the Git index
+itself (no `git add`/`git commit` anywhere in it)" — confirmed by grep,
+zero `git add`/`git commit` calls anywhere in `project-onboarding-v3.mjs`
+or `onboarding-continuity.mjs`. The actual initial commit is performed by
+whichever agent runs onboarding, following that flow's own returned
+`nextAction` text. So the real gap is most likely in the `nextAction`/
+readback guidance an agent follows post-onboarding (candidate:
+`pipeline-start-preflight.mjs` or the onboarding flow's own returned
+instructions) not naming `docs/state.md` + PRD/spec explicitly as files to
+stage — not a defect in `applyProjectOnboardingV3()` itself, which
+deliberately stays git-free by design.
+
+**`.onboarding-staging` confirmed genuinely ambiguous, not resolved.** Not
+in the `.gitignore` seed (`PROJECT_IGNORE_SEED`, three entries only: `/scratch/`,
+`/evidence/`, `/project/pipeline-state.json`), but its generator
+(`buildOnboardingIntakeGeneratePlan`) frames its content as a pre-binding
+"deterministic staging draft" with no cleanup/promotion/deletion logic
+found anywhere in `onboarding-continuity.mjs` — its intended post-generation
+lifecycle isn't fully specified in code either way. This still needs an
+explicit owner call (track it as an audit trail, or add it to the gitignore
+seed) before a fix touches it.
+
+**Next step, not yet dispatched:** a follow-up dispatch should (a) locate
+and fix the actual `nextAction`/readback guidance gap (read
+`pipeline-start-preflight.mjs` and the onboarding flow's returned
+instructions directly — not yet done by this investigation), confirming
+`docs/state.md` + initial PRD/spec get explicitly named for staging, and
+(b) separately resolve the `.onboarding-staging` lifecycle question before
+deciding its own fate. Also confirm `docs/adr/0063-repository-directory-contract.md`'s
+directory-kinds table directly (this investigation relied on prior session
+context for that, not a fresh read) before finalizing.
 - **Date:** 2026-08-24
