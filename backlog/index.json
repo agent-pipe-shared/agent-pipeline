@@ -3705,7 +3705,7 @@
     {
       "id": "pipeline.verify-mjs-runs-385-suites-strictly-sequentially",
       "status": "open",
-      "type": "improvement",
+      "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-24",
       "source": "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24 (\"wir müssen verify mindestens um 70% beschleunigen ... von mir aus auch 50% aber schneller ohne Verluste\")",

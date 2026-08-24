@@ -1,7 +1,7 @@
 ---
 schema: pipeline.backlog-item.v1
 id: pipeline.verify-mjs-runs-385-suites-strictly-sequentially
-type: improvement
+type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-08-24
