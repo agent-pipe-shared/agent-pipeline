@@ -249,25 +249,26 @@ and commit state come exclusively from {{COMMIT_SHAS}} above, confirmed via
 your own `git diff`/`git show`.
 
 **Scratchpad isolation (evidence-contamination guard):** the scratch location
-is the project's own `scratch/` directory — inside the repository, gitignored,
-reused by every session, and never an external host-temp path; no guard
-exception is needed to write there because it is already inside the project
-root. Gitignored is not invisible: you read the actual working tree with your
-Read/Grep/Glob/Bash grant, so `scratch/` content — including another in-flight
-dispatch's subdirectory or residue left by a crashed session — is something
-you CAN see if you look; isolation means staying inside your own subdirectory
-and never reading a sibling's content as evidence, not that the rest of
-`scratch/` does not exist. Never `.git/` for this purpose. Before building any
-evidence (fixtures, repros, baselines), create your own fresh subdirectory
-`scratch/<codename>-<random-hex>/`, where `<random-hex>` is at least 8 hex
-characters from a CSPRNG (e.g. `openssl rand -hex 4`) — the random component
-is what makes two independently dispatched Critics collision-free without
-coordinating; use a bare `mkdir` (not `mkdir -p`) so the filesystem enforces
-atomicity — if it fails because the name already exists, draw a new random
-suffix and retry, never adopt a directory you did not create. Work ONLY inside
-your own subdirectory; if you find pre-existing scratch state from a prior or
-concurrent dispatch, name it as a disclosure item rather than silently
-building evidence on top of it.
+is the project's own `scratch/dispatch/` directory — inside the repository,
+gitignored, reused by every session, and never an external host-temp path; no
+guard exception is needed to write there because it is already inside the
+project root. Gitignored is not invisible: you read the actual working tree
+with your Read/Grep/Glob/Bash grant, so `scratch/dispatch/` content —
+including another in-flight dispatch's subdirectory or residue left by a
+crashed session — is something you CAN see if you look; isolation means
+staying inside your own subdirectory and never reading a sibling's content as
+evidence, not that the rest of `scratch/dispatch/` does not exist. Never
+`.git/` for this purpose. Before building any evidence (fixtures, repros,
+baselines), create your own fresh subdirectory
+`scratch/dispatch/<codename>-<random-hex>/`, where `<random-hex>` is at least
+8 hex characters from a CSPRNG (e.g. `openssl rand -hex 4`) — the random
+component is what makes two independently dispatched Critics collision-free
+without coordinating; use a bare `mkdir` (not `mkdir -p`) so the filesystem
+enforces atomicity — if it fails because the name already exists, draw a new
+random suffix and retry, never adopt a directory you did not create. Work
+ONLY inside your own subdirectory; if you find pre-existing scratch state
+from a prior or concurrent dispatch, name it as a disclosure item rather than
+silently building evidence on top of it.
 
 **Directory contract, beyond your own scratch subdirectory (ADR-0063):**
 `docs/adr/0063-repository-directory-contract.md`'s directory-kinds table
