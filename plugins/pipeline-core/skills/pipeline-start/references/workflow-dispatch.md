@@ -105,6 +105,29 @@ what's done vs. remaining, and end the turn with that as the report. A
 clean checkpoint at 80% beats a silent cutoff at 100% with zero report —
 state this priority explicitly in the briefing, not just the number.
 
+## The dispatch-record artifact is not automatic — verify the prompt actually carries it
+
+An `agent()` call is an ordinary subagent invocation: nothing about the
+Workflow tool writes `evidence/dispatch-record-<TASK_ID>.json` for you, and
+nothing about `dispatch-authorship-verify.mjs` treats a Workflow-originated
+`Dispatch:` trailer any differently from one produced by the Agent tool — a
+missing record fails the exact same check either way. The instruction to
+create that file lives inside `templates/prompts/goldfish-task.md`'s field 6
+(the template this file's own opening paragraph says every `agent()` prompt
+string must carry verbatim, not reproduced from memory); if the constructed
+prompt string is abbreviated or hand-built instead, the instruction — and
+therefore the artifact — silently disappears. Confirmed recurring, not
+hypothetical: five `AGY-FIX2-*` commits produced via `agent()` this way
+carried a `Dispatch:` trailer with no matching record
+(`backlog/items/2026-08-24-workflow-tool-dispatches-produce-no-dispatch-record-artifact.md`),
+the same freehand-prompt failure class CLAUDE.md already names for
+NVA-WFDISP-1. "Paste the template verbatim" already failed once on this
+exact path — before calling `agent()` for any dispatch expected to commit
+with a `Dispatch:` trailer, grep the CONSTRUCTED prompt string itself for
+the literal substring `dispatch-record` (not the template file — the actual
+string you are about to pass to `agent()`) and confirm it is present; if it
+is not, the prompt is incomplete and will produce an unverifiable commit.
+
 ## `agentType` needs the `pipeline-core:` prefix
 
 A Workflow `agent()` call's `opts.agentType` resolves from the same registry
