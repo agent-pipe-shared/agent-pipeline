@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6f6a7401a1011800f27e03165a47051e2520f4c37f634d22958f27939f0142c7"
+    "transitionHead": "4b36621ca5cb64c2ada725bc01e1cde2eb59e05d880ebb4dd5f3cd3c4635510c"
   },
   "counts": {
-    "open": 46,
+    "open": 48,
     "in_progress": 3,
     "closed": 260
   },
@@ -3691,6 +3691,24 @@
       "owner": "pipeline",
       "created": "2026-08-16",
       "source": "PO, 2026-08-16: 'Was man hier an dem repo gut sehen kann ist, dass verify inzwischen unglaublich krass angeschwollen ist und sehr lange dauert.' Counts and the absent-duration finding were measured in the same session.",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.verify-marketplace-attestation-blocks-normal-active-development",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-24",
+      "source": "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24",
+      "deferred": false
+    },
+    {
+      "id": "pipeline.verify-mjs-runs-385-suites-strictly-sequentially",
+      "status": "open",
+      "type": "improvement",
+      "owner": "pipeline",
+      "created": "2026-08-24",
+      "source": "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24 (\"wir müssen verify mindestens um 70% beschleunigen ... von mir aus auch 50% aber schneller ohne Verluste\")",
       "deferred": false
     },
     {
