@@ -4,7 +4,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { closeSync, fstatSync, fsyncSync, ftruncateSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, realpathSync, renameSync, writeFileSync, writeSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn as spawnChildProcess, spawnSync } from "node:child_process";
 import {
   VERIFY_PROGRESS_SCHEMA,
   digestJson,
@@ -426,11 +426,129 @@ function tierBSpawnFlags(registration, repoRoot) {
   return ["--permission", ...registration.inputs.files.map((file) => `--allow-fs-read=${resolve(repoRoot, file.path)}`)];
 }
 
-function executeSuite({ suite, registration, run, candidate, policySha256, index, total, clock, spawn }) {
+// AGY-VERIFYTUNER-1: the async worker-pool's real child-process transport. Wraps
+// `child_process.spawn` in a Promise, deliberately mirroring `spawnSync`'s return shape
+// (`{ status, stdout, stderr, error }`) so `executeSuite` below needs no branching between a
+// synchronous test mock and a real spawn -- `await spawn(...)` resolves either identically.
+// `maxBuffer` is enforced by hand (spawn has no native equivalent to spawnSync's maxBuffer):
+// once accumulated stdout+stderr crosses it, the child is killed and an ENOBUFS-shaped error is
+// attached, matching spawnSync's own overflow signal that `executeSuite`'s truncation check
+// already reads (`result.error?.code === "ENOBUFS"`).
+function spawnAsync(command, argv, options = {}) {
+  return new Promise((resolvePromise) => {
+    const maxBuffer = typeof options.maxBuffer === "number" ? options.maxBuffer : Infinity;
+    let child;
+    try {
+      child = spawnChildProcess(command, argv, { cwd: options.cwd, stdio: ["ignore", "pipe", "pipe"] });
+    } catch (error) {
+      resolvePromise({ status: null, stdout: Buffer.alloc(0), stderr: Buffer.alloc(0), error });
+      return;
+    }
+    const stdoutChunks = [];
+    const stderrChunks = [];
+    let total = 0;
+    let overflowed = false;
+    let spawnError;
+    let settled = false;
+    const settle = (value) => { if (!settled) { settled = true; resolvePromise(value); } };
+    const collect = (chunks) => (chunk) => {
+      // Data handlers stay attached (never removed) after overflow so the child's pipes keep
+      // draining -- detaching them here would let the killed child hang on backpressure.
+      if (overflowed) return;
+      total += chunk.length;
+      if (total > maxBuffer) {
+        overflowed = true;
+        spawnError = Object.assign(new Error("stdout/stderr maxBuffer exceeded"), { code: "ENOBUFS" });
+        try { child.kill(); } catch { /* best-effort */ }
+        return;
+      }
+      chunks.push(chunk);
+    };
+    child.stdout.on("data", collect(stdoutChunks));
+    child.stderr.on("data", collect(stderrChunks));
+    child.once("error", (error) => {
+      spawnError = spawnError ?? error;
+      settle({ status: null, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), error: spawnError });
+    });
+    child.once("close", (code) => {
+      settle({ status: code, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), error: spawnError });
+    });
+  });
+}
+
+// A minimal counting semaphore bounding how many suites may have a child process in flight at
+// once. `acquire()` resolves immediately while under the limit; otherwise it queues and is woken
+// FIFO by the next `release()`. This is the sole mechanism enforcing `concurrency` -- dependsOn
+// gating (below, in runSuitePool) is a separate, independent constraint on top of it.
+function createSemaphore(limit) {
+  let active = 0;
+  const queue = [];
+  return {
+    acquire() {
+      if (active < limit) { active += 1; return Promise.resolve(); }
+      return new Promise((resolve) => queue.push(resolve)).then(() => { active += 1; });
+    },
+    release() {
+      active -= 1;
+      const next = queue.shift();
+      if (next) next();
+    },
+  };
+}
+
+// AGY-VERIFYTUNER-1: the bounded async worker pool. Every suite's own `runOne` first awaits its
+// dependsOn suites' completion (execute or reuse, success or failure -- "completed" only, never
+// "passed"), matching the briefing's scheduling gate; only a suite taking the execute path then
+// acquires a pool slot (reuse has no child process, so it runs inline/eagerly once its
+// dependencies clear, spending no concurrency slot). `steps[]` is written positionally at each
+// suite's own registration-order `offset`, so its final order is always registration order
+// regardless of real start/completion order -- the property the briefing calls out explicitly as
+// what keeps `evidence/verify-latest.json` diff-stable between runs of the same candidate.
+//
+// No separate cycle guard is added here: `createVerifyRun` (called earlier in runVerifyJournal,
+// before this function ever runs) already calls `planVerifyResume`, whose own `assertAcyclic`
+// rejects a cyclic or self-referential dependsOn -- and `planVerifyResume` also rejects a
+// dependsOn naming an id absent from the suite list -- so `completion.get(name)?.promise ??
+// Promise.resolve()` below can never actually fall through to its fallback for a suite that
+// reached this function; it stays only as defensive belt-and-braces, never load-bearing.
+async function runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot }) {
+  const total = suites.length;
+  const steps = new Array(total);
+  const receiptBySuite = {};
+  const semaphore = createSemaphore(concurrency);
+  const completion = new Map(suites.map((suite) => {
+    let resolveFn;
+    const promise = new Promise((resolve) => { resolveFn = resolve; });
+    return [suite.name, { promise, resolveFn }];
+  }));
+  async function runOne(suite, offset) {
+    const registration = registrations[offset];
+    await Promise.all((registration.dependsOn ?? []).map((name) => completion.get(name)?.promise ?? Promise.resolve()));
+    let receipt;
+    const reused = plan.reusable.includes(suite.name);
+    if (reused) {
+      receipt = reuseSuite({ suite, registration, sourceReceipt: prior.receipts[suite.name], sourceLog: prior.logs[suite.name], run, candidate, policySha256, index: offset + 1, total, clock });
+    } else {
+      await semaphore.acquire();
+      try {
+        receipt = await executeSuite({ suite: { ...suite, cwd: repoRoot }, registration, run, candidate, policySha256, index: offset + 1, total, clock, spawn });
+      } finally {
+        semaphore.release();
+      }
+    }
+    receiptBySuite[suite.name] = receipt;
+    steps[offset] = { name: suite.name, exitCode: receipt.exitCode, receiptSha256: receipt.receiptSha256, reused, durationMs: Date.parse(receipt.completedAt) - Date.parse(receipt.startedAt) };
+    completion.get(suite.name).resolveFn();
+  }
+  await Promise.all(suites.map((suite, offset) => runOne(suite, offset)));
+  return { steps, receiptBySuite };
+}
+
+async function executeSuite({ suite, registration, run, candidate, policySha256, index, total, clock, spawn }) {
   const startedAt = now(clock);
   appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "started", startedAt, completedAt: null, receiptSha256: null, diagnosticDigest: null }, console.log);
   const permissionFlags = isTierBRegistration(registration) ? tierBSpawnFlags(registration, suite.cwd) : [];
-  const result = spawn(process.execPath, [...permissionFlags, suite.file, ...(suite.args ?? [])], { encoding: "buffer", cwd: suite.cwd, maxBuffer: MAX_LOG_BYTES });
+  const result = await spawn(process.execPath, [...permissionFlags, suite.file, ...(suite.args ?? [])], { encoding: "buffer", cwd: suite.cwd, maxBuffer: MAX_LOG_BYTES });
   const stdout = Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout ?? "");
   const stderr = Buffer.isBuffer(result.stderr) ? result.stderr : Buffer.from(result.stderr ?? "");
   const diagnostic = result.error ? Buffer.from(`\n[verify-runner-error] ${result.error.code ?? "ERROR"}\n`) : Buffer.alloc(0);
@@ -478,7 +596,17 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
   return receipt;
 }
 
-export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnSync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false }) {
+// AGY-VERIFYTUNER-1: `concurrency` bounds how many suites may have a child process in flight at
+// once (see runSuitePool/createSemaphore above); its DEFAULT is 1, so a caller passing nothing --
+// exactly harness/scripts/verify.mjs's real, unmodified call shape today -- gets behavior
+// equivalent to the prior strictly-sequential loop. Raising the default itself, and reading a cap
+// from an env var or project/pipeline.json calibration, is explicitly reserved for a later,
+// separate commit (this dispatch's own Forbidden clause (b)) -- this parameter is the mechanism
+// only. `spawn` defaults to the new async `spawnAsync` (not the old `spawnSync`): production's
+// call site never passes its own `spawn`, so the default IS the production path, and it must be
+// genuinely async for concurrency > 1 to ever put more than one child process in flight.
+export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnAsync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, concurrency = 1 }) {
+  if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new TypeError("VERIFY-JOURNAL-CONCURRENCY");
   const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree, tierBDeclarations });
   // ADR-0065 coupling (3): this digest no longer covers `suites: registrations`, so one suite's
   // registration changing no longer invalidates every OTHER suite's receipt via
@@ -499,22 +627,15 @@ export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, po
     const prior = loadVerifyResumeArtifacts({ runsRoot: run.runsRoot, currentRunId: runId, suites: registrations });
     const plan = planVerifyResume({ runId, candidate, suites: registrations, receipts: prior.receipts, logs: prior.logs, policySha256, allowCrossCandidateReuse });
     atomicJson(join(run.runDir, "resume-plan.json"), plan);
-    const receiptBySuite = {};
-    const steps = [];
-    for (const [offset, suite] of suites.entries()) {
-      const registration = registrations[offset];
-      let receipt;
-      if (plan.reusable.includes(suite.name)) receipt = reuseSuite({ suite, registration, sourceReceipt: prior.receipts[suite.name], sourceLog: prior.logs[suite.name], run, candidate, policySha256, index: offset + 1, total: suites.length, clock });
-      else receipt = executeSuite({ suite: { ...suite, cwd: repoRoot }, registration, run, candidate, policySha256, index: offset + 1, total: suites.length, clock, spawn });
-      receiptBySuite[suite.name] = receipt;
-      // durationMs is derived from this receipt's OWN startedAt/completedAt, never borrowed from a
-      // prior run's receipt. For a freshly executed suite that is its real wall-clock cost. For a
-      // reused suite it is deliberately the (near-zero) cost of the reuse operation itself -- reading
-      // and re-sealing the prior log -- because this artifact records what THIS run actually spent,
-      // and a stale duration copied from a different run/environment would misrepresent both this
-      // run's own timing and how much the reuse mechanism is saving.
-      steps.push({ name: suite.name, exitCode: receipt.exitCode, receiptSha256: receipt.receiptSha256, reused: plan.reusable.includes(suite.name), durationMs: Date.parse(receipt.completedAt) - Date.parse(receipt.startedAt) });
-    }
+    // durationMs (inside runSuitePool) is derived from each receipt's OWN startedAt/completedAt,
+    // never borrowed from a prior run's receipt. For a freshly executed suite that is its real
+    // wall-clock cost. For a reused suite it is deliberately the (near-zero) cost of the reuse
+    // operation itself -- reading and re-sealing the prior log -- because this artifact records
+    // what THIS run actually spent, and a stale duration copied from a different run/environment
+    // would misrepresent both this run's own timing and how much the reuse mechanism is saving.
+    // `steps` is materialized in registration order regardless of real completion order (see
+    // runSuitePool's own comment) -- never completion order.
+    const { steps, receiptBySuite } = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot });
     const completedAt = now(clock);
     const terminal = { schema: RUN_TERMINAL_SCHEMA, runId, candidate, policySha256, planSha256: plan.planSha256, receipts: Object.values(receiptBySuite).map((receipt) => receipt.receiptSha256).sort(), status: steps.every((step) => step.exitCode === 0) ? "passed" : "failed", durability: run.manifest.durability, completedAt, journalSha256: sha(readFileSync(run.journalPath)), terminalSha256: null };
     const { terminalSha256: omittedTerminalSha256, ...terminalBody } = terminal;
