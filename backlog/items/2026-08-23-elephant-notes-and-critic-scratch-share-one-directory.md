@@ -5,6 +5,10 @@ type: defect
 owner: pipeline
 status: closed
 created: 2026-08-23
+closed_at: 2026-08-24
+closure_repository: self
+closure_commit: 3a99503a113c9e2522e51b918a73ff2c340a74e9
+closure_evidence: backlog/items/2026-08-23-elephant-notes-and-critic-scratch-share-one-directory.md
 source: "Observed 2026-08-23 while dispatching the sprint-agy-runner delta Critic review; templates/prompts/critic-review.md scratchpad-isolation block"
 due: 2026-08-30
 ---
