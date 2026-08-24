@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a03f15b44d495b83d5a19d7e48d4a6204ab542610a61ac9245894cf3c7248602"
+    "transitionHead": "af49d22274730f425c5ff004ee384188f7d9e13002fe556902df522d820593d1"
   },
   "counts": {
-    "open": 50,
+    "open": 49,
     "in_progress": 3,
-    "closed": 260
+    "closed": 261
   },
   "items": [
     {
@@ -198,7 +198,7 @@
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "Critic review finding F8, specs/sprint-agy-runner/evidence/2026-08-23-critic-review-agy-runner.md",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root",
@@ -207,7 +207,7 @@
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "Delta Critic review D7 (specs/sprint-agy-runner/evidence/2026-08-23-delta-critic-review-agy-runner.md), escalated by post-review verification against the object database and working tree",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.antigravity-sandbox-containment-push-escape-route-unclosed",
@@ -216,7 +216,7 @@
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "AGY-FIX-PUSHGUARD dispatch (evidence/dispatch-record-AGY-FIX-PUSHGUARD.json) and v3-bootstrap-authority.mjs's own removal-comment for the `.git/hooks/pre-push` workaround it used to install; spec gap closed by AGY-FIX-SPECGAP (specs/sprint-agy-runner/spec.md sec.8.2)",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.approval-authority-setup-echoes-generic-values-not-supplied-ones",
@@ -1128,7 +1128,7 @@
       "owner": "pipeline",
       "created": "2026-08-21",
       "source": "Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it",
@@ -1689,12 +1689,16 @@
     },
     {
       "id": "pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-10",
       "source": "PO, 2026-08-10, after reviewing two live greenfield happy-path tests: 'die pipeline nimmt durch ihre ineffizienz einfach zu viel zeit weg. Das ist so noch nicht extern vertretbar... Claude Code braucht jetzt 2h für das mini spiel mit push etc.'",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-24",
+      "closureRepository": "self",
+      "closureCommit": "b8e2da3b24c70656988e6dcb20b080a20b7d3baf",
+      "closureEvidence": "backlog/items/2026-08-10-happy-path-turn-and-wall-clock-cost-is-not-externally-defensible.md"
     },
     {
       "id": "pipeline.hardening-round-cannot-register-its-own-suites",
@@ -1886,7 +1890,7 @@
       "owner": "pipeline",
       "created": "2026-08-21",
       "source": "Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)",
-      "deferred": false
+      "deferred": true
     },
     {
       "id": "pipeline.kickoff-untracked-files-missing-from-commits",

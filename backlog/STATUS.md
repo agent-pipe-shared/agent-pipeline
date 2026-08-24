@@ -141,7 +141,7 @@
 | pipeline.handover-file-has-no-rotation-obligation | closed | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.happy-path-local-telemetry | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | open | workflow-improvement | pipeline | 2026-08-10 | — |
+| pipeline.happy-path-turn-and-wall-clock-cost-is-not-externally-defensible | closed | workflow-improvement | pipeline | 2026-08-10 | — |
 | pipeline.hardening-round-cannot-register-its-own-suites | open | defect | pipeline | 2026-08-08 | — |
 | pipeline.harness-classifier-blocks-authorized-onboarding-action | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.hgo-signature-ceremony-requires-more-human-steps-than-the-key-actually-needs | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -321,6 +321,6 @@
 
 ## Counts
 
-- open: 50
+- open: 49
 - in_progress: 3
-- closed: 260
+- closed: 261
