@@ -70,3 +70,20 @@ dispatched Critic can read them.
   notes.
 - `templates/prompts/critic-review.md` names the separated location.
 - The change is reflected in the vendored plugin copy of the template.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** accepted
+- **Rationale:** Candidate fix 1 (`scratch/dispatch/` as the Critic's target,
+  keeping orchestrator notes in flat `scratch/`) is narrow and does not
+  touch the contamination-boundary logic itself, only where the isolation
+  rule points — but it does edit the mandatory Critic dispatch template
+  (`templates/prompts/critic-review.md` + its vendored plugin copy), which
+  CLAUDE.md treats as sensitive ("dispatch from the template, never
+  freehand"). Real exposure, no evidenced harm yet (2026-08-23 delta review
+  found no contamination), not urgent enough to interrupt the current
+  verify-tuner priority.
+- **Assignment (if accepted):** this sprint, as its own small scoped
+  dispatch (2 files, no design latitude beyond picking the new path name) —
+  not done inline in this session.
+- **Date:** 2026-08-24

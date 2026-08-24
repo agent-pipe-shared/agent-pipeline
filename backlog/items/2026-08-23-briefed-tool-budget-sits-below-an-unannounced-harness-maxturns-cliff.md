@@ -90,7 +90,14 @@ dispatch runs to 50 and truncates, and the closing allowance never fires.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** accepted
+- **Rationale:** Small, fully-specified, no design latitude (proposal parts
+  1 and 2 name the exact files and target numbers already). Directly
+  relevant to the PO's 2026-08-24 observation that small fixes end up
+  costing many hours — a truncated dispatch needing a procedural resume
+  roughly doubles a round trip's cost, which is exactly what this item
+  measures and fixes. Part 3 (whether 50 is enough at all) needs
+  measurement first and is not blocking parts 1+2.
+- **Assignment (if accepted):** this sprint — dispatched to a
+  goldfish-mechanic task immediately following this triage pass.
+- **Date:** 2026-08-24

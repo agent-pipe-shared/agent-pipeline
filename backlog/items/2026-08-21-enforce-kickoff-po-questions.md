@@ -28,7 +28,14 @@ Move the collection of these critical PO parameters from the prompt layer to the
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** 
-- **Rationale:** 
-- **Assignment (if accepted):** 
-- **Date:**
+- **Decision:** deferred
+- **Rationale:** The proposal is a new technical-enforcement primitive (an
+  `ask_po_input`-style interaction gate, or a script-level interactive halt)
+  distinguishing "the agent asked the human" from "the agent typed a value"
+  — genuine guardrail/architecture impact and design latitude, not a small
+  fix. Per `docs/operating-model.md` §7 triage rule 4, scope like this is a
+  PO decision, not the Elephant's alone. No PO input on this specific item
+  has been given yet.
+- **Assignment (if accepted):** pending PO scoping decision on the
+  enforcement mechanism shape before any implementation is planned.
+- **Date:** 2026-08-24

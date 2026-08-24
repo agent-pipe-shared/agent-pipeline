@@ -162,3 +162,26 @@ measurement is one successful stable full Verify run at the intended candidate
 baseline with every suite fresh (`reused: false`) and its per-suite duration,
 declared-input digest, and exit code retained. Parts 2-4 remain open; Nova B is
 not inspected or implemented.
+
+### Triage addendum, 2026-08-24 — relation to the parallelization item, not a duplicate
+
+Confirmed **not** a stale duplicate of the newer
+`backlog/items/2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md`
+item, despite both tracing back to "Verify is too slow": this item's lever
+is **selective execution** (run fewer suites during active work, full Verify
+only at candidate-freeze/push boundaries — already PO-scoped, ADR-0065);
+the newer item's lever is **parallelizing the same full suite set**. They
+are complementary, not overlapping, and any pooling design for the newer
+item must keep this item's ADR-0065 Tier A/Tier B declared-input mechanism
+working correctly. Synergy worth flagging to whoever picks up either: the
+"one successful stable full Verify run with every suite fresh" this item
+still needs as its next concrete step is the same artifact the
+parallelization work's own staged rollout (concurrency=1
+baseline-equivalence check, landed before raising concurrency) will need to
+produce anyway — one full fresh run can serve both, rather than running it
+twice.
+
+- **Decision:** no change to the existing accepted/open split above (part 1
+  done, parts 2-4 PO-gated). This addendum only records the relationship to
+  the newer parallelization item and the fresh-run synergy.
+- **Date:** 2026-08-24

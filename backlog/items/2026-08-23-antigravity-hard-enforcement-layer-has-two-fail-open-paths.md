@@ -85,7 +85,14 @@ purely from the operator noticing nothing was ever blocked.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** deferred
+- **Rationale:** Point 1 (the swallowed-error fix) is confirmed landed
+  (commit `3ae43380`). Point 2 is, by this item's own design, a QG-06
+  residual-risk record with a self-scheduled review horizon, not a defect
+  awaiting a session fix — it is deliberately re-triaged at its own `due:`
+  date (2026-08-30) rather than closed or reassigned now. That date has not
+  been reached yet (today: 2026-08-24), so no PO decision is due this
+  session; re-triage this item when it expires, per its own Proposal text.
+- **Assignment (if accepted):** n/a — QG-06 record, self-scheduled re-review
+  at expiry.
+- **Date:** 2026-08-24

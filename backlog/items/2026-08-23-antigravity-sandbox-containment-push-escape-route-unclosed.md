@@ -95,7 +95,15 @@ granted, so an inert sandbox is detectable rather than silently assumed.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** deferred
+- **Rationale:** This is, by design, a QG-06 residual-risk record with its
+  own self-scheduled review horizon (`due: 2026-08-30`), not a defect
+  awaiting a session-level fix — the gap is structural (no PreToolUse guard
+  can see a sub-process-mediated push by construction) and its stated real
+  fix (verified OS-level sandbox containment, or a process-tree-aware
+  interceptor outside the hook model) is explicitly out of this item's own
+  scope. Expiry has not been reached yet (today: 2026-08-24); re-triage at
+  expiry per the item's own Proposal text.
+- **Assignment (if accepted):** n/a — QG-06 record, self-scheduled
+  re-review at expiry.
+- **Date:** 2026-08-24

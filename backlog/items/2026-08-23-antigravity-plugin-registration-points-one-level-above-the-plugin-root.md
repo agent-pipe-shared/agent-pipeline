@@ -102,3 +102,20 @@ PO's:
 - The installer and the tracked file agree on what the field denotes.
 - Whether this explains the observed push escape and F10 is stated explicitly,
   either way.
+
+## Triage (filled in by the Elephant of the next Pipeline session)
+
+- **Decision:** deferred
+- **Rationale:** Route 1 (relative plugin root, `plugins` →
+  `plugins/pipeline-core`) was applied 2026-08-24 (commit `c15ccdff`,
+  `AGY-FIX2-REGISTER`, delta-review finding D7). This item's own Acceptance
+  criteria require the fix to be confirmed against a running Antigravity
+  runner with a guard observed actually firing — no Claude Code session can
+  do that. `docs/state.md` already carries the same disclosure ("plausible
+  root cause… but unverified: no running Antigravity session confirmed it
+  empirically this session"). Stays open/deferred until a session with a
+  live Antigravity runner can close the Acceptance criteria; not a decision
+  for this session to make further.
+- **Assignment (if accepted):** n/a — blocked on live-runner access, not on
+  a scoping decision.
+- **Date:** 2026-08-24

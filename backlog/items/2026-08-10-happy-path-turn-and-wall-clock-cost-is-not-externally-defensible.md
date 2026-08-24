@@ -377,3 +377,17 @@ doc edit) to a `goldfish-mechanic`/`goldfish-implementor` tier; do not
 redesign or re-dispatch (a) — it is closed in substance already, only
 this item's own status needs to catch up once someone confirms the
 above.
+
+## Triage addendum, 2026-08-24
+
+- **Decision:** accepted (confirming the 2026-08-18 assignment, applied
+  directly rather than re-dispatched).
+- **Rationale:** (a) already closed in substance — no further action. (b)-1
+  is fully specified, one doc-pointer line, no design latitude, stage-0
+  eligible per `roles/elephant.md` — applied directly in this session
+  (`plugins/pipeline-core/skills/pipeline-start/SKILL.md`) rather than
+  spending a dispatch round on a single line. (b)-2 remains explicitly
+  deferred — its own lower-priority item, only if a fourth rediscovery
+  instance recurs.
+- **Assignment:** (b)-1 done this session. (b)-2 unassigned, conditional.
+- **Date:** 2026-08-24

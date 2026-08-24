@@ -28,7 +28,27 @@ Reconcile the documentation and the code. Either update `kickoff-design.md` to r
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:** 
-- **Rationale:** 
-- **Assignment (if accepted):** 
-- **Date:**
+- **Decision:** deferred — the item's own premise needs re-verification
+  before the proposed fix is applied.
+- **Rationale:** Re-read `onboarding-continuity.mjs` directly rather than
+  trusting the item's framing (this repo's own "re-verify inherited 'still
+  open' claims" discipline). `INTAKE_STAGING_DIRNAME` /
+  `project/.onboarding-staging/` is used by a distinct mechanism —
+  `buildOnboardingIntakeGeneratePlan()` / the `NVA-BL-INTAKEBIND-1`
+  "deterministic staging draft" checkpoint-generate flow — not the same
+  code path as the classic `kickoff plan`/`kickoff promote` flow
+  `kickoff-design.md` documents. That classic flow's own promotion-authority
+  check (`promotionArtifacts()`, line ~4143) explicitly still refuses to
+  reuse any path starting with `specs/kickoff-`, confirming `specs/kickoff-*`
+  is still a live, checked location in the current code, not stale
+  documentation. So this is not necessarily a simple doc-vs-code mismatch
+  with one obvious fix — it may be two genuinely different provisional-file
+  mechanisms that the original Antigravity observation conflated, in which
+  case the real question is which mechanism Antigravity's `kickoff plan`
+  invocation actually triggered. Applying the item's suggested fix (repoint
+  `kickoff-design.md` at `project/.onboarding-staging/`) without confirming
+  that first risks documenting the wrong mechanism as canonical.
+- **Assignment (if accepted):** needs a short follow-up read (which caller
+  Antigravity's `kickoff plan` actually invoked in the triggering session)
+  before either doc or code is changed; not done in this pass.
+- **Date:** 2026-08-24
