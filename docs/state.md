@@ -5,6 +5,18 @@
 
 ## Current handover — Antigravity CLI 3rd Runner Integration & Hardening (2026-08-24)
 
+**IN FLIGHT (autonomous overnight session, explicit PO instruction):** the
+4th and FINAL delta Critic review (round-budget cap) is dispatched,
+`claude-opus-5 at max`, covering all 37 commits since the delta-3 review's
+head (`fdd98727..7e77cb9b`) — items 13-16 below plus the earlier F1/F2/F6/F7
+fixes. PO instruction (verbatim intent): all reachable backlog items closed
+first (done, see items 13-16), then this Critic round, at most ONE further
+correction-and-recheck cycle if it FAILs, then a local version bump — no
+push, no signature ceremony without the PO. If this session ends before
+that Critic result is processed: check `evidence/dispatch-record-*` for
+recent entries and re-check `git log` for anything past `7e77cb9b` before
+assuming nothing happened.
+
 ### Current completed & open work
 
 The feature **`sprint-agy-runner`** (Issues #69, #92, #15; ADR-0067) is
