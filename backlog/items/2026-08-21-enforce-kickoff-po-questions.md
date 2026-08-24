@@ -57,19 +57,47 @@ agent proposes a value, the PO reviews and clears it through the standard
 one-command/approval-word/PIN flow, and `kickoff plan` only accepts a value
 carrying a valid, digest-bound approval for it.
 
-**Known, explicitly accepted limitation:** the entire ceremony happens over
-the same chat channel as everything else, so the dispatching agent DOES see
-the PIN/passphrase in plaintext once the PO types it — there is no
-out-of-band channel here. This does not defeat the mechanism's actual
-threat model (ADR-0061 Decision 0: "the adversary is the agent, not the
-human" — the gate exists to stop an agent from auto-approving on the
-human's behalf, not to keep a secret from a fully-trusted assistant): the
-agent cannot fabricate a valid PIN in advance to skip the step, since the
-check runs in a script against a stored value, not against the agent's own
-self-report, and the agent only sees the PIN after the PO has already
-typed it — too late to have forged the approval. PO's own framing: start
-with this shape and validate empirically in a real test run rather than
-resolving the concern analytically first.
+**Correction, 2026-08-24 (same session, before implementation started):**
+the Elephant's first pass at this design assumed the whole ceremony runs
+over the chat channel (so the agent would see the PIN in plaintext once
+typed) and told the PO so; the PO accepted that framing and asked to start
+anyway and validate empirically. Before dispatching implementation, the
+Elephant read `plugins/pipeline-core/scripts/po-human-approval.mjs`
+directly rather than relying on that assumption — `requireExplicitConfirmation()`
+/ `defaultReadConfirmation()` read the confirmation word (a static token,
+`"approve"`) and, downstream, the PIN itself, via `readSync(0, ...)` against
+file descriptor 0 of the PROCESS RUNNING THE SCRIPT — meaning this command
+is designed to be run by the human directly in their own terminal (the
+agent hands them a command to copy-paste, exactly the
+`attended-host-terminal`/`human-copy-only` execution-boundary pattern
+already used elsewhere in this repo, e.g. `guard-human-override.mjs`'s
+signature ceremony), not invoked by the agent's own tool call. **The agent
+therefore does NOT see the PIN or the confirmation word at all** under the
+`signature`-mode ceremony — a materially stronger property than first
+described. This repo's own `gates.push_approval` is currently `signature`
+(not `chat`), so if the new kickoff-parameter gate kind reuses that same
+per-project calibration (per ADR-0061 Decision 2's own invariance
+principle), it inherits the full external-key strength, not the lighter
+`chat`-mode attribution-only variant ADR-0056 also offers.
+
+**Open design question this correction surfaces, not yet resolved:**
+`signature` mode binds an approval to a `candidate: {commit, tree}` (see
+`plugins/pipeline-core/lib/critical-action-approval-request.mjs`,
+`CRITICAL_ACTION_KINDS = ["push", "deploy", "publication",
+"release-preflight"]`) — but `kickoff plan`'s language/profile question
+often happens on a BRAND-NEW project, potentially before any meaningful
+commit/candidate exists yet. Whether the new gate kind should genuinely use
+full `signature`-mode candidate binding, or deliberately opt into the
+lighter `chat` mode for this specific gate kind (since the threat here is
+an overeager/hallucinating agent, not a high-stakes external effect like a
+push), is a real tradeoff the PO has not yet weighed in on with this
+corrected understanding. **Left open, not implemented tonight** — the
+Elephant judged forcing this specific architecture call without PO input
+would repeat the exact self-disposition mistake this session already
+flagged and avoided for findings F3/F4/F5 earlier. Ready for the PO's next
+session with this full context; the mechanism survey above
+(`critical-action-approval-request.mjs`, `po-human-approval.mjs`) is
+already done and does not need repeating.
 
 **Not yet designed/implemented:** the exact new gate-kind wiring inside
 `po-human-approval.mjs`/`po-approval-gate.mjs`, how `kickoff plan` rejects
