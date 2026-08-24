@@ -89,3 +89,20 @@ deciding its own fate. Also confirm `docs/adr/0063-repository-directory-contract
 directory-kinds table directly (this investigation relied on prior session
 context for that, not a fresh read) before finalizing.
 - **Date:** 2026-08-24
+
+## Part (a) landed, 2026-08-24
+
+Commit `5ddbe60e` (`AGY-KICKOFFCOMMIT-1`): `kickoff-design.md` now names the
+exact files an agent must stage once `kickoff apply` or `kickoff promote
+apply` reports success — `docs/state.md` plus the generated PRD/Spec pair
+for each. Independently re-verified: `git show --stat 5ddbe60e` (1 file, 17
+insertions), `rg -n "onboarding-staging"` on the changed file returns no
+match (part (b) correctly excluded). This is a prose-guidance fix, not
+hook-enforced — same honesty class as the tool-budget base cap elsewhere in
+this repo; a structured/enforced version would need a dedicated follow-up
+touching `onboarding-continuity.mjs`, not attempted here.
+
+**Part (b) (`.onboarding-staging`'s tracked/untracked fate) remains
+genuinely undecided — item stays `open`.** Needs the PO's own call once
+awake; nothing further to investigate from the repo alone per this
+dispatch's own findings.
