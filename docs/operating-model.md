@@ -81,7 +81,7 @@ prevent.
 derived from it; they are not a second source of truth. A requested model route
 is not proof of the model that actually answered.
 
-### Profiles
+### 3.1 Profiles
 
 Profiles describe the size and lifecycle shape of the current topic, not a
 person or model:
@@ -96,7 +96,7 @@ Every profile has a `design_phase` and an `execution_phase`. A **phase** is a
 lifecycle state; it is not a profile. A **Sprint** is a planning window that
 groups work. Neither term changes a runner or authorizes a shortcut.
 
-### Duties
+### 3.2 Duties
 
 The route registry distinguishes duties such as `implement`, `mechanic`,
 `deep`, `test_author`, `readiness`, `critic_normal`, `critic_high_risk` and
@@ -104,6 +104,25 @@ The route registry distinguishes duties such as `implement`, `mechanic`,
 model-free for `feature` and `epic` and disabled for `mini`. Actual Advisory is
 on demand: one concrete question, reason and digest-bound evidence produce a
 sanitized receipt rather than an implementation decision.
+
+### 3.3 Stage-0 fast path
+
+The stage-0 fast path is a narrow, self-contained exception (EL-01) letting an
+interactive Elephant session execute a fix itself instead of dispatching a
+Goldfish. It applies only when a task meets ALL of the following criteria:
+
+1. Touches at most 2 files.
+2. Is at most roughly 25 diff lines.
+3. Makes no architecture, schema, public-API, test, guardrail-hook-CI,
+   dependency, or security-surface change.
+4. Is trivially `git revert`-able.
+5. Has no risk flag set.
+
+If ALL five criteria hold, the interactive Elephant session MAY execute the
+fix itself. `verify` and the evidence artifact remain mandatory regardless. A
+Critic run is required only if the risk flag is set. This exception is scoped
+exclusively to this definition — it is not extended by local judgment;
+anything outside these criteria still requires a Goldfish dispatch.
 
 ## 4. The lifecycle
 
