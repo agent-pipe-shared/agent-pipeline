@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.elephant-notes-and-critic-scratch-share-one-directory
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-23
 source: "Observed 2026-08-23 while dispatching the sprint-agy-runner delta Critic review; templates/prompts/critic-review.md scratchpad-isolation block"
 due: 2026-08-30
@@ -70,6 +70,19 @@ dispatched Critic can read them.
   notes.
 - `templates/prompts/critic-review.md` names the separated location.
 - The change is reflected in the vendored plugin copy of the template.
+
+## Closure, 2026-08-24
+
+Fixed via `AGY-SCRATCHSEP-1` (goldfish-implementor), commit `816331c3`. The
+Critic's isolation subdirectory moved from `scratch/<codename>-<hex>/` to
+`scratch/dispatch/<codename>-<hex>/` in both `templates/prompts/critic-review.md`
+and its vendored plugin copy — confirmed byte-identical before and after
+(`diff`, zero output). No other section of either template changed;
+`check-consumer-safe-paths.test.mjs` 9/9 green. All three Acceptance
+criteria above are met. Independently re-verified by the Elephant: `git
+show 816331c3` confirms the diff is confined to the intended paragraph
+(the larger line count is a text-reflow artifact of the longer path, not
+scope creep).
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
