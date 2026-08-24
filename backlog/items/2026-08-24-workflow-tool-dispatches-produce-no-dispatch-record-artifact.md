@@ -67,3 +67,29 @@ every future package that uses the Workflow tool for a Goldfish fan-out.
   artifact (or equivalent) that `dispatch-authorship-verify.mjs` recognizes
   and passes, with no manual reconstruction after the fact.
 - Existing template-built Agent-tool dispatches are unaffected.
+
+## Root cause confirmed, 2026-08-24
+
+Read-only research fork investigation (not this item's own author) confirmed:
+**process gap, not tooling gap.** `dispatch-authorship-verify.mjs` treats a
+Workflow-originated `Dispatch:` trailer identically to an Agent-tool one —
+nothing structurally prevents an `agent()` call from producing the record.
+`plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`
+already assumed (never stated outright) that every `agent()` prompt carries
+the record-writing instruction because it's supposed to be
+`templates/prompts/goldfish-task.md`'s field 6 verbatim — but nothing forced
+that, and CLAUDE.md already names a prior, identical failure on this exact
+path (NVA-WFDISP-1, freehand/abbreviated Workflow prompts).
+
+**Mitigation applied, commit `00e23bc7`:** added an explicit, checkable
+pre-dispatch step to `workflow-dispatch.md` — grep the actual CONSTRUCTED
+`agent()` prompt string (not the template file) for the literal substring
+`dispatch-record` before calling `agent()` on a dispatch expected to commit
+with a trailer. **This is a process/behavioral mitigation, not a structural
+guarantee** — same category as the tool-budget base cap (a discipline the
+Elephant follows, not a hook-enforced check) — so this item stays `open`
+rather than closing outright. No Workflow-tool dispatch has landed since
+this fix to empirically confirm it holds; re-verify the next time the
+Workflow tool is used for a committing dispatch, and close this item only
+once that confirmation exists (or a stronger structural check is built, if
+the process fix proves insufficient).
