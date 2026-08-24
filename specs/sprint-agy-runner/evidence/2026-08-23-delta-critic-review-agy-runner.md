@@ -202,3 +202,54 @@ QG-06 (both new risk items carry `owner: pipeline` / `due: 2026-08-30` in
 front-matter plus prose Owner and Expiry); dependency reality (zero new
 packages, actions, images or plugins anywhere in the delta); ADR-0011 language
 assignment.
+
+## PO disposition, 2026-08-24
+
+The PO reviewed D1–D7 above and decided the fix scope: D1, D2, D3 and D6
+fixed in code; D7 fixed as an unverified config-value correction pending an
+empirical check in a running Antigravity session; D5 accepted as **closed**,
+disposed of the same way the first review's F2 was. D4 did not fully land —
+see below.
+
+**D4 — partially landed; the test-coverage half is blocked, PO decision
+open.** The AGY-FIX2-PUSHGUARD dispatch's briefing (Elephant-authored)
+incorrectly claimed `guard-push.test.mjs` was agent-writable in this
+correction round, citing `ea1432e9` as precedent. That citation was wrong:
+`ea1432e9`'s own commit message records it as applied by the PO BY HAND,
+specifically because no agent tier may write that protected test path
+(`templates/prompts/agent-obligations.md` §2) — the same fact this record's
+own F11 disposition already stated. The dispatch caught the contradiction
+itself (read the cited commit, checked the guard-testpath override route,
+consulted its Advisor), correctly refused to force a write through, and
+delivered the fixable half: D1 (the `resolveDeclaredPushProject` `-C`-branch
+cwd fix) landed and is verified (156/156 `guard-push.test.mjs` cases,
+independently re-run). D4's own dedicated test coverage (`resolveShellCwd()`/
+`declaredCwd` unit tests, plus the regression test proving D1 itself) is
+undelivered and requires either PO hand-application (mirroring F11) or
+acceptance as a documented residual gap alongside D5 — open, not decided in
+this record.
+
+**D5 — closed, not repaired.** Seven of the twenty commits in the reviewed
+range carry no machine-parseable `Dispatch:` trailer and stay
+`UNVERIFIABLE` to `dispatch-authorship-verify` permanently — history is not
+rewritten to add one (GIT-05, no force-push/rewrite). This is the same
+defect class as the first review's F2, disposed of the same way: accepted
+and carried, not repaired. It is not a discipline failure going forward —
+every commit in this session after the delta review, including the
+AGY-FIX2-* correction wave dispatched to close D1/D2/D3/D6/D7, carries a
+correctly parsed `Dispatch:` trailer, checked directly against
+`git log --format="%h %(trailers:key=Dispatch,valueonly) %s"` rather than
+assumed.
+
+D2's own severity is narrower than this record's findings section states in
+isolation: `antigravity-pretool-guard.mjs` is wired only through Antigravity's
+own hook registration (`.agents/plugins.json`), never through
+`.claude/settings.json` — confirmed by grep, no match. Every Critic dispatch
+this session, including the one that produced this record, ran through
+Claude Code's own Agent/Task mechanism, which `antigravity-pretool-guard.mjs`
+never intercepts. D2 therefore did not block any dispatch actually issued in
+this session; its urgency is real but forward-looking, and specifically
+coupled to D7 — fixing D7 without D2 would have turned a currently silent gap
+into an active block on the CLAUDE.md-mandated Critic-dispatch path in a real
+Antigravity session. Both are fixed together in the same correction round for
+exactly this reason.
