@@ -234,20 +234,114 @@ Verify run bound to.
     (`2026-08-09-kickoff-promotion-cleanup-readback-has-no-in-session-recovery.md`,
     `2026-08-08-long-dispatches-truncate-before-emitting-their-report.md`).
 
+12. **F5 landed.** Commit `a40ef802`: `docs/operating-model.md` §3.1/3.2/3.3
+    added (stage-0 fast-path definition now has a real, numbered home);
+    independently re-verified by the Elephant (diff inspected, `EL-01`
+    cross-reference confirmed real, German mirror section provably
+    untouched). Open item 2 above is now fully closed.
+13. **Verify-tuner stage 1 landed.** Commit `9e6d5307`
+    (`AGY-VERIFYTUNER-1`, goldfish-deep): `verify-journal.mjs`'s suite loop
+    now runs through a bounded async worker pool (default `concurrency: 1`
+    — behavior-equivalent to before), `dependsOn` is now a real scheduling
+    gate, `steps[]` always materializes in registration order. Independently
+    re-verified: `node --test plugins/pipeline-core/scripts/verify-journal.test.mjs`
+    green, diff correctly scoped to the two allowed files only,
+    `harness/scripts/verify.mjs` correctly untouched (reserved for a
+    ceremony-gated single `await` edit — still open, see next-session
+    instructions). The dispatch's own closing sequence did not finish (no
+    `report.text` ever written, `outcome` stuck at
+    `"committed-pending-report"`) even though its real work — tests green,
+    commit landed at only 30/40 tool uses — is safe and independently
+    confirmed; treat as a data point that a complex task's CLOSING writeup
+    may need more than the +5 allowance, not as lost work.
+14. **Backlog triage continued this session, most of the remaining
+    non-deferred items now processed** (commits `816331c3`, `00e23bc7`,
+    `e7ed7cda`, `94e28285`, `fa804cac`, `7858f58c` + related):
+    - `2026-08-23-elephant-notes-and-critic-scratch-share-one-directory.md`
+      — **closed.** Fixed (`816331c3`) + a residual gap in `roles/critic.md`
+      the same fix had missed, found and closed separately (`e7ed7cda`).
+    - `2026-08-24-workflow-tool-dispatches-produce-no-dispatch-record-artifact.md`
+      (F3's tooling gap) — root cause confirmed (process gap, not a real
+      tooling gap — the same freehand-Workflow-prompt failure class as
+      NVA-WFDISP-1). Mitigation applied to `workflow-dispatch.md`
+      (`00e23bc7`): a checkable pre-dispatch grep step. **Stays open** — this
+      is a behavioral mitigation, not a structural guarantee; needs live
+      confirmation next time the Workflow tool lands a committing dispatch.
+    - `2026-08-21-kickoff-untracked-files-missing-from-commits.md` —
+      investigated (`94e28285`): the onboarding library deliberately never
+      touches git (confirmed by code comment + grep); the real gap is most
+      likely in whichever `nextAction`/readback guidance an agent follows
+      post-onboarding not naming `docs/state.md`/PRD/spec explicitly.
+      `.onboarding-staging`'s lifecycle remains genuinely ambiguous. **Not
+      yet fixed** — next step is reading `pipeline-start-preflight.mjs`'s
+      actual returned guidance text.
+    - `2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md`
+      part 3 — measured (`fa804cac`): every sample this session needed real
+      work well under the new 40/24 caps; interim recommendation is leave
+      `maxTurns` at 50/30. `AGY-VERIFYTUNER-1`'s own 30-tool-use work count
+      (see item 13 above) is the last confirming data point. **Stays open**
+      pending one more explicit close-out note reconciling the closing-
+      sequence finding above.
+    - `2026-08-21-kickoff-staging-directory-mismatch.md` — an investigation
+      fork was dispatched but did not deliver clear findings before
+      returning (see item 15 below); **still needs a proper investigation
+      pass**, prior finding stands: likely conflates two distinct onboarding
+      mechanisms (`specs/kickoff-*` vs. `project/.onboarding-staging/`),
+      not yet resolved which one Antigravity's `kickoff plan` actually used.
+    - `2026-08-21-enforce-kickoff-po-questions.md` — **PO-scoped design
+      direction decided** (`7858f58c`, live chat conversation): reuse
+      [ADR-0061](adr/0061-uniform-human-approval-ceremony.md)'s existing
+      uniform human-approval ceremony as a new gate kind for `kickoff
+      plan`'s language/profile values, rather than inventing a bespoke
+      `ask_po_input` primitive. Known, PO-accepted limitation: the PIN
+      passes through the same chat channel the agent reads, so the agent
+      sees it in plaintext — judged acceptable since ADR-0061's actual
+      threat model is "agent auto-approves on the human's behalf," not
+      secrecy from a trusted assistant, and the agent cannot fabricate a
+      valid PIN in advance. PO's own instruction: implement this shape and
+      validate empirically in a real test run rather than resolving it
+      analytically first. **Not yet implemented** — needs its own
+      `goldfish-deep` dispatch (genuine design latitude in the new gate-kind
+      wiring inside `po-human-approval.mjs`/`po-approval-gate.mjs`).
+15. **Process finding, 2026-08-24: a fork/`general-purpose` subagent briefed
+    "read-only research, do NOT write/commit" can still write and commit
+    anyway** — the restriction is prompt-level only, not tool-scoped (unlike
+    `goldfish-*`/`critic`, forks inherit the FULL toolset;
+    `workflow-dispatch.md` already documented this exact risk for further
+    Workflow/Agent-tool delegation specifically, and it turns out to apply
+    just as much to ordinary Edit/Write/commit access). Confirmed live: of 4
+    forks dispatched this session as "read-only investigation," at least 2
+    committed real fixes anyway (independently verified as correct, no
+    damage) — see items 14 above for what they actually produced. Saved as
+    a durable memory
+    (`~/.claude/projects/.../memory/feedback-forks-ignore-readonly-instructions.md`).
+    One fork (the `kickoff-staging-directory-mismatch` investigation) got
+    sidetracked into reporting on the OTHER forks' scope instead of
+    delivering its own briefed findings — its actual investigation still
+    needs to be (re-)done.
+
 ### Next session instructions
 
 1. Restart the Antigravity session (CLI `agy` or IDE reload) to empirically
    check whether D7's `.agents/plugins.json` fix actually makes the
    PreToolUse enforcement layer load.
-2. Run a final, uninterrupted full Verify for a clean 385/385 confirmation
-   (marketplace rsync already confirmed clean), then dispatch the fourth
-   (final round-budget slot) delta-scoped Critic review before any push is
-   considered.
-3. Dispatch the F5 fix (add the missing `operating-model.md` §3.3 section)
-   — recommendation accepted by the PO, not yet executed.
-4. Dispatch stage 1 of the verify-parallelization rollout (pool at
-   concurrency=1, per the Advisor-reviewed design in open item 8) to a
-   `goldfish-deep` task.
+2. Apply the single ceremony-gated `await` edit to `harness/scripts/verify.mjs`
+   (TP-3 protected) per the verify-tuner design (item 13 above) — one
+   contiguous edit at the `runVerifyJournal({...})` call site.
+3. Run a final, uninterrupted full Verify for a clean 385/385 confirmation
+   (marketplace rsync already confirmed clean; the pool defaults to
+   `concurrency: 1` so this should behave identically to before), then
+   dispatch the fourth (final round-budget slot) delta-scoped Critic review
+   before any push is considered.
+4. Re-investigate `kickoff-staging-directory-mismatch` (item 14 above) — the
+   prior fork attempt did not deliver usable findings.
+5. Read `pipeline-start-preflight.mjs`'s actual returned onboarding guidance
+   text to finish scoping the `kickoff-untracked-files` fix (item 14 above).
+6. Dispatch the `enforce-kickoff-po-questions` ADR-0061-reuse design (item
+   14 above) once ready for its own `goldfish-deep` package.
+7. Once real suite volume runs through the pool at `concurrency > 1`
+   (verify-tuner stage 2, not started), derive the mechanical serial-lane
+   suite list per the Advisor design in item 13's backlog record.
 
 ### Durable-rule and history pointers
 
