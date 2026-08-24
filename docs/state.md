@@ -34,33 +34,32 @@ empirical check in a running Antigravity session.
 
 ### Candidate and gate status
 
-Candidate: commit **`f07b22f4bd49d21c2df9db706af9c2799509c0f5`**, tree
-**`88aea93cd56fb8d6289f3f5070498cfe6c0cef6c`**. That is the commit the final
+Candidate: commit **`96581b7f651cebc56f72107a218f0c2a0e851ef2`**, tree
+**`8644f26c8d0e3e07a7eec7387d98cc3649b41e29`**. That is the commit the final
 Verify run bound to.
 
-- **Deterministic Verify — GREEN.** `node harness/scripts/verify.mjs` bound
-  the candidate exactly at start and finish (`binding: "exact"`), 385
-  registered suites, **385/385 passed, exit 0.**
-  Evidence: `evidence/verify-latest.json`.
-  - An earlier run at `ab28f9ae` (the version-bump commit) failed on
-    `backlog-state-check` alone (384/385 otherwise green): the new
-    `2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md` backlog
-    item used `type: improvement`, not in the canonical `BACKLOG_TYPES` set
-    (`workflow-improvement`/`tooling-radar`/`defect`/`idea`), which also
-    cascaded into a false-positive "ledger event 833: id does not name a
-    current backlog item" finding. Fixed by correcting the type to
-    `workflow-improvement` and regenerating `STATUS.md`/`index.json` with
-    `--write` (commit `f07b22f4`).
-  - The marketplace-attestation check (`human-guard-override-tests` F1,
-    `HGO-EXTERNAL-MARKETPLACE`) is green: the external local marketplace copy
-    (`~/agent-pipeline-local-marketplace/plugins/pipeline-core`) was rsynced
-    byte-identical to this checkout's `plugins/pipeline-core` mid-session
-    (confirmed via `diff -rq`, no output). This check running inside the
-    deterministic gate — failing on ordinary active development, not just
-    real drift — is filed as a design defect, not fixed:
+- **Deterministic Verify — 384/385 green; the 1 red is a known,
+  already-disclosed environmental issue, not a code defect.**
+  `node harness/scripts/verify.mjs` bound the candidate exactly at start and
+  finish (`binding: "exact"`), 385 registered suites. Evidence:
+  `evidence/verify-latest.json`.
+  - `antigravity-pretool-guard-tests`: **green** (independently re-run too,
+    42/42) — confirms the `AGY-FIX3-HARDENING` fix (F1/F2/F6) below.
+  - `backlog-state-check`: **green** (the `f07b22f4` taxonomy-type fix holds).
+  - `test-tmpdir-budget-tests`: **green**.
+  - `human-guard-override-tests`: **RED again** — the marketplace copy
+    (`~/agent-pipeline-local-marketplace/plugins/pipeline-core`) drifted
+    from this checkout again the moment `96581b7f` touched
+    `plugins/pipeline-core/hooks/antigravity-pretool-guard.mjs` (confirmed
+    via `diff -rq`, 2 files differ). It was rsynced clean once already this
+    session (at `f07b22f4`) and needs another rsync — this is exactly the
+    friction the design-defect backlog item below describes; ran the full
+    gate anyway rather than blocking on it, since the PO was AFK and this
+    is a known non-functional cause, not a fresh regression:
     [backlog item](../backlog/items/2026-08-24-verify-marketplace-attestation-blocks-normal-active-development.md).
-  - `test-tmpdir-budget-tests` is green: `scratch/test-tmp/` was cleared
-    (had exceeded the 40,000-entry budget).
+  - **Next session/PO action: rsync the marketplace copy again, then
+    re-run Verify once for a clean 385/385 confirmation** before treating
+    this candidate as gate-clean.
 - **Critic review — FAIL, then fully addressed, no re-critic run yet.** The
   first full review of `92037494..51dd7fc6` returned FAIL (3 blockers, 9
   majors, 7 minors;
@@ -88,9 +87,12 @@ Verify run bound to.
   guard that actually runs contamination/task-frame checks, still only ever
   sees `Subagents[0]`, so a Critic at index ≥1 still skips it entirely).
   F1/F2 plus F6 (residual shell inline-exec forms D6 didn't enumerate:
-  `bash -lc`, `zsh -c`, `dash -c`) are dispatched for a fix as
-  `AGY-FIX3-HARDENING` (goldfish-deep) — in progress as of this write, not
-  yet landed. F7 (a stale `spec.md` Wave 3 reference to the retired
+  `bash -lc`, `zsh -c`, `dash -c`) are **fixed and independently verified**
+  — `AGY-FIX3-HARDENING` (goldfish-deep), commit `96581b7f`, 42/42
+  `antigravity-pretool-guard.test.mjs` cases and 9/9
+  `check-consumer-safe-paths.test.mjs` cases re-run directly by the
+  Elephant, not only trusted from the dispatch report. F7 (a stale
+  `spec.md` Wave 3 reference to the retired
   `.agents/hooks.json` generator) is fixed (commit `c077ac7f`). **F3, F4,
   and F5 are explicitly NOT self-dispositioned and need a PO decision:**
   F3 — five `AGY-FIX2-*` goldfish-trailer commits have no
@@ -132,10 +134,13 @@ Verify run bound to.
 
 ### Open items
 
-1. **F1/F2/F6 fix (`AGY-FIX3-HARDENING`) needs independent verification once
-   landed**, then a fourth (final, round-budget-capped) delta Critic review
+1. **Rsync the marketplace copy, then re-run Verify for a clean 385/385**,
+   then dispatch a fourth (final, round-budget-capped) delta Critic review
    scoped to the diff since `fdd98727` (the third review's reviewed head) —
-   via `templates/prompts/critic-review.md`, never freehand.
+   via `templates/prompts/critic-review.md`, never freehand. The F1/F2/F6
+   fix (`AGY-FIX3-HARDENING`, commit `96581b7f`) is already independently
+   verified (42/42 + 9/9 suites re-run directly), so this round is the
+   remaining gate before a push can even be considered.
 2. **F3/F4/F5 need a PO decision** (see the third delta review paragraph
    above for what each is): F3 (missing `AGY-FIX2-*` dispatch-record
    artifacts — accept as a disclosed tooling gap, like D5? or require a
@@ -185,9 +190,10 @@ Verify run bound to.
 1. Restart the Antigravity session (CLI `agy` or IDE reload) to empirically
    check whether D7's `.agents/plugins.json` fix actually makes the
    PreToolUse enforcement layer load.
-2. Confirm `AGY-FIX3-HARDENING` landed and verified, then dispatch the
-   fourth (final round-budget slot) delta-scoped Critic review before any
-   push is considered.
+2. Rsync the marketplace copy (`AGY-FIX3-HARDENING` already landed and
+   independently verified), re-run Verify for a clean 385/385, then
+   dispatch the fourth (final round-budget slot) delta-scoped Critic review
+   before any push is considered.
 3. Get a PO decision on F3/F4/F5 (open item 2 above) — none are
    self-dispositioned.
 
@@ -228,10 +234,12 @@ through the existing archive index and files:
 - For this task, Nova B is explicitly out of scope.
 
 **Last updated:** 2026-08-24 — D1–D7 disposed and fixed, marketplace
-resynced, trust anchor rotated, version bumped, backlog-state fix landed,
-Verify green (385/385); third delta Critic review ran and returned FAIL
-(F1-F7); F7 fixed, F1/F2/F6 fix dispatched (`AGY-FIX3-HARDENING`, in
-progress), F3/F4/F5 need a PO decision, not yet self-dispositioned.
+resynced, trust anchor rotated, version bumped, backlog-state fix landed;
+third delta Critic review ran and returned FAIL (F1–F7); F1/F2/F6/F7 fixed
+and independently verified (`AGY-FIX3-HARDENING`, commit `96581b7f`);
+Verify 384/385 (only the known marketplace-drift check red, needs another
+rsync — not a code defect); F3/F4/F5 need a PO decision, not yet
+self-dispositioned; fourth and final delta Critic round still pending.
 
 ### Sentinel Links
 - specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md
