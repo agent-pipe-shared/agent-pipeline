@@ -137,7 +137,10 @@ Gemini token counts (`input_tokens`, `output_tokens`, `cached_tokens`) mapped in
    - Unit tests for discovery, argument building, output parsing, token usage extraction, and error taxonomy.
 
 3. **Wave 3: Hard Hook Enforcement & Setup Integration**
-   - Create `.agents/hooks.json` generator in `setup.mjs` / `setup-check.mjs`.
+   - `.agents/plugins.json` registration and `plugins/pipeline-core/hooks.json`
+     wiring, written by `install-agy.mjs` (not `setup.mjs`/`setup-check.mjs` —
+     the retired `.agents/hooks.json` generator these once named was replaced
+     by this plugin-registration path in `ffa55f78`).
    - Test hook execution with synthetic PreToolUse block scenarios.
 
 4. **Wave 4: Lifecycle & Onboarding Integration**
