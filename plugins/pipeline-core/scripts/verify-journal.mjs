@@ -446,17 +446,20 @@ function spawnAsync(command, argv, options = {}) {
     }
     const stdoutChunks = [];
     const stderrChunks = [];
-    let total = 0;
+    // Per-stream totals, not a combined one: spawnSync's own `maxBuffer` bounds stdout and
+    // stderr INDEPENDENTLY (Node's documented behavior), so a shared counter here would kill a
+    // suite that spawnSync would have let pass -- confirmed live regression, delta-4 Critic F3.
+    let stdoutTotal = 0;
+    let stderrTotal = 0;
     let overflowed = false;
     let spawnError;
     let settled = false;
     const settle = (value) => { if (!settled) { settled = true; resolvePromise(value); } };
-    const collect = (chunks) => (chunk) => {
+    const collect = (chunks, addLength) => (chunk) => {
       // Data handlers stay attached (never removed) after overflow so the child's pipes keep
       // draining -- detaching them here would let the killed child hang on backpressure.
       if (overflowed) return;
-      total += chunk.length;
-      if (total > maxBuffer) {
+      if (addLength(chunk.length) > maxBuffer) {
         overflowed = true;
         spawnError = Object.assign(new Error("stdout/stderr maxBuffer exceeded"), { code: "ENOBUFS" });
         try { child.kill(); } catch { /* best-effort */ }
@@ -464,8 +467,8 @@ function spawnAsync(command, argv, options = {}) {
       }
       chunks.push(chunk);
     };
-    child.stdout.on("data", collect(stdoutChunks));
-    child.stderr.on("data", collect(stderrChunks));
+    child.stdout.on("data", collect(stdoutChunks, (length) => (stdoutTotal += length)));
+    child.stderr.on("data", collect(stderrChunks, (length) => (stderrTotal += length)));
     child.once("error", (error) => {
       spawnError = spawnError ?? error;
       settle({ status: null, stdout: Buffer.concat(stdoutChunks), stderr: Buffer.concat(stderrChunks), error: spawnError });
@@ -598,8 +601,8 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
 
 // AGY-VERIFYTUNER-1: `concurrency` bounds how many suites may have a child process in flight at
 // once (see runSuitePool/createSemaphore above); its DEFAULT is 1, so a caller passing nothing --
-// exactly harness/scripts/verify.mjs's real, unmodified call shape today -- gets behavior
-// equivalent to the prior strictly-sequential loop. Raising the default itself, and reading a cap
+// exactly this repository's top-level Verify entry point's real, unmodified call shape today --
+// gets behavior equivalent to the prior strictly-sequential loop. Raising the default itself, and reading a cap
 // from an env var or project/pipeline.json calibration, is explicitly reserved for a later,
 // separate commit (this dispatch's own Forbidden clause (b)) -- this parameter is the mechanism
 // only. `spawn` defaults to the new async `spawnAsync` (not the old `spawnSync`): production's
