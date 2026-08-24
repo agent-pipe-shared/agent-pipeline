@@ -205,29 +205,53 @@ assignment.
 
 ## PO disposition, 2026-08-24
 
-The PO reviewed D1–D7 above and decided the fix scope: D1, D2, D3 and D6
+The PO reviewed D1–D7 above and decided the fix scope: D1, D2, D3, D4 and D6
 fixed in code; D7 fixed as an unverified config-value correction pending an
 empirical check in a running Antigravity session; D5 accepted as **closed**,
-disposed of the same way the first review's F2 was. D4 did not fully land —
-see below.
+disposed of the same way the first review's F2 was.
 
-**D4 — partially landed; the test-coverage half is blocked, PO decision
-open.** The AGY-FIX2-PUSHGUARD dispatch's briefing (Elephant-authored)
-incorrectly claimed `guard-push.test.mjs` was agent-writable in this
-correction round, citing `ea1432e9` as precedent. That citation was wrong:
-`ea1432e9`'s own commit message records it as applied by the PO BY HAND,
-specifically because no agent tier may write that protected test path
+**D4 — fixed, via the audited signature ceremony, not PO hand-application.**
+The AGY-FIX2-PUSHGUARD dispatch's briefing (Elephant-authored) incorrectly
+claimed `guard-push.test.mjs` was agent-writable in this correction round,
+citing `ea1432e9` as precedent. That citation was wrong: `ea1432e9`'s own
+commit message records it as applied by the PO BY HAND, specifically because
+no agent tier may write that protected test path
 (`templates/prompts/agent-obligations.md` §2) — the same fact this record's
 own F11 disposition already stated. The dispatch caught the contradiction
 itself (read the cited commit, checked the guard-testpath override route,
 consulted its Advisor), correctly refused to force a write through, and
-delivered the fixable half: D1 (the `resolveDeclaredPushProject` `-C`-branch
-cwd fix) landed and is verified (156/156 `guard-push.test.mjs` cases,
-independently re-run). D4's own dedicated test coverage (`resolveShellCwd()`/
-`declaredCwd` unit tests, plus the regression test proving D1 itself) is
-undelivered and requires either PO hand-application (mirroring F11) or
-acceptance as a documented residual gap alongside D5 — open, not decided in
-this record.
+delivered the fixable half then: D1 (the `resolveDeclaredPushProject`
+`-C`-branch cwd fix) landed and was verified independently (156/156
+`guard-push.test.mjs` cases).
+
+D4's own dedicated test coverage (`resolveShellCwd()`/`declaredCwd` unit
+tests, plus the regression test proving D1 itself) was drafted and verified
+against the real, already-fixed guard in `scratch/` first, then applied
+through the audited `pipeline-author-repair` signature ceremony
+(`guard-human-override.mjs`; request `05d60da5...`, plan `0b9c049c...`) —
+never the earlier-considered PO-hand-paste shortcut. That ceremony first hit
+two real obstacles, both resolved in-session and recorded here rather than
+routed around:
+
+1. An Elephant-authored file write (a new backlog item) between seeding the
+   request and running `authorize-by-signature` changed the tracked working
+   tree, which changed `statusSha256` and triggered `HGO-DRIFT` — CLAUDE.md's
+   own documented failure mode for exactly this sequencing. Recovered by
+   moving the new file into the gitignored `scratch/` temporarily, restoring
+   the original preimage, and retrying — no second signature needed.
+2. The PO's local signing key had been regenerated on 2026-08-17 (a different
+   machine) without the repository's committed trust anchor
+   (`project/critical-human-proof.json`) being updated to match, so the first
+   signed proof failed `HGO-PROOF-INVALID: PO-APPROVAL-TRUST-MISMATCH`. The
+   PO confirmed the new key live in session and applied the trust-anchor
+   rotation directly in their own terminal (commit `93b7775e`) — the same
+   route the two prior rotations in this file's own git history document,
+   since a signature cannot bootstrap trust in the very key it would need to
+   already trust. The D4 ceremony was then re-seeded against the new HEAD and
+   completed cleanly on the next attempt.
+
+159/159 `guard-push.test.mjs` cases pass, including the 156 pre-existing ones
+unchanged.
 
 **D5 — closed, not repaired.** Seven of the twenty commits in the reviewed
 range carry no machine-parseable `Dispatch:` trailer and stay
@@ -236,7 +260,7 @@ rewritten to add one (GIT-05, no force-push/rewrite). This is the same
 defect class as the first review's F2, disposed of the same way: accepted
 and carried, not repaired. It is not a discipline failure going forward —
 every commit in this session after the delta review, including the
-AGY-FIX2-* correction wave dispatched to close D1/D2/D3/D6/D7, carries a
+AGY-FIX2-* correction wave dispatched to close D1/D2/D3/D4/D6/D7, carries a
 correctly parsed `Dispatch:` trailer, checked directly against
 `git log --format="%h %(trailers:key=Dispatch,valueonly) %s"` rather than
 assumed.
