@@ -207,7 +207,16 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
       };
     }
     if (name === "invoke_subagent") {
-      const firstSubagent = Array.isArray(args.Subagents) && args.Subagents.length > 0 ? args.Subagents[0] : null;
+      const subagentsRaw = Array.isArray(args.Subagents) ? args.Subagents : [];
+      // D3 fix: carry every entry's type+prompt, not only index 0, so the Contamination Rule
+      // check below can reach a Critic subagent sitting anywhere in a multi-subagent envelope.
+      // Additive: kept OFF toolInput so canonicalPayload (built from toolInput, forwarded to
+      // guard-dispatch.mjs) stays byte-identical to the existing single-subagent shape.
+      const subagents = subagentsRaw.map((entry) => ({
+        subagent_type: entry?.TypeName ?? entry?.Role ?? "",
+        prompt: entry?.Prompt ?? "",
+      }));
+      const firstSubagent = subagentsRaw.length > 0 ? subagentsRaw[0] : null;
       return {
         toolName: "Task",
         toolInput: firstSubagent ? {
@@ -218,6 +227,7 @@ export function normalizeAntigravityToolInput(rawEnvelope) {
         filePath: null,
         command: "",
         isReadOnly: false,
+        subagents,
       };
     }
     // Read-only or unmanaged tool calls in Antigravity
@@ -350,18 +360,29 @@ export async function runAntigravityPreToolGuard(rawInput) {
   ].some((marker) => existsSync(join(projectRoot, marker)));
 
   // --- Antigravity Hardening Layer: critic dispatch contamination + inline exec containment ---
-  if (toolName === "Task" && String(toolInput.subagent_type ?? "").toLowerCase().includes("critic")) {
-    const prompt = toolInput.prompt || "";
-    // Disallow prose instructions (Paths Only Contamination Rule): a Critic
-    // dispatch built from the template carries paths/refs, never conversational
-    // steering -- roles/critic.md, templates/prompts/critic-review.md §2.
-    // D2 fix: the trigger word must be preceded by whitespace or start-of-string, not
-    // merely a non-word boundary -- a generic \b boundary also matches after a hyphen, so
-    // the old regex denied any prompt naming templates/prompts/critic-review.md (the exact
-    // canonical Critic-dispatch template CLAUDE.md mandates) purely because "review" sits
-    // between "-" and ".".
-    if (/(?:^|\s)(you are|please|examine|look at|review)\b/i.test(prompt)) {
-      deny("BLOCKED (Hardening Layer): Critic dispatch prompt contains prose. Only paths and refs are allowed (Contamination Rule).");
+  if (toolName === "Task") {
+    // D3 fix: inspect EVERY subagent entry in the raw envelope, not only index 0 -- a
+    // multi-subagent invoke_subagent call can carry the Critic at any position. Fall back to
+    // the single-subagent toolInput shape (subagent_type/prompt) when the envelope never
+    // populated `subagents` (e.g. the canonical tool_name/tool_input envelope), preserving the
+    // existing single-subagent behaviour exactly.
+    const subagentEntries = Array.isArray(normalized.subagents) && normalized.subagents.length > 0
+      ? normalized.subagents
+      : [{ subagent_type: toolInput.subagent_type, prompt: toolInput.prompt }];
+    for (const entry of subagentEntries) {
+      if (!String(entry?.subagent_type ?? "").toLowerCase().includes("critic")) continue;
+      const prompt = entry?.prompt || "";
+      // Disallow prose instructions (Paths Only Contamination Rule): a Critic
+      // dispatch built from the template carries paths/refs, never conversational
+      // steering -- roles/critic.md, templates/prompts/critic-review.md §2.
+      // D2 fix: the trigger word must be preceded by whitespace or start-of-string, not
+      // merely a non-word boundary -- a generic \b boundary also matches after a hyphen, so
+      // the old regex denied any prompt naming templates/prompts/critic-review.md (the exact
+      // canonical Critic-dispatch template CLAUDE.md mandates) purely because "review" sits
+      // between "-" and ".".
+      if (/(?:^|\s)(you are|please|examine|look at|review)\b/i.test(prompt)) {
+        deny("BLOCKED (Hardening Layer): Critic dispatch prompt contains prose. Only paths and refs are allowed (Contamination Rule).");
+      }
     }
   }
 

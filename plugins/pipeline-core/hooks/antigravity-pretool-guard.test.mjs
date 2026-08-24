@@ -492,6 +492,45 @@ check("Antigravity pretool guard still blocks genuine prose 'please review the c
   rmSync(root, { recursive: true, force: true });
 });
 
+// 4. Multi-subagent envelope inspection (D3)
+
+check("Antigravity pretool guard blocks a critic dispatch carrying prose at index 1 of a multi-subagent envelope (D3)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          { TypeName: "goldfish", Role: "Goldfish Implementor", Prompt: "some other subagent, not the critic" },
+          { TypeName: "critic", Role: "Critic", Prompt: "Please examine this file and review it." },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "deny");
+  assert.match(res.reason, /Contamination Rule/);
+  rmSync(root, { recursive: true, force: true });
+});
+
+check("Antigravity pretool guard allows a multi-subagent envelope when the critic entry (index 1) carries a clean paths-only prompt (D3 neighbour case)", () => {
+  const root = fixture();
+  const res = decision(run({
+    toolCall: {
+      name: "invoke_subagent",
+      args: {
+        Subagents: [
+          { TypeName: "researcher", Role: "Researcher", Prompt: "irrelevant" },
+          { TypeName: "critic", Role: "Critic", Prompt: CRITIC_TEMPLATE_PATH_FIXTURE_PROMPT },
+        ],
+      },
+    },
+  }, root));
+
+  assert.equal(res.decision, "allow");
+  rmSync(root, { recursive: true, force: true });
+});
+
 check("Antigravity pretool guard blocks inline node -e execution (containment)", () => {
   const root = fixture();
   const res = decision(run({
