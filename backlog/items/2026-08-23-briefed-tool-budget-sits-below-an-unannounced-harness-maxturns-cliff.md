@@ -98,6 +98,30 @@ dispatch runs to 50 and truncates, and the closing allowance never fires.
   roughly doubles a round trip's cost, which is exactly what this item
   measures and fixes. Part 3 (whether 50 is enough at all) needs
   measurement first and is not blocking parts 1+2.
-- **Assignment (if accepted):** this sprint — dispatched to a
-  goldfish-mechanic task immediately following this triage pass.
+- **Assignment (if accepted):** this sprint — parts 1+2 applied directly
+  this session (stage-0: 2 files, mechanical, no design latitude beyond
+  numbers already derived from the real `maxTurns` values, no need for a
+  full dispatch round-trip for a task this small).
 - **Date:** 2026-08-24
+
+## Parts 1+2 landed, 2026-08-24
+
+Commit `eccbdadd`: `templates/prompts/goldfish-task.md`'s base-cap default
+lowered from 45 to 40 (fits under the real `maxTurns: 50` with 5 in
+reserve, versus the old default landing exactly on the cliff with zero
+margin); `templates/prompts/critic-review.md`'s lowered from 45 to 24
+(matching this item's own empirically-successful counter-example dispatch,
+24+5=29 under `maxTurns: 30` — the template's OLD default of 45 would have
+overrun the Critic's real cliff by 15 turns on its own, a sharper version
+of this item's diagnosis than the item itself had measured). Both
+templates now name the real `maxTurns` cliff explicitly and its
+consequence (mid-sentence truncation, no report, no closing handover), so
+a future briefing at a different `agentType`/`maxTurns` rescales rather
+than reusing an unsafe number. Applied identically to the vendored plugin
+copies (`plugins/pipeline-core/templates/prompts/`), confirmed
+byte-identical before and after. `check-consumer-safe-paths.test.mjs`
+9/9 green.
+
+**Part 3 (whether `maxTurns: 50`/`30` is enough at all for this
+repository) remains open** — deliberately not touched, per this item's own
+ordering ("measure before changing it"). Item stays `open`.
