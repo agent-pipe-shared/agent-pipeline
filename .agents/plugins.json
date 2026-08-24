@@ -1,7 +1,7 @@
 {
   "entries": [
     {
-      "path": "plugins"
+      "path": "plugins/pipeline-core"
     }
   ]
 }
