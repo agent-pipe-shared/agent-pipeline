@@ -165,3 +165,41 @@ This is the third Critic round on this package (initial full review, delta
 review #2, this delta review #3). CLAUDE.md/review-protocol allow at most
 four rounds total (initial + up to three delta re-reviews) — one further
 round remains available after the next correction commits, not more.
+
+## PO disposition, 2026-08-24 (round 3, F3/F4/F5)
+
+F1, F2, F6, F7 already have code fixes, landed and independently re-verified
+by the Elephant (`AGY-FIX3-HARDENING`, commit `96581b7f`; `c077ac7f`) — see
+"Candidate and gate status" in `docs/state.md`. F3, F4, F5 were explicitly
+surfaced to the PO rather than self-dispositioned; the PO accepted the
+Elephant's recommendation for all three ("F3 Empfehlung / F4 Empfehlung / F5
+Empfehlung"):
+
+- **F3 — accepted as a disclosed tooling gap, same disposition class as D5.**
+  The five `AGY-FIX2-*` commits genuinely ran via the Workflow tool this
+  session; `dispatch-authorship-verify.mjs`'s expectation of a standard
+  `evidence/dispatch-record-<TASK_ID>.json` artifact does not hold for that
+  dispatch path. Not fabricated authorship — a tooling gap. Tracked as a
+  new backlog item so the underlying gap (Workflow-tool dispatches not
+  producing the standard dispatch-record artifact) gets a real fix rather
+  than staying only a disclosed exception:
+  `backlog/items/2026-08-24-workflow-tool-dispatches-produce-no-dispatch-record-artifact.md`.
+- **F4 — accepted and disclosed, same disposition class as D5.** The D4
+  test-coverage commit (`4244ad7a`) is mislabelled `stage-0 (elephant)` and
+  does not fit the actual stage-0 criteria. GIT-05 forbids rewriting history
+  to relabel it after the fact. No code remedy exists; this record and
+  `docs/state.md` are the disclosure.
+- **F5 — accepted; real fix dispatched rather than a mechanical citation
+  sweep.** Rather than repointing ~20 citations of a non-existent
+  "`docs/operating-model.md` §3.3" to point at `roles/elephant.md` instead,
+  the PO-accepted fix adds the real, numbered §3.3 section to
+  `docs/operating-model.md` (moving/duplicating the stage-0 definition
+  currently only inline in `roles/elephant.md`) so the existing citations
+  become correct instead of needing to change. Scoped as its own dispatch,
+  not done inline in this session — see `docs/state.md` Open Items.
+
+No further Critic round is needed to close F3/F4/F5 specifically — they are
+PO-accepted dispositions, not code defects awaiting re-review. The fourth
+and final allowed round (per the round-budget note above) remains reserved
+for whatever the F5 fix dispatch (and any other still-open code change)
+produces.
