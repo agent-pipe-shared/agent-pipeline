@@ -17,7 +17,7 @@ Agent-Pipeline unterstützt aktuell **Claude Code** und **Codex** als produktive
 In diesem Sprint wird **Antigravity CLI (`agy`) mit der Gemini-Modellfamilie als 3. vollwertiger, auditierbarer und technisch hart durchgesetzter Runner** implementiert.
 
 Die Unterstützung umfasst zwingend **beide Schichten**:
-1. **Interaktive Entwickler-Session (Dimension A):** Der Entwickler arbeitet im Repository direkt mit Antigravity (IDE oder CLI `agy`). Das System führt den Session-Start, Onboarding-Prüfungen, Lifecycle-Checks und harte Pre-Tool-Guardrails (`guard-git`, `guard-push`, `guard-lifecycle-ready`) über native Antigravity-Hooks (`hooks.json`) aus.
+1. **Interaktive Entwickler-Session (Dimension A):** Der Entwickler arbeitet im Repository direkt mit Antigravity (IDE oder CLI `agy`). Das System führt den Session-Start, Onboarding-Prüfungen, Lifecycle-Checks und harte Pre-Tool-Guardrails (`guard-git`, `guard-push`, `guard-lifecycle-ready`) über native Antigravity-Hooks (`.agents/plugins.json`) aus.
 2. **Programmatischer Dispatch & Rollen-Hosts (Dimension B):** Automatisierte Pipeline-Scripts (z. B. Subagenten-Dispatch für *Goldfish*, unabhängiges *Critic-Review* und *Advisory*) rufen `agy` im Headless-Modus auf, werten strukturierte Ergebnisse/Usage aus und erstellen kryptografisch/strukturell gebundene Receipts.
 
 ---
@@ -27,7 +27,7 @@ Die Unterstützung umfasst zwingend **beide Schichten**:
 1. **Harte technische Durchsetzung (Keine Prompt-Only-Scheinsicherheit):**
    - Ein Runner darf in der Pipeline nicht schwächer abgesichert sein als die anderen.
    - Ein Agent darf weder seine eigenen Guardrails modifizieren noch Tests unbemerkt aushebeln können.
-   - Antigravity nutzt daher clientseitige `PreToolUse`- und `SessionStart`-Hooks (`hooks.json` in `.agents/`), die unerlaubte Befehle (z. B. ungeprüftes `git push`, unautorisierte Dateimodifikationen vor Freigabe) vor der Ausführung abfangen und den Exit-Code 2 liefern.
+   - Antigravity nutzt daher clientseitige `PreToolUse`- und `SessionStart`-Hooks (`plugins.json` in `.agents/`), die unerlaubte Befehle (z. B. ungeprüftes `git push`, unautorisierte Dateimodifikationen vor Freigabe) vor der Ausführung abfangen und den Exit-Code 2 liefern.
 
 2. **Runner-Autarkie ([ADR-0057](../../docs/adr/0057-runner-platform-support-is-an-implementation-obligation.md) Decision 2a):**
    - Kein Runner darf Vorbedingung für einen anderen sein. Antigravity muss jeden unterstützten Lifecycle-Schritt vollständig autark ohne Claude- oder Codex-Präsenz abschließen können.
@@ -69,7 +69,7 @@ Basierend auf den Modellstärken und Kostenstrukturen gilt folgende feste Zuordn
   - Integration von Antigravity in `RUNNERS_WITHOUT_APP_SERVER`.
 
 - **Harte Guardrails & Hooks:**
-  - Generierung und Wartung von `.agents/hooks.json` mit Verknüpfung zu den bestehenden Pipeline-Guards (`guard-git`, `guard-push`, `guard-lifecycle-ready`, `guard-devplan`).
+  - Generierung und Wartung von `.agents/plugins.json` mit Verknüpfung zu den bestehenden Pipeline-Guards (`guard-git`, `guard-push`, `guard-lifecycle-ready`, `guard-devplan`).
 
 - **Critic & Subagents:**
   - `plugins/pipeline-core/scripts/critic-antigravity-host.mjs`: Isolierter Critic-Review-Host für Antigravity mit Receipt-Erzeugung.
@@ -92,7 +92,7 @@ Basierend auf den Modellstärken und Kostenstrukturen gilt folgende feste Zuordn
 ## 6. Risiken & Mitigation
 
 1. **Risiko: Drift zwischen Claude- und Antigravity-Hooks.**
-   - *Mitigation:* Beide Hook-Konfigurationen (`hooks/hooks.json` und `.agents/hooks.json`) greifen auf dieselben zugrundeliegenden MJS-Guard-Dateien (`guard-git.mjs`, `guard-push.mjs` etc.) zu.
+   - *Mitigation:* Beide Hook-Konfigurationen (`hooks/hooks.json` und `.agents/plugins.json`) greifen auf dieselben zugrundeliegenden MJS-Guard-Dateien (`guard-git.mjs`, `guard-push.mjs` etc.) zu.
 2. **Risiko: Regressionsbrüche bei bestehenden Claude/Codex-Tests.**
    - *Mitigation:* Jede Wave wird mit `node harness/scripts/verify.mjs` gegen die gesamte bestehende Suite (380+ Tests) validiert.
 3. **Risiko: Plattform-Unterschiede (Linux / macOS / Windows).**
@@ -104,7 +104,7 @@ Basierend auf den Modellstärken und Kostenstrukturen gilt folgende feste Zuordn
 
 - **Wave 1:** Manifeste, Schemas, Modell-Mappings & Profile v3 (`antigravity`).
 - **Wave 2:** Execution Host, Headless `agy` Invocations- & Result-Parser.
-- **Wave 3:** Harte Antigravity Hook-Infrastruktur (`.agents/hooks.json`) & Guard-Verdrahtung.
+- **Wave 3:** Harte Antigravity Hook-Infrastruktur (`.agents/plugins.json`) & Guard-Verdrahtung.
 - **Wave 4:** Onboarding-, Lifecycle- & Bootstrap-Threading (`pipeline-start`).
 - **Wave 5:** Critic-Host Adapter (`critic-antigravity-host.mjs`), Receipts & Subagents.
 - **Wave 6:** Full Conformance Suite, ADR-0067, Dokumentation & Verify-Abschluss.
