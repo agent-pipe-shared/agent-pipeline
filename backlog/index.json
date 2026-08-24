@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a2ae188a926a012f7e79aa7dad2e2fdb0a7a30752d2eeab7f95d13f312a47270"
+    "transitionHead": "6971fa950489b7cd5cbd3ae47ecafbfc553f6f0b784d03fee2ffeb3cdbc0477c"
   },
   "counts": {
-    "open": 48,
+    "open": 49,
     "in_progress": 3,
     "closed": 262
   },
@@ -1838,6 +1838,15 @@
       "closureRepository": "self",
       "closureCommit": "2640075144cdd0a2ddac36a2a41f2181c01c19f7",
       "closureEvidence": "backlog/items/2026-08-08-an-installing-consumer-is-never-asked-any-setup-decision.md"
+    },
+    {
+      "id": "pipeline.intake-generate-coordinator-path-undocumented-in-skill-references",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-24",
+      "source": "AGY-KICKOFFSTAGING-1 dispatch, follow-up trace on backlog/items/2026-08-21-kickoff-staging-directory-mismatch.md, 2026-08-24",
+      "deferred": false
     },
     {
       "id": "pipeline.intake-values-restart-resilient-immediately",
