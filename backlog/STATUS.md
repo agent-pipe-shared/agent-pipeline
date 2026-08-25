@@ -38,6 +38,7 @@
 | pipeline.backlog-plan-writers-skip-drift-classification | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.backlog-readme-still-documents-rejected-and-deferred-as-status-values | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.backlog-status-drifts-from-code-across-compaction-with-no-hardening | closed | defect | pipeline | 2026-08-19 | — |
+| pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage | open | defect | pipeline | 2026-08-25 | — |
 | pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code | closed | workflow-improvement | pipeline | 2026-08-11 | — |
 | pipeline.blocking-push-gate-has-no-terminal-exception-boundary | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.bootstrap-and-kickoff-teach-their-own-constraints-only-by-live-rejection | open | defect | pipeline | 2026-08-09 | — |
@@ -323,6 +324,6 @@
 
 ## Counts
 
-- open: 45
+- open: 46
 - in_progress: 3
 - closed: 267

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "bdf81571a56b07f3a2847109cf10b352e612650e5252ffde2396e2151023e83c"
+    "transitionHead": "3715fabb50e2ac368f5ec984f40f00ee8e0641cd979d10e54cc826582e78cae1"
   },
   "counts": {
-    "open": 45,
+    "open": 46,
     "in_progress": 3,
     "closed": 267
   },
@@ -405,6 +405,15 @@
       "closureRepository": "self",
       "closureCommit": "a4fd67f885bab2a67ff5e1de9431b4c390fe02c7",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-git.test.mjs"
+    },
+    {
+      "id": "pipeline.backlog-strip-for-dispatch-drops-every-section-after-triage",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-25",
+      "source": "Confirmed twice in one session, 2026-08-25: AGY-KICKOFFPOQ-1's own completion report (Deviations #1) and directly reproduced by the Elephant while preparing this item's own follow-up dispatch",
+      "deferred": true
     },
     {
       "id": "pipeline.benchmark-fixture-digest-binding-does-not-cover-executed-workload-code",
