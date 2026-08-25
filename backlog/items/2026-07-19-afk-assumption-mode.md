@@ -73,3 +73,15 @@ item `in_progress` rather than closing now, to honor that already-recorded
 two-half design rather than overriding it based on an instruction that
 predates knowing the registration half had separately landed; it closes
 alongside `session-keep-awake` at the final candidate freeze.
+
+### Sweep re-check, 2026-08-25 (AGY-SWEEP-afk-assumption-mode)
+
+Reconfirmed live: all 8 on-disk `afk-*.test.mjs` suites are registered in
+`harness/scripts/verify.mjs` (exact-match diff, no gap), and the two most
+load-bearing suites pass green (`afk-assumption-mode.test.mjs` 29/29,
+`afk-activation.test.mjs` 13/13). Both technical halves of this item's own
+two-half gate are complete; the only remaining gate is the release-
+administration half (final PO disposition + candidate evidence, batched
+with `session-keep-awake`), bound to whether the Nova A candidate freeze has
+actually occurred — a fact that lives only in `docs/state.md`. Status
+unchanged; no code touched this pass.

@@ -52,3 +52,18 @@ just received a FAIL from its final T1 Critic gate review (see
 `docs/state.md`) — so the actual candidate freeze this item is bound to
 has still not happened. This item stays `in_progress`, now blocked only
 on the real freeze event, not on any further go/no-go input.
+
+### Sweep re-check, 2026-08-25 (AGY-SWEEP-session-keep-awake)
+
+Reconfirmed live: all 7 session-power/session-cleanup test suites still pass
+(63/63, 0 fail) — the item's own implementation remains complete. The
+remaining action (bind final-candidate Verify/Security/independent Critic,
+then the authorized HAW-E batch and remote readback) is structurally
+unavailable to a bounded Goldfish dispatch: full `verify.mjs` is out of
+scope, independent Critic review needs Elephant-level dispatch access, and
+remote readback needs a push gated behind a PO signature ceremony. The
+acceptance matrix (`specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md`
+rows 36-43) confirms this exact remaining-action string is shared verbatim
+across at least 4 Sentinel/HAW-E items — a single batch action tied to the
+real candidate freeze, not independent per-item work. Status unchanged; no
+code touched this pass.

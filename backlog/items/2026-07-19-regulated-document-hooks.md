@@ -25,3 +25,16 @@ This public baseline record was recovered from the Sentinel PRD. It records scop
   placeholder, scope/status only), so there is nothing to implement even once
   Phoenix's own work resumes.
 - **Date:** 2026-08-17
+
+### Sweep re-check, 2026-08-25 (AGY-SWEEP-regulated-document-hooks)
+
+Traced the item's cited source (`specs/2026-07-19-sprint-sentinel-epic/spec.md`
+SNT-5/HAW-C, PRD line 106): it is an 8-surface regulated-document private
+vertical the epic itself gates "close only in HAW-E batch" — still a
+separate, open Sprint Phoenix scope. A live check of the existing foundation
+files (`document-hooks.mjs`, `document-lifecycle.mjs`,
+`document-identifiers.mjs`) shows only the original 2026-07-20/23 foundation
+commits, no HAW-C vertical work since the 2026-08-17 deferral. Design is
+fully specced with no product ambiguity; the genuine blocker is the HAW-E
+batch dependency plus a remaining-scope size well outside one bounded
+dispatch. Status unchanged; no code touched this pass.

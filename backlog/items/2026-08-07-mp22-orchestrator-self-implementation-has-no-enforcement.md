@@ -225,3 +225,14 @@ conscious PO call, not just this triage pass's default.
 
 Confirmed: stays at Alfred, not pulled forward. Accepted as a conscious
 restricted risk until then.
+
+### Sweep re-check, 2026-08-25 (AGY-SWEEP-mp22-orchestrator-enforcement)
+
+Re-verified live rather than trusting the inherited "still open" label:
+EL-13a/EL-13b/EL-25a in `roles/elephant.md` give partial technical coverage
+of the PO's accepted candidate 3, but this item's own 2026-08-17 update
+(written after EL-13b landed) still calls the gap "still-active", and no
+later artifact treats it as closed. This item also names a genuine
+cross-item dependency — the same root gap must close a second entry point
+owned by `2026-08-08-no-design-to-implementation-handover-exists.md`, a
+separate still-in-flight item. Status unchanged; no code touched this pass.
