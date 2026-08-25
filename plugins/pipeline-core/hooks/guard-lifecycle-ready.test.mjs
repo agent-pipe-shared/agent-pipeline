@@ -3150,6 +3150,7 @@ function hgoArmByChat(root, toolInput, denials) {
     reason,
     reasonSha256: prepared.reasonSha256,
     activate: true,
+    dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
   });
   assert.equal(armed.status, "armed", `chat arm failed: ${JSON.stringify(armed)}`);
 }
