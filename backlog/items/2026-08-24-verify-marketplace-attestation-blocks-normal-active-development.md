@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-marketplace-attestation-blocks-normal-active-development
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-24
 source: "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24"
 due: 2026-08-31
@@ -145,3 +145,48 @@ implementation is a `goldfish-deep` dispatch (guardrail-adjacent: touches
 `verify.mjs`'s TP-3-protected suite registration for the WARN-downgrade
 half, and `guard-push.mjs`/the push-approval flow for the new blocking
 half) — not attempted here.
+
+## Implemented, 2026-08-25 (AGY-MKTATTEST-1, PO-approved Direction 3)
+
+PO approved Direction 3 verbatim ("ja das passt! so machen"). Dispatched
+and landed, commit `cbd22d4f`:
+
+- `human-guard-override.test.mjs`'s F1 case now catches only
+  `HGO-EXTERNAL-MARKETPLACE`, logs a visible WARN
+  (`[AGY-MKTATTEST-1] WARN: ...`), and re-verifies the checkout's OWN
+  attestation with the external registry read forced unreadable — so the
+  WARN can never become an assertion-free pass that stops covering a real
+  regression in this checkout's own manifest/tree. Every other failure
+  this call can raise stays a hard test failure, unchanged.
+- `guard-push.mjs` gained `checkMarketplaceAttestation()`: a new hard,
+  blocking push-time check, active only for a Pipeline-source checkout,
+  reusing the SAME attestation (`localPluginInstallSourceObservation()`)
+  the test exercises — never a second, independently written comparison.
+  Deliberately does NOT reuse `criticalProofWaiverFor`/
+  `readCriticalHumanProofPolicy` (a considered deviation from this item's
+  own design recommendation): that machinery models a human's detached
+  proof of intent, and there is no proof a human could sign for "the rsync
+  copy on this machine currently matches" — a live environment fact, not
+  an attested decision. Reuses the plainer collected-failure-message shape
+  the file's other checks already use instead.
+- Two new live tests (in `human-guard-override.test.mjs`, since
+  `guard-push.test.mjs` is TP-5 protected with no in-session override
+  route) spawn the real `guard-push.mjs` subprocess and prove the new
+  check both blocks on a genuine drift and does not block a genuine match.
+
+**Independently reverified by this session (not just the dispatch's own
+report):** `human-guard-override.test.mjs` 76/76, `guard-push.test.mjs`
+159/159 (unchanged pass-set, no regression), `check-consumer-safe-paths.test.mjs`
+9/9. Two full `node harness/scripts/verify.mjs` runs: the first (bound to
+this dispatch's own commit `cbd22d4f`) found exactly one red suite,
+`backlog-state-check` — traced to an unrelated, pre-existing defect from
+earlier same-session work (a `closure_commit` ledger-invariant break on a
+different backlog item), fixed separately in commit `f7d4583c`; the second
+full run (bound to `4955303f`, which includes that fix) came back fully
+green, `exitCode: 0`, 385/385 suites.
+
+Acceptance criteria all met: ordinary commits touching
+`plugins/pipeline-core/**` no longer fail Verify for unrelated
+environment drift; the underlying security property is preserved, now
+enforced hard at the moment it actually matters (push time) instead of on
+every commit.
