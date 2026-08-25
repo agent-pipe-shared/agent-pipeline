@@ -4,6 +4,10 @@ id: pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-clif
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: 563be0260c3a256969a3452cd44a4a5d10726ece
+closure_evidence: backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md
 created: 2026-08-23
 source: "Direct measurement across one dispatch block, 2026-08-23 (agy-runner Critic-fix wave): five of six Goldfish dispatches ended mid-sentence without committing, every one of them at 50 or 51 tool uses, against briefed base caps of 30-35."
 ---
