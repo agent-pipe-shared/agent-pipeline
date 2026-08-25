@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.verify-mjs-runs-385-suites-strictly-sequentially
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-24
 source: "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24 (\"wir müssen verify mindestens um 70% beschleunigen ... von mir aus auch 50% aber schneller ohne Verluste\")"
 due: 2026-08-31
@@ -268,3 +268,16 @@ further concurrency-cap tuning fixes this; the suite's own internal cost
 now the binding constraint on how much closer to the 50–70% target this
 gate can get. Worth its own follow-up look before concluding the target is
 unreachable.
+
+## Closed, 2026-08-25 (PO decision) — partial result accepted, not over-engineered further
+
+PO instruction: don't over-engineer this further; close it with the
+current result rather than chasing the remaining gap. The ~42–50%
+reduction (6m58s vs. ~12–14min) is real, substantial, and lands from a
+clean, independently-verified full run — not a partial or theoretical
+number. `project-onboarding-v3-tests`'s 116.5s cost remains the concrete
+next lever if anyone picks this up later (raising `DEFAULT_VERIFY_
+CONCURRENCY` above 8 alone will not move it, since profiling that one
+suite's internal cost is the actual next step, not another concurrency
+knob) — left as a clearly-scoped follow-up note rather than a blocking
+condition on this item. Item closed.
