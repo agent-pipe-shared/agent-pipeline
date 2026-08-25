@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.kickoff-staging-directory-mismatch
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-21
 source: Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)
 ---
@@ -146,3 +146,29 @@ Reconcile the documentation and the code. Either update `kickoff-design.md` to r
     warrant its own backlog item; not filed here per this dispatch's
     single-file scope.
 - **Date:** 2026-08-24
+
+## Closed, 2026-08-25
+
+The actionable half of this item is resolved: the AGY-KICKOFFSTAGING-1 trace
+(above, 2026-08-24) is a complete, code-traced call chain showing `kickoff
+plan` never touches `INTAKE_STAGING_DIRNAME`/`project/.onboarding-staging/`
+— `kickoff-design.md` is accurate for that subcommand, no doc correction is
+warranted, and the item's original doc-vs-code mismatch claim is not
+confirmed.
+
+The one piece left genuinely unresolved ("which exact command Antigravity
+invoked in the original testing session") is explicitly, permanently
+undeterminable from the repository alone (no session transcript in scope)
+— it is not a defect with a fix, it is a historical question with no
+further evidence available. Re-verified before closing (this repo's own
+"re-verify inherited still-open claims" discipline): `docs/state.md`'s
+open-items list still described this as "still needs a proper
+investigation pass," which was stale — the trace above already completed
+that pass on 2026-08-24, docs/state.md simply was not cross-referenced
+against it afterward.
+
+The trace's own recommended follow-up (documentation-completeness gap for
+the `intake-generate-plan`/`intake-generate-apply` coordinator path) is
+already filed as its own item:
+`backlog/items/2026-08-24-intake-generate-coordinator-path-undocumented-in-skill-references.md`.
+Nothing further to do here. Item closed.
