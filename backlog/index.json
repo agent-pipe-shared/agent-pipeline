@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "89185087b836ae247ef226fd1edad37784857318408f3b6e55a45e005c822300"
+    "transitionHead": "46b31a938c949254fa4eca550ef66fd79a0c8d16257165c2f43757741ff8895f"
   },
   "counts": {
-    "open": 49,
+    "open": 48,
     "in_progress": 3,
-    "closed": 269
+    "closed": 270
   },
   "items": [
     {
@@ -702,12 +702,16 @@
     },
     {
       "id": "pipeline.codex-runner-has-no-real-support-on-native-windows",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-19",
       "source": "Live external greenfield test, 2026-08-19: project Rune_Test1_Codex_060_55, Windows host, Codex CLI, candidate 0.6.0+codex.20260819163512.ca18e0c. PO pasted the full session transcript; a companion fix (NVA-BL-CASWIN-1, scoped narrowly to the self-contradicting recovery message) was dispatched the same session. This item is the PO's own explicitly deferred second half: \"Für einen späteren sprint bzw. defered ein neues backlog item setzen, dass codex windows support noch gebaut werden muss.\"",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-08-25",
+      "closureRepository": "self",
+      "closureCommit": "ad5ed30139006e1d15da90cbf0958ee48a9e0c2e",
+      "closureEvidence": "backlog/items/2026-08-19-codex-runner-has-no-real-support-on-native-windows.md"
     },
     {
       "id": "pipeline.codex-sandbox-critic-longterm",
