@@ -196,6 +196,17 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         || !SHA256.test(parsed["selection-sha256"] ?? "")
         || !SHA256.test(parsed["reason-sha256"] ?? "")
         || typeof parsed.reason !== "string" || parsed.reason.trim() === "") throw new Error(usage());
+      // AGY-HGOFIX-2: authorizeHumanGuardOverride() now runs the same attended-terminal
+      // ceremony (lib/chat-gate-ceremony.mjs) pipeline-state.mjs's `approve-push` chat
+      // mode already uses, so this CLI must thread its own `dependencies` seam through
+      // (options.dependencies, the test-only injection point for isattyFn/readLineFn --
+      // a genuinely attended run relies on the real process.stdin.isTTY/readSync
+      // defaults instead). `writeFn` defaults to `writeError` (stderr), not the base
+      // `write`/stdout default `readAttendedLine()` would otherwise use: every other
+      // subcommand's stdout is a JSON contract (`write(JSON.stringify(...))`), so the
+      // human-facing confirmation prompt must never land on the same stream a caller
+      // parses as JSON.
+      const dependencies = { writeFn: (text) => writeError(text), ...(options.dependencies ?? {}) };
       write(`${JSON.stringify(authorizeHumanGuardOverride({
         rootDir: parsed.repo,
         pluginRoot: PLUGIN_ROOT,
@@ -207,6 +218,7 @@ export function main(argv = process.argv.slice(2), io = {}, options = {}) {
         activate: true,
         scriptPath: SCRIPT,
         authorSourceRoot: parsed["author-source-root"] ?? null,
+        dependencies,
       }))}\n`);
       return 0;
     }

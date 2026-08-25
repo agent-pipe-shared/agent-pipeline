@@ -18,6 +18,11 @@ import {
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
+import {
+  CHAT_GATE_CONFIRMATION_MISMATCH,
+  CHAT_GATE_NOT_ATTENDED,
+  requireAttendedChatGateConfirmation,
+} from "./chat-gate-ceremony.mjs";
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import {
   readCriticalHumanProofPolicy,
@@ -2338,6 +2343,7 @@ export function authorizeHumanGuardOverride({
   spawn = spawnSync,
   scriptPath,
   authorSourceRoot = null,
+  dependencies = {},
 } = {}) {
   if (activate !== true) fail("HGO-ACTIVATION", "override authorization requires explicit activation");
   // ADR-0059 Decision 1, defense in depth: this in-session `activate` path is an
@@ -2385,6 +2391,41 @@ export function authorizeHumanGuardOverride({
     scriptPath,
     authorSourceRoot,
   });
+  // AGY-HGOFIX-2: this in-session `activate` path had ZERO attended-terminal check --
+  // an agent could run plan -> prepare-authorization -> authorize --activate entirely by
+  // itself, computing every required digest itself, with no human step at all. The
+  // expected confirmation value is deterministic (derived from `selectionSha256`, itself
+  // already bound to requestSha256/planSha256/reasonSha256 by the HGO-SELECTION check
+  // above) rather than a random persisted challenge (contrast pipeline-state.mjs's
+  // `pendingPushChallenge`): the security property `requireAttendedChatGateConfirmation`
+  // provides is TTY-ness of fd 0, not secrecy of the expected string (mirrors
+  // po-authority-acknowledge-apply's `expected: apply.by`, also fully agent-known).
+  // Placed AFTER the mode/reason/selection/plan checks above but BEFORE any capability
+  // file is written or audit entry appended, so a failed attempt leaves the pending
+  // request/plan/selection fully available for a genuine attended retry.
+  const confirmationExpected = `HGO-${selectionSha256.slice(0, 8).toUpperCase()}`;
+  const confirmation = requireAttendedChatGateConfirmation({
+    summaryLines: [
+      "HUMAN GUARD OVERRIDE ACTIVATION CONFIRMATION -- read before you type the value:",
+      `  reason: ${reason}`,
+      `  request-sha256: ${requestSha256}`,
+      `  plan-sha256: ${planSha256}`,
+      `  selection-sha256: ${selectionSha256}`,
+      `  confirmation value: ${confirmationExpected}`,
+    ],
+    expected: confirmationExpected,
+    dependencies,
+  });
+  if (!confirmation.ok) {
+    fail(
+      confirmation.code,
+      confirmation.code === CHAT_GATE_NOT_ATTENDED
+        ? "override activation refused (CHAT-GATE-NOT-ATTENDED); a human must confirm this activation directly, in their own attended terminal -- an agent's own tool call cannot complete this step."
+        : confirmation.code === CHAT_GATE_CONFIRMATION_MISMATCH
+          ? "override activation refused (CHAT-GATE-CONFIRMATION-MISMATCH); the typed value did not match the confirmation value shown."
+          : "override activation refused; the attended confirmation ceremony did not succeed.",
+    );
+  }
   const repo = planned.mode === "global-plugin-install"
     ? controlPathTopology(rootDir)
     : topology(rootDir, spawn);

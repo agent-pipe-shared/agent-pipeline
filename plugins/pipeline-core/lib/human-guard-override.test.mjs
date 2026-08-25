@@ -578,6 +578,7 @@ test("one exact attended capability is audited, consumed once and cannot be repl
       reason,
       reasonSha256: reasonDigest(reason),
       activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000,
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
@@ -686,6 +687,7 @@ test("a host-Git-unavailable hook can consume only the exact audited local plugi
       reason,
       reasonSha256: reasonDigest(reason),
       activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3_000,
       scriptPath,
     });
@@ -754,6 +756,7 @@ test("local plugin installation capability rejects a changed candidate source", 
     authorizeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3_000, scriptPath,
     });
     writeFileSync(join(root, "plugins", "pipeline-core", "candidate.mjs"), "export const candidate = 2;\n");
@@ -813,6 +816,7 @@ test("commit and exact in-root patch admission never execute the effect or claim
         reason,
         reasonSha256: prepared.reasonSha256,
         activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
         nowMs: 3000,
         scriptPath,
       });
@@ -878,6 +882,7 @@ test("drift, expiry and concurrent consumption fail closed", () => {
       reason,
       reasonSha256: reasonDigest(reason),
       activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000,
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
@@ -972,6 +977,7 @@ test("NVA-W3-16: a rejected drift audit entry names exactly which checks diverge
       reason,
       reasonSha256: reasonDigest(reason),
       activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000,
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
@@ -1336,6 +1342,7 @@ test("pipeline author repair binds one exact source root and action without Stat
       reasonSha256: prepared.reasonSha256,
       authorSourceRoot: sourceRoot,
       activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000,
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
@@ -1443,6 +1450,7 @@ test("an armed capability is unusable when its authorization audit disappeared",
       reason,
       reasonSha256: prepared.reasonSha256,
       activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000,
       scriptPath,
     });
@@ -1576,6 +1584,7 @@ test("a tampered one-action capability cannot be consumed", () => {
       reason,
       reasonSha256: prepared.reasonSha256,
       activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000,
       scriptPath,
     });
@@ -1635,7 +1644,8 @@ test("NVA-SIGDISCLOSE-1 Finding 6: a tampered capability among several never poi
       authorizeHumanGuardOverride({
         rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
         planSha256: plan.planSha256, selectionSha256: prepared.selectionSha256, reason,
-        reasonSha256: prepared.reasonSha256, activate: true, nowMs: nowMs + 300, scriptPath,
+        reasonSha256: prepared.reasonSha256, activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` }, nowMs: nowMs + 300, scriptPath,
       });
       return plan.planSha256;
     }
@@ -1685,7 +1695,8 @@ test("NVA-SIGDISCLOSE-1 Finding 6: a record that IS validated but is a legitimat
     authorizeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
       planSha256: plan.planSha256, selectionSha256: prepared.selectionSha256, reason,
-      reasonSha256: prepared.reasonSha256, activate: true, nowMs: 3000, scriptPath,
+      reasonSha256: prepared.reasonSha256, activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` }, nowMs: 3000, scriptPath,
     });
     // A DIFFERENT, unrelated tool call -- the armed capability is well-formed and valid,
     // it simply does not match. This must fall straight through to "absent", carrying no
@@ -1743,6 +1754,7 @@ test("authorization audit failure rolls back its newly created capability", () =
         reason,
         reasonSha256: prepared.reasonSha256,
         activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
         nowMs: 3000,
         scriptPath,
       }),
@@ -2500,7 +2512,8 @@ test("NVA-BL-20 F5: the Codex marketplace-registry spawn is injectable from all 
     authorizeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
       planSha256: planned.planSha256, selectionSha256: prepared.selectionSha256, reason,
-      reasonSha256: reasonDigest(reason), activate: true, nowMs: 3_000, scriptPath,
+      reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` }, nowMs: 3_000, scriptPath,
     });
     const consume = (codexSpawn, nowMs) => consumeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, toolName: "Bash", toolInput, denials: denial,
@@ -2687,6 +2700,7 @@ test("NOVA-HGOELIG-2: chat mode reaches the identical out-of-root class with the
     const armed = authorizeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
     assert.equal(armed.status, "armed");
@@ -3116,6 +3130,7 @@ test("NVA-CROSSREPOLEDGER-1b: a cross-repository `git -C` command binds command 
     const armed = authorizeHumanGuardOverride({
       rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000, scriptPath,
     });
     assert.equal(armed.status, "armed");
@@ -3274,6 +3289,7 @@ test("NVA-CROSSREPOLEDGER-2a: a symlinked cross-repository target resolves the l
     const armed = authorizeHumanGuardOverride({
       rootDir: target, pluginRoot: PLUGIN_ROOT, requestSha256: recorded.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000, scriptPath,
     });
     assert.equal(armed.status, "armed");
