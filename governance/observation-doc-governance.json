@@ -113,6 +113,7 @@
           "docs/github-actions-token-permissions.md",
           "docs/gitlab-ci-pilot-threat-model.md",
           "docs/guard-maintenance-window-threat-model.md",
+          "docs/human-authorization-inventory.md",
           "docs/human-guard-override-threat-model.md",
           "docs/local-supervisor-state-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
