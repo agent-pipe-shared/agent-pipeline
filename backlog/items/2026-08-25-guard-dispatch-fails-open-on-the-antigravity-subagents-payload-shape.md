@@ -112,3 +112,38 @@ convenient form), not a paraphrased/relative-only version of it.
   to Nova B like the sibling theoretical item
   [[agent-binding-guards-are-not-os-level-sandboxing]].
 - **Date:** 2026-08-25
+
+### Triage update (Goldfish dispatch AGY-SWEEP-guard-dispatch-fail-open, 2026-08-25)
+
+- **Decision:** implemented. Revisited per explicit PO instruction to work
+  through deferred items now rather than leaving the earlier deferral
+  standing.
+- **What changed:** `plugins/pipeline-core/hooks/guard-dispatch.mjs` gained
+  `extractAntigravityDispatches()`, a third recognized payload shape
+  alongside the direct Agent-tool (`subagent_type`/`prompt`) and
+  Workflow-tool (`script`) shapes already handled: `toolInput.Subagents` is
+  read as an array of `{ TypeName, Prompt }` entries (capitalized keys,
+  matching the actual reported Antigravity shape) and each entry is run
+  through the same `dispatchFindings()` check the other two shapes already
+  use. A malformed entry (no string `TypeName`) is skipped rather than
+  guessed at, preserving the file's existing fail-open posture on anything
+  it cannot confidently read. The header comment gained a matching
+  "ANTIGRAVITY RUNNER AWARENESS" paragraph.
+- **Tests:** `plugins/pipeline-core/hooks/guard-dispatch.test.mjs` gained
+  GD12-GD15, built from the actual reported payload shape (capitalization
+  included, not a paraphrased stand-in): GD12 blocks a Subagents-array
+  Critic dispatch carrying a claims list, GD13 allows a clean
+  references-only one, GD14 blocks the exact freehand-prose Critic dispatch
+  the source session reproduced, GD15 allows an unrelated subagent type.
+  `node --test plugins/pipeline-core/hooks/guard-dispatch.test.mjs`: 15/15
+  pass, exit 0. `node --test
+  harness/scripts/check-consumer-safe-paths.test.mjs` (required, touched
+  `plugins/pipeline-core/`): 9/9 pass, exit 0.
+- **Not touched:** `NEVER_LIFTABLE_KERNEL_PATHS` in
+  `guard-maintenance-window.mjs` does not list `guard-dispatch.mjs` or
+  `dispatch-policy.mjs`, and this change adds no new import edge into any
+  listed file, so the kernel-closure test was out of scope per this
+  dispatch's own briefing and was not run.
+- **Commit:** `ced361b1b5c9f707472c20e361f5380a744c1adc`.
+- **`status:` field:** left untouched — the Elephant reconciles it centrally
+  across the sweep.
