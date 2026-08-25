@@ -348,3 +348,67 @@ GIT-01 wiring or GG-22.** A follow-up dispatch must self-heal onto
 `1a25b866` (not trunk), add tests for both blocks, run
 `guard-git.test.mjs`/whatever suite covers this hook, and only then land it
 on trunk.
+
+### Triage refresh, 2026-08-25 (AGY-SWEEP-orchestrator-authored-commits) — the 2026-08-19 note above is now stale; Part A is live on trunk and verified green
+
+Re-investigated per explicit PO instruction to revisit deferred/open items in
+AFK mode rather than rubber-stamp the existing Triage. Findings, checked
+directly against source and history rather than inherited from the note
+above (CLAUDE.md's re-verify-before-dispatching rule):
+
+- **The `1a25b866` "untested checkpoint" commit named above is gone and
+  superseded — confirmed empirically, not inferred.** `git cat-file -t
+  1a25b866` returns `fatal: Not a valid object name` in this worktree (which
+  shares this repo's full object database), so that SHA is not reachable
+  from any local ref. `git log --oneline -- plugins/pipeline-core/hooks/guard-git.mjs`
+  shows the real sequence: `cf7c6331` (the untested-checkpoint commit,
+  apparently since rewritten/GC'd or the note's SHA was from a different
+  clone) → `c716ba10` ("Revert ...") → `2d7690fe` (`feat(guard-git): wire
+  GIT-01 conventional-commit-type enforcement`) → `539cef43` (`feat(guard-git):
+  wire GG-22 backlog-ledger-debt guard`), all four ancestors of current
+  trunk (`badca7baa5`). The follow-up work the 2026-08-19 note called for
+  (self-heal, add tests, verify, land on trunk) already happened, just not
+  literally on top of that exact SHA.
+- **Part A (GIT-01 wiring) is live and tested on trunk, evidence run fresh
+  this session:** `node --test plugins/pipeline-core/hooks/guard-git.test.mjs`
+  — `230/230 cases passed`, summary `pass 1 / fail 0`, including
+  `GIT01-1..4` (inadmissible type blocked, admitted type allowed, editor
+  commit not false-blocked, non-commit git command untouched) and `GG22-1..6`
+  (bootstrap/clean/debt/reconciliation/non-status-edit/fail-open). The
+  `6decf59`/`design:` regression shape this item exists for is the exact
+  case `GIT01-1` blocks. This is now a live, deterministic, commit-time
+  control — not merely an audit trail — which is what this item's "Why they
+  belong in one item" section asked for.
+- **Direction 2/3 (authorship control) needs no further action from this
+  item specifically.** Already decided 2026-08-11: decline a technical
+  enforcement gate, attack the cause instead; the cause-side fix is owned by
+  the still-open `2026-08-07-mp22-orchestrator-self-implementation-has-no-enforcement.md`
+  item, not this one. Re-confirmed both `mp22` and
+  `2026-08-08-long-dispatches-truncate-before-emitting-their-report.md`
+  (the named upstream cause) are still `status: open` as of this pass — that
+  is a gap in those items, not in this one, since this item's own decision
+  already deferred that work there.
+- **Part B (the `verify.mjs` range-mode registration) remains genuinely
+  undone**, and was NOT attempted in this pass: registering a new suite
+  entry into `harness/scripts/verify.mjs` is `guard-testpath.mjs` TP-3
+  territory (confirmed by this item's own 2026-08-18 note — a concrete edit
+  attempt was refused there with only the external-signature HGO ceremony
+  offered), and running a live signature ceremony from an isolated sweep
+  worktree — one of 17 concurrent dispatches touching this repo today — is
+  outside this dispatch's remit and risks exactly the kind of HEAD/tree-bound
+  ceremony collision CLAUDE.md's "No tree mutation while a HEAD/tree-bound PO
+  command is outstanding" note warns about. Not built this pass, in either
+  code or tests, so as not to leave a half-finished, uncommitted diff behind
+  under a tightening tool budget (the failure mode the 2026-08-19 note above
+  itself records for `NVA-W5-GITGUARD-1`).
+
+**Recommendation to the Elephant: this item's core, originally-observed
+problem (a bad commit type slipping through uncaught, and — more broadly —
+a lifecycle rule enforced only by a reviewer reading history afterwards) is
+resolved and verified live on trunk; the authorship half was a deliberate
+PO decision, not an implementation gap, and is tracked elsewhere. The
+residual — Part B's redundant defense-in-depth range check for `verify.mjs`
+— is fully designed above (2026-08-19 "Direction 1 design" section, Part B)
+and could be spun into its own small, separate backlog item scoped exactly
+to "build script + tests, then a dedicated TP-3 ceremony to register it" if
+wanted; it is not required to consider this item's stated problem closed.
