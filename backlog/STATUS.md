@@ -130,7 +130,7 @@
 | pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane | closed | defect | pipeline | 2026-08-18 | — |
-| pipeline.guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape | open | defect | pipeline | 2026-08-25 | — |
+| pipeline.guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.guard-dispatch-has-no-workflow-tool-awareness | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table | closed | workflow-improvement | pipeline | 2026-08-16 | — |
@@ -143,7 +143,7 @@
 | pipeline.guard-refuses-documented-bounded-diagnostic | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-refuses-the-prescribed-recovery | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.guard-string-match-makes-a-file-uncommittable | closed | defect | pipeline | 2026-08-08 | — |
-| pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array | open | defect | pipeline | 2026-08-25 | — |
+| pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.handover-file-has-no-rotation-obligation | closed | workflow-improvement | pipeline | 2026-08-07 | — |
 | pipeline.handover-rotation-extraction-acknowledgment-is-repo-wide-not-section-scoped | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.happy-path-local-telemetry | closed | workflow-improvement | pipeline | 2026-08-18 | — |
@@ -207,7 +207,7 @@
 | pipeline.onboarding-lifecycle-plan-hardcodes-the-codex-runner | closed | defect | pipeline | 2026-08-06 | — |
 | pipeline.onboarding-ready-path-unconditional-restart-barrier-read | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.onboarding-restart-flow-is-codex-only-not-runner-aware | closed | defect | pipeline | 2026-08-07 | — |
-| pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | open | defect | pipeline | 2026-08-08 | — |
+| pipeline.orchestrator-authored-production-commits-have-no-deterministic-control | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.over-broad-ignore-rule-swallows-closure-evidence | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.parallel-goldfish-dispatches-race-on-shared-checkout | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.partial-lifecycle-blocks-read-only-diagnosis-and-tmp-fallback | closed | defect | pipeline | 2026-08-17 | — |
@@ -312,6 +312,7 @@
 | pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.verify-marketplace-attestation-blocks-normal-active-development | closed | defect | pipeline | 2026-08-24 | — |
 | pipeline.verify-mjs-runs-385-suites-strictly-sequentially | closed | workflow-improvement | pipeline | 2026-08-24 | — |
+| pipeline.verify-range-mode-registration-for-orchestrator-commit-control | open | idea | pipeline | 2026-08-25 | — |
 | pipeline.warn-security-gate-hard-blocks-every-push | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory | closed | defect | pipeline | 2026-08-17 | — |
@@ -329,6 +330,6 @@
 
 ## Counts
 
-- open: 48
+- open: 46
 - in_progress: 3
-- closed: 270
+- closed: 273
