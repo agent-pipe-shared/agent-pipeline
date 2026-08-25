@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-25
 source: "PO live observation during an Agy/Antigravity test session, 2026-08-25 (chat): an agent granted itself a push approval under gates.push_approval: chat"
 ---
@@ -103,3 +103,45 @@ scope as a `goldfish-deep` dispatch per the linked item.
 - **Assignment (if accepted):** this sprint — see
   `2026-08-21-enforce-kickoff-po-questions.md` for the actual dispatch.
 - **Date:** 2026-08-25
+
+## Implemented, 2026-08-25 (AGY-CHATADAPTER-1, commit `1ad664a8`)
+
+Closed. `plugins/pipeline-core/lib/chat-gate-ceremony.mjs` (new, 103
+lines): `requireAttendedChatGateConfirmation()` gates on
+`isAttendedTerminal()` (`process.stdin.isTTY`, injectable seam for tests)
+BEFORE any read — reusing the same `readSync(0, ...)` attended-terminal
+property `po-human-approval.mjs` already relies on for `signature` mode,
+never a second, weaker mechanism. `pipeline-state.mjs`'s `approve-push`
+chat-mode path is rewired onto it; the `--challenge <code>` CLI flag is
+REMOVED entirely (an agent could always copy-paste that value itself) —
+confirming is now only possible by re-running the identical command from a
+genuinely attended terminal.
+
+**Independently reverified by this session, not just the dispatch's own
+report:** read `chat-gate-ceremony.mjs` in full — sound design, fails
+closed on any TTY-detection error. Read the `pipeline-state.mjs` diff in
+full. Ran `node --test plugins/pipeline-core/scripts/pipeline-state.test.mjs`
+myself — exit 0, all checks pass, including the three new proofs: (1) an
+unattended in-process retry with the correct code is refused
+(`CHAT-GATE-NOT-ATTENDED`), challenge stays unconsumed; (2) a REAL spawned
+subprocess (`spawnSync`, not an injected seam) with the correct code piped
+into non-TTY stdin — exactly the shape an agent's own Bash tool call has —
+is refused with the same code, the strongest available proof; (3) a
+genuinely attended call (simulated via the file's own injectable
+`isattyFn`/`readLineFn` seam) with the correct value succeeds, and a wrong
+typed value is refused without consuming the pending challenge. Also ran
+`node --test harness/scripts/check-consumer-safe-paths.test.mjs` myself —
+9/9 green (this dispatch touches `plugins/pipeline-core/`).
+
+Residual, disclosed, not treated as a defect: `isAttendedTerminal()`
+checks `process.stdin.isTTY`, which stops the confirmed incident shape (a
+default agent piping/reusing its own command output) but would not by
+itself stop a deliberately pty-spawning adversarial agent — the same
+property class `po-human-approval.mjs`'s existing `signature`-mode
+ceremony already accepts as its own bar; not a new weakness introduced
+here.
+
+Full `node harness/scripts/verify.mjs` NOT yet run for this commit — the
+dispatch ran out of budget before reaching it; recommend one clean run
+before this lands as part of a larger push, though the two directly
+affected suites are independently confirmed green above.
