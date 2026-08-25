@@ -111,7 +111,7 @@ genuinely undecided — item stays `open`.** Needs the PO's own call once
 awake; nothing further to investigate from the repo alone per this
 dispatch's own findings.
 
-## Part (b) landed, 2026-08-25
+## Part (b) landed, 2026-08-25 — then reversed same day
 
 PO decision (chat, 2026-08-25): `project/.onboarding-staging/` is
 gitignored, not tracked — it is pre-binding scratch state (must be
@@ -126,4 +126,17 @@ so every future onboarded project gets the same rule from the start.
 not full-text equality, so it is unaffected by the addition — confirmed by
 reading the test directly before this change.
 
-Both parts (a) and (b) are now resolved. Item closed.
+**Reversed, same day (PO chat correction, 2026-08-25):** the initial PRD
+and Spec content that lands in this staging area is used substantively by
+`sprint-agy-runner` — it must not be discarded via `.gitignore`. Both
+gitignore additions (this repo's own `.gitignore` and `PROJECT_IGNORE_SEED`)
+were removed again; `.onboarding-staging` is tracked like any other
+generated PRD/Spec content, consistent with part (a)'s existing rule that
+`docs/state.md` + the PRD/Spec pair must always be staged. No directory
+currently exists on disk to re-add to the index (checked: `project/
+.onboarding-staging` is absent at the time of this correction) — the fix is
+purely the removal of the ignore rule, so future kickoff runs commit this
+content instead of silently dropping it.
+
+Both parts (a) and (b) are now resolved with the corrected disposition.
+Item stays closed.
