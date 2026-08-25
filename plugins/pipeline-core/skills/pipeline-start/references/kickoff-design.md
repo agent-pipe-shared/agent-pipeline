@@ -7,6 +7,20 @@ below is what to do once you are in one of those states. It was moved out of
 the core verbatim (BOOTMOD-1): the core is read at the start of every session
 and pays for every byte, including the sessions that never reach a kickoff.
 
+A genuinely pristine repository's `v4Inspection` status is no longer
+`kickoff-required` in current code: since commit `10e1b6a0`, that branch
+always routes instead to `intake-required`, `intake-design-questions-
+required`, or `bootstrap-binding-required` (`kickoff-required` survives only
+as an unreachable-in-practice safety net for a drifted state the design does
+not otherwise describe). If the observed status is one of those three, load
+`references/intake-generate-design.md` instead — that is the coordinator
+flow a fresh repository now actually routes toward; it hands off into the
+same promotion transaction this file documents below, so read this file
+first, then that one. A repository already mid-kickoff under the old model
+(`kickoff apply` already ran, `kickoff promote` has not) never reaches that
+branch at all — its continuity is already valid, so it keeps following the
+rest of this file untouched.
+
 A pristine project's first commits mix two different kinds of file: the
 onboarding transaction's own pipeline-scaffolding output (`.claude/settings*`,
 guard/hook configs, and any other pipeline-authority file it writes) and the

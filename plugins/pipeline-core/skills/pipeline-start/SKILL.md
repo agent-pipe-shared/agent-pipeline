@@ -229,6 +229,14 @@ it. It carries the two PO questions in full, the package directory and file
 names, the promotion transaction, the source-evidence rules, and the PRD/Spec
 quality bar.
 
+A pristine project's `v4Inspection` status is not always `kickoff-required`:
+since commit `10e1b6a0`, a genuinely fresh repository (no prior kickoff
+transaction) is routed instead to `intake-required`,
+`intake-design-questions-required`, or `bootstrap-binding-required` — load
+`references/intake-generate-design.md` for that path instead of
+`kickoff-design.md`. A repository already mid-kickoff under the old model
+keeps following `kickoff-design.md` untouched.
+
 Three of its rules are stated here as well, because a session that never loads
 it is still bound by them. No artifact of a pristine project is written before
 its bootstrap questions are answered. Two of those answers are PO input and are
@@ -253,6 +261,10 @@ The happy path loads no reference file. Load only the exact condition:
 - `references/continuation.md` for `PCR-BLOCKED` or `PCR-DECISION-PENDING`;
 - `references/kickoff-design.md` for kickoff intake questions, the durable
   design package, promotion, and the PRD/Spec quality bar;
+- `references/intake-generate-design.md` for the `intake-*`/
+  `bootstrap-binding-required` coordinator path a genuinely fresh repository
+  now actually routes toward, its staging output, and its handoff into the
+  same promotion transaction `kickoff-design.md` documents;
 - `references/push-approval.md` for the point a session constructs,
   explains, or discusses the push-approval gate (`gates.push_approval`),
   before a human clears it;

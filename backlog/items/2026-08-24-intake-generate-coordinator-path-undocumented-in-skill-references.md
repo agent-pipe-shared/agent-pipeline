@@ -99,3 +99,62 @@ the classic flow's PRD/Spec pair (part a of that item) — remains this
 item's own open scope: the missing skill-reference documentation for
 `intake-generate-plan`/`intake-generate-apply` is exactly where that
 staging instruction belongs once written.
+
+## Triage, 2026-08-25 (AGY-SWEEP-intake-generate-coordinator)
+
+Implemented. Added a new sibling reference,
+`plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md`,
+documenting the `intake-*`/`bootstrap-binding-required` coordinator at the
+same level of detail `kickoff-design.md` gives the classic flow: the step
+sequence (`intake-consent-apply` → `intake-capture-apply` (repeated) →
+`intake-design-questions-apply` → `intake-generate-plan`/`apply` →
+`bootstrap-bind-plan`/`apply`) with each command's exact flags read from
+`project-onboarding-v3.mjs`'s own CLI parsing; what `intake-generate-apply`
+writes and where (`project/.onboarding-staging/{design-input.md,
+prd_<featureId>.md, spec.md}`, `featureId` derivation, which two of the
+three files are meant to be hand-authored before binding, per the guard's
+own NVA-BL-INTAKEBIND-1 admission); and — directly answering the item's own
+"how/when it hands off" question — the discovery that `bootstrap-bind-apply`
+is not a separate binding mechanism at all: `planOnboardingBootstrapBind`/
+`applyOnboardingBootstrapBind` call the exact same
+`buildKickoffPromotionPlan`/`applyOnboardingKickoffPromotion` machinery
+`kickoff promote apply` uses, with `coordinatorSourced: true`. The doc also
+resolves this item's own "Cross-reference" positive half: it states the
+staging directory must be staged and committed, the same discipline
+`kickoff-design.md` already requires for `kickoff apply`'s own targets.
+
+`SKILL.md`'s "Kickoff intake" section and the typed-lazy-loading list now
+name the new reference and state the routing split plainly: a genuinely
+pristine repo's `v4Inspection` status is no longer `kickoff-required` in
+current code (that value survives only as an unreachable-in-practice safety
+net for an undesigned drifted state) — it is always `intake-required` /
+`intake-design-questions-required` / `bootstrap-binding-required` since
+commit `10e1b6a0`. `kickoff-design.md` itself got a short pointer at the top
+disambiguating the same split, so a session lands on the correct reference
+whichever status it actually observes — the item's acceptance criterion
+("kickoff-design.md/SKILL.md and the actual live v4Inspection routing agree
+on what a fresh repo's first bootstrap command actually is").
+
+Deviation from the item's own proposal (reported per the briefing's
+stop-condition guidance, not a stop): the proposal's first bullet asked
+whether routing itself should be reconsidered. Not reconsidered here — the
+routing is a deliberate, already-landed design (Wave 4 onboarding
+coordinator, `specs/wave4-onboarding-coordinator/design.md`), and revisiting
+it would be a genuine product/architecture call outside a documentation
+sweep's scope; only the documentation gap was closed.
+
+Verification: `node --test plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs`
+— exit 0, `pass 1 fail 0` (machine-written TAP log:
+`evidence/AGY-SWEEP-intake-generate-coordinator-verify.log`, not committed —
+ignored `evidence/` per `SKILL.md`'s scratch-space section). This suite
+asserts every `references/*.md` name `SKILL.md`'s typed-lazy-loading list
+cites actually exists and is non-empty, and re-checks the core budget
+(`intake-generate-design.md` itself is lazily loaded, so its own bytes do
+not count against the always-paid `SKILL.md` budget; the SKILL.md addition
+was kept to two short paragraphs for exactly that reason).
+
+Files changed:
+- `plugins/pipeline-core/skills/pipeline-start/references/intake-generate-design.md` (new)
+- `plugins/pipeline-core/skills/pipeline-start/SKILL.md`
+- `plugins/pipeline-core/skills/pipeline-start/references/kickoff-design.md`
+- this item (Triage section only; `status:` left untouched per dispatch briefing)
