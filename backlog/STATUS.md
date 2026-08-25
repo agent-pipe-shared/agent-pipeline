@@ -130,6 +130,7 @@
 | pipeline.guard-command-grammar-dialectfor-infers-shell-dialect-from-os-not-actual-shell | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-denial-escalates-benign-commands-to-human-in-terminal | open | defect | pipeline | 2026-08-09 | — |
 | pipeline.guard-devplan-and-guard-testpath-have-no-bash-write-lane | closed | defect | pipeline | 2026-08-18 | — |
+| pipeline.guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape | open | defect | pipeline | 2026-08-25 | — |
 | pipeline.guard-dispatch-has-no-workflow-tool-awareness | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.guard-human-override-cli-and-a-second-site-still-normalize-backslashes-unconditionally | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.guard-lifecycle-allowlist-should-derive-from-the-onboarding-cli-table | closed | workflow-improvement | pipeline | 2026-08-16 | — |
@@ -322,11 +323,12 @@
 | pipeline.windows-verify-brittle-test-hygiene | closed | defect | pipeline | 2026-07-25 | — |
 | pipeline.windows-verify-reproducibility | closed | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 | pipeline.workflow-tool-dispatches-produce-no-dispatch-record-artifact | open | defect | pipeline | 2026-08-24 | — |
+| pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session | open | defect | pipeline | 2026-08-25 | — |
 | pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.worktree-isolated-dispatch-leaves-an-untracked-dir-that-blocks-verify | closed | defect | pipeline | 2026-08-11 | — |
 
 ## Counts
 
-- open: 48
+- open: 50
 - in_progress: 3
 - closed: 268

@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "b89bfdf4fd60cbc238545a89e600769ee1d3621125e18b020dfeb1744f012bfd"
+    "transitionHead": "bd7967eacc5208661446f59590fdc6a3ecd09e68d05ed5193dd4107973a0c39c"
   },
   "counts": {
-    "open": 48,
+    "open": 50,
     "in_progress": 3,
     "closed": 268
   },
@@ -1539,6 +1539,15 @@
       "closureRepository": "self",
       "closureCommit": "130948c15fee0afe389cf787772f11b75b6dad72",
       "closureEvidence": "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
+    },
+    {
+      "id": "pipeline.guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-25",
+      "source": "PO relay (chat), 2026-08-25, from a separate Agy greenfield-test session's own live-reproduced dispatch-guard bypass test (transcript pasted verbatim by the PO); confirmed independently this session by direct reading of plugins/pipeline-core/hooks/guard-dispatch.mjs lines 83-99",
+      "deferred": true
     },
     {
       "id": "pipeline.guard-dispatch-has-no-workflow-tool-awareness",
@@ -3949,6 +3958,15 @@
       "created": "2026-08-24",
       "source": "Third delta Critic review of sprint-agy-runner, finding F3 (specs/sprint-agy-runner/evidence/2026-08-24-delta3-critic-review-agy-runner.md); PO-accepted disposition 2026-08-24",
       "deferred": false
+    },
+    {
+      "id": "pipeline.workflow-tool-isolation-worktree-never-created-a-worktree-this-session",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-25",
+      "source": "Elephant, 2026-08-25, live incident this session: three parallel Agent-tool dispatches with isolation: \"worktree\" all wrote into the SAME shared checkout, causing zero-commit truncations and a detached-HEAD incident; root-caused and recovered same session",
+      "deferred": true
     },
     {
       "id": "pipeline.worktree-hygiene-flags-onboardings-own-generated-files-as-dirty",
