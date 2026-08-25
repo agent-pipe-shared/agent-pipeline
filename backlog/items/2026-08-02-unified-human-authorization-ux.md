@@ -106,3 +106,48 @@ ADR-0043's 2026-08-17 amendment). PRD-approval migration and the adoption-
 enforcement check are exactly Alfred's "mechanical governance" scope; not
 needed near-term — push/deploy (the gates this session actually exercises)
 are already migrated.
+
+### Revisit and partial delivery (2026-08-25, PO-directed AFK sweep)
+
+- **Decision:** `implemented` for the bounded piece; item stays open — real
+  remaining scope exists and is not this dispatch's to close.
+- **What changed since the 2026-08-17 deferral, re-checked live rather than
+  inherited:** the PRD-approval piece of this item's remaining scope is now
+  **resolved**, not merely deferred — `backlog/items/2026-08-05-critical-
+  human-proof-not-wired-to-push-and-prd-gates.md` (the sibling item this
+  item's own 2026-08-06 Triage pointed at for that gap) was closed 2026-08-18
+  with an explicit PO decision: PRD approval does **not** get the same
+  Ed25519 signature requirement as push, because it is already SHA-bound and
+  judged less security-critical, and a signature requirement there would
+  violate the "minimize PO gates" line established for the HGO ceremony. That
+  removes PRD-approval migration from this item's open scope entirely — it is
+  answered, not outstanding.
+- **Delivered this pass:** `docs/human-authorization-inventory.md` — the
+  formal inventory of every human intent/gate this item's Proposal names as
+  step 1 ("Inventory every existing human intent and configured gate"),
+  cataloguing push/deploy/publication/GMW/HGO/kickoff-language against the
+  shared detached-proof contract, PRD-approval and remote-provisional-
+  approval as deliberately outside it, and the concrete remaining gaps below.
+  Every path the document cites was confirmed to exist in this checkout
+  before commit (see the dispatch record / completion report for the
+  verification command and exit code).
+- **Confirmed still genuinely open (not attempted this pass, with reasons):**
+  - **Adoption-enforcement check** — a `rg`-based scan of
+    `plugins/pipeline-core/scripts/*.mjs` for the substring `approv` returned
+    over 70 files, most unrelated to human authorization. Reliably telling a
+    new bespoke approval prompt apart from ordinary code that merely mentions
+    "approval" is a real design/scoping task, not a bounded mechanical
+    addition a single dispatch should attempt without more analysis.
+  - **Publication shape unification** — explicitly its own follow-up in
+    ADR-0056 ("the two now differ in shape, and one shape would be better
+    than two"), not re-litigated here.
+  - **Passkey/WebAuthn or other adapters** — none exist beyond the shipped
+    external Ed25519 CLI adapter; no desktop application exists in this
+    repository yet to consume one, so building an adapter now would be
+    speculative rather than bounded.
+  - **Cross-platform conformance** — unverified; needs execution on
+    macOS/Windows/WSL, unavailable in this sandboxed single-OS session.
+- **Assignment (if accepted):** the four gaps above remain unassigned; none
+  of them is a routine technical implementation choice — each needs either
+  further scoping work or a concrete consumer/target before it can be built.
+- **Date:** 2026-08-25
