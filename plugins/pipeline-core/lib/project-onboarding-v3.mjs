@@ -462,7 +462,7 @@ export function planProjectPartialAuthorityAdoption({ rootDir = process.cwd(), p
   const paths = [".claude", ".agents", ".codex", "docs"].filter((relative) => fs.existsSync(safePath(root, relative, fs))).sort();
   try {
     const artifacts = paths.map((relative) => ({ path: relative, snapshot: physicalTreeSnapshot(safePath(root, relative, fs), fs) }));
-    const intent = freshIntent(runner);
+    const intent = freshIntent(runner, fs);
     if (!validatePipelineUserV3(intent).ok) throw new Error("canonical V3 source is invalid");
     // This path holds an explicit PO profile selection, so the seeded gate
     // chapter is the one that profile asks for.
@@ -497,7 +497,7 @@ export function applyProjectPartialAuthorityAdoption({ rootDir = process.cwd(), 
   if (plan.status !== "ready" || plan.planSha256 !== planSha256) return { schema: PARTIAL_AUTHORITY_PLAN_SCHEMA, status: "invalid-plan", root: plan.root, diagnostics: [diagnostic("$.planSha256", "plan_digest_mismatch", "the supplied plan digest is not current", "run the read-only partial-authority plan again")] };
   const root = plan.root; const created = []; const createdDirectories = [];
   try {
-    const intent = freshIntent(runner); const baselines = freshBaselines(intent);
+    const intent = freshIntent(runner, fs); const baselines = freshBaselines(intent);
     const bytes = new Map([[SOURCE, renderYaml(intent)], [".claude/pipeline.yaml", baselines[".claude/pipeline.yaml"].bytes], [NEUTRAL_MANIFEST, baselines[NEUTRAL_MANIFEST].bytes], [CRITICAL_HUMAN_PROOF_POLICY_PATH, baselines[CRITICAL_HUMAN_PROOF_POLICY_PATH].bytes]]);
     for (const target of plan.targets) {
       const path = safePath(root, target.path, fs);
@@ -867,7 +867,7 @@ function isAdoptableUnmanagedRoot(entries, root, fs) {
 // literal, make it visible, or fail closed -- was decided by the follow-up
 // backlog item above, and the regression test named there is now inverted to
 // match: it asserts the omission is an error, not a preserved default.
-function freshIntent(runner) {
+function freshIntent(runner, fs) {
   requireRunner(runner, "freshIntent");
   const registry = loadRunnerProfilesV3Registry();
   return {
@@ -878,13 +878,20 @@ function freshIntent(runner) {
     routing: { profiles: clone(registry.profiles), duties: clone(registry.duties) },
     usage: { common_projection: "pipeline.runner-usage.v1", raw_persistence: "none" },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 3 },
-    // `push_approval` is seeded at its own fail-closed default rather than left
-    // absent. Absent and "signature" resolve identically (ADR-0056,
-    // readPushApprovalMode), so this changes no behaviour -- it changes what the
-    // operator can SEE. The setting is the single control over how a human clears
-    // a push, and with the key omitted the only way to learn that "chat" exists at
-    // all was to read the plugin's source, which is exactly what the 2026-08-09
-    // greenfield runs did.
+    // `push_approval` is seeded from THIS MACHINE's remembered preference
+    // (`machine-plane.mjs`'s `pushApprovalDefault`) when that plane is valid,
+    // falling back to the fail-closed literal "signature" only when it is
+    // absent/invalid -- exactly the situation in which the onboarding flow is
+    // about to ask the question anyway (`withPendingPushApprovalSetupAsk`
+    // below). Before this, the machine-scoped question's answer was recorded
+    // ONLY in `machine.json` and in guidance text telling the agent to
+    // hand-edit this file afterward -- an unenforced manual step, never
+    // actually applied to a generated repository
+    // (backlog: 2026-08-25-greenfield-onboarding-never-applies-the-machine-
+    // push-approval-preference.md). The setting is the single control over
+    // how a human clears a push, and with the key omitted the only way to
+    // learn that "chat" exists at all was to read the plugin's source, which
+    // is exactly what the 2026-08-09 greenfield runs did.
     // `security` is seeded OFF, and that is the honest value rather than a
     // weakening. It read `warn` while the manifest carried no security gate at
     // all, so a consumer was promised a gate nothing enforced -- the same defect
@@ -911,7 +918,7 @@ function freshIntent(runner) {
     //
     // Turning it on is a deliberate act with prerequisites, so it is named as one
     // rather than defaulted into.
-    gates: { dev_plan: "blocking", push: "blocking", push_approval: "signature", security: "off", claude_md_max_lines: 200 },
+    gates: { dev_plan: "blocking", push: "blocking", push_approval: machinePushApprovalPreference(fs) ?? "signature", security: "off", claude_md_max_lines: 200 },
     critic_export: clone(registry.criticExportPolicy),
     roles: { po: { display_label: "Human" } },
     session: { keep_awake: true },
@@ -4104,7 +4111,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   const hostManaged = inspected.status === "fresh-host-managed";
   const git = hostManaged ? { ok: true, version: null } : gitCapability(fs, inspected.root);
   if (!git.ok) return { schema: PLAN_SCHEMA, status: "unsupported", root: inspected.root, diagnostics: [diagnostic("$.git", "git_initial_branch_unsupported", git.reason, "install Git 2.28 or newer before activation")], targets: [], requiresExplicitActivation: true };
-  const intent = freshIntent(runner); const validation = validatePipelineUserV3(intent);
+  const intent = freshIntent(runner, fs); const validation = validatePipelineUserV3(intent);
   if (!validation.ok) return { schema: PLAN_SCHEMA, status: "invalid-authority", root: inspected.root, diagnostics: validation.errors, targets: [], requiresExplicitActivation: true };
   const baselines = freshBaselines(intent, { hostManaged });
   const manifest = validateManifest(parseYaml(baselines[NEUTRAL_MANIFEST].bytes), { rootDir: inspected.root });
@@ -4213,27 +4220,33 @@ function collectAuthorIdentityAction(missing) {
 }
 
 /**
- * Ask, once per MACHINE, how a push approval is cleared and where the PO's
- * signing key lives (backlog: installing-consumer-is-never-asked-any-setup-
- * decision.md; design: this repository's own Nova A epic setup-bootstrap
- * design note, SS3). Every setting an installing consumer needs today resolves silently to
- * its strictest default (`signature`, ADR-0056) with nobody ever telling them
- * a key is required, let alone that one exists. This closes exactly that gap
+ * Ask -- for EVERY repository, pre-filled from this machine's remembered
+ * preference -- how a push approval is cleared, and (only the first time a
+ * machine is ever asked) where the PO's signing key lives (backlog:
+ * installing-consumer-is-never-asked-any-setup-decision.md; design: this
+ * repository's own Nova A epic setup-bootstrap design note, SS3). Every
+ * setting an installing consumer needs today resolves silently to its
+ * strictest default (`signature`, ADR-0056) with nobody ever telling them a
+ * key is required, let alone that one exists. This closes exactly that gap
  * for the two decisions the PO scoped narrow for now -- `gates.push_approval`
  * and the PO key directory -- leaving the rest of the machine/repository
  * split (routing, language, session, usage, the remaining gates, autonomy,
  * critic/advisor export) to the deferred, full-taxonomy treatment.
  *
- * "Once per machine" is not a new counter to maintain: it falls straight out
- * of `unresolvedMachinePushApprovalSetup()` below, which is true exactly when
- * this machine's own configuration plane (`machine-plane.mjs`) has never been
- * written. A machine that already carries a valid plane has already been
- * asked; nova-setup-bootstrap.md SS3's own resolution is "no question" for
- * every repository onboarded on it afterward.
+ * `pipeline.user.yaml` is repository-scoped config (PO architectural
+ * decision, 2026-08-25): the question is therefore CONFIRMED per repository,
+ * not asked from scratch every time and not silenced after the first machine
+ * ever answers it. `machinePushApprovalPreference()` below supplies the
+ * pre-fill -- `null` (this machine has never answered) makes the guidance
+ * below walk the PO through the full first-time ceremony including the
+ * signing key; a resolved value makes it a short per-repository confirm/
+ * override instead. `freshIntent()` reads the SAME value to seed the
+ * generated `pipeline.user.yaml`, so confirming the pre-fill here needs no
+ * further write -- only an explicit override does.
  *
  * Deliberately does NOT write `pipeline.user.yaml`, `machine.json`, or a key
  * directory itself -- same asymmetry as `collectAuthorIdentityAction()`
- * above: this asks and guides, the caller (with the PO present) performs the
+ * above: this asks and guides, the caller (with the PO present) performs any
  * actual write with ordinary tools afterward. Only the PO ever creates the
  * signing key, in their own terminal (nova-setup-bootstrap.md SS3.3/SS6a) --
  * this library never runs `po-human-approval.mjs setup` on the PO's behalf
@@ -4243,7 +4256,8 @@ function collectAuthorIdentityAction(missing) {
 // (4 bytes) with ample margin, same role AUTHOR_IDENTITY_FIELD_MAX_BYTES
 // plays just above.
 const PUSH_APPROVAL_PREFERENCE_MAX_BYTES = 32;
-function collectPushApprovalPreferenceAction(poKeyDirectoryHint) {
+function collectPushApprovalPreferenceAction(poKeyDirectoryHint, machineDefault) {
+  const firstAsk = machineDefault === null;
   return {
     kind: "collect-input",
     input: {
@@ -4257,9 +4271,11 @@ function collectPushApprovalPreferenceAction(poKeyDirectoryHint) {
     },
     mutation: false,
     requiresConfirmation: false,
-    guidance: "this machine has never been asked how a push approval is cleared, and every setting today resolves silently to the strictest default; ask the PO once, in plain language: \"signature\" proves each approval with a detached Ed25519 signature whose private key never leaves the PO's own terminal (recommended); \"chat\" instead records an attribution in the session -- a labelled record, not a proof. Accept exactly \"signature\" or \"chat\" as the answer, never invent one. "
-      + `If "signature": ALSO ask the PO's name up front, in the SAME turn as the signature/chat question -- never discover the name requirement mid-ceremony as a second, failed call (backlog: 2026-08-18-po-key-trust-anchor-onboarding.md). Then walk the PO through creating their signing key, proposing (never demanding) ${poKeyDirectoryHint ?? "a directory outside every repository"} as the default location -- let them choose a different absolute path if they prefer, but it must stay outside any checkout. The PO then runs \`node plugins/pipeline-core/scripts/po-human-approval.mjs setup --repo-root <this repository> --directory <the chosen directory> --human-name "<the name they gave>"\` THEMSELVES, in their own terminal -- never through a tool call, and never with the key read, moved, or copied afterward. `
-      + "Once answered, write the chosen mode into this repository's committed gates.push_approval in pipeline.user.yaml (repository plane, ADR-0056), and record the same answer -- plus the key directory, if \"signature\" -- in the machine-scoped configuration plane (machine-plane.mjs) so no later repository on this machine is asked again.",
+    guidance: firstAsk
+      ? "this machine has never been asked how a push approval is cleared, and every setting today resolves silently to the strictest default; ask the PO once, in plain language: \"signature\" proves each approval with a detached Ed25519 signature whose private key never leaves the PO's own terminal (recommended); \"chat\" instead records an attribution in the session -- a labelled record, not a proof. Accept exactly \"signature\" or \"chat\" as the answer, never invent one. "
+        + `If "signature": ALSO ask the PO's name up front, in the SAME turn as the signature/chat question -- never discover the name requirement mid-ceremony as a second, failed call (backlog: 2026-08-18-po-key-trust-anchor-onboarding.md). Then walk the PO through creating their signing key, proposing (never demanding) ${poKeyDirectoryHint ?? "a directory outside every repository"} as the default location -- let them choose a different absolute path if they prefer, but it must stay outside any checkout. The PO then runs \`node plugins/pipeline-core/scripts/po-human-approval.mjs setup --repo-root <this repository> --directory <the chosen directory> --human-name "<the name they gave>"\` THEMSELVES, in their own terminal -- never through a tool call, and never with the key read, moved, or copied afterward. `
+        + "This repository's gates.push_approval in pipeline.user.yaml is seeded with the answer automatically (repository plane, ADR-0056), so no further write is needed for THIS repository; also record the same answer -- plus the key directory, if \"signature\" -- in the machine-scoped configuration plane (machine-plane.mjs) so the NEXT repository on this machine starts pre-filled with it instead of asking from scratch."
+      : `this repository's gates.push_approval (pipeline.user.yaml, ADR-0056) is pre-filled from this machine's remembered preference, "${machineDefault}" (machine-plane.mjs). This is a per-repository confirmation, not a one-time machine question -- it is asked again for every new repository, seeded with the machine default so the PO can confirm in one short turn rather than re-typing it from scratch. Ask the PO to confirm "${machineDefault}" for THIS repository, or type the other value ("signature" or "chat") to override it for this repository only -- an override here does not change the machine's own remembered default in machine-plane.mjs, and pipeline.user.yaml is already seeded with the pre-filled value, so only an override needs a further edit to gates.push_approval. Accept exactly "signature" or "chat" as the answer, never invent one.`,
     expected: { schema: SCHEMA, statuses: PORTABLE_APPLY_IDENTITY_ASK_STATUSES },
   };
 }
@@ -4295,6 +4311,24 @@ function defaultPoKeyDirectoryHint(fs) {
 function unresolvedMachinePushApprovalSetup(fs) {
   const readPlane = fs.readMachinePlane ?? readMachinePlane;
   return readPlane().status !== "valid";
+}
+
+/**
+ * This machine's remembered push-approval preference (`machine-plane.mjs`'s
+ * `pushApprovalDefault`), or `null` when the machine plane is absent/invalid
+ * -- i.e. exactly when `unresolvedMachinePushApprovalSetup()` above is true.
+ * The single read both `freshIntent()` (seeding a NEW repository's
+ * `pipeline.user.yaml`) and `withPendingPushApprovalSetupAsk()` (rendering
+ * the per-repository confirm/override ask, pre-filled with this same value)
+ * are built on, so the two can never disagree about what "the machine
+ * default" currently is.
+ */
+function machinePushApprovalPreference(fs) {
+  const readPlane = fs.readMachinePlane ?? readMachinePlane;
+  const result = readPlane();
+  if (result.status !== "valid") return null;
+  const value = result.plane?.pushApprovalDefault;
+  return value === "chat" || value === "signature" ? value : null;
 }
 
 function ensurePreimage(root, expectedState, fs) {
@@ -4800,14 +4834,16 @@ function withPendingAuthorIdentityAsk(observed, fs) {
 // Sibling of `withPendingAuthorIdentityAsk()` immediately above -- same
 // gating shape (local mode, same three resting statuses, same additive-only
 // contract), different question. Kept as its own function rather than folded
-// into that one: the two asks have unrelated resolutions (one is per-machine,
-// one is per-repository) and a shared name would misdescribe whichever
-// concern was not in it.
+// into that one: the two asks have unrelated resolutions -- this one is
+// pre-filled from a MACHINE-scoped default (`machinePushApprovalPreference()`)
+// but confirmed per REPOSITORY every time (PO decision 2026-08-25:
+// `pipeline.user.yaml` is repository-scoped config), while author identity
+// resolves purely per-repository -- and a shared name would misdescribe
+// whichever concern was not in it.
 function withPendingPushApprovalSetupAsk(observed, fs) {
   if (observed.repository?.mode !== "local") return observed;
   if (!PORTABLE_APPLY_IDENTITY_ASK_STATUSES.includes(observed.status)) return observed;
-  if (!unresolvedMachinePushApprovalSetup(fs)) return observed;
-  return { ...observed, pushApprovalSetupAction: collectPushApprovalPreferenceAction(defaultPoKeyDirectoryHint(fs)) };
+  return { ...observed, pushApprovalSetupAction: collectPushApprovalPreferenceAction(defaultPoKeyDirectoryHint(fs), machinePushApprovalPreference(fs)) };
 }
 
 // PO decision 2026-08-19 (backlog: 2026-08-18-po-key-trust-anchor-onboarding.md,
@@ -4885,8 +4921,10 @@ function proposeTrustAnchorMaterializationAction(anchor) {
   };
 }
 
-// Sibling of `withPendingPushApprovalSetupAsk()` immediately above -- the
-// OPPOSITE gate (fires only once the machine HAS already answered), proposing
+// Sibling of `withPendingPushApprovalSetupAsk()` immediately above -- unlike
+// that ask (which now fires unconditionally, every repository), this one
+// keeps its own gate and fires ONLY once the machine HAS already answered
+// (`unresolvedMachinePushApprovalSetup()` false), proposing
 // a repository-scoped materialization snippet instead of the machine-scoped
 // question.
 function withPendingTrustAnchorGuidanceAsk(observed, fs) {

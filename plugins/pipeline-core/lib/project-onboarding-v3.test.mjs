@@ -2170,15 +2170,20 @@ test("apply-portable-seed --activate surfaces the missing-author-identity ask-st
 });
 
 // Regression for backlog 2026-08-08-an-installing-consumer-is-never-asked-
-// any-setup-decision.md: nothing in the install path ever asked how a push
-// approval is cleared or told the installer a PO signing key exists at all --
-// every setting resolved silently to its strictest default. This drives the
-// real CLI `apply-portable-seed --activate` path (same shape as the
-// author-identity regression above) and proves the ask surfaces exactly once
-// per MACHINE: fires when the machine-scoped configuration plane has never
-// been written, stays silent once it has, and never in either case changes
-// the lifecycle's own resting status or primary chained nextAction.
-test("apply-portable-seed --activate surfaces the push-approval-setup ask-step once per machine", () => {
+// any-setup-decision.md and 2026-08-25-greenfield-onboarding-never-applies-
+// the-machine-push-approval-preference.md: nothing in the install path ever
+// asked how a push approval is cleared or told the installer a PO signing key
+// exists at all -- every setting resolved silently to its strictest default,
+// and even where the question WAS asked its answer was never applied to the
+// generated file. This drives the real CLI `apply-portable-seed --activate`
+// path (same shape as the author-identity regression above) and proves the
+// ask surfaces for EVERY repository (`pipeline.user.yaml` is
+// repository-scoped config, PO decision 2026-08-25): a first-time machine
+// gets the full ceremony guidance (signing key included), a machine with an
+// already-answered plane gets a short pre-filled confirm/override instead --
+// and never in either case does the ask change the lifecycle's own resting
+// status or primary chained nextAction.
+test("apply-portable-seed --activate surfaces the push-approval-setup ask-step for every repository, pre-filled from the machine default", () => {
   const unasked = root();
   const asked = root();
   const invoke = (args, deps) => {
@@ -2215,15 +2220,21 @@ test("apply-portable-seed --activate surfaces the push-approval-setup ask-step o
     const replayed = invoke(["apply-portable-seed", "--root", unasked, "--plan-sha256", digest, "--activate", "--runner", "codex"], neverAsked);
     assert.deepEqual(replayed.result, applied.result);
 
-    // (b) A machine whose configuration plane already exists: no question --
-    // exactly current (default `fakeDeps`) behavior, additive only.
+    // (b) A machine whose configuration plane already exists (default
+    // `fakeDeps`, `pushApprovalDefault: "signature"`): the ask still fires,
+    // for THIS repository, but pre-filled with the machine default and no
+    // signing-key ceremony repeated.
     const quietPlanned = invoke(["plan", "--root", asked, "--runner", "codex"], fakeDeps);
     const quietDigest = quietPlanned.result.nextAction.argv[quietPlanned.result.nextAction.argv.indexOf("--plan-sha256") + 1];
     const quietApplied = invoke(["apply-portable-seed", "--root", asked, "--plan-sha256", quietDigest, "--activate", "--runner", "codex"], fakeDeps);
     assert.equal(quietApplied.code, 0);
     assert.equal(quietApplied.result.status, "runtime-initialization-required");
-    assert.equal(Object.prototype.hasOwnProperty.call(quietApplied.result, "pushApprovalSetupAction"), false,
-      "a machine that already answered must not be asked again");
+    assert.equal(quietApplied.result.pushApprovalSetupAction.kind, "collect-input",
+      "a repository onboarded on an already-answered machine is still asked, pre-filled");
+    assert.match(quietApplied.result.pushApprovalSetupAction.guidance, /pre-filled/u);
+    assert.match(quietApplied.result.pushApprovalSetupAction.guidance, /"signature"/u);
+    assert.doesNotMatch(quietApplied.result.pushApprovalSetupAction.guidance, /po-human-approval\.mjs/u,
+      "an already-answered machine must not repeat the signing-key ceremony");
   } finally { dispose(unasked); dispose(asked); }
 });
 
@@ -2275,8 +2286,8 @@ test("apply-portable-seed --activate proposes a trust-anchor materialization sni
     assert.match(applied.result.trustAnchorGuidanceAction.guidance, /trustAnchors/u);
     assert.match(applied.result.trustAnchorGuidanceAction.guidance, /guard-gate-strength\.mjs/u,
       "must disclose that GS-2 forbids any agent write to this file");
-    assert.equal(Object.prototype.hasOwnProperty.call(applied.result, "pushApprovalSetupAction"), false,
-      "a machine that already answered the push-approval question is never asked it again");
+    assert.equal(applied.result.pushApprovalSetupAction.kind, "collect-input",
+      "the per-repository push-approval confirm is orthogonal to the trust-anchor guidance and still fires");
 
     // (b) This repository's own trust-anchor policy already carries the
     // matching digest: no proposal, silence is correct. Onboard `matched`
