@@ -31,58 +31,78 @@ call: leave it for now ("erstmal dann so weiter"), suggested next step if
 revisited is a full session restart (guaranteed fresh plugin load) or
 re-registering the local marketplace.
 
-**`enforce-kickoff-po-questions`: `AGY-KICKOFFPOQ-1` stopped cleanly, no
-code written** — its own stop condition fired: the `po-human-approval.mjs`/
-`po-approval-gate.mjs` family (the ceremony the `chat`-mode direction named)
-has zero chat-mode concept at all, and the one real chat ceremony in the
-plugin (`pipeline-state.mjs`'s push `pendingPushChallenge`) is push-only
-and still `forCommit`-bound — undercutting the original reason to prefer
-`chat` over `signature` for a pre-first-commit gate. Findings + 3 options
-recorded (`17d23532`). **PO picked option 1** (`fa581be7`): build a
-genuine, reusable chat-mode gate-kind registry inside `po-human-approval.mjs`/
-`po-approval-gate.mjs` FIRST, then add the kickoff-parameter kind to it —
-not option 2 (copy the push one-off) or option 3 (fall back to
-`signature`). **Scope widened same day (`a7af05f3`):** the registry should
-also cover the PRD/Spec plan-approval → implementation handoff
-(`docs/operating-model.md` §4, currently prose-only) — CRs explicitly out
-of scope, a separate issue is coming later. A real overlap was found and
-must be resolved by/during the next dispatch, not silently: plan approval
-already has a different, deliberately-built mechanism
-(`po-gate-authority.mjs`'s physical PRD acknowledgement marker, ADR-0021
-explicitly rejects attribution-only chat approval) — whether the new
-registry replaces it, sits alongside it, or plan-approval stays on the
-marker mechanism entirely is a PO product decision the dispatch must
-surface, not make silently.
+**`enforce-kickoff-po-questions` — a chat-mode approval primitive is being
+built in stages; push (A) is DONE, kickoff (B) is dispatched, PRD/Spec (C)
+still needs its own dispatch.** Full history: `AGY-KICKOFFPOQ-1` first
+found `po-human-approval.mjs`/`po-approval-gate.mjs` had zero chat-mode
+concept to join (`17d23532`); PO picked "build a real primitive first"
+(`fa581be7`); scope widened same day to also cover PRD/Spec plan-approval
+(`a7af05f3`), surfacing a real overlap with `po-gate-authority.mjs`'s
+existing PRD-marker mechanism (ADR-0021 explicitly rejects attribution-only
+approval) that needed a PO call.
 
-**CRITICAL live finding, same day (PO chat report):** during an Agy/
-Antigravity test, an agent granted itself a push approval under
-`gates.push_approval: chat`. Confirmed by direct code read, not just the
-PO's report: `pipeline-state.mjs`'s `approve-push` chat path prints the
-`PO-XXXX` challenge code to the SAME process's own stdout/stderr, and
-accepts it back via a second CLI call — nothing stops one agent, in one
-session, from reading its own output and resubmitting the code itself. No
-enforced human-turn boundary exists at all (a more severe gap than chat
-mode's documented "attribution-only, not proof" tradeoff). Recorded as its
-own item, `backlog/items/2026-08-25-chat-mode-push-approval-has-no-enforced-human-turn-boundary.md`
-(`b69c4ed3`/`07f5bc02`).
+**CRITICAL live finding, same day (PO chat report), independently
+confirmed by code read:** during an Agy/Antigravity test, an agent granted
+itself a push approval under `gates.push_approval: chat` —
+`pipeline-state.mjs`'s `approve-push` chat path printed the `PO-XXXX`
+challenge code to the SAME process's own stdout/stderr and accepted it
+back via a second CLI call, with no enforced human-turn boundary at all.
+Filed as its own item (`b69c4ed3`).
 
-**Dispatched: `AGY-CHATADAPTER-1`** (goldfish-deep, background, in flight
-as of this write) — folds both the kickoff-gate registry work and the push
-self-approval fix into ONE dispatch, since both need the identical
-underlying primitive. Required outcomes: (A) close the push self-approval
-hole — expected direction (hint, not mandate) is reusing the
-`signature`-mode ceremony's proven `readSync(0, ...)` attended-terminal
-property instead of the current print-then-reread-your-own-output shape;
-(B) gate `kickoff plan --language`/`--profile` through the same primitive.
-(C) the PRD/Spec marker-vs-registry question is investigate-and-decide-only
-— implement only if unambiguous from ADR-0021 + `po-gate-authority.mjs`,
-else stop that one sub-goal and report. CRs stay explicitly out of scope.
-Ruleset SHA `bb962eeb`. A secondary tooling defect was found and filed
-while preparing this dispatch (not blocking, worked around):
-`backlog-item-strip-for-dispatch.mjs` drops every section after the first
-`## Triage` heading, not just verdict-shaped content — confirmed twice now
-(`445e436f`); the dispatch was briefed with RAW backlog-item paths instead
-of the stripped copies.
+**PO decision, same day: standardize all three (push, kickoff, PRD/Spec)
+onto ONE registry — REPLACE, not alongside** (`4fa93a95`). Reasoning:
+fewer distinct approval mechanisms in the codebase, not more variants.
+Still explicitly excludes CRs (a separate future issue).
+
+**`AGY-CHATADAPTER-1` landed (A), the push fix — DONE, independently
+reverified, item CLOSED** (`589278ed`/`e4ababc8`/`4ac72a57`). New reusable
+primitive `plugins/pipeline-core/lib/chat-gate-ceremony.mjs`
+(`requireAttendedChatGateConfirmation()`/`isAttendedTerminal()`, gates on
+`process.stdin.isTTY` BEFORE any read — an agent's own tool call has no
+live human on fd 0, only a genuinely attended terminal does), wired into
+`approve-push`, `--challenge` CLI flag removed entirely (commit
+`1ad664a8`). This session independently re-ran `pipeline-state.test.mjs`
+and `check-consumer-safe-paths.test.mjs` itself (not just the dispatch's
+self-report) — both green, including a real spawned-subprocess proof that
+piped stdin carrying the correct code still gets refused.
+
+**Correctly declined, worth remembering:** a mid-task `SendMessage`
+relaying the PO's "standardize all three" decision to the ALREADY-RUNNING
+`AGY-CHATADAPTER-1` was correctly REFUSED by that dispatch — its field 4
+never granted write scope on `po-gate-authority.mjs`/ADR-0021, and a
+scope change reopening a rejected ADR alternative needs a properly
+authorized dispatch, not a chat relay. Right call by the dispatch, not a
+failure — do not try to shortcut a scope amendment via SendMessage again;
+build a fresh briefing instead.
+
+**Scope correction found by that same dispatch, confirmed independently:**
+`--profile` is not a valid flag on `kickoff plan`/`kickoff apply` at all
+(guard-rejected) — it belongs only to `kickoff promote plan`/`apply`, a
+separate later call site. (B)'s corrected scope is therefore TWO call
+sites (kickoff plan/apply `--language`, kickoff promote `--profile`), not
+one command with two flags as originally assumed. Recorded in the item
+(`6bd1798e`).
+
+**Dispatched: `AGY-CHATADAPTER-2`** (goldfish-deep, background, in flight
+as of this write) — gates both corrected kickoff call sites through
+`chat-gate-ceremony.mjs`; a third possible call site (`intake-consent-apply
+--language`) is investigate-and-decide-only, implement only if it reuses
+the pattern cleanly. Explicitly forbidden from touching `pipeline-state.mjs`,
+`chat-gate-ceremony.mjs`, `po-gate-authority.mjs`, ADR-0021, or
+`docs/operating-model.md` — those stay for a separate (C) dispatch. Item
+stays `open` regardless of how this lands (outcome C is a separate,
+not-yet-dispatched piece). Ruleset SHA `6bd1798e`.
+
+**Still not dispatched:** outcome (C), PRD/Spec plan-approval
+standardization replacing `po-gate-authority.mjs`'s marker mechanism — the
+biggest, most architecturally sensitive piece (reopens ADR-0021), needs
+its own properly-scoped dispatch with those files in field 4.
+
+**Secondary tooling defect found and filed (not blocking, worked
+around):** `backlog-item-strip-for-dispatch.mjs` drops every section after
+the first `## Triage` heading, not just verdict-shaped content — confirmed
+twice now (`445e436f`); both chat-adapter dispatches were briefed with RAW
+backlog-item paths instead of the stripped copies.
 
 **`verify-marketplace-attestation-blocks-normal-active-development` —
 CLOSED (`253398a6`/`4e2babd1`/`c69017fe`).** `AGY-MKTATTEST-1` landed
