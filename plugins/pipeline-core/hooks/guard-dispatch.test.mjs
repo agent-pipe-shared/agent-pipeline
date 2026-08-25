@@ -138,6 +138,35 @@ check("GD11 allow  a Workflow-embedded agent() call with a clean references-only
   tool_input: { script: WORKFLOW_SCRIPT_CLEAN },
 }, ALLOW);
 
+// GD12-GD15 -- the Antigravity runner's native invoke_subagent payload shape (backlog
+// 2026-08-25-guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape.md): the
+// ACTUAL shape reported by the source session, capitalization included -- not a paraphrased
+// stand-in ("fixture-blindness" lesson, goldfish-task.md's DoD note).
+check("GD12 block  an Antigravity Subagents-array dispatch carrying a claims list", {
+  tool_name: "invoke_subagent",
+  tool_input: { Subagents: [{ TypeName: "critic", Prompt: `${CLEAN_CRITIC}\n\nWHAT THE CHANGE CLAIMS (verify each):\n 1. x` }] },
+}, BLOCK, { stderrIncludes: ["DISPATCH-CONTAMINATION-CLAIMS-LIST", "templates/prompts/critic-review.md"] });
+
+check("GD13 allow  an Antigravity Subagents-array dispatch with a clean references-only prompt", {
+  tool_name: "invoke_subagent",
+  tool_input: { Subagents: [{ TypeName: "critic", Prompt: CLEAN_CRITIC }] },
+}, ALLOW);
+
+check("GD14 block  a freehand prose Antigravity Critic dispatch (the reproduced source-session bypass)", {
+  tool_name: "invoke_subagent",
+  tool_input: {
+    Subagents: [{
+      TypeName: "critic",
+      Prompt: "please review this code. I think the bug is in line 42 because I changed the array map.",
+    }],
+  },
+}, BLOCK, { stderrIncludes: ["DISPATCH-NO-RULESET-SHA"] });
+
+check("GD15 allow  an Antigravity dispatch of an unrelated subagent type", {
+  tool_name: "invoke_subagent",
+  tool_input: { Subagents: [{ TypeName: "general-purpose", Prompt: "find where X is defined" }] },
+}, ALLOW);
+
 console.log(`\n${pass}/${pass + failures.length} cases passed.`);
 if (failures.length > 0) {
   console.log("Failures:");

@@ -38,6 +38,17 @@
  * helper function, interpolation) is NOT statically resolvable here and is deliberately left
  * alone (fail-open, same posture as the rest of this file) rather than guessed at — a false
  * positive on a script that never dispatches a Goldfish/Critic role is worse than a miss.
+ *
+ * ANTIGRAVITY RUNNER AWARENESS. The Antigravity runner's native `invoke_subagent` tool call
+ * uses neither of the two shapes above: its payload is `{ Subagents: [{ TypeName: "...",
+ * Prompt: "..." }, ...] }` — capitalized keys, array-wrapped, one entry per dispatched
+ * subagent. Before this was recognized, that shape fell through every branch below to the
+ * unconditional `process.exit(0)`, admitting an Antigravity dispatch with zero checks
+ * regardless of contamination — backlog
+ * 2026-08-25-guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape.md.
+ * `extractAntigravityDispatches` reads `TypeName`/`Prompt` per array entry and checks each one
+ * exactly like a direct Agent-tool dispatch; a malformed entry (missing `TypeName`, non-string
+ * `Prompt`) is skipped rather than guessed at, same fail-open posture as the rest of this file.
  */
 import { readFileSync } from "node:fs";
 
@@ -70,6 +81,22 @@ function extractWorkflowDispatches(script) {
   return found;
 }
 
+// Recover `{ TypeName: '...', Prompt: '...' }`-shaped entries from the Antigravity runner's
+// native `invoke_subagent` payload: `toolInput.Subagents` is an array, one entry per dispatched
+// subagent. An entry with no string `TypeName` carries nothing to check against a role template
+// and is skipped, not guessed at -- same fail-open posture as the rest of this file.
+function extractAntigravityDispatches(subagents) {
+  const found = [];
+  for (const entry of subagents) {
+    if (!entry || typeof entry !== "object") continue;
+    const subagentType = typeof entry.TypeName === "string" ? entry.TypeName : "";
+    const prompt = typeof entry.Prompt === "string" ? entry.Prompt : "";
+    if (subagentType === "") continue;
+    found.push({ subagentType, prompt });
+  }
+  return found;
+}
+
 let input;
 try {
   input = JSON.parse(readFileSync(0, "utf8"));
@@ -93,6 +120,10 @@ if (typeof subagentType === "string" && subagentType !== "" && typeof prompt ===
   // Workflow-tool call: no discrete subagent_type/prompt field, but the script may carry
   // one or more embedded agent()/parallel()/pipeline() dispatches worth checking the same way.
   dispatches = extractWorkflowDispatches(toolInput.script);
+  if (dispatches.length === 0) process.exit(0);
+} else if (Array.isArray(toolInput.Subagents)) {
+  // Antigravity runner's native invoke_subagent shape: capitalized, array-wrapped.
+  dispatches = extractAntigravityDispatches(toolInput.Subagents);
   if (dispatches.length === 0) process.exit(0);
 } else {
   process.exit(0);
