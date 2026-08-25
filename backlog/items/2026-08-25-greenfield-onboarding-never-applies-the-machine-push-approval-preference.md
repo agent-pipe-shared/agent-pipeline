@@ -4,6 +4,10 @@ id: pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-prefe
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: fcf088bd1812f9897319d6f5ea2ba0d5f9604a43
+closure_evidence: backlog/items/2026-08-25-greenfield-onboarding-never-applies-the-machine-push-approval-preference.md
 created: 2026-08-25
 source: "PO question (chat), 2026-08-25: 'im onboarding muss ... auch der blocking mode also chat oder signature abgefragt werden. Das fehlt aktuell noch' -- investigated directly against plugins/pipeline-core/lib/project-onboarding-v3.mjs by the Elephant"
 ---
