@@ -305,7 +305,7 @@
 | pipeline.verify-gate-suite-fails-on-where-a-second-boundary-falls | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.verify-has-grown-to-269-suites-with-no-recorded-cost | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.verify-marketplace-attestation-blocks-normal-active-development | open | defect | pipeline | 2026-08-24 | — |
-| pipeline.verify-mjs-runs-385-suites-strictly-sequentially | open | workflow-improvement | pipeline | 2026-08-24 | — |
+| pipeline.verify-mjs-runs-385-suites-strictly-sequentially | closed | workflow-improvement | pipeline | 2026-08-24 | — |
 | pipeline.warn-security-gate-hard-blocks-every-push | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.wave5-scope-categorization-missed-triage-level-sprint-deferrals | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.windows-acl-hardening-never-remediates-a-pre-existing-insecure-directory | closed | defect | pipeline | 2026-08-17 | — |
@@ -322,6 +322,6 @@
 
 ## Counts
 
-- open: 46
+- open: 45
 - in_progress: 3
-- closed: 265
+- closed: 266

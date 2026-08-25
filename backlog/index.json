@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "a612d7ada6a7f04dda3f936ccfc3ca7605d617f1ebcc4d55aac9f9f5187f30d9"
+    "transitionHead": "3c8e5d7620e2b439fa6956697736bddc8968f56f71472e45c6682c6e95068a4e"
   },
   "counts": {
-    "open": 46,
+    "open": 45,
     "in_progress": 3,
-    "closed": 265
+    "closed": 266
   },
   "items": [
     {
@@ -3742,12 +3742,16 @@
     },
     {
       "id": "pipeline.verify-mjs-runs-385-suites-strictly-sequentially",
-      "status": "open",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-08-24",
       "source": "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24 (\"wir müssen verify mindestens um 70% beschleunigen ... von mir aus auch 50% aber schneller ohne Verluste\")",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-25",
+      "closureRepository": "self",
+      "closureCommit": "9b7b1d4df0c3b563c96a7afe5a87218125df82ee",
+      "closureEvidence": "backlog/items/2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md"
     },
     {
       "id": "pipeline.warn-security-gate-hard-blocks-every-push",
