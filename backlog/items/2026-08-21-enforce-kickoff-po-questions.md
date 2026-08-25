@@ -203,3 +203,26 @@ functionality.
 
 Status left `open` — no implementation was made, so this is deliberately
 NOT an "Implemented" section and the item is not closed.
+
+## Option picked, 2026-08-25 (PO decision)
+
+**Option 1**: build a genuine, reusable chat-mode gate primitive first (its
+own dispatch, real architecture latitude inside `po-human-approval.mjs`/
+`po-approval-gate.mjs`), then add the kickoff-parameter gate kind to it.
+This supersedes the 2026-08-25 "Mode decided" section above insofar as
+`chat` mode is no longer assumed to already exist as a joinable primitive —
+it has to be built. Options 2 (copy the push one-off) and 3 (fall back to
+`signature`) were not picked.
+
+**Scope for the next dispatch:** design and implement a chat-mode gate-kind
+registry inside the `po-human-approval.mjs`/`po-approval-gate.mjs` family,
+generalized enough that a NEW kind (starting with kickoff `--language`/
+`--profile`) can register into it without a bespoke one-off ceremony per
+kind — the property `pipeline-state.mjs`'s `pendingPushChallenge` and
+`human-guard-override.mjs`'s `activate: true` mechanism each lack today.
+Whether it must support running before any commit exists (the original
+brand-new-project case) is part of that design, not decided here — the
+primitive's shape should make that an explicit, considered choice rather
+than an accidental limitation inherited from copying the push ceremony.
+Not started; needs its own `goldfish-deep` dispatch package built from
+`templates/prompts/goldfish-task.md`.
