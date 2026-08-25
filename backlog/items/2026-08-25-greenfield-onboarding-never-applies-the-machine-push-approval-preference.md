@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-preference
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-25
 source: "PO question (chat), 2026-08-25: 'im onboarding muss ... auch der blocking mode also chat oder signature abgefragt werden. Das fehlt aktuell noch' -- investigated directly against plugins/pipeline-core/lib/project-onboarding-v3.mjs by the Elephant"
 ---
@@ -90,4 +90,21 @@ question exists at all.
   session does not have to re-derive the two call sites and the exact line
   numbers again.
 - **Assignment (if accepted):** unscheduled.
+- **Date:** 2026-08-25
+
+### Closure, 2026-08-25 (AGY-PUSHDEFAULT-2)
+
+Fixed same day: `freshIntent()` now seeds `gates.push_approval` from
+`machinePushApprovalPreference(fs)` (reading `machine-plane.mjs`'s
+`pushApprovalDefault`), falling back to `"signature"` only when the machine
+plane is absent/invalid. The onboarding ask itself changed from "once per
+machine, then silent forever" to "confirmed per repository, pre-filled with
+the machine default" (PO architectural decision, 2026-08-25:
+`pipeline.user.yaml` is repository-scoped config). Verified independently
+by the Elephant: `project-onboarding-v3.test.mjs` 132/132 green,
+`guard-maintenance-window-kernel-closure.test.mjs` and
+`check-consumer-safe-paths.test.mjs` green. Commit
+`cefd5dcb28b78ea8824130afbf54db54f0ae31f0`.
+
+- **Decision:** accepted, implemented
 - **Date:** 2026-08-25
