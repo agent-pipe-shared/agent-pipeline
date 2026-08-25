@@ -338,3 +338,31 @@ final wave does not cross a sprint boundary. Per the item's own governance
 (GF-059 F1/F3), the implementing dispatch must stay inside a dedicated,
 explicitly authorized pass for `codex-pretool-guard.mjs`/
 `onboarding-continuity.mjs` internals — not a freehand scope expansion.
+
+### Sweep revisit, 2026-08-25 (AGY-SWEEP-kickoff-promotion-cleanup) — blocked, no code change
+
+Revisited per explicit PO instruction (chat, 2026-08-25) to work through the
+backlog "as far as possible" in AFK mode and to actually build fixes, not
+just design them. Investigated whether any of Directions 1-3 could be
+implemented within this dispatch's own scope and forbidden-file list.
+
+Confirmed by direct import trace: `codex-pretool-guard.mjs` imports
+`topology()` and related exports directly from `human-guard-override.mjs`
+(`codex-pretool-guard.mjs:16`), and it is `human-guard-override.mjs`'s
+`topology()` that throws the `HGO-GIT`/`HGO-ROOT`/`HGO-COMMON-DIR` errors
+this item's Direction 1/2 need to either fix or route around. Both
+`codex-pretool-guard.mjs` and `human-guard-override.mjs` are explicitly
+forbidden to this dispatch ("unrelated concurrent work owns those"), and this
+item's own 2026-08-19 governance note already independently excludes
+designing or implementing Direction 1-3 outside "a dedicated, explicitly
+authorized pass" for exactly this code family — a generic AFK sweep across
+many unrelated backlog items is not that dedicated pass. Direction 3 (the
+diagnostics-message improvement) sits in the same excluded code family per
+that same governance note, so it was not attempted separately.
+
+**Decision: `blocked`.** Real technical blocker per this dispatch's own stop
+conditions: the item's own remaining fix necessarily touches a file this
+dispatch is forbidden from touching, and the item's own governance
+independently reserves Directions 1-3 for a dedicated authorized pass this
+dispatch is not. No code changes made; `status:` left untouched for the
+Elephant's central reconciliation.
