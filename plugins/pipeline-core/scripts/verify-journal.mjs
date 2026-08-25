@@ -346,6 +346,34 @@ const TIER_B_DECLARATIONS = Object.freeze({
       "plugins/pipeline-core/lib/control-catalog-schema.test.mjs",
     ]),
   }),
+  // ADR-0065 candidate (c), continuation (AGY-SWEEP-every-gate-binds-whole-tree). Same shape,
+  // one of the eight candidates the 2026-08-19 progress note left for "the next dispatch in this
+  // series" -- two of the eight (check-ownership-tests, sdlc-efficiency-metrics-tests) were
+  // rejected this dispatch: their source pair lives outside the plugin tree, in a source-only
+  // top-level script directory this table (itself inside the plugin tree) must not reference --
+  // the repo's consumer-safe-paths check correctly flags that. This table stays self-referencing.
+  // Confirmed live before this dispatch: control-catalog-migration.mjs has zero imports of its
+  // own, and its test file imports only "node:assert/strict" plus this one module -- no fs, no
+  // child_process, no os.tmpdir -- so its entire real input is these two files; confirmed by a
+  // real `node --permission --allow-fs-read=<src> --allow-fs-read=<test> <test>` run (exit 0, no
+  // other grant).
+  "control-catalog-migration-tests": Object.freeze({
+    reads: Object.freeze([
+      "plugins/pipeline-core/lib/control-catalog-migration.mjs",
+      "plugins/pipeline-core/lib/control-catalog-migration.test.mjs",
+    ]),
+  }),
+  // Same dispatch, same shape. Confirmed live before this dispatch: critic-packet-governance.mjs
+  // has zero imports of its own, and its test file imports only "node:assert/strict" plus this
+  // one module -- no fs, no child_process, no os.tmpdir -- so its entire real input is these two
+  // files; confirmed by a real `node --permission --allow-fs-read=<src> --allow-fs-read=<test>
+  // <test>` run (7/7 checks passed, no other grant).
+  "critic-packet-governance-tests": Object.freeze({
+    reads: Object.freeze([
+      "plugins/pipeline-core/lib/critic-packet-governance.mjs",
+      "plugins/pipeline-core/lib/critic-packet-governance.test.mjs",
+    ]),
+  }),
 });
 
 function tierBDeclaredFiles({ suite, rel, implementationSha256, repoRoot, declaration }) {
