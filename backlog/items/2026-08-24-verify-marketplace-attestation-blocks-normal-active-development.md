@@ -85,3 +85,63 @@ failure mode most likely to also hide a REAL drift the next time it matters.
 - The underlying security property (an agent cannot falsely claim the
   external marketplace matches the checkout) is preserved somewhere in the
   gate chain, not silently dropped.
+
+## Design recommendation, 2026-08-25 (proposal — PO acceptance needed, not implemented)
+
+**Recommendation: Direction 3 (downgrade to WARN inside `verify.mjs`, keep BLOCKING at the push gate).**
+
+**Why not Direction 1 (move to session-bootstrap):** a long active-dev
+session does not restart often — the check would run once per session and
+then stay silent for the rest of a multi-hour editing block, during which
+the marketplace copy could drift again without re-detection until the next
+restart. It solves "noisy on every commit" but not "must be true at the
+moment it actually matters" as precisely as gating at push time does, and
+it adds a new checkpoint concept (`session-bootstrap` as a security gate)
+where one does not currently exist for this class of check.
+
+**Why not Direction 2 (auto-sync as a `verify.mjs` setup step):** the item
+itself already names the real risk — a test script gets a machine-wide,
+cross-repo write side-effect (this marketplace also serves the nova
+checkout). A gate whose job is to VERIFY correctness should not also be the
+thing that silently repairs the environment out from under a session that
+did not ask for that; if the auto-sync itself has a bug, it could paper
+over a real drift instead of surfacing it. Higher blast radius for the
+same or lesser benefit than Direction 3.
+
+**Direction 3 is the smallest change and reuses existing infrastructure
+directly, not a new mechanism:**
+
+- `externalLocalMarketplaceObservation()`
+  (`plugins/pipeline-core/lib/human-guard-override.mjs:436`, already
+  exported at line 2979) is already a standalone, reusable function — the
+  fix is WHERE it is called and how its failure is treated, not new
+  detection logic.
+- `plugins/pipeline-core/hooks/guard-push.mjs` already has an established
+  pattern for exactly this class of check: a hard, blocking pre-push proof
+  requirement (`criticalProofWaiverFor`/`readCriticalHumanProofPolicy`,
+  `project/critical-human-proof.json`). Wiring
+  `externalLocalMarketplaceObservation()` into this same push-time gate (or
+  the `pipeline-state.mjs approve-push` flow it backs) is adding a second
+  instance of a pattern that already exists here, not inventing one.
+- Inside `verify.mjs`'s `human-guard-override-tests` suite, the specific
+  assertion that currently `fail()`s on a real, live, unsynced external
+  marketplace copy would instead log a WARN-level line (visible, not
+  silent) and return a passing suite result — preserving every OTHER
+  assertion in that suite (fixture-based, deterministic) as still fully
+  blocking. Only the one live-environment comparison changes tier.
+
+**What this does NOT change:** the underlying security property (an agent
+cannot falsely claim the external marketplace matches the checkout) stays
+exactly as strong at the moment it is load-bearing — publication. It only
+stops being asserted on every ordinary in-progress commit, which is the
+actual friction the PO observed twice in one session.
+
+**Not implemented — this is a proposal for PO acceptance**, per this
+item's own Acceptance criteria ("A design decision is made... [PO decides
+among the directions]") and the standing rule that an agent-authored
+design decision on someone else's behalf is not the right shape for
+something the PO explicitly asked to decide. If accepted, the follow-up
+implementation is a `goldfish-deep` dispatch (guardrail-adjacent: touches
+`verify.mjs`'s TP-3-protected suite registration for the WARN-downgrade
+half, and `guard-push.mjs`/the push-approval flow for the new blocking
+half) — not attempted here.
