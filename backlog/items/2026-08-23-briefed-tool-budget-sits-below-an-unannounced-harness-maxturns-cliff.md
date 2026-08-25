@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-23
 source: "Direct measurement across one dispatch block, 2026-08-23 (agy-runner Critic-fix wave): five of six Goldfish dispatches ended mid-sentence without committing, every one of them at 50 or 51 tool uses, against briefed base caps of 30-35."
 ---
@@ -155,3 +155,17 @@ completes; if it also finishes comfortably under 40, this closes part 3
 with full confidence. If it genuinely needed more room, that is the first
 real signal to reconsider `maxTurns` itself, and should be re-investigated
 then — not pre-empted here. Item stays `open` pending that one data point.
+
+## Part 3 closed, 2026-08-25
+
+The one open data point landed: `AGY-VERIFYTUNER-1` (`9e6d5307`) — a
+genuinely complex async worker-pool rewrite with real in-task design
+latitude — finished at **30 of 40** tool uses, tests green, commit landed
+cleanly with no truncation (`docs/state.md` item 13, 2026-08-24). This is
+comfortably under the new base cap, confirming the root cause parts 1+2
+already fixed (agents ignoring a non-binding soft cap) rather than the
+caps themselves being too tight even for complex work.
+
+**Final disposition: `maxTurns` stays at 50/30, no change needed.** All
+three parts of this item are now resolved: parts 1+2 landed (`eccbdadd`),
+part 3 measured and confirmed (this entry). Item closed.
