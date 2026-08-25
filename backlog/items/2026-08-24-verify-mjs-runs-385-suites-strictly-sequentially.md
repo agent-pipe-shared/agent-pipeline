@@ -4,6 +4,10 @@ id: pipeline.verify-mjs-runs-385-suites-strictly-sequentially
 type: workflow-improvement
 owner: pipeline
 status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: 9b7b1d4df0c3b563c96a7afe5a87218125df82ee
+closure_evidence: backlog/items/2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md
 created: 2026-08-24
 source: "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24 (\"wir müssen verify mindestens um 70% beschleunigen ... von mir aus auch 50% aber schneller ohne Verluste\")"
 due: 2026-08-31
