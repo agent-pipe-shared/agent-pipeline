@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: 2242a4f53191071f097118defefd57e5bbcdf87c
+closure_evidence: backlog/items/2026-08-25-gwm-kernel-doc-enumeration-diverges-from-the-code-array.md
 created: 2026-08-25
 source: "AGY-GWMKERNEL-1 (goldfish-deep) own report, 2026-08-25, Deliverable section 4 (Deliberately NOT changed) -- found while fixing the chat-gate-ceremony.mjs kernel-closure gap, explicitly flagged as pre-existing and out of that dispatch's scope"
 ---
@@ -109,3 +113,10 @@ Implemented option (b) from the Proposal:
   `node --test harness/scripts/check-consumer-safe-paths.test.mjs` -- 9/9
   pass, exit 0 (run because the change touches `plugins/pipeline-core/`).
 - Decision: `implemented`. Commit: `af85a7e486610063037ca85a689e753a8fa12161`.
+
+### Closure, 2026-08-25
+
+Closed by the Elephant. Independently re-verified
+(`node plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs`,
+3/3 including the new GMWKC03 superset check) on `sprint_agy` HEAD after
+cherry-picking `af85a7e4` in as `2242a4f53191071f097118defefd57e5bbcdf87c`.

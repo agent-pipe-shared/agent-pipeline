@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: 12a39b46bfa0628596546cfdb0703f0e903a0c7a
+closure_evidence: backlog/items/2026-08-25-guard-dispatch-fails-open-on-the-antigravity-subagents-payload-shape.md
 created: 2026-08-25
 source: "PO relay (chat), 2026-08-25, from a separate Agy greenfield-test session's own live-reproduced dispatch-guard bypass test (transcript pasted verbatim by the PO); confirmed independently this session by direct reading of plugins/pipeline-core/hooks/guard-dispatch.mjs lines 83-99"
 ---
@@ -147,3 +151,10 @@ convenient form), not a paraphrased/relative-only version of it.
 - **Commit:** `ced361b1b5c9f707472c20e361f5380a744c1adc`.
 - **`status:` field:** left untouched — the Elephant reconciles it centrally
   across the sweep.
+
+### Closure, 2026-08-25
+
+Closed by the Elephant. Independently re-verified
+(`node plugins/pipeline-core/hooks/guard-dispatch.test.mjs`, 15/15,
+including the reproduced source-session bypass GD14) on `sprint_agy` HEAD
+after cherry-picking `ced361b1` in as `12a39b46bfa0628596546cfdb0703f0e903a0c7a`.
