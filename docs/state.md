@@ -288,11 +288,21 @@ acknowledge-apply` now requires the ceremony, commits `01b10848`
 cherry-picked + `550b21d7`), push-approval preference now confirmed
 per-repository pre-filled from the machine default instead of asked once
 and never applied (closed, commit `cefd5dcb`). GWM kernel-closure gap for
-`chat-gate-ceremony.mjs` fixed (`f6c9800a`). Still open: HGO's
-`authorize --activate` chat-mode path needs the same attendance check (a
-correct, reviewed implementation exists but was reverted uncommitted —
-broke 12 pre-existing tests, no CLI wiring yet — needs a clean redo); GWM
-itself has no chat-mode activation path yet (barely started, reverted).
+`chat-gate-ceremony.mjs` fixed (`f6c9800a`). **HGO's `authorize --activate`
+chat-mode path now DONE** (`AGY-HGOFIX-2`, commit `69d608fe`,
+independently reverified 76/76): `authorizeHumanGuardOverride()` requires
+the attended-chat-gate confirmation in chat mode, unchanged in signature
+mode. Its own collateral regression (3 dependent test files calling the
+now-gated function in chat mode without the seam) was chased down:
+`guard-lifecycle-ready.test.mjs` fixed (`AGY-HGOFIX-3`, commit `60805fab`,
+127/127). **Still open:** `guard-gate-strength.test.mjs` (4 tests,
+GST21/25/26/27) and `guard-testpath-override.test.mjs` (4 tests,
+OT10/11/12/13) stay regressed — both are empirically confirmed TP-6/TP-7
+guard-protected test paths with no in-session override route
+(`status=author-repair-required`); fixing them needs a human-run
+author-repair ceremony or a follow-up dispatch scoped with that authority.
+GWM itself has no chat-mode activation path yet (barely started, reverted,
+not picked back up — not blocking anything currently in flight).
 **Live incident this session, recovered, filed:**
 `isolation: "worktree"` (Agent tool) never actually created a separate
 worktree — three parallel dispatches raced on the shared checkout, causing
@@ -315,19 +325,51 @@ distinct `.claude/worktrees/wf_*` entries), matching
 Workflow tool for any future worktree-isolated parallel dispatch in this
 repo; the Agent-tool-direct path stays suspect until separately verified.
 
-**AFK backlog sweep in progress (PO directive, chat, 2026-08-25):** working
-through the remaining 17 open items (12 general + `gwm-kernel-doc-drift` +
-`guard-dispatch-fail-open` + the 3 `in_progress` items) via one Workflow
-run, 17 parallel worktree-isolated `goldfish-deep` agents, each deciding
-`implemented`/`recommend-close`/`needs-po-decision`/`blocked` and actually
-building (not just designing) where warranted. `codex-runner-has-no-real-
-support-on-native-windows` already closed separately (won't-fix, PO: no
-Windows daemon exists, existing mitigation suffices). `AGY-HGOFIX-2` (HGO
-chat-gate wiring, serial, no isolation, shared checkout) also still
-running concurrently — does not conflict with the sweep's isolated
-worktrees. Results pending; each will be independently re-verified
-(worktree diff + tests run directly) before being merged/closed, per
+**AFK backlog sweep — COMPLETE and reconciled (PO directive, chat,
+2026-08-25).** `codex-runner-has-no-real-support-on-native-windows` closed
+separately first (won't-fix, PO: no Windows daemon exists, existing
+mitigation suffices). The 17-item Workflow-tool sweep (Run ID
+`wf_3ec6e465-da5`) landed; 8 of 17 agents failed to call `StructuredOutput`
+(harness-level truncation) but several still committed real work in their
+worktree — every one of the 17 worktrees was individually checked via
+`git worktree list`/diff, not just the returned JSON, per
 `workflow-dispatch.md`'s "never trust a returned result alone" rule.
+Reconciled onto `sprint_agy`: **6 fixes cherry-picked and independently
+re-verified** (own test suite run directly, not the dispatch's self-report)
+— a real Antigravity `Subagents`-payload dispatch-guard bypass fix (15/15,
+matches the live-reproduced finding from earlier this session), the GWM
+kernel-doc/code enumeration drift (13 missing entries, 3/3 incl. new
+GMWKC03 regression guard), a `backlog-strip-for-dispatch` section-dropping
+bug fix (12/12), a `verify.mjs` Tier-B promotion for two more suites
+(35/35), a goldfish/critic template hardening against silent turn-end
+abandonment (the exact `long-dispatches-truncate` failure mode this same
+sweep run itself hit for 8/17 agents — 4/4+36/36), and the missing
+`intake-generate`/`bootstrap-bind` coordinator skill-reference doc. Plus 6
+Triage-only re-triage/correction notes (stale-claim corrections, evidence
+re-checks) and one doc-only workflow-dispatch policy addition. Closed with
+fresh evidence: `orchestrator-authored-production-commits-have-no-
+deterministic-control` (GIT-01/GG-22 confirmed live, 230/230; its
+undelivered Part B split into its own item,
+`2026-08-25-verify-range-mode-registration-for-orchestrator-commit-
+control.md`), `guard-dispatch-fails-open-on-the-antigravity-subagents-
+payload-shape`, `gwm-kernel-doc-enumeration-diverges-from-the-code-array`.
+**One post-merge regression caught and fixed on the integrated tree**
+(not present in any individual worktree): the new
+`docs/human-authorization-inventory.md` doc was unclassified in
+`governance/observation-doc-governance.json`'s inventory, tripping
+`check-doc-contracts.test.mjs`'s observation-governance pass
+(`OG-DOC-UNCLASSIFIED`) — fixed, 36/36 green (`02014041`). **Confirmed
+still blocked, re-verified live rather than trusted from inheritance:**
+`mp22-orchestrator-self-implementation-has-no-enforcement` (Sprint Alfred),
+`regulated-document-hooks` (Sprint Phoenix HAW-E batch),
+`session-keep-awake` + `afk-assumption-mode` (both bound to the Nova A
+candidate freeze), `kickoff-promotion-cleanup-readback` (needs a dedicated
+authorized pass touching `human-guard-override.mjs`/
+`codex-pretool-guard.mjs`), `scratch-cleanup-mechanism` (points 1 and 3
+remain genuinely open). Backlog ledger reconciled (`6d62f964`); security
+scan and `check-backlog-state.mjs` both clean on the final tree; all 17
+sweep worktrees removed. 25 commits landed this reconciliation pass, still
+unpushed — no push approval exists for any of them.
 
 ### Sentinel Links
 - specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md
