@@ -491,7 +491,7 @@ test("AGY-VERIFYTUNER-1: a dependsOn suite does not START executing before its d
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-test("AGY-VERIFYTUNER-1: default concurrency (unspecified) matches the prior strictly-sequential behavior -- same steps[] content and order, same exit codes", async () => {
+test("AGY-VERIFYTUNER-1/2: explicit concurrency: 1 still matches the prior strictly-sequential behavior -- same steps[] content and order, same exit codes (explicit sequential stays available on request)", async () => {
   const f = twoSuiteFixture(["default-a", "default-b"]);
   let maxInFlight = 0;
   let inFlight = 0;
@@ -501,12 +501,159 @@ test("AGY-VERIFYTUNER-1: default concurrency (unspecified) matches the prior str
     onSettle: () => { inFlight -= 1; },
   });
   try {
-    // No `concurrency` key at all -- exactly harness/scripts/verify.mjs's real call shape.
-    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-default-concurrency", registerRun, spawn });
-    assert.equal(maxInFlight, 1, "default concurrency must never let two suites' child processes be in flight at once");
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-default-concurrency", registerRun, spawn, concurrency: 1 });
+    assert.equal(maxInFlight, 1, "explicit concurrency: 1 must never let two suites' child processes be in flight at once");
     assert.deepEqual(result.steps.map((step) => step.name), ["default-a", "default-b"]);
     assert.equal(result.steps.every((step) => step.exitCode === 0), true);
     assert.equal(result.terminal.status, "passed");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+// ============================================================================================
+// AGY-VERIFYTUNER-2: default concurrency resolution (env var > project/pipeline.json calibration
+// > DEFAULT_VERIFY_CONCURRENCY literal), and the serial/exclusive lanes.
+// ============================================================================================
+
+test("AGY-VERIFYTUNER-2: with no concurrency argument, no env override, and no calibration file, the resolved default is the hardcoded literal (> 1) -- real production concurrency, not the stage-1 mechanism default", async () => {
+  const f = twoSuiteFixture(["resolved-a", "resolved-b"]);
+  let maxInFlight = 0;
+  let inFlight = 0;
+  const spawn = delayedSpawn({
+    delayMs: 20,
+    onStart: () => { inFlight += 1; maxInFlight = Math.max(maxInFlight, inFlight); },
+    onSettle: () => { inFlight -= 1; },
+  });
+  try {
+    // No `concurrency` key -- exactly harness/scripts/verify.mjs's real call shape. `environment`
+    // is explicitly emptied so this test never depends on (or leaks into) ambient process.env.
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-resolved-default", registerRun, spawn, environment: {} });
+    assert.equal(maxInFlight, 2, "the resolved default must allow both suites' child processes in flight at once (> 1)");
+    assert.deepEqual(result.steps.map((step) => step.name), ["resolved-a", "resolved-b"]);
+    assert.equal(result.terminal.status, "passed");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("AGY-VERIFYTUNER-2: PIPELINE_VERIFY_CONCURRENCY in the passed environment overrides the default", async () => {
+  const f = twoSuiteFixture(["env-a", "env-b"]);
+  let maxInFlight = 0;
+  let inFlight = 0;
+  const spawn = delayedSpawn({
+    delayMs: 20,
+    onStart: () => { inFlight += 1; maxInFlight = Math.max(maxInFlight, inFlight); },
+    onSettle: () => { inFlight -= 1; },
+  });
+  try {
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-env-concurrency", registerRun, spawn, environment: { PIPELINE_VERIFY_CONCURRENCY: "1" } });
+    assert.equal(maxInFlight, 1, "PIPELINE_VERIFY_CONCURRENCY=1 must force strictly sequential execution even though the literal default is > 1");
+    assert.equal(result.terminal.status, "passed");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("AGY-VERIFYTUNER-2: a project/pipeline.json verifyConcurrency field is read as a calibration override when no env var is present", async () => {
+  const f = twoSuiteFixture(["cal-a", "cal-b"]);
+  mkdirSync(join(f.root, "project"), { recursive: true });
+  writeFileSync(join(f.root, "project", "pipeline.json"), JSON.stringify({ verifyConcurrency: 1 }), { mode: 0o600 });
+  let maxInFlight = 0;
+  let inFlight = 0;
+  const spawn = delayedSpawn({
+    delayMs: 20,
+    onStart: () => { inFlight += 1; maxInFlight = Math.max(maxInFlight, inFlight); },
+    onSettle: () => { inFlight -= 1; },
+  });
+  try {
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-calibration-concurrency", registerRun, spawn, environment: {} });
+    assert.equal(maxInFlight, 1, "the calibration file's verifyConcurrency: 1 must be honored when no env var overrides it");
+    assert.equal(result.terminal.status, "passed");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("AGY-VERIFYTUNER-2: PIPELINE_VERIFY_CONCURRENCY takes precedence over a project/pipeline.json calibration value", async () => {
+  const f = twoSuiteFixture(["prec-a", "prec-b"]);
+  mkdirSync(join(f.root, "project"), { recursive: true });
+  writeFileSync(join(f.root, "project", "pipeline.json"), JSON.stringify({ verifyConcurrency: 1 }), { mode: 0o600 });
+  let maxInFlight = 0;
+  let inFlight = 0;
+  const spawn = delayedSpawn({
+    delayMs: 20,
+    onStart: () => { inFlight += 1; maxInFlight = Math.max(maxInFlight, inFlight); },
+    onSettle: () => { inFlight -= 1; },
+  });
+  try {
+    const result = await runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" }, runId: "verify-precedence-concurrency", registerRun, spawn, environment: { PIPELINE_VERIFY_CONCURRENCY: "2" } });
+    assert.equal(maxInFlight, 2, "the env var (2) must win over the calibration file's value (1)");
+    assert.equal(result.terminal.status, "passed");
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("AGY-VERIFYTUNER-2: two suites named in serialLaneSuites never overlap each other, but a pool suite still overlaps a lane suite", async () => {
+  const f = twoSuiteFixture(["lane-one", "lane-two"]);
+  const poolFile = join(f.root, "pool-x.test.mjs");
+  writeFileSync(poolFile, "process.stdout.write('pool-x ok\\n')\n", { mode: 0o600 });
+  const suites = [...f.suites, { name: "pool-x", file: poolFile, dependsOn: [] }];
+  let laneInFlight = 0;
+  let maxLaneInFlight = 0;
+  let anyOverlapBetweenPoolAndLane = false;
+  let poolStarted = false;
+  const spawn = delayedSpawn({
+    delayMs: 30,
+    onStart: (file) => {
+      if (file === poolFile) { poolStarted = true; return; }
+      laneInFlight += 1;
+      maxLaneInFlight = Math.max(maxLaneInFlight, laneInFlight);
+      if (poolStarted) anyOverlapBetweenPoolAndLane = true;
+    },
+    onSettle: (file) => { if (file !== poolFile) laneInFlight -= 1; },
+  });
+  try {
+    const result = await runVerifyJournal({
+      gitCommonDir: f.common, repoRoot: f.root, candidate, suites, policyInputs: { harness: "test" },
+      runId: "verify-serial-lane", registerRun, spawn, concurrency: 4,
+      serialLaneSuites: new Set(["lane-one", "lane-two"]), exclusiveSuites: new Set(),
+    });
+    assert.equal(maxLaneInFlight, 1, "lane-one and lane-two must never both have a child process in flight");
+    assert.deepEqual(result.steps.map((step) => step.name), ["lane-one", "lane-two", "pool-x"]);
+    assert.equal(result.steps.every((step) => step.exitCode === 0), true);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("AGY-VERIFYTUNER-2: an exclusiveSuites member runs alone -- nothing else is in flight while it runs, and it runs before the concurrent phase starts", async () => {
+  const f = twoSuiteFixture(["solo", "concurrent-peer"]);
+  let anyOverlapWithSolo = false;
+  let soloRunning = false;
+  let otherInFlight = 0;
+  const spawn = delayedSpawn({
+    delayMs: 25,
+    onStart: (file) => {
+      const isSolo = file.endsWith("solo.test.mjs");
+      if (isSolo) { soloRunning = true; if (otherInFlight > 0) anyOverlapWithSolo = true; return; }
+      otherInFlight += 1;
+      if (soloRunning) anyOverlapWithSolo = true;
+    },
+    onSettle: (file) => { if (file.endsWith("solo.test.mjs")) soloRunning = false; else otherInFlight -= 1; },
+  });
+  try {
+    const result = await runVerifyJournal({
+      gitCommonDir: f.common, repoRoot: f.root, candidate, suites: f.suites, policyInputs: { harness: "test" },
+      runId: "verify-exclusive-lane", registerRun, spawn, concurrency: 4,
+      serialLaneSuites: new Set(), exclusiveSuites: new Set(["solo"]),
+    });
+    assert.equal(anyOverlapWithSolo, false, "no other suite may be in flight while the exclusive suite runs, and vice versa");
+    assert.deepEqual(result.steps.map((step) => step.name), ["solo", "concurrent-peer"]);
+    assert.equal(result.steps.every((step) => step.exitCode === 0), true);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test("AGY-VERIFYTUNER-2: an exclusiveSuites member whose own dependsOn names a non-exclusive suite is rejected up front rather than deadlocking", async () => {
+  const f = twoSuiteFixture(["excl-dep", "pool-dep"]);
+  const suites = [
+    { name: "excl-dep", file: f.files[0], dependsOn: ["pool-dep"] },
+    { name: "pool-dep", file: f.files[1], dependsOn: [] },
+  ];
+  try {
+    await assert.rejects(
+      () => runVerifyJournal({ gitCommonDir: f.common, repoRoot: f.root, candidate, suites, policyInputs: { harness: "test" }, runId: "verify-exclusive-bad-dependency", registerRun, spawn: spawnPass, exclusiveSuites: new Set(["excl-dep"]), serialLaneSuites: new Set() }),
+      /VERIFY-EXCLUSIVE-SUITE-DEPENDS-ON-POOL-SUITE:excl-dep->pool-dep/u,
+    );
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 

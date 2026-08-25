@@ -479,6 +479,88 @@ function spawnAsync(command, argv, options = {}) {
   });
 }
 
+// AGY-VERIFYTUNER-2: default concurrency resolution. Precedence: an explicit `concurrency`
+// argument to runVerifyJournal always wins (unchanged from stage 1); absent that, the env var
+// wins over the calibration file, which wins over the hardcoded literal below. A fixed literal
+// (not `os.availableParallelism()`) is deliberate: this repo runs on two machines, and a
+// machine-derived default would make the wall-clock evidence and the pool width incomparable
+// between them on a gate whose whole point is determinism (Advisor guidance, AGY-VERIFYTUNER-2).
+const DEFAULT_VERIFY_CONCURRENCY = 8;
+function resolveDefaultConcurrency(repoRoot, environment) {
+  const envValue = environment?.PIPELINE_VERIFY_CONCURRENCY;
+  if (typeof envValue === "string" && envValue.trim() !== "") {
+    const parsed = Number(envValue);
+    if (Number.isSafeInteger(parsed) && parsed >= 1) return parsed;
+  }
+  try {
+    // project/pipeline.json is this repo's own calibration file (not TP-protected, not owned by
+    // this dispatch's scope -- read only, never written by this mechanism). An absent or
+    // unpopulated `verifyConcurrency` field is the ordinary case today; it falls through to the
+    // hardcoded literal below, exactly like a read failure would.
+    const calibration = JSON.parse(readFileSync(join(repoRoot, "project", "pipeline.json"), "utf8"));
+    const declared = calibration?.verifyConcurrency;
+    if (Number.isSafeInteger(declared) && declared >= 1) return declared;
+  } catch { /* no calibration override available -- fall through to the hardcoded default */ }
+  return DEFAULT_VERIFY_CONCURRENCY;
+}
+
+// AGY-VERIFYTUNER-2: the serial lane, derived MECHANICALLY (scratch/derive-serial-lane.mjs, a
+// throwaway/gitignored script -- not committed; its exact patterns are reproduced in this
+// comment so the derivation is auditable without re-running anything) by scanning every suite
+// registered in harness/scripts/verify.mjs for three risk signals named in the design doc
+// (scratch/stripped-verify-mjs-parallelization.md, "Serial lane"):
+//   (a) a child_process call invoking "git" with no sign of an isolated fixture directory of its
+//       own (mkdtempSync/tmpdir()) -- i.e. it can plausibly race the REAL repo's .git/index.lock;
+//   (b) a reference to one of the real production modules/helpers that write under
+//       .git/agent-pipeline/** (worktree-lifecycle.mjs, session-cleanup*, human-guard-override.mjs,
+//       pipeline-state.mjs, verify-journal.mjs itself, nova-candidate-freeze.mjs,
+//       resolveRunsRoot/registerTemporaryIntent);
+//   (c) `.listen(` or a hardcoded-port `listen({ port: ... })` shape.
+// This is a heuristic sweep, deliberately conservative: a suite the sweep flags is never proven
+// unsafe, only plausibly so, and every suite the sweep does NOT flag stays in the ordinary pool.
+// Members of this lane run mutually exclusively of EACH OTHER (a dedicated 1-slot semaphore,
+// `laneSemaphore` below) but freely concurrently with the rest of the pool -- the risk the sweep
+// is defending against (two suites racing the same lock/port) is a risk between lane members,
+// not between a lane member and an unrelated suite.
+const SERIAL_LANE_SUITES = Object.freeze(new Set([
+  "afk-claude-host-tests", "antigravity-pretool-guard-tests", "backlog-state-check",
+  "codex-critic-probe-split-tests", "codex-pretool-guard-tests", "codex-sandbox-preflight-host-control-tests",
+  "codex-sandbox-preflight-plugin-tests", "codex-sandbox-runtime-tests", "continuity-result-bootstrap-tests",
+  "continuity-result-case-migration-tests", "continuity-result-close-tests", "continuity-result-rebind-tests",
+  "continuity-state-tests", "critical-human-proof-gate-tests", "doc-contract-check", "gate-strength-guard-tests",
+  "guard-devplan-tests", "guard-human-override-tests", "guard-lifecycle-ready-tests", "guard-maintenance-window-tests",
+  "guard-testpath-override-tests", "human-guard-override-tests", "lifecycle-ready-enforcement-tests",
+  "nova-b2-gitlab-ci-broker-core-tests", "nova-candidate-freeze-tests", "nova-verify-journal-tests",
+  "onboarding-continuity-tests", "phase26-invariants-check", "pipeline-start-scratch-lifecycle-tests",
+  "pipeline-start-v3-tests", "pipeline-state-approve-announce-tests", "pipeline-state-approve-push-argv-closure-tests",
+  "pipeline-state-discard-feature-tests", "pipeline-state-inspect-tests", "pipeline-state-inspection-contract-tests",
+  "pipeline-state-rebind-runner-tests", "pipeline-state-reopen-design-tests", "pipeline-state-revocation-tests",
+  "pipeline-state-tests", "po-gate-authority-fixture-tests", "po-human-approval-tests", "product-capability-inventory-tests",
+  "project-authority-migration-cli-tests", "project-authority-tests", "project-onboarding-v3-tests",
+  "publication-executor-productive-flow-tests", "publication-state-authority-tests", "push-prepare-tests",
+  "push-release-flow-docs-contract-tests", "reference-path-check", "repair-map-tests",
+  "scoped-verify-registration-tests", "scripts-pipeline-state-tests", "session-cleanup-binding-tests",
+  "session-cleanup-owner-nonce-tests", "session-cleanup-power-tests", "session-cleanup-recovery-tests",
+  "session-power-cli-tests", "settings-allowlist-merge-tests", "worktree-lifecycle-tests",
+]));
+
+// AGY-VERIFYTUNER-2: the exclusive lane. Unlike SERIAL_LANE_SUITES (mutually exclusive of EACH
+// OTHER, concurrent with everything else), a suite here must run with NOTHING ELSE in flight --
+// pool or lane. Found by manual read (not the mechanical sweep above, which scans only the three
+// git/agent-pipeline/port signals): `test-tmpdir-budget-tests`
+// (plugins/pipeline-core/lib/test-tmpdir-budget.test.mjs, case TB07) directly re-invokes
+// test-tmpdir-budget.mjs against THIS repo's real, shared scratch/test-tmp/ directory and asserts
+// it is within a fixed byte/entry budget -- exactly the risk the design doc's own "Serial lane"
+// section names by name ("this repo already hit a real temp-dir budget failure this session from
+// unrelated volume, so N-way concurrent temp-dir churn is a real risk, not hypothetical"). Under
+// concurrency, many unrelated pool suites create their own fixtures under that same shared
+// directory via mkdtempTestScratch() for the suite's ENTIRE runtime, not briefly -- a live
+// transient over-budget flake is a real risk, not a hypothetical one, so this suite runs alone,
+// before the pool starts. `test-tmpdir-tests` (test-tmpdir.test.mjs, read in full) was
+// deliberately NOT added: its own checks (unique-name non-collision, parent-directory reuse)
+// never observe sibling fixture content, so they are immune to concurrent siblings.
+const EXCLUSIVE_SUITES = Object.freeze(new Set(["test-tmpdir-budget-tests"]));
+
 // A minimal counting semaphore bounding how many suites may have a child process in flight at
 // once. `acquire()` resolves immediately while under the limit; otherwise it queues and is woken
 // FIFO by the next `release()`. This is the sole mechanism enforcing `concurrency` -- dependsOn
@@ -514,17 +596,34 @@ function createSemaphore(limit) {
 // dependsOn naming an id absent from the suite list -- so `completion.get(name)?.promise ??
 // Promise.resolve()` below can never actually fall through to its fallback for a suite that
 // reached this function; it stays only as defensive belt-and-braces, never load-bearing.
-async function runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot }) {
+//
+// AGY-VERIFYTUNER-2: two lanes layer on top of the stage-1 mechanism above, both keyed by suite
+// NAME (never by offset, so they apply identically regardless of registration order):
+//   - `exclusiveSuites` members run in a dedicated PRE-PHASE, one at a time, strictly before the
+//     concurrent phase below even starts -- nothing else (pool or lane) is in flight while they
+//     run. Their own dependsOn, if any, must resolve within the exclusive phase itself (asserted
+//     up front, fails fast rather than deadlocking); none of today's registered suites define one.
+//   - `serialLaneSuites` members share ONE dedicated 1-slot semaphore (`laneSemaphore`) instead of
+//     the main pool semaphore, so they never overlap EACH OTHER, but still run concurrently
+//     alongside ordinary pool suites during the concurrent phase.
+async function runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
   const total = suites.length;
   const steps = new Array(total);
   const receiptBySuite = {};
   const semaphore = createSemaphore(concurrency);
+  const laneSemaphore = createSemaphore(1);
   const completion = new Map(suites.map((suite) => {
     let resolveFn;
     const promise = new Promise((resolve) => { resolveFn = resolve; });
     return [suite.name, { promise, resolveFn }];
   }));
-  async function runOne(suite, offset) {
+  const registrationByName = new Map(suites.map((suite, offset) => [suite.name, registrations[offset]]));
+  for (const suite of suites) {
+    if (!exclusiveSuites.has(suite.name)) continue;
+    const badDependency = (registrationByName.get(suite.name)?.dependsOn ?? []).find((name) => !exclusiveSuites.has(name));
+    if (badDependency) throw new Error(`VERIFY-EXCLUSIVE-SUITE-DEPENDS-ON-POOL-SUITE:${suite.name}->${badDependency}`);
+  }
+  async function runOne(suite, offset, gate) {
     const registration = registrations[offset];
     await Promise.all((registration.dependsOn ?? []).map((name) => completion.get(name)?.promise ?? Promise.resolve()));
     let receipt;
@@ -532,18 +631,30 @@ async function runSuitePool({ suites, registrations, plan, prior, run, candidate
     if (reused) {
       receipt = reuseSuite({ suite, registration, sourceReceipt: prior.receipts[suite.name], sourceLog: prior.logs[suite.name], run, candidate, policySha256, index: offset + 1, total, clock });
     } else {
-      await semaphore.acquire();
+      await gate.acquire();
       try {
         receipt = await executeSuite({ suite: { ...suite, cwd: repoRoot }, registration, run, candidate, policySha256, index: offset + 1, total, clock, spawn });
       } finally {
-        semaphore.release();
+        gate.release();
       }
     }
     receiptBySuite[suite.name] = receipt;
     steps[offset] = { name: suite.name, exitCode: receipt.exitCode, receiptSha256: receipt.receiptSha256, reused, durationMs: Date.parse(receipt.completedAt) - Date.parse(receipt.startedAt) };
     completion.get(suite.name).resolveFn();
   }
-  await Promise.all(suites.map((suite, offset) => runOne(suite, offset)));
+  const exclusiveGate = createSemaphore(1);
+  const entries = suites.map((suite, offset) => ({ suite, offset }));
+  const exclusiveEntries = entries.filter(({ suite }) => exclusiveSuites.has(suite.name));
+  const poolEntries = entries.filter(({ suite }) => !exclusiveSuites.has(suite.name));
+  // Exclusive phase: strictly sequential, nothing else scheduled yet -- awaited one at a time
+  // rather than via Promise.all so a second exclusive suite never starts before the first's
+  // child process (if any) has fully settled.
+  for (const { suite, offset } of exclusiveEntries) {
+    await runOne(suite, offset, exclusiveGate);
+  }
+  // Concurrent phase: ordinary pool suites use `semaphore` (bounded by `concurrency`); lane
+  // suites use the separate `laneSemaphore` (bounded to 1, independent of `concurrency`).
+  await Promise.all(poolEntries.map(({ suite, offset }) => runOne(suite, offset, serialLaneSuites.has(suite.name) ? laneSemaphore : semaphore)));
   return { steps, receiptBySuite };
 }
 
@@ -600,17 +711,21 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
 }
 
 // AGY-VERIFYTUNER-1: `concurrency` bounds how many suites may have a child process in flight at
-// once (see runSuitePool/createSemaphore above); its DEFAULT is 1, so a caller passing nothing --
-// exactly this repository's top-level Verify entry point's real, unmodified call shape today --
-// gets behavior equivalent to the prior strictly-sequential loop. Raising the default itself, and reading a cap
-// from an env var or project/pipeline.json calibration, is explicitly reserved for a later,
-// separate commit (this dispatch's own Forbidden clause (b)) -- this parameter is the mechanism
-// only. `spawn` defaults to the new async `spawnAsync` (not the old `spawnSync`): production's
-// call site never passes its own `spawn`, so the default IS the production path, and it must be
-// genuinely async for concurrency > 1 to ever put more than one child process in flight.
-export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnAsync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, concurrency = 1 }) {
+// once (see runSuitePool/createSemaphore above). `spawn` defaults to the new async `spawnAsync`
+// (not the old `spawnSync`): production's call site never passes its own `spawn`, so the default
+// IS the production path, and it must be genuinely async for concurrency > 1 to ever put more
+// than one child process in flight.
+// AGY-VERIFYTUNER-2: an explicit `concurrency` argument still always wins (unchanged from stage
+// 1 -- this is how every stage-1 test above pins its own exact concurrency). Only when the
+// caller passes NOTHING -- exactly this repository's top-level Verify entry point's real,
+// unmodified call shape (harness/scripts/verify.mjs never passes `concurrency`) -- does the
+// default now resolve via `resolveDefaultConcurrency` (env var > project/pipeline.json
+// calibration > DEFAULT_VERIFY_CONCURRENCY), raising real production concurrency above 1 for the
+// first time. `environment` mirrors compileVerifySuites' own existing convention (defaults to
+// `process.env`, overridable so a test never depends on ambient environment or leaks into it).
+export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, environment = process.env, clock = Date.now, spawn = spawnAsync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}`, tierBDeclarations = TIER_B_DECLARATIONS, allowCrossCandidateReuse = false, concurrency = resolveDefaultConcurrency(repoRoot, environment), serialLaneSuites = SERIAL_LANE_SUITES, exclusiveSuites = EXCLUSIVE_SUITES }) {
   if (!Number.isSafeInteger(concurrency) || concurrency < 1) throw new TypeError("VERIFY-JOURNAL-CONCURRENCY");
-  const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree, tierBDeclarations });
+  const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree, tierBDeclarations, environment });
   // ADR-0065 coupling (3): this digest no longer covers `suites: registrations`, so one suite's
   // registration changing no longer invalidates every OTHER suite's receipt via
   // verify-policy-drift. Everything that term contributed per-suite is already checked per-suite
@@ -638,7 +753,7 @@ export async function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suit
     // would misrepresent both this run's own timing and how much the reuse mechanism is saving.
     // `steps` is materialized in registration order regardless of real completion order (see
     // runSuitePool's own comment) -- never completion order.
-    const { steps, receiptBySuite } = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot });
+    const { steps, receiptBySuite } = await runSuitePool({ suites, registrations, plan, prior, run, candidate, policySha256, clock, spawn, concurrency, repoRoot, serialLaneSuites, exclusiveSuites });
     const completedAt = now(clock);
     const terminal = { schema: RUN_TERMINAL_SCHEMA, runId, candidate, policySha256, planSha256: plan.planSha256, receipts: Object.values(receiptBySuite).map((receipt) => receipt.receiptSha256).sort(), status: steps.every((step) => step.exitCode === 0) ? "passed" : "failed", durability: run.manifest.durability, completedAt, journalSha256: sha(readFileSync(run.journalPath)), terminalSha256: null };
     const { terminalSha256: omittedTerminalSha256, ...terminalBody } = terminal;
