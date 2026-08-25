@@ -115,3 +115,91 @@ already covers that, and it needs no `candidate: {commit, tree}` binding,
 which matters because this gate fires on a brand-new project that may not
 have a meaningful commit yet (the exact tension the "Open design question"
 section above flagged). Ready for implementation dispatch.
+
+## Implementation blocked, 2026-08-25 (AGY-KICKOFFPOQ-1)
+
+Dispatched to implement the direction above under the `po-human-approval.mjs`/
+`po-approval-gate.mjs` family. Stopped before writing any code — the
+briefing's own stop condition 5 fires: "if `chat` mode turns out NOT to have
+an existing kind-registry pattern to extend ... STOP and report that finding
+rather than inventing a new registry mechanism." It does not.
+
+**What was checked, in full:**
+
+- `plugins/pipeline-core/lib/critical-action-approval-request.mjs` —
+  `CRITICAL_ACTION_KINDS = ["push", "deploy", "publication",
+  "release-preflight"]` is exclusively signature-mode: every request is
+  built around a `candidate: {commit, tree}` structure and a detached
+  Ed25519 proof. No mode branching exists in this file at all.
+- `plugins/pipeline-core/scripts/po-human-approval.mjs` (1162 lines, read
+  in full) and `po-approval-gate.mjs` — the family the design direction
+  names as the ceremony to join. Zero occurrences of `"chat"`,
+  `"attribution"` or `"in-session"` anywhere in either file. Every
+  subcommand (`KNOWN_COMMANDS`, line 357: `setup`, `prepare`,
+  `prepare-all`, `approve`, `approve-all`, `verify`, `verify-all`,
+  `prepare-critical`, `approve-critical`, `verify-critical`,
+  `authorize-critical`, `sign-intent`) is part of the signature-mode,
+  external-Ed25519-key, human-attended-terminal ceremony. There is no
+  chat-mode gate kind to join here, and no chat-mode test fixture in
+  `po-human-approval.test.mjs` either (its one `"chat"` hit is an
+  unrelated `pushApprovalDefault: "chat"` literal in a machine-plane
+  fixture) — 71/71 tests still green, confirmed as a baseline, not
+  because a chat gate-kind test exists among them.
+- The only working `chat`-mode ceremony anywhere in the plugin is a
+  bespoke, one-off `pendingPushChallenge` block inside
+  `plugins/pipeline-core/scripts/pipeline-state.mjs`'s `approve-push` case
+  (not in this dispatch's field-4 scope): a random `PO-XXXX` code, a
+  10-minute expiry, bound to `remote`/`destination`/`forCommit:
+  head.commit`. It exists for `push` only.
+  `critical-human-proof-policy.mjs`'s `GATE_APPROVAL_MODE_KEYS` table also
+  registers `feature-package-reconcile` as chat/signature-configurable,
+  but no chat-mode ceremony for that kind exists anywhere in
+  `pipeline-state.mjs` — the mode-selector table is not itself a working
+  ceremony; each kind that has one hand-rolled its own.
+  `plugins/pipeline-core/lib/human-guard-override.mjs` has a further,
+  separate chat-armed-capability mechanism (`activate: true`) for blocked
+  tool calls — a third, structurally unrelated domain, gated on the same
+  `gates.push_approval` setting only as a precondition.
+- None of the three is a generic, reusable chat-gate primitive a new kind
+  can join without either (a) inventing a new dispatch mechanism inside
+  `po-human-approval.mjs` (a file with zero chat concept today), or
+  (b) copying `pipeline-state.mjs`'s bespoke `pendingPushChallenge`
+  pattern into a fourth one-off case. Both are "a new gate that
+  introduces its own ritual" (ADR-0061 Decision 2) and outside this
+  dispatch's field-4 scope (`pipeline-state.mjs` is not a listed file).
+
+**A second finding that likely reopens the mode decision itself:** the
+2026-08-25 rationale states chat mode "needs no `candidate: {commit,
+tree}` binding, which matters because this gate fires on a brand-new
+project that may not have a meaningful commit yet." That is only half
+true. Push's chat path does skip the Ed25519-signed `candidate:
+{commit,tree}` *structure*, but it still requires and records
+`forCommit: head.commit` (`pipeline-state.mjs` lines ~5641-5646,
+~5669) — `approve-push` refuses with "current commit could not be
+determined" when `gitHead()` fails. The one existing chat ceremony
+therefore cannot run pre-first-commit either, which is exactly the case
+the PO's decision was meant to accommodate. This is worth the PO's
+attention before any further design/implementation dispatch.
+
+**Options for the PO to weigh, none picked here:**
+
+1. Design and build a genuine, reusable chat-mode gate primitive first
+   (its own dispatch, genuine architecture latitude), then add the
+   kickoff-parameter kind to it.
+2. Copy the push case's shape into a third bespoke one-off inside
+   `pipeline-state.mjs` for this kind specifically — accepted only with
+   eyes open that it repeats rather than resolves the ADR-0061
+   Decision 2 tension, and needs its own scope grant (`pipeline-state.mjs`
+   was not in this dispatch's field 4).
+3. Reconsider `signature` mode for this gate now that pre-first-commit is
+   understood to block the existing chat path too, removing the original
+   reason to prefer chat.
+
+**Verification run (no source changed):**
+`node --test plugins/pipeline-core/scripts/po-human-approval.test.mjs` —
+71/71 pass. `node harness/scripts/check-consumer-safe-paths.test.mjs` —
+9/9 pass. Both are baselines for the next dispatch, not evidence of new
+functionality.
+
+Status left `open` — no implementation was made, so this is deliberately
+NOT an "Implemented" section and the item is not closed.
