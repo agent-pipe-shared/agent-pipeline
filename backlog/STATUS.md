@@ -14,6 +14,7 @@
 | pipeline.adr-0056-conflict-scope-text-narrower-than-code | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.advisor-consent-is-requested-before-the-readiness-preflight | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.afk-assumption-mode | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.agent-binding-guards-are-not-os-level-sandboxing | open | idea | pipeline | 2026-08-25 | — |
 | pipeline.agent-definitions-pin-the-review-tier-model | open | defect | pipeline | 2026-08-07 | — |
 | pipeline.agent-never-asks-po-for-key-directory-invents-one-instead | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.agent-talks-itself-out-of-the-pipeline | closed | defect | pipeline | 2026-08-08 | — |
@@ -324,6 +325,6 @@
 
 ## Counts
 
-- open: 45
+- open: 46
 - in_progress: 3
 - closed: 268

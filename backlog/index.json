@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "093866d2d765bc6f32bf8c1c77ab4c252ff952b1c910ea780e9dfb7fa061ce9c"
+    "transitionHead": "8bf397544fec876544f6ab91d16df1ad1a27c811686058766f92a73c5ecb5ab1"
   },
   "counts": {
-    "open": 45,
+    "open": 46,
     "in_progress": 3,
     "closed": 268
   },
@@ -120,6 +120,15 @@
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": false,
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.agent-binding-guards-are-not-os-level-sandboxing",
+      "status": "open",
+      "type": "idea",
+      "owner": "pipeline",
+      "created": "2026-08-25",
+      "source": "PO relay (chat), 2026-08-25, from a separate Agy greenfield-test session's own threat-model self-analysis (Q&A transcript pasted verbatim by the PO); PO's own framing: 'eher was fürs backlog was aber nicht zeitnah angegangen wird (Thema eher für nova B)'",
+      "deferred": true
     },
     {
       "id": "pipeline.agent-definitions-pin-the-review-tier-model",
