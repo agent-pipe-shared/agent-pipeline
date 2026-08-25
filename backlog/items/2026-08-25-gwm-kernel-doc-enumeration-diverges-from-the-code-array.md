@@ -71,3 +71,41 @@ closes the class of defect, not just this instance.
   before AGY-GWMKERNEL-1's own report/transcript ages out.
 - **Assignment (if accepted):** unscheduled.
 - **Date:** 2026-08-25
+
+### Triage update (goldfish-deep, AGY-SWEEP-gwm-kernel-doc-drift, 2026-08-25)
+
+Revisited on explicit PO instruction to work through deferred AGY items in
+AFK mode rather than leaving the earlier "deferred" verdict standing.
+Implemented option (b) from the Proposal:
+
+- Reconciled `docs/guard-maintenance-window-threat-model.md`'s "Protected
+  assets" prose list: added `lib/guard-devplan-policy.mjs` to the primary
+  kernel bullet and the 12 missing closure-list entries
+  (`lib/feature-package-topology.mjs`, `lib/private-boundary.mjs`,
+  `lib/protected-test-paths.mjs`, `lib/publication-authority.mjs`,
+  `lib/publication-bundle.mjs`, `lib/publication-bundle-v2.mjs`,
+  `lib/publication-capability-preflight.mjs`, `lib/review-economy.mjs`,
+  `scripts/pipeline-state.mjs`, `scripts/po-gate-profile-repair.mjs`,
+  `scripts/project-onboarding-v3.mjs`,
+  `scripts/publication-close-journal.mjs`), reordered to mirror
+  `NEVER_LIFTABLE_KERNEL_PATHS`'s own order so the two can be diffed at a
+  glance. Verified byte-exact against the live array via a scratch script
+  (not committed) before writing the prose by hand.
+- Added a new regression check, GMWKC03, to the existing
+  `plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs`
+  (chosen over a new file since it already imports
+  `NEVER_LIFTABLE_KERNEL_PATHS` and owns this exact invariant space): it
+  parses the doc's "Protected assets" section for backtick-quoted
+  `lib/`/`scripts/`/`hooks/`/`project/...` path tokens and asserts they are
+  a superset of the code array, so the doc can no longer silently fall
+  behind a future array addition the way it did here.
+- Did NOT implement option (a) (mechanical doc regeneration at build/lint
+  time) -- (b)'s superset test already closes the drift class at
+  materially lower cost/risk than introducing a doc-generation step for one
+  section of one document; regeneration remains open for a future dispatch
+  if the PO wants it.
+- Verify: `node --test plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs`
+  -- 3/3 pass (GMWKC01, GMWKC02, GMWKC03), exit 0.
+  `node --test harness/scripts/check-consumer-safe-paths.test.mjs` -- 9/9
+  pass, exit 0 (run because the change touches `plugins/pipeline-core/`).
+- Decision: `implemented`. Commit: `af85a7e486610063037ca85a689e753a8fa12161`.
