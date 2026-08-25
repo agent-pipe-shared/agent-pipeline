@@ -86,3 +86,16 @@ starting points for whoever picks this up:
   reconsidered.
 - `kickoff-design.md`/`SKILL.md` and the actual live `v4Inspection` routing
   agree on what a fresh repo's first bootstrap command actually is.
+
+## Cross-reference, 2026-08-25
+
+`backlog/items/2026-08-21-kickoff-untracked-files-missing-from-commits.md`'s
+part (b) resolved the negative half of this proposal's third bullet
+(`.onboarding-staging` is no longer gitignored — PO correction, 2026-08-25:
+its content is used substantively by `sprint-agy-runner` and must not be
+discarded). The positive half — an agent must be explicitly told to STAGE
+that content, the same way `kickoff-design.md` already tells it to stage
+the classic flow's PRD/Spec pair (part a of that item) — remains this
+item's own open scope: the missing skill-reference documentation for
+`intake-generate-plan`/`intake-generate-apply` is exactly where that
+staging instruction belongs once written.
