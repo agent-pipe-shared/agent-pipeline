@@ -548,3 +548,66 @@ which stays as-is.
   required `git diff --check` was run. Full Verify was not run or claimed.
 
 - **Status:** `open` — no fabricated closure; Nova-A scope is preserved.
+
+### Prevention fix landed, 2026-08-25 — a bounded mitigation for Gap 1 and Gap 2, not a detector
+
+Re-triaged per explicit PO instruction (2026-08-25, AFK-mode sweep: "work
+through these now, making reasonable assumptions; implement means actually
+building it, not just designing it"). The 2026-08-20 investigation above
+correctly answered "can we *detect* abandonment after the fact?" — no,
+neither gap has a deterministic repository-local signal. It did not ask "can
+we *prevent the loss* in the first place?", and its own "ruled-out fixes"
+paragraph only considered and rejected a *promise* about host behavior ("a
+prompt-only 'resume after pause' instruction cannot prove that a host will
+deliver a later turn"). A *prohibition* that assumes nothing about host
+behavior was not considered, and both gaps admit one:
+
+- **Gap 1:** a dispatch must never voluntarily end a turn while budget
+  remains and work is unfinished — no announced-pause-awaiting-a-later-turn.
+  If budget remains, keep working (poll/wait in-turn) until either the work
+  finishes or the base tool-budget cap is actually reached; only reaching the
+  cap opens the already-shipped closing allowance.
+- **Gap 2:** a dispatch must never start a nested `run_in_background` job and
+  end its own turn before holding the result, since no repository-local
+  contract guarantees the harness delivers a further turn when that child job
+  completes. Stay in-turn until the result is held, or do not background the
+  work inside a dispatch.
+
+This is structurally identical to the two turn-discipline fixes this item
+already got shipped and accepted (record-created-first, commit-as-soon-as-
+green) — a briefing-level prohibition in the file a dispatch is actually
+built from, per this item's own bolded instruction above ("must put the …
+instruction into `templates/prompts/goldfish-task.md`"). Both new rules were
+added to `templates/prompts/goldfish-task.md` (field 6, next to the
+closing-allowance text) and to `templates/prompts/critic-review.md` (the
+equivalent closing-allowance section), regenerated into the two vendored
+copies under `plugins/pipeline-core/templates/prompts/` via
+`node harness/scripts/generate-vendored-canon.mjs` (byte-identical, per the
+generator's own manifest — no hand-copy).
+
+**Verification:** `node --test harness/scripts/generate-vendored-canon.test.mjs`
+(8/8), `node --test harness/scripts/check-consumer-safe-paths.test.mjs` (9/9),
+`node --test plugins/pipeline-core/scripts/check-vendored-template-sync.test.mjs`
+(4/4 — includes "real repo templates are byte-identical"), and
+`node --test harness/scripts/check-doc-contracts.test.mjs` (36/36), all exit 0.
+Confirmed via the array itself that neither template file is a
+`NEVER_LIFTABLE_KERNEL_PATHS` entry, and no new import edge was added to any
+kernel file (templates are prose, not JS modules) — the kernel-closure suite
+was not run, per this dispatch's own DoD condition for skipping it.
+
+**Scope discipline — what this does NOT close:** this is prevention, not
+detection. It reduces how often a dispatch *creates* an unrecoverable pause
+or an abandoned background job; it does not give the dispatcher a mechanical
+way to tell, from outside, whether an already-silent dispatch is paused-and-
+will-resume versus paused-and-abandoned. The 2026-08-20 investigation's
+"Ruled-out fixes" / "Smallest next authorized experiment" paragraphs for
+*detection* remain accurate and unaddressed by this update. Do not read this
+Triage entry as closing Gap 1/Gap 2 as originally framed — it closes the
+"can we stop the pattern from happening" half, which is the half a
+backlog-only, template-scoped dispatch could safely reach.
+
+- **Commit(s):** see the dispatch record
+  (`evidence/dispatch-record-AGY-SWEEP-long-dispatches-truncate.json`).
+- **Status left unchanged** by this dispatch (`open`) — the Elephant
+  reconciles `status:`/closure centrally after collecting the sweep.
+- **Date:** 2026-08-25

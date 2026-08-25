@@ -404,6 +404,27 @@ read, one more check, one more line of investigation, any continuation of
 Phase A. A reserve spendable on more reviewing is simply a larger cap, and then
 the cap means nothing.
 
+**Never end a turn voluntarily while budget remains and review work is
+unfinished — an announced pause is not a substitute for finishing or for the
+closing allowance.** A dispatch that pauses expecting a later turn to arrive
+(e.g. "I'll stop polling now to preserve the calls remaining for the
+completion sequence") has no guaranteed mechanism forcing that later turn —
+this has been observed to simply never resume, with no report and no closing
+handover, budget left unspent
+(`backlog/items/2026-08-08-long-dispatches-truncate-before-emitting-their-report.md`,
+Gap 1). If tool budget remains, keep working (poll/wait in-turn) until either
+the review finishes or the base cap above is actually reached — only reaching
+the base cap opens the closing allowance; choosing to stop early does not.
+
+**Never start a background job and end your own turn before holding its
+result.** A dispatch has been observed to start a nested `run_in_background`
+job and then end its own turn awaiting the result, with no evidence the
+harness reliably resumes it when that job finishes (same item, Gap 2) — there
+is no repository-local contract guaranteeing a backgrounded child job's
+completion delivers a further turn to the dispatch that started it. Either
+stay in-turn (poll/block) until you hold the result, or do not background the
+work inside a dispatch.
+
 **The closing handover is STRUCTURED, not prose,** and it is a PARTIAL review,
 labelled as one. Use the mandatory report format below and make these four
 statements explicit:
