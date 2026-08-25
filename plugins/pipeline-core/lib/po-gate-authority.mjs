@@ -176,6 +176,11 @@ const ACKNOWLEDGEMENT_REPAIR = "The active PRD does not carry the PO's plan ackn
   + " covered by the plan's own digest, so a mismatched name is refused as a stale plan, not silently accepted)."
   + " An agent must never run this route without that PO review having actually happened, and must never invent"
   + " a --by value -- the name must come from the PO's own instruction, not be guessed or defaulted."
+  + " The apply step (2026-08-25, AGY-PRDGATE-1, docs/adr/0021-prd-po-gate.md addendum) is no longer merely a"
+  + " moral prohibition on an agent running it unattended: it is wired through the same attended chat-gate"
+  + " ceremony already used for push approval and kickoff (lib/chat-gate-ceremony.mjs), so an agent's own tool"
+  + " call cannot complete it at all. The PO must run po-authority-acknowledge-apply themselves, directly in"
+  + " their own attended terminal, and retype the --by value shown back to them when prompted."
   + " Do not change activeFeature.planPath, which is not what is wrong here.";
 // A PRD whose bytes are not decodable UTF-8 never reaches any marker check. The
 // defect is the encoding of one file; no path, directory or PRD count is

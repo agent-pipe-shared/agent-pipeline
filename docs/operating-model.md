@@ -139,7 +139,14 @@ normative shape is:
 4. **Human plan gate.** Where the project/risk/rigor requires it, present a
    readable PRD and wait for explicit approval before implementation.
    Approval is recorded before the first implementation dispatch; it is never
-   inferred from chat, an old plan, or an implementor's confidence.
+   inferred from chat, an old plan, or an implementor's confidence. The
+   marker mechanism that records it is now mechanically enforced, not
+   prose-only: `po-authority-acknowledge-apply` (the command that writes the
+   acknowledgement marker) is wired through the same attended chat-gate
+   ceremony every other human gate uses ([ADR-0021](adr/0021-prd-po-gate.md)
+   2026-08-25 addendum; [ADR-0061](adr/0061-uniform-human-approval-ceremony.md)
+   Decision 2) — an agent's own tool call cannot complete it, no signature/
+   chat mode branch exists for it, and it applies unconditionally.
 5. **Dispatch.** Give a Goldfish one outcome, exact context paths, DoD checks,
    prohibitions, stop conditions and route metadata. Independent tasks may run
    in parallel when their files and state do not conflict.
