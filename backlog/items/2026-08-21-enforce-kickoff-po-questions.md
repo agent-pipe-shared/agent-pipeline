@@ -257,6 +257,8 @@ stay on the marker mechanism entirely and only kickoff `--language`/
 `--profile` (and later CRs) join the new chat-mode registry? If the answer
 isn't a clean yes/no from the files alone, this is a stop-and-report
 condition for that dispatch, not a design call to make silently — same
+discipline `AGY-KICKOFFPOQ-1` already followed once on the mode question
+itself.
 
 ## PO product decision, 2026-08-25 (chat) — REPLACE, standardize all three
 
@@ -273,7 +275,50 @@ has now made that call explicitly, it is no longer an implementor's guess.
 **Still explicitly excluded: Change Requests ("CRs")** — a separate issue
 is coming later; do not design for it. Relayed to the in-flight
 `AGY-CHATADAPTER-1` dispatch, which had been briefed to treat the PRD/Spec
-outcome as investigate-and-decide-only — now required, same as push and
-kickoff.
-discipline `AGY-KICKOFFPOQ-1` already followed once on the mode question
-itself.
+outcome as investigate-and-decide-only.
+
+**Correction, 2026-08-25 (same day, after AGY-CHATADAPTER-1's report):**
+the dispatch correctly DECLINED to act on the scope-change relayed via an
+in-session message — its own briefing's field 4 never granted write scope
+on `po-gate-authority.mjs`/ADR-0021/`docs/operating-model.md`, and per this
+repo's own "dispatch from the template, never freehand" discipline, a
+scope change of this weight (reopening an ADR's rejected alternative)
+needs a properly-authorized dispatch, not a chat relay. This was the
+CORRECT call by the dispatch, not a failure — noted so a future session
+does not try to shortcut a formal dispatch amendment via SendMessage
+again. The PO's standardize-all-three decision above stands; it needs a
+fresh, properly-scoped dispatch with those files in field 4, not a
+resumption message.
+
+## Push half landed, 2026-08-25 (AGY-CHATADAPTER-1) — kickoff/PRD-Spec still open
+
+**(A), the confirmed push self-approval hole, is DONE and independently
+reverified** — see the now-closed sibling item
+`2026-08-25-chat-mode-push-approval-has-no-enforced-human-turn-boundary.md`
+for the full evidence. The reusable primitive it built,
+`plugins/pipeline-core/lib/chat-gate-ceremony.mjs`
+(`requireAttendedChatGateConfirmation()`/`isAttendedTerminal()`), is what
+kickoff and PRD/Spec gating must now reuse — not a second, independently
+invented mechanism.
+
+**(B) scope correction, found by the dispatch itself, confirmed by direct
+read of `references/kickoff-design.md:100-118`:** `--profile` is NOT a
+valid flag on `kickoff plan`/`kickoff apply` at all — the guard's
+exact-length argv match rejects it there. `--profile <epic|feature|mini>`
+belongs only to `kickoff promote plan`/`apply` (binding the PRD/Spec
+package to a feature ID), a later, separate step. This item's own
+original "Triggering situation" (an agent invoking `kickoff plan` with a
+hallucinated `--language` AND `--profile`) is therefore imprecise about
+which subcommand a hallucinated profile would actually reach — not
+retracted, since the underlying risk (an agent supplying either value
+without asking) is real for both commands, just split across two call
+sites. **Corrected scope for the next dispatch:** gate `kickoff plan`/
+`kickoff apply`'s `--language` through `chat-gate-ceremony.mjs`, AND
+separately gate `kickoff promote plan`/`apply`'s `--profile` through the
+same primitive — two call sites, one reused mechanism, not one call site
+with two flags as originally assumed.
+
+**Not yet dispatched:** (B) corrected kickoff `--language`/`--profile`
+gating, and (C) the PRD/Spec plan-approval standardization (needs
+`po-gate-authority.mjs`/ADR-0021/`docs/operating-model.md` §4 properly in
+field-4 write scope this time). Item stays `open`.
