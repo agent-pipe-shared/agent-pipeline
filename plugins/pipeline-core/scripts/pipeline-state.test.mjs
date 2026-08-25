@@ -22,7 +22,7 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
-import { SCHEMA_ID, externalPathIsOutsideRoot, run, statePath } from "./pipeline-state.mjs";
+import { SCHEMA_ID, continuityLockPath, externalPathIsOutsideRoot, run, statePath } from "./pipeline-state.mjs";
 
 const candidate = { commit: "a".repeat(40), tree: "b".repeat(40) };
 const planSha256 = createHash("sha256").update("plan").digest("hex");
@@ -500,7 +500,11 @@ function invokeCaptured(argv, deps) {
   assert.equal(planned.status, 0, planned.err);
   const plan = JSON.parse(planned.out);
   assert.equal(plan.schema, "pipeline.po-authority-acknowledge-plan.v1");
-  const applied = invokeCaptured(plan.applyAction.argv.slice(1), deps);
+  // AGY-PRDGATE-1: apply is now gated by requireAttendedChatGateConfirmation();
+  // a genuinely attended confirming call (simulated via the injectable seam)
+  // must retype the exact --by value to succeed.
+  const attendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => plan.by };
+  const applied = invokeCaptured(plan.applyAction.argv.slice(1), attendedDeps);
   assert.equal(applied.status, 0, applied.err);
   const prdAfter = readFileSync(join(root, planPath), "utf8");
   assert.match(prdAfter, /<!-- po-plan-acknowledged: content-sound-and-spec-consistent -->/u,
@@ -551,7 +555,11 @@ function invokeCaptured(argv, deps) {
   staleArgv[shaIndex] = wrongSha;
   const before = readFileSync(join(root, planPath), "utf8");
   const beforeState = readFileSync(statePath(root), "utf8");
-  const rejected = invokeCaptured(staleArgv, deps);
+  // AGY-PRDGATE-1: --by is unchanged ("PO") in this stale-digest scenario, so
+  // an attended confirmation of it must pass the gate and fall through to the
+  // pre-existing stale-plan digest refusal below.
+  const attendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => "PO" };
+  const rejected = invokeCaptured(staleArgv, attendedDeps);
   assert.equal(rejected.status, 2);
   assert.ok(rejected.err.toLowerCase().includes("stale"), rejected.err);
   assert.equal(readFileSync(join(root, planPath), "utf8"), before, "a stale-digest apply must leave the PRD untouched");
@@ -587,13 +595,19 @@ function invokeCaptured(argv, deps) {
   mismatchedArgv[byIndex] = "Someone Else";
   const before = readFileSync(join(root, planPath), "utf8");
   const beforeState = readFileSync(statePath(root), "utf8");
-  const rejected = invokeCaptured(mismatchedArgv, deps);
+  // AGY-PRDGATE-1: the confirmation gate is checked against THIS call's own
+  // --by ("Someone Else"), so an attended retyping of that exact (wrong,
+  // mismatched-attribution) value still passes the gate and falls through to
+  // the pre-existing stale-plan digest refusal below.
+  const mismatchedAttendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => "Someone Else" };
+  const rejected = invokeCaptured(mismatchedArgv, mismatchedAttendedDeps);
   assert.equal(rejected.status, 2);
   assert.ok(rejected.err.toLowerCase().includes("stale"), rejected.err);
   assert.equal(readFileSync(join(root, planPath), "utf8"), before, "a mismatched-attribution apply must leave the PRD untouched");
   assert.equal(readFileSync(statePath(root), "utf8"), beforeState, "a mismatched-attribution apply must leave State untouched");
   // The exact --by the plan recorded still applies cleanly.
-  const applied = invokeCaptured(realArgv, deps);
+  const realAttendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => "PO" };
+  const applied = invokeCaptured(realArgv, realAttendedDeps);
   assert.equal(applied.status, 0, applied.err);
 }
 

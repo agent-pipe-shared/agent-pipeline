@@ -4656,6 +4656,43 @@ function runPoAuthorityAcknowledgeCommand(sub, rest, deps) {
     return 2;
   }
   if (sub === "po-authority-acknowledge-apply") {
+    // AGY-PRDGATE-1 (docs/adr/0021-prd-po-gate.md addendum; ADR-0061 Decision 2:
+    // a new gate must not invent its own ritual). This is an ORDINARY command a
+    // ready agent session could otherwise run itself, with --by supplied only by
+    // the agent's own claim about what the PO said in chat -- exactly the
+    // "gate held != gate fulfilled" risk ADR-0021's R-M14 addendum named but
+    // never mechanically enforced. No mode branching: unlike approve-push there
+    // is no signature/chat alternative for this gate, so the ceremony applies
+    // unconditionally. Stateless, single-call design (mirrors
+    // project-onboarding-v3.mjs's kickoff --language/--profile gate,
+    // AGY-CHATADAPTER-2) rather than approve-push's persisted
+    // pendingPushChallenge: ADR-0061 Decision 1 forbids "a hash pasted from one
+    // output into another input", which rules out planSha256 as the confirmed
+    // value; --by is already the value the PO must personally attest to, so
+    // there is nothing to generate and no state to hold between calls. Placed
+    // as the first statement in this branch, before the lock/transaction below,
+    // so an unattended or mismatched attempt touches no lock and no rebind
+    // transaction file.
+    const confirmation = requireAttendedChatGateConfirmation({
+      summaryLines: [
+        "PO PLAN ACKNOWLEDGEMENT CONFIRMATION -- read before you type the value:",
+        `  by: ${apply.by}`,
+        `  plan-sha256: ${apply.planSha256}`,
+        `  updated-at: ${apply.plannedAt}`,
+      ],
+      expected: apply.by,
+      dependencies: deps,
+    });
+    if (!confirmation.ok) {
+      if (confirmation.code === "CHAT-GATE-NOT-ATTENDED") {
+        console.error(`Error: po-authority-acknowledge-apply refused (CHAT-GATE-NOT-ATTENDED); a human must confirm --by ${apply.by} directly, in their own attended terminal -- an agent's own tool call cannot complete this step.`);
+        console.error("Re-run this EXACT command yourself and type the value shown above when prompted:");
+        console.error(`node plugins/pipeline-core/scripts/pipeline-state.mjs po-authority-acknowledge-apply --plan-sha256 ${apply.planSha256} --updated-at ${apply.plannedAt} --by ${JSON.stringify(apply.by)} --activate${apply.runner ? ` --runner ${apply.runner}` : ""}`);
+      } else {
+        console.error(`Error: po-authority-acknowledge-apply refused (${confirmation.code}); the typed value did not match --by ${apply.by}.`);
+      }
+      return 1;
+    }
     const runner = resolvePoRebindRunner(apply.runner, deps.env ?? process.env);
     const ackDeps = { ...deps, acknowledgeBy: apply.by };
     const lock = acquireContinuityLock(ackDeps.dir, PO_REBIND_LOCK_TOKEN, ackDeps);
