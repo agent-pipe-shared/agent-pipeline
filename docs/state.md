@@ -31,40 +31,60 @@ call: leave it for now ("erstmal dann so weiter"), suggested next step if
 revisited is a full session restart (guaranteed fresh plugin load) or
 re-registering the local marketplace.
 
-**`enforce-kickoff-po-questions` unblocked — PO decided `chat` mode**
-(not `signature`): the threat model here is an overeager/hallucinating
-agent, not an external attacker, and `chat` mode needs no
-`candidate: {commit, tree}` binding, which matters for a brand-new project
-with no meaningful commit yet. Recorded in the item (`21cbcab4`).
-**Dispatched for implementation:** `AGY-KICKOFFPOQ-1` (goldfish-deep,
-background, in flight as of this write) — new gate kind under the
-existing `po-human-approval.mjs`/ADR-0061 ceremony family,
-`project-onboarding-v3.mjs`'s `kickoff plan` call site rejects an
-unapproved language/profile value.
+**`enforce-kickoff-po-questions`: `AGY-KICKOFFPOQ-1` stopped cleanly, no
+code written** — its own stop condition fired: the `po-human-approval.mjs`/
+`po-approval-gate.mjs` family (the ceremony the `chat`-mode direction named)
+has zero chat-mode concept at all, and the one real chat ceremony in the
+plugin (`pipeline-state.mjs`'s push `pendingPushChallenge`) is push-only
+and still `forCommit`-bound — undercutting the original reason to prefer
+`chat` over `signature` for a pre-first-commit gate. Findings + 3 options
+recorded (`17d23532`). **PO picked option 1** (`fa581be7`): build a
+genuine, reusable chat-mode gate-kind registry inside `po-human-approval.mjs`/
+`po-approval-gate.mjs` FIRST, then add the kickoff-parameter kind to it —
+not option 2 (copy the push one-off) or option 3 (fall back to
+`signature`). **Not yet dispatched** — needs its own `goldfish-deep`
+package built from `templates/prompts/goldfish-task.md`. Item stays `open`.
 
 **`verify-marketplace-attestation-blocks-normal-active-development`
-approved (Direction 3: WARN inside Verify, BLOCKING at the push gate) —
-PO: "ja das passt! so machen".** **Dispatched for implementation:**
-`AGY-MKTATTEST-1` (goldfish-deep, background, in flight as of this
-write) — downgrades the one live-marketplace-comparison test inside
-`human-guard-override.test.mjs` to WARN-and-pass, adds a NEW hard
-blocking check at push time reusing `guard-push.mjs`'s existing
-critical-proof pattern.
+(Direction 3, PO-approved) — `AGY-MKTATTEST-1` substantially landed,
+independently reverified:** WARN-downgrade in `human-guard-override.test.mjs`
+(F1) + new hard blocking check in `guard-push.mjs`
+(`checkMarketplaceAttestation()`, reuses `localPluginInstallSourceObservation()`,
+never a second comparison), committed `cbd22d4f`. Independently confirmed
+by this session (not just self-report): `human-guard-override.test.mjs`
+76/76 (WARN visible, F1 still real), `guard-push.test.mjs` 159/159
+including the two new positive/negative push-block cases. Its own full
+Verify run (`binding: exact` @ `cbd22d4f`) found exactly one red suite —
+traced to an unrelated pre-existing defect (see next item), not this
+dispatch's own work. Resumed once (a clean self-paused wait, not a
+truncation) to run one final clean Verify against current HEAD and produce
+its completion report — in flight as of this write.
 
-**Both dispatches above run in parallel, touch disjoint files, but each
-ends with its own full `node harness/scripts/verify.mjs` run — a known
-collision risk on the shared `evidence/verify-latest.json` slot** (see
-`backlog/items/2026-08-12-shared-verify-evidence-slot-corrupted-by-concurrent-dispatches.md`
-if that item still exists). If both verify runs land nearly
-simultaneously, re-run whichever one's evidence looks corrupted/
-overwritten before trusting its result.
+**Real defect found by that Verify run, already fixed:** an earlier
+same-session "closure-pointer correction" on `kickoff-untracked-files-
+missing-from-commits` (see below) had rewritten `closure_commit` to
+`e07a2b11`, breaking `check-backlog-state.mjs`'s invariant that a closed
+item's `closure_commit` must equal its own final transition-ledger event's
+`evidence.commit` (the ledger, `backlog/transitions.ndjson`, is append-only
+and hash-chained — it had already recorded `169fba3d` for this item's
+closing transition, before the later revert existed).
+`reconcile-backlog-ledger.mjs` cannot repair this: it only reconciles
+STATUS transitions, never revisits an already-closed item's recorded
+evidence. `backlog-state.mjs` has a purpose-built `evidence-amendment`
+ledger-event kind for exactly this correction, **but no CLI/writer script
+implements it yet** (confirmed by search — only the library, its own
+tests, and the checker's validation logic reference it; a real gap for
+whoever needs to correct a closure_commit going forward). Fix applied:
+reverted `closure_commit` back to `169fba3d` (the ledger-bound value),
+documented why in the item, regenerated `backlog/index.json`
+(`f7d4583c`). `check-backlog-state.mjs` now exits 0.
 
-**Still open, unchanged from earlier this session:** `kickoff-untracked-
-files-missing-from-commits` (`closure_commit` corrected to `e07a2b11`
-after the same-day gitignore-then-revert; the positive staging-guidance
-gap is cross-referenced into `intake-generate-coordinator-path-
-undocumented-in-skill-references`, not yet implemented). D7 empirical
-Antigravity verification still outstanding.
+**Still open, revised:** `kickoff-untracked-files-missing-from-commits`
+— `closure_commit` is now `169fba3d` again (see above; do NOT "correct"
+it back to `e07a2b11` without first building the evidence-amendment
+writer). The positive staging-guidance gap is cross-referenced into
+`intake-generate-coordinator-path-undocumented-in-skill-references`, not
+yet implemented. D7 empirical Antigravity verification still outstanding.
 
 ### Current completed & open work
 
