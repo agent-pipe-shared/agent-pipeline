@@ -3,7 +3,11 @@ schema: pipeline.backlog-item.v1
 id: pipeline.orchestrator-authored-production-commits-have-no-deterministic-control
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: 2324582b983f5016ec23118099678018bf446e3e
+closure_evidence: backlog/items/2026-08-08-orchestrator-authored-production-commits-have-no-deterministic-control.md
 created: 2026-08-08
 due: 2026-08-22
 source: "Critic delta re-review v2, 2026-08-08 (backlog/evidence/2026-08-08-critic-delta-v2-verdict.md, Findings A and B). The pattern recurred nine minutes after the commit that acknowledged it."
@@ -412,3 +416,13 @@ residual — Part B's redundant defense-in-depth range check for `verify.mjs`
 and could be spun into its own small, separate backlog item scoped exactly
 to "build script + tests, then a dedicated TP-3 ceremony to register it" if
 wanted; it is not required to consider this item's stated problem closed.
+
+### Closure, 2026-08-25
+
+Closed per the recommendation directly above, independently re-verified by
+the Elephant (`node --test plugins/pipeline-core/hooks/guard-git.test.mjs`,
+230/230 including GIT01-1..4 and GG22-1..6, on `sprint_agy` HEAD). Part B
+(the `verify.mjs` range-mode registration) is real, designed, undelivered
+scope — filed separately as
+`backlog/items/2026-08-25-verify-range-mode-registration-for-orchestrator-commit-control.md`
+rather than left to rot silently inside a closed item.
