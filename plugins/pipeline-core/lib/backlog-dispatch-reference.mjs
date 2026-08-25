@@ -26,40 +26,109 @@
  */
 
 export const BACKLOG_STRIP_FENCE =
-  "<!-- SPEC-REFERENCE-STRIPPED-TRIAGE: everything from this point in the " +
-  "original backlog item has been removed for dispatch citation. It records " +
-  "a prior human/Critic decision, verdict, or closure evidence ABOUT this " +
-  "item -- never spec/reference content -- and would otherwise contaminate " +
-  "an independent downstream review or implementation. See the item's own " +
-  "file for the full history. Convention: backlog/items/2026-08-18-triage-" +
-  "verdict-text-can-contaminate-a-backlog-item-as-a-later-spec-reference.md. -->";
+  "<!-- SPEC-REFERENCE-STRIPPED-TRIAGE: this section of the original backlog " +
+  "item has been removed for dispatch citation. It recorded a prior human " +
+  "or Critic verdict about this item -- never spec/reference content -- and " +
+  "would otherwise contaminate an independent downstream review or " +
+  "implementation. See the item's own file for the full history. Convention: " +
+  "backlog/items/2026-08-18-triage-verdict-text-can-contaminate-a-backlog-" +
+  "item-as-a-later-spec-reference.md. -->";
 
 // Headings that mark the start of verdict/decision/closure prose rather than
 // spec-shaped content, matched case-insensitively at any heading level
-// (`##`, `###`, ...). The EARLIEST match in the body wins: an already-triaged
-// item can carry an appended "PO-decision implementation" or "Closure"
-// section below "## Triage", and all of it is verdict-adjacent, not spec
-// content.
-const VERDICT_HEADING = /^#{1,6}[ \t]+(triage|closure|po-decision implementation)\b/imu;
+// (`##`, `###`, ...). Each such heading's OWN section (its body, bounded by
+// the next heading at the same level or shallower -- never end-of-file) is
+// what gets removed; a later, differently-named heading (e.g. a PO decision
+// section appended after "## Triage") is spec content and survives unless it
+// independently matches this pattern too (2026-08-25 fix: the previous
+// "earliest match strips to end-of-file" behavior dropped every later
+// section regardless of shape -- backlog/items/2026-08-25-backlog-strip-for-
+// dispatch-drops-every-section-after-triage.md).
+const VERDICT_HEADING = /^(triage|closure|po-decision implementation)\b/iu;
+const HEADING_LINE_RE = /^(#{1,6})[ \t]+(.*)$/u;
+const FENCE_LINE_RE = /^\s*(`{3,}|~{3,})/u;
 
 /**
- * Strip everything from the first verdict-shaped heading onward out of a
- * backlog item's BODY (post-frontmatter Markdown, e.g. `parseBacklogItem(...)
- * .item.body` from `backlog-state.mjs`). Pure function: never touches the
- * filesystem, never mutates its input. Returns the ORIGINAL body unchanged
- * (`wasStripped: false`) when no verdict-shaped heading is present -- an
- * item with no Triage yet carries no verdict prose to strip.
+ * Locate every Markdown heading line in `body`, skipping lines inside a
+ * fenced code block (``` or ~~~) so a `#`-prefixed comment/shell line inside
+ * a Triage section's own fenced example can never be mistaken for a
+ * section-boundary heading and truncate the strip early.
+ */
+function findHeadings(body) {
+  const headings = [];
+  let insideFence = false;
+  let offset = 0;
+  for (const line of body.split("\n")) {
+    if (FENCE_LINE_RE.test(line)) {
+      insideFence = !insideFence;
+    } else if (!insideFence) {
+      const match = HEADING_LINE_RE.exec(line);
+      if (match) headings.push({ level: match[1].length, start: offset, lineText: line });
+    }
+    offset += line.length + 1;
+  }
+  return headings;
+}
+
+function verdictWord(lineText) {
+  const headingMatch = HEADING_LINE_RE.exec(lineText);
+  if (!headingMatch) return null;
+  const verdictMatch = VERDICT_HEADING.exec(headingMatch[2]);
+  return verdictMatch ? verdictMatch[1].toLowerCase() : null;
+}
+
+/** Merge overlapping/adjacent/nested [start, end) ranges into disjoint, ordered ranges. */
+function mergeRanges(ranges) {
+  const merged = [];
+  for (const [start, end] of ranges) {
+    const last = merged[merged.length - 1];
+    if (last && start <= last[1]) last[1] = Math.max(last[1], end);
+    else merged.push([start, end]);
+  }
+  return merged;
+}
+
+/**
+ * Strip every verdict-shaped heading's OWN section out of a backlog item's
+ * BODY (post-frontmatter Markdown, e.g. `parseBacklogItem(...).item.body`
+ * from `backlog-state.mjs`), leaving any other section -- however far below
+ * the first verdict heading it appears -- intact. Pure function: never
+ * touches the filesystem, never mutates its input. Returns the ORIGINAL
+ * body unchanged (`wasStripped: false`) when no verdict-shaped heading is
+ * present -- an item with no Triage yet carries no verdict prose to strip.
  *
  * @param {string} body
  * @returns {{ text: string, wasStripped: boolean, removedHeading: string|null }}
  */
 export function stripBacklogVerdictProse(body) {
   if (typeof body !== "string") throw new TypeError("body must be a string");
-  const match = VERDICT_HEADING.exec(body);
-  if (!match) return { text: body, wasStripped: false, removedHeading: null };
-  const removedHeading = match[1].toLowerCase();
-  const before = body.slice(0, match.index).replace(/\s+$/u, "");
-  const text = `${before}\n\n${BACKLOG_STRIP_FENCE}\n`;
+  const headings = findHeadings(body);
+  const ranges = [];
+  let removedHeading = null;
+  for (let i = 0; i < headings.length; i += 1) {
+    const heading = headings[i];
+    const word = verdictWord(heading.lineText);
+    if (!word) continue;
+    if (removedHeading === null) removedHeading = word;
+    let end = body.length;
+    for (let j = i + 1; j < headings.length; j += 1) {
+      if (headings[j].level <= heading.level) {
+        end = headings[j].start;
+        break;
+      }
+    }
+    ranges.push([heading.start, end]);
+  }
+  if (ranges.length === 0) return { text: body, wasStripped: false, removedHeading: null };
+  const merged = mergeRanges(ranges);
+  let text = "";
+  let cursor = 0;
+  for (const [start, end] of merged) {
+    const keep = body.slice(cursor, start).replace(/\s+$/u, "");
+    text += (keep.length ? `${keep}\n\n` : "") + `${BACKLOG_STRIP_FENCE}\n\n`;
+    cursor = end;
+  }
+  text += body.slice(cursor);
   return { text, wasStripped: true, removedHeading };
 }
 
