@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.codex-runner-has-no-real-support-on-native-windows
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
 source: "Live external greenfield test, 2026-08-19: project Rune_Test1_Codex_060_55, Windows host, Codex CLI, candidate 0.6.0+codex.20260819163512.ca18e0c. PO pasted the full session transcript; a companion fix (NVA-BL-CASWIN-1, scoped narrowly to the self-contradicting recovery message) was dispatched the same session. This item is the PO's own explicitly deferred second half: \"Für einen späteren sprint bzw. defered ein neues backlog item setzen, dass codex windows support noch gebaut werden muss.\""
 ---
@@ -117,6 +117,20 @@ weighing by whoever picks this up:
   same dispatch as the narrow symptom fix.
 - **Assignment (if accepted):** a future sprint, not named here — the PO's
   own message did not commit to a specific sprint, only "später" (later).
+
+### Closure, 2026-08-25
+
+PO decision (chat): won't-fix, closed. PO's own reasoning: Codex has no
+app-server/daemon under native Windows at all, so the narrower gap this
+item describes (real app-server-backed support) is moot — the mitigation
+already shipped (`NVA-BL-CASWIN-1`, the self-contradicting recovery message
+fix) is sufficient for the degrade-gracefully shape this item's own
+Proposal already pointed at (`onboarding-runtime.mjs` ~lines 447-474). No
+further work planned against this item.
+
+- **Decision:** rejected — won't-fix, superseded by the PO's own
+  architectural read (no Windows daemon exists to support).
+- **Date:** 2026-08-25
   Whoever picks this up should re-verify `NVA-BL-CASWIN-1`'s landed state
   first (confirm the companion fix is still in place and matches this
   item's own "Affected artifact" description) before designing further.
