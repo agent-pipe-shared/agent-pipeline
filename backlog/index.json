@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3715fabb50e2ac368f5ec984f40f00ee8e0641cd979d10e54cc826582e78cae1"
+    "transitionHead": "093866d2d765bc6f32bf8c1c77ab4c252ff952b1c910ea780e9dfb7fa061ce9c"
   },
   "counts": {
-    "open": 46,
+    "open": 45,
     "in_progress": 3,
-    "closed": 267
+    "closed": 268
   },
   "items": [
     {
@@ -540,12 +540,16 @@
     },
     {
       "id": "pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-25",
       "source": "PO live observation during an Agy/Antigravity test session, 2026-08-25 (chat): an agent granted itself a push approval under gates.push_approval: chat",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-25",
+      "closureRepository": "self",
+      "closureCommit": "589278edd930b14a9070d0f66481e2c5915a3b37",
+      "closureEvidence": "backlog/items/2026-08-25-chat-mode-push-approval-has-no-enforced-human-turn-boundary.md"
     },
     {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",

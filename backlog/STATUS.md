@@ -49,7 +49,7 @@
 | pipeline.canonical-verify-evidence-path | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.canonical-worktree-lifecycle | closed | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.capability-first-advisor-critic-dispatch | closed | workflow-improvement | pipeline | 2026-08-18 | — |
-| pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | open | defect | pipeline | 2026-08-25 | — |
+| pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration | closed | defect | pipeline | 2026-08-05 | — |
 | pipeline.claude-greenfield-run-happy-path-findings | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.claude-has-no-start-time-opt-in-adoption-path | open | idea | pipeline | 2026-08-05 | — |
@@ -324,6 +324,6 @@
 
 ## Counts
 
-- open: 46
+- open: 45
 - in_progress: 3
-- closed: 267
+- closed: 268
