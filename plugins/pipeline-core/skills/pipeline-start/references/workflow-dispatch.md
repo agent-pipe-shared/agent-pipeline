@@ -128,6 +128,31 @@ the literal substring `dispatch-record` (not the template file — the actual
 string you are about to pass to `agent()`) and confirm it is present; if it
 is not, the prompt is incomplete and will produce an unverifiable commit.
 
+**The pre-dispatch grep is necessary but not sufficient — it checks the
+INSTRUCTION was sent, not that it was OBEYED.** A prompt that correctly
+carries the record-writing instruction can still land a commit with no
+matching record: the dispatch can be truncated before it reaches that step
+(`guardrails/token-budget.md` TB-06's ~50-call cliff), or resumed and the
+resumed leg can skip it, or the subagent can simply commit and then run out
+of budget before writing the record. The grep check addresses the ROOT
+CAUSE confirmed for the original five `AGY-FIX2-*` commits (the instruction
+was absent from the prompt entirely) but not this separate, still-open
+failure mode — a prompt-text check cannot detect a post-prompt failure.
+Close the loop as part of
+the SAME post-return pass the "Never trust a returned result" section
+already requires (`git worktree list` / `git status --short` / `git log`):
+for every `agent()` result naming a task id that landed a commit with a
+`Dispatch: <TASK_ID> (goldfish)` trailer, also check whether
+`evidence/dispatch-record-<TASK_ID>.json` exists in the Elephant's own
+working tree (not the dispatch's worktree, which is discarded) — if it does
+not, or the dispatch's worktree copy was never merged back, the Elephant
+writes it itself immediately, sourced from the dispatch's own final report
+(`taskId`, `agentType`, `model`, `outcome`, the landed `commits`,
+`report.changedFiles`), mirroring what the goldfish would have written for
+itself. This makes the artifact's existence an Elephant-owned guarantee
+independent of whether the dispatched subagent actually reached that step,
+rather than trusting compliance with an instruction it may never get to.
+
 ## `agentType` needs the `pipeline-core:` prefix
 
 A Workflow `agent()` call's `opts.agentType` resolves from the same registry

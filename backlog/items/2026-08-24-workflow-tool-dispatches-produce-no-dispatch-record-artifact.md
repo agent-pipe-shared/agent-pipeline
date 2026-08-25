@@ -93,3 +93,45 @@ this fix to empirically confirm it holds; re-verify the next time the
 Workflow tool is used for a committing dispatch, and close this item only
 once that confirmation exists (or a stronger structural check is built, if
 the process fix proves insufficient).
+
+## Triage — 2026-08-25 (AGY-SWEEP re-visit)
+
+- **Decision:** `implemented` (partial — hardens the existing mitigation;
+  does not itself close the item).
+- **What was built:** the 2026-08-24 mitigation (`00e23bc7`) only closes
+  the failure mode it diagnosed — a constructed `agent()` prompt missing
+  the record-writing instruction entirely. It has a real, distinct gap: a
+  prompt that correctly carries the instruction can still land a commit
+  with no record if the dispatch truncates or is resumed before reaching
+  that step (`guardrails/token-budget.md` TB-06's ~50-call cliff is
+  documented elsewhere in this same repo as a live, recurring failure
+  mode, not a hypothetical one) — a pre-dispatch prompt-text grep cannot
+  detect a post-prompt failure. Added a second, POST-return layer to
+  `plugins/pipeline-core/skills/pipeline-start/references/workflow-dispatch.md`:
+  as part of the same post-`agent()`-return check the file already
+  requires ("Never trust a returned result"), the Elephant now also
+  checks whether `evidence/dispatch-record-<TASK_ID>.json` actually
+  exists for a task id that landed a `Dispatch: <TASK_ID> (goldfish)`
+  commit, and writes it itself immediately if not — mirroring what the
+  goldfish would have written. This makes the artifact's existence an
+  Elephant-owned guarantee instead of trusting subagent compliance with
+  an instruction it may never reach.
+- **Why the item stays open:** this dispatch (a Goldfish sweep item) has
+  no Workflow/Agent-tool fan-out access itself (`workflow-dispatch.md`:
+  "Only the Elephant orchestrates fan-out") and therefore cannot produce
+  the genuine end-to-end confirmation the item's own Acceptance criteria
+  and the prior Triage require — an actual Workflow-tool `agent()`
+  dispatch landing a real commit, checked post-hoc against
+  `dispatch-authorship-verify.mjs`. That remains for the next live
+  session that dispatches through the Workflow tool; re-verify then and
+  close only once that confirmation exists (unchanged from the prior
+  Triage's own closure bar).
+- **Verification:** doc-only change; no script references this file
+  (checked: no hit in `plugins/` or `harness/` for
+  `workflow-dispatch.md`), so no automated suite gates its content —
+  same evidentiary category as the prior `00e23bc7` mitigation. Read
+  through for markdown well-formedness and cross-checked the claimed
+  root-cause distinction against the item's own "Root cause confirmed"
+  section above.
+- **Commit:** see this repo's history for the commit landing this Triage
+  update and the `workflow-dispatch.md` edit together.
