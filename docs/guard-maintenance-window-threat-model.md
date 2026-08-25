@@ -58,7 +58,8 @@ below assumes it holds and is written to catch a change that would break it.
   below is imported, directly or transitively, by one of the entries above,
   and the test fails on any future edit that adds an import without extending
   this list to match. All paths are repo-relative under
-  `plugins/pipeline-core/`: `lib/codex-host-layout.mjs`,
+  `plugins/pipeline-core/`: `lib/chat-gate-ceremony.mjs`,
+  `lib/codex-host-layout.mjs`,
   `lib/codex-onboarding-app-server.mjs`,
   `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
   `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,

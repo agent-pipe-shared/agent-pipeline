@@ -149,6 +149,11 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   // file without extending this list to match, so this enumeration can no longer drift
   // from the code the way the seven-entry (then nine-entry) hand-typed list already had
   // twice.
+  // AGY-GWMKERNEL-1: chat-gate-ceremony.mjs (the shared "genuinely attended
+  // terminal" confirmation primitive, AGY-CHATADAPTER-1/2) is imported by
+  // pipeline-state.mjs and project-onboarding-v3.mjs below -- both already
+  // kernel paths -- so it is transitively kernel too (GMWKC01).
+  "plugins/pipeline-core/lib/chat-gate-ceremony.mjs",
   "plugins/pipeline-core/lib/codex-host-layout.mjs",
   "plugins/pipeline-core/lib/codex-onboarding-app-server.mjs",
   "plugins/pipeline-core/lib/codex-onboarding-capabilities.mjs",
