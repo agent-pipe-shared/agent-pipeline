@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-25
 closure_repository: self
-closure_commit: 169fba3d262569a1718e2ebc968d7f77f040d1c9
+closure_commit: e07a2b11bfb08309400a4b1f3b690f06ca344d52
 closure_evidence: backlog/items/2026-08-21-kickoff-untracked-files-missing-from-commits.md
 created: 2026-08-21
 source: Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)
@@ -140,3 +140,38 @@ content instead of silently dropping it.
 
 Both parts (a) and (b) are now resolved with the corrected disposition.
 Item stays closed.
+
+## Closure-pointer correction, 2026-08-25
+
+`closure_commit` above (`169fba3d...`) named the commit that ORIGINALLY
+added the `.onboarding-staging` gitignore rule — but that entire commit's
+effect was reverted same-day by `e07a2b11` per the "Reversed, same day"
+section above. A `closure_commit` pointing at a fully-undone commit is
+misleading (caught in review before this correction landed). Corrected to
+point at `e07a2b11` (the commit reflecting the actual current, resolved
+state: no gitignore rule).
+
+**Scope check against the PO's actual requirement, same review:** the PO's
+correction stated the PRD/Spec content "must be committed" — a positive
+requirement, not just "must not be actively discarded." Un-gitignoring
+`.onboarding-staging` satisfies the negative half (nothing now blocks
+tracking it) but does not by itself guarantee anything gets staged and
+committed — no code path here automatically `git add`s this directory; an
+agent still has to do it, and (per
+`backlog/items/2026-08-24-intake-generate-coordinator-path-undocumented-in-skill-references.md`,
+filed the day before this correction) there is currently NO skill-reference
+guidance telling an agent to do so for the `intake-generate-apply`
+coordinator flow that writes here — the same gap part (a) above already
+closed for the classic `kickoff apply`/`specs/kickoff-*` flow via
+`kickoff-design.md`.
+
+**Disposition:** item stays closed — the concrete defect this item named
+(files silently untracked/discardable) is resolved for both the classic
+flow (part a) and the negative half of the staging-flow case (part b, this
+correction). The remaining positive-guarantee gap (an agent must be told to
+actively stage `.onboarding-staging` content, the same way `kickoff-design.md`
+already tells it to stage the PRD/Spec pair) is now explicitly cross-
+referenced into `2026-08-24-intake-generate-coordinator-path-undocumented-in-skill-references.md`'s
+own proposal, which already named exactly this question as one of its
+candidate starting points — tracking it twice would fragment the fix rather
+than help it land.
