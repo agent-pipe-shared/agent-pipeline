@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { isDirectInvocation } from "../lib/entrypoint.mjs";
+import { requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import {
   applyOnboardingIntakeConsent,
   applyOnboardingIntakeCapture,
@@ -284,6 +285,55 @@ function parse(args) {
   if (output.activate && !APPLY_SHAPED_COMMANDS.has(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
 }
+// AGY-CHATADAPTER-2 (backlog/items/2026-08-21-enforce-kickoff-po-questions.md):
+// which two commands carry a PO-input value that must be genuinely confirmed by
+// a human in an attended terminal before this CLI accepts it, and what that
+// confirmation looks like. Deliberately keyed on `options.command`, never on
+// mere flag presence -- `--profile` is ALSO valid on `plan-partial-authority`/
+// `apply-partial-authority`, and `--language` is ALSO valid on `plan-repair`/
+// `apply-repair` and on `intake-consent-apply` (which additionally can carry
+// BOTH values in one bundled call, behind its own pre-existing `--granted`/
+// `--activate` consent gate -- a structurally different shape, left ungated
+// here; see the backlog item's "Outcome (3)" note). A presence-based gate would
+// silently reach those unrelated commands too.
+function kickoffChatGateSpecFor(options) {
+  if (options.command === "kickoff-plan" || options.command === "kickoff-apply") {
+    return {
+      label: `--language ${options.language}`,
+      expected: options.language,
+      summaryLines: [
+        "PO KICKOFF LANGUAGE CONFIRMATION -- read before you type the value:",
+        `  root: ${options.root}`,
+        `  goal: ${options.goal}`,
+        `  language: ${options.language}`,
+      ],
+    };
+  }
+  if (options.command === "kickoff-promote-plan" || options.command === "kickoff-promote-apply") {
+    return {
+      label: `--profile ${options.profile}`,
+      expected: options.profile,
+      summaryLines: [
+        "PO KICKOFF PROMOTION PROFILE CONFIRMATION -- read before you type the value:",
+        `  root: ${options.root}`,
+        `  id: ${options.featureId}`,
+        `  profile: ${options.profile}`,
+      ],
+    };
+  }
+  return null;
+}
+
+// The EXACT re-run command a human copies into their own attended terminal --
+// built from the raw argv this call received (not reconstructed from parsed
+// `options`), so it is byte-faithful to what the agent actually invoked, same
+// spirit as `approve-push`'s echoed command in pipeline-state.mjs. Each element
+// is JSON-quoted so a value containing spaces or shell metacharacters (a goal
+// sentence, for instance) still round-trips as one token when copy-pasted.
+function formatOnboardingRerunCommand(args) {
+  return `node plugins/pipeline-core/scripts/project-onboarding-v3.mjs ${args.map((value) => JSON.stringify(value)).join(" ")}`;
+}
+
 export function main(args = process.argv.slice(2), {
   write = process.stdout.write.bind(process.stdout),
   writeError = process.stderr.write.bind(process.stderr),
@@ -294,6 +344,41 @@ export function main(args = process.argv.slice(2), {
   if (options.help) { write(`${usage()}\n`); return 0; }
   if (options.error) { write(`${usage()}\n${options.error}\n`); return 2; }
   if (options.runner === undefined) options.runner = resolveActiveRunner(env);
+
+  // AGY-CHATADAPTER-2: an agent's own tool-calling harness has no TTY on file
+  // descriptor 0 and can never complete this step, no matter what value it
+  // already knows or pipes into stdin -- only a human running this EXACT
+  // command directly in their own attended terminal, and typing the proposed
+  // value back, can let it through (`requireAttendedChatGateConfirmation`,
+  // `lib/chat-gate-ceremony.mjs`, the same primitive AGY-CHATADAPTER-1 built
+  // for `approve-push`). Deliberately no persisted cross-call challenge record
+  // here (contrast `pipeline-state.mjs`'s `pendingPushChallenge`): kickoff-plan
+  // is declared `mutates: false` above, and `lib/project-onboarding-v3.mjs`
+  // itself documents that no project state file exists yet this early in
+  // onboarding -- inventing a new persistence location purely to hold a
+  // pending-challenge record would be exactly the "new one-off ceremony" this
+  // backlog item's own history already stopped short of building. The gate is
+  // therefore stateless and re-checked on every call: an unattended attempt
+  // (the agent's) always refuses; an attended attempt (the human's, typing the
+  // value shown back) always succeeds, with no state surviving between them.
+  const gateSpec = kickoffChatGateSpecFor(options);
+  if (gateSpec) {
+    const confirmation = requireAttendedChatGateConfirmation({
+      summaryLines: gateSpec.summaryLines,
+      expected: gateSpec.expected,
+      dependencies: deps ?? {},
+    });
+    if (!confirmation.ok) {
+      if (confirmation.code === "CHAT-GATE-NOT-ATTENDED") {
+        writeError(`Error: ${options.command} refused (${confirmation.code}); a human must confirm ${gateSpec.label} directly, in their own attended terminal -- an agent's own tool call cannot complete this step.\n`);
+        writeError("Re-run this EXACT command yourself and type the value shown above when prompted:\n");
+        writeError(`${formatOnboardingRerunCommand(args)}\n`);
+      } else {
+        writeError(`Error: ${options.command} refused (${confirmation.code}); the typed value did not match ${gateSpec.label}.\n`);
+      }
+      return 1;
+    }
+  }
   let output;
   try {
     if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent, runner: options.runner });

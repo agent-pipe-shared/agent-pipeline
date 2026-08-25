@@ -2915,11 +2915,16 @@ test("runtime apply permission races roll back every byte and remove the exact r
 test("public kickoff plan/apply carries goal as one argv element and reconstructs the bound plan", () => {
   const path = root();
   let stderr = "";
+  // AGY-CHATADAPTER-2: every kickoff plan/apply call in this test uses
+  // --language en, so a fixed attended-confirmation seam (isattyFn/readLineFn)
+  // reused across all of them is the correct simulation of a human confirming
+  // that same value each time -- not a weakening of the gate under test
+  // elsewhere (see project-onboarding-v3-argv-closure.test.mjs).
   const invoke = (args) => {
     let output = "";
     stderr = "";
     const code = onboardingCli(args, {
-      deps: fakeDeps,
+      deps: { ...fakeDeps, isattyFn: () => true, readLineFn: () => "en" },
       write: (chunk) => { output += chunk; },
       writeError: (chunk) => { stderr += chunk; },
     });
@@ -3369,13 +3374,13 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
     // directly (not the `writeError` dep), so this has to intercept the real
     // console method to see it -- same shape as `capturedStderr` in
     // pipeline-state.test.mjs.
-    const state = (argv) => {
+    const state = (argv, deps = {}) => {
       const stderr = [];
       const originalError = console.error;
       console.error = (...values) => { stderr.push(values.join(" ")); };
       let code;
       try {
-        code = pipelineStateRun(argv, { dir: path, writeError: (value) => stderr.push(String(value)) });
+        code = pipelineStateRun(argv, { dir: path, writeError: (value) => stderr.push(String(value)), ...deps });
       } finally {
         console.error = originalError;
       }
@@ -3416,13 +3421,19 @@ test("the seeded push gate refuses an unapproved push and admits it after the sh
 
     // (5) The approval itself -- the human step the whole gate exists for.
     // Chat mode's first call issues a challenge rather than completing the
-    // approval (ADR-0056); only the follow-up call, echoing that challenge
-    // back, actually clears the gate.
+    // approval (ADR-0056); only a follow-up call, re-run from an ATTENDED
+    // terminal and typing that challenge back, actually clears the gate
+    // (AGY-CHATADAPTER-1, commit 1ad664a8: there is no `--challenge` CLI flag
+    // any more -- `lib/chat-gate-ceremony.mjs`'s `requireAttendedChatGateConfirmation`
+    // reads the confirmation from `dependencies.isattyFn`/`dependencies.readLineFn`,
+    // simulated here the same way `pipeline-state.test.mjs`'s own already-fixed
+    // tests do it).
     const challengeAttempt = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"]);
     assert.equal(challengeAttempt.code, 1, challengeAttempt.stderr);
     assert.match(challengeAttempt.stderr, /PO-CHALLENGE/u);
     const challengeCode = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8")).pendingPushChallenge.code;
-    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x", "--challenge", challengeCode]);
+    const approved = state(["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"],
+      { isattyFn: () => true, readLineFn: () => challengeCode });
     assert.equal(approved.code, 0, approved.stderr);
 
     const admitted = attemptPush();
@@ -3538,8 +3549,21 @@ test("onboarding materializes project/critical-human-proof.json declaring push, 
         assert.equal(challengeAttempt.status, 1, challengeAttempt.stderr);
         assert.match(String(challengeAttempt.stderr), /PO-CHALLENGE/u);
         const challengeCode = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8")).pendingPushChallenge.code;
-        const approved = state("approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x", "--challenge", challengeCode);
-        assert.equal(approved.status, 0, approved.stderr);
+        // AGY-CHATADAPTER-1 (commit 1ad664a8) removed the `--challenge` CLI flag
+        // entirely; completing the ceremony now requires an ATTENDED terminal
+        // (`isAttendedTerminal()`), which a spawned subprocess's plain piped
+        // stdin can never satisfy -- that refusal is the exact security property
+        // proven elsewhere (this file's own PUSHSEED-2 test above, and
+        // project-onboarding-v3-argv-closure.test.mjs's live kickoff subprocess
+        // tests). This final confirming call is therefore made in-process
+        // instead, using the primitive's own injectable isattyFn/readLineFn seam
+        // to simulate a genuinely attended human -- same pattern PUSHSEED-2
+        // above and pipeline-state.test.mjs's own already-fixed coverage use.
+        const approved = pipelineStateRun(
+          ["approve-push", "--by", "po", "--remote", "origin", "--destination", "refs/heads/feat/x"],
+          { dir: path, isattyFn: () => true, readLineFn: () => challengeCode },
+        );
+        assert.equal(approved, 0, "chat-mode approval must be reachable from an attended terminal");
       }
     }
   } finally { dispose(signatureRoot); dispose(chatRoot); }
@@ -3836,10 +3860,13 @@ test("omitting --runner on the kickoff CLI resolves the historical Codex identit
   try {
     const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
     const goal = "Codex kickoff CLI regression pin";
+    // AGY-CHATADAPTER-2: every kickoff call in this test uses --language en, so
+    // a fixed attended-confirmation seam simulates a human confirming that same
+    // value each time.
     const invoke = (args, env = {}) => {
       let stdout = ""; let stderr = "";
       const code = onboardingCli(args, {
-        deps: fakeDeps,
+        deps: { ...fakeDeps, isattyFn: () => true, readLineFn: () => "en" },
         env,
         write: (chunk) => { stdout += chunk; },
         writeError: (chunk) => { stderr += chunk; },
@@ -3867,10 +3894,11 @@ test("omitting --runner on the kickoff CLI resolves the active Claude identity i
   try {
     initializeClaudeOnboardedRoot(path);
     const goal = "Claude kickoff CLI environment resolution";
+    // AGY-CHATADAPTER-2: fixed attended-confirmation seam, see the sibling test above.
     const invoke = (args, env) => {
       let stdout = ""; let stderr = "";
       const code = onboardingCli(args, {
-        deps: fakeDeps,
+        deps: { ...fakeDeps, isattyFn: () => true, readLineFn: () => "en" },
         env,
         write: (chunk) => { stdout += chunk; },
         writeError: (chunk) => { stderr += chunk; },
@@ -3892,10 +3920,14 @@ test("the kickoff CLI applies its closed runner value set: claude is honoured, u
   try {
     initializeClaudeOnboardedRoot(path);
     const goal = "Closed runner value set";
+    // AGY-CHATADAPTER-2: fixed attended-confirmation seam for the two kickoff
+    // calls below that use --language en; the `refusing`-deps override further
+    // down replaces `deps` wholesale and never reaches the gate (an unknown
+    // --runner is refused at parse() before the gate runs).
     const invoke = (args, overrides = {}) => {
       let stdout = ""; let stderr = "";
       const code = onboardingCli(args, {
-        deps: fakeDeps,
+        deps: { ...fakeDeps, isattyFn: () => true, readLineFn: () => "en" },
         write: (chunk) => { stdout += chunk; },
         writeError: (chunk) => { stderr += chunk; },
         ...overrides,
@@ -4115,10 +4147,12 @@ test("an apply-shaped runtime-attestation-required exits non-zero; the same stat
   try {
     initializeClaudeOnboardedRoot(path);
     const goal = "Exit-code split regression (RUNNERNEUT-1 mechanism C)";
+    // AGY-CHATADAPTER-2: fixed attended-confirmation seam for the --language en
+    // kickoff calls below.
     const invoke = (args) => {
       let stdout = ""; let stderr = "";
       const code = onboardingCli(args, {
-        deps: fakeDeps,
+        deps: { ...fakeDeps, isattyFn: () => true, readLineFn: () => "en" },
         write: (chunk) => { stdout += chunk; },
         writeError: (chunk) => { stderr += chunk; },
       });
@@ -4205,11 +4239,14 @@ test("public cleanup privatization preserves the historical kickoff seed for CLI
   let onboardingOutput = "";
   let onboardingError = "";
   let cleanupOutput = "";
+  // AGY-CHATADAPTER-2: every kickoff-promote call this closure drives below
+  // uses --profile feature, so a fixed attended-confirmation seam simulates a
+  // human confirming that same value each time.
   const invokeOnboarding = (args) => {
     onboardingOutput = "";
     onboardingError = "";
     const code = onboardingCli(args, {
-      deps: fakeDeps,
+      deps: { ...fakeDeps, isattyFn: () => true, readLineFn: () => "feature" },
       write: (chunk) => { onboardingOutput += chunk; },
       writeError: (chunk) => { onboardingError += chunk; },
     });
