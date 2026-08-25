@@ -306,6 +306,28 @@ recovered by hand (cherry-pick + selective revert). See backlog:
 `Prompt` payload shape (live defect, not theoretical); a GWM
 kernel-doc/code enumeration drift (13 undocumented entries); a general
 "guards are tool-level, not OS-level sandboxing" idea (Nova B, deferred).
+**Correction/narrower finding after further testing:** the broken mechanism
+was specifically the Agent tool's own `isolation: "worktree"` parameter —
+the **Workflow tool**'s `agent()` `opts.isolation: 'worktree'` DOES create
+real separate worktrees (confirmed live via `git worktree list` showing
+distinct `.claude/worktrees/wf_*` entries), matching
+`workflow-dispatch.md`'s own documented live-tested behavior. Prefer the
+Workflow tool for any future worktree-isolated parallel dispatch in this
+repo; the Agent-tool-direct path stays suspect until separately verified.
+
+**AFK backlog sweep in progress (PO directive, chat, 2026-08-25):** working
+through the remaining 17 open items (12 general + `gwm-kernel-doc-drift` +
+`guard-dispatch-fail-open` + the 3 `in_progress` items) via one Workflow
+run, 17 parallel worktree-isolated `goldfish-deep` agents, each deciding
+`implemented`/`recommend-close`/`needs-po-decision`/`blocked` and actually
+building (not just designing) where warranted. `codex-runner-has-no-real-
+support-on-native-windows` already closed separately (won't-fix, PO: no
+Windows daemon exists, existing mitigation suffices). `AGY-HGOFIX-2` (HGO
+chat-gate wiring, serial, no isolation, shared checkout) also still
+running concurrently — does not conflict with the sweep's isolated
+worktrees. Results pending; each will be independently re-verified
+(worktree diff + tests run directly) before being merged/closed, per
+`workflow-dispatch.md`'s "never trust a returned result alone" rule.
 
 ### Sentinel Links
 - specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md
