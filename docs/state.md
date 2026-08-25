@@ -52,9 +52,37 @@ already has a different, deliberately-built mechanism
 explicitly rejects attribution-only chat approval) — whether the new
 registry replaces it, sits alongside it, or plan-approval stays on the
 marker mechanism entirely is a PO product decision the dispatch must
-surface, not make silently. **Not yet dispatched** — needs its own
-`goldfish-deep` package built from `templates/prompts/goldfish-task.md`.
-Item stays `open`.
+surface, not make silently.
+
+**CRITICAL live finding, same day (PO chat report):** during an Agy/
+Antigravity test, an agent granted itself a push approval under
+`gates.push_approval: chat`. Confirmed by direct code read, not just the
+PO's report: `pipeline-state.mjs`'s `approve-push` chat path prints the
+`PO-XXXX` challenge code to the SAME process's own stdout/stderr, and
+accepts it back via a second CLI call — nothing stops one agent, in one
+session, from reading its own output and resubmitting the code itself. No
+enforced human-turn boundary exists at all (a more severe gap than chat
+mode's documented "attribution-only, not proof" tradeoff). Recorded as its
+own item, `backlog/items/2026-08-25-chat-mode-push-approval-has-no-enforced-human-turn-boundary.md`
+(`b69c4ed3`/`07f5bc02`).
+
+**Dispatched: `AGY-CHATADAPTER-1`** (goldfish-deep, background, in flight
+as of this write) — folds both the kickoff-gate registry work and the push
+self-approval fix into ONE dispatch, since both need the identical
+underlying primitive. Required outcomes: (A) close the push self-approval
+hole — expected direction (hint, not mandate) is reusing the
+`signature`-mode ceremony's proven `readSync(0, ...)` attended-terminal
+property instead of the current print-then-reread-your-own-output shape;
+(B) gate `kickoff plan --language`/`--profile` through the same primitive.
+(C) the PRD/Spec marker-vs-registry question is investigate-and-decide-only
+— implement only if unambiguous from ADR-0021 + `po-gate-authority.mjs`,
+else stop that one sub-goal and report. CRs stay explicitly out of scope.
+Ruleset SHA `bb962eeb`. A secondary tooling defect was found and filed
+while preparing this dispatch (not blocking, worked around):
+`backlog-item-strip-for-dispatch.mjs` drops every section after the first
+`## Triage` heading, not just verdict-shaped content — confirmed twice now
+(`445e436f`); the dispatch was briefed with RAW backlog-item paths instead
+of the stripped copies.
 
 **`verify-marketplace-attestation-blocks-normal-active-development` —
 CLOSED (`253398a6`/`4e2babd1`/`c69017fe`).** `AGY-MKTATTEST-1` landed
