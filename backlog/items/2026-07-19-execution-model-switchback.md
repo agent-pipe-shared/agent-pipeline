@@ -253,3 +253,99 @@ Remaining candidate-binding gate: no actual repository commit/tree observation
 is carried by this schema or produced by the statusLine path. A future slice
 must source and validate that binding from a real repository observation before
 the evidence may be described as candidate-bound.
+
+### TP-4 correction, 2026-08-25 (dispatch AGY-SWEEP-execution-model-switchback)
+
+Re-read this item per explicit PO instruction to revisit deferred/still-open
+items rather than rubber-stamping the prior Triage. The 2026-08-20 entry's
+"Remaining host-wiring gate" claim — "`.claude/settings.json` still has no
+live `statusLine` command wiring in this repository" and "an attended TP-4
+host step must wire the command" — is **factually wrong as of this dispatch**,
+confirmed by direct evidence, not inference:
+
+1. `git show 4375585c:.claude/settings.json` (this repo's first tracked
+   commit) already contains `"statusLine": {"type": "command", "command":
+   "node plugins/pipeline-core/scripts/statusline-context.mjs"}`. The wiring
+   has been present in this repository's own live `.claude/settings.json`
+   throughout its tracked history — it was never a pending step here; the
+   stale `NOT YET WIRED (TP-4)` comment inside
+   `statusline-context.mjs`'s own header (unchanged since that file's
+   creation) is itself the drift, not the settings file.
+2. Live production evidence that the wiring is actually firing, captured
+   during THIS dispatch's own session, in the main repo's `.claude/`
+   (not this dispatch's isolated worktree, which has no such file):
+   `.claude/.main-session-model-identity-89b5ae44-0cc4-4e78-9d79-029562e85118.json`
+   — `{"schema":"pipeline.main-session-model-identity.v1","subject":"main-session",
+   "source":"host-introspection","sessionId":"89b5ae44-...","eventId":
+   "statusline-89b5ae44-...-1787690583424","modelId":"Sonnet 5","observedAt":
+   "2026-08-25T20:43:03.424Z"}`. The captured `modelId` is `"Sonnet 5"` — only
+   `resolveModelName()`'s first branch (`model.display_name`) can produce that
+   exact string; its later fallbacks (`model.id`, a bare string) would have
+   produced a different-shaped value (e.g. `claude-sonnet-5`). This closes the
+   item's own stated confirmation requirement ("confirming `session_id` plus
+   `model.display_name`") empirically, from a real host tick, not a
+   hand-constructed fixture.
+3. Corroborating evidence the write is host-driven and repeated, not a
+   one-off manual/test invocation: the sibling
+   `.claude/.usage-89b5ae44-....json` (written by the same
+   `statusline-context.mjs` script's `writeUsageFile()`) carries a LATER
+   timestamp (`20:47:54.090Z` vs. the identity file's `20:43:03.424Z`),
+   showing the statusLine command ticked more than once across this live
+   session; and `.claude/.stop-suggest-89b5ae44-....json`, written by an
+   entirely different hook (`stop-suggest.mjs`, a Stop hook) keyed to the
+   same `session_id`, shows a second independent host-driven script
+   confirming the session is real and host-invoked, not manually seeded from
+   inside a worktree.
+
+**Conclusion:** TP-4 ("wire `statusLine` live and empirically confirm its
+real field names against an actual running host") is satisfied — not by a
+new ceremony, but by evidence this dispatch found already sitting in the
+main repo's `.claude/` from ordinary live use. Recommended-next-step item 2
+from the 2026-08-18 entry is done; item 3 (evidence writer/reader + schema +
+`post-compact-reground.mjs` wiring) was already done 2026-08-20
+(NVA-MODEL-IDENTITY-01). Item 4 (threat-model note) is substantively present
+in `main-session-route-attestation.mjs`'s own header comment ("this module
+does not claim provider or cryptographic attestation") though not yet
+promoted to a standalone doc — a documentation-polish gap, not a functional
+one.
+
+**Still genuinely open, and why it is not a bounded technical patch:** the
+"remaining candidate-binding gate" quoted above asks to "source **and
+validate**" a commit/tree binding. `route-receipt.mjs` (the only existing
+precedent for this kind of binding in this codebase) validates a dispatched
+child's `candidateCommit`/`candidateTree` against a **dispatcher-held**
+`dispatchBinding` supplied by the caller who dispatched that exact task — the
+ground truth to validate against always comes from outside the receipt
+itself. A main/coordinator session has no dispatcher and no single fixed
+candidate commit the way a dispatched task does; its HEAD moves as commits
+land throughout the session. Recording HEAD at observation time is a bounded
+technical addition (a "sourcing" step), but "validating" it against some
+ground truth has no defined ground truth to validate against for a main
+session — that is a structural gap this item's own wording did not
+anticipate, not a missing line of code. Separately, `statusline-context.mjs`
+runs on every statusLine tick under a stated fail-open/never-blocks/
+best-effort contract; spawning a `git` subprocess (or hand-parsing
+`.git/HEAD`, packed-refs, and worktree `.git`-as-a-file semantics) on that
+hot path is a real behavioral change to live PO tooling, not a free
+addition — it was not attempted this dispatch.
+
+No production code changed this pass; this is a documentation-only
+correction of a stale claim, backed by primary evidence. **Decision:
+`implemented`** for the TP-4 correction itself (a real, verifiable fix to
+this item's own inaccurate state, actioned by editing the item), while the
+remaining candidate-binding "validate" half stays open as a structural gap
+for a future dispatch — not scoped here because no bounded technical
+addition can supply the missing ground truth to validate against; the
+"source" half alone (an additive, unvalidated `headSha` observation field)
+was assessed but not built this pass, given the hot-path cost above.
+**Files read (no changes to production code):**
+`.claude/settings.json` (this repo's, both current and at commit
+`4375585c`), `.claude/.main-session-model-identity-89b5ae44-...json`,
+`.claude/.usage-89b5ae44-....json`, `.claude/.stop-suggest-89b5ae44-....json`
+(main repo, read-only, outside this dispatch's worktree),
+`plugins/pipeline-core/scripts/statusline-context.mjs`,
+`plugins/pipeline-core/lib/main-session-route-attestation.mjs`,
+`plugins/pipeline-core/hooks/post-compact-reground.mjs`,
+`plugins/pipeline-core/lib/route-receipt.mjs`. No status/Closure change;
+`status:` left exactly as found (`in_progress`) per this dispatch's own
+briefing constraints. **Date:** 2026-08-25

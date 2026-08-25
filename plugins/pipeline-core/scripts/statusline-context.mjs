@@ -7,11 +7,15 @@
  *
  * Sole statusLine script in this plugin -- nothing prior to extend.
  *
- * NOT YET WIRED (TP-4): `.claude/settings.json`'s `statusLine` field is untouched here on
- * purpose -- the later bundled wiring wave (W-WIRE-2, same plan) adds it under one
- * explicit PO-approved sentinel edit. This file's own test suite invokes the script
- * directly (module import + real subprocess spawn via stdin pipe), never via the live
- * statusLine pipeline.
+ * WIRED (TP-4, corrected 2026-08-25 -- backlog/items/2026-07-19-execution-model-switchback.md):
+ * this repo's own `.claude/settings.json` `statusLine` field has pointed at this exact script
+ * since this repository's tracked history began; live evidence a real host tick fired it and
+ * wrote a genuine `pipeline.main-session-model-identity.v1` snapshot (see the backlog item's
+ * 2026-08-25 Triage entry) confirms the real stdin field names match what this file reads,
+ * superseding the "not yet wired" note this header previously carried. This file's own test
+ * suite still invokes the script directly (module import + real subprocess spawn via stdin
+ * pipe) rather than via the live statusLine pipeline -- that stays a deliberate, independent
+ * test-isolation choice, not a sign the wiring itself is missing.
  *
  * STDIN FIELD-NAME AMBIGUITY (briefing stop-condition note, resolved defensively): the
  * exact Claude-Code statusLine stdin JSON shape could not be independently confirmed from
