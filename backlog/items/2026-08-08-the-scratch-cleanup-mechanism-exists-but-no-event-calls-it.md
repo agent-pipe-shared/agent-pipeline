@@ -206,3 +206,80 @@ governance, measurable rigor, and control integrity" — ADR-0043's
 are architecture/control-integrity work, not current-blocking. Not needed
 near-term: the unconditional `scratch/` write exemption (the part that
 actually unblocked sessions) already landed.
+
+### Sweep re-triage (AGY-SWEEP-scratch-cleanup-mechanism, 2026-08-25)
+
+Revisited per explicit PO instruction to work through deferred backlog
+items rather than rubber-stamp the prior deferral. Findings below correct
+the record above, which had gone stale by the time of this dispatch — the
+codebase moved after the 2026-08-17 deferral note without the note being
+updated.
+
+- **Point 2 (regression risk: unconditional `mkdir`) was already fixed,
+  contrary to the deferral note above still listing it open.** Landed in
+  `84da1fd9` ("fix(scratch): skip bootstrap sweep entirely when scratch/
+  does not exist"), 2026-08-12 — predating even the 2026-08-17 deferral
+  note. Verified live at `pipeline-start-preflight.mjs:398`:
+  `runBootstrapScratchLifecycle` returns `skipped-no-scratch-directory`
+  before touching the filesystem whenever `scratch/` does not already
+  exist.
+- **Point 4** (manifest exemption) remains moot, as already noted above.
+- **Point 1 (bind half) is still open, and is not a cheap wire-up.**
+  `PIPELINE_SCRATCH_SESSION_ID` is read at
+  `pipeline-start-preflight.mjs:415` but nothing in production sets it
+  (confirmed by grep across `plugins/pipeline-core/`: only the reading
+  site and its own tests reference the name). The tempting cheap fix —
+  mint a session UUID in `SKILL.md`'s prose and pass it as an env var to
+  the one-shot `node pipeline-start-preflight.mjs` CLI invocation — is
+  actively unsafe, not merely undone: `bindScratchDescriptor` records
+  `pid: process.pid` of that SAME one-shot CLI process
+  (`session-cleanup-recovery.mjs:1662`), which exits within milliseconds
+  of the call returning. Any later `retireOrphanScratchDescriptors` /
+  `planOrphanScratchRetirement` liveness check against that PID reads
+  "dead" immediately, regardless of whether the underlying agent
+  conversation is still active — so two sessions bootstrapping around the
+  same time (e.g. an Elephant and a Goldfish both starting) would see
+  each other's just-bound descriptor as instantly orphaned and delete a
+  live session's scratch directory. A correct fix needs either (a) a real
+  Claude Code SessionStart hook, which receives `session_id` via hook
+  stdin (as `stop-suggest.mjs` / `post-compact-reground.mjs` /
+  `guard-lifecycle-ready.mjs` already do) plus a PID/process-identity that
+  outlives the hook's own one-shot invocation — i.e. `process.ppid` (the
+  long-running host process) rather than `process.pid`, a semantics
+  decision not made anywhere in the code today — or (b) a different
+  liveness signal entirely. The lowest-risk wiring route, not yet tried:
+  extend an EXISTING already-wired SessionStart hook (`staleness-check.mjs`,
+  `setup-check.mjs`, or `codex-session-start-hint.mjs`, all already
+  registered in `hooks.json`'s `startup|resume|clear` matcher) to also
+  read `session_id` from its own hook stdin and bind/sweep using it — this
+  avoids editing `hooks.json` itself, which is both
+  `NEVER_LIFTABLE_KERNEL_PATHS`-listed and self-declared TP-4 ("edited
+  only under explicit PO approval") — but the `process.pid` vs
+  `process.ppid` semantics question above still needs resolving before
+  that route is safe to build.
+- **Point 3 (push-gate soft warning) is still open, but its stated
+  prerequisite is already done**, contrary to the 2026-08-12 handover text
+  above: `planOrphanScratchRetirement` (`session-cleanup-recovery.mjs:1717`)
+  is already exactly the non-mutating, read-only observer that handover
+  asked for (no `mkdirSync`, no `physicalScratchRoot` call — mirrors the
+  `{ create: false }` pattern the handover named). `guard-push.mjs` itself
+  has zero scratch references today (confirmed by grep). So the actual
+  remaining work is narrower than the stale handover text suggests: call
+  `planOrphanScratchRetirement` from `guard-push.mjs` and append an
+  advisory when any entry has `status: "orphan"`. Not attempted in this
+  dispatch — no budget remained to locate the current advisory/`exit(0)`
+  shape in `guard-push.mjs` (the 2026-08-12 "line ~1800" reference is
+  stale and unverified in this pass) and to verify a push-gate
+  exit-semantics change safely.
+- **Decision for this sweep dispatch: `blocked`.** Not `recommend-close`
+  (points 1 and 3 are real, confirmed-open work, not superseded or
+  already resolved). Not `implemented` (tool budget for this dispatch was
+  spent re-verifying the stale Triage above before any code could safely
+  be written and tested — see the point-2 finding, which shows the prior
+  Triage cannot be trusted at face value). Not `needs-po-decision` in the
+  genuine product/UX sense (the open questions above are technical: PID-
+  vs-PPID liveness semantics, and where the SessionStart wiring should
+  land) but blocked on a real technical constraint (the direct
+  session-identity route runs straight into the TP-4/kernel-protected
+  `hooks.json`) combined with this dispatch's remaining budget. Status
+  left `open`; not this dispatch's call to close or reassign.
