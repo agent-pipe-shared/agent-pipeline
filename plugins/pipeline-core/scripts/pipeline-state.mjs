@@ -359,6 +359,7 @@ import {
   verifyCriticalActionApprovalRequest,
 } from "../lib/critical-action-approval-request.mjs";
 import { criticalProofWaiverFor, readCriticalHumanProofPolicy } from "../lib/critical-human-proof-policy.mjs";
+import { requireAttendedChatGateConfirmation } from "../lib/chat-gate-ceremony.mjs";
 import {
   lifecycleDigest as closeCoordinatorDigest,
   readCloseCoordinator,
@@ -5621,8 +5622,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const expectedFlags = pushWaived
         ? new Set(["by", "remote", "destination"])
         : new Set(["by", "remote", "destination", "proof-request", "proof-authority", "proof"]);
-      const parsedWithChallenge = pushWaived ? parseExactFlags(rest, new Set(["by", "remote", "destination", "challenge"])) : { ok: false };
-      const parsed = parsedWithChallenge.ok ? parsedWithChallenge : parseExactFlags(rest, expectedFlags);
+      const parsed = parseExactFlags(rest, expectedFlags);
       const by = parsed.value?.by;
       if (!parsed.ok || isBlank(by)) {
         console.error(pushWaived
@@ -5653,14 +5653,27 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         return 2;
       }
       if (pushWaived) {
-        const challenge = parsed.value?.challenge;
+        // AGY-CHATADAPTER-1: closes a confirmed self-approval hole
+        // (backlog/items/2026-08-25-chat-mode-push-approval-has-no-enforced-
+        // human-turn-boundary.md). The OLD shape took a `--challenge <code>`
+        // CLI flag on this same call -- nothing stopped the same automated
+        // actor that read the code from this command's own first-run stderr
+        // from immediately supplying it back on a second, still fully
+        // non-interactive, invocation. There is now no `--challenge` flag at
+        // all: a pending challenge is only ever confirmed by re-running this
+        // EXACT command (`--by`/`--remote`/`--destination` unchanged, ADR-0056)
+        // from a real attended terminal, which `requireAttendedChatGateConfirmation`
+        // (`lib/chat-gate-ceremony.mjs`) verifies via `isAttendedTerminal()`
+        // BEFORE it ever reads anything -- an agent's own tool-calling harness
+        // has no TTY on fd 0, so it cannot complete this step no matter what
+        // it pipes into stdin.
         const pending = base?.pendingPushChallenge;
         const hasValidPending = pending && typeof pending.code === "string"
           && pending.forCommit === head.commit
           && pending.remote === remote
           && pending.destination === destination
           && pending.expiresAt && new Date(pending.expiresAt).getTime() > Date.now();
-        if (!challenge || !hasValidPending || challenge.trim() !== pending.code) {
+        if (!hasValidPending) {
           const code = `PO-${randomBytes(2).toString("hex").toUpperCase()}`;
           const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
           const challengeState = {
@@ -5671,8 +5684,26 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           };
           writeState(dir, challengeState, base);
           console.error(`[PO-CHALLENGE] Human confirmation required for push approval in chat mode.`);
-          console.error(`Please execute the following command to authorize the push:`);
-          console.error(`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by ${JSON.stringify(by)} --remote ${JSON.stringify(remote)} --destination ${JSON.stringify(destination)} --challenge ${code}`);
+          console.error(`The confirmation code is: ${code}`);
+          console.error(`A human must now re-run this EXACT command themselves, directly in their own attended terminal (not through an agent's tool call), and type the code above when prompted:`);
+          console.error(`node plugins/pipeline-core/scripts/pipeline-state.mjs approve-push --by ${JSON.stringify(by)} --remote ${JSON.stringify(remote)} --destination ${JSON.stringify(destination)}`);
+          return 1;
+        }
+        const confirmation = requireAttendedChatGateConfirmation({
+          summaryLines: [
+            "PO PUSH APPROVAL CONFIRMATION -- read before you type the code:",
+            `  approved by: ${by}`,
+            `  remote/destination: ${remote} -> ${destination}`,
+            `  commit: ${head.commit}`,
+            `  code: ${pending.code}`,
+          ],
+          expected: pending.code,
+          dependencies: deps,
+        });
+        if (!confirmation.ok) {
+          console.error(confirmation.code === "CHAT-GATE-NOT-ATTENDED"
+            ? "Error: approve-push refused (CHAT-GATE-NOT-ATTENDED); this command must be run by the PO directly in their own attended terminal -- an agent's own tool call cannot complete this step."
+            : "Error: approve-push refused (CHAT-GATE-CONFIRMATION-MISMATCH); the typed value did not match the confirmation code shown above.");
           return 1;
         }
       }

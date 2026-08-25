@@ -19,6 +19,7 @@ import { createHash, generateKeyPairSync, sign } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { fileURLToPath } from "node:url";
 
 import { createCriticalActionApprovalRequest, criticalActionSubjectSha256 } from "../lib/critical-action-approval-request.mjs";
 import { SCHEMA_ID, externalPathIsOutsideRoot, run, statePath } from "./pipeline-state.mjs";
@@ -141,8 +142,18 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   assert.equal(run(["materialize-push-threat-model"], deps), 0);
   gitAt("add", "-A");
   gitAt("commit", "-q", "-m", "chat approval mode");
+  // AGY-CHATADAPTER-1's live-subprocess test below spawns the REAL script, which
+  // resolves `head.commit` via the real `git rev-parse HEAD` in `root` -- not the
+  // injected `deps.gitHead` above. `pendingPushChallenge.forCommit` has to match
+  // whichever commit resolves the confirming call reaches, so both the in-process
+  // `run()` calls and the live subprocess must agree on one real value.
+  const realHeadCommit = gitAt("rev-parse", "HEAD").stdout.trim();
+  deps.gitHead = () => ({ ok: true, commit: realHeadCommit });
+  deps.gitCandidate = () => ({ ok: true, commit: realHeadCommit, tree: candidate.tree });
 
-  // 1. Calling approve-push without --challenge generates a challenge token and exits 1
+  // 1. Calling approve-push generates a challenge token and exits 1 -- there is
+  // no `--challenge` flag any more (AGY-CHATADAPTER-1): confirming is done by
+  // re-running this exact command from an attended terminal, never by an argv value.
   const initialAttempt = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"], deps));
   assert.equal(initialAttempt.result, 1, `initial attempt must prompt for challenge: ${initialAttempt.lines.join(" ")}`);
   assert.ok(initialAttempt.lines.some((line) => line.includes("PO-CHALLENGE")));
@@ -150,15 +161,54 @@ function approvePushAttempt(root, deps, pushTarget = { remote: "origin", destina
   assert.ok(intermediate.pendingPushChallenge?.code, "challenge code must be recorded in state");
   const challengeCode = intermediate.pendingPushChallenge.code;
 
-  // 2. Calling with matching --challenge succeeds with exit 0
-  const chatApproval = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main", "--challenge", challengeCode], deps));
-  assert.equal(chatApproval.result, 0, `chat mode must be reachable with challenge: ${chatApproval.lines.join(" ")}`);
+  // AGY-CHATADAPTER-1 (the actual security proof, confirmed vulnerability closed):
+  // a single automated actor re-running the EXACT SAME confirming call, with no
+  // attended terminal on fd 0, must NOT be able to complete the ceremony -- even
+  // though it already knows the correct code (it printed it in step 1 above).
+  // `deps` here carries no `isattyFn` override, so `isAttendedTerminal()` falls
+  // through to the real `process.stdin.isTTY`, which is falsy for this test
+  // process too -- exactly the property an agent's own tool-calling harness has.
+  const unattendedRetry = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"], deps));
+  assert.equal(unattendedRetry.result, 1, `a non-attended retry must be refused, not silently succeed: ${unattendedRetry.lines.join(" ")}`);
+  assert.ok(unattendedRetry.lines.some((line) => line.includes("CHAT-GATE-NOT-ATTENDED")),
+    `the refusal must name the not-attended code: ${unattendedRetry.lines.join(" ")}`);
+  const stillPending = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
+  assert.equal(stillPending.pushApproval, undefined, "an unattended retry must not record an approval");
+
+  // A live, real-process proof of the same property (no injected seam at all): the
+  // actual `pipeline-state.mjs` CLI, spawned as a genuinely separate process with a
+  // plain (non-TTY) piped stdin -- exactly the shape an agent's Bash tool call has --
+  // fed the CORRECT code on stdin and still refused, because the gate checks
+  // TTY-ness before it ever reads anything.
+  const scriptPath = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
+  const livePipedAttempt = spawnSync(process.execPath, [scriptPath, "approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"],
+    { cwd: root, encoding: "utf8", input: `${challengeCode}\n`, env: { ...process.env, CLAUDE_PROJECT_DIR: root } });
+  assert.notEqual(livePipedAttempt.status, 0, `a real piped-stdin process must be refused: ${livePipedAttempt.stderr}`);
+  assert.ok(livePipedAttempt.stderr.includes("CHAT-GATE-NOT-ATTENDED"),
+    `the live refusal must name the not-attended code: ${livePipedAttempt.stderr}`);
+
+  // 2. A genuinely attended confirming call (simulated via the injectable seam,
+  // matching this file family's own dependency-injection convention) succeeds.
+  const attendedDeps = { ...deps, isattyFn: () => true, readLineFn: () => challengeCode };
+  const chatApproval = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"], attendedDeps));
+  assert.equal(chatApproval.result, 0, `chat mode must be reachable from an attended terminal: ${chatApproval.lines.join(" ")}`);
   const recorded = JSON.parse(readFileSync(join(root, "project", "pipeline-state.json"), "utf8"));
   // The record has to say on its face that no proof backed it -- guard-push refuses
   // an approval recorded under a different policy than the one now in force.
   assert.equal(recorded.pushApproval.lastApproved.criticalProofWaiver.kind, "push");
   assert.equal(recorded.pushApproval.lastApproved.criticalProofWaiver.mode, "chat");
   assert.equal(recorded.pendingPushChallenge, undefined, "challenge must be cleared on approval");
+
+  // An attended call that types the WRONG value must still be refused, and must
+  // not consume/clear the pending challenge (the human gets to retry).
+  writeFileSync(join(root, "project", "pipeline-state.json"), JSON.stringify({
+    ...recorded, pushApproval: undefined,
+    pendingPushChallenge: { code: "PO-ABCD", forCommit: realHeadCommit, remote: "origin", destination: "refs/heads/main", expiresAt: new Date(Date.now() + 600000).toISOString() },
+  }));
+  const wrongTypedValue = capturedStderr(() => run(["approve-push", "--by", "PO", "--remote", "origin", "--destination", "refs/heads/main"],
+    { ...deps, isattyFn: () => true, readLineFn: () => "PO-WRONG" }));
+  assert.equal(wrongTypedValue.result, 1, `a mismatched typed value must be refused: ${wrongTypedValue.lines.join(" ")}`);
+  assert.ok(wrongTypedValue.lines.some((line) => line.includes("CHAT-GATE-CONFIRMATION-MISMATCH")));
 
   // The other half of the ordering: with the stand-down absent, `signature` is the
   // default and the six-flag ceremony is still demanded. Moving the waiver check
