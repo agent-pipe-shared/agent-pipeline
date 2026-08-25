@@ -53,6 +53,16 @@
  * entire point of this test (a missed dynamic import, or a missed spawn edge, is exactly
  * the kind of hole a hand-maintained enumeration already produced once).
  *
+ * GMWKC03 (pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array, 2026-08-25):
+ * GMWKC01 only proves the CODE array is closed under import -- it says nothing about
+ * whether `docs/guard-maintenance-window-threat-model.md`'s "Protected assets" prose
+ * transcription of that array is complete. A prior dispatch found 13 code entries with
+ * no mention in the doc at all, invisible to GMWKC01 because the doc isn't code. This
+ * check parses the doc's own backtick-quoted `lib/`/`scripts/`/`hooks/`/`project/...`
+ * path tokens out of that one section and asserts they are a SUPERSET of
+ * `NEVER_LIFTABLE_KERNEL_PATHS` -- it fails on any future array addition that isn't also
+ * reflected in the doc's prose, closing the class of drift rather than this one instance.
+ *
  * Run: node plugins/pipeline-core/lib/guard-maintenance-window-kernel-closure.test.mjs
  */
 import assert from "node:assert/strict";
@@ -250,6 +260,31 @@ check("GMWKC02 PLUGIN_KERNEL_SUFFIXES/PROJECT_KERNEL_PATHS derive correctly from
     isNeverLiftableKernelPath(join(globalPluginRoot, "lib", "entrypoint.mjs"), { rootDir: REPO_ROOT, livePluginRoot: globalPluginRoot }),
     true,
     "must be caught via the livePluginRoot anchor once entrypoint.mjs is a kernel path",
+  );
+});
+
+check("GMWKC03 docs/guard-maintenance-window-threat-model.md's Protected-assets prose lists every NEVER_LIFTABLE_KERNEL_PATHS entry", () => {
+  const docPath = join(REPO_ROOT, "docs", "guard-maintenance-window-threat-model.md");
+  const doc = readFileSync(docPath, "utf8");
+  const sectionStart = doc.indexOf("## Protected assets");
+  const sectionEnd = doc.indexOf("## Threats and controls");
+  if (sectionStart === -1 || sectionEnd === -1 || sectionEnd <= sectionStart) {
+    throw new Error(`Could not locate the "## Protected assets" ... "## Threats and controls" span in ${docPath}.`);
+  }
+  const section = doc.slice(sectionStart, sectionEnd);
+  const DOC_PATH_TOKEN_RE = /`((?:lib|scripts|hooks)\/[A-Za-z0-9_.\-]+\.(?:mjs|js|json)|project\/critical-human-proof\.json)`/g;
+  const docPaths = new Set();
+  let match;
+  while ((match = DOC_PATH_TOKEN_RE.exec(section)) !== null) {
+    const token = match[1];
+    docPaths.add(token.startsWith("project/") ? token : `plugins/pipeline-core/${token}`);
+  }
+  const missing = NEVER_LIFTABLE_KERNEL_PATHS.filter((p) => !docPaths.has(p));
+  assert.equal(
+    missing.length,
+    0,
+    `${missing.length} NEVER_LIFTABLE_KERNEL_PATHS entr${missing.length === 1 ? "y is" : "ies are"} not mentioned in ` +
+    `docs/guard-maintenance-window-threat-model.md's "Protected assets" section:\n${missing.join("\n")}`,
   );
 });
 

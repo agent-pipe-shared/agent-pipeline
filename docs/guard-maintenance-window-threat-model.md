@@ -46,7 +46,8 @@ below assumes it holds and is written to catch a change that would break it.
 - The never-liftable kernel: `hooks/guard-gate-strength.mjs`, the GMW
   verifier module, `hooks/hooks.json`, `lib/tool-write-target.mjs`,
   `hooks/guard-command-grammar.mjs`, `hooks/guard-lifecycle-ready.mjs`,
-  `project/critical-human-proof.json` (the trust anchor), and
+  `lib/guard-devplan-policy.mjs`, `project/critical-human-proof.json` (the
+  trust anchor), and
   `lib/critical-human-proof-policy.mjs`/`lib/po-approval-proof.mjs` (the two
   modules that verify a window and every push/deploy/publication/
   release-preflight proof). The kernel must be closed under import, not just
@@ -58,20 +59,30 @@ below assumes it holds and is written to catch a change that would break it.
   below is imported, directly or transitively, by one of the entries above,
   and the test fails on any future edit that adds an import without extending
   this list to match. All paths are repo-relative under
-  `plugins/pipeline-core/`: `lib/chat-gate-ceremony.mjs`,
+  `plugins/pipeline-core/`, listed in the SAME order as
+  `NEVER_LIFTABLE_KERNEL_PATHS` (`lib/guard-maintenance-window.mjs`) so the
+  two can be diffed at a glance
+  (`pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array`,
+  2026-08-25 -- 13 entries were previously present in the code array with no
+  mention here): `lib/chat-gate-ceremony.mjs`,
   `lib/codex-host-layout.mjs`,
   `lib/codex-onboarding-app-server.mjs`,
   `lib/codex-onboarding-capabilities.mjs`, `lib/codex-onboarding-runtime.mjs`,
   `lib/continuity-host-adapter.mjs`, `lib/continuity-state.mjs`,
   `lib/continuity-status.mjs`, `lib/critic-export-policy.mjs`,
   `lib/critical-action-approval-request.mjs`, `lib/document-hooks.mjs`,
-  `lib/entrypoint.mjs`, `lib/gate-estimate.mjs`, `lib/git-cmd.mjs`,
+  `lib/entrypoint.mjs`, `lib/feature-package-topology.mjs`,
+  `lib/gate-estimate.mjs`, `lib/git-cmd.mjs`,
   `lib/human-guard-override.mjs`, `lib/human-role-labels.mjs`,
   `lib/machine-plane.mjs`, `lib/manifest.mjs`, `lib/onboarding-continuity.mjs`,
   `lib/plan-spec-state-v2.mjs`, `lib/po-gate-authority.mjs`,
-  `lib/po-gate-profile-publisher.mjs`, `lib/project-authority.mjs`,
+  `lib/po-gate-profile-publisher.mjs`, `lib/private-boundary.mjs`,
+  `lib/project-authority.mjs`,
   `lib/project-onboarding-ready-gate.mjs`, `lib/project-onboarding-v3.mjs`,
-  `lib/recovery-preview-attestation.mjs`,
+  `lib/protected-test-paths.mjs`, `lib/publication-authority.mjs`,
+  `lib/publication-bundle.mjs`, `lib/publication-bundle-v2.mjs`,
+  `lib/publication-capability-preflight.mjs`,
+  `lib/recovery-preview-attestation.mjs`, `lib/review-economy.mjs`,
   `lib/runner-native-continuation.mjs`,
   `lib/runner-profile-migration-v2.mjs`,
   `lib/runner-profile-migration-v3.mjs`, `lib/runner-profiles-v2.mjs`,
@@ -80,7 +91,10 @@ below assumes it holds and is written to catch a change that would break it.
   `lib/session-cleanup-recovery.mjs`, `lib/source-observation.mjs`,
   `lib/windows-private-state.mjs`, `lib/worktree-lifecycle.mjs`,
   `lib/yaml-lite.mjs`, `scripts/codex-app-server-health.mjs`,
-  `scripts/continuity-status.mjs`, and `scripts/v3-bootstrap-authority.mjs`.
+  `scripts/continuity-status.mjs`, `scripts/pipeline-state.mjs`,
+  `scripts/po-gate-profile-repair.mjs`, `scripts/project-onboarding-v3.mjs`,
+  `scripts/publication-close-journal.mjs`, and
+  `scripts/v3-bootstrap-authority.mjs`.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).
