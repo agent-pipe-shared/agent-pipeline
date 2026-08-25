@@ -4,6 +4,10 @@ id: pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: 589278edd930b14a9070d0f66481e2c5915a3b37
+closure_evidence: backlog/items/2026-08-25-chat-mode-push-approval-has-no-enforced-human-turn-boundary.md
 created: 2026-08-25
 source: "PO live observation during an Agy/Antigravity test session, 2026-08-25 (chat): an agent granted itself a push approval under gates.push_approval: chat"
 ---
