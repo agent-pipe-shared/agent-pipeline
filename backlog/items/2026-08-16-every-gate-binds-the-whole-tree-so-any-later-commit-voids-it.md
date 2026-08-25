@@ -136,3 +136,38 @@ tool budget: `stack-run-outcome-tests`, `sdlc-run-graph-tests`,
 each showed the same clean two-file, zero-fs/zero-cp shape as
 `control-catalog-schema-tests` in the same scan and are good candidates
 for the next dispatch in this series. Item stays `open`.
+
+### Progress, 2026-08-25 (`AGY-SWEEP-every-gate-binds-whole-tree`)
+
+Continuing the series with two more of the eight candidates named above:
+`control-catalog-migration-tests` and `critic-packet-governance-tests`
+promoted to Tier-B declared-input entries (commit `5313fcf6`) -- both
+zero-import source/test pairs, confirmed live under a real
+`node --permission --allow-fs-read=<src> --allow-fs-read=<test> <test>`
+run against only their two declared files, no other grant needed.
+
+Two of the eight (`check-ownership-tests`, `sdlc-efficiency-metrics-tests`)
+were tried first and rejected: both pass the same live-permission check,
+but their source pair lives under `harness/scripts/`, outside the plugin
+tree, and `check-consumer-safe-paths.test.mjs` (AC-11) correctly fails a
+`plugins/pipeline-core/` file (this table lives in
+`plugins/pipeline-core/scripts/verify-journal.mjs`) naming a source-only
+path outside that tree as consumer-unsafe. This is a real constraint on the
+series, not specific to these two suites: **any future candidate whose
+source file lives outside `plugins/pipeline-core/` cannot be added to this
+table**, however clean its import shape, without first solving the
+consumer-safe-paths conflict (e.g. a second, harness-only declared-input
+table, or relocating `verify-journal.mjs`'s Tier-B lookup outside the
+plugin tree) -- worth flagging explicitly for whoever designs candidate
+(c)'s "general case" treatment, since `harness/scripts/*` suites
+(`sdlc-run-graph-tests`, `sdlc-efficiency-metrics-tests`,
+`check-ownership-tests`, `stack-run-outcome-tests` is actually under
+`plugins/pipeline-core/lib/` and unaffected) are a meaningful fraction of
+the remaining pool.
+
+`parallel-dispatch-planner-tests` and `backlog-dispatch-reference-tests`
+(both under `plugins/pipeline-core/lib/`, same clean import shape,
+confirmed by import audit but not live-permission-tested this dispatch)
+remain good candidates for the next one. Item stays `open` -- still not
+"the general case": 6 suites now Tier B, roughly 262 remain Tier A, and the
+harness-vs-plugin-tree boundary above is unresolved.
