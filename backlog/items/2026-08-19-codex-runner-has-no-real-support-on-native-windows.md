@@ -4,6 +4,10 @@ id: pipeline.codex-runner-has-no-real-support-on-native-windows
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: ad5ed30139006e1d15da90cbf0958ee48a9e0c2e
+closure_evidence: backlog/items/2026-08-19-codex-runner-has-no-real-support-on-native-windows.md
 created: 2026-08-19
 source: "Live external greenfield test, 2026-08-19: project Rune_Test1_Codex_060_55, Windows host, Codex CLI, candidate 0.6.0+codex.20260819163512.ca18e0c. PO pasted the full session transcript; a companion fix (NVA-BL-CASWIN-1, scoped narrowly to the self-contradicting recovery message) was dispatched the same session. This item is the PO's own explicitly deferred second half: \"Für einen späteren sprint bzw. defered ein neues backlog item setzen, dass codex windows support noch gebaut werden muss.\""
 ---
