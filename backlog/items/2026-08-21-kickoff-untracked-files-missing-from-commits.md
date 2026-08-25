@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.kickoff-untracked-files-missing-from-commits
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-21
 source: Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)
 ---
@@ -106,3 +106,20 @@ touching `onboarding-continuity.mjs`, not attempted here.
 genuinely undecided — item stays `open`.** Needs the PO's own call once
 awake; nothing further to investigate from the repo alone per this
 dispatch's own findings.
+
+## Part (b) landed, 2026-08-25
+
+PO decision (chat, 2026-08-25): `project/.onboarding-staging/` is
+gitignored, not tracked — it is pre-binding scratch state (must be
+authored and reviewed before binding, same class as `specs/kickoff-*`),
+not a durable artifact. Applied: `/project/.onboarding-staging/` added to
+this repo's own `.gitignore`, and the identical entry added to
+`PROJECT_IGNORE_SEED` (`plugins/pipeline-core/lib/project-onboarding-v3.mjs`,
+the single canonical source — no vendored duplicate of this file exists)
+so every future onboarded project gets the same rule from the start.
+`project-onboarding-v3.test.mjs`'s ignore-seed regression test
+(`"onboarding seeds ignore rules..."`) asserts individual regex matches,
+not full-text equality, so it is unaffected by the addition — confirmed by
+reading the test directly before this change.
+
+Both parts (a) and (b) are now resolved. Item closed.

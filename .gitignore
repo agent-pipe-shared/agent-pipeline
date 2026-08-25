@@ -37,6 +37,13 @@ tmp-inbounds.txt
 # one itself.
 /scratch/
 
+# Kickoff's "deterministic staging draft" (backlog item
+# 2026-08-21-kickoff-untracked-files-missing-from-commits.md, part b, PO
+# decision 2026-08-25): pre-binding scratch state that must be authored and
+# reviewed before binding, same class as specs/kickoff-* — not a durable
+# artifact, must not enter history.
+/project/.onboarding-staging/
+
 # Machine-generated verify evidence (QG-03, AC-G4-2): regenerated every
 # `node harness/scripts/verify.mjs` run — a status snapshot, not a durable
 # audit trail (unlike .claude/guard-override.log.jsonl), so it stays out of history.
