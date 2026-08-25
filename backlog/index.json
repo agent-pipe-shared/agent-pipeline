@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6971fa950489b7cd5cbd3ae47ecafbfc553f6f0b784d03fee2ffeb3cdbc0477c"
+    "transitionHead": "e148d3299e1210b98bc86a2f9f032afdab9936efe8ac4bec43a905ed299622cb"
   },
   "counts": {
-    "open": 49,
+    "open": 48,
     "in_progress": 3,
-    "closed": 262
+    "closed": 263
   },
   "items": [
     {
@@ -465,12 +465,16 @@
     },
     {
       "id": "pipeline.briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-23",
       "source": "Direct measurement across one dispatch block, 2026-08-23 (agy-runner Critic-fix wave): five of six Goldfish dispatches ended mid-sentence without committing, every one of them at 50 or 51 tool uses, against briefed base caps of 30-35.",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-25",
+      "closureRepository": "self",
+      "closureCommit": "563be0260c3a256969a3452cd44a4a5d10726ece",
+      "closureEvidence": "backlog/items/2026-08-23-briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff.md"
     },
     {
       "id": "pipeline.briefing-model-field-contradicts-agent-definition",
