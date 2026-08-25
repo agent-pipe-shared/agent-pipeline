@@ -322,3 +322,77 @@ with two flags as originally assumed.
 gating, and (C) the PRD/Spec plan-approval standardization (needs
 `po-gate-authority.mjs`/ADR-0021/`docs/operating-model.md` §4 properly in
 field-4 write scope this time). Item stays `open`.
+
+## (B) kickoff `--language`/`--profile` landed, 2026-08-25 (AGY-CHATADAPTER-2)
+
+Both call sites named in the correction above are DONE and tested:
+
+- `kickoff plan`/`kickoff apply --language <de|en>`
+  (`plugins/pipeline-core/scripts/project-onboarding-v3.mjs`) now requires
+  `requireAttendedChatGateConfirmation()` (`lib/chat-gate-ceremony.mjs`) to
+  pass before the value is accepted.
+- `kickoff promote plan`/`apply --profile <epic|feature|mini>` (same file)
+  gated independently, same primitive.
+
+**Design deviation from this item's own earlier framing, decided in-dispatch
+(advisor-reviewed), reported here rather than silently built in:** the
+Background's push-derived shape — "challenge-generate-and-store on first
+call … confirm-and-consume on a second" — is NOT what was built. Push's
+`pendingPushChallenge` needs a place to persist a challenge between two
+separate process invocations; `pipeline-state.mjs` has one
+(`project/pipeline-state.json`). Kickoff has none: `kickoff-plan` is
+declared `mutates: false`
+(`ONBOARDING_SUBCOMMANDS` in `project-onboarding-v3.mjs`), and
+`lib/project-onboarding-v3.mjs` itself documents (lines ~123–140) that no
+project state file exists this early in onboarding — inventing a new
+persistence location purely to hold a pending-challenge record would have
+been exactly the "new one-off ceremony" `AGY-KICKOFFPOQ-1`'s investigation
+already stopped short of building, and cuts against the PO's own
+fewer-mechanisms goal. The gate built instead is **stateless and reused
+as-is**: `requireAttendedChatGateConfirmation({ expected: <the value
+itself>, ... })` runs synchronously inside the one CLI call an agent or a
+human makes. An agent's own tool call is never attended
+(`isAttendedTerminal()` checks real TTY-ness on fd 0 before any read) and
+so can never complete it, no matter what value it already knows; a human
+re-running the exact same command in their own attended terminal, typing
+the value back, always succeeds. No random code, no expiry, no state
+surviving between calls — the primitive's own docstring explicitly
+sanctions `expected` being "a fixed word," which is what this is. Verified:
+15 new tests in
+`plugins/pipeline-core/scripts/project-onboarding-v3-argv-closure.test.mjs`
+(unattended refusal, attended-seam success, wrong-value refusal, and a real
+`spawnSync` piped-stdin subprocess refusal — the actual security proof —
+for both `--language` and `--profile`), plus 8 pre-existing kickoff-CLI
+tests in `plugins/pipeline-core/lib/project-onboarding-v3.test.mjs` updated
+to thread the same attended seam (6 broke because of this change; 2 were
+already broken by `AGY-CHATADAPTER-1`'s unrelated `--challenge`-flag
+removal and are fixed here too since they live in the same file). Full
+`lib/project-onboarding-v3.test.mjs` suite: 132/132 green.
+
+**Product consequence for the PO to weigh, not decided here:** the kickoff
+CLI is used programmatically today (fixture setup, orchestration) across
+much of the test suite and, presumably, real sessions — every unattended
+caller (including the agent's own normal orchestration) now refuses until
+a human runs the command themselves and confirms. That is the intended
+enforcement this item exists to build, not a bug, but it is a materially
+different day-to-day flow than before and is worth the PO's explicit
+sign-off if it turns out to add more friction than wanted in practice.
+
+**(3) `intake-consent-apply --language`/`--profile`
+(design SSa.5 point 1) — investigated, NOT implemented, genuinely different
+shape:** `applyOnboardingIntakeConsent()`
+(`plugins/pipeline-core/lib/onboarding-continuity.mjs`) accepts BOTH
+`--language` and `--profile` optionally in ONE bundled call (`language =
+null, profile = null`), unlike kickoff-plan/kickoff-promote-plan, which
+each carry exactly one gated value — the primitive as reused here binds one
+`expected` value per confirming call, not two independently-optional ones.
+It is also already gated by its own pre-existing consent mechanism
+(`granted !== true` → `INTAKE-CONSENT-REQUIRED`, plus mandatory
+`--activate`) — a different, already-shipped human-consent property this
+item's own investigation would need to reconcile with rather than layer a
+second, structurally mismatched gate on top of. Left for a future,
+separately-scoped dispatch to design; not attempted here per this
+dispatch's own stop condition for this sub-part.
+
+**Still not yet dispatched:** (C) the PRD/Spec plan-approval
+standardization. Item stays `open`.
