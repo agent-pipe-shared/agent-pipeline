@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "d9a121cfc7b23f9d4b7b13575ddb24b5f5f11935f1ccadd78235f2ee60b88777"
+    "transitionHead": "bdf81571a56b07f3a2847109cf10b352e612650e5252ffde2396e2151023e83c"
   },
   "counts": {
-    "open": 44,
+    "open": 45,
     "in_progress": 3,
     "closed": 267
   },
@@ -528,6 +528,15 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-18-capability-first-advisor-critic-dispatch.md"
+    },
+    {
+      "id": "pipeline.chat-mode-push-approval-has-no-enforced-human-turn-boundary",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-25",
+      "source": "PO live observation during an Agy/Antigravity test session, 2026-08-25 (chat): an agent granted itself a push approval under gates.push_approval: chat",
+      "deferred": false
     },
     {
       "id": "pipeline.claude-dir-leftovers-defeat-runner-neutral-project-migration",
