@@ -201,3 +201,70 @@ plumbing, test-suite authorship, and has genuine in-task design latitude
 in exactly the areas this design pass flagged as open, e.g. the serial-lane
 grep sweep's exact match list) implementing stage 1 (pool at concurrency=1)
 first, per the staged rollout above.
+
+## Stage 1 landed, 2026-08-24
+
+Commit `9e6d5307` (`AGY-VERIFYTUNER-1`, goldfish-deep): async worker pool
+at default `concurrency: 1`, behavior-equivalent to the prior sequential
+loop. See `docs/state.md` item 13 for independent re-verification detail.
+
+## Stage 2 landed, 2026-08-25 — target not fully met, item stays open
+
+Commit `adb9d57f` (`AGY-VERIFYTUNER-2`, goldfish-deep, resumed once after a
+tool-budget truncation): `resolveDefaultConcurrency()` raises production
+concurrency to `DEFAULT_VERIFY_CONCURRENCY = 8` (env var >
+`project/pipeline.json` calibration > this hardcoded literal — deliberately
+NOT machine-derived via `os.availableParallelism()`, so wall-clock evidence
+stays comparable across this repo's two development machines). A serial
+lane (60 suites, mechanically derived by scanning for git-lock/
+`.git/agent-pipeline/**`-write/port-listen risk signals) runs mutually
+exclusive of its own members but concurrent with the rest of the pool; one
+suite (`test-tmpdir-budget-tests`, found by manual read, not the mechanical
+sweep) runs in a stricter exclusive pre-phase alone before the pool starts,
+since it asserts a byte/entry budget against this repo's real shared
+`scratch/test-tmp/` directory.
+
+**Four real defects found and fixed while reaching a clean full run**
+(the dispatch's own truncated report could not confirm a clean run; this
+session's follow-up did):
+- `consumer-safe-paths-tests` — two dispatch-added comments in
+  `verify-journal.mjs` literally named `harness/scripts/verify.mjs`, a
+  Pipeline-source-only path this plugin's consumer-shipped file must never
+  reference (`45e5de3a`).
+- `test-tmpdir-budget-tests` — `scratch/test-tmp/` had accumulated 59,641
+  entries (max 40,000) from this session's own many test/verify runs; not a
+  code defect, cleaned directly (gitignored, disposable ephemeral fixtures).
+- `codex-isolated-critic-protected-preimage-tests` — a stale pinned
+  baseline hash for `roles/critic.md` in
+  `codex-isolated-critic-protected-preimage.v1.json`, never updated when
+  `e7ed7cda` legitimately changed that file (a pre-existing gap, unrelated
+  to this dispatch, only surfaced now because no full clean run had
+  completed since `e7ed7cda` landed until this session). **This specific
+  fix is currently blocked**, not this item: the Claude Code auto-mode
+  permission classifier refused to stage the edit to this security-baseline
+  file, correctly requiring explicit human/PO review before a tamper-
+  detection baseline gets updated. The corrected hash
+  (`d8067862aac6b676684f57e506eeb6c6ae209af36588994622ad3be5c0eaef03`,
+  independently computed and confirmed to make the suite pass) is sitting
+  uncommitted in the working tree pending that review.
+- `publication-executor-productive-flow-tests` — same root cause as F1
+  (`8f40f3f9`), a different consumer: this test's own `realVerifyRun()`
+  helper never gained an `await` when `runVerifyJournal` became async at
+  stage 1 (`9e6d5307`). Never caught before now for the same reason as the
+  preimage-baseline gap above. Fixed by threading async/await through the
+  full call chain (`f4257e3d`).
+
+**Measured wall-clock, clean run, 2026-08-25T05:59:47Z–06:06:45Z:**
+**6m 58s (419s)**, against the session's own measured baseline of ~12–14
+min (720–840s) — a **~42–50% reduction**, real but **short of the PO's
+50–70% target**, so this item stays `open` rather than closing.
+
+**Next lever identified, not yet acted on:** one single suite,
+`project-onboarding-v3-tests`, took 116.5s of the 419s total (~28% of the
+whole run) — by a wide margin the largest single cost, and (being in the
+serial lane) it cannot overlap with the other 59 serial-lane members. No
+further concurrency-cap tuning fixes this; the suite's own internal cost
+(subprocess/fixture count inside that one test file, not yet profiled) is
+now the binding constraint on how much closer to the 50–70% target this
+gate can get. Worth its own follow-up look before concluding the target is
+unreachable.
