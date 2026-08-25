@@ -4,6 +4,10 @@ id: pipeline.kickoff-untracked-files-missing-from-commits
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: 169fba3d262569a1718e2ebc968d7f77f040d1c9
+closure_evidence: backlog/items/2026-08-21-kickoff-untracked-files-missing-from-commits.md
 created: 2026-08-21
 source: Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)
 ---
