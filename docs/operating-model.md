@@ -163,6 +163,27 @@ normative shape is:
 7. **Critic.** Review the delta only after the applicable deterministic chain
    is green. High-risk, architecture, guardrail and security changes receive
    the required stronger review path. Findings need evidence and a disposition.
+
+   **Collection-block batching (2026-08-25, backlog item
+   `pipeline.critic-and-verify-cadence-may-be-too-fine-grained`).** Verify
+   and Critic gate a deliverable unit, not necessarily one individual
+   Goldfish dispatch. Where several independently-scoped Goldfish dispatches
+   run within the same session — none of them individually
+   guardrail/security/architecture-classified (MP-07) and each already Rigor
+   0/1 — the Elephant MAY collect their green, committed results into one
+   stated collection block and run ONE Verify pass plus ONE Critic review
+   against the combined diff, instead of a separate Verify+Critic pass per
+   dispatch. The block size is a bound the Elephant states before
+   dispatching (e.g. "this sweep's N items"), so a regression cannot ride
+   along unreviewed indefinitely. This does NOT loosen a single package's
+   OWN correction-wave re-Critic cadence (the round-budget rule: one delta
+   re-Critic after each fresh local correction commit, up to three, per
+   `templates/prompts/critic-review.md` item 4) — a 2026-08-24/25 correction
+   range showed that per-commit cadence catching a regression introduced by
+   the immediately preceding correction wave (documented in the same
+   backlog item's Description); a coarser correction-wave cadence risks
+   missing or burying exactly that class of regression, so it stays
+   unchanged.
 8. **Close.** Synchronize handover and history, preserve evidence, perform the
    required retro and run close extensions. A feature lifecycle is closed only
    after its tracked work is actually complete.
