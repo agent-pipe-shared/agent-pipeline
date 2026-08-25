@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "8bf397544fec876544f6ab91d16df1ad1a27c811686058766f92a73c5ecb5ab1"
+    "transitionHead": "b89bfdf4fd60cbc238545a89e600769ee1d3621125e18b020dfeb1744f012bfd"
   },
   "counts": {
-    "open": 46,
+    "open": 48,
     "in_progress": 3,
     "closed": 268
   },
@@ -1445,6 +1445,15 @@
       "closureEvidence": "plugins/pipeline-core/hooks/onboarding-consent-guard.test.mjs"
     },
     {
+      "id": "pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-preference",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-25",
+      "source": "PO question (chat), 2026-08-25: 'im onboarding muss ... auch der blocking mode also chat oder signature abgefragt werden. Das fehlt aktuell noch' -- investigated directly against plugins/pipeline-core/lib/project-onboarding-v3.mjs by the Elephant",
+      "deferred": true
+    },
+    {
       "id": "pipeline.greenfield-onboarding-writes-mixed-authority-tiers",
       "status": "closed",
       "type": "defect",
@@ -1686,6 +1695,15 @@
       "closureRepository": "self",
       "closureCommit": "b68b611417f8ab0b1adf7b9604fc391ec4e961cf",
       "closureEvidence": "specs/sprint-nova-epic/evidence/backlog/2026-08-11-pareto-triage-report.md"
+    },
+    {
+      "id": "pipeline.gwm-kernel-doc-enumeration-diverges-from-the-code-array",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-25",
+      "source": "AGY-GWMKERNEL-1 (goldfish-deep) own report, 2026-08-25, Deliverable section 4 (Deliberately NOT changed) -- found while fixing the chat-gate-ceremony.mjs kernel-closure gap, explicitly flagged as pre-existing and out of that dispatch's scope",
+      "deferred": true
     },
     {
       "id": "pipeline.handover-file-has-no-rotation-obligation",
