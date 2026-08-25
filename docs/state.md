@@ -278,14 +278,34 @@ through the existing archive index and files:
   completion or go-live claim is made by this handover.
 - For this task, Nova B is explicitly out of scope.
 
-**Last updated:** 2026-08-25 — F1 fixed and independently reverified; PO
-returned and cleared the backlog: accepted verify-tuner's partial result
-(item closed), reviewed and committed the security-baseline fix, decided
-`chat` mode for `enforce-kickoff-po-questions`, approved Direction 3 for
-marketplace-attestation; both now dispatched (`AGY-KICKOFFPOQ-1`,
-`AGY-MKTATTEST-1`, in flight); local version bumped to
-`0.6.0+20260825.bbee2df4` and installed (a CLI-side update-cache display
-quirk noted, not a real sync problem, deferred).
+**Last updated:** 2026-08-25 — chat-gate-ceremony standardization
+(`enforce-kickoff-po-questions`, PO decision: standardize push/kickoff/
+PRD-Spec approval onto ONE mechanism, `plugins/pipeline-core/lib/
+chat-gate-ceremony.mjs`). Landed and independently reverified this session:
+(A) push self-approval fix (closed), (B) kickoff `--language`/`--profile`
+gate (closed), (C) PRD/Spec acknowledgement gate (`po-authority-
+acknowledge-apply` now requires the ceremony, commits `01b10848`
+cherry-picked + `550b21d7`), push-approval preference now confirmed
+per-repository pre-filled from the machine default instead of asked once
+and never applied (closed, commit `cefd5dcb`). GWM kernel-closure gap for
+`chat-gate-ceremony.mjs` fixed (`f6c9800a`). Still open: HGO's
+`authorize --activate` chat-mode path needs the same attendance check (a
+correct, reviewed implementation exists but was reverted uncommitted —
+broke 12 pre-existing tests, no CLI wiring yet — needs a clean redo); GWM
+itself has no chat-mode activation path yet (barely started, reverted).
+**Live incident this session, recovered, filed:**
+`isolation: "worktree"` (Agent tool) never actually created a separate
+worktree — three parallel dispatches raced on the shared checkout, causing
+three zero-commit truncations and a detached-HEAD incident (a self-heal
+step ran `git checkout --detach` against the shared tree). No work lost;
+recovered by hand (cherry-pick + selective revert). See backlog:
+`2026-08-25-workflow-tool-isolation-worktree-never-created-a-worktree-this-session.md`.
+**Until that's resolved, dispatch serially in this repo, not via
+`isolation: "worktree"`.** Also filed this session: a confirmed, reproduced
+`guard-dispatch.mjs` fail-open on the Antigravity `Subagents`/`TypeName`/
+`Prompt` payload shape (live defect, not theoretical); a GWM
+kernel-doc/code enumeration drift (13 undocumented entries); a general
+"guards are tool-level, not OS-level sandboxing" idea (Nova B, deferred).
 
 ### Sentinel Links
 - specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md
