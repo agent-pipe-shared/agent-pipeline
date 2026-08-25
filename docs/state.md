@@ -42,23 +42,33 @@ recorded (`17d23532`). **PO picked option 1** (`fa581be7`): build a
 genuine, reusable chat-mode gate-kind registry inside `po-human-approval.mjs`/
 `po-approval-gate.mjs` FIRST, then add the kickoff-parameter kind to it —
 not option 2 (copy the push one-off) or option 3 (fall back to
-`signature`). **Not yet dispatched** — needs its own `goldfish-deep`
-package built from `templates/prompts/goldfish-task.md`. Item stays `open`.
+`signature`). **Scope widened same day (`a7af05f3`):** the registry should
+also cover the PRD/Spec plan-approval → implementation handoff
+(`docs/operating-model.md` §4, currently prose-only) — CRs explicitly out
+of scope, a separate issue is coming later. A real overlap was found and
+must be resolved by/during the next dispatch, not silently: plan approval
+already has a different, deliberately-built mechanism
+(`po-gate-authority.mjs`'s physical PRD acknowledgement marker, ADR-0021
+explicitly rejects attribution-only chat approval) — whether the new
+registry replaces it, sits alongside it, or plan-approval stays on the
+marker mechanism entirely is a PO product decision the dispatch must
+surface, not make silently. **Not yet dispatched** — needs its own
+`goldfish-deep` package built from `templates/prompts/goldfish-task.md`.
+Item stays `open`.
 
-**`verify-marketplace-attestation-blocks-normal-active-development`
-(Direction 3, PO-approved) — `AGY-MKTATTEST-1` substantially landed,
-independently reverified:** WARN-downgrade in `human-guard-override.test.mjs`
+**`verify-marketplace-attestation-blocks-normal-active-development` —
+CLOSED (`253398a6`/`4e2babd1`/`c69017fe`).** `AGY-MKTATTEST-1` landed
+PO-approved Direction 3: WARN-downgrade in `human-guard-override.test.mjs`
 (F1) + new hard blocking check in `guard-push.mjs`
 (`checkMarketplaceAttestation()`, reuses `localPluginInstallSourceObservation()`,
 never a second comparison), committed `cbd22d4f`. Independently confirmed
 by this session (not just self-report): `human-guard-override.test.mjs`
 76/76 (WARN visible, F1 still real), `guard-push.test.mjs` 159/159
-including the two new positive/negative push-block cases. Its own full
-Verify run (`binding: exact` @ `cbd22d4f`) found exactly one red suite —
-traced to an unrelated pre-existing defect (see next item), not this
-dispatch's own work. Resumed once (a clean self-paused wait, not a
-truncation) to run one final clean Verify against current HEAD and produce
-its completion report — in flight as of this write.
+including the two new positive/negative push-block cases. Two full Verify
+runs: the first (`binding: exact` @ `cbd22d4f`) found exactly one red
+suite, traced to an unrelated pre-existing defect (see next item, fixed
+separately); the second (`binding: exact` @ `4955303f`, includes that fix)
+came back fully green, `exitCode: 0`, 385/385.
 
 **Real defect found by that Verify run, already fixed:** an earlier
 same-session "closure-pointer correction" on `kickoff-untracked-files-
