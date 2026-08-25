@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "7fd151b4b339191ffee4fac2516f73522c911f5b2afd6b13bd75fb8a31d157f3"
+    "transitionHead": "a612d7ada6a7f04dda3f936ccfc3ca7605d617f1ebcc4d55aac9f9f5187f30d9"
   },
   "counts": {
-    "open": 47,
+    "open": 46,
     "in_progress": 3,
-    "closed": 264
+    "closed": 265
   },
   "items": [
     {
@@ -1902,12 +1902,16 @@
     },
     {
       "id": "pipeline.kickoff-staging-directory-mismatch",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-21",
       "source": "Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)",
-      "deferred": true
+      "deferred": true,
+      "closedAt": "2026-08-25",
+      "closureRepository": "self",
+      "closureCommit": "550b5fb5cd2fd3a2810816fcbb0d7bc3e7192013",
+      "closureEvidence": "backlog/items/2026-08-21-kickoff-staging-directory-mismatch.md"
     },
     {
       "id": "pipeline.kickoff-untracked-files-missing-from-commits",
@@ -1919,7 +1923,7 @@
       "deferred": false,
       "closedAt": "2026-08-25",
       "closureRepository": "self",
-      "closureCommit": "169fba3d262569a1718e2ebc968d7f77f040d1c9",
+      "closureCommit": "e07a2b11bfb08309400a4b1f3b690f06ca344d52",
       "closureEvidence": "backlog/items/2026-08-21-kickoff-untracked-files-missing-from-commits.md"
     },
     {

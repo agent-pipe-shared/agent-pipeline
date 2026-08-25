@@ -158,7 +158,7 @@
 | pipeline.kickoff-apply-action-drops-runner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.kickoff-design-names-the-wrong-repair-for-projection-drift | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.kickoff-promotion-cleanup-readback-has-no-in-session-recovery | open | defect | pipeline | 2026-08-09 | — |
-| pipeline.kickoff-staging-directory-mismatch | open | defect | pipeline | 2026-08-21 | — |
+| pipeline.kickoff-staging-directory-mismatch | closed | defect | pipeline | 2026-08-21 | — |
 | pipeline.kickoff-untracked-files-missing-from-commits | closed | defect | pipeline | 2026-08-21 | — |
 | pipeline.language-selection-scope-is-unclear-and-arrives-too-late | closed | workflow-improvement | pipeline | 2026-08-09 | — |
 | pipeline.ledger-drift-classification-has-no-reachability-cutoff | closed | defect | pipeline | 2026-08-16 | — |
@@ -322,6 +322,6 @@
 
 ## Counts
 
-- open: 47
+- open: 46
 - in_progress: 3
-- closed: 264
+- closed: 265
