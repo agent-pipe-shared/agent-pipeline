@@ -5,73 +5,66 @@
 
 ## Current handover — Antigravity CLI 3rd Runner Integration & Hardening (2026-08-25)
 
-**READ THIS FIRST — 2026-08-25 session result.** F1 (the blocking
-`await runVerifyJournal` gap) is fixed via the TP-3 signature ceremony
-(commit `8f40f3f9`) and **independently confirmed green by a clean full
-Verify run** (`evidence/verify-latest.json`, `binding: "exact"`,
-383/385 green — the 2 red are both known/disclosed, see below, not
-regressions). PO stepped away mid-session ("ich muss los") and authorized
-continued autonomous backlog work (excluding later-sprint items);
-**version bump + restart deliberately deferred** per explicit instruction
-("wir verschieben den neustart").
+**READ THIS FIRST — 2026-08-25 session, updated after PO check-in.** F1
+fixed and independently reverified (clean full Verify run, `binding:
+"exact"`, 383/385 green). Verify-tuner stage 2 landed at ~42–50% wall-
+clock reduction (target was 50–70%); **PO reviewed and explicitly
+accepted the partial result rather than chasing the remainder** — item
+closed (`9b7b1d4d`/`0874225f`/`bbee2df4`), no further concurrency/
+profiling work authorized unless something new comes up. The
+`project-onboarding-v3-tests` (116.5s) lever is recorded in the closed
+item for whoever picks it up later, not a blocker.
 
-**Verify-tuner stage 2 landed but the PO's 50–70% speed target is NOT
-met — item stays open.** `AGY-VERIFYTUNER-2` (commit `adb9d57f`, truncated
-once on tool budget, resumed) raised concurrency to 8 with a serial/
-exclusive lane. Reaching a clean full run required this session's own
-follow-up, which found and fixed FOUR real defects the dispatch's own
-truncated report could not confirm were clean: a source-only-path comment
-(`45e5de3a`), a `scratch/test-tmp/` volume cleanup (untracked, no commit),
-a stale security-baseline hash (see next paragraph — blocked), and a
-SECOND missing-`await`-on-now-async-`runVerifyJournal` bug, same class as
-F1, in `publication-executor-productive-flow-tests` (`f4257e3d`). Measured
-wall-clock: **6m58s vs. the ~12–14min baseline (~42–50% reduction)** —
-real but short of target. Next lever identified: one suite,
-`project-onboarding-v3-tests`, costs 116.5s of the 419s total — the
-binding constraint now, not the concurrency cap. Full detail:
-[backlog item](../backlog/items/2026-08-24-verify-mjs-runs-385-suites-strictly-sequentially.md).
+**Security-baseline fix reviewed and committed by the PO** (`309e87b4`) —
+the `codex-isolated-critic-protected-preimage.v1.json` stale-hash
+correction that the auto-mode classifier had held back is now landed.
 
-**One fix sitting uncommitted, blocked by the Claude Code auto-mode
-permission classifier — needs YOUR review, not mine.** A stale pinned
-baseline hash for `roles/critic.md` in
-`plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json`
-(never updated when `e7ed7cda` legitimately changed that file, 2026-08-24).
-The classifier correctly refused to let me `git add` an edit to a security
-tamper-detection baseline without explicit human confirmation. The
-corrected hash
-(`d8067862aac6b676684f57e506eeb6c6ae209af36588994622ad3be5c0eaef03`,
-independently computed, confirmed to make
-`codex-isolated-critic-protected-preimage.test.mjs` pass 4/4) is an
-uncommitted working-tree edit right now — `git diff --stat
-plugins/pipeline-core/scripts/codex-isolated-critic-protected-preimage.v1.json`
-to see it, then stage/commit yourself (or ask explicitly).
+**Version bumped and installed:** `plugins/pipeline-core/plugin.json` →
+`0.6.0+20260825.bbee2df4` (commit `9ef7e31a`), PO-requested, local only,
+no push. **Known open snag:** PO rsynced the marketplace copy and ran
+`claude plugin update`, which reported an unrelated-looking cached version
+string (`0.6.0+claude.20260820200609.40d3b47`) instead of picking up the
+new one — confirmed the on-disk marketplace copy DOES have the correct
+new version (`grep version` on the rsynced `plugin.json`), so this is a
+Claude Code CLI-side cache/registry quirk, not a file-sync problem. PO's
+call: leave it for now ("erstmal dann so weiter"), suggested next step if
+revisited is a full session restart (guaranteed fresh plugin load) or
+re-registering the local marketplace.
 
-**The 2 known-red suites in the clean run above (both disclosed, neither
-a regression):** `human-guard-override-tests` (the marketplace-attestation
-design defect — a Direction-3 recommendation is now written into
-[its backlog item](../backlog/items/2026-08-24-verify-marketplace-attestation-blocks-normal-active-development.md),
-awaiting your acceptance, not implemented); `codex-isolated-critic-
-protected-preimage-tests` (red only because the fix above sits
-uncommitted, not because of a real drift).
+**`enforce-kickoff-po-questions` unblocked — PO decided `chat` mode**
+(not `signature`): the threat model here is an overeager/hallucinating
+agent, not an external attacker, and `chat` mode needs no
+`candidate: {commit, tree}` binding, which matters for a brand-new project
+with no meaningful commit yet. Recorded in the item (`21cbcab4`).
+**Dispatched for implementation:** `AGY-KICKOFFPOQ-1` (goldfish-deep,
+background, in flight as of this write) — new gate kind under the
+existing `po-human-approval.mjs`/ADR-0061 ceremony family,
+`project-onboarding-v3.mjs`'s `kickoff plan` call site rejects an
+unapproved language/profile value.
 
-**Backlog closed/corrected 2026-08-25:**
-`briefed-tool-budget-sits-below-an-unannounced-harness-maxturns-cliff`
-(closed, part 3 confirmed with the missing data point), `kickoff-staging-
-directory-mismatch` (closed — the investigation was already complete and
-committed on 2026-08-24, this file just hadn't cross-referenced it),
-`kickoff-untracked-files-missing-from-commits` (`closure_commit` corrected
-after a same-day reversal — see next paragraph). `enforce-kickoff-po-
-questions` looked dispatch-ready per an earlier summary but on direct
-re-read is **NOT** — a genuine open PO design question (signature vs.
-chat mode for the new gate kind) blocks it; still open, still needs you.
+**`verify-marketplace-attestation-blocks-normal-active-development`
+approved (Direction 3: WARN inside Verify, BLOCKING at the push gate) —
+PO: "ja das passt! so machen".** **Dispatched for implementation:**
+`AGY-MKTATTEST-1` (goldfish-deep, background, in flight as of this
+write) — downgrades the one live-marketplace-comparison test inside
+`human-guard-override.test.mjs` to WARN-and-pass, adds a NEW hard
+blocking check at push time reusing `guard-push.mjs`'s existing
+critical-proof pattern.
 
-**A decision made and reversed same session, both by you:**
-`project/.onboarding-staging/` was gitignored (2026-08-25, your call),
-then you corrected it back — its content is used substantively by
-`sprint-agy-runner` and must not be discarded (commit `e07a2b11` reverts
-`169fba3d`). The remaining gap (an agent must be positively told to STAGE
-that content, not just find it un-ignored) is cross-referenced into
-`intake-generate-coordinator-path-undocumented-in-skill-references`.
+**Both dispatches above run in parallel, touch disjoint files, but each
+ends with its own full `node harness/scripts/verify.mjs` run — a known
+collision risk on the shared `evidence/verify-latest.json` slot** (see
+`backlog/items/2026-08-12-shared-verify-evidence-slot-corrupted-by-concurrent-dispatches.md`
+if that item still exists). If both verify runs land nearly
+simultaneously, re-run whichever one's evidence looks corrupted/
+overwritten before trusting its result.
+
+**Still open, unchanged from earlier this session:** `kickoff-untracked-
+files-missing-from-commits` (`closure_commit` corrected to `e07a2b11`
+after the same-day gitignore-then-revert; the positive staging-guidance
+gap is cross-referenced into `intake-generate-coordinator-path-
+undocumented-in-skill-references`, not yet implemented). D7 empirical
+Antigravity verification still outstanding.
 
 ### Current completed & open work
 
@@ -157,22 +150,19 @@ of this write; one uncommitted edit pending your review, see above).
 
 ### Next session instructions
 
-1. Review and stage/commit the pending `codex-isolated-critic-protected-
-   preimage.v1.json` fix (blocked by the auto-mode classifier, see lead
-   section) — or explicitly ask for it to be committed.
-2. Decide: spend the one remaining authorized re-critic round, or trust
-   the independently-verified fixes and proceed to version bump.
-3. Local version bump (`plugins/pipeline-core/plugin.json`) — deliberately
-   deferred this session, ready whenever you are. Still no push without
-   fresh explicit approval.
-4. `enforce-kickoff-po-questions`: decide signature-vs-chat-mode for the
-   new gate kind (full context already surveyed, recorded in the item).
-5. `verify-marketplace-attestation-blocks-normal-active-development`:
-   accept, reject, or amend the Direction-3 recommendation now in the item.
-6. Restart Antigravity to empirically check D7's plugin-registration fix.
-7. Optional follow-up: profile `project-onboarding-v3-tests` (116.5s of
-   the verify-tuner run's 419s total) as the next lever toward the
-   50–70% Verify speed target.
+1. Check the two in-flight dispatches (`AGY-KICKOFFPOQ-1`,
+   `AGY-MKTATTEST-1`) — read their dispatch records
+   (`evidence/dispatch-record-AGY-KICKOFFPOQ-1.json`,
+   `evidence/dispatch-record-AGY-MKTATTEST-1.json`) and resume
+   procedurally (never take over their work directly) if either truncated.
+   Watch for the shared-verify-evidence-slot collision risk noted in the
+   lead section.
+2. Decide: spend the one remaining authorized re-critic round on
+   `sprint-agy-runner`, or trust the independently-verified fixes.
+3. The `claude plugin update` stale-cache-string snag (lead section) —
+   revisit if it still matters; a full session restart is the suggested
+   next step if so.
+4. Restart Antigravity to empirically check D7's plugin-registration fix.
 
 ### Durable-rule and history pointers
 
@@ -210,15 +200,14 @@ through the existing archive index and files:
   completion or go-live claim is made by this handover.
 - For this task, Nova B is explicitly out of scope.
 
-**Last updated:** 2026-08-25 — F1 fixed and independently reverified (clean
-full Verify run); verify-tuner stage 2 landed with 4 real defects found and
-fixed along the way, ~42–50% wall-clock reduction (target 50–70% not met,
-item stays open); one security-baseline fix blocked by the auto-mode
-classifier pending PO review; several backlog items closed/corrected
-(maxTurns part 3, kickoff-staging-directory-mismatch, kickoff-untracked-
-files pointer correction); a marketplace-attestation design recommendation
-recorded, awaiting PO acceptance; version bump and restart deliberately
-deferred per explicit PO instruction.
+**Last updated:** 2026-08-25 — F1 fixed and independently reverified; PO
+returned and cleared the backlog: accepted verify-tuner's partial result
+(item closed), reviewed and committed the security-baseline fix, decided
+`chat` mode for `enforce-kickoff-po-questions`, approved Direction 3 for
+marketplace-attestation; both now dispatched (`AGY-KICKOFFPOQ-1`,
+`AGY-MKTATTEST-1`, in flight); local version bumped to
+`0.6.0+20260825.bbee2df4` and installed (a CLI-side update-cache display
+quirk noted, not a real sync problem, deferred).
 
 ### Sentinel Links
 - specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md
