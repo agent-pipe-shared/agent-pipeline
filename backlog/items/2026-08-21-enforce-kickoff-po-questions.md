@@ -257,5 +257,23 @@ stay on the marker mechanism entirely and only kickoff `--language`/
 `--profile` (and later CRs) join the new chat-mode registry? If the answer
 isn't a clean yes/no from the files alone, this is a stop-and-report
 condition for that dispatch, not a design call to make silently — same
+
+## PO product decision, 2026-08-25 (chat) — REPLACE, standardize all three
+
+**Resolves the overlap above.** PO: "alle 3 standardisieren und bauen das
+es nicht so viele verschiedene Optionen gibt nur cr nicht" — standardize
+all three (push, kickoff `--language`/`--profile`, PRD/Spec plan-approval)
+onto the ONE new chat-mode gate-kind registry; the goal is explicitly
+FEWER distinct approval mechanisms in this codebase, not more variants
+sitting alongside each other. This picks the REPLACE option over ALONGSIDE
+or stay-on-marker: `po-gate-authority.mjs`'s physical PRD-marker mechanism
+is superseded by the new registry for plan approval, reopening (and this
+time deciding) ADR-0021's "pure UI dialog as approval" question — the PO
+has now made that call explicitly, it is no longer an implementor's guess.
+**Still explicitly excluded: Change Requests ("CRs")** — a separate issue
+is coming later; do not design for it. Relayed to the in-flight
+`AGY-CHATADAPTER-1` dispatch, which had been briefed to treat the PRD/Spec
+outcome as investigate-and-decide-only — now required, same as push and
+kickoff.
 discipline `AGY-KICKOFFPOQ-1` already followed once on the mode question
 itself.
