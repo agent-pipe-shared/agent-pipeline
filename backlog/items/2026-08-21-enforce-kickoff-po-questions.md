@@ -226,3 +226,36 @@ primitive's shape should make that an explicit, considered choice rather
 than an accidental limitation inherited from copying the push ceremony.
 Not started; needs its own `goldfish-deep` dispatch package built from
 `templates/prompts/goldfish-task.md`.
+
+## Scope widened, 2026-08-25 (PO clarification, chat)
+
+The primitive should also cover the **PRD/Spec plan-approval → implementation
+handoff** (`docs/operating-model.md` §4, "Human plan gate"), not just kickoff
+`--language`/`--profile`. Today that gate is prose-only: "present a readable
+PRD and wait for explicit approval before implementation... never inferred
+from chat" — the exact same unenforced-instruction shape that motivated this
+whole item, just for a different gate. **Explicitly OUT of scope for now:**
+Change Requests ("CRs") — the PO named this as a third future consumer, but
+said a separate issue for it is coming later; do not design for it yet.
+
+**Overlap found, needs resolving before/during the dispatch, not decided
+here:** plan approval already has a DIFFERENT, already-shipped mechanism —
+`po-gate-authority.mjs`'s physical acknowledgement marker
+(`PO_GATE_PRD_ACKNOWLEDGEMENT_MARKER`) written into the PRD/spec text,
+plus `state.poGateAcknowledgement = {by, at}` (closed backlog item
+`2026-08-18-atomic-prd-approval-without-mutation.md`, commits `00b768cb`
+.. `2e5d1c91`). That mechanism was deliberately built to require the PO's
+own hands physically touch the document (ADR-0021 explicitly rejects "a
+pure UI dialog as approval") — a materially different property than the
+attribution-only `chat` mode this item's own investigation describes.
+Before building anything, the next dispatch must read ADR-0021 and
+`po-gate-authority.mjs` in full and answer: does the new chat-mode gate-kind
+registry REPLACE the marker mechanism for plan approval (reopening
+ADR-0021's rejected alternative — a PO product decision, not an
+implementor's call), sit ALONGSIDE it as an option, or should plan-approval
+stay on the marker mechanism entirely and only kickoff `--language`/
+`--profile` (and later CRs) join the new chat-mode registry? If the answer
+isn't a clean yes/no from the files alone, this is a stop-and-report
+condition for that dispatch, not a design call to make silently — same
+discipline `AGY-KICKOFFPOQ-1` already followed once on the mode question
+itself.
