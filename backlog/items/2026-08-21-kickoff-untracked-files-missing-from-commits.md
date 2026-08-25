@@ -6,7 +6,7 @@ owner: pipeline
 status: closed
 closed_at: 2026-08-25
 closure_repository: self
-closure_commit: e07a2b11bfb08309400a4b1f3b690f06ca344d52
+closure_commit: 169fba3d262569a1718e2ebc968d7f77f040d1c9
 closure_evidence: backlog/items/2026-08-21-kickoff-untracked-files-missing-from-commits.md
 created: 2026-08-21
 source: Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)
@@ -141,15 +141,35 @@ content instead of silently dropping it.
 Both parts (a) and (b) are now resolved with the corrected disposition.
 Item stays closed.
 
-## Closure-pointer correction, 2026-08-25
+## Closure-pointer correction, 2026-08-25 — then reverted (ledger invariant)
 
-`closure_commit` above (`169fba3d...`) named the commit that ORIGINALLY
-added the `.onboarding-staging` gitignore rule — but that entire commit's
-effect was reverted same-day by `e07a2b11` per the "Reversed, same day"
-section above. A `closure_commit` pointing at a fully-undone commit is
-misleading (caught in review before this correction landed). Corrected to
-point at `e07a2b11` (the commit reflecting the actual current, resolved
-state: no gitignore rule).
+`closure_commit` was briefly changed from `169fba3d...` to `e07a2b11...`
+on the reasoning that `169fba3d` named a commit whose entire effect was
+reverted same-day by `e07a2b11` (see "Reversed, same day" above) and was
+therefore misleading. **That change was itself wrong and has been
+reverted, restoring `closure_commit: 169fba3d...`.** Reason, found by a
+full `verify.mjs` run: `check-backlog-state.mjs` enforces that a closed
+item's `closure_commit` equals its OWN final transition-ledger event's
+`evidence.commit` — and the ledger (`backlog/transitions.ndjson`, sequence
+844, hash-chained and append-only) already recorded `169fba3d` as the
+commit that performed this item's `in_progress -> closed` transition,
+before the later revert existed. Pointing `closure_commit` at `e07a2b11`
+broke that binding and is not fixable by re-running
+`reconcile-backlog-ledger.mjs` (it only reconciles STATUS transitions,
+never revisits an already-recorded closing event's evidence once
+appended) — the ledger has a purpose-built `evidence-amendment` event kind
+for exactly this correction (`backlog-state.mjs`,
+`validateBacklogEvidenceAmendment`/`planBacklogEvidenceAmendment`), but no
+CLI/writer script exists yet to actually append one (confirmed by search:
+only the library and its own tests and the checker's validation logic
+reference it, nothing under `scripts/`). Building that writer is out of
+scope for this item; if `closure_commit` genuinely needs to point at
+`e07a2b11` in the future, it must go through that amendment mechanism once
+it exists, never a direct frontmatter edit. The narrative content of this
+item (the "Reversed, same day" section) already fully explains the
+gitignore add-then-revert; the `closure_commit` field itself only needs to
+correctly cite the commit that performed the recorded ledger closure, not
+track every later change to the item's substance.
 
 **Scope check against the PO's actual requirement, same review:** the PO's
 correction stated the PRD/Spec content "must be committed" — a positive
