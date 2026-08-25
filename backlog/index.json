@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "e148d3299e1210b98bc86a2f9f032afdab9936efe8ac4bec43a905ed299622cb"
+    "transitionHead": "7fd151b4b339191ffee4fac2516f73522c911f5b2afd6b13bd75fb8a31d157f3"
   },
   "counts": {
-    "open": 48,
+    "open": 47,
     "in_progress": 3,
-    "closed": 263
+    "closed": 264
   },
   "items": [
     {
@@ -1911,12 +1911,16 @@
     },
     {
       "id": "pipeline.kickoff-untracked-files-missing-from-commits",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-21",
       "source": "Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-25",
+      "closureRepository": "self",
+      "closureCommit": "169fba3d262569a1718e2ebc968d7f77f040d1c9",
+      "closureEvidence": "backlog/items/2026-08-21-kickoff-untracked-files-missing-from-commits.md"
     },
     {
       "id": "pipeline.language-selection-scope-is-unclear-and-arrives-too-late",
