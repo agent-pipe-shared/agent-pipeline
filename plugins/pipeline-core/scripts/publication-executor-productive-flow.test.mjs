@@ -103,7 +103,7 @@ function writeCheckScript(root, name, body) {
 /** Runs ONE real, trivial example test (never this repository's own several-hundred-item
  * list) through the real `runVerifyJournal` plumbing, genuinely passing or genuinely
  * failing depending on `exitOk`. */
-function realVerifyRun(value, { exitOk }) {
+async function realVerifyRun(value, { exitOk }) {
   const body = exitOk
     ? "process.stdout.write('a98r6 example check ok\\n');\n"
     : "process.stderr.write('a98r6 example check failing on purpose\\n');\nprocess.exitCode = 1;\n";
@@ -205,7 +205,7 @@ function writeEvidence(root, relPath, record) {
  * failure into passing evidence, then confirms the honestly-recorded failure is itself
  * consulted -- and rejected -- by the real `preparePublicationTransaction` prepare step.
  */
-function prepareTransaction(value, { verifyOk = true } = {}) {
+async function prepareTransaction(value, { verifyOk = true } = {}) {
   const preflight = preflightPublication({
     rootDir: value.root, preflightId: "a98r6-fixture", candidateOid: value.candidate,
     remoteName: "origin", destinationRef: "refs/heads/main",
@@ -214,7 +214,7 @@ function prepareTransaction(value, { verifyOk = true } = {}) {
   const preflightPath = writeEvidence(value.root, "evidence/capability-preflight.json", preflight);
   const identityPath = writeEvidence(value.root, "evidence/identity.json", gateEvidence("identity", value.candidate, value.tree));
 
-  const verifyRun = realVerifyRun(value, { exitOk: verifyOk });
+  const verifyRun = await realVerifyRun(value, { exitOk: verifyOk });
   assert.equal(verifyRun.terminal.status, verifyOk ? "passed" : "failed");
   const verifySourcePath = writeEvidence(value.root, "evidence/verify-run-source.json", verifyEvidenceFromRealRun(value, verifyRun));
   let verifyPath;
@@ -274,13 +274,13 @@ function planTransaction(value, prepared, transactionId, { approvalId, attributi
 }
 
 let tests = 0;
-function check(name, fn) {
-  fn();
+async function check(name, fn) {
+  await fn();
   tests += 1;
   console.log(`PASS  ${name}`);
 }
 
-check("disposable-remote publication loop: preflight -> prepare -> authorize-plan -> authorize-apply -> execute -> readback converge on real remote state", () => {
+await check("disposable-remote publication loop: preflight -> prepare -> authorize-plan -> authorize-apply -> execute -> readback converge on real remote state", async () => {
   const value = fixture("loop");
   const now = 1_000_000;
   const approvalId = `po-${value.candidate.slice(0, 8)}`;
@@ -288,7 +288,7 @@ check("disposable-remote publication loop: preflight -> prepare -> authorize-pla
   const approvedAt = now - 10;
   const expiresAt = now + 500_000;
 
-  const { prepared, transactionId } = prepareTransaction(value);
+  const { prepared, transactionId } = await prepareTransaction(value);
   const plan = planTransaction(value, prepared, transactionId, { approvalId, attribution, approvedAt, expiresAt });
 
   // Step 5: authorize-apply --activate, the digest-bound apply action the plan named.
@@ -387,7 +387,7 @@ check("disposable-remote publication loop: preflight -> prepare -> authorize-pla
   );
 });
 
-check("authorize-apply rejects a tampered plan digest before any effect, even after a genuine authorize-plan preview", () => {
+await check("authorize-apply rejects a tampered plan digest before any effect, even after a genuine authorize-plan preview", async () => {
   const value = fixture("tampered-plan");
   const now = 1_000_000;
   const approvalId = `po-${value.candidate.slice(0, 8)}`;
@@ -395,7 +395,7 @@ check("authorize-apply rejects a tampered plan digest before any effect, even af
   const approvedAt = now - 10;
   const expiresAt = now + 500_000;
 
-  const { prepared, transactionId } = prepareTransaction(value);
+  const { prepared, transactionId } = await prepareTransaction(value);
   planTransaction(value, prepared, transactionId, { approvalId, attribution, approvedAt, expiresAt });
 
   assert.throws(() => applyPublicationAuthorization({
@@ -410,7 +410,7 @@ check("authorize-apply rejects a tampered plan digest before any effect, even af
   }, { now: () => now + 1 }), /push-authorized|authority/u, "execute has nothing to consume: the authority never advanced past prepared");
 });
 
-check("authorize-apply rejects a genuinely-planned apply replayed after its own expiry window", () => {
+await check("authorize-apply rejects a genuinely-planned apply replayed after its own expiry window", async () => {
   const value = fixture("expired-window");
   const now = 1_000_000;
   const approvalId = `po-${value.candidate.slice(0, 8)}`;
@@ -418,7 +418,7 @@ check("authorize-apply rejects a genuinely-planned apply replayed after its own 
   const approvedAt = now - 10;
   const expiresAt = now + 100;
 
-  const { prepared, transactionId } = prepareTransaction(value);
+  const { prepared, transactionId } = await prepareTransaction(value);
   const plan = planTransaction(value, prepared, transactionId, { approvalId, attribution, approvedAt, expiresAt });
 
   assert.throws(() => applyPublicationAuthorization({
@@ -429,9 +429,9 @@ check("authorize-apply rejects a genuinely-planned apply replayed after its own 
   assert.equal(oid(value.remote, "refs/heads/main"), value.base, "an expired apply must never reach the remote");
 });
 
-check("a genuinely failing example test blocks the real prepare step -- the real result is consulted downstream, not merely present", () => {
+await check("a genuinely failing example test blocks the real prepare step -- the real result is consulted downstream, not merely present", async () => {
   const value = fixture("failing-verify");
-  const { transactionId } = prepareTransaction(value, { verifyOk: false });
+  const { transactionId } = await prepareTransaction(value, { verifyOk: false });
   assert.match(transactionId, /^tx-/u);
 });
 
@@ -545,7 +545,7 @@ function validateBaselineAdoptionReceipt(root, receipt) {
   return { status: reasons.length === 0 ? "verified" : "rejected", reasons };
 }
 
-check("R0 baseline adoption: a real rebase's receipt is built from and re-verified against the disposable repo's actual post-rebase state", () => {
+await check("R0 baseline adoption: a real rebase's receipt is built from and re-verified against the disposable repo's actual post-rebase state", () => {
   const value = baselineAdoptionFixture();
 
   // The real rebase: replay nova-previous's two commits onto released-base. No conflicts by
