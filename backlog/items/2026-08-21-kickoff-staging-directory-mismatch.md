@@ -4,6 +4,10 @@ id: pipeline.kickoff-staging-directory-mismatch
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: 550b5fb5cd2fd3a2810816fcbb0d7bc3e7192013
+closure_evidence: backlog/items/2026-08-21-kickoff-staging-directory-mismatch.md
 created: 2026-08-21
 source: Manual observation during sprint_agy kickoff testing (Rune_Test1_Agy_060_59)
 ---
