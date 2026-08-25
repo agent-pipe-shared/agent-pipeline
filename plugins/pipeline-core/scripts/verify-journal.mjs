@@ -507,7 +507,7 @@ function resolveDefaultConcurrency(repoRoot, environment) {
 // AGY-VERIFYTUNER-2: the serial lane, derived MECHANICALLY (scratch/derive-serial-lane.mjs, a
 // throwaway/gitignored script -- not committed; its exact patterns are reproduced in this
 // comment so the derivation is auditable without re-running anything) by scanning every suite
-// registered in harness/scripts/verify.mjs for three risk signals named in the design doc
+// registered in the Pipeline-source Verify entrypoint for three risk signals named in the design doc
 // (scratch/stripped-verify-mjs-parallelization.md, "Serial lane"):
 //   (a) a child_process call invoking "git" with no sign of an isolated fixture directory of its
 //       own (mkdtempSync/tmpdir()) -- i.e. it can plausibly race the REAL repo's .git/index.lock;
@@ -718,7 +718,7 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
 // AGY-VERIFYTUNER-2: an explicit `concurrency` argument still always wins (unchanged from stage
 // 1 -- this is how every stage-1 test above pins its own exact concurrency). Only when the
 // caller passes NOTHING -- exactly this repository's top-level Verify entry point's real,
-// unmodified call shape (harness/scripts/verify.mjs never passes `concurrency`) -- does the
+// unmodified call shape (the Pipeline-source Verify entrypoint never passes `concurrency`) -- does the
 // default now resolve via `resolveDefaultConcurrency` (env var > project/pipeline.json
 // calibration > DEFAULT_VERIFY_CONCURRENCY), raising real production concurrency above 1 for the
 // first time. `environment` mirrors compileVerifySuites' own existing convention (defaults to
