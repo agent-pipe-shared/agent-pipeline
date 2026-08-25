@@ -122,7 +122,7 @@
 | pipeline.goldfish-dispatches-touching-plugin-files-dont-self-check-consumer-safe-paths | closed | defect | pipeline | 2026-08-18 | — |
 | pipeline.grammar-refusal-does-not-say-which-part-failed | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.greenfield-ask-before-install-duty-ignored-live | closed | defect | pipeline | 2026-08-19 | — |
-| pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-preference | open | defect | pipeline | 2026-08-25 | — |
+| pipeline.greenfield-onboarding-never-applies-the-machine-push-approval-preference | closed | defect | pipeline | 2026-08-25 | — |
 | pipeline.greenfield-onboarding-writes-mixed-authority-tiers | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.greenfield-seeded-with-private-overlay-calibration | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.gs-1-signature-ceremony-has-no-light-path-for-a-chat-approved-trivial-config-edit | closed | idea | pipeline | 2026-08-17 | — |
@@ -329,6 +329,6 @@
 
 ## Counts
 
-- open: 50
+- open: 49
 - in_progress: 3
-- closed: 268
+- closed: 269
