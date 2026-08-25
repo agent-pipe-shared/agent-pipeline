@@ -630,7 +630,7 @@ if (startedCandidate.status === "dirty") {
       const phaseSteps = PHASE_STEPS.map((suite, index) => ({ ...suite, dependsOn: index === 0 ? [] : [PHASE_STEPS[index - 1].name] }));
       const registeredSuites = [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...phaseSteps];
       try {
-        verifyRun = runVerifyJournal({
+        verifyRun = await runVerifyJournal({
           gitCommonDir: gitCommonDirectory(),
           repoRoot,
           candidate: { commit: startedCandidate.commit, tree: startedCandidate.tree },
