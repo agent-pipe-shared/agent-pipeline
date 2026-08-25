@@ -105,3 +105,13 @@ an unapproved value, and the live test run validating the shape actually
 works end to end. Scope this as its own dispatch package (genuine design
 latitude in the gate-kind wiring — `goldfish-deep` tier) once picked up;
 not started this session.
+
+## Mode decided, 2026-08-25 (PO decision)
+
+**`chat` mode**, not `signature`. Rationale (PO-confirmed): the threat
+model here is an overeager/hallucinating agent typing a value without
+asking, not an external attacker — `chat` mode's attribution-only property
+already covers that, and it needs no `candidate: {commit, tree}` binding,
+which matters because this gate fires on a brand-new project that may not
+have a meaningful commit yet (the exact tension the "Open design question"
+section above flagged). Ready for implementation dispatch.
