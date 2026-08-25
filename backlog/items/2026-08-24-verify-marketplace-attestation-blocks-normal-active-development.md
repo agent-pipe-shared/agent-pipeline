@@ -4,6 +4,10 @@ id: pipeline.verify-marketplace-attestation-blocks-normal-active-development
 type: defect
 owner: pipeline
 status: closed
+closed_at: 2026-08-25
+closure_repository: self
+closure_commit: 253398a68f7eb70661ee3ce5e885b9150c93861e
+closure_evidence: backlog/items/2026-08-24-verify-marketplace-attestation-blocks-normal-active-development.md
 created: 2026-08-24
 source: "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24"
 due: 2026-08-31
