@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "3c8e5d7620e2b439fa6956697736bddc8968f56f71472e45c6682c6e95068a4e"
+    "transitionHead": "d9a121cfc7b23f9d4b7b13575ddb24b5f5f11935f1ccadd78235f2ee60b88777"
   },
   "counts": {
-    "open": 45,
+    "open": 44,
     "in_progress": 3,
-    "closed": 266
+    "closed": 267
   },
   "items": [
     {
@@ -3733,12 +3733,16 @@
     },
     {
       "id": "pipeline.verify-marketplace-attestation-blocks-normal-active-development",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-08-24",
       "source": "PO observation during the sprint-agy-runner D-fix wave, 2026-08-24",
-      "deferred": false
+      "deferred": false,
+      "closedAt": "2026-08-25",
+      "closureRepository": "self",
+      "closureCommit": "253398a68f7eb70661ee3ce5e885b9150c93861e",
+      "closureEvidence": "backlog/items/2026-08-24-verify-marketplace-attestation-blocks-normal-active-development.md"
     },
     {
       "id": "pipeline.verify-mjs-runs-385-suites-strictly-sequentially",
