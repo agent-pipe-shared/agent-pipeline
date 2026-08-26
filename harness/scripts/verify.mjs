@@ -633,6 +633,12 @@ const TEST_SUITES = [
   { name: "reference-path-check", file: join(scriptDir, "check-reference-paths.mjs") },
   { name: "repair-map-tests", file: join(pluginScriptsDir, "repair-map.test.mjs") },
   { name: "obligations-contract-tests", file: join(scriptDir, "generate-agent-obligations.test.mjs") },
+  // NOT a duplicate of `lib-plan-spec-state-v2-tests` below: these are two
+  // DIFFERENT files that share a basename — `harness/lib/plan-spec-state-v2.test.mjs`
+  // (9,902 bytes) and `plugins/pipeline-core/lib/plan-spec-state-v2.test.mjs`
+  // (28,852 bytes). A review round read the pair as one file registered twice and
+  // both entries were removed, silently dropping two real suites from the gate.
+  { name: "harness-lib-plan-spec-state-v2-tests", file: join(repoRoot, "harness", "lib", "plan-spec-state-v2.test.mjs") },
   { name: "check-directory-contract-tests", file: join(scriptDir, "check-directory-contract.test.mjs") },
   { name: "check-gitignore-anchoring-tests", file: join(scriptDir, "check-gitignore-anchoring.test.mjs") },
   { name: "check-review-retry-plan-tests", file: join(scriptDir, "check-review-retry-plan.test.mjs") },
@@ -644,6 +650,9 @@ const TEST_SUITES = [
   { name: "guard-maintenance-window-kernel-closure-tests", file: join(libDir, "guard-maintenance-window-kernel-closure.test.mjs") },
   { name: "handover-rotation-tests", file: join(libDir, "handover-rotation.test.mjs") },
   { name: "observation-governance-bootstrap-tests", file: join(libDir, "observation-governance-bootstrap.test.mjs") },
+  // See the note on `harness-lib-plan-spec-state-v2-tests` above: same basename,
+  // different file, different directory. Both entries are required.
+  { name: "lib-plan-spec-state-v2-tests", file: join(libDir, "plan-spec-state-v2.test.mjs") },
   { name: "review-retry-planner-tests", file: join(libDir, "review-retry-planner.test.mjs") },
   { name: "session-cleanup-recovery-tests", file: join(libDir, "session-cleanup-recovery.test.mjs") },
   { name: "test-tmpdir-budget-tests", file: join(libDir, "test-tmpdir-budget.test.mjs") },
