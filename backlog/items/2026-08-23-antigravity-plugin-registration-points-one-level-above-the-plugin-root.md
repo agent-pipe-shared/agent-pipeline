@@ -3,10 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.antigravity-plugin-registration-points-one-level-above-the-plugin-root
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-26
+closure_repository: self
+closure_commit: 2b6680edb65771858e46826013c63c98d717fe12
+closure_evidence: backlog/items/2026-08-23-antigravity-plugin-registration-points-one-level-above-the-plugin-root.md
 created: 2026-08-23
 source: "Delta Critic review D7 (specs/sprint-agy-runner/evidence/2026-08-23-delta-critic-review-agy-runner.md), escalated by post-review verification against the object database and working tree"
-due: 2026-08-30
 ---
 
 # `.agents/plugins.json` registers the plugin container, not the plugin root, so the Antigravity enforcement layer very likely never loads

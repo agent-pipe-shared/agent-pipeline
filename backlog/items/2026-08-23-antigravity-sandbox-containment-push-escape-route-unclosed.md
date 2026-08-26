@@ -3,10 +3,13 @@ schema: pipeline.backlog-item.v1
 id: pipeline.antigravity-sandbox-containment-push-escape-route-unclosed
 type: defect
 owner: pipeline
-status: open
+status: closed
+closed_at: 2026-08-26
+closure_repository: self
+closure_commit: 2b6680edb65771858e46826013c63c98d717fe12
+closure_evidence: backlog/items/2026-08-23-antigravity-sandbox-containment-push-escape-route-unclosed.md
 created: 2026-08-23
 source: "AGY-FIX-PUSHGUARD dispatch (evidence/dispatch-record-AGY-FIX-PUSHGUARD.json) and v3-bootstrap-authority.mjs's own removal-comment for the `.git/hooks/pre-push` workaround it used to install; spec gap closed by AGY-FIX-SPECGAP (specs/sprint-agy-runner/spec.md sec.8.2)"
-due: 2026-08-30
 ---
 
 # A structural push-escape route survives every PreToolUse command-line guard when Antigravity's own Layer-1 sandbox is not actually active
