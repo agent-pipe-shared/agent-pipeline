@@ -70,12 +70,105 @@ Confirmed genuinely parallel: the bounded async worker pool
 ~2m17s, with multiple suites' `startedAt` timestamps within ~500ms of each
 other before any had completed.
 
-**Not yet done:** this candidate has not been pushed, and no push-approval
-ceremony has started. No Critic review has been dispatched against the
-`0d5a6e6b..3268fcd8` range (271 fetched commits + the ledger-reconciliation
-and manifest-stamp commits made in this session). Whether/when to push,
-and whether this range needs its own Critic gate given it was authored in
-another session/branch, is a PO decision not yet asked.
+**Not yet done at that point:** push, push-approval ceremony, Critic review
+of the fetched range. See the release-readiness block immediately below —
+superseded by it, kept here for the exact 385/385 evidence trail.
+
+### Release-readiness follow-up (same 2026-08-26 session, continued)
+
+**PO correction: 0.6.0 is a combined Nova+Phoenix release number, not a
+Nova-only one** — Phoenix ([ADR-0043](adr/0043-post-go-live-sprint-model.md),
+evidence/governance/decisions/audit-export/traceability) runs alongside
+Nova per the PO's 2026-08-17 sprint order and was intended to land together
+under 0.6.0. Do not release this candidate as "0.6.0" alone without
+resolving that with the PO first; do not use "0.5.7" either (not a real
+target — `VERSION` and every stamp already say 0.6.0). Undecided as of this
+writing: intake Phoenix now and release combined, or release Nova alone
+under a different number. **Nova B is confirmed NOT a blocker either way**
+— `specs/sprint-nova-epic/plans/nova-b.md` slice B3-A scoped Nova B's own
+Agy touchpoint as a deliberate non-functional stub only, explicitly
+deferring the real Agy work to "#69's later dedicated AGY sprint" — which
+is exactly the `sprint-agy-runner` work just fetched. Nova B and Agy are
+independently scoped and independently releasable.
+
+**PO instruction: before deciding release timing, re-triage TODAY (not at
+their 2026-08-30 due dates) the 3 open Antigravity QG-06 residual-risk
+items, then run Critic + re-Critic.** Disposition:
+
+- `antigravity-hard-enforcement-layer-has-two-fail-open-paths` — point 1
+  (swallowed-error write) was already fixed (`3ae43380`, pre-existing).
+  Point 2 (daemon can't resolve `node` on `$PATH` → hook never fires, no
+  in-repo fix possible) got a NEW observability mitigation: dispatched
+  `AGY-HARDENFORCE-DETECT-1` (goldfish-deep, non-isolated/shared-tree —
+  truncated once at the 50-turn cliff mid-task with real uncommitted work
+  in the tree, resumed via a purely-procedural SendMessage per
+  `workflow-dispatch.md`'s recovery pattern, then committed
+  `ab347a74` "feat(preflight): detect whether the Antigravity
+  hard-enforcement hook fired this session"). **Not yet independently
+  re-verified by the Elephant** (DoD/Verify/final report from the resumed
+  leg still outstanding as of this note) — do not treat as landed until
+  that lands and is checked.
+- `antigravity-plugin-registration-points-one-level-above-the-plugin-root`
+  and `antigravity-sandbox-containment-push-escape-route-unclosed` — both
+  CLOSED directly by the Elephant (no code work possible/warranted: item 2's
+  fix was already applied and semantically correct per the installer,
+  remaining acceptance criterion needs a live Antigravity runner no session
+  here has; item 3's real fix needs its own properly-scoped security design,
+  not an ad hoc dispatch, and the risk is already fully disclosed in
+  `specs/sprint-agy-runner/spec.md` sec.8.2/sec.9 row 8). Commits:
+  `2b6680ed` (closure narrative), `3009e13f` (closure metadata),
+  `f7bc54c4` (ledger reconciliation).
+
+**A 4th, separate item surfaced by the PO mid-session and judged more
+release-relevant than the original 3** (affects every existing
+already-onboarded consumer repo, not just Antigravity adopters):
+`existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration`
+(filed 2026-08-26, explicitly "undesigned" — no confirmed repro). The
+Elephant's own quick check found the JSON-schema diff itself
+backward-compatible (enum widening only: `runners.enabled`/`default` gained
+`antigravity`, `critic_export.rules[].provider` gained `google`; no new
+`required` fields) and `runtime.targetsSha256` unchanged before/after the
+fetch — pointing toward "no actual break at the schema layer" but NOT yet
+proof, since the item names two other candidate mechanisms
+(chat-gate-ceremony standardization; per-repo push-approval-mode
+confirmation pre-filled from the machine default) not yet checked. PO
+instruction: scope AND fix in parallel with the above. Dispatched
+`AGY-CALIBRATION-MIGRATION-1` (goldfish-deep, **worktree-isolated** —
+correctly required since `AGY-HARDENFORCE-DETECT-1` above was actively
+committing in the shared main tree at dispatch time;
+`.claude/worktrees/agent-<id>` landed on the expected stale
+`0d5a6e6b` base per the known worktree-provisioning trap, briefing carried
+the mandatory self-heal instruction to `f7bc54c4c5415f894c900b8240084feb8e797e6a`).
+Briefed to reach one of two honest outcomes: (A) a real break exists →
+build a scoped detection+migration path, or (B) no break reproduces →
+land a backward-compatibility-pinning regression test and write up the
+evidence, not to force a migration mechanism for an unconfirmed problem.
+**Result not yet known as of this note — dispatch was in progress.**
+
+**Also filed this session, needs a real home:**
+`sendmessage-mid-task-scope-relay-rule-has-no-durable-home` — a durable
+operational rule (found during the ADR-0066 extraction pass that rotated
+the 2026-08-25 handover section below) that has no home in
+`docs/operating-model.md` or `workflow-dispatch.md` yet: a PO decision that
+widens a running dispatch's scope must not be relayed via `SendMessage` —
+build a fresh, properly-scoped briefing instead.
+
+**Next steps once both dispatches land (not done yet):** (1) Elephant
+independently re-verifies each dispatch's DoD/Verify claims directly
+(never trust the returned report alone — check `git log`/`git status`/run
+the suites), per `workflow-dispatch.md`'s "never trust a returned result"
+rule. (2) Reconcile `AGY-HARDENFORCE-DETECT-1`'s and (if it closes
+anything) `AGY-CALIBRATION-MIGRATION-1`'s backlog-item Triage/closure
+directly (Elephant work, not delegated). (3) Run one more full
+`node harness/scripts/verify.mjs` on the combined result. (4) Dispatch an
+independent Critic review over the full accumulated range since
+`0d5a6e6b` (271 fetched commits + every commit this session made:
+ledger fixes, manifest stamp, the two closures, the handover rotation, and
+whatever these two dispatches land) — capped at 2 Critic rounds per this
+repo's own working practice; self-verify a 3rd-round rework instead of a
+3rd Critic dispatch. (5) Only then return to the PO with a release
+recommendation, including the still-open Nova+Phoenix version-number
+question above.
 
 ## Operational head
 
