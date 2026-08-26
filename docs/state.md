@@ -368,8 +368,36 @@ authorized pass touching `human-guard-override.mjs`/
 `codex-pretool-guard.mjs`), `scratch-cleanup-mechanism` (points 1 and 3
 remain genuinely open). Backlog ledger reconciled (`6d62f964`); security
 scan and `check-backlog-state.mjs` both clean on the final tree; all 17
-sweep worktrees removed. 25 commits landed this reconciliation pass, still
-unpushed — no push approval exists for any of them.
+sweep worktrees removed. 25 commits landed this reconciliation pass.
+
+**Pushed, 2026-08-26.** The two remaining chat-gate regressions from
+`AGY-HGOFIX-2` are now closed. TP-6 (`guard-gate-strength.test.mjs`) and
+TP-7 (`guard-testpath-override.test.mjs`) are Pipeline plugin source with
+NO in-session override route at all — `pipeline-author-repair` mode is
+structurally unreachable in this repo's self-application topology
+(`plugins/pipeline-core` has no independent git toplevel of its own,
+confirmed live); `repair-map.mjs` itself reports `command: (none)` for
+`HGO-AUTHOR-ROOT-REQUIRED`. The PO applied the same `dependencies` seam
+directly in their own terminal, outside this session, via a script this
+session prepared with pre/post verification (`6f073ecf`); independently
+re-verified here (36/36, 19/19, plus 76/76 and 127/127 no-regression
+checks). A full `verify.mjs` run ahead of the push then caught a FOURTH,
+previously-unflagged chat-gate regression the two prior dispatches never
+covered: `codex-pretool-guard.test.mjs` (2 failures) arms its capability
+via a real detached subprocess spawn of `guard-human-override.mjs`, which
+can never satisfy an attended-terminal check by design — fixed by calling
+the CLI's exported `main()` in-process instead, injecting the identical
+test-only seam (`1a2dbb0a`). Also found and fixed: the machine-scoped
+`poKeyDirectory` (`~/.agent-pipeline/machine.json`, outside repo scope)
+still pointed at a stale key directory from 2026-08-10 that no longer
+matches the pinned trust anchor — the code deliberately refuses to
+auto-overwrite this once set (by design, prevents silent key-directory
+swaps), so it needed explicit PO confirmation, given, then corrected by
+hand. Full `verify.mjs` 385/385 green, security scan clean, push-prepare
+fully green, PO signed via `authorize-critical` in their own terminal.
+Pushed `origin/sprint_agy`: `2887e774..1a2dbb0a` (214 commits,
+fast-forward). `pipeline-state.mjs approve-push` recorded the approval
+before the push ran.
 
 ### Sentinel Links
 - specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md
