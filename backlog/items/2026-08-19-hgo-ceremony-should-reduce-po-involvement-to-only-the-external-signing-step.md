@@ -3,10 +3,22 @@ schema: pipeline.backlog-item.v1
 id: pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step
 type: workflow-improvement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-23"
+closure_repository: "self"
+closure_commit: "eabc96b6fefe39ee8f6859817f4ffee2fd454f7b"
+closure_evidence: "plugins/pipeline-core/scripts/guard-human-override.test.mjs"
 source: "PO instruction, 2026-08-19, live during the hooks.json author-repair HGO ceremony: 'kannst du das hgo bitte so umbauen, dass der agent das selbstständig alles macht bis zum eigentlichen signieren und dann einem auch direkt nur den signier befehl gibt?' and the follow-up 'so bauen das der PO definitiv nur das eine signier gate macht.'"
 ---
+
+## Closed — 2026-08-23
+
+Implemented in commit `eabc96b6` via `prepareHumanGuardOverrideForSignature()`
+and `guard-human-override.mjs prepare-for-signature`, collapsing the multi-step
+plan/prepare/digest workflow into a single command that outputs the exact signing
+command and final authorization invocation. Verified with unit tests in
+`plugins/pipeline-core/scripts/guard-human-override.test.mjs`.
 
 # The HGO override ceremony makes the PO relay four command outputs by hand; it should reduce their involvement to exactly the external signing step
 

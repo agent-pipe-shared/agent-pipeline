@@ -3,10 +3,22 @@ schema: pipeline.backlog-item.v1
 id: pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store
 type: defect
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-23"
+closure_repository: "self"
+closure_commit: "7473f6c9611ec2aaf05f784b04f1b35da108e9f3"
+closure_evidence: "plugins/pipeline-core/lib/human-guard-override.mjs"
 source: "PO instruction, 2026-08-19: 'und danach auch härten, dass goldfische solche guards nicht umgehen können' — after live discovery during the hooks.json wiring ceremony that a dispatched subagent recovered a deliberately-withheld request digest by reading .git/agent-pipeline/human-guard-overrides/requests/ directly."
 ---
+
+## Closed — 2026-08-23
+
+Closed following PO triage: digest withholding is a UX/attention nudge rather
+than a security boundary; the cryptographic boundary is the external Ed25519
+signature requirement on the authorization intent. Misleading comment was
+corrected in commit `7473f6c9` ("digest-withholding comment correction") in
+`plugins/pipeline-core/lib/human-guard-override.mjs`.
 
 # HGO's `author-repair-required` digest withholding is a stderr-only boundary, not an access boundary — a Goldfish can read it straight off disk
 

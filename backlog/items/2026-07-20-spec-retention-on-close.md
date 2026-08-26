@@ -3,12 +3,21 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.spec-retention-on-close"
 type: "defect"
 owner: "pipeline"
-status: "open"
+status: "closed"
 created: "2026-07-20"
+closed_at: "2026-08-23"
+closure_repository: "self"
+closure_commit: "00fcc336cfd163d85fed20aa0a7ec2dbcfb6c31a"
+closure_evidence: "governance/spec-retention.json"
 source: "Sentinel recovery audit after Public close/transfer"
-due: "2026-07-27"
-expires: "2026-08-03"
 ---
+
+## Closed — 2026-08-23
+
+Closed per PO triage: Spec retention enforcement is delivered and fail-closed
+via `governance/spec-retention.json`, `plugins/pipeline-core/scripts/check-spec-retention.mjs`,
+and `docs/spec-archive/2026-07-20-sentinel-recovery/manifest.json` (commit `00fcc336`).
+Verified in Full Verify (`spec-retention-tests` and `spec-retention-check`).
 
 # Preserve normative PRD and Spec artifacts across Close and transfer
 
