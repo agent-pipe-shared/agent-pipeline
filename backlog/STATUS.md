@@ -83,7 +83,7 @@
 | pipeline.hash-chained-ledger-collides-with-the-secret-scanner | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.hgo-author-repair-digest-withholding-is-bypassable-by-reading-the-request-store | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.hgo-ceremony-should-reduce-po-involvement-to-only-the-external-signing-step | closed | workflow-improvement | pipeline | 2026-08-19 | — |
-| pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check | open | requirement | pipeline | 2026-08-19 | — |
+| pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check | closed | requirement | pipeline | 2026-08-19 | — |
 | pipeline.human-approval-ux-directory-clarity-and-single-command | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-authorization-prompts-ignore-the-configured-language-profile | closed | defect | pipeline | 2026-08-07 | — |
 | pipeline.human-legible-approval-record | closed | requirement | pipeline | 2026-08-06 | — |
@@ -183,8 +183,8 @@
 
 ## Counts
 
-- open: 1
+- open: 0
 - in_progress: 20
-- closed: 137
+- closed: 138
 - rejected: 2
 - deferred: 15

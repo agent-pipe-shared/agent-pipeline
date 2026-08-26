@@ -7,6 +7,7 @@ status: closed
 created: 2026-08-19
 closed_at: "2026-08-23"
 closure_repository: "self"
+closure_commit: "ed428603ae0bd65eb79c7309c586bd1300b64bda"
 closure_evidence: "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
 source: "Critic round-1 review (Finding 3) of commit b3153385, PHX-WP-READONLY-GRAMMAR-WIDEN. Split out as follow-up work rather than crammed into the same rework that fixed Finding 1 (blocker, security regression) and Finding 2 (vacuous test)."
 ---

@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "1e7538e0e94ed183ef9402169f9cdfd6b4555fa5e92502dae51427cc2ee4f942"
+    "transitionHead": "7d31f84be4725245b9f915881370b041b882c5f9453bf088a211662d425cfd51"
   },
   "counts": {
-    "open": 1,
+    "open": 0,
     "in_progress": 20,
-    "closed": 137,
+    "closed": 138,
     "rejected": 2,
     "deferred": 15
   },
@@ -879,11 +879,15 @@
     },
     {
       "id": "pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check",
-      "status": "open",
+      "status": "closed",
       "type": "requirement",
       "owner": "pipeline",
       "created": "2026-08-19",
-      "source": "Split out of backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md at its close (2026-08-19) -- that item's HGO hook-side (denial+consumption) ledger emission landed and is tested; its CLI-side (granted) wiring hit a genuine architectural conflict, was correctly reverted, and needs a design review rather than a fourth goldfish-scale dispatch on the same file."
+      "source": "Split out of backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md at its close (2026-08-19) -- that item's HGO hook-side (denial+consumption) ledger emission landed and is tested; its CLI-side (granted) wiring hit a genuine architectural conflict, was correctly reverted, and needs a design review rather than a fourth goldfish-scale dispatch on the same file.",
+      "closedAt": "2026-08-23",
+      "closureRepository": "self",
+      "closureCommit": "40fe7258dc66bde8e6d305627bb83312ea068dfd",
+      "closureEvidence": "plugins/pipeline-core/lib/human-guard-override.test.mjs"
     },
     {
       "id": "pipeline.human-approval-ux-directory-clarity-and-single-command",
