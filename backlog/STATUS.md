@@ -269,6 +269,7 @@
 | pipeline.security-scan-license-allowlist-assumes-the-pipeline-repository | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.seeded-verify-contract-is-always-green | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.self-healing-local-cleanup-recovery | closed | workflow-improvement | pipeline | 2026-08-18 | — |
+| pipeline.sendmessage-mid-task-scope-relay-rule-has-no-durable-home | open | workflow-improvement | pipeline | 2026-08-26 | — |
 | pipeline.sentinel-epic-acceptance-matrix-archive-drift | closed | defect | pipeline | 2026-08-19 | — |
 | pipeline.sentinel-go-live-completion | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.session-keep-awake | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
@@ -332,6 +333,6 @@
 
 ## Counts
 
-- open: 46
+- open: 47
 - in_progress: 3
 - closed: 275

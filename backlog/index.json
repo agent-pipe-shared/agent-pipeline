@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "f17dde7b3a8708d0b652606a5854670c5cf7c69b0093357606755ec21f18f2d2"
+    "transitionHead": "22794047028b5b7e5caed6d6ce43737385f41f56ce1006bcd362fc43b377334b"
   },
   "counts": {
-    "open": 46,
+    "open": 47,
     "in_progress": 3,
     "closed": 275
   },
@@ -3302,6 +3302,15 @@
       "closureRepository": "self",
       "closureCommit": "77aef463aa4a80d1ad153f901873630747ee21f0",
       "closureEvidence": "backlog/items/2026-08-18-self-healing-local-cleanup-recovery.md"
+    },
+    {
+      "id": "pipeline.sendmessage-mid-task-scope-relay-rule-has-no-durable-home",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-08-26",
+      "source": "Handover-rotation extraction pass (ADR-0066 Decision 6/7) over docs/state.md's 2026-08-25 'Antigravity CLI 3rd Runner Integration & Hardening' section, before rotating it to archive",
+      "deferred": false
     },
     {
       "id": "pipeline.sentinel-epic-acceptance-matrix-archive-drift",
