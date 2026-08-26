@@ -15,12 +15,35 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { main as guardHumanOverrideMain } from "../scripts/guard-human-override.mjs";
 
 const hookDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = join(hookDir, "..");
 const adapter = join(hookDir, "codex-pretool-guard.mjs");
 const humanOverrideScript = join(pluginRoot, "scripts", "guard-human-override.mjs");
 let passed = 0;
+
+/**
+ * authorizeHumanGuardOverride()'s chat-mode/pipeline-author-repair activation now requires
+ * a genuine attended terminal (lib/chat-gate-ceremony.mjs, AGY-HGOFIX-2) -- unreachable from
+ * a real detached `spawnSync` subprocess by design; that is the property the fix exists to
+ * guarantee. Call the CLI's own exported `main()` in-process instead, injecting the same
+ * test-only `dependencies` seam AGY-HGOFIX-2/3 already use in human-guard-override.test.mjs
+ * and guard-lifecycle-ready.test.mjs, so this still exercises the real `authorize` command
+ * logic end to end. `argv[0]` is the script path (see authorizeAction.argv's own shape in
+ * human-guard-override.mjs); `main()` expects argv starting from the subcommand.
+ */
+function activateAuthorization(authorizeAction, selectionSha256) {
+  let stdout = "";
+  let stderr = "";
+  const status = guardHumanOverrideMain(authorizeAction.argv.slice(1), {
+    write: (text) => { stdout += text; },
+    writeError: (text) => { stderr += text; },
+  }, {
+    dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${selectionSha256.slice(0, 8).toUpperCase()}` },
+  });
+  return { status, stdout, stderr };
+}
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "codex-pretool-"));
@@ -334,9 +357,7 @@ check("attended Human override admits only the exact next tool call and is then 
   ], { cwd: root, encoding: "utf8", shell: false });
   assert.equal(prepared.status, 0, prepared.stderr);
   const authorization = JSON.parse(prepared.stdout);
-  const authorized = spawnSync(process.execPath, [
-    ...authorization.authorizeAction.argv,
-  ], { cwd: root, encoding: "utf8", shell: false });
+  const authorized = activateAuthorization(authorization.authorizeAction, authorization.selectionSha256);
   assert.equal(authorized.status, 0, authorized.stderr);
   const allowed = run(input, root);
   assert.equal(allowed.status, 0, allowed.stderr);
@@ -472,9 +493,7 @@ check("Pipeline Author Repair selects one exact source root and consumes one pat
   ], { cwd: root, encoding: "utf8", shell: false });
   assert.equal(prepared.status, 0, prepared.stderr);
   const authorization = JSON.parse(prepared.stdout);
-  const authorized = spawnSync(process.execPath, authorization.authorizeAction.argv, {
-    cwd: root, encoding: "utf8", shell: false,
-  });
+  const authorized = activateAuthorization(authorization.authorizeAction, authorization.selectionSha256);
   assert.equal(authorized.status, 0, authorized.stderr);
   const allowed = run(input, root);
   assert.equal(allowed.status, 0, allowed.stderr);
