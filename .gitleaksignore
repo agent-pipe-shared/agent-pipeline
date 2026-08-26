@@ -127,7 +127,7 @@ content-v1:7f4a6eb6eb7abcb42eb8f728c8c5cad714173f4fb84a4759615b42506a551c7a:back
 # PHX-WP-GITLEAKS-FALSEPOS-IGNORE (2026-08-19): 4 confirmed false positives from the clean-
 # candidate run at commit 7fc34e0baeade3244f43158e7b2d5cdc57703204, each verified by direct
 # content inspection (not by rule/pattern alone) before being added.
-content-v1:591a0d0aa52775edfc81169216da539bc951ed05474538058314d046d0cb6a70:plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs:sentry-access-token:206:10
+content-v1:790f874f89c3a3f6ce291b72711a0173f2a4b236816d95c027a1679497a8979a:plugins/pipeline-core/scripts/security-adapters/gitleaks.test.mjs:sentry-access-token:206:10
 # ^ deliberate, already-commented test fixture (see the file's own comment above this line):
 # "the literal that trips gitleaks' sentry-access-token rule (empirically confirmed while
 # designing this fix)" -- a bare 64-hex-character digest used to exercise gitleaks' own
