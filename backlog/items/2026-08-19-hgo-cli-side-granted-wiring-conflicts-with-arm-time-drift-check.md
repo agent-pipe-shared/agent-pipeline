@@ -3,10 +3,22 @@ schema: pipeline.backlog-item.v1
 id: pipeline.hgo-cli-side-granted-wiring-conflicts-with-arm-time-drift-check
 type: requirement
 owner: pipeline
-status: open
+status: closed
 created: 2026-08-19
+closed_at: "2026-08-23"
+closure_repository: "self"
+closure_evidence: "plugins/pipeline-core/lib/human-guard-override.test.mjs"
 source: "Split out of backlog/items/2026-08-07-gmw-hgo-evidence-must-reach-the-phoenix-audit-ledger.md at its close (2026-08-19) -- that item's HGO hook-side (denial+consumption) ledger emission landed and is tested; its CLI-side (granted) wiring hit a genuine architectural conflict, was correctly reverted, and needs a design review rather than a fourth goldfish-scale dispatch on the same file."
 ---
+
+## Closed — 2026-08-23
+
+PO Decision (Option 1) implemented: `filterGovernanceEventsStatus` in
+`plugins/pipeline-core/lib/human-guard-override.mjs` excludes
+`governance/events/**` from the `statusSha256` drift-check preimage, so a
+fail-closed ledger append before arming no longer trips `HGO-DRIFT`. Source,
+config and spec paths remain fully covered. Verified with unit test coverage
+in `plugins/pipeline-core/lib/human-guard-override.test.mjs`.
 
 # HGO's CLI-side `granted` ledger emission cannot be added without breaking arm-time drift detection
 
@@ -63,7 +75,7 @@ attempts it a fourth time on this file.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted Option 1 — exclude `governance/events/**` from the `statusSha256` drift check preimage.
+- **Rationale:** Decouples uncommitted governance audit events from the code-drift verification at arm time without weakening protection against modifications to source code, configs, or specs. All governance ledger events continue to be tracked, committed, and pushed.
+- **Assignment (if accepted):** `plugins/pipeline-core/lib/human-guard-override.mjs` and `plugins/pipeline-core/lib/human-guard-override.test.mjs`.
+- **Date:** 2026-08-23
