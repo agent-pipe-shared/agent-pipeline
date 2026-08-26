@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-26T05:42:18.525Z",
+  "updatedAt": "2026-08-26T05:55:38.318Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -156,22 +156,22 @@
   "pushApproval": {
     "lastApproved": {
       "approvedBy": "APS",
-      "approvedAt": "2026-08-26T05:42:18.525Z",
-      "forCommit": "1a2dbb0aae0b416658f56a8ab6514579370cdbb6",
+      "approvedAt": "2026-08-26T05:55:38.318Z",
+      "forCommit": "d02642baa5c06cbc4a9449597392e4bba163c8bb",
       "criticalProof": {
-        "proofSha256": "ae89626f039cbc61b93ca7a9da9d6c2481b3cca9aeb87ec85ab979afcac598e3",
-        "intentSha256": "242d5bc735061d2ebf31fd1408f6a1e2cd8ef7bf7fd67327f916c50ae295441d",
+        "proofSha256": "cc88e14c99f2b5786318497b65ae234e34644d2568b541f48dfb0ff88f41e0fa",
+        "intentSha256": "42c8b21a36f36bd2f0cecfd120d435f282c74f4ff795b0bcc84e694be1dd3bfa",
         "action": {
           "kind": "push",
-          "subjectSha256": "5637c8a14d59d4706321fe0d56384ce062ac316cb03c5def3ff56ba99cab085a",
-          "expiresAt": "2026-08-26T06:38:36.589Z"
+          "subjectSha256": "cbb55380a341ab32d6a52b201150ace59e544f937bdd2766503e716f7f7437ab",
+          "expiresAt": "2026-08-26T06:55:01.372Z"
         },
         "proof": {
           "schema": "pipeline.po-approval-proof.v1",
-          "intentSha256": "242d5bc735061d2ebf31fd1408f6a1e2cd8ef7bf7fd67327f916c50ae295441d",
+          "intentSha256": "42c8b21a36f36bd2f0cecfd120d435f282c74f4ff795b0bcc84e694be1dd3bfa",
           "keyReference": "local-po-key",
           "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAULJPLmcfrK+fF6yLn8YPL2Bj0ohgMIKiB/N84KCUHHQ=\n-----END PUBLIC KEY-----\n",
-          "signatureBase64": "87Pp45vViTuENo5GbfoOknTNWg1/yfTX821UzC06Uc6k27ZdRRX1LzWkj2ygFW8lkmKtEwQ+T9Ghb6hvwf0ZAg=="
+          "signatureBase64": "+9e8+AJQBlBY+tt2bU93b5wW1EoEsO/ywLb7lJ4OsxHYeXZZKrqHu6LfsJbTrMsuvlwasenlY0U1fGjOgaVBCA=="
         }
       },
       "remote": "origin",
@@ -232,6 +232,11 @@
       "proofSha256": "ae89626f039cbc61b93ca7a9da9d6c2481b3cca9aeb87ec85ab979afcac598e3",
       "kind": "push",
       "consumedAt": "2026-08-26T05:42:18.525Z"
+    },
+    {
+      "proofSha256": "cc88e14c99f2b5786318497b65ae234e34644d2568b541f48dfb0ff88f41e0fa",
+      "kind": "push",
+      "consumedAt": "2026-08-26T05:55:38.318Z"
     }
   ]
 }
