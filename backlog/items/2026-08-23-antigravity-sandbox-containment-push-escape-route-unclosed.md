@@ -107,3 +107,29 @@ granted, so an inert sandbox is detectable rather than silently assumed.
 - **Assignment (if accepted):** n/a — QG-06 record, self-scheduled
   re-review at expiry.
 - **Date:** 2026-08-24
+
+### Re-triage, 2026-08-26 (PO instruction: decide today rather than wait for the 2026-08-30 expiry)
+
+- **Decision:** closed as an accepted, permanently-documented residual
+  risk — not deferred further. QG-06 permits either an expiry date OR a
+  documented, justified calibration in place of one; this item already has
+  the latter, so a further time-bound deferral was redundant with what is
+  already true: `specs/sprint-agy-runner/spec.md` sec.8.2 states plainly
+  that the execution host does not itself enforce `--sandbox` isolation and
+  that Layer-1 containment is unverifiable from inside the session, and
+  sec.9's Governance & Policy Checklist row 8 names the PO as owner of
+  exactly this gap by its own item reference.
+- **Why no code fix was attempted here:** the real fix this item itself
+  names — verified OS-level sandbox containment, or a process-tree-aware
+  push interceptor outside the PreToolUse hook model — is a genuine
+  security-engineering undertaking, not a bounded dispatch. Building an
+  ad hoc "verify the sandbox" check without that scoping risks the exact
+  failure this item's sibling item warned about for a different control
+  (`2026-08-23-antigravity-plugin-registration-points-one-level-above-the-plugin-root`'s
+  "why no fix was applied" section): an unconfirmed check that CLAIMS to
+  verify containment reads as a working control and would be actively
+  worse than today's honest "unverifiable" disclosure if it were wrong.
+- **What stays true going forward:** this remains PO-owned, permanently
+  disclosed risk, not a scheduled task. A future session that wants to
+  actually close the underlying gap needs a properly scoped design (its
+  own spec/PRD), not a backlog-item re-triage.

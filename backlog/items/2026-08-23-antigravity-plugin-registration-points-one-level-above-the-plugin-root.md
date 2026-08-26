@@ -119,3 +119,33 @@ PO's:
 - **Assignment (if accepted):** n/a — blocked on live-runner access, not on
   a scoping decision.
 - **Date:** 2026-08-24
+
+### Re-triage, 2026-08-26 (PO instruction: decide today rather than wait for the 2026-08-30 expiry)
+
+- **Decision:** closed, code-level defect accepted as fixed. The only
+  Acceptance criterion still unmet — "the resolution semantics of
+  `entries[].path` are established empirically against a running
+  Antigravity runner" and "a guard actually firing in an Antigravity
+  session" — genuinely cannot be produced by any Claude Code session: there
+  is no live Antigravity runner reachable from here, today or at any future
+  2026-08-30 re-triage either, so leaving this item open on a due date does
+  not change when that evidence becomes available. Re-triaging it as a
+  time-bound QG-06 record was therefore the wrong shape — it implied a
+  future session in this environment could close the gap, and none can.
+- **What is actually settled:** the code fix (Route 1, relative plugin root
+  `plugins` → `plugins/pipeline-core`, commit `c15ccdff`) matches the
+  installer's own documented semantics (`install-agy.mjs:28` defines the
+  field as the directory containing `plugin.json`) and was reviewed by the
+  delta Critic round that raised D7 in the first place
+  (`specs/sprint-agy-runner/evidence/2026-08-23-delta-critic-review-agy-runner.md`).
+  It is the only one of the three candidate routes that is both
+  policy-clean (no machine-absolute path) and semantically correct per the
+  installer.
+- **What stays open, permanently, as a standing note rather than a due-dated
+  item:** whether this registration actually loads inside a real Antigravity
+  runner — and therefore whether it explains the previously observed push
+  escape and Critic F10 — is unconfirmed. `docs/state.md` already discloses
+  this ("plausible root cause… but unverified"). Any future session with
+  genuine live Antigravity access should confirm it with a guard actually
+  firing; until then this is a known limitation, not a scheduled task with
+  an owner who can act on it from inside this repository.
