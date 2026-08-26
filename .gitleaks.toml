@@ -20,7 +20,20 @@
 # file path gitleaks itself reports (empirically the absolute filesystem path of the scanned
 # source tree, not a path relative to `--source`) -- verified by testing a strict
 # `^backlog/transitions\.ndjson$` anchor, which never matched, against the working
-# `.*backlog/transitions\.ndjson$` form used below.
+# `.*/backlog/transitions\.ndjson$` form used below (path-segment-anchored per RW2-GITLEAKSCONFIG
+# below).
+#
+# RW2-GITLEAKSCONFIG, 2026-08-27: the `.*` prefix above is required (absolute-path prefix, see
+# above) but was unanchored on its OWN right edge -- `.*backlog/transitions\.ndjson$` also
+# matches any path merely ENDING in that literal substring, e.g. a directory named
+# `notbacklog/transitions.ndjson` (no path-separator boundary before `backlog`), not only a
+# genuine `backlog/` directory. Patterns below now require a literal `/` immediately before
+# `backlog`, so only an actual `backlog` path segment can match. This does not, and (gitleaks'
+# regex engine has no lookbehind) cannot, distinguish the repository's own top-level `backlog/`
+# from some OTHER, differently-nested `.../backlog/transitions.ndjson` a candidate tree could in
+# principle introduce elsewhere -- gitleaks reports only the absolute path, with no marker for
+# "relative to --source", so a purely static regex cannot bind to "top-level only". Known,
+# accepted limitation of this allowlist mechanism, not fixed by this anchor.
 #
 # VFX3-SECURITY, 2026-08-26: the Nova/Phoenix merge introduced a second hash-chained ledger,
 # `backlog/transitions-phoenix-history.ndjson` (the Phoenix-side history carried across the
@@ -29,6 +42,14 @@
 # below did not cover it, so its lines surfaced as 39 unignored `sentry-access-token` findings.
 # Extended to both ledger files rather than filed as 39 individual .gitleaksignore entries --
 # consistent with why this file exists at all (see header).
+#
+# What justifies exempting `transitions-phoenix-history.ndjson` specifically: unlike
+# `transitions.ndjson` (live, append-only, checked by the ledger tooling on every write), the
+# history file is a frozen archival copy (backlog/README.md) that nothing projects or appends to.
+# `check-backlog-state.mjs`'s `checkPhoenixHistoryImmutable` pins its bytes to a fixed SHA-256 and
+# blocks the gate on any drift -- so no new content, secret or otherwise, can reach this path
+# without failing that check first. The exemption only ever covers bytes already scanned once, at
+# merge time; it does not open a lane for anything written later.
 
 [extend]
 useDefault = true
@@ -37,10 +58,10 @@ useDefault = true
 id = "sentry-access-token"
 
 [[rules.allowlists]]
-paths = ['''.*backlog/transitions\.ndjson$''', '''.*backlog/transitions-phoenix-history\.ndjson$''']
+paths = ['''.*/backlog/transitions\.ndjson$''', '''.*/backlog/transitions-phoenix-history\.ndjson$''']
 
 [[rules]]
 id = "generic-api-key"
 
 [[rules.allowlists]]
-paths = ['''.*backlog/transitions\.ndjson$''', '''.*backlog/transitions-phoenix-history\.ndjson$''']
+paths = ['''.*/backlog/transitions\.ndjson$''', '''.*/backlog/transitions-phoenix-history\.ndjson$''']

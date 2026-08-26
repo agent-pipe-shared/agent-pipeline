@@ -89,6 +89,43 @@ test("inspect after set-feature surfaces phase, draft lifecycle, and the live Ne
   assert.equal(afterBytes, beforeBytes, "inspect must not mutate the state file");
 });
 
+test("inspect reports phoenixEpicHistory as null when the field is absent", () => {
+  const root = freshRoot("no-phoenix");
+  assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.equal(payload.phoenixEpicHistory, null);
+});
+
+test("inspect surfaces a compact phoenixEpicHistory summary when the field is present (RW2-STATEKEY)", () => {
+  const root = freshRoot("phoenix");
+  assert.equal(run(["set-feature", "--id", "widget", "--plan-path", "specs/widget/prd.md"], { dir: root, now: () => NOW }), 0);
+  const statePathValue = resolveStatePath(root);
+  const state = JSON.parse(readFileSync(statePathValue, "utf8"));
+  state.phoenixEpicHistory = {
+    note: "preserved verbatim, historical record only",
+    activeFeature: { id: "sprint-phoenix-epic", planPath: "specs/sprint-phoenix-epic/prd_phoenix-epic.md", phase: "implementation" },
+    continuity: { schema: "pipeline.continuity.v0", featureId: "sprint-phoenix-epic", revision: 8 },
+  };
+  writeFileSync(statePathValue, JSON.stringify(state, null, 2) + "\n");
+  const beforeBytes = readFileSync(statePathValue, "utf8");
+
+  const result = invoke(root, ["inspect"]);
+  assert.equal(result.status, 0, result.err);
+  const payload = JSON.parse(result.out);
+  assert.deepEqual(payload.phoenixEpicHistory, {
+    present: true,
+    featureId: "sprint-phoenix-epic",
+    continuityRevision: 8,
+    note: "preserved verbatim, historical record only",
+  });
+
+  // Zero mutation: inspect must not touch the state file even when this field is present.
+  const afterBytes = readFileSync(statePathValue, "utf8");
+  assert.equal(afterBytes, beforeBytes, "inspect must not mutate the state file");
+});
+
 test("--help lists inspect among the accepted commands", () => {
   const root = freshRoot("help");
   const result = invoke(root, ["--help"]);

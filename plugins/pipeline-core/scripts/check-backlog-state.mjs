@@ -57,6 +57,18 @@ const STATUS_PATH = "backlog/STATUS.md";
 const INDEX_PATH = "backlog/index.json";
 const TRANSACTION_PATH = "backlog/.state-transaction.json";
 const SENTINEL_RECOVERY_CATALOG_PATH = "backlog/sentinel-recovery-catalog.json";
+// backlog/transitions-phoenix-history.ndjson is an immutable archived copy of
+// the Phoenix branch's ledger tail (sequences 145-525), preserved verbatim by
+// the Nova/Phoenix merge (commit c181817f) so those entries' original hashes
+// stay readable. It is NOT active state: nothing projects it, and it is never
+// appended to. This pin -- the file's exact SHA-256 at merge time -- is the
+// mechanical check that closes "what stops a real secret from being added to
+// this file later" for the two .gitleaks.toml rule exemptions scoped to this
+// path: any byte change at all, a genuine edit or a forged appended entry
+// alike, fails this check before the exemption could ever cover new content.
+// See backlog/README.md for the declaration this pin backs.
+const PHOENIX_HISTORY_PATH = "backlog/transitions-phoenix-history.ndjson";
+const PHOENIX_HISTORY_SHA256 = "a8e5859467aab1d6a72cacc351114ff1f3625660ecaf4d9d2b569abd4c6582c7";
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40}$/u;
 const LICENSE_SURFACES = ["LICENSE", "LICENSE-DOCS", "NOTICE", "CONTRIBUTING.md", "README.md", "docs/licensing.md", "third-party-licenses.json"];
@@ -499,6 +511,31 @@ export function recoverBacklogTransaction(root = DEFAULT_ROOT) {
   }
 }
 
+/**
+ * Validate that the archived Phoenix ledger tail has not moved a single byte
+ * since the merge. This is a byte-identity pin, not a chain re-validation: a
+ * hash-chain check alone would still accept a new, syntactically valid,
+ * chain-consistent entry appended after the preserved tail -- which is
+ * exactly the vector the .gitleaks.toml exemption on this path needs closed.
+ * Any drift here is INTEGRITY (unclassified by classifyBacklogFindings,
+ * which defaults unrecognised findings to blocking).
+ *
+ * Presence-gated like SENTINEL_RECOVERY_CATALOG_PATH above: a repo root that
+ * never has this file (every `check-backlog-state.test.mjs` fixture -- it
+ * builds a minimal synthetic `backlog/` and does not mirror this archival
+ * path) is not asserted against it. The real project root always has it, so
+ * this still fails closed there.
+ */
+function checkPhoenixHistoryImmutable(root, findings) {
+  const repoPath = PHOENIX_HISTORY_PATH;
+  const path = join(root, repoPath);
+  if (!existsSync(path)) return;
+  const actual = createHash("sha256").update(readFileSync(path)).digest("hex");
+  if (actual !== PHOENIX_HISTORY_SHA256) {
+    findings.push(`${repoPath}: bytes changed since the Nova/Phoenix merge (expected sha256 ${PHOENIX_HISTORY_SHA256}, got ${actual}); this file is an immutable archived copy and must never be edited or appended to`);
+  }
+}
+
 function checkSchemas(root, findings) {
   for (const [repoPath, expectedId] of SCHEMAS) {
     if (repoPath === "backlog/schemas/sentinel-recovery.schema.json" && !existsSync(join(root, SENTINEL_RECOVERY_CATALOG_PATH))) continue;
@@ -559,6 +596,7 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true, auth
   const ledger = parseTransitionLedger(ledgerText ?? "", { path: LEDGER_PATH });
   findings.push(...ledger.errors);
   checkSchemas(root, findings);
+  checkPhoenixHistoryImmutable(root, findings);
   if (ledger.events.some((event) => event?.schema === TRANSITION_V2_SCHEMA)) {
     const repoPath = "backlog/schemas/transition-v2.schema.json";
     const text = readText(join(root, repoPath), findings, repoPath);

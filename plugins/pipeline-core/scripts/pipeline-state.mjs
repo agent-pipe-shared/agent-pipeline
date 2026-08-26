@@ -42,6 +42,8 @@
  *         "approvedAt": "<ISO-8601>", "usedAt": "<ISO-8601>"? }
  *     ] | absent,
  *     "continuity": <closed pipeline.continuity.v0 object> | absent,
+ *     "phoenixEpicHistory": <opaque preserved sprint-phoenix-epic continuity/authority
+ *       record, own `note` field explains provenance> | absent,
  *     "updatedAt": "<ISO-8601>"
  *   }
  *   Every field beyond `schema` is optional -- consumers (the two gate hooks) treat an
@@ -70,6 +72,19 @@
  *   there, of any `kind`, refuses a repeat `feature-package-reconcile` presentation of
  *   that same proof with `CRITICAL-PROOF-REPLAY`, mirroring `approve-push`'s own
  *   consumption-ledger shape (~6554-6576 as of this writing).
+ *
+ *   `phoenixEpicHistory` (added by the 2026-08-26 sprint_phoenix merge; RW2-STATEKEY):
+ *   the sprint-phoenix-epic feature's own continuity/authority/approval history,
+ *   preserved VERBATIM from `origin/sprint_phoenix` per explicit PO instruction that no
+ *   Phoenix data be lost in the merge -- see the block's own `note` field for full
+ *   provenance. HISTORICAL RECORD ONLY: no subcommand reads, writes or otherwise
+ *   interprets its internals as active pipeline state (`activeFeature`/`continuity`/
+ *   `planApproval` etc. above remain the only authoritative ones); it is opaque data
+ *   carried alongside the schema, not a second copy of the schema. Its ONE reader is
+ *   `inspect` (`summarizePhoenixEpicHistory` below), which surfaces a compact,
+ *   read-only presence/identity projection so the block stays discoverable to every
+ *   session that runs `inspect` instead of silently going stale -- that projection
+ *   is descriptive only and never a basis for a state transition.
  *
  *   DEVIATION NOTE (declared during the F1 fix, commit 1c0a181 -- see the `set-feature`/
  *   `set-phase` entries below for that fix itself, which moved `phase` INSIDE
@@ -7120,6 +7135,24 @@ export function reconstructPlanApprovalBriefing(state) {
 }
 
 /**
+ * `inspect`'s ONE reader of `state.phoenixEpicHistory` (RW2-STATEKEY): the field
+ * itself is opaque, preserved-verbatim historical data (see the SCHEMA doc above),
+ * never interpreted as active state by any writer subcommand. This projects a
+ * compact, read-only presence/identity summary so the block stays visible to every
+ * session that runs `inspect` rather than being silently forgotten -- it derives
+ * nothing that feeds a state transition. Returns `null` when the field is absent.
+ */
+function summarizePhoenixEpicHistory(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  return {
+    present: true,
+    featureId: typeof value.activeFeature?.id === "string" ? value.activeFeature.id : null,
+    continuityRevision: Number.isSafeInteger(value.continuity?.revision) ? value.continuity.revision : null,
+    note: typeof value.note === "string" ? value.note : null,
+  };
+}
+
+/**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
  * code. `deps` allows tests to inject `dir`, `now`, `gitHead`, and `env` without
  * touching the real filesystem/clock/git/environment.
@@ -8450,6 +8483,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         lifecycle: { ok: lifecycle.ok, code: lifecycle.code, status: lifecycle.status },
         pushApproval: base.pushApproval ?? null,
         closedFeaturesCount: Array.isArray(base.closedFeatures) ? base.closedFeatures.length : 0,
+        phoenixEpicHistory: summarizePhoenixEpicHistory(base.phoenixEpicHistory ?? null),
         nextAction: nextActionSection(base),
       };
       console.log(JSON.stringify(payload, null, 2));

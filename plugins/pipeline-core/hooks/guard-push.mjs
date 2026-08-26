@@ -427,6 +427,16 @@ function parsePushBinding(rawCmd) {
  * guessing needed, or the symbolic ref `HEAD`, whose target depends on the
  * checkout this guard must not assume), this returns `null` unchanged --
  * exactly today's behavior -- rather than guess.
+ *
+ * A bare name is also not automatically a branch: git's own ref DWIM lookup for an
+ * unqualified push source checks `refs/tags/<name>` before `refs/heads/<name>`, so
+ * `git push origin <tagname>` writes `refs/tags/<tagname>`, never `refs/heads/<tagname>`
+ * -- and a name that resolves to BOTH a tag and a branch is exactly as ambiguous. This
+ * function therefore confirms `source` names an existing local branch, and that no
+ * same-named local tag pre-empts it, before returning the `refs/heads/<source>` guess;
+ * either way, "cannot be established as a branch" returns `null`, same as the other
+ * declined cases above -- a binding this guard authorizes against must be observed, not
+ * synthesised.
  */
 function resolveImplicitPushDestination(projectDir, remote, source) {
   if (source.startsWith("refs/")) return source;
@@ -441,6 +451,18 @@ function resolveImplicitPushDestination(projectDir, remote, source) {
   // (e.g. an unreadable config) -- fail closed to "unresolved", same as today.
   if (configuredPush.status === 0 && configuredPush.stdout?.trim()) return null;
   if (configuredPush.status !== 1) return null;
+  // Confirm `source` is actually a local branch (and not shadowed by a same-named local
+  // tag, which git's own DWIM order would prefer) before guessing refs/heads/<source>.
+  const headRef = spawnSync(
+    "git", ["-C", projectDir, "show-ref", "--verify", "--quiet", `refs/heads/${source}`],
+    { timeout: 5000 },
+  );
+  if (headRef.status !== 0) return null; // no local branch by this name -- cannot resolve as a branch push.
+  const tagRef = spawnSync(
+    "git", ["-C", projectDir, "show-ref", "--verify", "--quiet", `refs/tags/${source}`],
+    { timeout: 5000 },
+  );
+  if (tagRef.status === 0) return null; // same-named local tag exists -- ambiguous; don't guess.
   return `refs/heads/${source}`;
 }
 
@@ -751,10 +773,17 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
  * no manifest and no push gate at all, so deferring it to the gate section would hand
  * every ungoverned checkout a free push to main.
  *
- * Deliberately narrower than the boundary it excepts. Only the EXPLICIT destination form
- * is admitted; `git push origin main`, where the destination is implied by the remote's
- * configuration rather than written down, stays refused. An attestation names a ref, and
- * a command that does not name one cannot be matched against it without guessing.
+ * Narrower than the boundary it excepts in exactly one respect: a destination that never
+ * resolved at all stays refused here, because an attestation names a ref and a `null`
+ * destination cannot be matched against it without guessing. That covers `HEAD` (a
+ * symbolic ref whose target depends on the checkout) and a bare source
+ * `resolveImplicitPushDestination` declined to resolve as a branch (see its own
+ * docstring). It does NOT cover an ordinary `git push origin main`: since
+ * PHX-WP-GUARDPUSH-REFSPEC-RESOLVE, that resolves its own destination to
+ * `refs/heads/main` deterministically (no `remote.<name>.push` override, `main`
+ * confirmed as a local branch, no same-named tag) before this runs, so it is admitted on
+ * the same footing as the fully-qualified `git push origin main:refs/heads/main` --
+ * both need a valid attestation for this exact commit, tree, remote and ref.
  *
  * Failure of any kind — no state, no anchor, unreadable candidate — is not an exception.
  */

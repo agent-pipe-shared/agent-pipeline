@@ -928,8 +928,23 @@ async function admitSignedPush() {
 // Phoenix-governed repository an agent-invented one-time token is NOT authority: the
 // override additionally requires a checkpoint-bound canonical human-governance decision,
 // scoped to this exact repository, candidate, rule and guard artifact digest, and it is
-// consumed in the append-only human stream. This ADDS a requirement on top of the target
-// binding below — it never creates a second way to permit anything.
+// consumed in the append-only human stream. This ADDS a requirement on top of the local
+// consumption ledger below — it must FALL THROUGH to that ledger's per-command binding,
+// retry admission and TTL rather than exiting in its place, or Phoenix governance would
+// create a second, weaker way to permit the same class of command the ledger below
+// refuses (fixed 2026-08-27: an earlier version exited immediately on a successful
+// Phoenix consumption, so the local ledger's commandSha256/candidateCommit/target binding
+// and audit record were never reached for a Phoenix admission). The canonical decision's
+// OWN scope binds repository/candidate/packageId/action/environment/artifacts but not the
+// literal command text, so it is deliberately treated as single-shot here too: this block
+// always re-attempts consumption fresh (it never skips based on the local ledger's retry
+// admission), so a second presentation of the identical command is refused by the
+// canonical decision's own single-use disposition before the local ledger is even
+// consulted — the local ledger's retry admission therefore only ever matters for
+// non-Phoenix overrides. `nowEpochMs`/`observedAtEpochMs` sent to the governance-authority
+// CLI are this process's own clock reading, never the agent-supplied reference file's
+// claim, so the canonical decision's TTL cannot be defeated by an agent asserting a
+// friendlier "now".
 function exactKeys(value, keys) { return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
 function phoenixGovernedProject() { return existsSync(join(projectDir, "governance", "events", "registry.json")); }
 function currentCandidate() {
@@ -955,7 +970,13 @@ function invokeGovernanceAuthority(flag, request) {
 function consumePhoenixOverrideAuthority(reference, rule) {
   const expectedCandidate = currentCandidate();
   if (!expectedCandidate) return "the current repository candidate could not be read";
-  const authority = invokeGovernanceAuthority("--request-json", reference.authorityRequest);
+  // `nowEpochMs` drives the canonical decision's own TTL check (resolveHumanGovernanceAuthority
+  // denies "expired" once nowEpochMs > validity.expiresAtEpochMs); it is deliberately this
+  // process's real clock reading, never `reference.authorityRequest.nowEpochMs` as parsed from
+  // the agent-supplied reference file, or an agent could assert a friendlier "now" and defeat
+  // the TTL entirely. The rest of authorityRequest is untouched -- only the trust-sensitive
+  // clock field is substituted.
+  const authority = invokeGovernanceAuthority("--request-json", { ...reference.authorityRequest, nowEpochMs: Date.now() });
   const scope = authority?.scope;
   let guardDigest;
   try { guardDigest = createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"); } catch { return "the guarded artifact digest could not be read"; }
@@ -974,7 +995,10 @@ function consumePhoenixOverrideAuthority(reference, rule) {
     decisionDigest: authority.decisionDigest,
     candidate: expectedCandidate,
     checkpoint: reference.authorityRequest.checkpoint,
-    observedAtEpochMs: reference.consumption.observedAtEpochMs,
+    // Same substitution as above and for the same reason: the liveness re-check performed
+    // under the append lock (human-governance-ledger.mjs assertAppend) re-runs the TTL check
+    // against this value, so it must be real time too, not `reference.consumption.observedAtEpochMs`.
+    observedAtEpochMs: Date.now(),
     consumption: {
       decisionId: reference.consumption.decisionId,
       eventId: reference.consumption.eventId,
@@ -1080,16 +1104,18 @@ function blockHumanAuthorityFailure(rule, reason) {
   emit(2, [formatBlockHeader(rule), `Override NOT applied: ${reason}.`, overrideProcedureText(rule), ...notices]);
 }
 // Adapted from 998a609:725-735: at 998a609 this was the canonicalAuthority=true branch of
-// allowWithOverride. allowWithOverride is a merge-introduced binding, so the canonical
-// branch is restored additively under its own name; the emitted lines are those of
-// 998a609:727-732, with the reason taken from the Phoenix split.
-function allowWithPhoenixAuthority(reason) {
-  emit(1, [
-    `[git-guard] OVERRIDE APPLIED (one-time): rule ${arming.rule}, token ${arming.token}.`,
-    `Reason: ${reason}`,
-    "Ledger: canonical human-governance decision consumed (no local command or reason persisted).",
-    ...notices,
-  ]);
+// allowWithOverride, and it used to exit here directly. It no longer does (2026-08-27 fix):
+// a Phoenix admission must still pass through the local consumption ledger below (per-command
+// binding, retry admission, TTL, and an actual audit record) exactly like a local-token
+// admission — this function only records that the additional canonical-decision requirement
+// was satisfied and lets control fall through; `arming.reason` is narrowed from the raw
+// "<reference>|<reason>" pair to just the clean reason so the ledger entry and the eventual
+// allow message below record the human-readable reason, not the reference file path.
+function noteConsumedPhoenixAuthority(reason) {
+  notices.push(
+    `[git-guard] Phoenix canonical human-governance decision consumed (additional requirement, one-time): rule ${arming.rule}, token ${arming.token}.`,
+  );
+  arming = { ...arming, reason };
 }
 
 // All deny rules are always evaluated; consumption is decided on the FINAL verdict
@@ -1277,16 +1303,23 @@ if (matched.length > 0) {
     const target = overrideTarget();
     if (!target.ok) blockTargetBindingFailure(matched[0]);
     // Phoenix-governed repository: the target binding above is necessary but NOT
-    // sufficient. Restored from 998a609:748-753 — CONJOINED with the target check rather
-    // than placed beside it, so this can only refuse where the guard already permitted;
-    // it can never permit anything the guard refuses. Every exit below is emit()'d.
+    // sufficient. Restored from 998a609:748-753 — an ADDITIONAL requirement layered on top
+    // of the local consumption ledger below, never a replacement for it (2026-08-27 fix: it
+    // used to `emit()`/exit here on success, so the ledger's per-command binding, retry
+    // admission and TTL below were never reached for a Phoenix admission — this can now only
+    // ADD to what the ledger below permits/refuses; every exit in this block is still
+    // emit()'d, and a success here falls through instead of exiting). This block always
+    // re-attempts consumption fresh rather than skipping on a would-be retry: the canonical
+    // decision is single-use at its own layer, so a second presentation of the identical
+    // command is refused right here by the decision's own disposition, before the local
+    // ledger's retry admission is ever consulted.
     if (phoenixGovernedProject()) {
       const phoenix = phoenixAuthorityArming(arming.reason);
       const authorityReference = readPhoenixOverrideReference(phoenix.reference);
       if (!authorityReference) blockHumanAuthorityFailure(matched[0], "a closed Phoenix authority reference is required");
       const authorityFailure = consumePhoenixOverrideAuthority(authorityReference, arming.rule);
       if (authorityFailure) blockHumanAuthorityFailure(matched[0], authorityFailure);
-      allowWithPhoenixAuthority(phoenix.reason);
+      noteConsumedPhoenixAuthority(phoenix.reason);
     }
     const prior = findConsumption(arming.rule, arming.token, target);
     const armedAt = new Date();

@@ -18,11 +18,11 @@
  */
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { name, CAPABILITY_CONTRACT_V2, gitleaksContentAuthorityLine, run } from "./gitleaks.mjs";
+import { name, CAPABILITY_CONTRACT_V2, gitleaksContentAuthorityLine, gitleaksConfigMissingResult, run } from "./gitleaks.mjs";
 import { resolveTrustedSystemExecutable } from "../tool-identity.mjs";
 
 test("CAPABILITY_CONTRACT_V2 exists and is frozen", () => {
@@ -115,6 +115,52 @@ test("run() always passes --no-git to `gitleaks detect`, keeping every existing 
       assert.ok(args.includes(flag), `existing flag ${flag} must remain in args: ${JSON.stringify(args)}`);
     }
     assert.equal(args[args.indexOf("--source") + 1], rootDir, "--source must still point at rootDir");
+  } finally {
+    rmSync(rootDir, { recursive: true, force: true });
+  }
+});
+
+// ===============================================================================================
+// Config-path resolution (RW2-GITLEAKSCONFIG) -- GITLEAKS_CONFIG_PATH is self-application-scoped
+// (resolved relative to this adapter module's own on-disk location, four directories below the
+// repo root); a plugin-only deployment without the repo root present must fail with an explicit,
+// specific diagnostic rather than an opaque scanner_error from letting gitleaks itself choke on a
+// missing --config path.
+// ===============================================================================================
+
+test("gitleaksConfigMissingResult() returns an ERROR/config_missing result naming the missing path", () => {
+  const result = gitleaksConfigMissingResult("/nonexistent/marketplace-root/.gitleaks.toml");
+  assert.equal(result.status, "ERROR");
+  assert.equal(result.classification, "config_missing");
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.raw, null);
+  assert.match(result.reason, /\/nonexistent\/marketplace-root\/\.gitleaks\.toml/);
+});
+
+test("run() short-circuits to gitleaksConfigMissingResult() BEFORE spawning gitleaks when GITLEAKS_CONFIG_PATH is absent (hermetic: fixture binaryPath points at a real, but config-less, sibling dir)", async () => {
+  // This repo's own checkout always has a real .gitleaks.toml (GITLEAKS_CONFIG_PATH resolves
+  // successfully here), so this case cannot be reproduced by pointing run() at a real missing
+  // config -- it is deliberately covered as a pure unit test of the returned shape above, plus a
+  // positive regression here confirming GITLEAKS_CONFIG_PATH DOES resolve in this checkout (the
+  // self-application case the whole adapter is scoped to), so the new existsSync() guard never
+  // fires for the deployment this repo's own verify/security-scan actually runs in.
+  const { dirname } = await import("node:path");
+  const { fileURLToPath } = await import("node:url");
+  // This test file lives in the SAME directory as gitleaks.mjs (security-adapters/), so the same
+  // four-`..` climb GITLEAKS_CONFIG_PATH itself uses (see gitleaks.mjs) applies unchanged here.
+  const configPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", ".gitleaks.toml");
+  assert.ok(existsSync(configPath), `expected .gitleaks.toml to exist at the resolved repo-root path in this checkout: ${configPath}`);
+  let spawnCalled = false;
+  const rootDir = mkdtempSync(join(tmpdir(), "gitleaks-config-present-spy-"));
+  try {
+    const spySpawn = (cmd, args) => {
+      spawnCalled = true;
+      writeFileSync(args[args.indexOf("--report-path") + 1], "[]");
+      return { status: 0, stdout: "", stderr: "", error: null };
+    };
+    const result = await run({ rootDir, config: { binaryPath: join(rootDir, "unused-fake-gitleaks") }, spawnFn: spySpawn, timeoutMs: 5000 });
+    assert.equal(result.status, "PASS", `expected PASS (config present, clean spy report), got ${result.status} (${result.reason ?? ""})`);
+    assert.equal(spawnCalled, true, "gitleaks must still be spawned when the config is present");
   } finally {
     rmSync(rootDir, { recursive: true, force: true });
   }

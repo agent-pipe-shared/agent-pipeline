@@ -849,7 +849,7 @@ test("approve-fork-disposition refuses a tampered approvalIntent before any sign
       /not issued for the fork-disposition authority/u,
     );
     assert.equal(confirmations.length, 0, "the confirmation prompt -- and therefore OpenSSL -- must never be reached once the intent is tampered");
-    assert.equal(existsSync(join(dirs.directory, "proof-critical-governance-fork-disposition.json")), false, "no signature may be produced for a request with a tampered approvalIntent");
+    assert.equal(existsSync(join(dirs.directory, `proof-${dirs.fingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`)), false, "no signature may be produced for a request with a tampered approvalIntent");
   } finally {
     cleanup(dirs);
   }
@@ -958,7 +958,7 @@ test("po-approval-gate.mjs drives the public half of the fork-disposition ceremo
     // The signing half is not the control plane's to run: it delegates to the
     // approve-critical branch and therefore reads the private key.
     assert.throws(() => runApprovalGate(["approve-fork-disposition", ...forkArgs(dirs)], { readConfirmation: () => "approve", spawn: () => ({ status: 0 }) }), /Usage:/u);
-    assert.equal(existsSync(join(dirs.directory, "proof-critical-governance-fork-disposition.json")), false, "no proof may exist before the human has signed");
+    assert.equal(existsSync(join(dirs.directory, `proof-${dirs.fingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`)), false, "no proof may exist before the human has signed");
 
     await runForkDispositionApproval(["approve-fork-disposition", ...forkArgs(dirs)], { readConfirmation: () => "approve" });
     const verified = await runApprovalGate(["verify-fork-disposition", ...forkArgs(dirs)], {});
@@ -1524,7 +1524,7 @@ test("authorize-critical fails closed before setup and prepares nothing when key
   }
 });
 
-test("authorize-critical fails closed before setup and prepares nothing when key material is absent", () => {
+test("authorize-critical fails closed before setup and prepares nothing when key material is absent (fixtureDirs variant)", () => {
   const dirs = fixtureDirs();
   try {
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
@@ -1533,7 +1533,7 @@ test("authorize-critical fails closed before setup and prepares nothing when key
       () => runHumanApproval(["authorize-critical", ...criticalRequestArgs(dirs)], {}),
       /run setup before authorize-critical/u,
     );
-    assert.equal(existsSync(join(dirs.directory, "request-critical-push.json")), false, "no request may be written before key material is confirmed present");
+    assert.equal(existsSync(criticalArtifacts(dirs).request), false, "no request may be written before key material is confirmed present");
   } finally {
     cleanup(dirs);
   }
@@ -3054,7 +3054,7 @@ test("authorize-critical never signs a stale request left in the external direct
   }
 });
 
-test("authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof", () => {
+test("authorize-critical still requires the literal word approve: anything else cancels before OpenSSL and writes no proof (fixtureDirs variant)", () => {
   const dirs = fixtureDirs();
   try {
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
@@ -3082,7 +3082,7 @@ test("authorize-critical still requires the literal word approve: anything else 
   }
 });
 
-test("the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal", () => {
+test("the agent-facing approval gate cannot invoke authorize-critical: signing stays on the human terminal (fixtureDirs variant)", () => {
   const dirs = fixtureDirs();
   try {
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
@@ -3091,7 +3091,7 @@ test("the agent-facing approval gate cannot invoke authorize-critical: signing s
       () => runApprovalGate(["authorize-critical", ...criticalRequestArgs(dirs)], {}),
       /Usage:/u,
     );
-    assert.equal(existsSync(join(dirs.directory, "request-critical-push.json")), false, "the public control plane must not be able to reach authorize-critical at all");
+    assert.equal(existsSync(criticalArtifacts(dirs).request), false, "the public control plane must not be able to reach authorize-critical at all");
   } finally {
     cleanup(dirs);
   }
