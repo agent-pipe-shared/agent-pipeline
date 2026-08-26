@@ -26,6 +26,12 @@ critic_export:
       packetBoundary: "candidate-diff-and-allowlisted-references"
       packetSchema: "pipeline.critic-candidate-packet.v1"
       provider: "openai"
+    -
+      assuranceClass: "functional-equivalent-read-only; OS isolation not asserted"
+      dataClass: "repository-candidate"
+      packetBoundary: "candidate-diff-and-allowlisted-references"
+      packetSchema: "pipeline.critic-candidate-packet.v1"
+      provider: "google"
   schema: "pipeline.critic-export-policy.v1"
 gates:
   claude_md_max_lines: 200
@@ -42,6 +48,17 @@ roles:
 routing:
   duties:
     advisory:
+      antigravity:
+        adapter: "host-consult"
+        effort: "high"
+        evidence: "advisory-receipt"
+        isolation: "selected-sandbox-network-open-read-only"
+        runner: "antigravity"
+        selector:
+          kind: "model-id"
+          value: "gemini-3.1-pro-high"
+        state: "unavailable"
+        status: "pipeline.antigravity-sandbox-execution-receipt.v1"
       claude:
         adapter: "native-fable"
         effort: "not-applicable"
@@ -85,6 +102,14 @@ routing:
         mini: "disabled"
       receipt: "pipeline.advisory-receipt.v1"
     critic_high_risk:
+      antigravity:
+        effort: "max"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gemini-3.1-pro-high"
+        state: "unavailable"
+        unavailable: "defer"
       claude:
         effort: "max"
         evidence: "dispatch-receipt"
@@ -102,6 +127,14 @@ routing:
         state: "default"
         unavailable: "defer"
     critic_normal:
+      antigravity:
+        effort: "high"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gemini-3.7-flash-high"
+        state: "unavailable"
+        unavailable: "defer"
       claude:
         effort: "high"
         evidence: "dispatch-receipt"
@@ -119,6 +152,14 @@ routing:
         state: "default"
         unavailable: "defer"
     deep:
+      antigravity:
+        effort: "high"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gemini-3.7-flash-high"
+        state: "unavailable"
+        unavailable: "defer"
       claude:
         effort: "medium"
         evidence: "dispatch-receipt"
@@ -136,6 +177,14 @@ routing:
         state: "opt-in"
         unavailable: "defer"
     implement:
+      antigravity:
+        effort: "high"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gemini-3.7-flash-high"
+        state: "unavailable"
+        unavailable: "defer"
       claude:
         effort: "medium"
         evidence: "dispatch-receipt"
@@ -153,6 +202,14 @@ routing:
         state: "default"
         unavailable: "defer"
     mechanic:
+      antigravity:
+        effort: "low"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gemini-3.7-flash-low"
+        state: "unavailable"
+        unavailable: "defer"
       claude:
         effort: "medium"
         evidence: "dispatch-receipt"
@@ -170,6 +227,14 @@ routing:
         state: "opt-in"
         unavailable: "defer"
     readiness:
+      antigravity:
+        effort: "high"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gemini-3.7-flash-high"
+        state: "unavailable"
+        unavailable: "defer"
       claude:
         effort: "high"
         evidence: "dispatch-receipt"
@@ -187,6 +252,14 @@ routing:
         state: "default"
         unavailable: "defer"
     test_author:
+      antigravity:
+        effort: "high"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gemini-3.7-flash-high"
+        state: "unavailable"
+        unavailable: "defer"
       claude:
         effort: "high"
         evidence: "dispatch-receipt"
@@ -206,6 +279,14 @@ routing:
   profiles:
     epic:
       design_phase:
+        antigravity:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gemini-3.1-pro-high"
+          state: "unavailable"
+          unavailable: "defer"
         claude:
           effort: "xhigh"
           evidence: "dispatch-receipt"
@@ -223,6 +304,14 @@ routing:
           state: "default"
           unavailable: "defer"
       execution_phase:
+        antigravity:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gemini-3.7-flash-high"
+          state: "unavailable"
+          unavailable: "defer"
         claude:
           effort: "high"
           evidence: "dispatch-receipt"
@@ -241,6 +330,14 @@ routing:
           unavailable: "defer"
     feature:
       design_phase:
+        antigravity:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gemini-3.1-pro-high"
+          state: "unavailable"
+          unavailable: "defer"
         claude:
           effort: "high"
           evidence: "dispatch-receipt"
@@ -258,6 +355,14 @@ routing:
           state: "default"
           unavailable: "defer"
       execution_phase:
+        antigravity:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gemini-3.7-flash-high"
+          state: "unavailable"
+          unavailable: "defer"
         claude:
           effort: "medium"
           evidence: "dispatch-receipt"
@@ -276,6 +381,14 @@ routing:
           unavailable: "defer"
     mini:
       design_phase:
+        antigravity:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gemini-3.7-flash-high"
+          state: "unavailable"
+          unavailable: "defer"
         claude:
           effort: "high"
           evidence: "dispatch-receipt"
@@ -293,6 +406,14 @@ routing:
           state: "default"
           unavailable: "defer"
       execution_phase:
+        antigravity:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gemini-3.7-flash-high"
+          state: "unavailable"
+          unavailable: "defer"
         claude:
           effort: "medium"
           evidence: "dispatch-receipt"
@@ -314,6 +435,7 @@ runners:
   enabled:
     - "claude"
     - "codex"
+    - "antigravity"
 schema: "pipeline.user.v3"
 session:
   keep_awake: true
