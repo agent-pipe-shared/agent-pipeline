@@ -128,7 +128,13 @@ try {
           const { blocked, stderr } = ask(root, form, { toolName });
           assert.equal(blocked, true, `${rule.id} admitted a ${toolName} to ${form}`);
           assert.match(stderr, new RegExp(`Rule ID: ${rule.id}\\b`, "u"), `${toolName} ${form}`);
-          assert.match(stderr, /the PO edits this file directly, outside an agent session/u);
+          // Inverted 2026-08-08 (LIFTRULES-2, ADR-0059's companion instruction to Decision 6),
+          // mirroring guard-gate-strength.test.mjs GST02: a hand-edit is the FORBIDDEN escape
+          // hatch now, not the desired one -- every rule this guard denies is reachable through
+          // an audited ceremony instead. This sibling file still pinned the pre-LIFTRULES-2
+          // stale text; reconciled here to the same, already-corrected shape as GST02.
+          assert.match(stderr, /human-authorized override.*audited edit/su, `${toolName} ${form}`);
+          assert.doesNotMatch(stderr, /the PO edits this file directly, outside an agent session/u, `${toolName} ${form}`);
         }
       }
     }
@@ -145,7 +151,16 @@ try {
       const commands = [
         `touch ${rule.path}`,
         `cp /tmp/evil.mjs ${rule.path}`,
-        `git add ${rule.path}`,
+        // `git add` is deliberately NOT in this list (present in an earlier revision, dropped
+        // here): it is classified by guard-lifecycle-ready.mjs as a repository-index-mutating
+        // git command that requires full onboarding session readiness BEFORE any path-specific
+        // rule runs -- true for every path, git-init'd fixture or not (measured), and orthogonal
+        // to GS-8/GS-9. This `governed()` fixture only carries the pipeline marker files, not a
+        // bootstrapped session, so `git add` never reaches GUARD-GATE-STRENGTH-SHELL here and
+        // asserting it in that shape tests readiness gating, not this rule. `mv` (mirroring the
+        // main suite's GST13) exercises the same "opaque token inside a mutating shell command"
+        // shape the needle matcher must catch.
+        `mv /tmp/evil.mjs ${rule.path}`,
         `git checkout -- ${rule.path}`,
         `node -e 'require("fs").writeFileSync("${rule.path}", "export const x = 1;\\n")'`,
       ];

@@ -7,7 +7,7 @@ status: closed
 created: 2026-08-07
 closed_at: "2026-08-19"
 closure_repository: "self"
-closure_commit: "8fcd369c91ad97f11ccf47d0e18290768e8e24cf"
+closure_commit: "1b6e6a606ffcd6f32c3993b73be1110d3eb299af"
 closure_evidence: "plugins/pipeline-core/hooks/hooks.json"
 source: "PO handover from a separate session (agent-pipeline-share_phoenix), submitted through the PO's own channel, 2026-08-07."
 due: 2026-09-06

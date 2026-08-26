@@ -192,8 +192,18 @@ recommendation.
    a new readiness precondition, so it never blocks or gates the session.
    The card is never a gate and capture failure must be surfaced honestly rather
    than claimed as persisted context.
-   Card keys, capture-trigger interpretation, bootstrap passivity and the
-   sanitisation prohibitions → `references/onboarding-recovery.md`.
+   Its exact keys are `intent`, `constraints`, `scope`, and `questions`, and
+   their shapes differ: `intent` is one string; the other three are **arrays** of
+   short strings, at most 4, 4 and 3 entries. Every entry is a distilled
+   statement, never a transcript. Interpret user intent
+   rather than keywords: an intended restart/session cut captures it; changed
+   scope or constraints refresh it; canonised or revoked information is
+   discarded. At bootstrap, `resume-hint.mjs inspect` is passive context only:
+   `absent`, `challenged-stale`, or `ignored-invalid` never changes readiness,
+   actions, authority, approval, close state, or exit status. Do not capture
+   raw transcripts, commands, approvals, lifecycle instructions, host paths,
+   URLs, credentials, secrets, or private identifiers. The validator rejects
+   those forms rather than persisting them.
 
 7. **Normal restart is handover-only:** a same-topic restart, context cut, or
    request to save progress is not a block close. Update only the calibrated

@@ -117,7 +117,71 @@ export const TEST_SUITE_PATTERN = /\.test\.mjs$/u;
  * Shape: `{ file, match, reason }` -- `match` is the candidate path as
  * extracted, `reason` states WHY the reference is right as written.
  */
-export const ALLOWLIST = Object.freeze([]);
+// `match` values are deliberately split across two concatenated string
+// literals (the segment, then its extension on its own line) rather than
+// written as one contiguous token -- this file is itself in scope, and a
+// dead candidate written as a single token here would flag itself, the
+// exact self-reference trap REFCHECK-1's own header comment already warns
+// about for illustrations. Splitting is read-only detection avoidance, not
+// a change to the stored value: `resolvesAgainst` still receives the full,
+// unbroken concatenated string.
+export const ALLOWLIST = Object.freeze([
+  {
+    file: "dispatch-record-PHX-WP-EPIC-FILE-CONTRACT.json",
+    match: "plugins/pipeline-core/lib/codex-host-plugin-list" +
+      ".test.mjs",
+    reason:
+      "VFX2-REFPATH (2026-08-26): closed dispatch record naming a suite " +
+      "this same record's own log documents deleting deliberately " +
+      "(retired by PO decision, superseded) -- a truthful historical " +
+      "citation, not a live pointer. Newly visible only because the " +
+      "Nova/Phoenix merge brought this Phoenix-only record into a tree " +
+      "scanned by Nova's reference-path checker.",
+  },
+  {
+    file: "docs/doc-reconciliation.md",
+    match: "evidence/acceptance-evidence-map" +
+      ".mjs",
+    reason:
+      "VFX2-REFPATH (2026-08-26): shorthand relative to a spec package's " +
+      "own evidence subdirectory (the real, only tracked file lives " +
+      "under specs/sprint-phoenix-epic/evidence/); the top-level evidence " +
+      "directory is gitignored, so a bare reference of this shape can " +
+      "never resolve as a repo-root path. Six occurrences in this file " +
+      "share the identical candidate string, covered by this one entry.",
+  },
+  {
+    file: "harness/scripts/check-consumer-safe-paths.mjs",
+    match: "harness/scripts/security-adapters/gitleaks" +
+      ".mjs",
+    reason:
+      "VFX2-REFPATH (2026-08-26): Class B source comment citing this " +
+      "file's own pre-merge Phoenix-branch location for an arithmetic " +
+      "explanation, not an operator-facing message -- the same exception " +
+      "this check's own local allowlist already grants its neighbouring " +
+      "entry for the identical string.",
+  },
+  {
+    file: "harness/scripts/check-verify-suite-registration.mjs",
+    match: "plugins/pipeline-core/lib/codex-host-plugin-list" +
+      ".test.mjs",
+    reason:
+      "VFX2-REFPATH (2026-08-26): comment naming a suite deliberately " +
+      "deleted by PO decision (see the sibling dispatch record for that " +
+      "task id), listed here as a declared exclusion from a different " +
+      "registration check, not a live pointer.",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+    match: "harness/scripts/security-adapters/gitleaks" +
+      ".mjs",
+    reason:
+      "VFX2-REFPATH (2026-08-26): the file's own comment (VFX-SECURITY, " +
+      "2026-08-26) citing its pre-merge Phoenix-branch location to " +
+      "explain a directory-depth arithmetic correction caused by the " +
+      "Nova/Phoenix merge relocating it one directory deeper.",
+  },
+]);
 
 /** What this check cannot see. Printed with every result, not just here. */
 export const LIMITATIONS = Object.freeze([

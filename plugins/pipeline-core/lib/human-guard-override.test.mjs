@@ -471,6 +471,10 @@ test("Part C: prepareHumanGuardOverrideForSignature() fails closed on the global
   // round 1): the function's own docstring asserts createPoApprovalIntent()'s candidate
   // validation already throws for this mode because its repository observation carries no
   // head/tree -- this test is that discriminating check, not just the reasoning.
+  // NVA-HGOTEST-1: wrapped in withFakeCodexRegistry() like every sibling
+  // global-plugin-install test above -- recordHumanGuardDenial()'s external-marketplace
+  // observation otherwise reads this HOST's real, uncontrolled `codex` registration.
+  withFakeCodexRegistry([], () => {
   const root = fixtureSignature();
   try {
     mkdirSync(join(root, "harness", "scripts"), { recursive: true });
@@ -501,6 +505,7 @@ test("Part C: prepareHumanGuardOverrideForSignature() fails closed on the global
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+  });
 });
 
 test("ADR-0059 Decision 1: an absent trustAnchor (no trustPolicy given, no committed anchor) is refused with HGO-TRUST-ANCHOR-MISSING", () => {
@@ -3067,6 +3072,7 @@ test("Part A (a): a benign statusSha256/head/tree-only repository change between
     const armed = authorizeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3500, scriptPath,
     });
     assert.equal(armed.status, "armed");
@@ -3148,6 +3154,7 @@ test("Part A (b): a policyIdentity change between plan and arm still blocks with
       () => authorizeHumanGuardOverride({
         rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
         selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+        dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
         nowMs: 3000, scriptPath,
       }),
       (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DRIFT",
@@ -3234,6 +3241,7 @@ test("Part A (c): a hand-tampered byte in a pluginIdentity()-hashed file between
         () => authorizeHumanGuardOverride({
           rootDir: root, pluginRoot: plugin, requestSha256: request.requestSha256, planSha256: plan.planSha256,
           selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+          dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
           nowMs: 3000, scriptPath,
         }),
         (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-PLUGIN-DRIFT",
@@ -3267,6 +3275,7 @@ test("Part A (d): a benign repository-only change between plan and arm does not 
     const armed = authorizeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000, scriptPath,
     });
     assert.equal(armed.status, "armed");
@@ -3319,6 +3328,7 @@ test("Part A (e): the chat path has no signedCandidate concept and cannot trip H
     const armed = authorizeHumanGuardOverride({
       rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256, planSha256: plan.planSha256,
       selectionSha256: prepared.selectionSha256, reason, reasonSha256: reasonDigest(reason), activate: true,
+      dependencies: { isattyFn: () => true, readLineFn: () => `HGO-${prepared.selectionSha256.slice(0, 8).toUpperCase()}` },
       nowMs: 3000, scriptPath,
     });
     assert.equal(armed.status, "armed");

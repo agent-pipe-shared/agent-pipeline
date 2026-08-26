@@ -86,11 +86,16 @@ const SPEC_SHA = createHash("sha256").update("spec").digest("hex");
 function proofBundle(dir, { candidate, remote = "origin", destination = "refs/heads/main", featureId = "fixture-feature" } = {}) {
   const external = freshRoot("external");
   mkdirSync(join(dir, "project"), { recursive: true });
-  mkdirSync(join(dir, "specs", "sprint-nova-epic", "implementation"), { recursive: true });
+  // Nova's `approve-push` resolves the threat-model artifact itself at the fixed
+  // conventional path `project/push-threat-model.md` (resolvePushThreatModelArtifact /
+  // PUSH_THREAT_MODEL_DEFAULT_PATH) rather than accepting a caller-supplied threat-model
+  // binding -- this fixture must therefore materialize the artifact at that exact path so
+  // the request's `subjectSha256` (computed below) matches what `approve-push` itself
+  // recomputes when it verifies the proof.
   const threatModelBody = "fixture threat model\n";
-  writeFileSync(join(dir, "specs", "sprint-nova-epic", "implementation", "critical-action-authorization-threat-model.md"), threatModelBody);
+  writeFileSync(join(dir, "project", "push-threat-model.md"), threatModelBody);
   const threatModel = {
-    path: "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md",
+    path: "project/push-threat-model.md",
     sha256: createHash("sha256").update(threatModelBody).digest("hex"),
   };
   const keys = generateKeyPairSync("ed25519");

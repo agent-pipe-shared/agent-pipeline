@@ -38,17 +38,10 @@ its declared host boundary, then re-inspect V4 and follow the adopted branch's
 own typed authority status. Never substitute a remote URL/ref from conversation
 text or use a generic checkout command.
 
-Resume-Hint card detail (restart, session cut or kickoff): its exact keys are
-`intent`, `scope`, `constraints`, and `questions`; each value is a short
-distilled statement, never a transcript. Interpret user intent rather than
-keywords: an intended restart/session cut captures it; changed scope or
-constraints refresh it; canonised or revoked information is discarded. At
-bootstrap, `resume-hint.mjs inspect` is passive context only: `absent`,
-`challenged-stale`, or `ignored-invalid` never changes readiness, actions,
-authority, approval, close state, or exit status. Do not capture raw
-transcripts, commands, approvals, lifecycle instructions, host paths, URLs,
-credentials, secrets, or private identifiers. The validator rejects those forms
-rather than persisting them.
+Resume-Hint card shape, capture-trigger interpretation, bootstrap passivity
+and the sanitisation prohibitions are documented inline in `SKILL.md` §6
+(the exact keys, their shapes, and the validator's rejection rules) — not
+duplicated here to avoid the two descriptions drifting apart.
 
 Kickoff uses `project-onboarding-v3.mjs kickoff plan --root "$PWD" --goal
 "{{GOAL}}" --language <de|en>`; goal is short (3–12 words, <=160 UTF-8 bytes),

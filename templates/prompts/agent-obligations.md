@@ -53,6 +53,7 @@ ready session may run, which is wider.
 - `rg -n 'needle' file.txt`
 - `rg -n 'needle' file.txt | head -20`
 - `rg -n 'a' x | rg -n 'b'`
+- `git status && git log`
 
 ### 1b. Which refusals carry a typed retry action
 
@@ -65,7 +66,6 @@ a route it never offered is wasted budget.
 | `git commit -F msg.txt -- a.md` | 0 |
 | `git commit -m 'one line'` | 0 |
 | `git commit -m 'line one\n\nline two'` | 0 |
-| `git status && git log` | 0 |
 | `git status ; git log` | 2 |
 | `echo hi > out.txt` | 0 |
 | `cat a.txt 2>&1` | 0 |
@@ -73,7 +73,7 @@ a route it never offered is wasted budget.
 
 ## 2. Protected test paths — and there is no in-session override
 
-Derived from `project/guard-config.json` (10 entries). `guard-testpath`
+Derived from `project/guard-config.json` (12 entries). `guard-testpath`
 refuses every Edit/Write against these. For Pipeline plugin source in a source
 checkout the override does not help either, and the reason is specific rather
 than general: `recordHumanGuardDenial()` takes the `eligible.authorCandidate`
@@ -95,6 +95,8 @@ a route.**
 | `TP-8` | `plugins/pipeline-core/lib/entrypoint\.test\.mjs$` |
 | `TP-9` | `plugins/pipeline-core/lib/critical-human-proof-policy\.test\.mjs$` |
 | `TP-10` | `plugins/pipeline-core/hooks/notebook-write-coverage\.test\.mjs$` |
+| `TP-11` | `plugins/pipeline-core/lib/public-core-origin-allowlist\.test\.mjs$` |
+| `TP-12` | `plugins/pipeline-core/lib/self-application-attestation-gate\.test\.mjs$` |
 
 This is not a blanket rule about `plugins/pipeline-core/**`: files under that
 tree that match no pattern above are ordinarily editable.

@@ -581,7 +581,13 @@ process.exit(0);
       return { status: 0, stdout: "", stderr: "" };
     },
   });
-  const gitleaksConfigPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", ".gitleaks.toml");
+  // VFX2-SECURITY, 2026-08-26: this test file lives at
+  // `plugins/pipeline-core/scripts/security-scan.test.mjs`, ONE directory shallower than the
+  // adapter under test (`plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs`), so
+  // matching the adapter's now-corrected `GITLEAKS_CONFIG_PATH` (four `..` from the adapter's own
+  // directory) needs three `..` from here, not two -- two only reaches `plugins/.gitleaks.toml`,
+  // which does not exist (see gitleaks.mjs's own comment on the relocation this corrects for).
+  const gitleaksConfigPath = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", ".gitleaks.toml");
   assertEqual("gitleaks run: candidate tree uses its verified physical root", invocation.args, [
     "detect", "--source", rootDir, "--no-git", "--config", gitleaksConfigPath, "--report-format", "json",
     "--report-path", invocation.args[invocation.args.indexOf("--report-path") + 1], "--no-banner", "--exit-code", "0",

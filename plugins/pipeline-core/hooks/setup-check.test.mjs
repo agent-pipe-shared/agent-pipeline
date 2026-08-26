@@ -289,6 +289,33 @@ function preflightPluginList(version) {
     available: [],
   });
 }
+// Deterministic, hermetic default for the origin/content self-application attestation
+// dependency (design: bootstrap-origin-allowlist-and-codex-wsl-freshness.md §A.2/§A.3) --
+// mirrors `readyObservation` in pipeline-start-preflight.test.mjs, this suite's own
+// sibling. Without it, `preflightAt` (run from a real git checkout, so
+// `pluginRootHasSelfApplicationGit` is true) invokes the real `observePublicCoreIdentity`
+// against this actual repo's origin, which is not on the public allowlist -- making every
+// case below observe "plugin-refresh-required" regardless of version/installedIdentity,
+// which is not what this suite is about (it is about the reconciliation contract, not the
+// attestation feature).
+function readyObservation() {
+  return {
+    schema: "pipeline.public-core-observation.v1",
+    status: "ready",
+    candidate: {
+      repository: "https://github.com/agent-pipe-shared/agent-pipeline.git",
+      branch: "main",
+      commit: "a".repeat(40),
+      tree: "b".repeat(40),
+    },
+    plugin: {
+      name: "pipeline-core",
+      version: "0.4.5+test",
+      manifestSha256: "c".repeat(64),
+      contentSha256: "d".repeat(64),
+    },
+  };
+}
 /** Injected end-to-end: no subprocess, no home-directory read, no real plugin registry. */
 function preflightAt(rootDir, installedVersion = "0.5.3+test") {
   return observePipelineStartPreflight({
@@ -296,6 +323,7 @@ function preflightAt(rootDir, installedVersion = "0.5.3+test") {
     pluginList: preflightPluginList(installedVersion),
     read: () => PREFLIGHT_MANIFEST,
     cwd: rootDir,
+    observe: readyObservation,
   });
 }
 

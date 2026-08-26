@@ -94,7 +94,17 @@ below assumes it holds and is written to catch a change that would break it.
   `scripts/continuity-status.mjs`, `scripts/pipeline-state.mjs`,
   `scripts/po-gate-profile-repair.mjs`, `scripts/project-onboarding-v3.mjs`,
   `scripts/publication-close-journal.mjs`, and
-  `scripts/v3-bootstrap-authority.mjs`.
+  `scripts/v3-bootstrap-authority.mjs`. A second closure gap (VFX2-GMW,
+  `sprint_phoenix` merge, 2026-08-26) added: `lib/agent-decision-journal.mjs`,
+  `lib/authority-revision-proof.mjs`, `lib/control-execution-exchange.mjs`,
+  `lib/control-execution-lifecycle-event.mjs`,
+  `lib/decision-reference-dual-evaluation.mjs`, `lib/external-push-ledger.mjs`,
+  `lib/governance-event-store.mjs`, `lib/governance-event.mjs`,
+  `lib/guard-authority-ledger-intake.mjs`, `lib/guard-handoff-offer.mjs`,
+  `lib/human-decision-attribution.mjs`, `lib/human-governance-decision.mjs`,
+  `lib/human-governance-ledger.mjs`, `lib/human-role-exception-decision.mjs`,
+  `lib/lifecycle-governance-events.mjs`, `lib/onboarding-consent-marker.mjs`,
+  `lib/threat-model-approval-request.mjs`, and `lib/threat-model.mjs`.
 - The window record's cryptographic integrity and its TTL.
 - The audit visibility of an open or recently-closed window (the bootstrap
   warning).

@@ -919,8 +919,10 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
     // the fourth kind arrived here unnoticed. `feature-package-reconcile` was
     // added to CRITICAL_COMMAND_KINDS deliberately (PHX-WP-POHUMAN-SIGNING-ERGO
     // fix 2, 2026-08-18) and is exercised by its own positive-path test below,
-    // so it is excluded from this negative loop.
-    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile"].includes(entry))) {
+    // so it is excluded from this negative loop. `release-preflight` was added
+    // the same way (GF-105/ADR-0064 Decision 4) and is exercised by its own
+    // positive-path tests further below, so it is excluded here too.
+    for (const kind of CRITICAL_ACTION_KINDS.filter((entry) => !["push", "deploy", "publication", "feature-package-reconcile", "release-preflight"].includes(entry))) {
       assert.throws(() => runHumanApproval([
         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
         "--feature-id", "cyb-4", "--plan", "plan.md", "--spec", "spec.md",
@@ -1026,7 +1028,7 @@ function criticalArgv(command, dirs, { kind = "push", subjectSha256, expiresAt, 
 test("setup's already-exists branch accepts a 3-key trust policy carrying humanName", () => {
   const dirs = fixtureDirs();
   try {
-    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn });
+    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"], { spawn: fakeSetupSpawn });
     const authorityPath = join(dirs.directory, "trust-policy.json");
     const authority = JSON.parse(readFileSync(authorityPath, "utf8"));
     writeFileSync(authorityPath, `${JSON.stringify({ ...authority, humanName: "Nova the PO" }, null, 2)}\n`);
@@ -1042,7 +1044,7 @@ test("setup's already-exists branch accepts a 3-key trust policy carrying humanN
 test("setup's already-exists branch still fails closed on an unrelated extra field (not humanName)", () => {
   const dirs = fixtureDirs();
   try {
-    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn });
+    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"], { spawn: fakeSetupSpawn });
     const authorityPath = join(dirs.directory, "trust-policy.json");
     const authority = JSON.parse(readFileSync(authorityPath, "utf8"));
     writeFileSync(authorityPath, `${JSON.stringify({ ...authority, unexpectedField: "x" }, null, 2)}\n`);
@@ -1732,6 +1734,7 @@ function prepareWindow(dirs, { scopeRuleIds = ["GS-6", "TP-1"], reason = WINDOW_
     specSha256: "b".repeat(64),
     policyRevision: "gmw-test-v1",
     livePluginRoot: dirs.plugin,
+    authorshipMode: "goldfish-dispatch",
   });
 }
 

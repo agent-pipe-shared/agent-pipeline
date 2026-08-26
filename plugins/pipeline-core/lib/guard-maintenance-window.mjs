@@ -227,6 +227,30 @@ export const NEVER_LIFTABLE_KERNEL_PATHS = Object.freeze([
   "plugins/pipeline-core/scripts/project-onboarding-v3.mjs",
   "plugins/pipeline-core/scripts/publication-close-journal.mjs",
   "plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs",
+  // VFX2-GMW (sprint_phoenix merge, 2026-08-26): GMWKC01 found this second closure gap
+  // after the merge -- guard-gate-strength.mjs, human-guard-override.mjs,
+  // project-onboarding-v3.mjs and scripts/pipeline-state.mjs (all already kernel paths
+  // above) each gained a new import into the human-governance-ledger/control-execution/
+  // decision-attribution machinery that Phoenix's side of the merge introduced. Every
+  // entry below is imported, directly or transitively, from one of those four files.
+  "plugins/pipeline-core/lib/agent-decision-journal.mjs",
+  "plugins/pipeline-core/lib/authority-revision-proof.mjs",
+  "plugins/pipeline-core/lib/control-execution-exchange.mjs",
+  "plugins/pipeline-core/lib/control-execution-lifecycle-event.mjs",
+  "plugins/pipeline-core/lib/decision-reference-dual-evaluation.mjs",
+  "plugins/pipeline-core/lib/external-push-ledger.mjs",
+  "plugins/pipeline-core/lib/governance-event-store.mjs",
+  "plugins/pipeline-core/lib/governance-event.mjs",
+  "plugins/pipeline-core/lib/guard-authority-ledger-intake.mjs",
+  "plugins/pipeline-core/lib/guard-handoff-offer.mjs",
+  "plugins/pipeline-core/lib/human-decision-attribution.mjs",
+  "plugins/pipeline-core/lib/human-governance-decision.mjs",
+  "plugins/pipeline-core/lib/human-governance-ledger.mjs",
+  "plugins/pipeline-core/lib/human-role-exception-decision.mjs",
+  "plugins/pipeline-core/lib/lifecycle-governance-events.mjs",
+  "plugins/pipeline-core/lib/onboarding-consent-marker.mjs",
+  "plugins/pipeline-core/lib/threat-model-approval-request.mjs",
+  "plugins/pipeline-core/lib/threat-model.mjs",
 ]);
 
 // The "plugins/pipeline-core/..." entries above are written against whatever
