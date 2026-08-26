@@ -3,7 +3,7 @@
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
 > Audience: every agent role in every pipeline-bound project and in this repo. Highest-stakes zone: <PROJECT_B> (real devices, alarm system, locks — a living house).
 
-**Precedence and enforcement:** as defined in `guardrails/global.md` (header). Security diffs are always risk class HIGH: every security-relevant change triggers a Critic review in `--bare` isolation, with the review tier escalated to a higher-capability model for these security-class diffs (canonical trigger wording: `docs/operating-model.md` §4.2).
+**Precedence and enforcement:** as defined in `guardrails/global.md` (header). Security diffs are always risk class HIGH: every security-relevant change triggers a Critic review in `--bare` isolation, with the review tier escalated to a higher-capability model for these security-class diffs (canonical trigger wording: `harness/review-protocol.md` §2.1, *Trigger decision table*).
 
 Rule IDs: `SEC-xx`.
 
@@ -14,7 +14,7 @@ Rule IDs: `SEC-xx`.
 - **MUST NOT** write secret values (tokens, API keys, passwords, credentials, private URLs/paths that grant access) into ANY persisted artifact: docs, specs, briefings, prompts, completion reports, commit messages, telemetry rows, HISTORY/handover entries, code comments, or test fixtures.
 - **MUST** reference secrets by NAME and location only (e.g. `{{ENV_VAR_NAME}} from the runtime environment`, `secrets.yaml key {{KEY_NAME}}`), never by value.
 - If a secret value has leaked into an artifact: STOP, report to the PO immediately (the value must be rotated — deleting the text does not un-leak a committed secret).
-- **Why:** The repos are distributed across two machines and a remote; git history makes every leak permanent. Briefings and reports are persisted and quoted (three-artifacts archive, `docs/operating-model.md` §7) — a secret placed there spreads uncontrollably.
+- **Why:** The repos are distributed across two machines and a remote; git history makes every leak permanent. Briefings and reports are persisted and quoted (three-artifacts archive, `docs/operating-model.md`, *The lifecycle* — step 8, Close) — a secret placed there spreads uncontrollably.
 - **Verification:** Secret-hygiene step in the `/close` ritual; the Critic checks artifacts for credential-shaped strings in security reviews. **RESOLVED (SEC-06 below):** the deterministic secret scanner is `plugins/pipeline-core/scripts/security-scan.mjs`'s `gitleaks` adapter — a manifest-driven, opt-in verify-chain phase, not a per-project ad-hoc decision anymore.
 
 ## SEC-02 — Secret-file staging block (guard-enforced)
@@ -28,13 +28,13 @@ Rule IDs: `SEC-xx`.
 - **MUST NOT** place secret values in Goldfish briefings, context files, or dispatch metadata. Goldfish work is designed to be secret-free: secrets live in the runtime environment or ignored local files, injected by the PO or the runtime where needed.
 - A Goldfish whose task appears to REQUIRE a secret value **MUST** trigger its stop condition and report back — never ask around, never read secret stores on its own initiative.
 - **Why:** Briefings and completion reports are persisted, versioned artifacts (three-artifacts archive) and get quoted into other contexts; fresh execution contexts have no need-to-know. The cheapest secret to protect is the one never handed out.
-- **Verification:** Briefing format check (6 mandatory fields, `docs/operating-model.md` §2.3 — none carries credential values); "task requires secret" is a listed stop condition in briefing templates; the Critic flags credential material in dispatch artifacts.
+- **Verification:** Briefing format check (6 mandatory fields, `docs/operating-model.md`, *The lifecycle* — step 5, Dispatch; `roles/goldfish.md` GF-01 — none carries credential values); "task requires secret" is a listed stop condition in briefing templates; the Critic flags credential material in dispatch artifacts.
 
 ## SEC-04 — Slopsquatting: verify every new dependency
 
 - Before adding ANY new dependency (package, action, container image, plugin), **MUST** verify: (a) it exists in the official registry under exactly that name (hallucinated names differ subtly), (b) it is the intended, maintained project (repo link, release history, download signals), (c) **the proposed VERSION is current in the registry right now — not a stale, training-cutoff version.** A model's training data freezes at a point in time; the version it "remembers" as latest may be several majors behind, deprecated, or yanked since — check the registry's actual current/recommended listing at verification time, do not pin from memory. Evidence: registry URL + version pinned.
 - **MUST** list every new dependency in the completion report under a "new dependencies" item with that evidence; **MUST NOT** slip dependencies in silently.
-- New dependencies are at least risk class MEDIUM → Critic trigger per matrix (`docs/operating-model.md` §4.2); CI actions are SHA-pinned (tooling-policy W7).
+- New dependencies are at least risk class MEDIUM → Critic trigger per matrix (`harness/review-protocol.md` §2.1, *Trigger decision table*); CI actions are SHA-pinned (tooling-policy W7).
 - **Why:** Slopsquatting is an active attack vector: adversaries register the package names AI models frequently hallucinate. A typo-level name difference is a supply-chain compromise — and a stale training-cutoff version pinned with full confidence is the same failure mode one layer down: correct name, wrong evidence.
 - **Verification:** Completion report rubric "new dependencies" filled with registry evidence; lockfile diff is part of the reviewed diff; Critic rubric contains the dependency reality check "do all new imports/packages exist under exactly that name, with registry evidence?" — landed in `plugins/pipeline-core/agents/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`, and `harness/checklists/critic-review.md`.
 
@@ -161,3 +161,28 @@ new term for this case).
   the conflation-detection case, the six-term-presence case (including a
   missing-term failure naming the term), and a clean pass against this
   repo's real docs.
+
+## SEC-10 — Threat-model scope: the guard union defends against the agent, not against a human operator
+
+- The adversary every guard/signature/ceremony mechanism in this repository
+  (git-guard union, GMW, HGO, `signature`-mode push approval) is built to
+  defend against is **the agent acting on its own or manipulated authority**
+  — never a human with legitimate machine access. **MUST NOT** propose,
+  design, or add a NEW human-facing ceremony, key, or approval step whose
+  only stated benefit is resistance against a human operator (e.g. a second
+  PO-held signing key, a per-release human signing ceremony) — that is
+  outside this pipeline's threat model, not a stronger version of it.
+  ADR-0056 `signature` mode's existing detached-signature burden is already
+  at the accepted ceiling for human-facing friction; a new proposal that
+  would add to it needs the PO's explicit, threat-model-aware sign-off,
+  never an Elephant default.
+- **Why:** PO ruling (2026-08-07, verbatim): *"PO schlüssel?! ne jetzt
+  übertreiben wir hier wieder! wir sichern den agenten ab und nicht den
+  human. Das signieren ausserhalb ist schon heftig genug."* — stated while
+  rejecting a proposed second PO-held release-signing key, and generalized
+  by the PO as a standing scope rule for this repository's guard work, not
+  a one-off rejection of that specific proposal.
+- **Verification:** A design/ADR proposing a new human-facing signing/
+  approval mechanism names, explicitly, which agent-side threat it closes;
+  a proposal whose only justification is human-adversary resistance is a
+  SEC-10 violation to flag at design review or Critic review.

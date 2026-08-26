@@ -10,9 +10,19 @@ due: 2026-09-06
 expires: 2026-09-06
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_commit: "864c7f1f84b5e0a874e360bf26e168fa92f14aaf"
 closure_evidence: "backlog/items/2026-08-07-onboarding-restart-flow-is-codex-only-not-runner-aware.md"
 ---
+
+**Merge note (2026-08-26):** frontmatter `closure_commit` corrected from
+`badde56d93ef9f792e31820d111238d4ff64d594` (Nova's generic 14-item bulk
+backlog-close commit, "docs(backlog): close 14 items already fixed in
+Phoenix or superseded by Nova") to `864c7f1f84b5e0a874e360bf26e168fa92f14aaf`
+("fix(onboarding): a Claude-onboarded project reaches its kickoff instead
+of a Codex dead end") — the ledger's reconciled evidence.commit for this
+item and the commit whose message actually names this exact defect.
+Corrected to agree with the transition ledger's final `evidence.commit` for
+this item (VFX-BACKLOG, `backlog-state-check`).
 
 # Onboarding restart flow always launches Codex, regardless of the active runner
 

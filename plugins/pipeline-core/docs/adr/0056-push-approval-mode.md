@@ -7,6 +7,8 @@ grundsätzlich ja aber die externe Signierung muss konfigurierbar sein also entw
 human gate per chat oder harte Freigabe extern mit Signatur und das per
 pipeline.user.yaml oder so konfiguriert"*. **Refines** [ADR-0055](0055-critical-human-proof-waiver.md).
 
+**Governs:** pipeline.user.yaml, project/critical-human-proof.json, project/pipeline-state.json, plugins/pipeline-core/hooks/guard-push.mjs
+
 ## Context
 
 [ADR-0055](0055-critical-human-proof-waiver.md) gave the Ed25519 gate an off-switch,
@@ -232,6 +234,29 @@ this sprint has already paid for twice.
 
 - `deploy` and `publication` have no source-of-truth mode. If an operator ever asks
   for one, the shape is already proven here.
+- **Extended, 2026-08-11 (PO instruction, verbatim): "jetzt als Implementierung
+  umsetzen auch gerne mit der selben Schlüssel Ed vs Chat Logik"** — build P-AC-08's
+  missing `feature-package-reconcile` approval wiring now, reusing the same key
+  (the committed `trustAnchor` in `project/critical-human-proof.json`, unchanged
+  and un-widened — this repository already has one) and the same signature/chat
+  mode shape this ADR proves. This is exactly the case decision 7's Follow-up
+  bullet above anticipated for `deploy`/`publication`, now asked for a fifth
+  action kind. **Decided: a new `gates.reconcile_approval` key**, same shape as
+  `gates.push_approval` (`"signature"` default, `"chat"` alternative, same
+  fail-closed-on-unparseable/uncommitted/symlinked rules) — not an overload of
+  `gates.push_approval` itself, because reconcile and push are different actions
+  an operator may reasonably want different modes for, and decision 5's "the
+  source wins, a contradiction fails closed" logic is written in terms of one
+  action kind owning one key. `feature-package-reconcile`'s approval gate
+  (`deps.featurePackageReconcileApproval` in `scripts/pipeline-state.mjs`) is
+  its own always-on dependency injection point, not routed through
+  `criticalProofWaiverFor`/`CRITICAL_ACTION_KINDS` at all today — so this does
+  not require adding a kind to `project/critical-human-proof.json`'s
+  `requiredKinds` (a kernel-path edit, GMW-gated); it only reads that file's
+  already-public, already-committed `trustAnchor`, unchanged. Scoped to
+  `feature-package-reconcile` only. `continuity-authority-revision-apply`'s
+  identical `deps.authorityRevisionApproval` gap is a separate criterion's
+  problem, explicitly not touched by this amendment.
 - The `chat` mode makes a session-level attestation plausible (a signed session
   transcript reference, say). Not built, not needed for the ask.
 - **Closed, from the T5 Critic (F4), 2026-08-18.** Decision 5 used to describe the
@@ -244,3 +269,55 @@ this sprint has already paid for twice.
   was not brought onto decision 7's rebuild-and-verify. It is not weaker for it — the
   executor verifies externally at consumption — but the two now differ in shape, and one
   shape would be better than two.
+
+## Correction — 2026-08-16: the trust anchor is a SET, and this repository's is empty
+
+This ADR says in three places that the committed `trustAnchor` is a single key and is
+"unchanged and un-widened". Both halves have since stopped being true for this
+repository, and the ADR is corrected here rather than left to read as current.
+
+**What changed.** `project/critical-human-proof.json` was migrated from schema
+`pipeline.critical-human-proof-policy.v1` (one `trustAnchor` object) to `.v3`
+(`trustAnchors`, a SET), with the set left **empty**. The installed plugin build already
+implements v3: `verifyAgainstTrustAnchors` has exactly two postures — an absent or empty
+set means "any well-formed Ed25519 key may sign", and a non-empty set enforces membership
+by BOTH `keyReference` and `publicKeySha256`, a lone v1/v2 anchor being wrapped as a set
+of one. The migration is therefore a data change only; no plugin code moved.
+
+**Why.** The trust anchor had been rotated on 2026-08-11 to a key that exists on only one
+of the two machines this repository runs on, which made every signature step —
+`feature-package-reconcile`, the Guard Maintenance Window, and the push approval itself —
+unsatisfiable on the other. Pinning per-machine keys instead would have required editing
+this very policy file for every new machine, and that file is gate-strength-protected, so
+the fix for "I cannot sign" would itself have needed a signature.
+
+**What this does and does not weaken, stated plainly, because decision 4 sets the
+precedent for saying so.** The detached-proof requirement is untouched: a push still needs
+a real Ed25519 proof over the intent, verified cryptographically. What is gone is the
+*identity* pinning — the proof no longer has to come from one named key.
+
+That is deliberate and it is not a hole, because **this guard family bounds agents, not
+humans.** An agent still cannot produce the clearance: the proof file must live at an
+absolute path strictly outside the repository root, and `GUARD-CROSS-REPO-MUTATION`
+refuses an agent every write there. A human with access to the machine could always
+change any file, guard or no guard — protecting against that was never this system's job,
+and the PO has now said so twice, here and in rejecting
+`backlog/items/2026-08-10-guard-testpath-not-kernel-protected-like-its-sibling.md` on the
+same reasoning.
+
+**Two operational consequences, measured rather than assumed:**
+
+1. `pipeline-state.mjs` gates only on the singular `policy.trustAnchor`, in the installed
+   build as well as the repository copy. Under a v3 document that field is `null`, so its
+   approval-time anchor check silently stops applying and enforcement moves entirely to
+   the guard's own verify path. Not a hole — the guard still enforces the set — but the
+   failure moves from approval time to push time, which is exactly the late-discovery
+   problem that check's own comment says it exists to prevent.
+2. The repository-local `lib/critical-human-proof-policy.mjs` does not know v3 at all and
+   returns `CRITICAL-PROOF-POLICY-INVALID` for the migrated document, fail-closed.
+   Ceremonies must therefore run the installed plugin's copy of `pipeline-state.mjs`, not
+   the repository's, until the branch takes the v3 library. The PO's decision is to wait
+   for the next 0.5.5 candidate rather than port it here.
+
+**Authority.** PO decision and PO-executed edit, 2026-08-16 (`0d3d9bcc`). Recorded by the
+Elephant of the same session; the ADR's own decisions 1-7 are otherwise unchanged.

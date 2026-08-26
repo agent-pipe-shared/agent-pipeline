@@ -9,9 +9,19 @@ due: 2026-09-06
 source: "PO request in the 2026-08-07 Nova session for a deliberate confirmation before PIN entry, explicitly qualified as language-profile dependent; partially delivered by NOVA-PO-CONFIRM-1 in commits 5efb0f1 and 584a598."
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_commit: "598a8388a819086a10a649ff696b2a5b925b6fec"
 closure_evidence: "backlog/items/2026-08-07-human-authorization-prompts-ignore-the-configured-language-profile.md"
 ---
+
+**Merge note (2026-08-26):** frontmatter `closure_commit` corrected from
+`badde56d93ef9f792e31820d111238d4ff64d594` (Nova's generic 14-item bulk
+backlog-close commit, "docs(backlog): close 14 items already fixed in
+Phoenix or superseded by Nova") to `598a8388a819086a10a649ff696b2a5b925b6fec`
+("feat(po-approval): speak the configured language in the pre-signature
+prompt") — the ledger's reconciled evidence.commit for this item and the
+commit whose message actually names this exact defect. Corrected to agree
+with the transition ledger's final `evidence.commit` for this item
+(VFX-BACKLOG, `backlog-state-check`).
 
 # The pre-signature confirmation prompt is English-only and ignores `runtime.humanFacingLanguage`
 

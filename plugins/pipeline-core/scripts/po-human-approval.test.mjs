@@ -204,7 +204,7 @@ test("setup fresh-key creation with a custom --key-reference prints the H-AC-11 
   const dirs = fixtureDirs();
   try {
     const output = captureStdout(() => {
-      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name"], { spawn: fakeSetupSpawn });
+      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name", "--human-name", "Test Operator"], { spawn: fakeSetupSpawn });
       assert.equal(result.ok, true);
       assert.equal(result.authority.keyReference, "roa-full-name");
       assert.equal("recovered" in result, false);
@@ -220,7 +220,7 @@ test("setup fresh-key creation with the default --key-reference (local-po-key) d
   const dirs = fixtureDirs();
   try {
     const output = captureStdout(() => {
-      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn });
+      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"], { spawn: fakeSetupSpawn });
       assert.equal(result.ok, true);
       assert.equal(result.authority.keyReference, "local-po-key");
     });
@@ -236,10 +236,10 @@ test("setup's recovered branch (private+public key exist, no authority yet) does
     // First run creates the key pair with the default reference; drop the
     // authority file it wrote so the next `setup` call takes the "recovered"
     // branch (privateKey && publicKey && !authority).
-    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory], { spawn: fakeSetupSpawn });
+    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--human-name", "Test Operator"], { spawn: fakeSetupSpawn });
     rmSync(join(dirs.directory, "trust-policy.json"), { force: true });
     const output = captureStdout(() => {
-      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name"], { spawn: fakeSetupSpawn });
+      const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name", "--human-name", "Test Operator"], { spawn: fakeSetupSpawn });
       assert.equal(result.ok, true);
       assert.equal(result.recovered, true);
       assert.equal(result.authority.keyReference, "roa-full-name");
@@ -256,7 +256,7 @@ test("setup's already-exists branch (matching trust policy already present) does
     // First run creates the key pair and an authority bound to a custom
     // reference; a second `setup` call with the SAME reference must take the
     // "already exists" branch (all three present, values match).
-    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name"], { spawn: fakeSetupSpawn });
+    runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name", "--human-name", "Test Operator"], { spawn: fakeSetupSpawn });
     const output = captureStdout(() => {
       const result = runHumanApproval(["setup", "--repo-root", dirs.repoRoot, "--directory", dirs.directory, "--key-reference", "roa-full-name"], { spawn: fakeSetupSpawn });
       assert.equal(result.ok, true);
@@ -758,7 +758,13 @@ test("a fork-disposition request built by the CLI, signed with the PO key, is ac
     assert.equal(prepared.forkedEventDigests.length, 2);
     assert.notDeepEqual(prepared.candidate, FORK_CANDIDATE, "the candidate must be the derived one, never a repository commit/tree");
 
-    const written = JSON.parse(readFileSync(join(dirs.directory, "request-critical-governance-fork-disposition.json"), "utf8"));
+    // dirs.fingerprint is the SAME full derivePoGateRepositoryFingerprint() digest
+    // po-human-approval.mjs computes for this real-git fixture (via discoverRepository's
+    // commonDir/primaryRoot, mirrored by resolveGitCommonDir there); only the first 12
+    // hex chars land in filenames (PO-KEYDIR-01(B)) -- repositoryFingerprintFor() below
+    // assumes a non-git tmpdir fixture and would be wrong here.
+    const forkFp = dirs.fingerprint.slice(0, 12);
+    const written = JSON.parse(readFileSync(join(dirs.directory, `request-${forkFp}-critical-governance-fork-disposition.json`), "utf8"));
     assert.equal(written.action.kind, "governance-fork-disposition");
     assert.equal(written.action.subjectSha256, prepared.subjectSha256);
 
@@ -825,7 +831,7 @@ test("approve-fork-disposition refuses a tampered approvalIntent before any sign
     const { authority } = keyFixture(dirs.directory);
     declareTrustAnchor(dirs.repoRoot, authority);
     await runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, ["--expires-at", FAR_FUTURE])], {});
-    const requestPath = join(dirs.directory, "request-critical-governance-fork-disposition.json");
+    const requestPath = join(dirs.directory, `request-${dirs.fingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`);
     const request = JSON.parse(readFileSync(requestPath, "utf8"));
     // action.kind/action.subjectSha256 stay correct (they pass the earlier
     // check at :419-421); only the approvalIntent's own authority field is
@@ -852,6 +858,7 @@ test("prepare-critical keeps composing push/deploy/publication requests exactly 
     writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
     const observed = { commit: "d".repeat(40), tree: "e".repeat(40) };
     const subjectSha256 = "a".repeat(64);
+    const fp = repositoryFingerprintFor(dirs.repoRoot);
     for (const kind of ["push", "deploy", "publication"]) {
       const result = runHumanApproval([
         "prepare-critical", "--repo-root", dirs.repoRoot, "--directory", dirs.directory,
@@ -867,7 +874,7 @@ test("prepare-critical keeps composing push/deploy/publication requests exactly 
         specBytes: Buffer.from("spec bytes\n", "utf8"),
         action: { kind, subjectSha256, expiresAt: FAR_FUTURE },
       });
-      assert.deepEqual(JSON.parse(readFileSync(join(dirs.directory, `request-critical-${kind}.json`), "utf8")), expected, "real repository file bytes and the caller-supplied subject digest, unchanged");
+      assert.deepEqual(JSON.parse(readFileSync(join(dirs.directory, `request-${fp}-critical-${kind}.json`), "utf8")), expected, "real repository file bytes and the caller-supplied subject digest, unchanged");
     }
     // The fork-locating flags stay unknown to every pre-existing command.
     assert.throws(() => runHumanApproval([
@@ -886,7 +893,7 @@ test("the -critical trio refuses the fork-disposition kind, so no operator route
     writeFileSync(join(dirs.repoRoot, "plan.md"), "plan bytes\n");
     writeFileSync(join(dirs.repoRoot, "spec.md"), "spec bytes\n");
     const prepared = await runForkDispositionApproval(["prepare-fork-disposition", ...forkArgs(dirs, ["--expires-at", FAR_FUTURE])], {});
-    const requestPath = join(dirs.directory, "request-critical-governance-fork-disposition.json");
+    const requestPath = join(dirs.directory, `request-${dirs.fingerprint.slice(0, 12)}-critical-governance-fork-disposition.json`);
     const before = readFileSync(requestPath, "utf8");
 
     // The exact escape route: the CORRECT receipt's subject digest, copied into

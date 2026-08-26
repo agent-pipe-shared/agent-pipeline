@@ -4666,13 +4666,22 @@ function runFeaturePackageReconcileTests() {
   mkdirSync(join(dir, "specs", "sprint-nova-epic", "implementation"), { recursive: true });
   const threatModelText = "fixture threat model\n";
   writeFileSync(join(dir, "specs", "sprint-nova-epic", "implementation", "critical-action-authorization-threat-model.md"), threatModelText);
+  // approve-push resolves the bound threat-model artifact at the single fixed
+  // project/push-threat-model.md path (resolvePushThreatModelArtifact,
+  // PUSH_THREAT_MODEL_DEFAULT_PATH) BEFORE verifyCriticalHumanProof's requiredKinds
+  // check ever runs -- an absent artifact refuses byte-null with
+  // CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE, short-circuiting this test's own target
+  // refusal. This fixture materializes that artifact so the invocation reaches the
+  // SAME point a real operator invocation would reach it, matching
+  // critical-human-proof-gate.test.mjs's own real-proof fixture shape.
+  writeFileSync(join(dir, "project", "push-threat-model.md"), threatModelText);
   writeFileSync(join(dir, "project", "critical-human-proof.json"), JSON.stringify({ schema: "pipeline.critical-human-proof-policy.v1", requiredKinds: ["deploy"] }));
   // No project/pipeline-state.json is seeded: verifyCriticalHumanProof's requiredKinds
   // check is the FIRST thing it does, before state is ever consulted, so this refusal is
   // reached (and state stays genuinely absent, not merely untouched) with no state file
   // at all -- exactly like PS10/PS11's existing approve-push fixtures.
   const pushTarget = { remote: "origin", destination: "refs/heads/main" };
-  const threatModel = { path: "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md", sha256: sha256Hex(threatModelText) };
+  const threatModel = { path: "project/push-threat-model.md", sha256: sha256Hex(threatModelText) };
   const candidate = PAC08_CANDIDATE;
   const subjectSha256 = criticalActionSubjectSha256({ kind: "push", candidate, subject: { sourceCommit: candidate.commit, ...pushTarget, threatModel } });
   const request = createCriticalActionApprovalRequest({

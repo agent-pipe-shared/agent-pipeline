@@ -371,6 +371,16 @@ if (isAbsolute(filePath)) {
 relPath = posix.normalize(relPath.replace(/\\/g, "/"));
 const normalizedPath = normalize(relPath);
 
+// ---- scratch/: UNCONDITIONAL allow, before any gate evaluation ---------------------
+// Mirrors lib/guard-devplan-policy.mjs's devPlanGateVerdict() (the source of truth the
+// shell lane -- GUARD-DEVPLAN-SHELL -- calls directly): scratch/ is the Pipeline's own
+// shipped scratch location and must never be gated, not even by the neutral-State
+// private-cleanup-identity refusal or ledger-authority resolution below (VFX-GUARDS
+// reconciliation -- this hook's PHX-restored ledger-authority/close-artifact logic ran
+// its checks before scratch/ was ever considered, diverging from the lib the shell lane
+// still uses).
+if (normalizedPath.startsWith("scratch/")) process.exit(0);
+
 // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
 const manifestResult = loadManifest(projectDir);
 if (manifestResult.status === "absent") process.exit(0);

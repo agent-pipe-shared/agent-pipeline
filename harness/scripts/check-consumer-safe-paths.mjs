@@ -123,6 +123,22 @@ export const VENDORED_CANON_ALLOWLIST = Object.freeze([
   // templates/prompts/elephant-kickoff.md (lines 5, 87)
   { file: "plugins/pipeline-core/templates/prompts/elephant-kickoff.md", match: "harness/session-", reason: vendoredCanonAllowlistReason("templates/prompts/elephant-kickoff.md") }, // L5
   { file: "plugins/pipeline-core/templates/prompts/elephant-kickoff.md", match: "harness/scripts/", reason: vendoredCanonAllowlistReason("templates/prompts/elephant-kickoff.md") }, // L87
+
+  // --- Phoenix/Nova merge reconciliation (VFX-MISC, 2026-08-26): Phoenix
+  // split `docs/operating-model.md`'s trigger-matrix content out into a new
+  // `harness/review-protocol.md`; the vendored citing files above (and one
+  // newly-vendored doc) picked up new citations to it in the merge. Each
+  // entry below is Class B for the same reason as the surrounding
+  // VENDORED_CANON_ALLOWLIST entries: a byte-identical vendored copy citing
+  // this repository's own canon in its self-application voice, not a new
+  // consumer-facing instruction.
+  { file: "plugins/pipeline-core/guardrails/git.md", match: "harness/review-protocol.md` §2.1, *Trigger decision table*)", reason: vendoredCanonAllowlistReason("guardrails/git.md") },
+  { file: "plugins/pipeline-core/guardrails/security.md", match: "harness/review-protocol.md` §2.1, *Trigger decision table*", reason: vendoredCanonAllowlistReason("guardrails/security.md") },
+  { file: "plugins/pipeline-core/roles/critic.md", match: "harness/review-protocol.md` §2.1", reason: vendoredCanonAllowlistReason("roles/critic.md") },
+  { file: "plugins/pipeline-core/roles/elephant.md", match: "harness/review-protocol.md` §2.1", reason: vendoredCanonAllowlistReason("roles/elephant.md") },
+  { file: "plugins/pipeline-core/roles/elephant.md", match: "`+`harness/`", reason: vendoredCanonAllowlistReason("roles/elephant.md") },
+  { file: "plugins/pipeline-core/templates/prompts/elephant-kickoff.md", match: "harness/review-protocol.md` §2.1 trigger decision table", reason: vendoredCanonAllowlistReason("templates/prompts/elephant-kickoff.md") },
+  { file: "plugins/pipeline-core/docs/push-release-flow.md", match: "node harness/scripts/check-doc-reconciliation.mjs", reason: vendoredCanonAllowlistReason("docs/push-release-flow.md") },
   // templates/prompts/goldfish-task.md (line 8)
   { file: "plugins/pipeline-core/templates/prompts/goldfish-task.md", match: "harness/", reason: vendoredCanonAllowlistReason("templates/prompts/goldfish-task.md") }, // L8
   // templates/prompts/kickoff-new-project.md (lines 4, 57, 115, 122, 227)
@@ -399,6 +415,63 @@ export const ALLOWLIST = Object.freeze([
     match: "wired into `harness/scripts/verify.mjs`",
     reason:
       "Class B: header doc comment describing this standalone diagnostic's own relationship to the calibrated Verify gate (deliberately not registered in it), not a consumer-facing path assumption.",
+  },
+
+  // --- Phoenix/Nova merge reconciliation (VFX-MISC, 2026-08-26): new
+  // content that entered the plugin tree during the merge, each classified
+  // per the module doc comment's A/B/C taxonomy.
+  {
+    file: "plugins/pipeline-core/skills/close-block/SKILL.md",
+    match: "harness/review-protocol.md` §2.1, *Trigger decision table*",
+    reason: "Class B: bare parenthetical citation to the trigger-matrix source, not a runtime command a consumer executes.",
+  },
+  {
+    file: "plugins/pipeline-core/hooks/guard-devplan.mjs",
+    match: "harness/scripts/pipeline-state.mjs` is out of scope for this",
+    reason: "Class B: source comment (doc block), not an operator-facing message.",
+  },
+  {
+    file: "plugins/pipeline-core/hooks/guard-devplan.mjs",
+    match: "harness/scripts/pipeline-state.mjs, never by hand)",
+    reason:
+      "Class A: constructed WARN message returned to the operator naming harness/scripts/pipeline-state.mjs (source-only). Same defect class as setup-check.mjs's existing Class A entry above; not fixed by this dispatch -- deferred to the follow-up remediation.",
+  },
+  {
+    file: "plugins/pipeline-core/hooks/guard-devplan.mjs",
+    match: "node harness/scripts/pipeline-state.mjs approve-plan --by <name> ",
+    reason:
+      "Class A: constructed verdict message returned to the operator naming harness/scripts/pipeline-state.mjs (source-only). Same defect class as the WARN-message entry above; not fixed by this dispatch -- deferred.",
+  },
+  {
+    file: "plugins/pipeline-core/hooks/guard-el01-tripwire.mjs",
+    match: "rewrite only via harness/scripts/pipeline-state.mjs, never by hand",
+    reason:
+      "Class A: constructed WARN message returned to the operator naming harness/scripts/pipeline-state.mjs (source-only). Same defect class as guard-devplan.mjs's analogous WARN message above; not fixed by this dispatch -- deferred.",
+  },
+  {
+    file: "plugins/pipeline-core/lib/decision-reference-dual-evaluation.mjs",
+    match: "harness/scripts/pipeline-state.mjs` and any",
+    reason: "Class B: source comment (doc block), not an operator-facing message.",
+  },
+  {
+    file: "plugins/pipeline-core/lib/external-push-ledger.mjs",
+    match: "harness/scripts/pipeline-state-external-push-ledger.test.mjs",
+    reason: "Class B: source comment citing this repository's own test file path, not an operator-facing message.",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/clean-candidate-run.mjs",
+    match: "harness/scripts/verify.mjs`'s candidate preflight",
+    reason: "Class B: source comment, not an operator-facing message.",
+  },
+  {
+    file: "plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs",
+    match: "harness/scripts/security-adapters/gitleaks.mjs`, also three directories deep",
+    reason: "Class B: source comment (VFX-SECURITY, 2026-08-26) citing this file's pre-merge Phoenix-branch location for the arithmetic-correction explanation, not an operator-facing message.",
+  },
+  {
+    filePattern: /^plugins\/pipeline-core\/scripts\/phoenix-authority-revision\.mjs$/u,
+    reason:
+      "Class unclear: imports pipelineState from harness/scripts/pipeline-state.mjs by relative path. Whether this proof-gated continuity-authority-revision wrapper is ever consumer-invoked (vs. self-application-only maintenance tooling run from this repository's own checkout, matching the same-shaped scripts already marked Class B self-application-only above) was not confidently determined within this dispatch's budget -- left for the follow-up dispatch's judgment rather than guessed.",
   },
 ]);
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
-import * as gitleaks from "../security-adapters/gitleaks.mjs";
-import * as osv from "../security-adapters/osv-scanner.mjs";
-import * as semgrep from "../security-adapters/semgrep.mjs";
+import * as gitleaks from "../../../plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs";
+import * as osv from "../../../plugins/pipeline-core/scripts/security-adapters/osv-scanner.mjs";
+import * as semgrep from "../../../plugins/pipeline-core/scripts/security-adapters/semgrep.mjs";
 import { sameExecutable, sha256 } from "./tool-identity.mjs";
 
 const ADAPTERS = Object.freeze({ gitleaks, "osv-scanner": osv, semgrep });

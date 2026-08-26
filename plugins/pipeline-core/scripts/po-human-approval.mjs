@@ -1306,7 +1306,16 @@ export async function runForkDispositionApproval(argv = process.argv.slice(2), d
   if (!FORK_DISPOSITION_COMMANDS.has(args.command)) fail(USAGE);
   const repository = resolve(args.repoRoot);
   const directory = externalDirectory(repository, resolve(args.directory), { create: args.command === "prepare-fork-disposition" });
-  const suffix = `-critical-${GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind}`;
+  // PO-KEYDIR-01(B): every per-transaction artifact filename this command writes must
+  // carry the same repository-fingerprint segment executeHumanApproval() computes for
+  // the SAME repoRoot/directory/kind -- approve-fork-disposition delegates signing into
+  // that shared function (below), which independently derives this exact fingerprint
+  // for the paths it looks up; a mismatch here means prepare/verify write and read one
+  // filename while approve looks for another, silently reporting "run setup and prepare
+  // before approving" even though prepare just ran.
+  const gitCommonDir = resolveGitCommonDir(repository, dependencies);
+  const repositoryFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: gitCommonDir ?? repository, primaryRoot: repository }).slice(0, 12);
+  const suffix = `-${repositoryFingerprint}-critical-${GOVERNANCE_FORK_DISPOSITION_APPROVAL.kind}`;
   const paths = {
     request: artifactPath(directory, `request${suffix}.json`),
     authority: artifactPath(directory, "trust-policy.json"),

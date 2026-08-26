@@ -4,11 +4,11 @@
   "files": [
     {
       "path": "harness/review-protocol.md",
-      "rawSha256": "8872a2748efca541beddefab51d318850fe9226abdeedee4d229f003bad157b8"
+      "rawSha256": "fc516b411382861d4ad248cf7f491dccded2c7e9349f01493d2983c50d00bbd9"
     },
     {
       "path": "plugins/pipeline-core/agents/critic.md",
-      "rawSha256": "506ceb6fda45f39455f272342a4158df3827b8340835351c0ddbe37f23ace565"
+      "rawSha256": "3a293cf1657bfda4a36a5d05c84664088c3e8f2873873bbe3e9eb51eb10a2085"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
@@ -32,11 +32,11 @@
     },
     {
       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
-      "rawSha256": "c37b742126c5d249d4095c7ce25b5438e7a3661920526cba1e7b2f963f792896"
+      "rawSha256": "3b56934f3644bd855b197f2a23e7ae3e1eaf331f848657c1c0094298fc6c279d"
     },
     {
       "path": "roles/critic.md",
-      "rawSha256": "d8067862aac6b676684f57e506eeb6c6ae209af36588994622ad3be5c0eaef03"
+      "rawSha256": "68e6d94752a9f7d28f8fa8510ee5d501735e926863065611b1f4238dcc8362f9"
     }
   ]
 }

@@ -85,10 +85,15 @@ const MAX_IGNORE_BYTES = 256 * 1024;
 // config must NOT be sourced from that untrusted, not-yet-approved tree (the same reasoning
 // security-scan.mjs already applies to a candidate-supplied manifest path -- a candidate commit
 // must never be able to smuggle its own scanner-config override). This adapter file's path is
-// fixed at `harness/scripts/security-adapters/gitleaks.mjs`, three directories below the repo
-// root, so `../../../.gitleaks.toml` from this file's own directory is the repo root's config,
+// fixed at `plugins/pipeline-core/scripts/security-adapters/gitleaks.mjs`, FOUR directories below
+// the repo root (VFX-SECURITY, 2026-08-26: corrected from three -- the original PHX-WP-GITLEAKS-
+// RULE-SCOPE comment assumed this file's pre-merge Phoenix location,
+// `harness/scripts/security-adapters/gitleaks.mjs`, also three directories deep but under a
+// different top-level dir; the Nova/Phoenix merge relocated the file one directory deeper without
+// updating this arithmetic, so it resolved to `plugins/.gitleaks.toml`, which does not exist), so
+// `../../../../.gitleaks.toml` from this file's own directory is the repo root's config,
 // regardless of what `rootDir` points at for any given run.
-const GITLEAKS_CONFIG_PATH = pathJoin(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", ".gitleaks.toml");
+const GITLEAKS_CONFIG_PATH = pathJoin(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "..", ".gitleaks.toml");
 
 function sha256(value) {
   return createHash("sha256").update(value).digest("hex");

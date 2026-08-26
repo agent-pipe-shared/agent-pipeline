@@ -10,9 +10,19 @@ due: 2026-09-06
 expires: 2026-09-06
 closed_at: "2026-08-18"
 closure_repository: "self"
-closure_commit: "badde56d93ef9f792e31820d111238d4ff64d594"
+closure_commit: "4d19def0ac9e5c2c6112b72e923bb95b6400be28"
 closure_evidence: "backlog/items/2026-08-07-guard-lifecycle-ready-rejects-plan-runtime-intent-argv.md"
 ---
+
+**Merge note (2026-08-26):** frontmatter `closure_commit` corrected from
+`badde56d93ef9f792e31820d111238d4ff64d594` (Nova's generic 14-item bulk
+backlog-close commit, "docs(backlog): close 14 items already fixed in
+Phoenix or superseded by Nova") to `4d19def0ac9e5c2c6112b72e923bb95b6400be28`
+("fix(guard-lifecycle-ready): accept the runner-plus-intent plan* argv
+shape") — the ledger's reconciled evidence.commit for this item and the
+commit whose message actually names this exact defect. Corrected to agree
+with the transition ledger's final `evidence.commit` for this item
+(VFX-BACKLOG, `backlog-state-check`).
 
 # `guard-lifecycle-ready.mjs` rejects the Pipeline's own `plan-runtime`/`plan-repair`/etc. `nextAction` whenever `intent` is not `"onboarding"`
 

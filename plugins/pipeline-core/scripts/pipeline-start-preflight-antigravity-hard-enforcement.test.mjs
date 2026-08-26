@@ -233,7 +233,8 @@ test("Codex preflight output keys are unchanged by this addition (byte-identical
     observeAntigravityHardEnforcementFn: spy,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "bootstrapPayload", "executionBoundary", "handoff", "installedSource", "installedVersion",
-    "nextAction", "pluginRoot", "schema", "status", "statusScope", "version",
+    "bootstrapPayload", "concurrentSessionWarning", "executionBoundary", "handoff", "installedSource",
+    "installedVersion", "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "statusScope",
+    "version",
   ]);
 });

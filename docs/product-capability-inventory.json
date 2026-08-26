@@ -269,12 +269,6 @@
       "member": "PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\""
     },
     {
-      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
-      "kind": "hook",
-      "path": "plugins/pipeline-core/hooks/hooks.json",
-      "member": "PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\""
-    },
-    {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
@@ -2171,6 +2165,18 @@
       "member": "observation-governance-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-consent-guard-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "onboarding-consent-guard-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-consent-mark-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "onboarding-consent-mark-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-consent-marker-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2265,6 +2271,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "phoenix-governance-threat-model-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-antigravity-hard-enforcement-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-start-preflight-antigravity-hard-enforcement-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
@@ -2475,6 +2487,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "private-overlay-runtime-projection-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:protected-test-paths-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "protected-test-paths-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
@@ -3367,7 +3385,6 @@
         "guard:plugins/pipeline-core/hooks/guard-el01-tripwire.mjs:guard-el01-tripwire",
         "guard:plugins/pipeline-core/hooks/guard-gate-strength.mjs:guard-gate-strength",
         "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
-        "guard:plugins/pipeline-core/hooks/guard-handover-size.mjs:guard-handover-size",
         "guard:plugins/pipeline-core/hooks/guard-onboarding-consent-lock.mjs:guard-onboarding-consent-lock",
         "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
         "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
@@ -3377,11 +3394,9 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-el01-tripwire.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-gate-strength.mjs\"",
-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-handover-size.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\" --runner claude",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-onboarding-consent-lock.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write|NotebookEdit:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
-        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Task|Agent|Workflow:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-dispatch.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
@@ -3793,6 +3808,7 @@
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-authority-approval-tests",
         "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-antigravity-hard-enforcement-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-scratch-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",

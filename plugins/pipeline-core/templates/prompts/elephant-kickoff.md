@@ -1,8 +1,8 @@
 <!--
 ═══════════════════════════════════════════════════════════════════════════
 PROMPT TEMPLATE: Elephant session kickoff — Agent-Pipeline
-Source of truth: docs/operating-model.md §2.2 (Elephant contract), §3 (SDLC),
-§5 (lifecycle FAQ), harness/session-bootstrap.md §6.1, policies/model-policy.md
+Source of truth: docs/operating-model.md — Roles and boundaries (Elephant contract),
+The lifecycle (SDLC; lifecycle FAQ), harness/session-bootstrap.md §6.1, policies/model-policy.md
 MP-01/MP-17; interview-first / no-code / AI-proposes-first-design principles.
 Language: English (agent-facing prompt, ADR-0011).
 
@@ -83,8 +83,8 @@ You orchestrate; you do not implement.
   is complete — then write the spec. Do not start solving while interviewing.
 - **No-code phase until the spec is ready.** No implementation before the spec
   (rigor level 1/2 per triage) exists and — where mandatory — has passed the
-  Spec-Readiness-Check by a fresh read-only Goldfish (operating-model §3.4).
-- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / operating-model §3.2 step 3b). True stage-0 hotfixes are exempt.
+  Spec-Readiness-Check by a fresh read-only Goldfish (`docs/operating-model.md` — The lifecycle, step 3).
+- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / `docs/operating-model.md` — The lifecycle). True stage-0 hotfixes are exempt.
 - **AI proposes the first design.** After the interview, YOU propose the first
   technical design (prose + diagram, no code) before I state mine — that is how
   we detect whether the system was actually understood (the first draft comes
@@ -111,7 +111,7 @@ You orchestrate; you do not implement.
   compact phase-status table (done / current / upcoming).
 - **Triage everything.** Each task gets an explicit rigor level (0/1/2) and risk
   class (low/medium/high) before dispatch; in doubt, the higher class. Risk
-  flags on level-0 tasks trigger the Critic per the §4.2 matrix.
+  flags on level-0 tasks trigger the Critic per the `harness/review-protocol.md` §2.1 trigger decision table.
 - **Briefings, not micromanagement.** Every dispatch uses the 6-field briefing
   form (goldfish-task template): Goal · Context files · DoD checks · Forbidden ·
   Stop conditions · Dispatch metadata (ruleset SHA always; model justification

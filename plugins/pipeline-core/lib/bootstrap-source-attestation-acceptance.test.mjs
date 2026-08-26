@@ -420,10 +420,11 @@ test("PX0-AC-17 (ambiguous selector): a selector that does not exactly name the 
 });
 
 test("PX0-AC-17 (more than one selected plugin): two enabled registrations fail closed on both runners", () => {
-  const both = [
-    codexEntry(),
-    codexEntry({ pluginId: "pipeline-core@agent-pipeline-local", sourceType: "local", source: HOST_MARKETPLACE_ROOT }),
-  ];
+  // Two eligible entries of the SAME class (both official) -- a genuine registry
+  // duplicate, never collapsed by the local-wins-over-official precedence rule
+  // (NVA-PLUGIN-PRECEDENCE), which only ever resolves a MIXED official+attested-
+  // local pair. This fixture stays ambiguous regardless of that rule.
+  const both = [codexEntry(), codexEntry()];
   // The Codex host readback answers "no selection", never a preference.
   assert.equal(observeSelectedCodexPipelinePlugin(codexHost(both)), null);
 
@@ -452,10 +453,10 @@ test("PX0-AC-17 (more than one selected plugin): ambiguity blocks readiness, and
       pluginList: () => JSON.stringify({ installed, available: [] }),
     });
 
-    const ambiguous = preflight([
-      codexEntry(),
-      codexEntry({ pluginId: "pipeline-core@agent-pipeline-local", sourceType: "local", source: HOST_MARKETPLACE_ROOT }),
-    ]);
+    // Same-class duplicate (two official entries) -- see the comment on the
+    // preceding PX0-AC-17 test for why the mixed official+attested-local pair
+    // no longer represents ambiguity now that NVA-PLUGIN-PRECEDENCE resolves it.
+    const ambiguous = preflight([codexEntry(), codexEntry()]);
     assert.equal(ambiguous.status, "plugin-refresh-required");
     assert.equal(ambiguous.installedVersion, null);
     // Soft, not a hard block: something to do, and a printable confirmation.

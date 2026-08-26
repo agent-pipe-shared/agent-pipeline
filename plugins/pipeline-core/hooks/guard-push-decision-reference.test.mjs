@@ -93,14 +93,22 @@ function fingerprintFor(dir) {
 function signedPushRepo(prefix, { decisionReference, forCommitOverride } = {}) {
   const dir = freshRepo(prefix);
   const key = pushKeypair();
+
+  // The threat model file must be committed, not merely written, BEFORE `head`/`tree` are
+  // captured below: guard-push.mjs's "Methodological Agent Guard" check (VFX-GUARDS
+  // reconciliation) blocks any push while specs/, docs/, or backlog/ carries an uncommitted
+  // file -- a rule this fixture predates. Committing it here, ahead of the head/tree capture,
+  // keeps `head` equal to the real final HEAD the guard subprocess resolves at push time.
+  const threatModelBody = "# fixture threat model\n";
+  writeFile(dir, THREAT_MODEL_REL, threatModelBody);
+  gitAt(dir, "add", THREAT_MODEL_REL);
+  gitAt(dir, "commit", "-q", "-m", "threat model");
+  const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
+
   const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
   const tree = gitAt(dir, "rev-parse", `${head}^{tree}`).stdout.trim();
   writeFile(dir, ".claude/pipeline.yaml", "schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: blocking\n    type: human\n    approval: required\n");
   writeFile(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
-
-  const threatModelBody = "# fixture threat model\n";
-  writeFile(dir, THREAT_MODEL_REL, threatModelBody);
-  const threatModel = { path: THREAT_MODEL_REL, sha256: createHash("sha256").update(threatModelBody).digest("hex") };
 
   writeFile(dir, "project/critical-human-proof.json", {
     schema: "pipeline.critical-human-proof-policy.v1",

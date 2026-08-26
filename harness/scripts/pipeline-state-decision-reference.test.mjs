@@ -123,8 +123,14 @@ function pushFixture(prefix) {
   mkdirSync(join(dir, "specs", "sprint-nova-epic", "implementation"), { recursive: true });
   const threatModelBody = "fixture threat model\n";
   writeFileSync(join(dir, "specs", "sprint-nova-epic", "implementation", "critical-action-authorization-threat-model.md"), threatModelBody);
+  // approve-push resolves its bound threat-model artifact at the single fixed
+  // project/push-threat-model.md path (resolvePushThreatModelArtifact,
+  // PUSH_THREAT_MODEL_DEFAULT_PATH), BEFORE requiredKinds is even consulted -- an absent
+  // artifact refuses byte-null with CRITICAL-PROOF-BOUND-ARTIFACT-UNAVAILABLE. Materialize it
+  // here so approve-push reaches the point every PSDR* case actually exercises.
+  writeFileSync(join(dir, "project", "push-threat-model.md"), threatModelBody);
   const threatModel = {
-    path: "specs/sprint-nova-epic/implementation/critical-action-authorization-threat-model.md",
+    path: "project/push-threat-model.md",
     sha256: createHash("sha256").update(threatModelBody).digest("hex"),
   };
   const keys = generateKeyPairSync("ed25519");
