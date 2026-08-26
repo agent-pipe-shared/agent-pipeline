@@ -101,6 +101,24 @@ and reads its hook wiring from this file directly).
 
 If any hook command exits with non-zero code, Antigravity cancels tool execution and feeds the stderr error back to the agent session.
 
+**Session-start observability (AGY-HARDENFORCE-DETECT-1, 2026-08-26):** if the
+Antigravity CLI daemon cannot resolve `node` on its own `$PATH` (a background
+daemon typically does not source `.bashrc`, so an `fnm`/`nvm`-managed `node`
+is invisible to it), no hook process ever starts at all -- including
+`antigravity-start-hint.mjs`, whose `PreInvocation` firing writes the session
+bootstrap lock `.git/agent-pipeline/run/session-<id>/requires-bootstrap.lock`
+that `antigravity-pretool-guard.mjs`'s mandatory-bootstrap hard block depends
+on. There is no code fix for this from inside a hook that never runs.
+`pipeline-start-preflight.mjs` (`observeAntigravityHardEnforcement`) closes
+the resulting observability gap, not the underlying gap itself: for the
+Antigravity runner only, it scans that lock directory for the freshest write
+and, when none is fresh within a 30-minute window, surfaces a clear,
+non-blocking warning (both as a `antigravityHardEnforcement` field on the
+preflight envelope and as plain text on stderr) naming the daemon/`node`-PATH
+cause and pointing at `GEMINI.md`'s Prerequisites section. It never fires for
+Claude or Codex, and it can only ever detect the gap, never make the
+enforcement layer itself fire when the daemon cannot reach `node`.
+
 ---
 
 ## 4. Headless Execution Contract (`agy`)

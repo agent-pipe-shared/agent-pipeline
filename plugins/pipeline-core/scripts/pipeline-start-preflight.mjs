@@ -3,7 +3,7 @@
 
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -261,6 +261,100 @@ export function installedPipelineVersion(pluginList = () => readInstalledPluginL
   return installedPipelineIdentity(pluginList, runner)?.version ?? null;
 }
 
+export const ANTIGRAVITY_HARD_ENFORCEMENT_SCHEMA = "pipeline.antigravity-hard-enforcement-observation.v1";
+// 30 minutes: generous enough to absorb a slow session start (network calls, a
+// subagent dispatch chain, IDE/daemon warm-up) between the hook's own write and
+// this preflight running, while still being short enough that a lock left over
+// from an earlier, genuinely different session -- hours or days old -- reads as
+// stale rather than as evidence about the CURRENT one. See
+// observeAntigravityHardEnforcement's own doc comment for why a window is the
+// accepted substitute for an exact session match here.
+export const ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS = 30 * 60 * 1000;
+const ANTIGRAVITY_HARD_ENFORCEMENT_WARNING =
+  "pipeline-core: the Antigravity hard-enforcement layer (PreToolUse guard union) appears NOT " +
+  "to have fired this session -- no freshly written session bootstrap lock was found under " +
+  ".git/agent-pipeline/run/. This usually means the Antigravity CLI daemon could not resolve " +
+  "`node` on its $PATH, so no hook process ever started this session. See GEMINI.md's " +
+  "Prerequisites section for the known cause and workaround. This is observability only: it " +
+  "does not and cannot make the enforcement layer fire.";
+
+/**
+ * Detects -- never fixes -- whether `antigravity-start-hint.mjs` (the
+ * Antigravity `PreInvocation` hard-enforcement hook) fired at least once this
+ * session, by looking for a freshly written session bootstrap lock under
+ * `.git/agent-pipeline/run/session-<id>/requires-bootstrap.lock` -- the exact
+ * literal path that hook writes inside its try block on every successful
+ * firing (see its own source; `antigravity-pretool-guard.mjs`'s mandatory-
+ * bootstrap hard block reads the identical path). backlog item
+ * 2026-08-23-antigravity-hard-enforcement-layer-has-two-fail-open-paths.md,
+ * "Candidate future direction": if the Antigravity daemon can never resolve
+ * `node` on its `$PATH`, no hook process starts at all, so nothing inside a
+ * hook can ever detect the gap -- this check runs from the bootstrap path
+ * instead, which still executes even when every hook is inert.
+ *
+ * ANTIGRAVITY ONLY, BY DESIGN: the daemon/node-PATH fail-open this observes
+ * is specific to that runner's background-daemon architecture (GEMINI.md
+ * Prerequisites). Claude and Codex have no such daemon and no such gap --
+ * the caller must gate the call itself on `runner === "antigravity"` rather
+ * than relying on this function to no-op for other runners, so a Claude/Codex
+ * bootstrap never even reaches this code path.
+ *
+ * SESSION IDENTITY GAP (deliberate, disclosed -- see
+ * `runBootstrapScratchLifecycle`'s own doc comment above for the identical
+ * limitation in a sibling mechanism): this preflight has no session id of its
+ * own. A plain CLI bootstrap invocation reads no hook stdin, which is the only
+ * place a session id is ever delivered here, so reliably matching "this exact
+ * session's" lock file is not constructible from this call site. The accepted,
+ * disclosed substitute is a freshness-window heuristic scanning EVERY
+ * `session-<id>/requires-bootstrap.lock` under the run directory and taking the
+ * single freshest mtime: within `freshWindowMs` of `now` counts as observed;
+ * older (or absent entirely) reads exactly like "never fired," because a stale
+ * lock from a different, already-ended session is not evidence about this one.
+ *
+ * FAIL-OPEN, NEVER THROWS: a detector ABOUT enforcement inertness that itself
+ * crashes bootstrap would be strictly worse than the silent gap it exists to
+ * surface. Every filesystem read here is wrapped so any unexpected failure
+ * (run directory absent, unreadable, a raced/partial entry, a permissions
+ * error) folds into "not observed" -- the same outcome a genuine absence
+ * produces -- rather than propagating.
+ */
+export function observeAntigravityHardEnforcement({
+  rootDir = process.cwd(),
+  now = Date.now(),
+  freshWindowMs = ANTIGRAVITY_HARD_ENFORCEMENT_FRESH_WINDOW_MS,
+  readdir = readdirSync,
+  stat = statSync,
+} = {}) {
+  let freshestAgeMs = null;
+  try {
+    const runDir = resolve(rootDir, ".git", "agent-pipeline", "run");
+    const entries = readdir(runDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry?.isDirectory?.() || !entry.name.startsWith("session-")) continue;
+      try {
+        const info = stat(resolve(runDir, entry.name, "requires-bootstrap.lock"));
+        if (!info.isFile()) continue;
+        const ageMs = now - info.mtimeMs;
+        // A future mtime (clock skew, a corrupted filesystem) is never trusted
+        // as evidence of freshness -- treated the same as no usable entry.
+        if (ageMs < 0) continue;
+        if (freshestAgeMs === null || ageMs < freshestAgeMs) freshestAgeMs = ageMs;
+      } catch {
+        continue; // this one entry raced away or is unreadable; keep scanning the rest
+      }
+    }
+  } catch {
+    freshestAgeMs = null; // run directory absent, unreadable, or any other scan failure
+  }
+  const observed = freshestAgeMs !== null && freshestAgeMs <= freshWindowMs;
+  return {
+    schema: ANTIGRAVITY_HARD_ENFORCEMENT_SCHEMA,
+    observed,
+    freshWindowMs,
+    warning: observed ? null : ANTIGRAVITY_HARD_ENFORCEMENT_WARNING,
+  };
+}
+
 export function observePipelineStartPreflight({
   env = process.env,
   pluginList,
@@ -268,6 +362,7 @@ export function observePipelineStartPreflight({
   scriptUrl = import.meta.url,
   cwd = process.cwd(),
   knownMarketplaces = readClaudeKnownMarketplaces,
+  observeAntigravityHardEnforcementFn = observeAntigravityHardEnforcement,
 } = {}) {
   const pluginRoot = resolve(dirname(fileURLToPath(scriptUrl)), "..");
   // CLAUDECODE is set by every Claude Code session (main and subagent); its
@@ -337,6 +432,13 @@ export function observePipelineStartPreflight({
           },
         }
       : null,
+    // Antigravity-only, and gated at the CALL itself (not merely at the field):
+    // for Claude/Codex, observeAntigravityHardEnforcementFn is never invoked and
+    // this key is absent from the envelope entirely, keeping their output
+    // byte-identical to before this addition.
+    ...(runner === "antigravity"
+      ? { antigravityHardEnforcement: observeAntigravityHardEnforcementFn({ rootDir: cwd }) }
+      : {}),
   };
   return {
     ...result,
@@ -431,6 +533,19 @@ export function runBootstrapScratchLifecycle({
 export function main() {
   const result = observePipelineStartPreflight();
   process.stdout.write(`${JSON.stringify(result)}\n`);
+  // Antigravity-only: the structured field above already carries this, but a
+  // human watching the terminal reads stderr, not a JSON blob -- so the same
+  // non-blocking warning is also printed here in plain text. Absent entirely
+  // for Claude/Codex (the field itself is absent for them) and absent when
+  // the hard-enforcement layer WAS observed this session (nothing to warn
+  // about).
+  if (result.antigravityHardEnforcement && result.antigravityHardEnforcement.observed === false) {
+    try {
+      process.stderr.write(`${result.antigravityHardEnforcement.warning}\n`);
+    } catch {
+      // stderr unavailable; the JSON field on stdout still carries the warning.
+    }
+  }
   // Deliberately on stderr and deliberately NOT a field of the typed preflight result:
   // stdout is a parsed `pipeline.start-preflight.v1` envelope under a measured payload
   // budget, so the housekeeping receipt travels beside it rather than inside it.
