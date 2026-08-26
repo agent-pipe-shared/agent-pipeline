@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "10f49526ea86eec532944d3e6f294a67fd2c4c5fe518cc3b20f2311e3c7c7e52"
+    "transitionHead": "bd91537f7e77896b4976c6a1c5de98994c1998f3d2bcf6c0563beea558729eef"
   },
   "counts": {
-    "open": 46,
+    "open": 48,
     "in_progress": 3,
     "closed": 273
   },
@@ -1204,6 +1204,15 @@
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "deferred": false,
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-26",
+      "source": "PO observation (chat), 2026-08-26: updating a consumer repo onto the sprint_agy ruleset changes pipeline.user.yaml's expected shape; an already-onboarded repository that does not also update its own pipeline.user.yaml drifts and the pipeline breaks with no repair path.",
+      "deferred": false
     },
     {
       "id": "pipeline.explicit-final-acceptance-gate",
@@ -2952,6 +2961,15 @@
       "closureRepository": "self",
       "closureCommit": "9ae28dad3f6c9c41833e7d629fa3d1d73872d2a2",
       "closureEvidence": "backlog/items/2026-08-18-push-approval-general-mode-lane-does-not-bind-remote-or-destination.md"
+    },
+    {
+      "id": "pipeline.push-approval-record-always-trails-the-signed-commit",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-08-26",
+      "source": "PO observation, 2026-08-26, live during a routine push: 'dieses update des push standes wird jetzt aber nicht auf dem anderen pc ankommen. das ist noch eine schwäche im ablauf da die infos verloren gehen' -- caught mid-session, reproduced twice in the same push sequence.",
+      "deferred": false
     },
     {
       "id": "pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile",

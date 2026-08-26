@@ -103,6 +103,7 @@
 | pipeline.every-gate-binds-the-whole-tree-so-any-later-commit-voids-it | open | workflow-improvement | pipeline | 2026-08-16 | — |
 | pipeline.evidence-bound-review-retry-economics | closed | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | in_progress | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.existing-repos-drift-on-agy-pipeline-user-yaml-update-no-migration | open | defect | pipeline | 2026-08-26 | — |
 | pipeline.explicit-final-acceptance-gate | closed | workflow-improvement | pipeline | 2026-08-18 | — |
 | pipeline.external-public-json-cross-drive-windows-paths-are-not-recognized-as-outside-the-project-root | closed | defect | pipeline | 2026-08-17 | — |
 | pipeline.four-critic-preimage-pins-drifted-or-never-valid | closed | defect | pipeline | 2026-08-12 | — |
@@ -241,6 +242,7 @@
 | pipeline.promotion-freezes-a-prd-the-po-gate-will-reject | closed | defect | pipeline | 2026-08-08 | — |
 | pipeline.promotion-leaves-the-handover-and-the-runtime-language-frozen-at-kickoff | closed | defect | pipeline | 2026-08-09 | — |
 | pipeline.push-approval-general-mode-lane-does-not-bind-remote-or-destination | closed | defect | pipeline | 2026-08-18 | — |
+| pipeline.push-approval-record-always-trails-the-signed-commit | open | defect | pipeline | 2026-08-26 | — |
 | pipeline.push-approval-signature-ceremony-is-not-staged-by-project-profile | closed | idea | pipeline | 2026-08-09 | — |
 | pipeline.push-approval-signature-commands-also-line-wrap | closed | defect | pipeline | 2026-08-10 | — |
 | pipeline.push-approval-skill-reference-predates-adr-0061 | closed | defect | pipeline | 2026-08-09 | — |
@@ -330,6 +332,6 @@
 
 ## Counts
 
-- open: 46
+- open: 48
 - in_progress: 3
 - closed: 273
